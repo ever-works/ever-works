@@ -8,6 +8,7 @@ import type {
 } from '@ever-works/contracts/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import {
     Dialog,
     DialogClose,
@@ -38,6 +39,13 @@ function normalizeSlugPreview(value: string): string {
 
 const DEBOUNCE_MS = 300;
 const MAX_NAME_LENGTH = 200;
+/**
+ * PR-6 (domain-model evolution, review §23.5) — matches the server-side
+ * storage cap on `Organization.vision` (see `CreateOrganizationRequest`
+ * in `@ever-works/contracts/api`). Prompt-assembly consumers apply
+ * their own tighter ~2000-char injection cap.
+ */
+const MAX_VISION_LENGTH = 5000;
 
 export interface CreateOrganizationModalProps {
     open: boolean;
@@ -80,6 +88,14 @@ export function CreateOrganizationModal({ open, onOpenChange }: CreateOrganizati
     const { organizations, mutate } = useOrganizations();
 
     const [name, setName] = useState('');
+    /**
+     * PR-6 — optional company Vision. Hidden behind a secondary toggle
+     * so the create flow stays zero-friction; when provided it is sent
+     * alongside `name` and later injected (fenced, untrusted) into
+     * Idea-generation / agent-run / Mission-tick prompts.
+     */
+    const [vision, setVision] = useState('');
+    const [showVision, setShowVision] = useState(false);
     const [submitError, setSubmitError] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
     const [slugStatus, setSlugStatus] = useState<SlugStatus>({ kind: 'idle' });
@@ -98,6 +114,8 @@ export function CreateOrganizationModal({ open, onOpenChange }: CreateOrganizati
     useEffect(() => {
         if (!open) {
             setName('');
+            setVision('');
+            setShowVision(false);
             setSubmitError(null);
             setSlugStatus({ kind: 'idle' });
             setCreatedOrg(null);
@@ -168,6 +186,14 @@ export function CreateOrganizationModal({ open, onOpenChange }: CreateOrganizati
         }
         setSubmitError(null);
         wasFirstOrgRef.current = organizations.length === 0;
+        // Vision is strictly optional — omit the key entirely when the
+        // user left it blank so the POST body stays identical to the
+        // pre-PR-6 contract for the common zero-friction path.
+        const trimmedVision = vision.trim();
+        let payload: { name: string; vision?: string } = { name: trimmed };
+        if (trimmedVision.length > 0) {
+            payload.vision = trimmedVision.slice(0, MAX_VISION_LENGTH);
+        }
         startTransition(() => {
             void (async () => {
                 try {
@@ -176,7 +202,7 @@ export function CreateOrganizationModal({ open, onOpenChange }: CreateOrganizati
                         credentials: 'include',
                         cache: 'no-store',
                         headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ name: trimmed }),
+                        body: JSON.stringify(payload),
                     });
                     if (!res.ok) {
                         const body = await res
@@ -234,7 +260,7 @@ export function CreateOrganizationModal({ open, onOpenChange }: CreateOrganizati
                 }
             })();
         });
-    }, [name, organizations.length, mutate, onOpenChange, router, t]);
+    }, [name, vision, organizations.length, mutate, onOpenChange, router, t]);
 
     const handleUpgradeDialogClose = useCallback(
         (didUpgrade: boolean) => {
@@ -297,6 +323,35 @@ export function CreateOrganizationModal({ open, onOpenChange }: CreateOrganizati
                                 t={t}
                                 hasName={name.trim().length > 0}
                             />
+
+                            {/*
+                             * PR-6 — optional, collapsed-by-default Vision.
+                             * Secondary affordance on purpose: creating an
+                             * Organization must stay a single-field flow.
+                             */}
+                            {!showVision ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowVision(true)}
+                                    disabled={pending}
+                                    data-testid="vision-toggle"
+                                    className="text-xs text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark underline underline-offset-2 transition-colors"
+                                >
+                                    {t('visionToggle')}
+                                </button>
+                            ) : (
+                                <Textarea
+                                    label={t('visionLabel')}
+                                    value={vision}
+                                    onChange={(e) => setVision(e.target.value)}
+                                    placeholder={t('visionPlaceholder')}
+                                    helperText={t('visionHelp')}
+                                    maxLength={MAX_VISION_LENGTH}
+                                    rows={3}
+                                    disabled={pending}
+                                    data-testid="vision-input"
+                                />
+                            )}
                         </div>
 
                         <DialogFooter>

@@ -140,6 +140,21 @@ export enum ActivityActionType {
     // Lifecycle + heartbeat + file edits + budget + skills + tasks.
     // Storage stays `varchar` (no Postgres ENUM); the API layer is the
     // single source of allowed strings.
+    // PR-3 (domain-model evolution) — Mission lifecycle (closes audit gap G3)
+    MISSION_CREATED = 'mission_created',
+    MISSION_PAUSED = 'mission_paused',
+    MISSION_RESUMED = 'mission_resumed',
+    MISSION_COMPLETED = 'mission_completed',
+    MISSION_FAILED = 'mission_failed',
+    MISSION_DELETED = 'mission_deleted',
+    MISSION_TICK_CAPPED = 'mission_tick_capped',
+    // PR-3 — Idea (WorkProposal) lifecycle
+    IDEA_GENERATED = 'idea_generated',
+    IDEA_DISMISSED = 'idea_dismissed',
+    IDEA_QUEUED = 'idea_queued',
+    IDEA_ACCEPTED = 'idea_accepted',
+    IDEA_FAILED = 'idea_failed',
+    IDEA_REBUILD_STARTED = 'idea_rebuild_started',
     AGENT_CREATED = 'agent_created',
     AGENT_PAUSED = 'agent_paused',
     AGENT_RESUMED = 'agent_resumed',

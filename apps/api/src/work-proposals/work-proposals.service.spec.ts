@@ -97,8 +97,8 @@ describe('WorkProposalsApiService', () => {
         const workAgentPreferences = { find: jest.fn().mockResolvedValue([]) };
         const config = { get: jest.fn((_k: string, d: unknown) => d) };
         const workAgent = {
-            createGoal: jest.fn().mockResolvedValue({
-                goal: { id: 'g1', instruction: '', status: 'waiting-for-approval' },
+            createBuildRequest: jest.fn().mockResolvedValue({
+                buildRequest: { id: 'g1', instruction: '', status: 'waiting-for-approval' },
                 run: { id: 'r1' },
             }),
             getPreferences: jest.fn().mockResolvedValue({

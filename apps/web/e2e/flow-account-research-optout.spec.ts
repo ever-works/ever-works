@@ -409,26 +409,29 @@ test.describe('Account research opt-out — Discover surface (seeded user, read-
         expect(typeof status.canRefresh).toBe('boolean');
         expect(typeof status.researching).toBe('boolean');
 
-        // Navigate the Discover page — the dashboard surface that renders
+        // Navigate the Ideas page — the dashboard surface that renders
         // AI-curated Work ideas (the consumer of inferredInterests-driven
-        // proposals). next-dev local-vs-CI route divergence: the nested route may
-        // render in CI but 404 to the catch-all locally, so accept EITHER the real
-        // Discover heading OR a generic page heading, and never hard-fail on 404.
+        // proposals). /discover was removed in PR-10 of the domain-model
+        // evolution (vestigial pre-Ideas surface, operator-approved removal);
+        // /ideas is its successor. next-dev local-vs-CI route divergence: the
+        // nested route may render in CI but 404 to the catch-all locally, so
+        // accept EITHER the real Ideas heading OR a generic page heading, and
+        // never hard-fail on 404.
         const origin = baseURL ?? 'http://localhost:3000';
-        await page.goto(`${origin}/discover`, { waitUntil: 'domcontentloaded' });
+        await page.goto(`${origin}/ideas`, { waitUntil: 'domcontentloaded' });
 
         // `.first()` must wrap the UNION, not just the left side: in the local
         // 404-to-home fallback the page has several h1/h2 nodes, so a bare
         // `.or(anyHeading)` resolves to multiple elements and trips strict mode.
-        const discoverHeading = page.getByRole('heading', { name: /discover/i });
+        const ideasHeading = page.getByRole('heading', { name: /idea/i });
         const anyHeading = page.locator('h1, h2');
-        await expect(discoverHeading.or(anyHeading).first()).toBeVisible({ timeout: 30_000 });
+        await expect(ideasHeading.or(anyHeading).first()).toBeVisible({ timeout: 30_000 });
 
         // The page must not crash into a client error boundary — the body should
         // have meaningful content, not a bare error chrome.
         const body = page.locator('body');
         await expect(body).toBeVisible();
         const text = (await body.innerText().catch(() => '')) ?? '';
-        expect(text.length, 'Discover page should render non-empty content').toBeGreaterThan(0);
+        expect(text.length, 'Ideas page should render non-empty content').toBeGreaterThan(0);
     });
 });

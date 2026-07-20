@@ -117,6 +117,41 @@ export interface AgentTarget {
 }
 
 /**
+ * Reporting period for one scorecard metric — how often the target is
+ * meant to be met/reset by the operator.
+ */
+export type AgentScorecardPeriod = 'weekly' | 'monthly' | 'quarterly';
+
+/**
+ * One quantified goal on an Agent's scorecard (Agent Scorecards
+ * increment 1 — data model + manual editing + display). Stored as a
+ * `simple-json` array on `agents.scorecard`.
+ *
+ * - `key`     — kebab-case identifier, unique within the scorecard
+ *               (stable handle for testids / future automation).
+ * - `label`   — human-readable metric name (<= 80 chars).
+ * - `target`  — the goal value for the period.
+ * - `current` — the latest measured value (manually edited in this
+ *               increment; auto-updating from run output is a follow-up).
+ * - `floor`   — optional minimum acceptable value; below it the metric
+ *               reads as critical.
+ * - `stretch` — optional stretch goal; at/above it the metric reads as
+ *               exceeded.
+ * - `unit`    — optional display unit ("PRs", "%", "$"...).
+ * - `period`  — weekly | monthly | quarterly.
+ */
+export interface AgentScorecardMetric {
+    key: string;
+    label: string;
+    target: number;
+    current: number;
+    floor?: number | null;
+    stretch?: number | null;
+    unit?: string | null;
+    period: AgentScorecardPeriod;
+}
+
+/**
  * Heartbeat idle-tick behavior (agents/spec.md §5.2 — F3 operator decision).
  *
  * - `propose`  — ask the AI for the next action (default; delivers visible work).
@@ -331,6 +366,16 @@ export class Agent {
 
     @Column({ type: 'varchar', length: 254, nullable: true })
     committerEmail?: string | null;
+
+    // ── Scorecard (Agent Scorecards increment 1) ──
+    // Quantified per-Agent goals so an AI worker's output is measurable.
+    // Nullable JSON array of AgentScorecardMetric; null = no scorecard set.
+    // This increment covers the data model + manual editing + display only —
+    // auto-updating `current` from run output and the org-dashboard at-risk
+    // roll-up are follow-ups.
+
+    @Column('simple-json', { nullable: true })
+    scorecard?: AgentScorecardMetric[] | null;
 
     // EW-655 (Tenants & Organizations Phase 3) — Tier A scope FKs.
     // Both NULL until the owning user creates their first Organization

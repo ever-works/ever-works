@@ -36,3 +36,7 @@ export * from './job-runtime.interface.js';
 // default lives in @ever-works/agent (zero external deps); every other
 // scheme ships as a plugin package under packages/plugins/secret-store-*/.
 export * from './secret-store.interface.js';
+// Goals feature PR-7 — read-only metrics collectors (custom-http, Stripe;
+// PostHog + Google Analytics in PR-9). Consumed by MetricsFacadeService
+// and, from PR-8 on, by Goal evaluation.
+export * from './metrics-provider.interface.js';

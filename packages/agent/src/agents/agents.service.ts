@@ -14,6 +14,7 @@ import {
     AgentIdleBehavior,
     type AgentPermissions,
     AgentScope,
+    type AgentScorecardMetric,
     AgentStatus,
     type AgentTarget,
 } from '../entities/agent.entity';
@@ -32,6 +33,7 @@ import { slugifyText } from '../utils/text.utils';
 import { isUniqueConstraintError } from '../utils/db-error.utils';
 import { toAgentDto, type AgentDto } from './types';
 import { computeNextHeartbeat } from './heartbeat-cron';
+import { validateScorecard } from './scorecard';
 
 // Upload IDs are SHA-256 hex strings (the `id` field returned by
 // POST /api/uploads/file). 64 lowercase hex chars — NOT UUID-shaped
@@ -106,6 +108,11 @@ export interface UpdateAgentInput {
     avatarImageUploadId?: string | null;
     committerName?: string | null;
     committerEmail?: string | null;
+    /**
+     * Agent Scorecards increment 1 — replace the whole scorecard
+     * (null clears it). Validated via `validateScorecard`.
+     */
+    scorecard?: AgentScorecardMetric[] | null;
 }
 
 /**
@@ -389,6 +396,19 @@ export class AgentsService {
         if (input.committerEmail !== undefined) {
             const trimmed = input.committerEmail?.trim() ?? '';
             patch.committerEmail = trimmed.length > 0 ? trimmed : null;
+        }
+
+        // Agent Scorecards increment 1 — whole-array replace; null (or an
+        // empty array) clears the scorecard. `validateScorecard` is the
+        // defense-in-depth check behind the DTO layer (tools/import callers
+        // reach this service without class-validator).
+        if (input.scorecard !== undefined) {
+            if (input.scorecard !== null) {
+                const problem = validateScorecard(input.scorecard);
+                if (problem) throw new BadRequestException(problem);
+            }
+            patch.scorecard =
+                input.scorecard && input.scorecard.length > 0 ? input.scorecard : null;
         }
 
         await this.agents.updateById(id, patch);
