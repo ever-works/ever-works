@@ -6,7 +6,7 @@
  * `@trigger.dev/sdk` dependency (mirrors the Tasks-feature
  * `AgentTaskExecuteDispatcher` seam). The platform's Trigger.dev
  * wrapper (`packages/tasks`) supplies the real adapter that fans a
- * freshly-created `WorkAgentGoal` out to the `idea-build-execute`
+ * freshly-created `WorkBuildRequest` out to the `idea-build-execute`
  * task; unit tests / CLI leave the token unbound.
  *
  * Consumers inject this with `@Optional() @Inject(...)`. When the
@@ -17,7 +17,7 @@
  * executes.
  */
 export interface IdeaBuildExecuteDispatchPayload {
-    /** The freshly-created `WorkAgentGoal` to execute. */
+    /** The freshly-created `WorkBuildRequest` to execute. */
     goalId: string;
     /** Owner scope — every DB access in the executor is scoped to this. */
     userId: string;

@@ -1,10 +1,10 @@
 import type { Repository } from 'typeorm';
 import { IdeaBuildExecutorService } from '../idea-build-executor.service';
 import {
-    WorkAgentGoal,
-    WorkAgentGoalSource,
-    WorkAgentGoalStatus,
-} from '../../entities/work-agent-goal.entity';
+    WorkBuildRequest,
+    WorkBuildRequestSource,
+    WorkBuildRequestStatus,
+} from '../../entities/work-build-request.entity';
 import { WorkAgentRun, WorkAgentRunStatus } from '../../entities/work-agent-run.entity';
 import { WorkAgentRunLog } from '../../entities/work-agent-run-log.entity';
 import type { WorkAgentService } from '../work-agent.service';
@@ -18,13 +18,13 @@ const ENABLED = 'EVER_WORKS_IDEA_BUILD_EXECUTOR_ENABLED';
 const DRY_RUN = 'EVER_WORKS_IDEA_BUILD_EXECUTOR_DRY_RUN';
 const OUTCOME = 'EVER_WORKS_IDEA_BUILD_EXECUTOR_DRY_RUN_OUTCOME';
 
-function makeGoal(overrides: Partial<WorkAgentGoal> = {}): WorkAgentGoal {
+function makeGoal(overrides: Partial<WorkBuildRequest> = {}): WorkBuildRequest {
     return {
         id: 'goal-1',
         userId: 'user-1',
         instruction: 'build me a thing',
-        status: WorkAgentGoalStatus.WAITING_FOR_APPROVAL,
-        source: WorkAgentGoalSource.USER,
+        status: WorkBuildRequestStatus.WAITING_FOR_APPROVAL,
+        source: WorkBuildRequestSource.USER,
         dryRun: false,
         guardrailsOverride: null,
         agentPlanSummary: null,
@@ -33,26 +33,26 @@ function makeGoal(overrides: Partial<WorkAgentGoal> = {}): WorkAgentGoal {
         createdAt: new Date('2026-07-19'),
         updatedAt: new Date('2026-07-19'),
         ...overrides,
-    } as WorkAgentGoal;
+    } as WorkBuildRequest;
 }
 
-function makeGoalsRepo(goal: WorkAgentGoal | null, count = 1) {
-    const saved: WorkAgentGoal[] = [];
+function makeGoalsRepo(goal: WorkBuildRequest | null, count = 1) {
+    const saved: WorkBuildRequest[] = [];
     return {
         _saved: saved,
         findOne: jest.fn(async () => goal),
-        save: jest.fn(async (g: WorkAgentGoal) => {
+        save: jest.fn(async (g: WorkBuildRequest) => {
             // snapshot the status at save time so the RUNNING→COMPLETED
             // sequence is observable in assertions.
             saved.push({ ...g });
             return g;
         }),
         count: jest.fn(async () => count),
-    } as unknown as Repository<WorkAgentGoal> & {
+    } as unknown as Repository<WorkBuildRequest> & {
         findOne: jest.Mock;
         save: jest.Mock;
         count: jest.Mock;
-        _saved: WorkAgentGoal[];
+        _saved: WorkBuildRequest[];
     };
 }
 
@@ -96,7 +96,7 @@ function makeRun(): WorkAgentRun {
     return {
         id: 'run-1',
         userId: 'user-1',
-        goalId: 'goal-1',
+        buildRequestId: 'goal-1',
         status: WorkAgentRunStatus.WAITING_FOR_APPROVAL,
         dryRun: true,
         progressPercent: 10,
@@ -124,7 +124,7 @@ describe('IdeaBuildExecutorService', () => {
     });
 
     function build(
-        goal: WorkAgentGoal | null,
+        goal: WorkBuildRequest | null,
         decision: GoalCompletionDecision = {
             outcome: 'accepted',
             ideaId: 'idea-1',
@@ -201,7 +201,7 @@ describe('IdeaBuildExecutorService', () => {
 
             // Goal transitioned RUNNING then COMPLETED (observable via save order).
             const statuses = goals._saved.map((g) => g.status);
-            expect(statuses).toEqual([WorkAgentGoalStatus.RUNNING, WorkAgentGoalStatus.COMPLETED]);
+            expect(statuses).toEqual([WorkBuildRequestStatus.RUNNING, WorkBuildRequestStatus.COMPLETED]);
 
             expect(result).toEqual({
                 status: 'completed',
@@ -215,7 +215,7 @@ describe('IdeaBuildExecutorService', () => {
 
         it('is idempotent — a terminal goal is skipped without re-running completion', async () => {
             const { service, workProposals } = build(
-                makeGoal({ status: WorkAgentGoalStatus.COMPLETED }),
+                makeGoal({ status: WorkBuildRequestStatus.COMPLETED }),
             );
 
             const result = await service.executeBuild({
@@ -262,7 +262,7 @@ describe('IdeaBuildExecutorService', () => {
                 'failure',
             );
             const statuses = goals._saved.map((g) => g.status);
-            expect(statuses).toEqual([WorkAgentGoalStatus.RUNNING, WorkAgentGoalStatus.FAILED]);
+            expect(statuses).toEqual([WorkBuildRequestStatus.RUNNING, WorkBuildRequestStatus.FAILED]);
             expect(result.status).toBe('failed');
         });
     });

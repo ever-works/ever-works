@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { config } from '../config';
-import { WorkAgentGoal, WorkAgentGoalStatus } from '../entities/work-agent-goal.entity';
+import { WorkBuildRequest, WorkBuildRequestStatus } from '../entities/work-build-request.entity';
 import { WorkAgentRun, WorkAgentRunStatus } from '../entities/work-agent-run.entity';
 import { WorkAgentRunLog, WorkAgentRunLogLevel } from '../entities/work-agent-run-log.entity';
 import { WorkProposalRepository } from '../user-research/work-proposal.repository';
@@ -39,10 +39,10 @@ export type IdeaBuildExecuteResult =
       };
 
 const TERMINAL_GOAL_STATUSES = [
-    WorkAgentGoalStatus.COMPLETED,
-    WorkAgentGoalStatus.CANCELED,
-    WorkAgentGoalStatus.REJECTED,
-    WorkAgentGoalStatus.FAILED,
+    WorkBuildRequestStatus.COMPLETED,
+    WorkBuildRequestStatus.CANCELED,
+    WorkBuildRequestStatus.REJECTED,
+    WorkBuildRequestStatus.FAILED,
 ];
 
 const ACTIVE_RUN_STATUSES = [
@@ -60,7 +60,7 @@ const ACTIVE_RUN_STATUSES = [
  * This is the production caller the dormant build pipeline was always
  * missing: `WorkProposalService.handleGoalCompletion` and
  * `WorkProposalRepository.markBuilding` had NO callers on `develop`, so
- * a `WorkAgentGoal` created by the build/retry/rebuild endpoints (or by
+ * a `WorkBuildRequest` created by the build/retry/rebuild endpoints (or by
  * Mission auto-build) sat at WAITING_FOR_APPROVAL forever and the Idea
  * stayed QUEUED. This service, invoked by the `idea-build-execute`
  * Trigger.dev task, advances that Goal and completes the cycle.
@@ -95,8 +95,8 @@ export class IdeaBuildExecutorService {
     private readonly logger = new Logger(IdeaBuildExecutorService.name);
 
     constructor(
-        @InjectRepository(WorkAgentGoal)
-        private readonly goals: Repository<WorkAgentGoal>,
+        @InjectRepository(WorkBuildRequest)
+        private readonly goals: Repository<WorkBuildRequest>,
         @InjectRepository(WorkAgentRun)
         private readonly runs: Repository<WorkAgentRun>,
         @InjectRepository(WorkAgentRunLog)
@@ -158,12 +158,12 @@ export class IdeaBuildExecutorService {
     // ─── dry-run path ───────────────────────────────────────────────
 
     private async runDryRun(
-        goal: WorkAgentGoal,
+        goal: WorkBuildRequest,
         ideaId: string,
         injectedOutcome?: SyntheticBuildOutcome,
     ): Promise<IdeaBuildExecuteResult> {
         // 1. Auto-approve + start: WAITING_FOR_APPROVAL/PENDING/PLANNING → RUNNING.
-        goal.status = WorkAgentGoalStatus.RUNNING;
+        goal.status = WorkBuildRequestStatus.RUNNING;
         await this.goals.save(goal);
         await this.startActiveRun(goal, 'Dry-run build executor started (auto-approved).');
 
@@ -192,7 +192,7 @@ export class IdeaBuildExecutorService {
         switch (decision.outcome) {
             case 'accepted':
             case 'rebuild-accepted': {
-                await this.finishGoal(goal, WorkAgentGoalStatus.COMPLETED, null);
+                await this.finishGoal(goal, WorkBuildRequestStatus.COMPLETED, null);
                 await this.completeActiveRun(
                     goal,
                     `Dry-run: Idea accepted (workId=${decision.workId}).`,
@@ -211,7 +211,7 @@ export class IdeaBuildExecutorService {
                 // fresh Goal after `retryDelaySeconds`. We mark this Goal
                 // completed and record that a retry WOULD have been
                 // scheduled, so the decision is observable without a loop.
-                await this.finishGoal(goal, WorkAgentGoalStatus.COMPLETED, null);
+                await this.finishGoal(goal, WorkBuildRequestStatus.COMPLETED, null);
                 await this.completeActiveRun(
                     goal,
                     `Dry-run: retry decision (attempt ${decision.attempts}, ` +
@@ -229,7 +229,7 @@ export class IdeaBuildExecutorService {
             case 'failed': {
                 await this.finishGoal(
                     goal,
-                    WorkAgentGoalStatus.FAILED,
+                    WorkBuildRequestStatus.FAILED,
                     `Dry-run build failed: ${decision.message}`,
                 );
                 await this.failActiveRun(goal, `Dry-run: Idea failed (${decision.kind}).`);
@@ -243,7 +243,7 @@ export class IdeaBuildExecutorService {
             }
             case 'noop':
             default: {
-                await this.finishGoal(goal, WorkAgentGoalStatus.COMPLETED, null);
+                await this.finishGoal(goal, WorkBuildRequestStatus.COMPLETED, null);
                 await this.completeActiveRun(goal, `Dry-run: no-op decision (${decision.reason}).`);
                 return {
                     status: 'failed',
@@ -277,7 +277,7 @@ export class IdeaBuildExecutorService {
      *     dry-run off can never strand an Idea in BUILDING.
      */
     private async runRealGeneration(
-        goal: WorkAgentGoal,
+        goal: WorkBuildRequest,
         ideaId: string,
     ): Promise<IdeaBuildExecuteResult> {
         this.logger.warn(
@@ -316,7 +316,7 @@ export class IdeaBuildExecutorService {
         };
     }
 
-    private async startActiveRun(goal: WorkAgentGoal, message: string): Promise<void> {
+    private async startActiveRun(goal: WorkBuildRequest, message: string): Promise<void> {
         const run = await this.findActiveRun(goal);
         if (!run) return;
         // The run entity has no dedicated RUNNING state — GENERATING is
@@ -329,7 +329,7 @@ export class IdeaBuildExecutorService {
         await this.writeLog(goal.userId, run.id, 'running', message);
     }
 
-    private async completeActiveRun(goal: WorkAgentGoal, message: string): Promise<void> {
+    private async completeActiveRun(goal: WorkBuildRequest, message: string): Promise<void> {
         const run = await this.findActiveRun(goal, [WorkAgentRunStatus.GENERATING]);
         if (!run) return;
         run.status = WorkAgentRunStatus.COMPLETED;
@@ -339,7 +339,7 @@ export class IdeaBuildExecutorService {
         await this.writeLog(goal.userId, run.id, 'completed', message);
     }
 
-    private async failActiveRun(goal: WorkAgentGoal, message: string): Promise<void> {
+    private async failActiveRun(goal: WorkBuildRequest, message: string): Promise<void> {
         const run = await this.findActiveRun(goal, [WorkAgentRunStatus.GENERATING]);
         if (!run) return;
         run.status = WorkAgentRunStatus.FAILED;
@@ -350,18 +350,18 @@ export class IdeaBuildExecutorService {
     }
 
     private async findActiveRun(
-        goal: WorkAgentGoal,
+        goal: WorkBuildRequest,
         statuses: WorkAgentRunStatus[] = ACTIVE_RUN_STATUSES,
     ): Promise<WorkAgentRun | null> {
         return this.runs.findOne({
-            where: { goalId: goal.id, userId: goal.userId, status: In(statuses) },
+            where: { buildRequestId: goal.id, userId: goal.userId, status: In(statuses) },
             order: { createdAt: 'DESC' },
         });
     }
 
     private async finishGoal(
-        goal: WorkAgentGoal,
-        status: WorkAgentGoalStatus,
+        goal: WorkBuildRequest,
+        status: WorkBuildRequestStatus,
         error: string | null,
     ): Promise<void> {
         goal.status = status;
