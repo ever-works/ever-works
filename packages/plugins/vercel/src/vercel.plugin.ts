@@ -552,9 +552,7 @@ export class VercelPlugin implements IPlugin, IDeploymentPlugin, IOAuthPlugin {
 	 */
 	private isOAuthConfigured(): boolean {
 		return (
-			!!process.env[ENV_OAUTH_CLIENT_ID] &&
-			!!process.env[ENV_OAUTH_CLIENT_SECRET] &&
-			!!this.getIntegrationSlug()
+			!!process.env[ENV_OAUTH_CLIENT_ID] && !!process.env[ENV_OAUTH_CLIENT_SECRET] && !!this.getIntegrationSlug()
 		);
 	}
 }

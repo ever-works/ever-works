@@ -420,15 +420,32 @@ describe('TemplateCatalogService', () => {
         // Mission repo. The mock returns ONLY the matching curated id
         // for each (owner, repo) so non-orphan curated rows aren't
         // erroneously deactivated.
-        const CURATED_BY_REPO: Record<string, string> = {
-            'ever-works/directory-web-template': 'classic',
-            'ever-works/directory-web-minimal-template': 'minimal',
-            'ever-works/starter-business-mission-template': 'starter-business',
-            'ever-works/starter-content-mission-template': 'starter-content',
+        // Curated rows keyed by their OWN kind — the real
+        // findAllBuiltInByRepositoryCoordinates filters by (kind, owner, repo),
+        // so a work/mission template that happens to share a repo with a
+        // website template must NOT surface the website rows. Modeling the kind
+        // filter here keeps the cross-kind seeds (listWorkTemplates /
+        // listMissionTemplates reuse directory-web* repos) from spuriously
+        // deactivating the curated website rows.
+        const CURATED_BY_REPO: Record<string, { id: string; kind: string }> = {
+            'ever-works/directory-web-template': { id: 'classic', kind: 'website' },
+            'ever-works/directory-web-minimal-template': { id: 'minimal', kind: 'website' },
+            'ever-works/starter-business-mission-template': {
+                id: 'starter-business',
+                kind: 'mission',
+            },
+            'ever-works/starter-content-mission-template': {
+                id: 'starter-content',
+                kind: 'mission',
+            },
         };
         templateRepository.findAllBuiltInByRepositoryCoordinates.mockImplementation(
             async (kind: string, owner: string, repo: string) => {
-                if (owner === 'ever-works' && repo === 'directory-web-minimal-template') {
+                if (
+                    kind === 'website' &&
+                    owner === 'ever-works' &&
+                    repo === 'directory-web-minimal-template'
+                ) {
                     return [
                         {
                             id: 'minimal',
@@ -448,11 +465,11 @@ describe('TemplateCatalogService', () => {
                         },
                     ];
                 }
-                const curatedId = CURATED_BY_REPO[`${owner}/${repo}`];
-                if (!curatedId) return [];
+                const curated = CURATED_BY_REPO[`${owner}/${repo}`];
+                if (!curated || curated.kind !== kind) return [];
                 return [
                     {
-                        id: curatedId,
+                        id: curated.id,
                         kind,
                         sourceType: 'built_in',
                         repositoryOwner: owner,

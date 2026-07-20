@@ -24,8 +24,14 @@ Notes:
 - Stripe amounts are minor units; values are converted with `amount / 100`.
   Two-decimal currencies (usd, eur, gbp, ...) are assumed — zero-decimal
   currencies (jpy, krw, ...) are not yet compensated for.
-- `gross_volume` counts **paid** charges in the configured currency only;
-  refunds are *not* subtracted (that is what makes it gross).
+- `gross_volume` is **single-currency**: it counts **paid** charges in the
+  configured `currency` only — charges in any other currency are excluded
+  from the sum (multi-currency accounts get the configured-currency slice,
+  not a mixed-denomination total). Refunds are *not* subtracted (that is
+  what makes it gross).
+- Because `charges.list` has no server-side currency filter, excluded
+  foreign-currency charges are still walked and **count toward the
+  pagination cap** below.
 
 ### Pagination cap (`metric-truncated`)
 

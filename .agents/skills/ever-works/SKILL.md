@@ -1,12 +1,12 @@
 ---
 name: ever-works
 description: >-
-  Repo-specific guide to the Ever Works monorepo (ever-works/ever-works) — its
-  pnpm + Turborepo layout, the per-workspace test runners (Jest vs Vitest vs
-  Playwright), file-naming and import-alias conventions, the commit/branch
-  model, and the real build/lint/type-check commands. Use this whenever working
-  anywhere in this repository so changes match the codebase's actual conventions
-  and pass CI.
+    Repo-specific guide to the Ever Works monorepo (ever-works/ever-works) — its
+    pnpm + Turborepo layout, the per-workspace test runners (Jest vs Vitest vs
+    Playwright), file-naming and import-alias conventions, the commit/branch
+    model, and the real build/lint/type-check commands. Use this whenever working
+    anywhere in this repository so changes match the codebase's actual conventions
+    and pass CI.
 ---
 
 # Ever Works monorepo
@@ -59,13 +59,13 @@ Ever Works uses Jest **and** Vitest, split by build tooling (see the repo's own
 `docs/testing/overview.md`), plus Playwright for web e2e:
 
 - **Jest** — `packages/agent` (~26 suites / ~719 tests, `packages/agent/jest.config.js`) and `apps/api` (`apps/api/jest.config.js`). These are the SWC/NestJS packages. Test files are `*.spec.ts`.
-  - `cd packages/agent && pnpm test` · `pnpm test:cov` · `npx jest --testPathPattern='generators'`
-  - `cd apps/api && pnpm test`
+    - `cd packages/agent && pnpm test` · `pnpm test:cov` · `npx jest --testPathPattern='generators'`
+    - `cd apps/api && pnpm test`
 - **Vitest** — `packages/plugin`, every `packages/plugins/*`, and `apps/web` unit tests. Test files are `*.spec.ts`.
-  - `cd packages/plugins/openai && pnpm test` · `npx vitest run src/openai.spec.ts`
-  - `cd apps/web && pnpm test` (web unit)
+    - `cd packages/plugins/openai && pnpm test` · `npx vitest run src/openai.spec.ts`
+    - `cd apps/web && pnpm test` (web unit)
 - **Playwright** — `apps/web` end-to-end. Specs in `apps/web/e2e/*.spec.ts`, config `apps/web/playwright.config.ts`.
-  - `cd apps/web && pnpm test:e2e` (or `pnpm test:e2e` from the repo root)
+    - `cd apps/web && pnpm test:e2e` (or `pnpm test:e2e` from the repo root)
 - Root `pnpm test` runs `turbo run test`, delegating to each workspace's own runner.
 
 ## File & symbol naming
