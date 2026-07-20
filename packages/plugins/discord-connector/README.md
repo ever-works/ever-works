@@ -17,14 +17,14 @@ Agent → reply) is a follow-up.
 
 ## Connection config (`targetConfig`)
 
-| Key                | Required | Secret | Description                                                       |
-| ------------------ | -------- | ------ | --------------------------------------------------------------- |
-| `botToken`         | Yes      | Yes    | Bot token. Env fallback `DISCORD_BOT_TOKEN`.                     |
+| Key                | Required | Secret | Description                                                                                  |
+| ------------------ | -------- | ------ | -------------------------------------------------------------------------------------------- |
+| `botToken`         | Yes      | Yes    | Bot token. Env fallback `DISCORD_BOT_TOKEN`.                                                 |
 | `publicKey`        | No       | Yes    | Application public key for inbound Interactions API (P2). Env fallback `DISCORD_PUBLIC_KEY`. |
-| `applicationId`    | No       | No     | Discord application (client) id.                                 |
-| `guildId`          | No       | No     | Default guild/server id.                                         |
-| `defaultChannelId` | No       | No     | Default destination channel (e.g. `123456789012345678`).        |
-| `channelId`        | No       | No     | Per-send channel override (takes precedence over the default).   |
+| `applicationId`    | No       | No     | Discord application (client) id.                                                             |
+| `guildId`          | No       | No     | Default guild/server id.                                                                     |
+| `defaultChannelId` | No       | No     | Default destination channel (e.g. `123456789012345678`).                                     |
+| `channelId`        | No       | No     | Per-send channel override (takes precedence over the default).                               |
 
 The `discord.js` `REST` client pins the host to `discord.com` and injects the
 `Authorization: Bot <token>` header, so there is no SSRF surface. `send` is

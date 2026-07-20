@@ -16,13 +16,13 @@ Agent → reply) is a follow-up.
 
 ## Connection config (`targetConfig`)
 
-| Key                | Required | Secret | Description                                                    |
-| ------------------ | -------- | ------ | ------------------------------------------------------------- |
-| `botToken`         | Yes      | Yes    | Bot User OAuth token (`xoxb-…`). Env fallback `SLACK_BOT_TOKEN`. |
+| Key                | Required | Secret | Description                                                       |
+| ------------------ | -------- | ------ | ----------------------------------------------------------------- |
+| `botToken`         | Yes      | Yes    | Bot User OAuth token (`xoxb-…`). Env fallback `SLACK_BOT_TOKEN`.  |
 | `signingSecret`    | No       | Yes    | For inbound Events API (P2). Env fallback `SLACK_SIGNING_SECRET`. |
-| `appId`            | No       | No     | Slack app id.                                                 |
-| `defaultChannelId` | No       | No     | Default destination channel (e.g. `C0123456789`).            |
-| `channelId`        | No       | No     | Per-send channel override (takes precedence over the default). |
+| `appId`            | No       | No     | Slack app id.                                                     |
+| `defaultChannelId` | No       | No     | Default destination channel (e.g. `C0123456789`).                 |
+| `channelId`        | No       | No     | Per-send channel override (takes precedence over the default).    |
 
 The `@slack/web-api` `WebClient` pins the host to `slack.com`, so there is no SSRF
 surface. `send` is idempotent on `messageRef`, scoped to `connectorId` + channel.
