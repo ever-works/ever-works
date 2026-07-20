@@ -55,6 +55,8 @@ function org(overrides: Partial<OrganizationResponse> = {}): OrganizationRespons
         registrationProvider: null,
         registrationStatus: null,
         linkedWorkId: null,
+        vision: null,
+        visionUpdatedAt: null,
         createdAt: '2026-05-28T00:00:00.000Z',
         updatedAt: '2026-05-28T00:00:00.000Z',
         ...overrides,
@@ -88,7 +90,13 @@ describe('CreateOrganizationModal — EW-661 Phase 9', () => {
         fireEvent.change(input, { target: { value: '   ' } });
         const submit = screen.getByText('organizations.create.submit');
         expect((submit as HTMLButtonElement).disabled).toBe(true);
-        expect(fetchMock).not.toHaveBeenCalled();
+        // The modal now fires a best-effort catalog fetch on open
+        // (teams-and-companies spec §4.4) — the invariant under test is
+        // that no CREATE request left the client.
+        const createCalls = fetchMock.mock.calls.filter(
+            ([url]) => url === '/api/organizations' || url === '/api/organizations/import-company',
+        );
+        expect(createCalls).toHaveLength(0);
     });
 
     /**

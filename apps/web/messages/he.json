@@ -263,7 +263,8 @@
             "savedSuccess": "ההגדרות נשמרו.",
             "noSettings": "אין צורך בהגדרה עבור תוסף זה.",
             "getTokenPrompt": "צרו אסימון קודם, הדביקו אותו למטה ושמרו כדי לאמת את החיבור.",
-            "loadingStatus": "טוען סטטוס חיבור..."
+            "loadingStatus": "טוען סטטוס חיבור...",
+            "setupGuide": "Setup guide"
         },
         "plugins": {
             "byokDescription": "חברו את המפתח שלכם כדי לפתוח את ההגדרה המלאה.",
@@ -455,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "אישורי פעולות",
+                "subtitle": "הסוכנים שלך הציעו פעולות אלו בעלות תופעות לוואי. אשר או דחה כל אחת מהן."
+            },
+            "actions": {
+                "approve": "אישור",
+                "reject": "דחייה",
+                "approveAll": "אשר הכול"
+            },
+            "actionType": {
+                "spawn_agent": "יצירת סוכן",
+                "schedule_task": "תזמון משימה",
+                "send_message": "שליחת הודעה",
+                "budget_override": "חריגה מתקציב",
+                "other": "פעולה"
+            },
+            "riskFlags": {
+                "budget_override": "חריגה מתקציב",
+                "destructive": "הרסנית",
+                "cross_scope": "חוצת תחומים",
+                "high_fanout": "התפצלות גבוהה"
+            },
+            "toast": {
+                "approved": "הפעולה אושרה",
+                "rejected": "הפעולה נדחתה",
+                "bulkApproved": "אושרו {count} פעולות",
+                "bulkApprovedSkipped": "אושרו {approved} פעולות, {skipped} כבר הוכרעו",
+                "error": "משהו השתבש. נסה שוב."
+            }
+        },
         "title": "לוח מחוונים",
         "connectGithub": {
             "title": "חבר את חשבון GitHub שלך",
@@ -609,6 +641,55 @@
                 "reset": "אפס"
             }
         },
+        "memoryPage": {
+            "consolidation": {
+                "action": "איחוד",
+                "title": "איחוד הזיכרון",
+                "previewIntro": "תצוגה מקדימה של מה שהאיחוד יעשה. שום דבר לא משתנה עד שתחיל.",
+                "scanned": "{count} נסרקו",
+                "promoted": "{count} קודמו",
+                "synthesized": "{count} סוכמו",
+                "superseded": "{count} הוחלפו",
+                "promotedHeading": "קודמו",
+                "supersededHeading": "הוחלפו",
+                "more": "+{count} נוספים",
+                "apply": "החל",
+                "cancel": "ביטול",
+                "applied": "אוחד: {promoted} קודמו, {synthesized} סוכמו, {superseded} הוחלפו",
+                "failed": "האיחוד נכשל. נסה שוב.",
+                "badgePromoted": "קודם",
+                "badgeSuperseded": "הוחלף"
+            },
+            "title": "Memory",
+            "subtitle": "כל מה שהארגון שלך יודע, במקום אחד — מרוכז מתוך ה-Knowledge Base של כל עבודה.",
+            "searchPlaceholder": "חפש בכל מה שהארגון יודע…",
+            "newDocument": "חדש",
+            "documentsIndexed": "{count, plural, =0 {אין מסמכים באינדקס} one {מסמך אחד באינדקס} two {שני מסמכים באינדקס} other {# מסמכים באינדקס}}",
+            "worksCovered": "{count, plural, =0 {אין עבודות} one {עבודה אחת} two {שתי עבודות} other {# עבודות}}",
+            "filters": {
+                "type": "סוג",
+                "work": "עבודה",
+                "source": "מקור",
+                "status": "סטטוס",
+                "clearAll": "נקה הכול"
+            },
+            "source": {
+                "workKb": "Work KB",
+                "orgKb": "Org KB",
+                "user": "Manual",
+                "agent": "Agent",
+                "imported": "Imported",
+                "seeded": "Seeded"
+            },
+            "empty": {
+                "title": "עדיין אין כלום ב-Memory.",
+                "subtitle": "ככל שהעבודות שלך בונות את ה-Knowledge Base שלהן — מסמכי מותג, פרסונות, מחקר, מדריכי סגנון — הכול מופיע כאן, ניתן לחיפוש בכל הארגון.",
+                "noOrg": "בחר או צור ארגון כדי לראות את ה-Memory המרוכזת שלו. Memory משתרעת על פני כל עבודה בארגון הפעיל.",
+                "noResults": "אין מסמכים שתואמים את החיפוש והמסננים שלך."
+            },
+            "orgScoped": "ארגון",
+            "openInWork": "פתח בעבודה"
+        },
         "agentsPage": {
             "title": "סוכנים",
             "subtitle": "החברים המלאכותיים שלך. כל אחד נושא נשמה (מי הוא/היא), הוראות, ותקציב - ופועל על משימות, עבודות, או כל הדייר שלך.",
@@ -663,7 +744,11 @@
                 "templateStepTitle": "התחל מתבנית (אופציונלי)",
                 "startFromScratch": "התחל מאפס",
                 "pickParentHint": "בחר {scope} למעלה כדי להמשיך, או בחר טווח סביבת עבודה.",
-                "nextDisabledReason": "בחר ייחוס או בחר טווח סביבת עבודה כדי להמשיך."
+                "nextDisabledReason": "בחר ייחוס או בחר טווח סביבת עבודה כדי להמשיך.",
+                "teamLabel": "צוות",
+                "teamNone": "ללא צוות",
+                "reportsToLabel": "כפוף ל־",
+                "reportsToNone": "ללא מנהל"
             },
             "orDivider": "או",
             "createManually": "צור סוכן ידנית",
@@ -681,6 +766,42 @@
                 "yourTemplates": "התבניות שלך",
                 "yourTemplatesEmpty": "הסוכנים שאתה יוצר יופיעו כאן כתבניות חוזרות.",
                 "openInWizard": "פתח באשף"
+            },
+            "settings": {
+                "orgCard": {
+                    "title": "ארגון",
+                    "teamLabel": "צוות",
+                    "teamNone": "ללא צוות",
+                    "reportsToLabel": "כפוף ל־",
+                    "reportsToNone": "ללא מנהל",
+                    "save": "שמור",
+                    "saving": "שומר…"
+                }
+            },
+            "guardrails": {
+                "title": "מעקות בטיחות",
+                "subtitle": "קבע אילו פעולות מוצעות ימתינו לאישור שלך, יבוצעו אוטומטית או ייחסמו.",
+                "modeLabel": "מצב שיגור",
+                "modeRequireApproval": "דרוש אישור",
+                "modeRequireApprovalHint": "כל פעולה מוצעת ממתינה בתור האישורים שלך עד שתחליט.",
+                "modeAutonomous": "אוטונומי",
+                "modeAutonomousHint": "פעולות בטוחות מבוצעות ללא המתנה. פעולות עם סימוני סיכון תמיד עוברות לתור האישורים שלך.",
+                "autoApproveLabel": "סוגי פעולות לאישור אוטומטי",
+                "autoApproveHint": "רק סוגי הפעולות שנבחרו מבוצעים אוטומטית; כל השאר ממשיך לעבור דרך התור.",
+                "blockedLabel": "סוגי פעולות חסומים",
+                "blockedHint": "פעולות חסומות נדחות אוטומטית ונרשמות בהיסטוריית התור.",
+                "actionTypes": {
+                    "spawn_agent": "יצירת סוכן",
+                    "schedule_task": "תזמון משימה",
+                    "send_message": "שליחת הודעה",
+                    "budget_override": "עקיפת תקציב",
+                    "other": "אחר"
+                },
+                "save": "שמור מעקות בטיחות",
+                "reset": "איפוס לברירת מחדל",
+                "saveSuccess": "מעקות הבטיחות נשמרו",
+                "saveError": "לא ניתן לשמור את מעקות הבטיחות",
+                "resetSuccess": "מעקות הבטיחות אופסו לברירת מחדל"
             }
         },
         "tasksPage": {
@@ -938,6 +1059,33 @@
             "empty": "No budget data yet."
         },
         "missionDetail": {
+            "attachedWorks": {
+                "pickerTruncated": "Showing your 100 most recent Works - open the Works page for the full list.",
+                "title": "Attached Works",
+                "empty": "No Works attached to this Mission yet. Attach one below.",
+                "attachTitle": "Attach a Work",
+                "workLabel": "Work",
+                "workPlaceholder": "Select a Work",
+                "relationLabel": "Relation",
+                "attach": "Attach",
+                "detach": "Detach",
+                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "noWorksToAttach": "You have no Works to attach yet.",
+                "relations": {
+                    "created": "Created",
+                    "improves": "Improves",
+                    "operates": "Operates",
+                    "markets": "Markets",
+                    "researches": "Researches",
+                    "retires": "Retires"
+                },
+                "toasts": {
+                    "attached": "Work attached",
+                    "attachError": "Couldn't attach Work",
+                    "detached": "Work detached",
+                    "detachError": "Couldn't detach Work"
+                }
+            },
             "backToMissions": "Back to Missions",
             "badges": {
                 "scheduled": "Scheduled",
@@ -1003,6 +1151,23 @@
                 "cancel": "Cancel",
                 "confirm": "Clone Mission"
             },
+            "completeDialog": {
+                "title": "Complete this Mission",
+                "description": "Optionally record a conclusion verdict for this Mission. \"No verdict\" completes it without recording an outcome.",
+                "outcomeLabel": "Outcome (optional)",
+                "noVerdict": "No verdict",
+                "cancel": "Cancel",
+                "confirm": "Complete Mission"
+            },
+            "outcomes": {
+                "succeeded": "Succeeded",
+                "partially_succeeded": "Partially succeeded",
+                "failed": "Failed",
+                "cancelled": "Cancelled",
+                "superseded": "Superseded"
+            },
+            "outcomeTooltip": "Outcome recorded when this Mission was completed",
+            "completedAtLabel": "Completed",
             "toasts": {
                 "settingsSaved": "Mission settings saved",
                 "settingsError": "Couldn't save settings",
@@ -1095,11 +1260,15 @@
                 "creating": "יוצר…",
                 "minLength": "התיאור חייב להכיל לפחות 10 תווים.",
                 "error": "לא ניתן ליצור את ה-Idea. נסה שוב."
+            },
+            "linkedWorks": {
+                "title": "Linked Works",
+                "kind": {
+                    "built": "Built",
+                    "linked": "Linked",
+                    "rebuilt": "Rebuilt"
+                }
             }
-        },
-        "discover": {
-            "title": "גלה",
-            "subtitle": "רעיונות עבודה שנבחרו על ידי AI ומותאמים אישית עבורך."
         },
         "header": {
             "welcome": "ברוך שובך, {username}!",
@@ -1186,8 +1355,49 @@
                 }
             }
         },
+        "schedules": {
+            "title": "תזמונים",
+            "subtitle": "כל מה שמתוזמן לרוץ בעבודות, בסוכנים, ב-Missions ובמשימות שלך",
+            "fetchFailed": "טעינת התזמונים נכשלה",
+            "retry": "ניסיון נוסף",
+            "columns": {
+                "owner": "בעלים",
+                "cadence": "קצב",
+                "nextRun": "הרצה הבאה",
+                "status": "סטטוס"
+            },
+            "filters": {
+                "all": "הכל",
+                "activeOnly": "פעילים בלבד"
+            },
+            "sourceTypes": {
+                "recurringTask": "משימה חוזרת",
+                "agentHeartbeat": "פעימת סוכן",
+                "workSchedule": "תזמון עבודה",
+                "missionTick": "פעימת Mission",
+                "sourceValidation": "אימות מקור",
+                "dataSync": "סנכרון נתונים",
+                "inboundTrigger": "טריגר נכנס"
+            },
+            "statuses": {
+                "active": "פעיל",
+                "paused": "מושהה",
+                "disabled": "מושבת",
+                "error": "שגיאה",
+                "ended": "הסתיים"
+            },
+            "empty": {
+                "title": "עדיין לא תוזמן דבר",
+                "description": "משימות חוזרות, פעימות סוכנים, תזמוני עבודה, פעימות Mission, אימות מקורות וסנכרון נתונים יופיעו כאן לאחר שתגדיר אותם.",
+                "noResults": "אין תזמונים התואמים את המסנן הנוכחי."
+            }
+        },
         "activity": {
-            "title": "יומן פעילות",
+            "viewToggle": {
+                "log": "יומן",
+                "schedules": "תזמונים"
+            },
+            "title": "פעילות",
             "subtitle": "עקוב אחר כל הפעולות בעבודות שלך",
             "loading": "טוען...",
             "fetchFailed": "נכשל בטעינת הפעילויות",
@@ -1349,6 +1559,7 @@
             "subtitle": "נהל את הגדרות החשבון וההעדפות שלך",
             "tabs": {
                 "profile": "פרופיל",
+                "organization": "Organization",
                 "security": "אבטחה",
                 "apiKeys": "מפתחות API",
                 "data": "נתונים",
@@ -1385,14 +1596,14 @@
                 "sections": {
                     "agent": {
                         "title": "סוכן עבודה אוטונומי",
-                        "description": "אפשר לסוכן לתכנן, לחקור ולהכין עבודות מיעדים כלליים."
+                        "description": "אפשר לסוכן לתכנן, לחקור ולהכין עבודות מבקשות בנייה כלליות."
                     },
                     "guardrails": {
                         "title": "מגבלות",
                         "description": "קבע מגבלות קשות לפני שהסוכן יכול ליצור עבודות, להוסיף פריטים או להוציא תקציב."
                     },
                     "queue": {
-                        "title": "תור ליעד",
+                        "title": "הוספת בקשת בנייה לתור",
                         "description": "תן לסוכן הוראה רחבה. הוא מתחיל כממתין ופועל בתוך המגבלות שלך."
                     },
                     "liveRun": {
@@ -1400,7 +1611,7 @@
                         "description": "מצב נוכחי ופעילות אחרונה של הסוכן."
                     },
                     "recentGoals": {
-                        "title": "יעדים אחרונים",
+                        "title": "בקשות בנייה אחרונות",
                         "description": "הוראות סוכן עבודה ממתינות, פעילות והושלמות."
                     },
                     "autoGenerateIdeas": {
@@ -1431,7 +1642,7 @@
                     "approvalThreshold": "סף אישור",
                     "confirmBeforeCreate": "אשר לפני יצירת עבודות",
                     "confirmBeforeDelete": "אשר לפני מחיקת פריטים",
-                    "dryRunThisGoal": "הפעלת ניסיון עבור יעד זה",
+                    "dryRunThisGoal": "הפעלת ניסיון עבור בקשת בנייה זו",
                     "autoGenerateCadenceMinutes": "Run every N minutes",
                     "autoGenerateBatchSize": "Ideas per cycle",
                     "autoBuildThrottlePerDay": "Daily auto-build cap",
@@ -1447,7 +1658,7 @@
                     "saveSettings": "שמור הגדרות",
                     "saveSection": "Save",
                     "useDefault": "Use default",
-                    "queueGoal": "הוסף לתור יעד",
+                    "queueGoal": "הוסף בקשת בנייה לתור",
                     "preparePlan": "Prepare plan",
                     "stop": "עצור"
                 },
@@ -1464,16 +1675,16 @@
                 },
                 "empty": {
                     "noActiveRun": "אין הפעלה פעילה של סוכן עבודה.",
-                    "noGoals": "עדיין אין יעדים לסוכן עבודה.",
+                    "noGoals": "עדיין אין בקשות בנייה לסוכן עבודה.",
                     "waitingForUpdate": "ממתין לעדכון הפעלה ראשון."
                 },
                 "toasts": {
                     "settingsSaved": "הגדרות סוכן עבודה נשמרו",
                     "settingsError": "שמירת הגדרות נכשלה",
-                    "goalQueued": "יעד סוכן עבודה התווסף לתור",
-                    "goalError": "הוספת יעד לתור נכשלה",
-                    "goalCanceled": "יעד סוכן עבודה בוטל",
-                    "cancelError": "ביטול יעד נכשל"
+                    "goalQueued": "בקשת בנייה של סוכן עבודה התווספה לתור",
+                    "goalError": "הוספת בקשת בנייה לתור נכשלה",
+                    "goalCanceled": "בקשת בנייה של סוכן עבודה בוטלה",
+                    "cancelError": "ביטול בקשת בנייה נכשל"
                 }
             },
             "data": {
@@ -1737,7 +1948,45 @@
             "tasksInFlight": "משימות בתהליך",
             "tasksBlocked": "{count} חסומות",
             "tasksNoBlockers": "ללא מכשולים",
-            "fromLastMonth": "מהחודש שעבר"
+            "fromLastMonth": "מהחודש שעבר",
+            "teams": "צוותים"
+        },
+        "attention": {
+            "title": "דורש תשומת לב",
+            "kinds": {
+                "agentError": {
+                    "title": "הסוכן “{name}” נכשל",
+                    "subtitle": "הושהה אוטומטית לאחר כשלים חוזרים"
+                },
+                "scheduleFailed": {
+                    "title": "הרצת התזמון נכשלה",
+                    "subtitle": "ההרצה האחרונה של “{name}” לא הושלמה"
+                },
+                "schedulePaused": {
+                    "title": "התזמון הושהה",
+                    "subtitle": "“{name}” הושהה לאחר כשלים חוזרים"
+                },
+                "generationFailed": {
+                    "title": "היצירה נכשלה",
+                    "subtitle": "לא ניתן היה לבנות את “{name}”"
+                },
+                "taskBlocked": {
+                    "title": "המשימה חסומה",
+                    "subtitle": "“{name}” זקוק לקלט כדי להמשיך"
+                },
+                "budgetExceeded": {
+                    "title": "התקציב חרג",
+                    "subtitle": "הוצאות החשבון הגיעו לתקרה"
+                }
+            }
+        },
+        "soon": {
+            "title": "בקרוב",
+            "more": "+{n} נוספים",
+            "source": {
+                "work": "עבודה",
+                "mission": "Mission"
+            }
         },
         "adminUsage": {
             "title": "שימוש בפלטפורמה",
@@ -1803,6 +2052,18 @@
             "createButton": "צור עבודה"
         },
         "workDetail": {
+            "missions": {
+                "title": "Missions",
+                "subtitle": "Your Missions that relate to this Work. Missions never own Works — these are references.",
+                "relations": {
+                    "created": "Created",
+                    "improves": "Improves",
+                    "operates": "Operates",
+                    "markets": "Markets",
+                    "researches": "Researches",
+                    "retires": "Retires"
+                }
+            },
             "agentsDropdown": {
                 "trigger": "סוכנים",
                 "heading": "סוכנים לעבודה זו",
@@ -4126,6 +4387,177 @@
                 "unexpectedError": "אירעה שגיאה בלתי צפויה"
             }
         },
+        "goalsPage": {
+            "title": "Goals",
+            "subtitle": "Measurable targets evaluated automatically against your metrics providers. Each Goal tracks a live metric toward a target — open one to see its progress, run a check, or set an outcome.",
+            "newGoal": "New Goal",
+            "statuses": {
+                "draft": "Draft",
+                "active": "Active",
+                "paused": "Paused",
+                "completed": "Completed"
+            },
+            "outcomes": {
+                "achieved": "Achieved",
+                "missed": "Missed",
+                "abandoned": "Abandoned"
+            },
+            "filterBar": {
+                "status": "Status",
+                "anyStatus": "Any status",
+                "apply": "Apply",
+                "reset": "Reset"
+            },
+            "loadError": {
+                "title": "Could not load Goals."
+            },
+            "empty": {
+                "title": "No Goals yet.",
+                "subtitle": "Create a Goal to track a business metric toward a target — income, signups, churn, error rate — evaluated automatically on a schedule."
+            },
+            "pagination": {
+                "showing": "Showing {from}-{to}",
+                "noResults": "No results on this page",
+                "previous": "Previous",
+                "next": "Next"
+            },
+            "card": {
+                "comparator": {
+                    "gte": "At least",
+                    "lte": "At most"
+                },
+                "nextCheckPrefix": "Next check:",
+                "windowPrefix": "Window:",
+                "window": {
+                    "day": "Daily",
+                    "week": "Weekly",
+                    "month": "Monthly",
+                    "total": "Total",
+                    "point": "Point-in-time"
+                }
+            }
+        },
+        "goalNew": {
+            "title": "New Goal",
+            "subtitle": "Define a measurable target and the metric that tracks it. New Goals start as a draft — activate from the detail page to begin scheduled evaluation.",
+            "backToGoals": "Back to Goals",
+            "created": "Goal created",
+            "sections": {
+                "metricSource": "Metric source",
+                "target": "Target",
+                "cadence": "Evaluation cadence"
+            },
+            "fields": {
+                "title": "Title",
+                "titlePlaceholder": "e.g. Monthly Stripe income of $1,000",
+                "description": "Description",
+                "descriptionPlaceholder": "Optional context for this Goal",
+                "pluginId": "Provider plugin ID",
+                "metricId": "Metric ID",
+                "params": "Parameters (JSON)",
+                "paramsHint": "Optional provider-specific parameters as a JSON object (e.g. a currency filter).",
+                "paramsInvalid": "Parameters must be valid JSON.",
+                "paramsNotObject": "Parameters must be a JSON object.",
+                "comparator": "Direction",
+                "targetValue": "Target value",
+                "unit": "Unit",
+                "window": "Window",
+                "deadline": "Deadline (optional)",
+                "checkFrequency": "Check frequency (minutes)",
+                "checkFrequencyHint": "Minimum {min} minutes; lower values are clamped."
+            },
+            "comparators": {
+                "gte": "At least (grow to target)",
+                "lte": "At most (shrink to target)"
+            },
+            "windows": {
+                "day": "Daily",
+                "week": "Weekly",
+                "month": "Monthly",
+                "total": "Total",
+                "point": "Point-in-time"
+            },
+            "errors": {
+                "titleRequired": "Title is required.",
+                "metricSourceRequired": "Provider plugin ID and metric ID are required.",
+                "targetInvalid": "Target value must be a number.",
+                "unitRequired": "Unit is required.",
+                "deadlineInvalid": "Deadline is not a valid date.",
+                "createFailed": "Couldn't create the Goal. Please try again."
+            },
+            "actions": {
+                "create": "Create Goal",
+                "cancel": "Cancel"
+            }
+        },
+        "goalDetail": {
+            "backToGoals": "Back to Goals",
+            "actions": {
+                "evaluateNow": "Evaluate now",
+                "activate": "Activate",
+                "pause": "Pause",
+                "delete": "Delete"
+            },
+            "sections": {
+                "progress": "Progress",
+                "details": "Details",
+                "outcome": "Outcome"
+            },
+            "progress": {
+                "current": "Current",
+                "target": "Target",
+                "noSamples": "No observations yet. Activate the Goal or run an evaluation to start collecting samples.",
+                "sampleCount": "{count} observations"
+            },
+            "comparator": {
+                "gte": "At least",
+                "lte": "At most"
+            },
+            "window": {
+                "day": "Daily",
+                "week": "Weekly",
+                "month": "Monthly",
+                "total": "Total",
+                "point": "Point-in-time"
+            },
+            "details": {
+                "plugin": "Provider",
+                "metric": "Metric",
+                "window": "Window",
+                "baseline": "Baseline",
+                "checkFrequency": "Check frequency",
+                "minutes": "{count} min",
+                "nextCheck": "Next check",
+                "deadline": "Deadline",
+                "noDeadline": "Open-ended",
+                "lastObserved": "Last observed"
+            },
+            "outcome": {
+                "hint": "How this Goal ended. Auto-set by evaluation, and always overridable by you.",
+                "overrideLabel": "Override outcome",
+                "overrideNote": "Setting an outcome completes the Goal; clearing it re-opens the outcome.",
+                "none": "None"
+            },
+            "outcomes": {
+                "achieved": "Achieved",
+                "missed": "Missed",
+                "abandoned": "Abandoned"
+            },
+            "toasts": {
+                "activated": "Goal activated",
+                "paused": "Goal paused",
+                "lifecycleError": "Couldn't update the Goal.",
+                "evaluated": "Evaluation complete",
+                "evaluateError": "Couldn't evaluate the Goal.",
+                "outcomeSaved": "Outcome updated",
+                "outcomeError": "Couldn't update the outcome.",
+                "deleted": "Goal deleted",
+                "deleteError": "Couldn't delete the Goal."
+            },
+            "confirm": {
+                "delete": "Delete this Goal? Its observation history and Mission links will be removed. This cannot be undone."
+            }
+        },
         "sidebar": {
             "menu": "תפריט",
             "aiChat": "צ'אט AI",
@@ -4136,14 +4568,17 @@
                 "dashboard": "לוח מחוונים",
                 "activity": "פעילות",
                 "missions": "Missions",
+                "goals": "Goals",
                 "ideas": "Ideas",
                 "works": "עבודות",
                 "tasks": "משימות",
                 "agents": "סוכנים",
+                "memory": "Memory",
                 "plugins": "תוספים",
                 "skills": "מיומנויות",
                 "templates": "תבניות",
-                "settings": "הגדרות"
+                "settings": "הגדרות",
+                "teams": "צוותים"
             },
             "tooltips": {
                 "expandSidebar": "הרחב צד",
@@ -4437,7 +4872,9 @@
                 "defaultSelected": "ברירת מחדל נבחרה",
                 "makeDefault": "הפוך לברירת מחדל",
                 "fork": "פיצול",
-                "useTemplate": "Use this Template",
+                "useTemplate": "Use",
+                "useTemplateFull": "Use this Template",
+                "moreActions": "More actions",
                 "edit": "עריכה",
                 "archive": "ארכיון",
                 "customizeAgain": "התאמה אישית שוב",
@@ -4610,11 +5047,30 @@
             }
         },
         "templateSelector": {
+            "label": "תבנית",
             "defaultOption": "השתמש בברירת המחדל",
             "defaultOptionWithName": "השתמש בברירת המחדל ({name})",
             "optionLabel": "{name}",
             "optionDefaultLabel": "{name} (ברירת מחדל)",
             "changeAnywayLink": "שנה בכל מקרה",
+            "typeLabel": "סוג תבנית",
+            "chipType": {
+                "website": "Website",
+                "landing": "Landing",
+                "blog": "Blog",
+                "directory": "Directory",
+                "store": "Store",
+                "company": "Company",
+                "awesome": "Awesome"
+            },
+            "searchPlaceholder": "חיפוש תבניות…",
+            "searchAriaLabel": "חיפוש תבניות",
+            "groupYourTemplates": "התבניות שלך",
+            "groupBlueprints": "Blueprints",
+            "featuredBadge": "מומלץ",
+            "defaultBadge": "ברירת מחדל",
+            "empty": "אין תבניות התואמות לחיפוש שלך.",
+            "resultCount": "{count, plural, =0 {אין תבניות} one {# תבנית} other {# תבניות}}",
             "origin": {
                 "standard": "תקן",
                 "forked": "מפוצל",
@@ -4681,6 +5137,150 @@
             "toggleError": "נכשל בשינוי מצב התוסף",
             "system": "מערכת",
             "goToPluginSettings": "עבור להגדרות התוסף"
+        },
+        "teamsPage": {
+            "title": "צוותים",
+            "subtitle": "ארגן את הסוכנים והחברים שלך בצוותים בתוך הארגון הזה.",
+            "orgChartCta": "מבנה ארגוני",
+            "newTeamCta": "צוות חדש",
+            "empty": {
+                "title": "אין צוותים עדיין",
+                "description": "צור את הצוות הראשון שלך כדי לקבץ סוכנים וחברים, ואז סדר אותם במבנה הארגוני.",
+                "cta": "צור צוות"
+            },
+            "noOrg": {
+                "title": "צוותים קיימים בתוך ארגון",
+                "description": "צור קודם ארגון — לאחר מכן תוכל לקבץ את הסוכנים והחברים שלו בצוותים.",
+                "cta": "צור ארגון"
+            },
+            "card": {
+                "agents": "{count, plural, one {סוכן אחד} two {שני סוכנים} many {# סוכנים} other {# סוכנים}}",
+                "members": "{count, plural, one {חבר אחד} two {שני חברים} many {# חברים} other {# חברים}}",
+                "subTeams": "{count, plural, one {תת-צוות אחד} two {שני תתי-צוותים} many {# תתי-צוותים} other {# תתי-צוותים}}"
+            },
+            "newDialog": {
+                "title": "צוות חדש",
+                "nameLabel": "שם",
+                "namePlaceholder": "לדוגמה: הנדסה",
+                "descriptionLabel": "תיאור",
+                "descriptionPlaceholder": "על מה הצוות הזה אחראי (אופציונלי)",
+                "parentLabel": "צוות אב",
+                "parentNone": "ללא צוות אב (רמה עליונה)",
+                "managerLabel": "סוכן מנהל",
+                "managerNone": "ללא מנהל",
+                "submit": "צור צוות",
+                "creating": "יוצר…",
+                "cancel": "בטל"
+            },
+            "detail": {
+                "overviewTab": "סקירה",
+                "settingsTab": "הגדרות",
+                "rosterTitle": "הרכב הצוות",
+                "subTeamsTitle": "תתי-צוותים",
+                "managerLabel": "מנהל",
+                "parentLabel": "צוות אב",
+                "addMemberCta": "הוסף חבר",
+                "addMemberTypeLabel": "סוג",
+                "addMemberAgent": "סוכן",
+                "addMemberUser": "חבר",
+                "addMemberSelectLabel": "מי",
+                "addMemberSubmit": "הוסף",
+                "adding": "מוסיף…",
+                "removeMember": "הסר",
+                "roleLead": "מוביל",
+                "roleMember": "חבר",
+                "emptyRoster": "אין חברים עדיין — הוסף סוכנים או עמיתים לצוות הזה."
+            },
+            "settings": {
+                "title": "הגדרות צוות",
+                "nameLabel": "שם",
+                "descriptionLabel": "תיאור",
+                "parentLabel": "צוות אב",
+                "managerLabel": "סוכן מנהל",
+                "save": "שמור שינויים",
+                "saving": "שומר…",
+                "saved": "הצוות עודכן",
+                "deleteTitle": "אזור סכנה",
+                "deleteDescription": "מחיקת צוות מעבירה את תתי-הצוותים שלו רמה אחת למעלה ומסירה את הרכב הצוות. סוכנים וחברים אינם נמחקים.",
+                "deleteCta": "מחק צוות",
+                "deleteConfirm": "למחוק את הצוות הזה? תתי-הצוותים יעלו רמה אחת; הסוכנים והחברים יישמרו.",
+                "deleting": "מוחק…"
+            },
+            "errors": {
+                "createFailed": "לא ניתן היה ליצור את הצוות",
+                "updateFailed": "לא ניתן היה לעדכן את הצוות",
+                "deleteFailed": "לא ניתן היה למחוק את הצוות",
+                "memberAddFailed": "לא ניתן היה להוסיף את החבר",
+                "memberRemoveFailed": "לא ניתן היה להסיר את החבר"
+            }
+        },
+        "orgChartPage": {
+            "title": "מבנה ארגוני",
+            "subtitle": "הצוותים, הסוכנים והחברים של הארגון הזה.",
+            "backToTeams": "צוותים",
+            "zoomIn": "התקרב",
+            "zoomOut": "התרחק",
+            "fitView": "התאמה",
+            "unassignedGroup": "לא משויכים",
+            "membersBadge": "{count, plural, one {חבר אחד} two {שני חברים} many {# חברים} other {# חברים}}",
+            "empty": "אין עדיין מה להציג — צור קודם צוותים או סוכנים בארגון הזה.",
+            "noOrg": "צור ארגון כדי לראות את המבנה הארגוני שלו."
+        },
+        "discover": {
+            "title": "גלה",
+            "subtitle": "רעיונות עבודה שנבחרו על ידי AI ומותאמים אישית עבורך."
+        },
+        "triggers": {
+            "title": "טריגרים נכנסים",
+            "subtitle": "Webhooks וקריאות API חתומים שיוצרים משימה בעת הפעלה.",
+            "new": "טריגר חדש",
+            "empty": "אין טריגרים עדיין. צור אחד כדי לקבל webhooks חתומים.",
+            "firedCount": "{count} הפעלות",
+            "lastFired": "הופעל לאחרונה",
+            "status": {
+                "active": "פעיל",
+                "paused": "מושהה"
+            },
+            "createTitle": "טריגר נכנס חדש",
+            "createDescription": "תקבל כתובת webhook חתומה וסוד. מערכות חיצוניות שולחות POST כדי ליצור משימה.",
+            "form": {
+                "name": "שם",
+                "namePlaceholder": "התראות פריסה",
+                "description": "תיאור",
+                "descriptionPlaceholder": "מה מפעיל את הטריגר הזה?",
+                "taskTitle": "תבנית כותרת משימה",
+                "taskTitlePlaceholder": "טריגר: {name}",
+                "taskTitleHint": "{name} מתרחב לשם הטריגר."
+            },
+            "actions": {
+                "pause": "השהה",
+                "resume": "המשך",
+                "rotate": "החלף סוד",
+                "delete": "מחק",
+                "cancel": "ביטול",
+                "create": "צור"
+            },
+            "reveal": {
+                "title": "סוד הטריגר",
+                "warning": "העתק את הסוד עכשיו — לא תוכל לראות אותו שוב.",
+                "url": "כתובת Webhook",
+                "secret": "סוד חתימה",
+                "curl": "דוגמה לבקשה חתומה",
+                "copy": "העתק",
+                "done": "סיום"
+            },
+            "toast": {
+                "created": "הטריגר נוצר",
+                "createFailed": "לא ניתן ליצור את הטריגר",
+                "rotated": "הסוד הוחלף",
+                "rotateFailed": "לא ניתן להחליף את הסוד",
+                "toggleFailed": "לא ניתן לעדכן את הטריגר",
+                "deleted": "הטריגר נמחק",
+                "deleteFailed": "לא ניתן למחוק את הטריגר",
+                "loadFailed": "לא ניתן לטעון את הטריגרים",
+                "copyFailed": "לא ניתן להעתיק ללוח"
+            },
+            "confirmDelete": "למחוק את הטריגר הזה? כתובת ה-webhook שלו תפסיק לפעול מיד ולא ניתן לבטל זאת."
         }
     },
     "layout": {
@@ -4749,9 +5349,8 @@
             "resetPassword": "אפס סיסמה",
             "authError": "שגיאת אימות",
             "dashboard": "לוח בקרה",
-            "activity": "יומן פעילות",
+            "activity": "פעילות",
             "works": "עבודות",
-            "discover": "גלה",
             "newWork": "עבודה חדשה",
             "work": "עבודה",
             "overview": "סקירה כללית",
@@ -4768,7 +5367,8 @@
             "security": "אבטחה",
             "apiKeys": "מפתחות API",
             "dangerZone": "אזור מסוכן",
-            "pluginSettings": "הגדרות תוסף"
+            "pluginSettings": "הגדרות תוסף",
+            "discover": "גלה"
         }
     },
     "api": {
@@ -4950,12 +5550,35 @@
         }
     },
     "organizations": {
+        "settings": {
+            "title": "Organization",
+            "subtitle": "Manage your Organization's shared context.",
+            "loading": "Loading…",
+            "selectLabel": "Organization",
+            "visionLabel": "Vision",
+            "visionPlaceholder": "e.g. Become the go-to platform where small teams launch and grow AI-run businesses.",
+            "visionHelp": "Shared with every AI agent working in this Organization — Idea generation, Mission runs, and agent tasks all receive it as context.",
+            "lastUpdated": "Vision last updated",
+            "save": "Save",
+            "saved": "Saved",
+            "empty": {
+                "title": "No Organization yet",
+                "description": "Create an Organization from the workspace switcher to set a company vision."
+            },
+            "errors": {
+                "generic": "Failed to save. Please try again."
+            }
+        },
         "switcher": {
             "heading": "Switch Organization",
             "createNew": "Create Organization",
             "loading": "Loading…"
         },
         "create": {
+            "visionToggle": "Add company vision (optional)",
+            "visionLabel": "Vision",
+            "visionPlaceholder": "e.g. Become the go-to platform where small teams launch and grow AI-run businesses.",
+            "visionHelp": "Optional. Guides all agents working in this Organization — Idea generation, Mission runs, and agent tasks receive it as context. You can add or edit it later in Settings.",
             "title": "Create Organization",
             "description": "Give your Organization a name. We'll allocate a unique slug for its URL.",
             "nameLabel": "Name",
@@ -4972,6 +5595,14 @@
                 "nameRequired": "Name is required",
                 "nameTooLong": "Name must be 200 characters or fewer",
                 "generic": "Failed to create Organization"
+            },
+            "templates": {
+                "label": "נקודת התחלה",
+                "blankTitle": "ארגון ריק",
+                "blankDescription": "התחל ריק — הוסף צוותים וסוכנים מאוחר יותר.",
+                "meta": "{agents, plural, one {סוכן אחד} two {שני סוכנים} many {# סוכנים} other {# סוכנים}} · {teams, plural, one {צוות אחד} two {שני צוותים} many {# צוותים} other {# צוותים}}",
+                "submitImport": "צור מתבנית",
+                "importError": "לא ניתן היה ליצור את הארגון מהתבנית הזו"
             }
         },
         "upgrade": {

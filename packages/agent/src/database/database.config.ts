@@ -38,7 +38,7 @@ import {
     WebhookDelivery,
     WorkProposal,
     WorkAgentPreference,
-    WorkAgentGoal,
+    WorkBuildRequest,
     WorkAgentRun,
     WorkAgentRunLog,
     WorkKnowledgeDocument,
@@ -48,15 +48,24 @@ import {
     WorkKnowledgeChunk,
     WorkKnowledgeChunkCoordinate,
     Mission,
+    // Goals & Metrics (PR-8)
+    Goal,
+    GoalMetricSample,
+    MissionGoal,
     // Tenants & Organizations (EW-651 epic) — Phase 1 / EW-653
     Tenant,
     Organization,
     // Agents/Skills/Tasks (PR #1017 specs)
     Agent,
+    // Agent Action Approval Queue — human-in-the-loop gate.
+    AgentActionProposal,
     AgentRun,
     AgentRunLog,
     AgentBudget,
     AgentMembership,
+    Team,
+    TeamMember,
+    TeamResource,
     Skill,
     SkillBinding,
     Task,
@@ -71,7 +80,9 @@ import {
     TaskKbMention,
     UserTaskCounter,
     MissionAttachment,
+    MissionWork,
     WorkProposalAttachment,
+    IdeaWork,
     AgentAttachment,
     // Notifications v2 (EW-650 + siblings)
     TenantEmailAddress,
@@ -93,6 +104,8 @@ import {
     TenantRuntimeProviderAllowlist,
     // Per-version credential snapshot history (EW-742 P1 T11 follow-up)
     TenantCredentialSnapshot,
+    // Inbound Triggers (Trigger Schedules) — signed webhook/API triggers
+    InboundTrigger,
 } from '../entities';
 import {
     PluginEntity,
@@ -169,21 +182,35 @@ export const ENTITIES = [
     WebhookDelivery,
     WorkProposal,
     WorkAgentPreference,
-    WorkAgentGoal,
+    WorkBuildRequest,
     WorkAgentRun,
     WorkAgentRunLog,
     // Missions / Ideas / Works (spec 2026-05-24, Phase 0 PR 0.2)
     Mission,
+    // Goals & Metrics (PR-8) — goals + append-only samples + Mission link.
+    // Registered here AND in entities/index.ts (bug-class: a
+    // forFeature'd-but-unregistered entity throws
+    // EntityMetadataNotFoundError → unmapped 500 on every query).
+    Goal,
+    GoalMetricSample,
+    MissionGoal,
     // Tenants & Organizations (EW-651 epic) — Phase 1 / EW-653
     Tenant,
     Organization,
     // Agents / Skills / Tasks (PR #1017 specs, Phase 1 + Phase 8)
     Agent,
+    // Agent Action Approval Queue — human-in-the-loop gate for side-effectful actions.
+    AgentActionProposal,
     AgentRun,
     AgentRunLog,
     AgentBudget,
     AgentMembership,
     AgentAttachment,
+    // Teams & Prebuilt Companies (teams-and-companies spec §2)
+    Team,
+    TeamMember,
+    // Team ↔ resource association (Works/Agents/Missions/Ideas/Tasks belong to Teams)
+    TeamResource,
     Skill,
     SkillBinding,
     // Phase 11 — Tasks family
@@ -200,7 +227,9 @@ export const ENTITIES = [
     UserTaskCounter,
     // PR #1044 — Mission/Idea attachment edge tables
     MissionAttachment,
+    MissionWork,
     WorkProposalAttachment,
+    IdeaWork,
     // Knowledge Base entities (EW-639 / EW-640)
     WorkKnowledgeDocument,
     WorkKnowledgeUpload,
@@ -240,6 +269,9 @@ export const ENTITIES = [
     // in-flight runs can bind to their captured credentials after a
     // rotation (ADR-017 §3 Q4).
     TenantCredentialSnapshot,
+    // Inbound Triggers (Trigger Schedules) — signed webhook/API triggers
+    // that spawn Tasks on verified HMAC deliveries.
+    InboundTrigger,
 ];
 
 /**

@@ -162,7 +162,7 @@ export const WHITELIST: WhitelistEntry[] = [
 	// needed.
 	// ────────────────────────────────────────────────────────────
 
-	// Missions (11)
+	// Missions (14)
 	{
 		method: 'GET',
 		path: '/api/me/missions',
@@ -194,6 +194,23 @@ export const WHITELIST: WhitelistEntry[] = [
 	{ method: 'POST', path: '/api/me/missions/{id}/complete', toolName: 'complete_mission' },
 	{ method: 'POST', path: '/api/me/missions/{id}/clone', toolName: 'clone_mission' },
 	{ method: 'POST', path: '/api/me/missions/{id}/run-now', toolName: 'run_mission_now' },
+	// PR-2 (domain-model evolution) — Mission ↔ Work typed relations.
+	// Attach/detach only records HOW a Mission relates to a Work
+	// (created|improves|operates|markets|researches|retires); it never
+	// transfers ownership and detach never touches the Work itself.
+	{
+		method: 'GET',
+		path: '/api/me/missions/{id}/works',
+		toolName: 'list_mission_works',
+		annotations: { readOnlyHint: true }
+	},
+	{ method: 'POST', path: '/api/me/missions/{id}/works', toolName: 'attach_work_to_mission' },
+	{
+		method: 'DELETE',
+		path: '/api/me/missions/{id}/works/{workId}/{relation}',
+		toolName: 'detach_work_from_mission',
+		annotations: { destructiveHint: true }
+	},
 
 	// Ideas / Work-Proposals (13)
 	{ method: 'POST', path: '/api/me/work-proposals', toolName: 'create_idea' },

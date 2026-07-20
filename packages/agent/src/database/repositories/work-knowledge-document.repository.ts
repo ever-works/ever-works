@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, Like, Not, Repository } from 'typeorm';
+import { Brackets, In, IsNull, Like, Not, Repository, SelectQueryBuilder } from 'typeorm';
 import { WorkKnowledgeDocument } from '../../entities/work-knowledge-document.entity';
 import {
     KB_ORG_INHERITABLE_CLASSES,
@@ -23,6 +23,42 @@ export interface KbDocumentListOptions {
     q?: string;
     limit?: number;
     offset?: number;
+}
+
+/**
+ * Org-wide Memory (Cortex P1) — options for the org-scoped aggregation
+ * over `work_knowledge_documents`.
+ *
+ * Unlike {@link KbDocumentListOptions} (which is single-scope: exactly
+ * one Work OR the org's own org-scoped rows), this is deliberately a
+ * MULTI-Work fan-in: it returns `(workId IN workIds) OR (org-scoped rows
+ * for organizationId)` in one feed. The mandatory-scope guard is
+ * preserved — a call with neither a non-empty `workIds` nor an
+ * `organizationId` throws, so an unscoped cross-tenant dump can never
+ * be produced (spec §2.1 / §7). Every legitimate caller resolves the
+ * org's Work ids via `WorkRepository.findIdsByOrganization` first.
+ */
+export interface OrgMemoryAggregateOptions {
+    /** Work ids in the active org (from `WorkRepository.findIdsByOrganization`). */
+    workIds?: string[];
+    /** Active org id — includes its own org-scoped (`workId IS NULL`) documents. */
+    organizationId?: string;
+    /** Facet filter: KB document classes (the Type chip). */
+    classes?: KbDocumentClass[];
+    /** Facet filter: lifecycle statuses (the Status chip). */
+    statuses?: KbDocumentStatus[];
+    /** Facet filter: sources (the Source chip). */
+    sources?: KbDocumentSource[];
+    /** Free-text lexical search over title + description. */
+    q?: string;
+    limit?: number;
+    offset?: number;
+}
+
+/** A single `{ value, count }` facet bucket for the Memory chips. */
+export interface OrgMemoryFacetCount {
+    value: string;
+    count: number;
 }
 
 /**
@@ -203,6 +239,170 @@ export class WorkKnowledgeDocumentRepository {
         return { items, total };
     }
 
+    /**
+     * Org-wide Memory (Cortex P1) — mandatory-scope predicate shared by
+     * {@link listForOrgAggregate} and {@link facetsForOrgAggregate}.
+     *
+     * Builds `(doc.workId IN workIds) OR (doc.organizationId = orgId AND
+     * doc.workId IS NULL)` and (optionally) the lexical `q` filter, so
+     * both the list feed and the facet counters see the exact same
+     * scope. Throws when NEITHER a non-empty `workIds` nor an
+     * `organizationId` is supplied — the same anti-cross-tenant-dump
+     * guard `list()` enforces, so an unscoped call can never leak every
+     * tenant's KB rows.
+     */
+    private applyOrgAggregateScope(
+        qb: SelectQueryBuilder<WorkKnowledgeDocument>,
+        opts: OrgMemoryAggregateOptions,
+    ): void {
+        const hasWorkIds = !!opts.workIds && opts.workIds.length > 0;
+        if (!hasWorkIds && !opts.organizationId) {
+            throw new Error(
+                'WorkKnowledgeDocumentRepository.listForOrgAggregate requires workIds or organizationId',
+            );
+        }
+
+        qb.andWhere(
+            new Brackets((w) => {
+                if (hasWorkIds) {
+                    w.orWhere('doc.workId IN (:...aggWorkIds)', { aggWorkIds: opts.workIds });
+                }
+                if (opts.organizationId) {
+                    w.orWhere('(doc.organizationId = :aggOrgId AND doc.workId IS NULL)', {
+                        aggOrgId: opts.organizationId,
+                    });
+                }
+            }),
+        );
+
+        if (opts.q) {
+            // Security: escape LIKE wildcards (%/_/\) in the user term and
+            // pair each predicate with an explicit ESCAPE clause — mirrors
+            // `list()` above. Value is bound (not SQLi); escaping stops a
+            // caller bypassing the filter or forcing a leading-wildcard scan.
+            qb.andWhere(
+                "(doc.title LIKE :aggQ ESCAPE '\\' OR doc.description LIKE :aggQ ESCAPE '\\')",
+                { aggQ: `%${sanitizeLikePattern(opts.q)}%` },
+            );
+        }
+    }
+
+    /**
+     * Org-wide Memory (Cortex P1) — the list feed. Returns the ranked,
+     * facet-filtered page of documents across the org's Works ∪ the org's
+     * own org-scoped rows, plus the true total (drives the "documents
+     * indexed" header counter).
+     */
+    async listForOrgAggregate(
+        opts: OrgMemoryAggregateOptions,
+    ): Promise<{ items: WorkKnowledgeDocument[]; total: number }> {
+        const qb = this.repository.createQueryBuilder('doc');
+        this.applyOrgAggregateScope(qb, opts);
+
+        if (opts.classes && opts.classes.length > 0) {
+            qb.andWhere('doc.kbDocumentClass IN (:...aggClasses)', { aggClasses: opts.classes });
+        }
+        if (opts.statuses && opts.statuses.length > 0) {
+            qb.andWhere('doc.status IN (:...aggStatuses)', { aggStatuses: opts.statuses });
+        }
+        if (opts.sources && opts.sources.length > 0) {
+            qb.andWhere('doc.source IN (:...aggSources)', { aggSources: opts.sources });
+        }
+
+        qb.orderBy('doc.updatedAt', 'DESC');
+
+        const total = await qb.getCount();
+
+        if (opts.limit !== undefined) {
+            qb.take(opts.limit);
+        }
+        if (opts.offset !== undefined) {
+            qb.skip(opts.offset);
+        }
+
+        const items = await qb.getMany();
+        return { items, total };
+    }
+
+    /**
+     * Org-wide Memory (Cortex P1) — the org-wide total document count.
+     *
+     * Counts every KB document across the org scope (its Works ∪ its own
+     * org-scoped rows) IGNORING the facet selections AND the lexical `q`,
+     * so the "documents indexed" header stays stable while the user
+     * searches or toggles chips. Only the mandatory scope predicate is
+     * applied — `q`, `classes`, `statuses` and `sources` are deliberately
+     * dropped by not forwarding them to {@link applyOrgAggregateScope}.
+     */
+    async countForOrgScope(opts: OrgMemoryAggregateOptions): Promise<number> {
+        const qb = this.repository.createQueryBuilder('doc');
+        this.applyOrgAggregateScope(qb, {
+            workIds: opts.workIds,
+            organizationId: opts.organizationId,
+        });
+        return qb.getCount();
+    }
+
+    /**
+     * Org-wide Memory (Cortex P1) — per-facet value counts for the chips.
+     *
+     * Computed over the SCOPE (+ lexical `q`) only, NOT the chip
+     * selections themselves, so multi-select chips show stable counts as
+     * the user toggles values. The `works` facet excludes org-scoped
+     * (`workId IS NULL`) rows — those documents belong to the org itself,
+     * not to any Work.
+     */
+    async facetsForOrgAggregate(opts: OrgMemoryAggregateOptions): Promise<{
+        types: OrgMemoryFacetCount[];
+        works: OrgMemoryFacetCount[];
+        statuses: OrgMemoryFacetCount[];
+        sources: OrgMemoryFacetCount[];
+    }> {
+        const baseQb = (): SelectQueryBuilder<WorkKnowledgeDocument> => {
+            const qb = this.repository.createQueryBuilder('doc');
+            this.applyOrgAggregateScope(qb, opts);
+            return qb;
+        };
+
+        const toBuckets = (
+            rows: Array<{ value: string | null; count: string | number }>,
+        ): OrgMemoryFacetCount[] =>
+            rows
+                .filter((r) => r.value !== null && r.value !== undefined)
+                .map((r) => ({ value: r.value as string, count: Number(r.count) }));
+
+        const [typeRows, workRows, statusRows, sourceRows] = await Promise.all([
+            baseQb()
+                .select('doc.kbDocumentClass', 'value')
+                .addSelect('COUNT(*)', 'count')
+                .groupBy('doc.kbDocumentClass')
+                .getRawMany<{ value: string | null; count: string }>(),
+            baseQb()
+                .andWhere('doc.workId IS NOT NULL')
+                .select('doc.workId', 'value')
+                .addSelect('COUNT(*)', 'count')
+                .groupBy('doc.workId')
+                .getRawMany<{ value: string | null; count: string }>(),
+            baseQb()
+                .select('doc.status', 'value')
+                .addSelect('COUNT(*)', 'count')
+                .groupBy('doc.status')
+                .getRawMany<{ value: string | null; count: string }>(),
+            baseQb()
+                .select('doc.source', 'value')
+                .addSelect('COUNT(*)', 'count')
+                .groupBy('doc.source')
+                .getRawMany<{ value: string | null; count: string }>(),
+        ]);
+
+        return {
+            types: toBuckets(typeRows),
+            works: toBuckets(workRows),
+            statuses: toBuckets(statusRows),
+            sources: toBuckets(sourceRows),
+        };
+    }
+
     async listInheritableForOrg(
         organizationId: string,
         classes?: KbDocumentClass[],
@@ -269,6 +469,22 @@ export class WorkKnowledgeDocumentRepository {
     async delete(docId: string): Promise<boolean> {
         const result = await this.repository.delete({ id: docId });
         return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Set (or clear, with `null`) the `consolidation` marker on many
+     * documents in a single UPDATE. Used by the consolidation apply pass to
+     * clear stale promotions without N per-row round-trips. No-op on an empty
+     * id list.
+     */
+    async bulkSetConsolidation(
+        docIds: string[],
+        consolidation: WorkKnowledgeDocument['consolidation'],
+    ): Promise<void> {
+        if (docIds.length === 0) return;
+        await this.repository.update({ id: In(docIds) }, {
+            consolidation,
+        } as Partial<WorkKnowledgeDocument>);
     }
 
     async setLock(

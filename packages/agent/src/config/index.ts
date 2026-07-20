@@ -403,6 +403,64 @@ export const config = {
         },
     },
 
+    /**
+     * PR-4 (domain-model evolution) — Idea → Work build executor.
+     *
+     * The Idea build pipeline is DORMANT on `develop`: creating a
+     * `WorkAgentGoal` via `POST /me/work-proposals/:id/build` (or
+     * retry / rebuild), or via Mission auto-build, flips the Idea to
+     * QUEUED but nothing ever transitions the Goal past
+     * WAITING_FOR_APPROVAL, so no Work is ever produced.
+     *
+     * This flag turns the executor on. It is **OFF by default**, so
+     * merging this PR is a strict no-op in production until an
+     * operator explicitly sets `EVER_WORKS_IDEA_BUILD_EXECUTOR_ENABLED=true`.
+     * When off, every enqueue site short-circuits and behavior is
+     * EXACTLY as today (Goal created, Idea QUEUED, nothing executes).
+     *
+     * `isDryRun()` defaults to `true`: even once the executor is
+     * enabled, it does NOT spend on real AI/deploy — it synthesizes a
+     * deterministic Goal outcome and drives the full completion state
+     * machine (accept → acceptedWorkId / retry / failed) so the wiring
+     * is observable without cost. Turning dry-run off is intentionally
+     * a second, separate switch; the real-generation path is a
+     * documented not-implemented stub (guarded by the budget guard),
+     * so flipping dry-run off today produces a telemetry no-op rather
+     * than real spend.
+     *
+     * NOTE (approval gate): enabling the executor implies auto-approval
+     * of Idea-build Goals — `WorkAgentService.createGoal` seeds them at
+     * WAITING_FOR_APPROVAL, and the executor advances them to RUNNING
+     * without a human approval click. This is scoped to Idea-build
+     * Goals (`ideaId` set); power-user direct Goals are untouched.
+     */
+    ideaBuildExecutor: {
+        /** Master switch. Default `false` — production no-op until flipped. */
+        isEnabled() {
+            return process.env.EVER_WORKS_IDEA_BUILD_EXECUTOR_ENABLED === 'true';
+        },
+        /**
+         * Dry-run mode. Default `true` (only `=== 'false'` disables it),
+         * so an operator who enables the executor still cannot trigger
+         * real spend without explicitly opting out of dry-run.
+         */
+        isDryRun() {
+            return process.env.EVER_WORKS_IDEA_BUILD_EXECUTOR_DRY_RUN !== 'false';
+        },
+        /**
+         * Deterministic synthetic outcome for dry-run mode: `success`
+         * (default) drives the accept → acceptedWorkId path; `failure`
+         * drives the terminal-failure path. Both exercise the full
+         * completion state machine without real generation. Operators
+         * flip this to watch either branch in a live dry-run.
+         */
+        getDryRunOutcome(): 'success' | 'failure' {
+            return process.env.EVER_WORKS_IDEA_BUILD_EXECUTOR_DRY_RUN_OUTCOME === 'failure'
+                ? 'failure'
+                : 'success';
+        },
+    },
+
     // EW-120 Activity Feed pull-mode plumbing — per-Work HMAC secret is
     // encrypted at rest with this key. AES-256-GCM expects a 32-byte key;
     // the consumer service decodes hex / base64 / utf8 in that order.

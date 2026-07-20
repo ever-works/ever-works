@@ -1,4 +1,4 @@
-import { IsOptional, IsString, Length } from 'class-validator';
+import { IsOptional, IsString, Length, MaxLength } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 /**
@@ -27,4 +27,16 @@ export class CreateOrganizationDto {
     @IsString()
     @Length(1, 64)
     slug?: string;
+
+    @ApiPropertyOptional({
+        description:
+            'PR-6 (review §23.5) — optional company vision statement. Trimmed and capped at 5000 chars; empty/whitespace-only is stored as NULL. When set, `visionUpdatedAt` is stamped.',
+        maxLength: 5000,
+    })
+    // Nullable column — `@IsOptional()` lets an explicit null through
+    // (treated the same as omitted at create time: stored as NULL).
+    @IsOptional()
+    @IsString()
+    @MaxLength(5000)
+    vision?: string | null;
 }

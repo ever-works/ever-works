@@ -46,6 +46,7 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'ActivityLog',
     // Agents/Skills/Tasks (PR #1019) ──
     'Agent',
+    'AgentActionProposal',
     'AgentAttachment',
     'AgentBudget',
     'AgentEmailAssignment',
@@ -66,8 +67,16 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'GitHubAppInstallation',
     'GitHubAppInstallationRepository',
     'GitHubAppUserLink',
+    // Inbound Triggers (Trigger Schedules) — signed webhook/API triggers
+    'InboundTrigger',
     'Mission',
+    // Domain-model evolution PR-8 — Goals + measurement
+    'Goal',
+    'GoalMetricSample',
+    'MissionGoal',
     'MissionAttachment',
+    'MissionWork',
+    'IdeaWork',
     'Notification',
     'NotificationChannel',
     'NotificationChannelDeliveryLog',
@@ -94,6 +103,11 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'TaskReviewer',
     'TaskWatcher',
     // ──────────────────────────
+    // Teams & Prebuilt Companies (teams-and-companies spec §2) ──
+    'Team',
+    'TeamMember',
+    'TeamResource',
+    // ──────────────────────────
     'Template',
     'TemplateCustomization',
     'Tenant',
@@ -117,12 +131,12 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'WebhookSubscription',
     'Work',
     'WorkAdvancedPrompts',
-    'WorkAgentGoal',
     'WorkAgentPreference',
     'WorkAgentRun',
     'WorkAgentRunLog',
     'WorkBudget',
     'WorkBudgetAlertState',
+    'WorkBuildRequest',
     'WorkCustomDomain',
     'WorkDeployment',
     'WorkGenerationHistory',

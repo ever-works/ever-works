@@ -15,11 +15,13 @@ import { API_BASE, authedHeaders, registerUserViaAPI, createWorkViaAPI } from '.
  * `/api/me/missions`.
  *
  * ── NON-DUPLICATION ─────────────────────────────────────────────────────
- * Deliberately DISJOINT from the seven sibling specs:
+ * Deliberately DISJOINT from the eight sibling specs:
  *   - flow-idea-build-lifecycle.spec.ts       — the build/retry/rebuild/dismiss
  *     state machine + ?statuses observability.
- *   - flow-idea-to-work-accept.spec.ts        — accept happy/idempotent/ownership
+ *   - flow-idea-to-work-accept.spec.ts        — accept happy/re-point/ownership
  *     + mission linkage round-trip.
+ *   - flow-idea-multi-work-links.spec.ts      — idea_works 0..N provenance
+ *     (multi-link accept, newest-first GET :id/works, per-Work back-pointers).
  *   - ideas-extension.spec.ts                 — shallow 401/404 contract pins.
  *   - flow-mission-idea-build.spec.ts         — Mission tick / cap math.
  *   - flow-mission-ideas-isolation.spec.ts    — scoping/ordering/counting lattice.
@@ -61,7 +63,10 @@ import { API_BASE, authedHeaders, registerUserViaAPI, createWorkViaAPI } from '.
  *      stamp). Was a 200 cross-user-linkage IDOR before the fix.
  *    · workId well-formed but NON-EXISTENT → 404 (the same ownership guard
  *      short-circuits when findById returns null); the Idea stays PENDING.
- *    · workId the CALLER owns → 200 { ok:true }, Idea ACCEPTED + stamped.
+ *    · workId the CALLER owns → 200 { ok:true }, Idea ACCEPTED + stamped BOTH
+ *      ways (review §23.1): `acceptedWorkId` on the Idea AND the Work-side
+ *      `acceptedFromIdeaId` back-pointer (first-writer-wins — a Work keeps at
+ *      most ONE source Idea), plus an authoritative `idea_works` provenance row.
  *    · ACCEPTED Idea → rebuild commits ACCEPTED→building, acceptedWorkId PRESERVED.
  *
  *  POST /api/me/missions  validation lattice
@@ -583,6 +588,14 @@ test.describe('Idea → Work accept — Work-side edge cases (FK, ownership, rol
         });
         expect(ok.status()).toBe(200);
         expect((await readIdea(request, headers, idea.id)).acceptedWorkId).toBe(work.id);
+
+        // Review §23.1: the successful accept stamped the WORK-side back-pointer
+        // too — `acceptedFromIdeaId` = the source Idea (first-writer-wins; this
+        // Work had no source Idea, so the stamp lands).
+        const workRead = await request.get(`${API_BASE}/api/works/${work.id}`, { headers });
+        expect(workRead.status(), `work read body=${await workRead.text()}`).toBe(200);
+        const workBody = await workRead.json();
+        expect((workBody?.work ?? workBody)?.acceptedFromIdeaId ?? null).toBe(idea.id);
     });
 
     test('rebuild of an ACCEPTED Idea commits ACCEPTED→building and PRESERVES acceptedWorkId (no Work re-point on the no-AI stack)', async ({
@@ -624,9 +637,13 @@ test.describe('Idea → Work accept — Work-side edge cases (FK, ownership, rol
         // on goal completion, which can't run here.
         expect(after.acceptedWorkId).toBe(work.id);
 
-        // The backing Work was NOT deleted by the rebuild.
+        // The backing Work was NOT deleted by the rebuild — and its §23.1
+        // back-pointer (stamped when the accept linked it) survives untouched:
+        // first-writer-wins means nothing ever re-points a Work's source Idea.
         const stillThere = await request.get(`${API_BASE}/api/works/${work.id}`, { headers });
         expect(stillThere.status()).toBe(200);
+        const stillBody = await stillThere.json();
+        expect((stillBody?.work ?? stillBody)?.acceptedFromIdeaId ?? null).toBe(idea.id);
     });
 });
 

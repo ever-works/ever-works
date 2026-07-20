@@ -16,7 +16,9 @@ export * from './agent-plugin-tools-facade';
 export * from './agent-tools-skill';
 export * from './agent-tool.service';
 export * from './budget-period';
+export * from './guardrails';
 export * from './heartbeat-cron';
+export * from './scorecard';
 export * from './types';
 // Re-export the entity types so api callers don't need a deep import.
 export {
@@ -27,6 +29,8 @@ export {
     AgentStatus,
     AGENT_PERMISSIONS_DEFAULT,
     type AgentPermissions,
+    type AgentScorecardMetric,
+    type AgentScorecardPeriod,
     type AgentTarget,
 } from '../entities/agent.entity';
 export { AgentBudget, type AgentBudgetIntervalUnit } from '../entities/agent-budget.entity';

@@ -19,6 +19,20 @@ export type AgentIdleBehavior = 'propose' | 'sleep' | 'self-improve';
 
 export type AgentFileName = 'SOUL.md' | 'AGENTS.md' | 'HEARTBEAT.md' | 'TOOLS.md' | 'agent.yml';
 
+// ── Agent Dispatch Guardrails ──
+// Pure guardrail types + the action-type tuple live in a
+// `server-only`-free module (`agents.shared.ts`) so `'use client'`
+// components (e.g. AgentGuardrailsCard) can import them without pulling
+// this server-only module into the client bundle. Re-exported here so
+// server-side callers keep one import site.
+export {
+    AGENT_GUARDRAIL_ACTION_TYPES,
+    type AgentGuardrailActionType,
+    type AgentGuardrailsMode,
+    type AgentGuardrails,
+} from './agents.shared';
+import type { AgentGuardrails } from './agents.shared';
+
 export interface AgentPermissions {
     canCreateAgents: boolean;
     canAssignTasks: boolean;
@@ -33,6 +47,23 @@ export interface AgentPermissions {
 export interface AgentTarget {
     type: 'mission' | 'work' | 'idea';
     id: string;
+}
+
+// Agent Scorecards increment 1 — mirrors `AgentScorecardMetric` /
+// `AgentScorecardPeriod` on the agent entity. Quantified per-Agent
+// goals; `current` is manually edited in this increment (auto-update
+// from run output + the org-dashboard at-risk roll-up are follow-ups).
+export type AgentScorecardPeriod = 'weekly' | 'monthly' | 'quarterly';
+
+export interface AgentScorecardMetric {
+    key: string;
+    label: string;
+    target: number;
+    current: number;
+    floor?: number | null;
+    stretch?: number | null;
+    unit?: string | null;
+    period: AgentScorecardPeriod;
 }
 
 export interface Agent {
@@ -52,6 +83,13 @@ export interface Agent {
     status: AgentStatus;
     permissions: AgentPermissions;
     targets: AgentTarget[] | null;
+    /**
+     * Teams & Companies spec §1.2 — direct-manager edge for the org
+     * chart (additive, descriptive-only in v1; same-org enforced by
+     * the API service).
+     */
+    reportsToAgentId: string | null;
+    guardrails: AgentGuardrails | null;
     heartbeatCadence: string | null;
     idleBehavior: AgentIdleBehavior;
     nextHeartbeatAt: string | null;
@@ -62,6 +100,7 @@ export interface Agent {
     avatarMode: AgentAvatarMode;
     avatarIcon: string | null;
     avatarImageUploadId: string | null;
+    scorecard: AgentScorecardMetric[] | null;
     contentHash: string | null;
     createdAt: string;
     updatedAt: string;
@@ -119,6 +158,9 @@ export interface UpdateAgentInput {
     avatarMode?: AgentAvatarMode;
     avatarIcon?: string | null;
     avatarImageUploadId?: string | null;
+    /** Teams & Companies spec §3 — additive PATCH field (null clears the manager edge). */
+    reportsToAgentId?: string | null;
+    scorecard?: AgentScorecardMetric[] | null;
 }
 
 export interface AgentFileBody {
@@ -244,6 +286,19 @@ export const agentsAPI = {
             endpoint: `/agents/${id}`,
             data: input,
             method: 'PATCH',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * PUT semantics — replaces the whole guardrails policy;
+     * `null` clears back to the default queue-everything posture.
+     */
+    async updateGuardrails(id: string, guardrails: AgentGuardrails | null): Promise<Agent> {
+        return serverMutation<Agent>({
+            endpoint: `/agents/${id}/guardrails`,
+            data: { guardrails },
+            method: 'PUT',
             wrapInData: false,
         });
     },

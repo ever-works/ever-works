@@ -47,7 +47,7 @@ export function PluginsCatalogStep({ cards, pluginsById, onExpand }: PluginsCata
                     No additional integrations available right now.
                 </div>
             ) : (
-                <div className="space-y-2 max-h-[420px] overflow-y-auto pr-1">
+                <div className="space-y-2">
                     {cards.map((card) => {
                         const plugin = pluginsById[card.pluginId];
                         const expanded = openId === card.pluginId;

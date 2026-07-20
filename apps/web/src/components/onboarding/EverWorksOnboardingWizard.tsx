@@ -300,7 +300,7 @@ function SideNav({
                     Get started with Ever Works
                 </h2>
                 <p className="text-[11px] leading-relaxed mt-1 text-text-muted dark:text-text-muted-dark">
-                    A guided 9-step walkthrough. You can change any choice later from Settings.
+                    A guided multi-step walkthrough. You can change any choice later from Settings.
                 </p>
             </div>
             <nav className="flex-1 px-3 pb-2 space-y-0.5 overflow-y-auto">
@@ -382,7 +382,11 @@ function StepBody({
 }) {
     switch (step.kind) {
         case 'welcome':
-            return <WelcomeStep />;
+            return (
+                <WelcomeStep
+                    upcomingSteps={flow.steps.filter((s) => s.kind !== 'welcome').map(labelForStep)}
+                />
+            );
         case 'ai-choice':
             return (
                 <ChoiceStep
@@ -414,7 +418,7 @@ function StepBody({
             return (
                 <ChoiceStep
                     title="Your storage"
-                    description="Where do you want your work repos to live?"
+                    description="Where do you want your Work repos to live?"
                     cards={catalog.storage}
                     selected={flow.state.storage.choice}
                     icons={STORAGE_ICONS}
@@ -428,7 +432,7 @@ function StepBody({
             return (
                 <ConfigStep
                     title="Connect your GitHub"
-                    description="Sign in with GitHub so we can create your work repos."
+                    description="Sign in with GitHub so we can create your Work repos."
                     plugin={plugin}
                     connection={connections['github'] ?? null}
                     isStatusLoading={isStatusLoading}
@@ -439,7 +443,7 @@ function StepBody({
             return (
                 <ChoiceStep
                     title="Your deployment"
-                    description="Where do you want your works to be deployed?"
+                    description="Where do you want your Works to be deployed?"
                     cards={catalog.deploy}
                     selected={flow.state.deploy.choice}
                     columns={3}
@@ -474,6 +478,7 @@ function StepBody({
                 <CreateWorkStep
                     onLeave={() => flow.finish()}
                     prompt={flow.state.prompt}
+                    onPromptChange={flow.setPrompt}
                     onQuickCreate={
                         flow.state.prompt
                             ? async (prompt) => {
@@ -616,7 +621,7 @@ function labelForStep(step: WizardStep): string {
         case 'plugins-catalog':
             return 'Plugins & Integrations';
         case 'create-work':
-            return 'Create your first work';
+            return 'Create your first Work';
         default:
             return step.kind;
     }

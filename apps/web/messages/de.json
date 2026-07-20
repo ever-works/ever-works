@@ -263,7 +263,8 @@
             "savedSuccess": "Einstellungen gespeichert.",
             "noSettings": "Keine Konfiguration für dieses Plugin erforderlich.",
             "getTokenPrompt": "Erstellen Sie zuerst ein Token, fügen Sie es unten ein und speichern Sie, um die Verbindung zu überprüfen.",
-            "loadingStatus": "Verbindungsstatus wird geladen…"
+            "loadingStatus": "Verbindungsstatus wird geladen…",
+            "setupGuide": "Setup guide"
         },
         "plugins": {
             "byokDescription": "Verbinden Sie Ihren eigenen Schlüssel, um die volle Konfiguration freizuschalten.",
@@ -455,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "Aktionsfreigaben",
+                "subtitle": "Ihre Agenten haben diese Aktionen mit Nebenwirkungen vorgeschlagen. Genehmigen oder lehnen Sie jede einzelne ab."
+            },
+            "actions": {
+                "approve": "Genehmigen",
+                "reject": "Ablehnen",
+                "approveAll": "Alle genehmigen"
+            },
+            "actionType": {
+                "spawn_agent": "Agent erstellen",
+                "schedule_task": "Aufgabe planen",
+                "send_message": "Nachricht senden",
+                "budget_override": "Budgetüberschreibung",
+                "other": "Aktion"
+            },
+            "riskFlags": {
+                "budget_override": "Budgetüberschreibung",
+                "destructive": "Destruktiv",
+                "cross_scope": "Bereichsübergreifend",
+                "high_fanout": "Hohe Verzweigung"
+            },
+            "toast": {
+                "approved": "Aktion genehmigt",
+                "rejected": "Aktion abgelehnt",
+                "bulkApproved": "{count} Aktionen genehmigt",
+                "bulkApprovedSkipped": "{approved} Aktionen genehmigt, {skipped} bereits entschieden",
+                "error": "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut."
+            }
+        },
         "title": "Übersicht",
         "connectGithub": {
             "title": "Verbinden Sie Ihr GitHub-Konto",
@@ -609,6 +641,55 @@
                 "reset": "Zurücksetzen"
             }
         },
+        "memoryPage": {
+            "consolidation": {
+                "action": "Konsolidieren",
+                "title": "Speicher konsolidieren",
+                "previewIntro": "Vorschau, was die Konsolidierung bewirkt. Es ändert sich nichts, bis Sie anwenden.",
+                "scanned": "{count} geprüft",
+                "promoted": "{count} hochgestuft",
+                "synthesized": "{count} zusammengefasst",
+                "superseded": "{count} ersetzt",
+                "promotedHeading": "Hochgestuft",
+                "supersededHeading": "Ersetzt",
+                "more": "+{count} weitere",
+                "apply": "Anwenden",
+                "cancel": "Abbrechen",
+                "applied": "Konsolidiert: {promoted} hochgestuft, {synthesized} zusammengefasst, {superseded} ersetzt",
+                "failed": "Konsolidierung fehlgeschlagen. Bitte versuchen Sie es erneut.",
+                "badgePromoted": "Hochgestuft",
+                "badgeSuperseded": "Ersetzt"
+            },
+            "title": "Memory",
+            "subtitle": "Alles, was Ihre Organisation weiß, an einem Ort — aggregiert aus der Knowledge Base jedes Werks.",
+            "searchPlaceholder": "Durchsuchen Sie alles, was die Organisation weiß…",
+            "newDocument": "Neu",
+            "documentsIndexed": "{count, plural, =0 {Keine Dokumente indexiert} one {# Dokument indexiert} other {# Dokumente indexiert}}",
+            "worksCovered": "{count, plural, =0 {keine Werke} one {# Werk} other {# Werke}}",
+            "filters": {
+                "type": "Typ",
+                "work": "Werk",
+                "source": "Quelle",
+                "status": "Status",
+                "clearAll": "Alle löschen"
+            },
+            "source": {
+                "workKb": "Work KB",
+                "orgKb": "Org KB",
+                "user": "Manual",
+                "agent": "Agent",
+                "imported": "Imported",
+                "seeded": "Seeded"
+            },
+            "empty": {
+                "title": "Noch nichts in Memory.",
+                "subtitle": "Während Ihre Werke ihre Knowledge Base aufbauen — Markendokumente, Personas, Recherchen, Styleguides — erscheint alles hier, durchsuchbar in der gesamten Organisation.",
+                "noOrg": "Wählen oder erstellen Sie eine Organisation, um deren aggregierte Memory zu sehen. Memory umfasst jedes Werk in der aktiven Organisation.",
+                "noResults": "Keine Dokumente entsprechen Ihrer Suche und Ihren Filtern."
+            },
+            "orgScoped": "Organisation",
+            "openInWork": "Im Werk öffnen"
+        },
         "agentsPage": {
             "title": "Agenten",
             "subtitle": "Ihre KI-Kollegen. Jeder trägt eine Seele (wer er/sie ist), Anweisungen und ein Budget - und agiert bei Missionen, Aufgaben oder Ihrem gesamten Mandanten.",
@@ -663,7 +744,11 @@
                 "templateStepTitle": "Von einer Vorlage aus starten (optional)",
                 "startFromScratch": "Von Grundlage starten",
                 "pickParentHint": "Wählen Sie ein {scope} oben aus, um fortzufahren, oder wählen Sie den Arbeitsbereich.",
-                "nextDisabledReason": "Wählen Sie ein übergeordnetes Element oder wählen Sie den Arbeitsbereich aus, um fortzufahren."
+                "nextDisabledReason": "Wählen Sie ein übergeordnetes Element oder wählen Sie den Arbeitsbereich aus, um fortzufahren.",
+                "teamLabel": "Team",
+                "teamNone": "Kein Team",
+                "reportsToLabel": "Berichtet an",
+                "reportsToNone": "Kein Manager"
             },
             "orDivider": "Oder",
             "createManually": "Agent manuell erstellen",
@@ -681,6 +766,42 @@
                 "yourTemplates": "Ihre Vorlagen",
                 "yourTemplatesEmpty": "Von Ihnen erstellte Agenten erscheinen hier als wiederverwendbare Vorlagen.",
                 "openInWizard": "Assistent öffnen"
+            },
+            "settings": {
+                "orgCard": {
+                    "title": "Organisation",
+                    "teamLabel": "Team",
+                    "teamNone": "Kein Team",
+                    "reportsToLabel": "Berichtet an",
+                    "reportsToNone": "Kein Manager",
+                    "save": "Speichern",
+                    "saving": "Wird gespeichert…"
+                }
+            },
+            "guardrails": {
+                "title": "Guardrails",
+                "subtitle": "Legen Sie fest, welche vorgeschlagenen Aktionen auf Ihre Freigabe warten, automatisch ausgeführt oder blockiert werden.",
+                "modeLabel": "Dispatch-Modus",
+                "modeRequireApproval": "Freigabe erforderlich",
+                "modeRequireApprovalHint": "Jede vorgeschlagene Aktion wartet in Ihrer Freigabe-Warteschlange, bis Sie entscheiden.",
+                "modeAutonomous": "Autonom",
+                "modeAutonomousHint": "Sichere Aktionen laufen ohne Wartezeit. Aktionen mit Risiko-Markierungen landen immer in Ihrer Freigabe-Warteschlange.",
+                "autoApproveLabel": "Automatisch freigegebene Aktionstypen",
+                "autoApproveHint": "Nur die ausgewählten Aktionstypen laufen automatisch; alles andere wartet weiterhin auf Freigabe.",
+                "blockedLabel": "Blockierte Aktionstypen",
+                "blockedHint": "Blockierte Aktionen werden automatisch abgelehnt und im Verlauf der Warteschlange festgehalten.",
+                "actionTypes": {
+                    "spawn_agent": "Agent erstellen",
+                    "schedule_task": "Aufgabe planen",
+                    "send_message": "Nachricht senden",
+                    "budget_override": "Budget-Überschreibung",
+                    "other": "Sonstiges"
+                },
+                "save": "Guardrails speichern",
+                "reset": "Auf Standard zurücksetzen",
+                "saveSuccess": "Guardrails gespeichert",
+                "saveError": "Guardrails konnten nicht gespeichert werden",
+                "resetSuccess": "Guardrails auf Standard zurückgesetzt"
             }
         },
         "tasksPage": {
@@ -938,6 +1059,33 @@
             "empty": "No budget data yet."
         },
         "missionDetail": {
+            "attachedWorks": {
+                "pickerTruncated": "Showing your 100 most recent Works - open the Works page for the full list.",
+                "title": "Attached Works",
+                "empty": "No Works attached to this Mission yet. Attach one below.",
+                "attachTitle": "Attach a Work",
+                "workLabel": "Work",
+                "workPlaceholder": "Select a Work",
+                "relationLabel": "Relation",
+                "attach": "Attach",
+                "detach": "Detach",
+                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "noWorksToAttach": "You have no Works to attach yet.",
+                "relations": {
+                    "created": "Created",
+                    "improves": "Improves",
+                    "operates": "Operates",
+                    "markets": "Markets",
+                    "researches": "Researches",
+                    "retires": "Retires"
+                },
+                "toasts": {
+                    "attached": "Work attached",
+                    "attachError": "Couldn't attach Work",
+                    "detached": "Work detached",
+                    "detachError": "Couldn't detach Work"
+                }
+            },
             "backToMissions": "Back to Missions",
             "badges": {
                 "scheduled": "Scheduled",
@@ -1003,6 +1151,23 @@
                 "cancel": "Cancel",
                 "confirm": "Clone Mission"
             },
+            "completeDialog": {
+                "title": "Complete this Mission",
+                "description": "Optionally record a conclusion verdict for this Mission. \"No verdict\" completes it without recording an outcome.",
+                "outcomeLabel": "Outcome (optional)",
+                "noVerdict": "No verdict",
+                "cancel": "Cancel",
+                "confirm": "Complete Mission"
+            },
+            "outcomes": {
+                "succeeded": "Succeeded",
+                "partially_succeeded": "Partially succeeded",
+                "failed": "Failed",
+                "cancelled": "Cancelled",
+                "superseded": "Superseded"
+            },
+            "outcomeTooltip": "Outcome recorded when this Mission was completed",
+            "completedAtLabel": "Completed",
             "toasts": {
                 "settingsSaved": "Mission settings saved",
                 "settingsError": "Couldn't save settings",
@@ -1095,11 +1260,15 @@
                 "creating": "Wird erstellt…",
                 "minLength": "Die Beschreibung muss mindestens 10 Zeichen lang sein.",
                 "error": "Die Idea konnte nicht erstellt werden. Bitte versuche es erneut."
+            },
+            "linkedWorks": {
+                "title": "Linked Works",
+                "kind": {
+                    "built": "Built",
+                    "linked": "Linked",
+                    "rebuilt": "Rebuilt"
+                }
             }
-        },
-        "discover": {
-            "title": "Entdecken",
-            "subtitle": "KI-kuratierte Arbeitsideen, die auf Sie zugeschnitten sind."
         },
         "header": {
             "welcome": "Willkommen zurück, {username}!",
@@ -1186,8 +1355,49 @@
                 }
             }
         },
+        "schedules": {
+            "title": "Zeitpläne",
+            "subtitle": "Alles, was in Ihren Werken, Agenten, Missions und Aufgaben geplant ausgeführt wird",
+            "fetchFailed": "Zeitpläne konnten nicht geladen werden",
+            "retry": "Wiederholen",
+            "columns": {
+                "owner": "Besitzer",
+                "cadence": "Intervall",
+                "nextRun": "Nächster Lauf",
+                "status": "Status"
+            },
+            "filters": {
+                "all": "Alle",
+                "activeOnly": "Nur aktive"
+            },
+            "sourceTypes": {
+                "recurringTask": "Wiederkehrende Aufgabe",
+                "agentHeartbeat": "Agent-Heartbeat",
+                "workSchedule": "Werk-Zeitplan",
+                "missionTick": "Mission-Tick",
+                "sourceValidation": "Quellenvalidierung",
+                "dataSync": "Datensynchronisierung",
+                "inboundTrigger": "Eingehender Trigger"
+            },
+            "statuses": {
+                "active": "Aktiv",
+                "paused": "Pausiert",
+                "disabled": "Deaktiviert",
+                "error": "Fehler",
+                "ended": "Beendet"
+            },
+            "empty": {
+                "title": "Noch nichts geplant",
+                "description": "Wiederkehrende Aufgaben, Agent-Heartbeats, Werk-Zeitpläne, Mission-Ticks, Quellenvalidierung und Datensynchronisierung erscheinen hier, sobald Sie sie eingerichtet haben.",
+                "noResults": "Keine Zeitpläne entsprechen dem aktuellen Filter."
+            }
+        },
         "activity": {
-            "title": "Aktivitätsprotokoll",
+            "viewToggle": {
+                "log": "Protokoll",
+                "schedules": "Zeitpläne"
+            },
+            "title": "Aktivität",
             "subtitle": "Verfolgen Sie alle Vorgänge in Ihren Werken",
             "loading": "Laden…",
             "fetchFailed": "Aktivitäten konnten nicht geladen werden",
@@ -1349,6 +1559,7 @@
             "subtitle": "Verwalten Sie Ihre Kontoeinstellungen und Vorlieben",
             "tabs": {
                 "profile": "Profil",
+                "organization": "Organization",
                 "security": "Sicherheit",
                 "apiKeys": "API-Schlüssel",
                 "data": "Daten",
@@ -1385,14 +1596,14 @@
                 "sections": {
                     "agent": {
                         "title": "Autonomer Arbeits-Agent",
-                        "description": "Lassen Sie den Agenten Ziele auf hoher Ebene planen, recherchieren und vorbereiten."
+                        "description": "Lassen Sie den Agenten Build-Anfragen auf hoher Ebene planen, recherchieren und vorbereiten."
                     },
                     "guardrails": {
                         "title": "Guardrails",
                         "description": "Legen Sie Grenzen fest, bevor der Agent Arbeitsaufgaben erstellen, Elemente hinzufügen oder Budgets ausgeben kann."
                     },
                     "queue": {
-                        "title": "Ziel in die Warteschlange einreihen",
+                        "title": "Build-Anfrage in die Warteschlange einreihen",
                         "description": "Geben Sie dem Agenten eine allgemeine Anweisung. Sie startet als ausstehend und läuft innerhalb Ihrer Schutzmechanismen."
                     },
                     "liveRun": {
@@ -1400,7 +1611,7 @@
                         "description": "Aktueller Status und jüngste Aktivität des Agenten."
                     },
                     "recentGoals": {
-                        "title": "Letzte Ziele",
+                        "title": "Letzte Build-Anfragen",
                         "description": "Ausstehende, laufende und abgeschlossene Arbeits-Agent-Anweisungen."
                     },
                     "autoGenerateIdeas": {
@@ -1431,7 +1642,7 @@
                     "approvalThreshold": "Genehmigungsgrenzwert",
                     "confirmBeforeCreate": "Vor dem Erstellen von Arbeitsaufgaben bestätigen",
                     "confirmBeforeDelete": "Vor dem Löschen von Elementen bestätigen",
-                    "dryRunThisGoal": "Dieses Ziel als Testlauf ausführen",
+                    "dryRunThisGoal": "Diese Build-Anfrage als Testlauf ausführen",
                     "autoGenerateCadenceMinutes": "Run every N minutes",
                     "autoGenerateBatchSize": "Ideas per cycle",
                     "autoBuildThrottlePerDay": "Daily auto-build cap",
@@ -1447,7 +1658,7 @@
                     "saveSettings": "Einstellungen speichern",
                     "saveSection": "Save",
                     "useDefault": "Use default",
-                    "queueGoal": "Ziel in die Warteschlange einreihen",
+                    "queueGoal": "Build-Anfrage in die Warteschlange einreihen",
                     "preparePlan": "Prepare plan",
                     "stop": "Stop"
                 },
@@ -1464,16 +1675,16 @@
                 },
                 "empty": {
                     "noActiveRun": "Keine aktive Arbeits-Agent-Ausführung.",
-                    "noGoals": "Noch keine Arbeits-Agent-Ziele.",
+                    "noGoals": "Noch keine Build-Anfragen des Arbeits-Agenten.",
                     "waitingForUpdate": "Warten auf das erste Update der Ausführung."
                 },
                 "toasts": {
                     "settingsSaved": "Einstellungen des Arbeits-Agenten gespeichert",
                     "settingsError": "Einstellungen konnten nicht gespeichert werden",
-                    "goalQueued": "Ziel des Arbeits-Agenten in die Warteschlange eingereiht",
-                    "goalError": "Ziel konnte nicht in die Warteschlange eingereiht werden",
-                    "goalCanceled": "Ziel des Arbeits-Agenten abgebrochen",
-                    "cancelError": "Ziel konnte nicht abgebrochen werden"
+                    "goalQueued": "Build-Anfrage des Arbeits-Agenten in die Warteschlange eingereiht",
+                    "goalError": "Build-Anfrage konnte nicht in die Warteschlange eingereiht werden",
+                    "goalCanceled": "Build-Anfrage des Arbeits-Agenten abgebrochen",
+                    "cancelError": "Build-Anfrage konnte nicht abgebrochen werden"
                 }
             },
             "data": {
@@ -1737,7 +1948,45 @@
             "tasksInFlight": "Laufende Aufgaben",
             "tasksBlocked": "{count} blockiert",
             "tasksNoBlockers": "keine Blocker",
-            "fromLastMonth": "vom letzten Monat"
+            "fromLastMonth": "vom letzten Monat",
+            "teams": "Teams"
+        },
+        "attention": {
+            "title": "Erfordert Aufmerksamkeit",
+            "kinds": {
+                "agentError": {
+                    "title": "Fehler bei Agent “{name}”",
+                    "subtitle": "Nach wiederholten Fehlern automatisch pausiert"
+                },
+                "scheduleFailed": {
+                    "title": "Zeitplan-Ausführung fehlgeschlagen",
+                    "subtitle": "Letzte Ausführung von “{name}” wurde nicht abgeschlossen"
+                },
+                "schedulePaused": {
+                    "title": "Zeitplan pausiert",
+                    "subtitle": "“{name}” nach wiederholten Fehlern pausiert"
+                },
+                "generationFailed": {
+                    "title": "Generierung fehlgeschlagen",
+                    "subtitle": "“{name}” konnte nicht erstellt werden"
+                },
+                "taskBlocked": {
+                    "title": "Aufgabe blockiert",
+                    "subtitle": "“{name}” benötigt eine Eingabe, um fortzufahren"
+                },
+                "budgetExceeded": {
+                    "title": "Budget überschritten",
+                    "subtitle": "Die Kontoausgaben haben ihr Limit erreicht"
+                }
+            }
+        },
+        "soon": {
+            "title": "Demnächst",
+            "more": "+{n} weitere",
+            "source": {
+                "work": "Werk",
+                "mission": "Mission"
+            }
         },
         "adminUsage": {
             "title": "Plattform-Nutzung",
@@ -1803,6 +2052,18 @@
             "createButton": "Werk erstellen"
         },
         "workDetail": {
+            "missions": {
+                "title": "Missions",
+                "subtitle": "Your Missions that relate to this Work. Missions never own Works — these are references.",
+                "relations": {
+                    "created": "Created",
+                    "improves": "Improves",
+                    "operates": "Operates",
+                    "markets": "Markets",
+                    "researches": "Researches",
+                    "retires": "Retires"
+                }
+            },
             "agentsDropdown": {
                 "trigger": "Agenten",
                 "heading": "Agenten für diese Aufgabe",
@@ -4126,6 +4387,177 @@
                 "unexpectedError": "Ein unerwarteter Fehler ist aufgetreten"
             }
         },
+        "goalsPage": {
+            "title": "Goals",
+            "subtitle": "Measurable targets evaluated automatically against your metrics providers. Each Goal tracks a live metric toward a target — open one to see its progress, run a check, or set an outcome.",
+            "newGoal": "New Goal",
+            "statuses": {
+                "draft": "Draft",
+                "active": "Active",
+                "paused": "Paused",
+                "completed": "Completed"
+            },
+            "outcomes": {
+                "achieved": "Achieved",
+                "missed": "Missed",
+                "abandoned": "Abandoned"
+            },
+            "filterBar": {
+                "status": "Status",
+                "anyStatus": "Any status",
+                "apply": "Apply",
+                "reset": "Reset"
+            },
+            "loadError": {
+                "title": "Could not load Goals."
+            },
+            "empty": {
+                "title": "No Goals yet.",
+                "subtitle": "Create a Goal to track a business metric toward a target — income, signups, churn, error rate — evaluated automatically on a schedule."
+            },
+            "pagination": {
+                "showing": "Showing {from}-{to}",
+                "noResults": "No results on this page",
+                "previous": "Previous",
+                "next": "Next"
+            },
+            "card": {
+                "comparator": {
+                    "gte": "At least",
+                    "lte": "At most"
+                },
+                "nextCheckPrefix": "Next check:",
+                "windowPrefix": "Window:",
+                "window": {
+                    "day": "Daily",
+                    "week": "Weekly",
+                    "month": "Monthly",
+                    "total": "Total",
+                    "point": "Point-in-time"
+                }
+            }
+        },
+        "goalNew": {
+            "title": "New Goal",
+            "subtitle": "Define a measurable target and the metric that tracks it. New Goals start as a draft — activate from the detail page to begin scheduled evaluation.",
+            "backToGoals": "Back to Goals",
+            "created": "Goal created",
+            "sections": {
+                "metricSource": "Metric source",
+                "target": "Target",
+                "cadence": "Evaluation cadence"
+            },
+            "fields": {
+                "title": "Title",
+                "titlePlaceholder": "e.g. Monthly Stripe income of $1,000",
+                "description": "Description",
+                "descriptionPlaceholder": "Optional context for this Goal",
+                "pluginId": "Provider plugin ID",
+                "metricId": "Metric ID",
+                "params": "Parameters (JSON)",
+                "paramsHint": "Optional provider-specific parameters as a JSON object (e.g. a currency filter).",
+                "paramsInvalid": "Parameters must be valid JSON.",
+                "paramsNotObject": "Parameters must be a JSON object.",
+                "comparator": "Direction",
+                "targetValue": "Target value",
+                "unit": "Unit",
+                "window": "Window",
+                "deadline": "Deadline (optional)",
+                "checkFrequency": "Check frequency (minutes)",
+                "checkFrequencyHint": "Minimum {min} minutes; lower values are clamped."
+            },
+            "comparators": {
+                "gte": "At least (grow to target)",
+                "lte": "At most (shrink to target)"
+            },
+            "windows": {
+                "day": "Daily",
+                "week": "Weekly",
+                "month": "Monthly",
+                "total": "Total",
+                "point": "Point-in-time"
+            },
+            "errors": {
+                "titleRequired": "Title is required.",
+                "metricSourceRequired": "Provider plugin ID and metric ID are required.",
+                "targetInvalid": "Target value must be a number.",
+                "unitRequired": "Unit is required.",
+                "deadlineInvalid": "Deadline is not a valid date.",
+                "createFailed": "Couldn't create the Goal. Please try again."
+            },
+            "actions": {
+                "create": "Create Goal",
+                "cancel": "Cancel"
+            }
+        },
+        "goalDetail": {
+            "backToGoals": "Back to Goals",
+            "actions": {
+                "evaluateNow": "Evaluate now",
+                "activate": "Activate",
+                "pause": "Pause",
+                "delete": "Delete"
+            },
+            "sections": {
+                "progress": "Progress",
+                "details": "Details",
+                "outcome": "Outcome"
+            },
+            "progress": {
+                "current": "Current",
+                "target": "Target",
+                "noSamples": "No observations yet. Activate the Goal or run an evaluation to start collecting samples.",
+                "sampleCount": "{count} observations"
+            },
+            "comparator": {
+                "gte": "At least",
+                "lte": "At most"
+            },
+            "window": {
+                "day": "Daily",
+                "week": "Weekly",
+                "month": "Monthly",
+                "total": "Total",
+                "point": "Point-in-time"
+            },
+            "details": {
+                "plugin": "Provider",
+                "metric": "Metric",
+                "window": "Window",
+                "baseline": "Baseline",
+                "checkFrequency": "Check frequency",
+                "minutes": "{count} min",
+                "nextCheck": "Next check",
+                "deadline": "Deadline",
+                "noDeadline": "Open-ended",
+                "lastObserved": "Last observed"
+            },
+            "outcome": {
+                "hint": "How this Goal ended. Auto-set by evaluation, and always overridable by you.",
+                "overrideLabel": "Override outcome",
+                "overrideNote": "Setting an outcome completes the Goal; clearing it re-opens the outcome.",
+                "none": "None"
+            },
+            "outcomes": {
+                "achieved": "Achieved",
+                "missed": "Missed",
+                "abandoned": "Abandoned"
+            },
+            "toasts": {
+                "activated": "Goal activated",
+                "paused": "Goal paused",
+                "lifecycleError": "Couldn't update the Goal.",
+                "evaluated": "Evaluation complete",
+                "evaluateError": "Couldn't evaluate the Goal.",
+                "outcomeSaved": "Outcome updated",
+                "outcomeError": "Couldn't update the outcome.",
+                "deleted": "Goal deleted",
+                "deleteError": "Couldn't delete the Goal."
+            },
+            "confirm": {
+                "delete": "Delete this Goal? Its observation history and Mission links will be removed. This cannot be undone."
+            }
+        },
         "sidebar": {
             "menu": "Menü",
             "aiChat": "AI-Chat",
@@ -4136,14 +4568,17 @@
                 "dashboard": "Dashboard",
                 "activity": "Aktivität",
                 "missions": "Missions",
+                "goals": "Goals",
                 "ideas": "Ideas",
                 "works": "Werke",
                 "tasks": "Aufgaben",
                 "agents": "Agenten",
+                "memory": "Memory",
                 "plugins": "Plugins",
                 "skills": "Fähigkeiten",
                 "templates": "Vorlagen",
-                "settings": "Einstellungen"
+                "settings": "Einstellungen",
+                "teams": "Teams"
             },
             "tooltips": {
                 "expandSidebar": "Sidebar erweitern",
@@ -4437,7 +4872,9 @@
                 "defaultSelected": "Standard ausgewählt",
                 "makeDefault": "Als Standard festlegen",
                 "fork": "Forken",
-                "useTemplate": "Use this Template",
+                "useTemplate": "Use",
+                "useTemplateFull": "Use this Template",
+                "moreActions": "More actions",
                 "edit": "Bearbeiten",
                 "archive": "Archivieren",
                 "customizeAgain": "Anpassen",
@@ -4610,11 +5047,30 @@
             }
         },
         "templateSelector": {
+            "label": "Vorlage",
             "defaultOption": "Standard verwenden",
             "defaultOptionWithName": "Standard verwenden ({name})",
             "optionLabel": "{name}",
             "optionDefaultLabel": "{name} (Standard)",
             "changeAnywayLink": "Trotzdem ändern",
+            "typeLabel": "Vorlagentyp",
+            "chipType": {
+                "website": "Website",
+                "landing": "Landing",
+                "blog": "Blog",
+                "directory": "Directory",
+                "store": "Store",
+                "company": "Company",
+                "awesome": "Awesome"
+            },
+            "searchPlaceholder": "Vorlagen suchen…",
+            "searchAriaLabel": "Vorlagen suchen",
+            "groupYourTemplates": "Ihre Vorlagen",
+            "groupBlueprints": "Blueprints",
+            "featuredBadge": "Empfohlen",
+            "defaultBadge": "Standard",
+            "empty": "Keine Vorlagen entsprechen Ihrer Suche.",
+            "resultCount": "{count, plural, =0 {Keine Vorlagen} one {# Vorlage} other {# Vorlagen}}",
             "origin": {
                 "standard": "Standard",
                 "forked": "Geforkt",
@@ -4681,6 +5137,150 @@
             "toggleError": "Plugin konnte nicht umgeschaltet werden",
             "system": "System",
             "goToPluginSettings": "Zu Plugin-Einstellungen"
+        },
+        "teamsPage": {
+            "title": "Teams",
+            "subtitle": "Organisieren Sie Ihre Agenten und Mitglieder in Teams innerhalb dieser Organisation.",
+            "orgChartCta": "Organigramm",
+            "newTeamCta": "Neues Team",
+            "empty": {
+                "title": "Noch keine Teams",
+                "description": "Erstellen Sie Ihr erstes Team, um Agenten und Mitglieder zu gruppieren, und ordnen Sie sie anschließend im Organigramm an.",
+                "cta": "Team erstellen"
+            },
+            "noOrg": {
+                "title": "Teams gehören zu einer Organisation",
+                "description": "Erstellen Sie zuerst eine Organisation – danach können Sie deren Agenten und Mitglieder in Teams gruppieren.",
+                "cta": "Organisation erstellen"
+            },
+            "card": {
+                "agents": "{count, plural, one {# Agent} other {# Agenten}}",
+                "members": "{count, plural, one {# Mitglied} other {# Mitglieder}}",
+                "subTeams": "{count, plural, one {# Unterteam} other {# Unterteams}}"
+            },
+            "newDialog": {
+                "title": "Neues Team",
+                "nameLabel": "Name",
+                "namePlaceholder": "z. B. Engineering",
+                "descriptionLabel": "Beschreibung",
+                "descriptionPlaceholder": "Wofür dieses Team zuständig ist (optional)",
+                "parentLabel": "Übergeordnetes Team",
+                "parentNone": "Kein übergeordnetes Team (oberste Ebene)",
+                "managerLabel": "Manager-Agent",
+                "managerNone": "Kein Manager",
+                "submit": "Team erstellen",
+                "creating": "Wird erstellt…",
+                "cancel": "Abbrechen"
+            },
+            "detail": {
+                "overviewTab": "Übersicht",
+                "settingsTab": "Einstellungen",
+                "rosterTitle": "Mitgliederliste",
+                "subTeamsTitle": "Unterteams",
+                "managerLabel": "Manager",
+                "parentLabel": "Übergeordnetes Team",
+                "addMemberCta": "Mitglied hinzufügen",
+                "addMemberTypeLabel": "Typ",
+                "addMemberAgent": "Agent",
+                "addMemberUser": "Mitglied",
+                "addMemberSelectLabel": "Wer",
+                "addMemberSubmit": "Hinzufügen",
+                "adding": "Wird hinzugefügt…",
+                "removeMember": "Entfernen",
+                "roleLead": "Leitung",
+                "roleMember": "Mitglied",
+                "emptyRoster": "Noch keine Mitglieder – fügen Sie diesem Team Agenten oder Teamkollegen hinzu."
+            },
+            "settings": {
+                "title": "Team-Einstellungen",
+                "nameLabel": "Name",
+                "descriptionLabel": "Beschreibung",
+                "parentLabel": "Übergeordnetes Team",
+                "managerLabel": "Manager-Agent",
+                "save": "Änderungen speichern",
+                "saving": "Wird gespeichert…",
+                "saved": "Team aktualisiert",
+                "deleteTitle": "Gefahrenzone",
+                "deleteDescription": "Beim Löschen eines Teams werden seine Unterteams eine Ebene nach oben verschoben und seine Mitgliederliste entfernt. Agenten und Mitglieder werden nicht gelöscht.",
+                "deleteCta": "Team löschen",
+                "deleteConfirm": "Dieses Team löschen? Unterteams rücken eine Ebene nach oben; Agenten und Mitglieder bleiben erhalten.",
+                "deleting": "Wird gelöscht…"
+            },
+            "errors": {
+                "createFailed": "Team konnte nicht erstellt werden",
+                "updateFailed": "Team konnte nicht aktualisiert werden",
+                "deleteFailed": "Team konnte nicht gelöscht werden",
+                "memberAddFailed": "Mitglied konnte nicht hinzugefügt werden",
+                "memberRemoveFailed": "Mitglied konnte nicht entfernt werden"
+            }
+        },
+        "orgChartPage": {
+            "title": "Organigramm",
+            "subtitle": "Teams, Agenten und Mitglieder dieser Organisation.",
+            "backToTeams": "Teams",
+            "zoomIn": "Vergrößern",
+            "zoomOut": "Verkleinern",
+            "fitView": "Einpassen",
+            "unassignedGroup": "Nicht zugewiesen",
+            "membersBadge": "{count, plural, one {# Mitglied} other {# Mitglieder}}",
+            "empty": "Noch nichts darzustellen – erstellen Sie zuerst Teams oder Agenten in dieser Organisation.",
+            "noOrg": "Erstellen Sie eine Organisation, um ihr Organigramm zu sehen."
+        },
+        "discover": {
+            "title": "Entdecken",
+            "subtitle": "KI-kuratierte Arbeitsideen, die auf Sie zugeschnitten sind."
+        },
+        "triggers": {
+            "title": "Eingehende Trigger",
+            "subtitle": "Signierte Webhooks und API-Aufrufe, die beim Auslösen eine Aufgabe erstellen.",
+            "new": "Neuer Trigger",
+            "empty": "Noch keine Trigger. Erstellen Sie einen, um signierte Webhooks zu empfangen.",
+            "firedCount": "{count} Auslösungen",
+            "lastFired": "zuletzt ausgelöst",
+            "status": {
+                "active": "Aktiv",
+                "paused": "Pausiert"
+            },
+            "createTitle": "Neuer eingehender Trigger",
+            "createDescription": "Sie erhalten eine signierte Webhook-URL und ein Geheimnis. Externe Systeme senden per POST, um eine Aufgabe zu erstellen.",
+            "form": {
+                "name": "Name",
+                "namePlaceholder": "Deployment-Benachrichtigungen",
+                "description": "Beschreibung",
+                "descriptionPlaceholder": "Was löst diesen Trigger aus?",
+                "taskTitle": "Vorlage für Aufgabentitel",
+                "taskTitlePlaceholder": "Trigger: {name}",
+                "taskTitleHint": "{name} wird durch den Trigger-Namen ersetzt."
+            },
+            "actions": {
+                "pause": "Pausieren",
+                "resume": "Fortsetzen",
+                "rotate": "Geheimnis rotieren",
+                "delete": "Löschen",
+                "cancel": "Abbrechen",
+                "create": "Erstellen"
+            },
+            "reveal": {
+                "title": "Trigger-Geheimnis",
+                "warning": "Kopieren Sie das Geheimnis jetzt — Sie können es später nicht mehr sehen.",
+                "url": "Webhook-URL",
+                "secret": "Signaturgeheimnis",
+                "curl": "Beispiel für eine signierte Anfrage",
+                "copy": "Kopieren",
+                "done": "Fertig"
+            },
+            "toast": {
+                "created": "Trigger erstellt",
+                "createFailed": "Trigger konnte nicht erstellt werden",
+                "rotated": "Geheimnis rotiert",
+                "rotateFailed": "Geheimnis konnte nicht rotiert werden",
+                "toggleFailed": "Trigger konnte nicht aktualisiert werden",
+                "deleted": "Trigger gelöscht",
+                "deleteFailed": "Trigger konnte nicht gelöscht werden",
+                "loadFailed": "Trigger konnten nicht geladen werden",
+                "copyFailed": "Kopieren in die Zwischenablage fehlgeschlagen"
+            },
+            "confirmDelete": "Diesen Trigger löschen? Seine Webhook-URL funktioniert sofort nicht mehr und dies kann nicht rückgängig gemacht werden."
         }
     },
     "layout": {
@@ -4749,9 +5349,8 @@
             "resetPassword": "Passwort zurücksetzen",
             "authError": "Authentifizierungsfehler",
             "dashboard": "Dashboard",
-            "activity": "Aktivitätsprotokoll",
+            "activity": "Aktivität",
             "works": "Werke",
-            "discover": "Entdecken",
             "newWork": "Neues Werk",
             "work": "Werk",
             "overview": "Übersicht",
@@ -4768,7 +5367,8 @@
             "security": "Sicherheit",
             "apiKeys": "API-Schlüssel",
             "dangerZone": "Gefahrenzone",
-            "pluginSettings": "Plugin-Einstellungen"
+            "pluginSettings": "Plugin-Einstellungen",
+            "discover": "Entdecken"
         }
     },
     "api": {
@@ -4950,12 +5550,35 @@
         }
     },
     "organizations": {
+        "settings": {
+            "title": "Organization",
+            "subtitle": "Manage your Organization's shared context.",
+            "loading": "Loading…",
+            "selectLabel": "Organization",
+            "visionLabel": "Vision",
+            "visionPlaceholder": "e.g. Become the go-to platform where small teams launch and grow AI-run businesses.",
+            "visionHelp": "Shared with every AI agent working in this Organization — Idea generation, Mission runs, and agent tasks all receive it as context.",
+            "lastUpdated": "Vision last updated",
+            "save": "Save",
+            "saved": "Saved",
+            "empty": {
+                "title": "No Organization yet",
+                "description": "Create an Organization from the workspace switcher to set a company vision."
+            },
+            "errors": {
+                "generic": "Failed to save. Please try again."
+            }
+        },
         "switcher": {
             "heading": "Switch Organization",
             "createNew": "Create Organization",
             "loading": "Loading…"
         },
         "create": {
+            "visionToggle": "Add company vision (optional)",
+            "visionLabel": "Vision",
+            "visionPlaceholder": "e.g. Become the go-to platform where small teams launch and grow AI-run businesses.",
+            "visionHelp": "Optional. Guides all agents working in this Organization — Idea generation, Mission runs, and agent tasks receive it as context. You can add or edit it later in Settings.",
             "title": "Create Organization",
             "description": "Give your Organization a name. We'll allocate a unique slug for its URL.",
             "nameLabel": "Name",
@@ -4972,6 +5595,14 @@
                 "nameRequired": "Name is required",
                 "nameTooLong": "Name must be 200 characters or fewer",
                 "generic": "Failed to create Organization"
+            },
+            "templates": {
+                "label": "Ausgangspunkt",
+                "blankTitle": "Leere Organisation",
+                "blankDescription": "Leer starten – Teams und Agenten später hinzufügen.",
+                "meta": "{agents, plural, one {# Agent} other {# Agenten}} · {teams, plural, one {# Team} other {# Teams}}",
+                "submitImport": "Aus Vorlage erstellen",
+                "importError": "Die Organisation konnte aus dieser Vorlage nicht erstellt werden"
             }
         },
         "upgrade": {

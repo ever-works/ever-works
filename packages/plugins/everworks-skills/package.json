@@ -47,6 +47,7 @@
 			"capabilities": [
 				"skills-provider"
 			],
+			"autoEnable": true,
 			"defaultForCapabilities": [
 				"skills-provider"
 			],

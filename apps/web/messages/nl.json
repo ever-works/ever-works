@@ -263,7 +263,8 @@
             "savedSuccess": "Instellingen opgeslagen.",
             "noSettings": "Geen configuratie vereist voor deze plugin.",
             "getTokenPrompt": "Maak eerst een token aan, plak het hieronder en sla op om de verbinding te verifiëren.",
-            "loadingStatus": "Verbindingsstatus laden..."
+            "loadingStatus": "Verbindingsstatus laden...",
+            "setupGuide": "Setup guide"
         },
         "plugins": {
             "byokDescription": "Verbind je eigen sleutel om de volledige configuratie te ontgrendelen.",
@@ -455,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "Actie-goedkeuringen",
+                "subtitle": "Je agents hebben deze acties met bijwerkingen voorgesteld. Keur elke actie goed of wijs deze af."
+            },
+            "actions": {
+                "approve": "Goedkeuren",
+                "reject": "Afwijzen",
+                "approveAll": "Alles goedkeuren"
+            },
+            "actionType": {
+                "spawn_agent": "Agent aanmaken",
+                "schedule_task": "Taak inplannen",
+                "send_message": "Bericht versturen",
+                "budget_override": "Budgetoverschrijving",
+                "other": "Actie"
+            },
+            "riskFlags": {
+                "budget_override": "Budgetoverschrijving",
+                "destructive": "Destructief",
+                "cross_scope": "Scope-overschrijdend",
+                "high_fanout": "Hoge fan-out"
+            },
+            "toast": {
+                "approved": "Actie goedgekeurd",
+                "rejected": "Actie afgewezen",
+                "bulkApproved": "{count} acties goedgekeurd",
+                "bulkApprovedSkipped": "{approved} acties goedgekeurd, {skipped} al beslist",
+                "error": "Er is iets misgegaan. Probeer het opnieuw."
+            }
+        },
         "title": "Dashboard",
         "connectGithub": {
             "title": "Verbind je GitHub-account",
@@ -546,17 +578,9 @@
             "title": "Missions",
             "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
             "newMission": "+ New Mission",
-            "quickAdd": {
-                "label": "Start een nieuwe Missie",
-                "submitTitle": "Maak Missie",
-                "minLength": "Beschrijving moet ten minste 10 tekens lang zijn.",
-                "created": "Missie gemaakt",
-                "error": "Kon Missie niet maken. Probeer het opnieuw."
-            },
             "empty": {
                 "title": "No Missions yet.",
-                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting.",
-                "openNew": "Open de unieke creator"
+                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting."
             },
             "card": {
                 "scheduled": "Scheduled",
@@ -572,11 +596,60 @@
             "filterBar": {
                 "search": "Zoeken",
                 "searchPlaceholder": "Titel of beschrijving",
-                "status": "Status",
                 "anyStatus": "Elke status",
                 "apply": "Toepassen",
-                "reset": "Herstellen"
+                "reset": "Resetten",
+                "status": "Status"
             }
+        },
+        "memoryPage": {
+            "consolidation": {
+                "action": "Consolideren",
+                "title": "Geheugen consolideren",
+                "previewIntro": "Voorbeeld van wat consolidatie zal doen. Er verandert niets totdat je toepast.",
+                "scanned": "{count} gescand",
+                "promoted": "{count} gepromoveerd",
+                "synthesized": "{count} samengevoegd",
+                "superseded": "{count} vervangen",
+                "promotedHeading": "Gepromoveerd",
+                "supersededHeading": "Vervangen",
+                "more": "+{count} meer",
+                "apply": "Toepassen",
+                "cancel": "Annuleren",
+                "applied": "Geconsolideerd: {promoted} gepromoveerd, {synthesized} samengevoegd, {superseded} vervangen",
+                "failed": "Consolidatie mislukt. Probeer het opnieuw.",
+                "badgePromoted": "Gepromoveerd",
+                "badgeSuperseded": "Vervangen"
+            },
+            "title": "Memory",
+            "subtitle": "Alles wat je organisatie weet, op één plek — samengevoegd uit de Knowledge Base van elk Werk.",
+            "searchPlaceholder": "Zoek in alles wat de organisatie weet…",
+            "newDocument": "Nieuw",
+            "documentsIndexed": "{count, plural, =0 {Geen documenten geïndexeerd} one {# document geïndexeerd} other {# documenten geïndexeerd}}",
+            "worksCovered": "{count, plural, =0 {geen Werken} one {# Werk} other {# Werken}}",
+            "filters": {
+                "type": "Type",
+                "work": "Werk",
+                "source": "Bron",
+                "status": "Status",
+                "clearAll": "Alles wissen"
+            },
+            "source": {
+                "workKb": "Work KB",
+                "orgKb": "Org KB",
+                "user": "Manual",
+                "agent": "Agent",
+                "imported": "Imported",
+                "seeded": "Seeded"
+            },
+            "empty": {
+                "title": "Nog niets in Memory.",
+                "subtitle": "Naarmate je Werken hun Knowledge Base opbouwen — merkdocumenten, persona’s, onderzoek, stijlgidsen — verschijnt alles hier, doorzoekbaar in de hele organisatie.",
+                "noOrg": "Selecteer of maak een Organisatie om de samengevoegde Memory te zien. Memory omvat elk Werk in de actieve Organisatie.",
+                "noResults": "Geen documenten komen overeen met je zoekopdracht en filters."
+            },
+            "orgScoped": "Organisatie",
+            "openInWork": "Openen in Werk"
         },
         "agentsPage": {
             "title": "Agenten",
@@ -622,7 +695,47 @@
                 "cancel": "Annuleren",
                 "back": "Terug",
                 "next": "Volgende",
-                "create": "Maak Agent"
+                "create": "Maak Agent",
+                "teamLabel": "Team",
+                "teamNone": "Geen team",
+                "reportsToLabel": "Rapporteert aan",
+                "reportsToNone": "Geen manager"
+            },
+            "settings": {
+                "orgCard": {
+                    "title": "Organisatie",
+                    "teamLabel": "Team",
+                    "teamNone": "Geen team",
+                    "reportsToLabel": "Rapporteert aan",
+                    "reportsToNone": "Geen manager",
+                    "save": "Opslaan",
+                    "saving": "Opslaan…"
+                }
+            },
+            "guardrails": {
+                "title": "Vangrails",
+                "subtitle": "Bepaal welke voorgestelde acties op je goedkeuring wachten, automatisch worden uitgevoerd of worden geblokkeerd.",
+                "modeLabel": "Dispatch-modus",
+                "modeRequireApproval": "Goedkeuring vereist",
+                "modeRequireApprovalHint": "Elke voorgestelde actie wacht in je goedkeuringswachtrij totdat je beslist.",
+                "modeAutonomous": "Autonoom",
+                "modeAutonomousHint": "Veilige acties worden direct uitgevoerd. Acties met risicomarkeringen komen altijd in je goedkeuringswachtrij.",
+                "autoApproveLabel": "Automatisch goedgekeurde actietypes",
+                "autoApproveHint": "Alleen de geselecteerde actietypes worden automatisch uitgevoerd; al het andere blijft in de wachtrij.",
+                "blockedLabel": "Geblokkeerde actietypes",
+                "blockedHint": "Geblokkeerde acties worden automatisch afgewezen en vastgelegd in de wachtrijgeschiedenis.",
+                "actionTypes": {
+                    "spawn_agent": "Agent aanmaken",
+                    "schedule_task": "Taak inplannen",
+                    "send_message": "Bericht versturen",
+                    "budget_override": "Budgetoverschrijving",
+                    "other": "Overig"
+                },
+                "save": "Vangrails opslaan",
+                "reset": "Terugzetten naar standaard",
+                "saveSuccess": "Vangrails opgeslagen",
+                "saveError": "Kon vangrails niet opslaan",
+                "resetSuccess": "Vangrails teruggezet naar standaard"
             }
         },
         "tasksPage": {
@@ -796,6 +909,33 @@
             "empty": "No budget data yet."
         },
         "missionDetail": {
+            "attachedWorks": {
+                "pickerTruncated": "Showing your 100 most recent Works - open the Works page for the full list.",
+                "title": "Attached Works",
+                "empty": "No Works attached to this Mission yet. Attach one below.",
+                "attachTitle": "Attach a Work",
+                "workLabel": "Work",
+                "workPlaceholder": "Select a Work",
+                "relationLabel": "Relation",
+                "attach": "Attach",
+                "detach": "Detach",
+                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "noWorksToAttach": "You have no Works to attach yet.",
+                "relations": {
+                    "created": "Created",
+                    "improves": "Improves",
+                    "operates": "Operates",
+                    "markets": "Markets",
+                    "researches": "Researches",
+                    "retires": "Retires"
+                },
+                "toasts": {
+                    "attached": "Work attached",
+                    "attachError": "Couldn't attach Work",
+                    "detached": "Work detached",
+                    "detachError": "Couldn't detach Work"
+                }
+            },
             "backToMissions": "Back to Missions",
             "badges": {
                 "scheduled": "Scheduled",
@@ -861,6 +1001,23 @@
                 "cancel": "Cancel",
                 "confirm": "Clone Mission"
             },
+            "completeDialog": {
+                "title": "Complete this Mission",
+                "description": "Optionally record a conclusion verdict for this Mission. \"No verdict\" completes it without recording an outcome.",
+                "outcomeLabel": "Outcome (optional)",
+                "noVerdict": "No verdict",
+                "cancel": "Cancel",
+                "confirm": "Complete Mission"
+            },
+            "outcomes": {
+                "succeeded": "Succeeded",
+                "partially_succeeded": "Partially succeeded",
+                "failed": "Failed",
+                "cancelled": "Cancelled",
+                "superseded": "Superseded"
+            },
+            "outcomeTooltip": "Outcome recorded when this Mission was completed",
+            "completedAtLabel": "Completed",
             "toasts": {
                 "settingsSaved": "Mission settings saved",
                 "settingsError": "Couldn't save settings",
@@ -893,7 +1050,6 @@
                 "label": "Add a new Idea",
                 "placeholder": "Describe an Idea — e.g. \"A curated list of the best AI coding agents released this year\"",
                 "submit": "Add",
-                "submitTitle": "Idee toevoegen",
                 "minLength": "Description must be at least 10 characters."
             },
             "toggles": {
@@ -937,11 +1093,31 @@
                 "anyStatus": "Elke status",
                 "apply": "Toepassen",
                 "reset": "Herstellen"
+            },
+            "newPage": {
+                "link": "Handmatig aanmaken",
+                "or": "Of",
+                "title": "Nieuwe Idea",
+                "subtitle": "Schrijf je eigen Idea. Beschrijf het Work dat je wilt maken — je kunt het daarna in de wachtrij zetten om te bouwen.",
+                "nameLabel": "Titel",
+                "namePlaceholder": "Optioneel — laat leeg om het uit de beschrijving af te leiden",
+                "descriptionLabel": "Beschrijving",
+                "descriptionPlaceholder": "Beschrijf het Work dat deze Idea moet worden — bijv. “Een samengestelde directory van open-source AI-agentframeworks, geordend op frameworktype en licentie.”",
+                "descriptionHint": "Minstens 10 tekens.",
+                "cancel": "Annuleren",
+                "create": "Idea aanmaken",
+                "creating": "Aanmaken…",
+                "minLength": "De beschrijving moet minstens 10 tekens bevatten.",
+                "error": "Kan de Idea niet aanmaken. Probeer het opnieuw."
+            },
+            "linkedWorks": {
+                "title": "Linked Works",
+                "kind": {
+                    "built": "Built",
+                    "linked": "Linked",
+                    "rebuilt": "Rebuilt"
+                }
             }
-        },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
         },
         "header": {
             "welcome": "Welkom terug, {username}!",
@@ -1127,6 +1303,10 @@
                     "failed": "Mislukt",
                     "cancelled": "Geannuleerd"
                 }
+            },
+            "viewToggle": {
+                "log": "Logboek",
+                "schedules": "Planningen"
             }
         },
         "works": {
@@ -1190,6 +1370,7 @@
             "subtitle": "Beheer je accountinstellingen en voorkeuren",
             "tabs": {
                 "profile": "Profiel",
+                "organization": "Organization",
                 "security": "Beveiliging",
                 "apiKeys": "API-sleutels",
                 "data": "Gegevens",
@@ -1226,14 +1407,14 @@
                 "sections": {
                     "agent": {
                         "title": "Work agent planning",
-                        "description": "Prepare approval-ready Work plans from high-level goals. Live execution stays blocked until an executor is connected."
+                        "description": "Prepare approval-ready Work plans from high-level build requests. Live execution stays blocked until an executor is connected."
                     },
                     "guardrails": {
                         "title": "Guardrails",
                         "description": "Set hard limits that future live execution must follow before creating Works, adding items, or spending budget."
                     },
                     "queue": {
-                        "title": "Queue a goal",
+                        "title": "Queue a build request",
                         "description": "Give the agent a broad instruction. It creates an approval-ready plan inside your guardrails."
                     },
                     "liveRun": {
@@ -1241,7 +1422,7 @@
                         "description": "Current state and recent agent activity."
                     },
                     "recentGoals": {
-                        "title": "Recent goals",
+                        "title": "Recent build requests",
                         "description": "Pending, running, and completed Work agent instructions."
                     },
                     "autoGenerateIdeas": {
@@ -1272,7 +1453,7 @@
                     "approvalThreshold": "Approval threshold",
                     "confirmBeforeCreate": "Confirm before creating Works",
                     "confirmBeforeDelete": "Confirm before deleting items",
-                    "dryRunThisGoal": "Dry run this goal",
+                    "dryRunThisGoal": "Dry run this build request",
                     "autoGenerateCadenceMinutes": "Run every N minutes",
                     "autoGenerateBatchSize": "Ideas per cycle",
                     "autoBuildThrottlePerDay": "Daily auto-build cap",
@@ -1288,7 +1469,7 @@
                     "saveSettings": "Save settings",
                     "saveSection": "Save",
                     "useDefault": "Use default",
-                    "queueGoal": "Queue goal",
+                    "queueGoal": "Queue build request",
                     "preparePlan": "Prepare plan",
                     "stop": "Stop"
                 },
@@ -1305,16 +1486,16 @@
                 },
                 "empty": {
                     "noActiveRun": "No active Work agent run.",
-                    "noGoals": "No Work agent goals yet.",
+                    "noGoals": "No Work agent build requests yet.",
                     "waitingForUpdate": "Waiting for the first run update."
                 },
                 "toasts": {
                     "settingsSaved": "Work agent settings saved",
                     "settingsError": "Failed to save settings",
                     "goalQueued": "Work agent plan prepared",
-                    "goalError": "Failed to queue goal",
-                    "goalCanceled": "Work agent goal canceled",
-                    "cancelError": "Failed to cancel goal"
+                    "goalError": "Failed to queue build request",
+                    "goalCanceled": "Work agent build request canceled",
+                    "cancelError": "Failed to cancel build request"
                 }
             },
             "data": {
@@ -1573,7 +1754,45 @@
             "totalItems": "Totaal items",
             "activeWebsites": "Actieve websites",
             "monthSpend": "Month Spend",
-            "fromLastMonth": "van afgelopen maand"
+            "fromLastMonth": "van afgelopen maand",
+            "teams": "Teams"
+        },
+        "attention": {
+            "title": "Vereist aandacht",
+            "kinds": {
+                "agentError": {
+                    "title": "Fout bij agent “{name}”",
+                    "subtitle": "Automatisch gepauzeerd na herhaalde fouten"
+                },
+                "scheduleFailed": {
+                    "title": "Geplande uitvoering mislukt",
+                    "subtitle": "Laatste uitvoering van “{name}” is niet voltooid"
+                },
+                "schedulePaused": {
+                    "title": "Planning gepauzeerd",
+                    "subtitle": "“{name}” gepauzeerd na herhaalde fouten"
+                },
+                "generationFailed": {
+                    "title": "Generatie mislukt",
+                    "subtitle": "“{name}” kon niet worden gebouwd"
+                },
+                "taskBlocked": {
+                    "title": "Taak geblokkeerd",
+                    "subtitle": "“{name}” heeft invoer nodig om door te gaan"
+                },
+                "budgetExceeded": {
+                    "title": "Budget overschreden",
+                    "subtitle": "De accountuitgaven hebben hun limiet bereikt"
+                }
+            }
+        },
+        "soon": {
+            "title": "Binnenkort",
+            "more": "+{n} meer",
+            "source": {
+                "work": "Werk",
+                "mission": "Mission"
+            }
         },
         "adminUsage": {
             "title": "Platform usage",
@@ -1639,6 +1858,18 @@
             "createButton": "Werk aanmaken"
         },
         "workDetail": {
+            "missions": {
+                "title": "Missions",
+                "subtitle": "Your Missions that relate to this Work. Missions never own Works — these are references.",
+                "relations": {
+                    "created": "Created",
+                    "improves": "Improves",
+                    "operates": "Operates",
+                    "markets": "Markets",
+                    "researches": "Researches",
+                    "retires": "Retires"
+                }
+            },
             "agentsDropdown": {
                 "trigger": "Agenten",
                 "heading": "Agenten voor deze Work",
@@ -3394,7 +3625,7 @@
         },
         "newPage": {
             "title": "+ New",
-            "subtitle": "Tell the agent what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
+            "subtitle": "Tell us what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
             "promptLabel": "What do you want to build?",
             "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
             "chipLabel": "Pick a kind",
@@ -3409,19 +3640,21 @@
                 "company": "Company"
             },
             "chipDescriptions": {
-                "mission": "Een doorlopend Doel waar de agent aan blijft werken — genereert Idees op een schema of in één keer.",
-                "idea": "Een eenmalige briefing die de agent omzet naar een Work plan dat je kunt bouwen.",
-                "website": "Een meerdere pagina's site voor een bedrijf, dienst, of merk — gegenereerde content + code.",
-                "landing-page": "Een gerichte één-pagina — wachtlijsten, productlanceringen, webinar aanmeldingen, lead capture.",
-                "blog": "Een blog met categorieën, RSS, code highlighting, en SEO-ready content.",
-                "directory": "Een geselecteerde directory site met zoekfunctie, filters, en gestructureerde item data.",
-                "awesome-repo": "Een awesome-list repo — markdown index, gecategoriseerde links, en verversbare metadata.",
+                "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
+                "idea": "A one-shot brief the agent turns into a Work plan you can build.",
+                "agent": "An AI teammate that acts across Missions, Works, or your whole Workspace.",
+                "task": "A trackable item assigned to a person or an Agent.",
+                "website": "A multi-page site for a business, service, or brand — generated content + code.",
+                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
+                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
+                "directory": "A curated directory site with search, filters, and structured item data.",
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
                 "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
-            "submitTitle": "Maken",
             "or": "or",
             "hints": {
+                "pickChip": "Pick a chip above to enable Create.",
                 "minLength": "Add a description (at least 10 characters) to enable Create."
             },
             "toasts": {
@@ -3929,6 +4162,177 @@
                 "unexpectedError": "Er is een onverwachte fout opgetreden"
             }
         },
+        "goalsPage": {
+            "title": "Goals",
+            "subtitle": "Measurable targets evaluated automatically against your metrics providers. Each Goal tracks a live metric toward a target — open one to see its progress, run a check, or set an outcome.",
+            "newGoal": "New Goal",
+            "statuses": {
+                "draft": "Draft",
+                "active": "Active",
+                "paused": "Paused",
+                "completed": "Completed"
+            },
+            "outcomes": {
+                "achieved": "Achieved",
+                "missed": "Missed",
+                "abandoned": "Abandoned"
+            },
+            "filterBar": {
+                "status": "Status",
+                "anyStatus": "Any status",
+                "apply": "Apply",
+                "reset": "Reset"
+            },
+            "loadError": {
+                "title": "Could not load Goals."
+            },
+            "empty": {
+                "title": "No Goals yet.",
+                "subtitle": "Create a Goal to track a business metric toward a target — income, signups, churn, error rate — evaluated automatically on a schedule."
+            },
+            "pagination": {
+                "showing": "Showing {from}-{to}",
+                "noResults": "No results on this page",
+                "previous": "Previous",
+                "next": "Next"
+            },
+            "card": {
+                "comparator": {
+                    "gte": "At least",
+                    "lte": "At most"
+                },
+                "nextCheckPrefix": "Next check:",
+                "windowPrefix": "Window:",
+                "window": {
+                    "day": "Daily",
+                    "week": "Weekly",
+                    "month": "Monthly",
+                    "total": "Total",
+                    "point": "Point-in-time"
+                }
+            }
+        },
+        "goalNew": {
+            "title": "New Goal",
+            "subtitle": "Define a measurable target and the metric that tracks it. New Goals start as a draft — activate from the detail page to begin scheduled evaluation.",
+            "backToGoals": "Back to Goals",
+            "created": "Goal created",
+            "sections": {
+                "metricSource": "Metric source",
+                "target": "Target",
+                "cadence": "Evaluation cadence"
+            },
+            "fields": {
+                "title": "Title",
+                "titlePlaceholder": "e.g. Monthly Stripe income of $1,000",
+                "description": "Description",
+                "descriptionPlaceholder": "Optional context for this Goal",
+                "pluginId": "Provider plugin ID",
+                "metricId": "Metric ID",
+                "params": "Parameters (JSON)",
+                "paramsHint": "Optional provider-specific parameters as a JSON object (e.g. a currency filter).",
+                "paramsInvalid": "Parameters must be valid JSON.",
+                "paramsNotObject": "Parameters must be a JSON object.",
+                "comparator": "Direction",
+                "targetValue": "Target value",
+                "unit": "Unit",
+                "window": "Window",
+                "deadline": "Deadline (optional)",
+                "checkFrequency": "Check frequency (minutes)",
+                "checkFrequencyHint": "Minimum {min} minutes; lower values are clamped."
+            },
+            "comparators": {
+                "gte": "At least (grow to target)",
+                "lte": "At most (shrink to target)"
+            },
+            "windows": {
+                "day": "Daily",
+                "week": "Weekly",
+                "month": "Monthly",
+                "total": "Total",
+                "point": "Point-in-time"
+            },
+            "errors": {
+                "titleRequired": "Title is required.",
+                "metricSourceRequired": "Provider plugin ID and metric ID are required.",
+                "targetInvalid": "Target value must be a number.",
+                "unitRequired": "Unit is required.",
+                "deadlineInvalid": "Deadline is not a valid date.",
+                "createFailed": "Couldn't create the Goal. Please try again."
+            },
+            "actions": {
+                "create": "Create Goal",
+                "cancel": "Cancel"
+            }
+        },
+        "goalDetail": {
+            "backToGoals": "Back to Goals",
+            "actions": {
+                "evaluateNow": "Evaluate now",
+                "activate": "Activate",
+                "pause": "Pause",
+                "delete": "Delete"
+            },
+            "sections": {
+                "progress": "Progress",
+                "details": "Details",
+                "outcome": "Outcome"
+            },
+            "progress": {
+                "current": "Current",
+                "target": "Target",
+                "noSamples": "No observations yet. Activate the Goal or run an evaluation to start collecting samples.",
+                "sampleCount": "{count} observations"
+            },
+            "comparator": {
+                "gte": "At least",
+                "lte": "At most"
+            },
+            "window": {
+                "day": "Daily",
+                "week": "Weekly",
+                "month": "Monthly",
+                "total": "Total",
+                "point": "Point-in-time"
+            },
+            "details": {
+                "plugin": "Provider",
+                "metric": "Metric",
+                "window": "Window",
+                "baseline": "Baseline",
+                "checkFrequency": "Check frequency",
+                "minutes": "{count} min",
+                "nextCheck": "Next check",
+                "deadline": "Deadline",
+                "noDeadline": "Open-ended",
+                "lastObserved": "Last observed"
+            },
+            "outcome": {
+                "hint": "How this Goal ended. Auto-set by evaluation, and always overridable by you.",
+                "overrideLabel": "Override outcome",
+                "overrideNote": "Setting an outcome completes the Goal; clearing it re-opens the outcome.",
+                "none": "None"
+            },
+            "outcomes": {
+                "achieved": "Achieved",
+                "missed": "Missed",
+                "abandoned": "Abandoned"
+            },
+            "toasts": {
+                "activated": "Goal activated",
+                "paused": "Goal paused",
+                "lifecycleError": "Couldn't update the Goal.",
+                "evaluated": "Evaluation complete",
+                "evaluateError": "Couldn't evaluate the Goal.",
+                "outcomeSaved": "Outcome updated",
+                "outcomeError": "Couldn't update the outcome.",
+                "deleted": "Goal deleted",
+                "deleteError": "Couldn't delete the Goal."
+            },
+            "confirm": {
+                "delete": "Delete this Goal? Its observation history and Mission links will be removed. This cannot be undone."
+            }
+        },
         "sidebar": {
             "menu": "Menu",
             "aiChat": "AI-chat",
@@ -3939,14 +4343,17 @@
                 "dashboard": "Dashboard",
                 "activity": "Activiteit",
                 "missions": "Missions",
+                "goals": "Goals",
                 "ideas": "Ideas",
                 "works": "Werken",
                 "tasks": "Taken",
                 "agents": "Agenten",
+                "memory": "Memory",
                 "plugins": "Plugins",
                 "skills": "Vaardigheden",
                 "templates": "Sjablonen",
-                "settings": "Instellingen"
+                "settings": "Instellingen",
+                "teams": "Teams"
             },
             "tooltips": {
                 "expandSidebar": "Zijbalk uitklappen",
@@ -4240,7 +4647,9 @@
                 "defaultSelected": "Standaard geselecteerd",
                 "makeDefault": "Maak standaard",
                 "fork": "Fork",
-                "useTemplate": "Use this Template",
+                "useTemplate": "Use",
+                "useTemplateFull": "Use this Template",
+                "moreActions": "More actions",
                 "edit": "Bewerken",
                 "archive": "Archiveren",
                 "customizeAgain": "Customize again",
@@ -4413,11 +4822,30 @@
             }
         },
         "templateSelector": {
+            "label": "Sjabloon",
             "defaultOption": "Gebruik standaard",
             "defaultOptionWithName": "Gebruik standaard ({name})",
             "optionLabel": "{name}",
             "optionDefaultLabel": "{name} (Standaard)",
             "changeAnywayLink": "Desondanks wijzigen",
+            "typeLabel": "Sjabloontype",
+            "chipType": {
+                "website": "Website",
+                "landing": "Landing",
+                "blog": "Blog",
+                "directory": "Directory",
+                "store": "Store",
+                "company": "Company",
+                "awesome": "Awesome"
+            },
+            "searchPlaceholder": "Sjablonen zoeken…",
+            "searchAriaLabel": "Sjablonen zoeken",
+            "groupYourTemplates": "Je sjablonen",
+            "groupBlueprints": "Blueprints",
+            "featuredBadge": "Uitgelicht",
+            "defaultBadge": "Standaard",
+            "empty": "Geen sjablonen komen overeen met je zoekopdracht.",
+            "resultCount": "{count, plural, =0 {Geen sjablonen} one {# sjabloon} other {# sjablonen}}",
             "origin": {
                 "standard": "Standaard",
                 "forked": "Forked",
@@ -4485,332 +4913,186 @@
             "system": "Systeem",
             "goToPluginSettings": "Ga naar plug-ininstellingen"
         },
-        "proposals": {
-            "header": {
-                "title": "Ideas",
-                "titleWithName": "Ideas"
-            },
-            "actions": {
-                "accept": "Build",
-                "viewWork": "View Work",
-                "dismiss": "Dismiss",
-                "dismissAria": "Dismiss this idea",
-                "refresh": "Suggest more"
-            },
-            "researching": {
-                "title": "Drafting ideas from your profile…",
-                "subtitle": "This usually takes under a minute."
-            },
-            "empty": {
-                "title": "No ideas right now.",
-                "subtitle": "New suggestions will appear here when they are ready."
-            },
-            "errors": {
-                "rateLimited": "Daily limit reached. Try again tomorrow.",
-                "generic": "Couldn't refresh ideas. Please try again."
-            },
-            "plugins": {
-                "label": "Suggested plugins"
-            },
-            "failureKinds": {
-                "transient-network": "Network blip",
-                "transient-rate-limit": "Rate limited",
-                "transient-upstream-5xx": "Upstream service error",
-                "transient-plugin": "Plugin timeout",
-                "permanent-invalid-input": "Invalid input",
-                "permanent-unknown": "Build failed"
-            }
-        },
-        "missionsPreview": {
-            "title": "Missions",
-            "viewAll": "View all ({n}) →",
-            "empty": {
-                "title": "No Missions yet.",
-                "subtitleRich": "<link>Start one</link> to give the agent a persistent Goal that keeps generating Ideas for you."
-            },
-            "badges": {
-                "scheduled": "Scheduled"
-            },
-            "counters": {
-                "ideas": "Ideas",
-                "works": "Works",
-                "sites": "Sites"
-            }
-        },
-        "missionsPage": {
-            "title": "Missions",
-            "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
-            "newMission": "+ New Mission",
-            "empty": {
-                "title": "No Missions yet.",
-                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting."
-            },
-            "card": {
-                "scheduled": "Scheduled",
-                "oneShot": "One-shot",
-                "schedulePrefix": "Cron:",
-                "autoBuildOn": "Auto-build on",
-                "autoBuildOff": "Auto-build off",
-                "capInherit": "Inherit user default",
-                "capUnlimited": "Unlimited",
-                "capPrefix": "Outstanding cap:",
-                "clonedFromPrefix": "Cloned from another Mission"
-            }
-        },
-        "budgetSummary": {
-            "period": "{period}",
-            "currentSpend": "Current spend",
-            "cap": "Monthly cap",
-            "noCap": "No cap set",
-            "percentUsed": "{percent}% used",
-            "blocked": "Over cap — blocked",
-            "overCap": "Over cap",
-            "loading": "Loading budget…",
-            "empty": "No budget data yet."
-        },
-        "missionDetail": {
-            "backToMissions": "Back to Missions",
-            "badges": {
-                "scheduled": "Scheduled",
-                "oneShot": "One-shot",
-                "cloned": "Cloned",
-                "clonedTooltip": "This Mission is a Full Fork of another"
-            },
-            "sections": {
-                "settings": "Mission settings",
-                "guardrails": "Guardrails override",
-                "liveRuns": "Live runs",
-                "ideas": "Ideas",
-                "relatedWorks": "Related Works",
-                "inheritedWorks": "Related Works (inherited)",
-                "activity": "Activity",
-                "spend": "Spend over time"
-            },
-            "fields": {
-                "schedule": "Schedule (cron, UTC)",
-                "autoBuildWorks": "Auto-build Works from spawned Ideas",
-                "capInherit": "Inherit user-level default cap",
-                "outstandingCap": "Outstanding-Ideas cap (-1 = unlimited)"
-            },
-            "actions": {
-                "saveSettings": "Save settings",
-                "pause": "Pause",
-                "resume": "Resume",
-                "complete": "Complete",
-                "delete": "Delete",
-                "runNow": "Run now",
-                "clone": "Clone"
-            },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
-            },
-            "guardrails": {
-                "activeOverride": "Custom guardrail overrides are active on this Mission.",
-                "inheriting": "No overrides set — using your global Work-agent guardrails."
-            },
-            "liveRuns": {
-                "empty": "No active runs."
-            },
-            "ideas": {
-                "empty": "No Ideas spawned by this Mission yet."
-            },
-            "works": {
-                "empty": "No Works have been built from this Mission's Ideas yet."
-            },
-            "inherited": {
-                "fromSource": "Inherited from",
-                "empty": "The source Mission has no Works to inherit."
-            },
-            "activity": {
-                "empty": "Activity timeline will appear here once Mission ticks start running."
-            },
-            "spend": {
-                "empty": "Spend chart will appear here once budgets are wired."
-            },
-            "clone": {
-                "title": "Clone this Mission",
-                "description": "Full Fork: copies metadata + non-dismissed Ideas (as Pending). Works are NOT cloned — they remain attached to the source.",
-                "titleLabel": "Title for the new Mission (optional)",
-                "cancel": "Cancel",
-                "confirm": "Clone Mission"
-            },
-            "toasts": {
-                "settingsSaved": "Mission settings saved",
-                "settingsError": "Couldn't save settings",
-                "paused": "Mission paused",
-                "pauseError": "Couldn't pause",
-                "resumed": "Mission resumed",
-                "resumeError": "Couldn't resume",
-                "completed": "Mission marked complete",
-                "completeError": "Couldn't complete",
-                "deleted": "Mission deleted",
-                "deleteError": "Couldn't delete",
-                "runNowError": "Couldn't run now",
-                "cloned": "Cloned: {ideasCloned} idea(s) carried, {ideasSkipped} dismissed skipped.",
-                "cloneError": "Couldn't clone Mission",
-                "runNow": {
-                    "noop-placeholder": "Run-now queued (placeholder)",
-                    "queued": "Tick queued",
-                    "spawned": "New Ideas spawned",
-                    "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
-                    "no-ideas": "Tick ran but generated no Ideas",
-                    "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
-                }
-            }
-        },
-        "ideasPage": {
-            "title": "Ideas",
-            "subtitle": "Everything the platform has drafted for you, plus anything you've typed in. Build the ones worth building.",
-            "quickAdd": {
-                "label": "Add a new Idea",
-                "placeholder": "Describe an Idea — e.g. \"A curated list of the best AI coding agents released this year\"",
-                "submit": "Add",
-                "minLength": "Description must be at least 10 characters."
-            },
-            "toggles": {
-                "showAccepted": "Show accepted",
-                "showDismissed": "Show dismissed"
-            },
-            "filters": {
-                "all": "All",
-                "pending": "Pending",
-                "queued": "Queued",
-                "building": "Building",
-                "failed": "Failed",
-                "accepted": "Accepted",
-                "dismissed": "Dismissed",
-                "done": "Done",
-                "doneTooltip": "Ideas that became Works. Click a card to open its Work."
-            },
-            "gears": {
-                "menuLabel": "Settings",
-                "autoGenerate": "Auto-generate Ideas…",
-                "autoBuild": "Auto-build Works…",
-                "autoRetry": "Auto-retry policy…",
-                "accountBudgets": "Account-wide budgets…"
-            },
-            "toasts": {
-                "ideaCreated": "Idea added",
-                "ideaCreateError": "Couldn't add idea. Please try again.",
-                "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again.",
-                "ideaGone": "Dit idee is niet meer beschikbaar."
-            },
-            "empty": {
-                "title": "No Ideas match these filters.",
-                "subtitle": "Toggle accepted / dismissed, or add one with the field above."
-            },
-            "viewAll": "View all ({n}) →",
-            "filterBar": {
-                "search": "Zoeken",
-                "searchPlaceholder": "Titel of beschrijving",
-                "status": "Status",
-                "anyStatus": "Elke status",
-                "apply": "Toepassen",
-                "reset": "Herstellen"
-            },
-            "newPage": {
-                "link": "Handmatig aanmaken",
-                "or": "Of",
-                "title": "Nieuwe Idea",
-                "subtitle": "Schrijf je eigen Idea. Beschrijf het Work dat je wilt maken — je kunt het daarna in de wachtrij zetten om te bouwen.",
-                "nameLabel": "Titel",
-                "namePlaceholder": "Optioneel — laat leeg om het uit de beschrijving af te leiden",
-                "descriptionLabel": "Beschrijving",
-                "descriptionPlaceholder": "Beschrijf het Work dat deze Idea moet worden — bijv. “Een samengestelde directory van open-source AI-agentframeworks, geordend op frameworktype en licentie.”",
-                "descriptionHint": "Minstens 10 tekens.",
-                "cancel": "Annuleren",
-                "create": "Idea aanmaken",
-                "creating": "Aanmaken…",
-                "minLength": "De beschrijving moet minstens 10 tekens bevatten.",
-                "error": "Kan de Idea niet aanmaken. Probeer het opnieuw."
-            }
-        },
         "discover": {
             "title": "Discover",
             "subtitle": "AI-curated Work ideas tailored to you."
         },
-        "adminUsage": {
-            "title": "Platform usage",
-            "description": "Cross-user, cross-directory spend for the current period. Self-hosted operators only.",
-            "periodLabel": "{period}",
-            "totalSpend": "Total spend: {amount}",
-            "empty": "No usage recorded this period.",
-            "columnUser": "User",
-            "columnEmail": "Email",
-            "columnWork": "Directory",
-            "columnUnits": "Units",
-            "columnCost": "Cost",
-            "loadFailed": "Could not load admin usage. You may not have platform-admin access."
-        },
-        "budgets": {
-            "overviewTitle": "Spend in {period}",
-            "overviewProgressLabel": "{percent}% of {cap} cap",
-            "overviewOverageSuffix": " (overage allowed)",
-            "overviewEmpty": "No monthly cap set. Add one in Budgets & Usage to enable alerts.",
-            "topPluginsTitle": "Top plugins by spend",
-            "topPluginsEmpty": "No usage recorded yet this period.",
-            "trendTitle": "Daily spend — {period}",
-            "trendEmpty": "No usage recorded yet this period.",
-            "trendDayLabel": "Day {day}"
-        },
-        "newPage": {
-            "title": "+ New",
-            "subtitle": "Tell us what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
-            "promptLabel": "What do you want to build?",
-            "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
-            "chipLabel": "Pick a kind",
-            "chips": {
-                "mission": "Mission",
-                "idea": "Idea",
-                "website": "Website",
-                "landing-page": "Landing Page",
-                "blog": "Blog",
-                "directory": "Directory",
-                "awesome-repo": "Awesome Repo",
-                "company": "Company"
+        "teamsPage": {
+            "title": "Teams",
+            "subtitle": "Organiseer je Agenten en leden in teams binnen deze organisatie.",
+            "orgChartCta": "Organogram",
+            "newTeamCta": "Nieuw team",
+            "empty": {
+                "title": "Nog geen teams",
+                "description": "Maak je eerste team aan om Agenten en leden te groeperen en orden ze vervolgens in het organogram.",
+                "cta": "Team aanmaken"
             },
-            "chipDescriptions": {
-                "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
-                "idea": "A one-shot brief the agent turns into a Work plan you can build.",
-                "agent": "An AI teammate that acts across Missions, Works, or your whole Workspace.",
-                "task": "A trackable item assigned to a person or an Agent.",
-                "website": "A multi-page site for a business, service, or brand — generated content + code.",
-                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
-                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
-                "directory": "A curated directory site with search, filters, and structured item data.",
-                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
-                "company": "Register a new entity. Becomes an Organization in your account."
+            "noOrg": {
+                "title": "Teams horen bij een organisatie",
+                "description": "Maak eerst een organisatie aan — daarna kun je de Agenten en leden ervan in teams groeperen.",
+                "cta": "Organisatie aanmaken"
             },
-            "submit": "Create",
-            "or": "or",
-            "hints": {
-                "pickChip": "Pick a chip above to enable Create.",
-                "minLength": "Add a description (at least 10 characters) to enable Create."
+            "card": {
+                "agents": "{count, plural, one {# agent} other {# agenten}}",
+                "members": "{count, plural, one {# lid} other {# leden}}",
+                "subTeams": "{count, plural, one {# subteam} other {# subteams}}"
             },
-            "toasts": {
-                "missionCreated": "Mission created",
-                "ideaCreated": "Idea added",
-                "submitError": "Couldn't create. Please try again."
+            "newDialog": {
+                "title": "Nieuw team",
+                "nameLabel": "Naam",
+                "namePlaceholder": "bijv. Engineering",
+                "descriptionLabel": "Beschrijving",
+                "descriptionPlaceholder": "Waar dit team verantwoordelijk voor is (optioneel)",
+                "parentLabel": "Bovenliggend team",
+                "parentNone": "Geen bovenliggend team (hoogste niveau)",
+                "managerLabel": "Manager-agent",
+                "managerNone": "Geen manager",
+                "submit": "Team aanmaken",
+                "creating": "Aanmaken…",
+                "cancel": "Annuleren"
             },
-            "cards": {
-                "ai": {
-                    "title": "Create Work with AI",
-                    "subtitle": "Describe what you want and let the agent prepare an approval-ready plan.",
-                    "cta": "Get started"
-                },
-                "manual": {
-                    "title": "Create Work Manually",
-                    "subtitle": "Configure every step yourself — provider, template, items, and deploy.",
-                    "cta": "Configure now"
-                },
-                "import": {
-                    "title": "Import Existing Work",
-                    "subtitle": "Bring in a Work you already have — repo, items, and provider settings.",
-                    "cta": "Import now"
-                }
+            "detail": {
+                "overviewTab": "Overzicht",
+                "settingsTab": "Instellingen",
+                "rosterTitle": "Teamleden",
+                "subTeamsTitle": "Subteams",
+                "managerLabel": "Manager",
+                "parentLabel": "Bovenliggend team",
+                "addMemberCta": "Lid toevoegen",
+                "addMemberTypeLabel": "Type",
+                "addMemberAgent": "Agent",
+                "addMemberUser": "Lid",
+                "addMemberSelectLabel": "Wie",
+                "addMemberSubmit": "Toevoegen",
+                "adding": "Toevoegen…",
+                "removeMember": "Verwijderen",
+                "roleLead": "Lead",
+                "roleMember": "Lid",
+                "emptyRoster": "Nog geen leden — voeg Agenten of teamgenoten toe aan dit team."
+            },
+            "settings": {
+                "title": "Teaminstellingen",
+                "nameLabel": "Naam",
+                "descriptionLabel": "Beschrijving",
+                "parentLabel": "Bovenliggend team",
+                "managerLabel": "Manager-agent",
+                "save": "Wijzigingen opslaan",
+                "saving": "Opslaan…",
+                "saved": "Team bijgewerkt",
+                "deleteTitle": "Gevarenzone",
+                "deleteDescription": "Als je een team verwijdert, schuiven de subteams een niveau omhoog en wordt de ledenlijst verwijderd. Agenten en leden worden niet verwijderd.",
+                "deleteCta": "Team verwijderen",
+                "deleteConfirm": "Dit team verwijderen? Subteams schuiven één niveau omhoog; Agenten en leden blijven behouden.",
+                "deleting": "Verwijderen…"
+            },
+            "errors": {
+                "createFailed": "Kon het team niet aanmaken",
+                "updateFailed": "Kon het team niet bijwerken",
+                "deleteFailed": "Kon het team niet verwijderen",
+                "memberAddFailed": "Kon het lid niet toevoegen",
+                "memberRemoveFailed": "Kon het lid niet verwijderen"
             }
+        },
+        "orgChartPage": {
+            "title": "Organogram",
+            "subtitle": "Teams, Agenten en leden van deze organisatie.",
+            "backToTeams": "Teams",
+            "zoomIn": "Inzoomen",
+            "zoomOut": "Uitzoomen",
+            "fitView": "Passend maken",
+            "unassignedGroup": "Niet toegewezen",
+            "membersBadge": "{count, plural, one {# lid} other {# leden}}",
+            "empty": "Nog niets om weer te geven — maak eerst teams of Agenten aan in deze organisatie.",
+            "noOrg": "Maak een organisatie aan om het organogram te zien."
+        },
+        "schedules": {
+            "title": "Planningen",
+            "subtitle": "Alles wat gepland staat om uit te voeren in je werken, agenten, Missions en taken",
+            "fetchFailed": "Planningen konden niet worden geladen",
+            "retry": "Opnieuw proberen",
+            "columns": {
+                "owner": "Eigenaar",
+                "cadence": "Frequentie",
+                "nextRun": "Volgende uitvoering",
+                "status": "Status"
+            },
+            "filters": {
+                "all": "Alle",
+                "activeOnly": "Alleen actieve"
+            },
+            "sourceTypes": {
+                "recurringTask": "Terugkerende taak",
+                "agentHeartbeat": "Agent-heartbeat",
+                "workSchedule": "Werkplanning",
+                "missionTick": "Mission-tick",
+                "sourceValidation": "Bronvalidatie",
+                "dataSync": "Gegevenssynchronisatie",
+                "inboundTrigger": "Inkomende trigger"
+            },
+            "statuses": {
+                "active": "Actief",
+                "paused": "Gepauzeerd",
+                "disabled": "Uitgeschakeld",
+                "error": "Fout",
+                "ended": "Beëindigd"
+            },
+            "empty": {
+                "title": "Nog niets gepland",
+                "description": "Terugkerende taken, agent-heartbeats, werkplanningen, Mission-ticks, bronvalidatie en gegevenssynchronisatie verschijnen hier zodra je ze hebt ingesteld.",
+                "noResults": "Geen planningen komen overeen met het huidige filter."
+            }
+        },
+        "triggers": {
+            "title": "Inkomende triggers",
+            "subtitle": "Ondertekende webhooks en API-aanroepen die een Taak aanmaken bij activering.",
+            "new": "Nieuwe trigger",
+            "empty": "Nog geen triggers. Maak er een om ondertekende webhooks te ontvangen.",
+            "firedCount": "{count} keer geactiveerd",
+            "lastFired": "laatst geactiveerd",
+            "status": {
+                "active": "Actief",
+                "paused": "Gepauzeerd"
+            },
+            "createTitle": "Nieuwe inkomende trigger",
+            "createDescription": "Je krijgt een ondertekende webhook-URL en een geheim. Externe systemen POST-en ernaartoe om een Taak aan te maken.",
+            "form": {
+                "name": "Naam",
+                "namePlaceholder": "Deploy-meldingen",
+                "description": "Beschrijving",
+                "descriptionPlaceholder": "Wat activeert deze trigger?",
+                "taskTitle": "Sjabloon voor taaktitel",
+                "taskTitlePlaceholder": "Trigger: {name}",
+                "taskTitleHint": "{name} wordt vervangen door de triggernaam."
+            },
+            "actions": {
+                "pause": "Pauzeren",
+                "resume": "Hervatten",
+                "rotate": "Geheim roteren",
+                "delete": "Verwijderen",
+                "cancel": "Annuleren",
+                "create": "Aanmaken"
+            },
+            "reveal": {
+                "title": "Triggergeheim",
+                "warning": "Kopieer het geheim nu — je kunt het later niet meer zien.",
+                "url": "Webhook-URL",
+                "secret": "Ondertekeningsgeheim",
+                "curl": "Voorbeeld van ondertekend verzoek",
+                "copy": "Kopiëren",
+                "done": "Klaar"
+            },
+            "toast": {
+                "created": "Trigger aangemaakt",
+                "createFailed": "Kon de trigger niet aanmaken",
+                "rotated": "Geheim geroteerd",
+                "rotateFailed": "Kon het geheim niet roteren",
+                "toggleFailed": "Kon de trigger niet bijwerken",
+                "deleted": "Trigger verwijderd",
+                "deleteFailed": "Kon de trigger niet verwijderen",
+                "loadFailed": "Kon de triggers niet laden",
+                "copyFailed": "Kon niet naar klembord kopiëren"
+            },
+            "confirmDelete": "Deze trigger verwijderen? De webhook-URL werkt onmiddellijk niet meer en dit kan niet ongedaan worden gemaakt."
         }
     },
     "layout": {
@@ -4881,7 +5163,6 @@
             "dashboard": "Dashboard",
             "activity": "Activiteitenlogboek",
             "works": "Werken",
-            "discover": "Discover",
             "newWork": "Nieuwe werk",
             "work": "Werk",
             "overview": "Overzicht",
@@ -4898,7 +5179,8 @@
             "security": "Beveiliging",
             "apiKeys": "API-sleutels",
             "dangerZone": "Gevarenzone",
-            "pluginSettings": "Plug-ininstellingen"
+            "pluginSettings": "Plug-ininstellingen",
+            "discover": "Discover"
         }
     },
     "api": {
@@ -5075,12 +5357,35 @@
         }
     },
     "organizations": {
+        "settings": {
+            "title": "Organization",
+            "subtitle": "Manage your Organization's shared context.",
+            "loading": "Loading…",
+            "selectLabel": "Organization",
+            "visionLabel": "Vision",
+            "visionPlaceholder": "e.g. Become the go-to platform where small teams launch and grow AI-run businesses.",
+            "visionHelp": "Shared with every AI agent working in this Organization — Idea generation, Mission runs, and agent tasks all receive it as context.",
+            "lastUpdated": "Vision last updated",
+            "save": "Save",
+            "saved": "Saved",
+            "empty": {
+                "title": "No Organization yet",
+                "description": "Create an Organization from the workspace switcher to set a company vision."
+            },
+            "errors": {
+                "generic": "Failed to save. Please try again."
+            }
+        },
         "switcher": {
             "heading": "Switch Organization",
             "createNew": "Create Organization",
             "loading": "Loading…"
         },
         "create": {
+            "visionToggle": "Add company vision (optional)",
+            "visionLabel": "Vision",
+            "visionPlaceholder": "e.g. Become the go-to platform where small teams launch and grow AI-run businesses.",
+            "visionHelp": "Optional. Guides all agents working in this Organization — Idea generation, Mission runs, and agent tasks receive it as context. You can add or edit it later in Settings.",
             "title": "Create Organization",
             "description": "Give your Organization a name. We'll allocate a unique slug for its URL.",
             "nameLabel": "Name",
@@ -5097,6 +5402,14 @@
                 "nameRequired": "Name is required",
                 "nameTooLong": "Name must be 200 characters or fewer",
                 "generic": "Failed to create Organization"
+            },
+            "templates": {
+                "label": "Startpunt",
+                "blankTitle": "Lege organisatie",
+                "blankDescription": "Begin leeg — voeg later teams en agenten toe.",
+                "meta": "{agents, plural, one {# agent} other {# agenten}} · {teams, plural, one {# team} other {# teams}}",
+                "submitImport": "Aanmaken op basis van sjabloon",
+                "importError": "Kon de organisatie niet aanmaken op basis van dit sjabloon"
             }
         },
         "upgrade": {

@@ -4,8 +4,10 @@ import {
     IsBoolean,
     IsEmail,
     IsEnum,
+    IsIn,
     IsInt,
     IsNotEmpty,
+    IsNumber,
     IsObject,
     IsOptional,
     IsString,
@@ -19,11 +21,17 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import {
+    AGENT_GUARDRAIL_MODES,
     AgentAvatarMode,
     AgentIdleBehavior,
     AgentScope,
     AgentStatus,
+    type AgentGuardrails,
 } from '@ever-works/agent/agents';
+import {
+    AGENT_ACTION_PROPOSAL_ACTION_TYPES,
+    type AgentActionProposalActionType,
+} from '@ever-works/agent/agent-approvals';
 
 /**
  * Permissions partial sent on create/update — every flag optional;
@@ -38,6 +46,56 @@ export class AgentPermissionsDto {
     @ApiProperty({ required: false }) @IsOptional() @IsBoolean() canCommitToRepo?: boolean;
     @ApiProperty({ required: false }) @IsOptional() @IsBoolean() canOpenPullRequests?: boolean;
     @ApiProperty({ required: false }) @IsOptional() @IsBoolean() canCallExternalTools?: boolean;
+}
+
+/**
+ * Agent Scorecards increment 1 — one quantified goal on an Agent's
+ * scorecard. Mirrors `AgentScorecardMetric` on the agent entity; the
+ * service re-validates via `validateScorecard` (defense-in-depth for
+ * non-HTTP callers).
+ */
+export class AgentScorecardMetricDto {
+    @ApiProperty({ maxLength: 64, pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$' })
+    @IsString()
+    @MaxLength(64)
+    @Matches(/^[a-z0-9]+(?:-[a-z0-9]+)*$/)
+    key: string;
+
+    @ApiProperty({ minLength: 1, maxLength: 80 })
+    @IsString()
+    @MinLength(1)
+    @MaxLength(80)
+    label: string;
+
+    // @IsNumber() rejects NaN/Infinity by default (allowNaN/allowInfinity
+    // false) — matches the service's finite-number rule.
+    @ApiProperty()
+    @IsNumber()
+    target: number;
+
+    @ApiProperty()
+    @IsNumber()
+    current: number;
+
+    @ApiProperty({ required: false, nullable: true })
+    @IsOptional()
+    @IsNumber()
+    floor?: number | null;
+
+    @ApiProperty({ required: false, nullable: true })
+    @IsOptional()
+    @IsNumber()
+    stretch?: number | null;
+
+    @ApiProperty({ required: false, nullable: true, maxLength: 20 })
+    @IsOptional()
+    @IsString()
+    @MaxLength(20)
+    unit?: string | null;
+
+    @ApiProperty({ enum: ['weekly', 'monthly', 'quarterly'] })
+    @IsIn(['weekly', 'monthly', 'quarterly'])
+    period: 'weekly' | 'monthly' | 'quarterly';
 }
 
 export class AgentTargetDto {
@@ -263,6 +321,71 @@ export class UpdateAgentDto {
     @IsEmail()
     @MaxLength(254)
     committerEmail?: string | null;
+
+    @ApiProperty({
+        required: false,
+        nullable: true,
+        description: 'Direct manager Agent id for the Org Chart; null clears it',
+    })
+    @IsOptional()
+    @IsUUID()
+    reportsToAgentId?: string | null;
+
+    // Agent Scorecards increment 1 — whole-array replace; null clears.
+    @ApiProperty({ required: false, type: [AgentScorecardMetricDto] })
+    @IsOptional()
+    @IsArray()
+    @ValidateNested({ each: true })
+    @Type(() => AgentScorecardMetricDto)
+    scorecard?: AgentScorecardMetricDto[] | null;
+}
+
+/**
+ * Agent Dispatch Guardrails policy body — mirrors the pure
+ * `AgentGuardrails` shape (`packages/agent/src/agents/guardrails.ts`).
+ * The service re-validates via `validateGuardrails` (defense-in-depth),
+ * so this DTO only has to shape-check for the global ValidationPipe.
+ */
+export class AgentGuardrailsDto implements AgentGuardrails {
+    @ApiProperty({ enum: AGENT_GUARDRAIL_MODES as unknown as string[] })
+    @IsIn(AGENT_GUARDRAIL_MODES as unknown as string[])
+    mode: 'require_approval' | 'autonomous';
+
+    @ApiProperty({
+        required: false,
+        isArray: true,
+        enum: AGENT_ACTION_PROPOSAL_ACTION_TYPES as unknown as string[],
+        description:
+            'Autonomous-mode narrowing: only these action types may auto-approve. Omitted = all.',
+    })
+    @IsOptional()
+    @IsArray()
+    @IsIn(AGENT_ACTION_PROPOSAL_ACTION_TYPES as unknown as string[], { each: true })
+    autoApproveActionTypes?: AgentActionProposalActionType[];
+
+    @ApiProperty({
+        required: false,
+        isArray: true,
+        enum: AGENT_ACTION_PROPOSAL_ACTION_TYPES as unknown as string[],
+        description: 'Action types this Agent may never take — auto-rejected with an audit row.',
+    })
+    @IsOptional()
+    @IsArray()
+    @IsIn(AGENT_ACTION_PROPOSAL_ACTION_TYPES as unknown as string[], { each: true })
+    blockedActionTypes?: AgentActionProposalActionType[];
+}
+
+/**
+ * Body for `PUT /api/agents/:id/guardrails`. PUT semantics — the whole
+ * policy is replaced. `{"guardrails": null}` (or an omitted field)
+ * clears back to the default queue-everything posture.
+ */
+export class UpdateAgentGuardrailsDto {
+    @ApiProperty({ required: false, type: AgentGuardrailsDto, nullable: true })
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => AgentGuardrailsDto)
+    guardrails?: AgentGuardrailsDto | null;
 }
 
 export class ListAgentsQueryDto {

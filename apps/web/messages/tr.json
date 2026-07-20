@@ -263,7 +263,8 @@
             "savedSuccess": "Ayarlar kaydedildi.",
             "noSettings": "Bu eklenti için yapılandırma gerekmez.",
             "getTokenPrompt": "Önce bir belirteç oluşturun, ardından aşağıya yapıştırın ve bağlantıyı doğrulamak için kaydedin.",
-            "loadingStatus": "Bağlantı durumu yükleniyor..."
+            "loadingStatus": "Bağlantı durumu yükleniyor...",
+            "setupGuide": "Setup guide"
         },
         "plugins": {
             "byokDescription": "Tam yapılandırmayı açmak için kendi anahtarınızı bağlayın.",
@@ -455,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "Eylem onayları",
+                "subtitle": "Ajanlarınız yan etkili bu eylemleri önerdi. Her birini onaylayın veya reddedin."
+            },
+            "actions": {
+                "approve": "Onayla",
+                "reject": "Reddet",
+                "approveAll": "Tümünü onayla"
+            },
+            "actionType": {
+                "spawn_agent": "Ajan oluştur",
+                "schedule_task": "Görev zamanla",
+                "send_message": "Mesaj gönder",
+                "budget_override": "Bütçe aşımı",
+                "other": "Eylem"
+            },
+            "riskFlags": {
+                "budget_override": "Bütçe aşımı",
+                "destructive": "Yıkıcı",
+                "cross_scope": "Kapsamlar arası",
+                "high_fanout": "Yüksek dallanma"
+            },
+            "toast": {
+                "approved": "Eylem onaylandı",
+                "rejected": "Eylem reddedildi",
+                "bulkApproved": "{count} eylem onaylandı",
+                "bulkApprovedSkipped": "{approved} eylem onaylandı, {skipped} zaten karara bağlandı",
+                "error": "Bir şeyler ters gitti. Lütfen tekrar deneyin."
+            }
+        },
         "title": "Pano",
         "connectGithub": {
             "title": "GitHub hesabınızı bağlayın",
@@ -546,17 +578,9 @@
             "title": "Missions",
             "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
             "newMission": "+ New Mission",
-            "quickAdd": {
-                "label": "Yeni Bir Görev Başlat",
-                "submitTitle": "Görev Oluştur",
-                "minLength": "Açıklama en az 10 karakter olmalı.",
-                "created": "Görev oluşturuldu",
-                "error": "Görev oluşturulamadı. Lütfen tekrar deneyin."
-            },
             "empty": {
                 "title": "No Missions yet.",
-                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting.",
-                "openNew": "Entegre oluşturucuyu aç"
+                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting."
             },
             "card": {
                 "scheduled": "Scheduled",
@@ -568,15 +592,56 @@
                 "capUnlimited": "Unlimited",
                 "capPrefix": "Outstanding cap:",
                 "clonedFromPrefix": "Cloned from another Mission"
-            },
-            "filterBar": {
-                "search": "Ara",
-                "searchPlaceholder": "Başlık veya açıklama",
-                "status": "Durum",
-                "anyStatus": "Herhangi bir durum",
-                "apply": "Uygula",
-                "reset": "Sıfırla"
             }
+        },
+        "memoryPage": {
+            "consolidation": {
+                "action": "Birleştir",
+                "title": "Belleği birleştir",
+                "previewIntro": "Birleştirmenin ne yapacağının önizlemesi. Uygulayana kadar hiçbir şey değişmez.",
+                "scanned": "{count} tarandı",
+                "promoted": "{count} yükseltildi",
+                "synthesized": "{count} sentezlendi",
+                "superseded": "{count} değiştirildi",
+                "promotedHeading": "Yükseltildi",
+                "supersededHeading": "Değiştirildi",
+                "more": "+{count} daha",
+                "apply": "Uygula",
+                "cancel": "İptal",
+                "applied": "Birleştirildi: {promoted} yükseltildi, {synthesized} sentezlendi, {superseded} değiştirildi",
+                "failed": "Birleştirme başarısız oldu. Lütfen tekrar deneyin.",
+                "badgePromoted": "Yükseltildi",
+                "badgeSuperseded": "Değiştirildi"
+            },
+            "title": "Memory",
+            "subtitle": "Kuruluşunuzun bildiği her şey tek bir yerde — her İşin Knowledge Base'inden bir araya getirildi.",
+            "searchPlaceholder": "Kuruluşun bildiği her şeyde arayın…",
+            "newDocument": "Yeni",
+            "documentsIndexed": "{count, plural, =0 {Dizine eklenmiş belge yok} one {# belge dizine eklendi} other {# belge dizine eklendi}}",
+            "worksCovered": "{count, plural, =0 {İş yok} one {# İş} other {# İş}}",
+            "filters": {
+                "type": "Tür",
+                "work": "İş",
+                "source": "Kaynak",
+                "status": "Durum",
+                "clearAll": "Tümünü temizle"
+            },
+            "source": {
+                "workKb": "Work KB",
+                "orgKb": "Org KB",
+                "user": "Manual",
+                "agent": "Agent",
+                "imported": "Imported",
+                "seeded": "Seeded"
+            },
+            "empty": {
+                "title": "Memory'de henüz hiçbir şey yok.",
+                "subtitle": "İşleriniz Knowledge Base'lerini oluşturdukça — marka belgeleri, kişiler, araştırmalar, stil kılavuzları — her şey burada görünür ve kuruluşun tamamında aranabilir.",
+                "noOrg": "Toplu Memory'sini görmek için bir Kuruluş seçin veya oluşturun. Memory, etkin Kuruluştaki her İşi kapsar.",
+                "noResults": "Aramanız ve filtrelerinizle eşleşen belge yok."
+            },
+            "orgScoped": "Kuruluş",
+            "openInWork": "İşte aç"
         },
         "agentsPage": {
             "title": "Ajanlar",
@@ -622,7 +687,47 @@
                 "cancel": "İptal",
                 "back": "Geri",
                 "next": "İleri",
-                "create": "Ajan Oluştur"
+                "create": "Ajan Oluştur",
+                "teamLabel": "Ekip",
+                "teamNone": "Ekip yok",
+                "reportsToLabel": "Bağlı olduğu yönetici",
+                "reportsToNone": "Yönetici yok"
+            },
+            "settings": {
+                "orgCard": {
+                    "title": "Organizasyon",
+                    "teamLabel": "Ekip",
+                    "teamNone": "Ekip yok",
+                    "reportsToLabel": "Bağlı olduğu yönetici",
+                    "reportsToNone": "Yönetici yok",
+                    "save": "Kaydet",
+                    "saving": "Kaydediliyor…"
+                }
+            },
+            "guardrails": {
+                "title": "Korkuluklar",
+                "subtitle": "Önerilen hangi eylemlerin onayınızı bekleyeceğine, otomatik çalışacağına veya engelleneceğine karar verin.",
+                "modeLabel": "Gönderim modu",
+                "modeRequireApproval": "Onay gerektir",
+                "modeRequireApprovalHint": "Önerilen her eylem, siz karar verene kadar onay kuyruğunuzda bekler.",
+                "modeAutonomous": "Otonom",
+                "modeAutonomousHint": "Güvenli eylemler beklemeden çalışır. Risk işaretli eylemler her zaman onay kuyruğunuza girer.",
+                "autoApproveLabel": "Otomatik onaylanan eylem türleri",
+                "autoApproveHint": "Yalnızca seçilen eylem türleri otomatik çalışır; geri kalan her şey kuyruğa girmeye devam eder.",
+                "blockedLabel": "Engellenen eylem türleri",
+                "blockedHint": "Engellenen eylemler otomatik olarak reddedilir ve kuyruk geçmişine kaydedilir.",
+                "actionTypes": {
+                    "spawn_agent": "Ajan oluştur",
+                    "schedule_task": "Görev planla",
+                    "send_message": "Mesaj gönder",
+                    "budget_override": "Bütçe geçersiz kılma",
+                    "other": "Diğer"
+                },
+                "save": "Korkulukları kaydet",
+                "reset": "Varsayılana sıfırla",
+                "saveSuccess": "Korkuluklar kaydedildi",
+                "saveError": "Korkuluklar kaydedilemedi",
+                "resetSuccess": "Korkuluklar varsayılana sıfırlandı"
             }
         },
         "tasksPage": {
@@ -796,6 +901,33 @@
             "empty": "No budget data yet."
         },
         "missionDetail": {
+            "attachedWorks": {
+                "pickerTruncated": "Showing your 100 most recent Works - open the Works page for the full list.",
+                "title": "Attached Works",
+                "empty": "No Works attached to this Mission yet. Attach one below.",
+                "attachTitle": "Attach a Work",
+                "workLabel": "Work",
+                "workPlaceholder": "Select a Work",
+                "relationLabel": "Relation",
+                "attach": "Attach",
+                "detach": "Detach",
+                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "noWorksToAttach": "You have no Works to attach yet.",
+                "relations": {
+                    "created": "Created",
+                    "improves": "Improves",
+                    "operates": "Operates",
+                    "markets": "Markets",
+                    "researches": "Researches",
+                    "retires": "Retires"
+                },
+                "toasts": {
+                    "attached": "Work attached",
+                    "attachError": "Couldn't attach Work",
+                    "detached": "Work detached",
+                    "detachError": "Couldn't detach Work"
+                }
+            },
             "backToMissions": "Back to Missions",
             "badges": {
                 "scheduled": "Scheduled",
@@ -861,6 +993,23 @@
                 "cancel": "Cancel",
                 "confirm": "Clone Mission"
             },
+            "completeDialog": {
+                "title": "Complete this Mission",
+                "description": "Optionally record a conclusion verdict for this Mission. \"No verdict\" completes it without recording an outcome.",
+                "outcomeLabel": "Outcome (optional)",
+                "noVerdict": "No verdict",
+                "cancel": "Cancel",
+                "confirm": "Complete Mission"
+            },
+            "outcomes": {
+                "succeeded": "Succeeded",
+                "partially_succeeded": "Partially succeeded",
+                "failed": "Failed",
+                "cancelled": "Cancelled",
+                "superseded": "Superseded"
+            },
+            "outcomeTooltip": "Outcome recorded when this Mission was completed",
+            "completedAtLabel": "Completed",
             "toasts": {
                 "settingsSaved": "Mission settings saved",
                 "settingsError": "Couldn't save settings",
@@ -893,7 +1042,6 @@
                 "label": "Add a new Idea",
                 "placeholder": "Describe an Idea — e.g. \"A curated list of the best AI coding agents released this year\"",
                 "submit": "Add",
-                "submitTitle": "Fikir Ekle",
                 "minLength": "Description must be at least 10 characters."
             },
             "toggles": {
@@ -937,11 +1085,31 @@
                 "anyStatus": "Herhangi bir durum",
                 "apply": "Uygula",
                 "reset": "Sıfırla"
+            },
+            "newPage": {
+                "link": "Manuel oluştur",
+                "or": "Veya",
+                "title": "Yeni Idea",
+                "subtitle": "Kendi Idea'nı yaz. Oluşturmak istediğin Work'ü tanımla — daha sonra derleme için sıraya alabilirsin.",
+                "nameLabel": "Başlık",
+                "namePlaceholder": "İsteğe bağlı — açıklamadan türetmek için boş bırakın",
+                "descriptionLabel": "Açıklama",
+                "descriptionPlaceholder": "Bu Idea'nın dönüşmesi gereken Work'ü tanımlayın — örneğin “Framework türüne ve lisansa göre düzenlenmiş, açık kaynaklı YZ ajan framework'lerinin özenle seçilmiş bir dizini.”",
+                "descriptionHint": "En az 10 karakter.",
+                "cancel": "İptal",
+                "create": "Idea oluştur",
+                "creating": "Oluşturuluyor…",
+                "minLength": "Açıklama en az 10 karakter olmalıdır.",
+                "error": "Idea oluşturulamadı. Lütfen tekrar deneyin."
+            },
+            "linkedWorks": {
+                "title": "Linked Works",
+                "kind": {
+                    "built": "Built",
+                    "linked": "Linked",
+                    "rebuilt": "Rebuilt"
+                }
             }
-        },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
         },
         "header": {
             "welcome": "Tekrar hoş geldiniz, {username}!",
@@ -1127,6 +1295,10 @@
                     "failed": "Başarısız",
                     "cancelled": "İptal edildi"
                 }
+            },
+            "viewToggle": {
+                "log": "Günlük",
+                "schedules": "Zamanlamalar"
             }
         },
         "works": {
@@ -1190,6 +1362,7 @@
             "subtitle": "Hesap ayarlarınızı ve tercihlerinizi yönetin",
             "tabs": {
                 "profile": "Profil",
+                "organization": "Organization",
                 "security": "Güvenlik",
                 "apiKeys": "API Anahtarları",
                 "data": "Veri",
@@ -1226,14 +1399,14 @@
                 "sections": {
                     "agent": {
                         "title": "Work agent planning",
-                        "description": "Prepare approval-ready Work plans from high-level goals. Live execution stays blocked until an executor is connected."
+                        "description": "Prepare approval-ready Work plans from high-level build requests. Live execution stays blocked until an executor is connected."
                     },
                     "guardrails": {
                         "title": "Guardrails",
                         "description": "Set hard limits that future live execution must follow before creating Works, adding items, or spending budget."
                     },
                     "queue": {
-                        "title": "Queue a goal",
+                        "title": "Queue a build request",
                         "description": "Give the agent a broad instruction. It creates an approval-ready plan inside your guardrails."
                     },
                     "liveRun": {
@@ -1241,7 +1414,7 @@
                         "description": "Current state and recent agent activity."
                     },
                     "recentGoals": {
-                        "title": "Recent goals",
+                        "title": "Recent build requests",
                         "description": "Pending, running, and completed Work agent instructions."
                     },
                     "autoGenerateIdeas": {
@@ -1272,7 +1445,7 @@
                     "approvalThreshold": "Approval threshold",
                     "confirmBeforeCreate": "Confirm before creating Works",
                     "confirmBeforeDelete": "Confirm before deleting items",
-                    "dryRunThisGoal": "Dry run this goal",
+                    "dryRunThisGoal": "Dry run this build request",
                     "autoGenerateCadenceMinutes": "Run every N minutes",
                     "autoGenerateBatchSize": "Ideas per cycle",
                     "autoBuildThrottlePerDay": "Daily auto-build cap",
@@ -1288,7 +1461,7 @@
                     "saveSettings": "Save settings",
                     "saveSection": "Save",
                     "useDefault": "Use default",
-                    "queueGoal": "Queue goal",
+                    "queueGoal": "Queue build request",
                     "preparePlan": "Prepare plan",
                     "stop": "Stop"
                 },
@@ -1305,16 +1478,16 @@
                 },
                 "empty": {
                     "noActiveRun": "No active Work agent run.",
-                    "noGoals": "No Work agent goals yet.",
+                    "noGoals": "No Work agent build requests yet.",
                     "waitingForUpdate": "Waiting for the first run update."
                 },
                 "toasts": {
                     "settingsSaved": "Work agent settings saved",
                     "settingsError": "Failed to save settings",
                     "goalQueued": "Work agent plan prepared",
-                    "goalError": "Failed to queue goal",
-                    "goalCanceled": "Work agent goal canceled",
-                    "cancelError": "Failed to cancel goal"
+                    "goalError": "Failed to queue build request",
+                    "goalCanceled": "Work agent build request canceled",
+                    "cancelError": "Failed to cancel build request"
                 }
             },
             "data": {
@@ -1573,7 +1746,45 @@
             "totalItems": "Toplam Öğe",
             "activeWebsites": "Aktif Web Siteleri",
             "monthSpend": "Month Spend",
-            "fromLastMonth": "geçen aydan"
+            "fromLastMonth": "geçen aydan",
+            "teams": "Takımlar"
+        },
+        "attention": {
+            "title": "Dikkat gerektiriyor",
+            "kinds": {
+                "agentError": {
+                    "title": "“{name}” ajanı hata verdi",
+                    "subtitle": "Tekrarlanan hatalardan sonra otomatik duraklatıldı"
+                },
+                "scheduleFailed": {
+                    "title": "Zamanlanmış çalıştırma başarısız",
+                    "subtitle": "“{name}” son çalıştırması tamamlanmadı"
+                },
+                "schedulePaused": {
+                    "title": "Zamanlama duraklatıldı",
+                    "subtitle": "Tekrarlanan hatalardan sonra “{name}” duraklatıldı"
+                },
+                "generationFailed": {
+                    "title": "Üretim başarısız",
+                    "subtitle": "“{name}” oluşturulamadı"
+                },
+                "taskBlocked": {
+                    "title": "Görev engellendi",
+                    "subtitle": "Devam etmek için “{name}” girdi gerektiriyor"
+                },
+                "budgetExceeded": {
+                    "title": "Bütçe aşıldı",
+                    "subtitle": "Hesap harcaması sınırına ulaştı"
+                }
+            }
+        },
+        "soon": {
+            "title": "Yakında",
+            "more": "+{n} daha",
+            "source": {
+                "work": "İş",
+                "mission": "Mission"
+            }
         },
         "adminUsage": {
             "title": "Platform usage",
@@ -1639,6 +1850,18 @@
             "createButton": "İş Oluştur"
         },
         "workDetail": {
+            "missions": {
+                "title": "Missions",
+                "subtitle": "Your Missions that relate to this Work. Missions never own Works — these are references.",
+                "relations": {
+                    "created": "Created",
+                    "improves": "Improves",
+                    "operates": "Operates",
+                    "markets": "Markets",
+                    "researches": "Researches",
+                    "retires": "Retires"
+                }
+            },
             "agentsDropdown": {
                 "trigger": "Ajanlar",
                 "heading": "Bu İşin Ajanları",
@@ -3394,7 +3617,7 @@
         },
         "newPage": {
             "title": "+ New",
-            "subtitle": "Tell the agent what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
+            "subtitle": "Tell us what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
             "promptLabel": "What do you want to build?",
             "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
             "chipLabel": "Pick a kind",
@@ -3409,19 +3632,21 @@
                 "company": "Company"
             },
             "chipDescriptions": {
-                "mission": "Ajnın üzerinde sürekli çalıştığı devam eden bir Hedef — zamanlamaya göre veya tek seferlik Fikirler oluşturur.",
-                "idea": "Ajnın inşa edebileceğiniz bir İş planına dönüştürdüğü tek seferlik bir brifing.",
-                "website": "Bir işletme, hizmet veya marka için çok sayfalı bir site — oluşturulan içerik + kod.",
-                "landing-page": "Odaklanmış tek sayfalık bir sayfa — bekleme listeleri, ürün lansmanları, webinar kayıtları, potansiyel müşteri yakalama.",
-                "blog": "Kategoriler, RSS, kod vurgulama ve SEO hazır içeriği olan bir blog.",
-                "directory": "Arama, filtreler ve yapılandırılmış öğe verileriyle düzenlenmiş bir dizin sitesi.",
-                "awesome-repo": "Awesome-list deposu — markdown indeksi, kategorilere ayrılmış bağlantılar ve yenilenebilir metadata.",
+                "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
+                "idea": "A one-shot brief the agent turns into a Work plan you can build.",
+                "agent": "An AI teammate that acts across Missions, Works, or your whole Workspace.",
+                "task": "A trackable item assigned to a person or an Agent.",
+                "website": "A multi-page site for a business, service, or brand — generated content + code.",
+                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
+                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
+                "directory": "A curated directory site with search, filters, and structured item data.",
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
                 "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
-            "submitTitle": "Oluştur",
             "or": "or",
             "hints": {
+                "pickChip": "Pick a chip above to enable Create.",
                 "minLength": "Add a description (at least 10 characters) to enable Create."
             },
             "toasts": {
@@ -3929,6 +4154,177 @@
                 "unexpectedError": "Beklenmeyen bir hata oluştu"
             }
         },
+        "goalsPage": {
+            "title": "Goals",
+            "subtitle": "Measurable targets evaluated automatically against your metrics providers. Each Goal tracks a live metric toward a target — open one to see its progress, run a check, or set an outcome.",
+            "newGoal": "New Goal",
+            "statuses": {
+                "draft": "Draft",
+                "active": "Active",
+                "paused": "Paused",
+                "completed": "Completed"
+            },
+            "outcomes": {
+                "achieved": "Achieved",
+                "missed": "Missed",
+                "abandoned": "Abandoned"
+            },
+            "filterBar": {
+                "status": "Status",
+                "anyStatus": "Any status",
+                "apply": "Apply",
+                "reset": "Reset"
+            },
+            "loadError": {
+                "title": "Could not load Goals."
+            },
+            "empty": {
+                "title": "No Goals yet.",
+                "subtitle": "Create a Goal to track a business metric toward a target — income, signups, churn, error rate — evaluated automatically on a schedule."
+            },
+            "pagination": {
+                "showing": "Showing {from}-{to}",
+                "noResults": "No results on this page",
+                "previous": "Previous",
+                "next": "Next"
+            },
+            "card": {
+                "comparator": {
+                    "gte": "At least",
+                    "lte": "At most"
+                },
+                "nextCheckPrefix": "Next check:",
+                "windowPrefix": "Window:",
+                "window": {
+                    "day": "Daily",
+                    "week": "Weekly",
+                    "month": "Monthly",
+                    "total": "Total",
+                    "point": "Point-in-time"
+                }
+            }
+        },
+        "goalNew": {
+            "title": "New Goal",
+            "subtitle": "Define a measurable target and the metric that tracks it. New Goals start as a draft — activate from the detail page to begin scheduled evaluation.",
+            "backToGoals": "Back to Goals",
+            "created": "Goal created",
+            "sections": {
+                "metricSource": "Metric source",
+                "target": "Target",
+                "cadence": "Evaluation cadence"
+            },
+            "fields": {
+                "title": "Title",
+                "titlePlaceholder": "e.g. Monthly Stripe income of $1,000",
+                "description": "Description",
+                "descriptionPlaceholder": "Optional context for this Goal",
+                "pluginId": "Provider plugin ID",
+                "metricId": "Metric ID",
+                "params": "Parameters (JSON)",
+                "paramsHint": "Optional provider-specific parameters as a JSON object (e.g. a currency filter).",
+                "paramsInvalid": "Parameters must be valid JSON.",
+                "paramsNotObject": "Parameters must be a JSON object.",
+                "comparator": "Direction",
+                "targetValue": "Target value",
+                "unit": "Unit",
+                "window": "Window",
+                "deadline": "Deadline (optional)",
+                "checkFrequency": "Check frequency (minutes)",
+                "checkFrequencyHint": "Minimum {min} minutes; lower values are clamped."
+            },
+            "comparators": {
+                "gte": "At least (grow to target)",
+                "lte": "At most (shrink to target)"
+            },
+            "windows": {
+                "day": "Daily",
+                "week": "Weekly",
+                "month": "Monthly",
+                "total": "Total",
+                "point": "Point-in-time"
+            },
+            "errors": {
+                "titleRequired": "Title is required.",
+                "metricSourceRequired": "Provider plugin ID and metric ID are required.",
+                "targetInvalid": "Target value must be a number.",
+                "unitRequired": "Unit is required.",
+                "deadlineInvalid": "Deadline is not a valid date.",
+                "createFailed": "Couldn't create the Goal. Please try again."
+            },
+            "actions": {
+                "create": "Create Goal",
+                "cancel": "Cancel"
+            }
+        },
+        "goalDetail": {
+            "backToGoals": "Back to Goals",
+            "actions": {
+                "evaluateNow": "Evaluate now",
+                "activate": "Activate",
+                "pause": "Pause",
+                "delete": "Delete"
+            },
+            "sections": {
+                "progress": "Progress",
+                "details": "Details",
+                "outcome": "Outcome"
+            },
+            "progress": {
+                "current": "Current",
+                "target": "Target",
+                "noSamples": "No observations yet. Activate the Goal or run an evaluation to start collecting samples.",
+                "sampleCount": "{count} observations"
+            },
+            "comparator": {
+                "gte": "At least",
+                "lte": "At most"
+            },
+            "window": {
+                "day": "Daily",
+                "week": "Weekly",
+                "month": "Monthly",
+                "total": "Total",
+                "point": "Point-in-time"
+            },
+            "details": {
+                "plugin": "Provider",
+                "metric": "Metric",
+                "window": "Window",
+                "baseline": "Baseline",
+                "checkFrequency": "Check frequency",
+                "minutes": "{count} min",
+                "nextCheck": "Next check",
+                "deadline": "Deadline",
+                "noDeadline": "Open-ended",
+                "lastObserved": "Last observed"
+            },
+            "outcome": {
+                "hint": "How this Goal ended. Auto-set by evaluation, and always overridable by you.",
+                "overrideLabel": "Override outcome",
+                "overrideNote": "Setting an outcome completes the Goal; clearing it re-opens the outcome.",
+                "none": "None"
+            },
+            "outcomes": {
+                "achieved": "Achieved",
+                "missed": "Missed",
+                "abandoned": "Abandoned"
+            },
+            "toasts": {
+                "activated": "Goal activated",
+                "paused": "Goal paused",
+                "lifecycleError": "Couldn't update the Goal.",
+                "evaluated": "Evaluation complete",
+                "evaluateError": "Couldn't evaluate the Goal.",
+                "outcomeSaved": "Outcome updated",
+                "outcomeError": "Couldn't update the outcome.",
+                "deleted": "Goal deleted",
+                "deleteError": "Couldn't delete the Goal."
+            },
+            "confirm": {
+                "delete": "Delete this Goal? Its observation history and Mission links will be removed. This cannot be undone."
+            }
+        },
         "sidebar": {
             "menu": "Menü",
             "aiChat": "AI Sohbet",
@@ -3939,14 +4335,17 @@
                 "dashboard": "Pano",
                 "activity": "Etkinlik",
                 "missions": "Missions",
+                "goals": "Goals",
                 "ideas": "Ideas",
                 "works": "İşler",
                 "tasks": "Görevler",
                 "agents": "Ajanlar",
+                "memory": "Memory",
                 "plugins": "Eklentiler",
                 "skills": "Yetenekler",
                 "templates": "Şablonlar",
-                "settings": "Ayarlar"
+                "settings": "Ayarlar",
+                "teams": "Ekipler"
             },
             "tooltips": {
                 "expandSidebar": "Kenar çubuğunu genişlet",
@@ -4240,7 +4639,9 @@
                 "defaultSelected": "Varsayılan seçildi",
                 "makeDefault": "Varsayılan yap",
                 "fork": "Çatalla",
-                "useTemplate": "Use this Template",
+                "useTemplate": "Use",
+                "useTemplateFull": "Use this Template",
+                "moreActions": "More actions",
                 "edit": "Düzenle",
                 "archive": "Arşivle",
                 "customizeAgain": "Customize again",
@@ -4413,11 +4814,30 @@
             }
         },
         "templateSelector": {
+            "label": "Şablon",
             "defaultOption": "Varsayılanı kullan",
             "defaultOptionWithName": "Varsayılanı kullan ({name})",
             "optionLabel": "{name}",
             "optionDefaultLabel": "{name} (Varsayılan)",
             "changeAnywayLink": "İndi değiştir",
+            "typeLabel": "Şablon türü",
+            "chipType": {
+                "website": "Website",
+                "landing": "Landing",
+                "blog": "Blog",
+                "directory": "Directory",
+                "store": "Store",
+                "company": "Company",
+                "awesome": "Awesome"
+            },
+            "searchPlaceholder": "Şablon ara…",
+            "searchAriaLabel": "Şablon ara",
+            "groupYourTemplates": "Şablonlarınız",
+            "groupBlueprints": "Blueprints",
+            "featuredBadge": "Öne çıkan",
+            "defaultBadge": "Varsayılan",
+            "empty": "Aramanızla eşleşen şablon yok.",
+            "resultCount": "{count, plural, =0 {Şablon yok} one {# şablon} other {# şablon}}",
             "origin": {
                 "standard": "Standart",
                 "forked": "Forklu",
@@ -4485,332 +4905,186 @@
             "system": "Sistem",
             "goToPluginSettings": "Eklenti ayarlarına git"
         },
-        "proposals": {
-            "header": {
-                "title": "Ideas",
-                "titleWithName": "Ideas"
-            },
-            "actions": {
-                "accept": "Build",
-                "viewWork": "View Work",
-                "dismiss": "Dismiss",
-                "dismissAria": "Dismiss this idea",
-                "refresh": "Suggest more"
-            },
-            "researching": {
-                "title": "Drafting ideas from your profile…",
-                "subtitle": "This usually takes under a minute."
-            },
-            "empty": {
-                "title": "No ideas right now.",
-                "subtitle": "New suggestions will appear here when they are ready."
-            },
-            "errors": {
-                "rateLimited": "Daily limit reached. Try again tomorrow.",
-                "generic": "Couldn't refresh ideas. Please try again."
-            },
-            "plugins": {
-                "label": "Suggested plugins"
-            },
-            "failureKinds": {
-                "transient-network": "Network blip",
-                "transient-rate-limit": "Rate limited",
-                "transient-upstream-5xx": "Upstream service error",
-                "transient-plugin": "Plugin timeout",
-                "permanent-invalid-input": "Invalid input",
-                "permanent-unknown": "Build failed"
-            }
-        },
-        "missionsPreview": {
-            "title": "Missions",
-            "viewAll": "View all ({n}) →",
-            "empty": {
-                "title": "No Missions yet.",
-                "subtitleRich": "<link>Start one</link> to give the agent a persistent Goal that keeps generating Ideas for you."
-            },
-            "badges": {
-                "scheduled": "Scheduled"
-            },
-            "counters": {
-                "ideas": "Ideas",
-                "works": "Works",
-                "sites": "Sites"
-            }
-        },
-        "missionsPage": {
-            "title": "Missions",
-            "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
-            "newMission": "+ New Mission",
-            "empty": {
-                "title": "No Missions yet.",
-                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting."
-            },
-            "card": {
-                "scheduled": "Scheduled",
-                "oneShot": "One-shot",
-                "schedulePrefix": "Cron:",
-                "autoBuildOn": "Auto-build on",
-                "autoBuildOff": "Auto-build off",
-                "capInherit": "Inherit user default",
-                "capUnlimited": "Unlimited",
-                "capPrefix": "Outstanding cap:",
-                "clonedFromPrefix": "Cloned from another Mission"
-            }
-        },
-        "budgetSummary": {
-            "period": "{period}",
-            "currentSpend": "Current spend",
-            "cap": "Monthly cap",
-            "noCap": "No cap set",
-            "percentUsed": "{percent}% used",
-            "blocked": "Over cap — blocked",
-            "overCap": "Over cap",
-            "loading": "Loading budget…",
-            "empty": "No budget data yet."
-        },
-        "missionDetail": {
-            "backToMissions": "Back to Missions",
-            "badges": {
-                "scheduled": "Scheduled",
-                "oneShot": "One-shot",
-                "cloned": "Cloned",
-                "clonedTooltip": "This Mission is a Full Fork of another"
-            },
-            "sections": {
-                "settings": "Mission settings",
-                "guardrails": "Guardrails override",
-                "liveRuns": "Live runs",
-                "ideas": "Ideas",
-                "relatedWorks": "Related Works",
-                "inheritedWorks": "Related Works (inherited)",
-                "activity": "Activity",
-                "spend": "Spend over time"
-            },
-            "fields": {
-                "schedule": "Schedule (cron, UTC)",
-                "autoBuildWorks": "Auto-build Works from spawned Ideas",
-                "capInherit": "Inherit user-level default cap",
-                "outstandingCap": "Outstanding-Ideas cap (-1 = unlimited)"
-            },
-            "actions": {
-                "saveSettings": "Save settings",
-                "pause": "Pause",
-                "resume": "Resume",
-                "complete": "Complete",
-                "delete": "Delete",
-                "runNow": "Run now",
-                "clone": "Clone"
-            },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
-            },
-            "guardrails": {
-                "activeOverride": "Custom guardrail overrides are active on this Mission.",
-                "inheriting": "No overrides set — using your global Work-agent guardrails."
-            },
-            "liveRuns": {
-                "empty": "No active runs."
-            },
-            "ideas": {
-                "empty": "No Ideas spawned by this Mission yet."
-            },
-            "works": {
-                "empty": "No Works have been built from this Mission's Ideas yet."
-            },
-            "inherited": {
-                "fromSource": "Inherited from",
-                "empty": "The source Mission has no Works to inherit."
-            },
-            "activity": {
-                "empty": "Activity timeline will appear here once Mission ticks start running."
-            },
-            "spend": {
-                "empty": "Spend chart will appear here once budgets are wired."
-            },
-            "clone": {
-                "title": "Clone this Mission",
-                "description": "Full Fork: copies metadata + non-dismissed Ideas (as Pending). Works are NOT cloned — they remain attached to the source.",
-                "titleLabel": "Title for the new Mission (optional)",
-                "cancel": "Cancel",
-                "confirm": "Clone Mission"
-            },
-            "toasts": {
-                "settingsSaved": "Mission settings saved",
-                "settingsError": "Couldn't save settings",
-                "paused": "Mission paused",
-                "pauseError": "Couldn't pause",
-                "resumed": "Mission resumed",
-                "resumeError": "Couldn't resume",
-                "completed": "Mission marked complete",
-                "completeError": "Couldn't complete",
-                "deleted": "Mission deleted",
-                "deleteError": "Couldn't delete",
-                "runNowError": "Couldn't run now",
-                "cloned": "Cloned: {ideasCloned} idea(s) carried, {ideasSkipped} dismissed skipped.",
-                "cloneError": "Couldn't clone Mission",
-                "runNow": {
-                    "noop-placeholder": "Run-now queued (placeholder)",
-                    "queued": "Tick queued",
-                    "spawned": "New Ideas spawned",
-                    "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
-                    "no-ideas": "Tick ran but generated no Ideas",
-                    "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
-                }
-            }
-        },
-        "ideasPage": {
-            "title": "Ideas",
-            "subtitle": "Everything the platform has drafted for you, plus anything you've typed in. Build the ones worth building.",
-            "quickAdd": {
-                "label": "Add a new Idea",
-                "placeholder": "Describe an Idea — e.g. \"A curated list of the best AI coding agents released this year\"",
-                "submit": "Add",
-                "minLength": "Description must be at least 10 characters."
-            },
-            "toggles": {
-                "showAccepted": "Show accepted",
-                "showDismissed": "Show dismissed"
-            },
-            "filters": {
-                "all": "All",
-                "pending": "Pending",
-                "queued": "Queued",
-                "building": "Building",
-                "failed": "Failed",
-                "accepted": "Accepted",
-                "dismissed": "Dismissed",
-                "done": "Done",
-                "doneTooltip": "Ideas that became Works. Click a card to open its Work."
-            },
-            "gears": {
-                "menuLabel": "Settings",
-                "autoGenerate": "Auto-generate Ideas…",
-                "autoBuild": "Auto-build Works…",
-                "autoRetry": "Auto-retry policy…",
-                "accountBudgets": "Account-wide budgets…"
-            },
-            "toasts": {
-                "ideaCreated": "Idea added",
-                "ideaCreateError": "Couldn't add idea. Please try again.",
-                "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again.",
-                "ideaGone": "Bu fikir artık kullanılamıyor."
-            },
-            "empty": {
-                "title": "No Ideas match these filters.",
-                "subtitle": "Toggle accepted / dismissed, or add one with the field above."
-            },
-            "viewAll": "View all ({n}) →",
-            "filterBar": {
-                "search": "Ara",
-                "searchPlaceholder": "Başlık veya açıklama",
-                "status": "Durum",
-                "anyStatus": "Herhangi bir durum",
-                "apply": "Uygula",
-                "reset": "Sıfırla"
-            },
-            "newPage": {
-                "link": "Manuel oluştur",
-                "or": "Veya",
-                "title": "Yeni Idea",
-                "subtitle": "Kendi Idea'nı yaz. Oluşturmak istediğin Work'ü tanımla — daha sonra derleme için sıraya alabilirsin.",
-                "nameLabel": "Başlık",
-                "namePlaceholder": "İsteğe bağlı — açıklamadan türetmek için boş bırakın",
-                "descriptionLabel": "Açıklama",
-                "descriptionPlaceholder": "Bu Idea'nın dönüşmesi gereken Work'ü tanımlayın — örneğin “Framework türüne ve lisansa göre düzenlenmiş, açık kaynaklı YZ ajan framework'lerinin özenle seçilmiş bir dizini.”",
-                "descriptionHint": "En az 10 karakter.",
-                "cancel": "İptal",
-                "create": "Idea oluştur",
-                "creating": "Oluşturuluyor…",
-                "minLength": "Açıklama en az 10 karakter olmalıdır.",
-                "error": "Idea oluşturulamadı. Lütfen tekrar deneyin."
-            }
-        },
         "discover": {
             "title": "Discover",
             "subtitle": "AI-curated Work ideas tailored to you."
         },
-        "adminUsage": {
-            "title": "Platform usage",
-            "description": "Cross-user, cross-directory spend for the current period. Self-hosted operators only.",
-            "periodLabel": "{period}",
-            "totalSpend": "Total spend: {amount}",
-            "empty": "No usage recorded this period.",
-            "columnUser": "User",
-            "columnEmail": "Email",
-            "columnWork": "Directory",
-            "columnUnits": "Units",
-            "columnCost": "Cost",
-            "loadFailed": "Could not load admin usage. You may not have platform-admin access."
-        },
-        "budgets": {
-            "overviewTitle": "Spend in {period}",
-            "overviewProgressLabel": "{percent}% of {cap} cap",
-            "overviewOverageSuffix": " (overage allowed)",
-            "overviewEmpty": "No monthly cap set. Add one in Budgets & Usage to enable alerts.",
-            "topPluginsTitle": "Top plugins by spend",
-            "topPluginsEmpty": "No usage recorded yet this period.",
-            "trendTitle": "Daily spend — {period}",
-            "trendEmpty": "No usage recorded yet this period.",
-            "trendDayLabel": "Day {day}"
-        },
-        "newPage": {
-            "title": "+ New",
-            "subtitle": "Tell us what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
-            "promptLabel": "What do you want to build?",
-            "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
-            "chipLabel": "Pick a kind",
-            "chips": {
-                "mission": "Mission",
-                "idea": "Idea",
-                "website": "Website",
-                "landing-page": "Landing Page",
-                "blog": "Blog",
-                "directory": "Directory",
-                "awesome-repo": "Awesome Repo",
-                "company": "Company"
+        "teamsPage": {
+            "title": "Ekipler",
+            "subtitle": "Bu organizasyon içinde Ajanlarınızı ve üyelerinizi ekipler halinde düzenleyin.",
+            "orgChartCta": "Organizasyon Şeması",
+            "newTeamCta": "Yeni Ekip",
+            "empty": {
+                "title": "Henüz ekip yok",
+                "description": "Ajanları ve üyeleri gruplamak için ilk ekibinizi oluşturun, ardından onları organizasyon şemasında düzenleyin.",
+                "cta": "Ekip oluştur"
             },
-            "chipDescriptions": {
-                "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
-                "idea": "A one-shot brief the agent turns into a Work plan you can build.",
-                "agent": "An AI teammate that acts across Missions, Works, or your whole Workspace.",
-                "task": "A trackable item assigned to a person or an Agent.",
-                "website": "A multi-page site for a business, service, or brand — generated content + code.",
-                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
-                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
-                "directory": "A curated directory site with search, filters, and structured item data.",
-                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
-                "company": "Register a new entity. Becomes an Organization in your account."
+            "noOrg": {
+                "title": "Ekipler bir organizasyona bağlıdır",
+                "description": "Önce bir organizasyon oluşturun — ardından Ajanlarını ve üyelerini ekipler halinde gruplayabilirsiniz.",
+                "cta": "Organizasyon Oluştur"
             },
-            "submit": "Create",
-            "or": "or",
-            "hints": {
-                "pickChip": "Pick a chip above to enable Create.",
-                "minLength": "Add a description (at least 10 characters) to enable Create."
+            "card": {
+                "agents": "{count, plural, one {# ajan} other {# ajan}}",
+                "members": "{count, plural, one {# üye} other {# üye}}",
+                "subTeams": "{count, plural, one {# alt ekip} other {# alt ekip}}"
             },
-            "toasts": {
-                "missionCreated": "Mission created",
-                "ideaCreated": "Idea added",
-                "submitError": "Couldn't create. Please try again."
+            "newDialog": {
+                "title": "Yeni Ekip",
+                "nameLabel": "Ad",
+                "namePlaceholder": "örn. Mühendislik",
+                "descriptionLabel": "Açıklama",
+                "descriptionPlaceholder": "Bu ekibin sorumlu olduğu alan (isteğe bağlı)",
+                "parentLabel": "Üst ekip",
+                "parentNone": "Üst ekip yok (en üst düzey)",
+                "managerLabel": "Yönetici ajan",
+                "managerNone": "Yönetici yok",
+                "submit": "Ekip Oluştur",
+                "creating": "Oluşturuluyor…",
+                "cancel": "İptal"
             },
-            "cards": {
-                "ai": {
-                    "title": "Create Work with AI",
-                    "subtitle": "Describe what you want and let the agent prepare an approval-ready plan.",
-                    "cta": "Get started"
-                },
-                "manual": {
-                    "title": "Create Work Manually",
-                    "subtitle": "Configure every step yourself — provider, template, items, and deploy.",
-                    "cta": "Configure now"
-                },
-                "import": {
-                    "title": "Import Existing Work",
-                    "subtitle": "Bring in a Work you already have — repo, items, and provider settings.",
-                    "cta": "Import now"
-                }
+            "detail": {
+                "overviewTab": "Genel Bakış",
+                "settingsTab": "Ayarlar",
+                "rosterTitle": "Kadro",
+                "subTeamsTitle": "Alt ekipler",
+                "managerLabel": "Yönetici",
+                "parentLabel": "Üst ekip",
+                "addMemberCta": "Üye ekle",
+                "addMemberTypeLabel": "Tür",
+                "addMemberAgent": "Ajan",
+                "addMemberUser": "Üye",
+                "addMemberSelectLabel": "Kim",
+                "addMemberSubmit": "Ekle",
+                "adding": "Ekleniyor…",
+                "removeMember": "Kaldır",
+                "roleLead": "Lider",
+                "roleMember": "Üye",
+                "emptyRoster": "Henüz üye yok — bu ekibe Ajanlar veya ekip arkadaşları ekleyin."
+            },
+            "settings": {
+                "title": "Ekip Ayarları",
+                "nameLabel": "Ad",
+                "descriptionLabel": "Açıklama",
+                "parentLabel": "Üst ekip",
+                "managerLabel": "Yönetici ajan",
+                "save": "Değişiklikleri kaydet",
+                "saving": "Kaydediliyor…",
+                "saved": "Ekip güncellendi",
+                "deleteTitle": "Tehlike bölgesi",
+                "deleteDescription": "Bir ekibi silmek, alt ekiplerini bir üst düzeye taşır ve kadrosunu kaldırır. Ajanlar ve üyeler silinmez.",
+                "deleteCta": "Ekibi sil",
+                "deleteConfirm": "Bu ekip silinsin mi? Alt ekipler bir üst düzeye taşınır; Ajanlar ve üyeler korunur.",
+                "deleting": "Siliniyor…"
+            },
+            "errors": {
+                "createFailed": "Ekip oluşturulamadı",
+                "updateFailed": "Ekip güncellenemedi",
+                "deleteFailed": "Ekip silinemedi",
+                "memberAddFailed": "Üye eklenemedi",
+                "memberRemoveFailed": "Üye kaldırılamadı"
             }
+        },
+        "orgChartPage": {
+            "title": "Organizasyon Şeması",
+            "subtitle": "Bu organizasyonun ekipleri, Ajanları ve üyeleri.",
+            "backToTeams": "Ekipler",
+            "zoomIn": "Yakınlaştır",
+            "zoomOut": "Uzaklaştır",
+            "fitView": "Sığdır",
+            "unassignedGroup": "Atanmamış",
+            "membersBadge": "{count, plural, one {# üye} other {# üye}}",
+            "empty": "Henüz gösterilecek bir şey yok — önce bu organizasyonda ekipler veya Ajanlar oluşturun.",
+            "noOrg": "Organizasyon şemasını görmek için bir organizasyon oluşturun."
+        },
+        "schedules": {
+            "title": "Zamanlamalar",
+            "subtitle": "İşlerinizde, ajanlarınızda, Missions ve görevlerinizde çalışması planlanan her şey",
+            "fetchFailed": "Zamanlamalar yüklenemedi",
+            "retry": "Yeniden dene",
+            "columns": {
+                "owner": "Sahip",
+                "cadence": "Sıklık",
+                "nextRun": "Sonraki çalıştırma",
+                "status": "Durum"
+            },
+            "filters": {
+                "all": "Tümü",
+                "activeOnly": "Yalnızca etkin"
+            },
+            "sourceTypes": {
+                "recurringTask": "Yinelenen görev",
+                "agentHeartbeat": "Ajan sinyali",
+                "workSchedule": "İş zamanlaması",
+                "missionTick": "Mission tik'i",
+                "sourceValidation": "Kaynak doğrulama",
+                "dataSync": "Veri senkronizasyonu",
+                "inboundTrigger": "Gelen tetikleyici"
+            },
+            "statuses": {
+                "active": "Aktif",
+                "paused": "Duraklatıldı",
+                "disabled": "Devre dışı",
+                "error": "Hata",
+                "ended": "Sona erdi"
+            },
+            "empty": {
+                "title": "Henüz hiçbir şey zamanlanmadı",
+                "description": "Yinelenen görevler, ajan sinyalleri, iş zamanlamaları, Mission tik'leri, kaynak doğrulama ve veri senkronizasyonu, bunları ayarladığınızda burada görünecek.",
+                "noResults": "Geçerli filtreyle eşleşen zamanlama yok."
+            }
+        },
+        "triggers": {
+            "title": "Gelen tetikleyiciler",
+            "subtitle": "Tetiklendiğinde bir Görev oluşturan imzalı webhook ve API çağrıları.",
+            "new": "Yeni tetikleyici",
+            "empty": "Henüz tetikleyici yok. İmzalı webhook almak için bir tane oluşturun.",
+            "firedCount": "{count} tetikleme",
+            "lastFired": "son tetikleme",
+            "status": {
+                "active": "Etkin",
+                "paused": "Duraklatıldı"
+            },
+            "createTitle": "Yeni gelen tetikleyici",
+            "createDescription": "İmzalı bir webhook URL’si ve bir gizli anahtar alırsınız. Dış sistemler Görev oluşturmak için POST gönderir.",
+            "form": {
+                "name": "Ad",
+                "namePlaceholder": "Dağıtım bildirimleri",
+                "description": "Açıklama",
+                "descriptionPlaceholder": "Bu tetikleyiciyi ne tetikler?",
+                "taskTitle": "Görev başlığı şablonu",
+                "taskTitlePlaceholder": "Tetikleyici: {name}",
+                "taskTitleHint": "{name}, tetikleyici adına dönüşür."
+            },
+            "actions": {
+                "pause": "Duraklat",
+                "resume": "Sürdür",
+                "rotate": "Gizli anahtarı değiştir",
+                "delete": "Sil",
+                "cancel": "İptal",
+                "create": "Oluştur"
+            },
+            "reveal": {
+                "title": "Tetikleyici gizli anahtarı",
+                "warning": "Gizli anahtarı şimdi kopyalayın — bir daha göremezsiniz.",
+                "url": "Webhook URL’si",
+                "secret": "İmzalama gizli anahtarı",
+                "curl": "İmzalı istek örneği",
+                "copy": "Kopyala",
+                "done": "Tamam"
+            },
+            "toast": {
+                "created": "Tetikleyici oluşturuldu",
+                "createFailed": "Tetikleyici oluşturulamadı",
+                "rotated": "Gizli anahtar değiştirildi",
+                "rotateFailed": "Gizli anahtar değiştirilemedi",
+                "toggleFailed": "Tetikleyici güncellenemedi",
+                "deleted": "Tetikleyici silindi",
+                "deleteFailed": "Tetikleyici silinemedi",
+                "loadFailed": "Tetikleyiciler yüklenemedi",
+                "copyFailed": "Panoya kopyalanamadı"
+            },
+            "confirmDelete": "Bu tetikleyici silinsin mi? Webhook URL’si hemen çalışmayı durdurur ve bu işlem geri alınamaz."
         }
     },
     "layout": {
@@ -4881,7 +5155,6 @@
             "dashboard": "Panel",
             "activity": "Etkinlik Günlüğü",
             "works": "İşler",
-            "discover": "Discover",
             "newWork": "Yeni İş",
             "work": "İş",
             "overview": "Genel Bakış",
@@ -4898,7 +5171,8 @@
             "security": "Güvenlik",
             "apiKeys": "API Anahtarları",
             "dangerZone": "Tehlike Bölgesi",
-            "pluginSettings": "Eklenti Ayarları"
+            "pluginSettings": "Eklenti Ayarları",
+            "discover": "Discover"
         }
     },
     "api": {
@@ -5075,12 +5349,35 @@
         }
     },
     "organizations": {
+        "settings": {
+            "title": "Organization",
+            "subtitle": "Manage your Organization's shared context.",
+            "loading": "Loading…",
+            "selectLabel": "Organization",
+            "visionLabel": "Vision",
+            "visionPlaceholder": "e.g. Become the go-to platform where small teams launch and grow AI-run businesses.",
+            "visionHelp": "Shared with every AI agent working in this Organization — Idea generation, Mission runs, and agent tasks all receive it as context.",
+            "lastUpdated": "Vision last updated",
+            "save": "Save",
+            "saved": "Saved",
+            "empty": {
+                "title": "No Organization yet",
+                "description": "Create an Organization from the workspace switcher to set a company vision."
+            },
+            "errors": {
+                "generic": "Failed to save. Please try again."
+            }
+        },
         "switcher": {
             "heading": "Switch Organization",
             "createNew": "Create Organization",
             "loading": "Loading…"
         },
         "create": {
+            "visionToggle": "Add company vision (optional)",
+            "visionLabel": "Vision",
+            "visionPlaceholder": "e.g. Become the go-to platform where small teams launch and grow AI-run businesses.",
+            "visionHelp": "Optional. Guides all agents working in this Organization — Idea generation, Mission runs, and agent tasks receive it as context. You can add or edit it later in Settings.",
             "title": "Create Organization",
             "description": "Give your Organization a name. We'll allocate a unique slug for its URL.",
             "nameLabel": "Name",
@@ -5097,6 +5394,14 @@
                 "nameRequired": "Name is required",
                 "nameTooLong": "Name must be 200 characters or fewer",
                 "generic": "Failed to create Organization"
+            },
+            "templates": {
+                "label": "Başlangıç noktası",
+                "blankTitle": "Boş organizasyon",
+                "blankDescription": "Boş başlayın — ekipleri ve ajanları daha sonra ekleyin.",
+                "meta": "{agents, plural, one {# ajan} other {# ajan}} · {teams, plural, one {# ekip} other {# ekip}}",
+                "submitImport": "Şablondan oluştur",
+                "importError": "Bu şablondan organizasyon oluşturulamadı"
             }
         },
         "upgrade": {

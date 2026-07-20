@@ -39,17 +39,17 @@ export interface PreferencesView {
 export const notificationPreferencesAPI = {
     listEventTypes: async () => {
         const data = await serverFetch<{ eventTypes: NotificationEventType[] }>(
-            '/api/notifications/event-types',
+            '/notifications/event-types',
         );
         return data.eventTypes;
     },
     getPreferences: async () => {
-        return serverFetch<PreferencesView>('/api/notifications/preferences');
+        return serverFetch<PreferencesView>('/notifications/preferences');
     },
     setEventSubscription: async (eventKey: string, channelIds: string[]) => {
         return serverMutation<{ subscription: NotificationSubscription }>({
             method: 'PUT',
-            endpoint: `/api/notifications/preferences/event/${encodeURIComponent(eventKey)}`,
+            endpoint: `/notifications/preferences/event/${encodeURIComponent(eventKey)}`,
             data: { channelIds },
             wrapInData: false,
         });
@@ -61,7 +61,7 @@ export const notificationPreferencesAPI = {
     }) => {
         return serverMutation<{ preference: NotificationPreference }>({
             method: 'PUT',
-            endpoint: '/api/notifications/preferences/quiet-hours',
+            endpoint: '/notifications/preferences/quiet-hours',
             data: input,
             wrapInData: false,
         });
@@ -69,7 +69,7 @@ export const notificationPreferencesAPI = {
     muteCategory: async (category: string, mutedUntil: string | null) => {
         return serverMutation<{ mute: { category: string; mutedUntil: string | null } }>({
             method: 'POST',
-            endpoint: '/api/notifications/preferences/mute',
+            endpoint: '/notifications/preferences/mute',
             data: { category, mutedUntil },
             wrapInData: false,
         });
@@ -77,7 +77,7 @@ export const notificationPreferencesAPI = {
     unmuteCategory: async (category: string) => {
         await serverMutation<void>({
             method: 'DELETE',
-            endpoint: `/api/notifications/preferences/mute/${encodeURIComponent(category)}`,
+            endpoint: `/notifications/preferences/mute/${encodeURIComponent(category)}`,
             data: {},
             wrapInData: false,
         });

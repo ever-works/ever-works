@@ -7,12 +7,21 @@ import {
     WorkRepository,
 } from '@ever-works/agent/database';
 import { WorkModule } from '@ever-works/agent/services';
+import { AgentsModule as AgentAgentsModule } from '@ever-works/agent/agents';
+import { SkillsModule as AgentSkillsModule } from '@ever-works/agent/skills';
+import { TasksDomainModule } from '@ever-works/agent/tasks-domain';
+import { AgentTeamsModule } from '@ever-works/agent/teams';
+import { FacadesModule } from '@ever-works/agent/facades';
 import { TenantBootstrapService } from '../scope/tenant-bootstrap.service';
 import { UsersModule } from '../users/users.module';
 import { OrganizationService } from './organization.service';
 import { OrganizationMembershipService } from './organization-membership.service';
 import { OrganizationOwnershipGuard } from './guards/organization-ownership.guard';
 import { OrganizationsController } from './organizations.controller';
+import { OrgTemplateCatalogService } from './org-template-catalog.service';
+import { OrgTemplatesController } from './org-templates.controller';
+import { CompanyImportService } from './company-import.service';
+import { CompanyImportController } from './company-import.controller';
 import { WorkRegisteredListener } from './work-registered.listener';
 
 /**
@@ -35,7 +44,19 @@ import { WorkRegisteredListener } from './work-registered.listener';
     // EW-665 (Phase 13) — `WorkModule` provides `WorkLifecycleService`, used
     // by the Register-Company controller to land + transition the backing
     // Company Work. `WorkModule` doesn't import Organizations, so no cycle.
-    imports: [DatabaseModule, UsersModule, WorkModule],
+    // Teams & Prebuilt Companies (spec §6) — the company-template importer
+    // composes the agent/skills/tasks/teams domain services plus the git
+    // facade (catalog reads from the private ever-works/orgs repo).
+    imports: [
+        DatabaseModule,
+        UsersModule,
+        WorkModule,
+        AgentAgentsModule,
+        AgentSkillsModule,
+        TasksDomainModule,
+        AgentTeamsModule,
+        FacadesModule,
+    ],
     providers: [
         UserRepository,
         TenantRepository,
@@ -60,8 +81,11 @@ import { WorkRegisteredListener } from './work-registered.listener';
         // EW-665 (Phase 13) — turns a Company Work's `→ registered`
         // transition (the `work.status.changed` event) into an Org.
         WorkRegisteredListener,
+        // Teams & Prebuilt Companies (spec §6) — catalog reader + importer.
+        OrgTemplateCatalogService,
+        CompanyImportService,
     ],
-    controllers: [OrganizationsController],
+    controllers: [OrganizationsController, OrgTemplatesController, CompanyImportController],
     exports: [
         OrganizationService,
         OrganizationMembershipService,

@@ -12,6 +12,10 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 import { PortableDateColumn } from './_types';
+// Type-only import (erased at compile time) — no runtime cycle with the
+// agents module barrel; the pure helper itself only imports types from
+// `agent-action-proposal.entity`.
+import type { AgentGuardrails } from '../agents/guardrails';
 
 /**
  * Agent scope (agents/spec.md §3.6 / architecture/agents-skills-tasks.md §3).
@@ -117,6 +121,41 @@ export interface AgentTarget {
 }
 
 /**
+ * Reporting period for one scorecard metric — how often the target is
+ * meant to be met/reset by the operator.
+ */
+export type AgentScorecardPeriod = 'weekly' | 'monthly' | 'quarterly';
+
+/**
+ * One quantified goal on an Agent's scorecard (Agent Scorecards
+ * increment 1 — data model + manual editing + display). Stored as a
+ * `simple-json` array on `agents.scorecard`.
+ *
+ * - `key`     — kebab-case identifier, unique within the scorecard
+ *               (stable handle for testids / future automation).
+ * - `label`   — human-readable metric name (<= 80 chars).
+ * - `target`  — the goal value for the period.
+ * - `current` — the latest measured value (manually edited in this
+ *               increment; auto-updating from run output is a follow-up).
+ * - `floor`   — optional minimum acceptable value; below it the metric
+ *               reads as critical.
+ * - `stretch` — optional stretch goal; at/above it the metric reads as
+ *               exceeded.
+ * - `unit`    — optional display unit ("PRs", "%", "$"...).
+ * - `period`  — weekly | monthly | quarterly.
+ */
+export interface AgentScorecardMetric {
+    key: string;
+    label: string;
+    target: number;
+    current: number;
+    floor?: number | null;
+    stretch?: number | null;
+    unit?: string | null;
+    period: AgentScorecardPeriod;
+}
+
+/**
  * Heartbeat idle-tick behavior (agents/spec.md §5.2 — F3 operator decision).
  *
  * - `propose`  — ask the AI for the next action (default; delivers visible work).
@@ -217,6 +256,16 @@ export class Agent {
     @Column({ type: 'text', nullable: true })
     capabilities?: string | null;
 
+    /**
+     * Direct manager for the Org Chart + `AGENTS.md reportsTo:` on company
+     * import (teams-and-companies spec §1.2). Raw self-reference column —
+     * FK ON DELETE SET NULL by migration; same-org + acyclicity are
+     * service-enforced. Descriptive in v1: carries NO authz and does not
+     * alter the createSubAgent scope-narrowing cascade.
+     */
+    @Column({ type: 'uuid', nullable: true })
+    reportsToAgentId?: string | null;
+
     // ── AI provider routing ──
     // null = use account default per the existing AiFacadeService cascade.
 
@@ -246,6 +295,17 @@ export class Agent {
      */
     @Column('simple-json', { nullable: true })
     targets?: AgentTarget[] | null;
+
+    /**
+     * Agent Dispatch Guardrails — per-Agent policy applied when the
+     * Agent proposes a side-effectful action (see
+     * `agents/guardrails.ts` for the pure evaluator +
+     * `AgentApprovalsService.createProposal` for enforcement).
+     * `null` = default posture: every proposal queues for human
+     * approval, exactly the pre-guardrails behavior.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    guardrails?: AgentGuardrails | null;
 
     // ── Heartbeat ──
 
@@ -331,6 +391,16 @@ export class Agent {
 
     @Column({ type: 'varchar', length: 254, nullable: true })
     committerEmail?: string | null;
+
+    // ── Scorecard (Agent Scorecards increment 1) ──
+    // Quantified per-Agent goals so an AI worker's output is measurable.
+    // Nullable JSON array of AgentScorecardMetric; null = no scorecard set.
+    // This increment covers the data model + manual editing + display only —
+    // auto-updating `current` from run output and the org-dashboard at-risk
+    // roll-up are follow-ups.
+
+    @Column('simple-json', { nullable: true })
+    scorecard?: AgentScorecardMetric[] | null;
 
     // EW-655 (Tenants & Organizations Phase 3) — Tier A scope FKs.
     // Both NULL until the owning user creates their first Organization

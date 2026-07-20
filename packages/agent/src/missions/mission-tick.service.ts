@@ -1,9 +1,16 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { ActivityLogService } from '../activity-log/activity-log.service';
+import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
+import { config } from '../config';
 import { Mission, MissionStatus, MissionType } from '../entities/mission.entity';
-import { WorkProposalSource } from '../entities/work-proposal.entity';
+import { WorkProposal, WorkProposalSource } from '../entities/work-proposal.entity';
 import { WorkAgentService } from '../work-agent/work-agent.service';
+import {
+    IDEA_BUILD_EXECUTE_DISPATCHER,
+    type IdeaBuildExecuteDispatcher,
+} from '../work-agent/idea-build-executor.dispatcher';
 import { WorkProposalRepository } from '../user-research/work-proposal.repository';
 import { WorkProposalService } from '../user-research/work-proposal.service';
 import { matchesCron } from './cron-matcher';
@@ -116,6 +123,18 @@ export class MissionTickService {
         private readonly workProposals: WorkProposalService,
         private readonly workProposalRepo: WorkProposalRepository,
         private readonly workAgent: WorkAgentService,
+        // Idea/mission lifecycle activity (PR-3) + Schedules P2 `mission_tick`
+        // coverage — same @Optional() ActivityLogService (hand-rolled unit-test
+        // constructors omit it; production DI provides it via ActivityLogModule
+        // imported by MissionsModule).
+        @Optional()
+        private readonly activityLog?: ActivityLogService,
+        // PR-4 — Idea build executor dispatch seam (same token the API
+        // build path uses). Optional: unbound in tests / CLI, and only
+        // ever consulted when the executor flag is on.
+        @Optional()
+        @Inject(IDEA_BUILD_EXECUTE_DISPATCHER)
+        private readonly ideaBuildDispatcher?: IdeaBuildExecuteDispatcher,
     ) {}
 
     /**
@@ -163,8 +182,57 @@ export class MissionTickService {
             if (outcome.outcome === 'spawned') summary.ran += 1;
             else if (outcome.outcome === 'failed') summary.failed += 1;
             else summary.skipped += 1;
+
+            // Schedules P2 — record every FIRED scheduled tick in the
+            // Activity feed. A tick "fires" when its cron matched this
+            // cycle; the no-match minutes — the vast majority — are
+            // intentionally NOT logged so the feed isn't flooded once
+            // per minute. The domain-model tick already emits a dedicated
+            // lifecycle row for `failed` (mission_failed) and `cap-hit`
+            // (mission_tick_capped), so only the outcomes without their
+            // own row emit the generic `mission_tick`. Every fired tick
+            // therefore lands exactly one Activity row, with no
+            // double-logging. Best-effort + user-scoped to the owner.
+            if (outcome.outcome === 'spawned' || outcome.outcome === 'no-ideas') {
+                void this.emitMissionTick(mission, outcome);
+            }
         }
         return summary;
+    }
+
+    /**
+     * Emit a `mission_tick` ActivityLog row for a scheduled Mission whose
+     * cron fired this cycle. FAILED status only for the generator-threw
+     * outcome; every other fired outcome (spawned / no-ideas / cap-hit) is
+     * a COMPLETED tick. Best-effort — wrapped so a logging failure can
+     * never disrupt the tick loop.
+     */
+    private async emitMissionTick(mission: Mission, outcome: MissionTickOutcome): Promise<void> {
+        if (!this.activityLog) return;
+        try {
+            await this.activityLog.log({
+                userId: mission.userId,
+                actionType: ActivityActionType.MISSION_TICK,
+                action: 'mission.tick',
+                status:
+                    outcome.outcome === 'failed' ? ActivityStatus.FAILED : ActivityStatus.COMPLETED,
+                summary: `Mission "${mission.title}" ticked (${outcome.outcome})`,
+                details: {
+                    missionId: mission.id,
+                    outcome: outcome.outcome,
+                    ideasCreated: outcome.ideasCreated ?? 0,
+                    ideasQueued: outcome.ideasQueued ?? 0,
+                    outstanding: outcome.outstanding ?? null,
+                    cap: outcome.cap ?? null,
+                    message: outcome.message ?? null,
+                },
+            });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            this.logger.warn(
+                `Failed to emit mission_tick activity for mission ${mission.id}: ${message}`,
+            );
+        }
     }
 
     /**
@@ -229,6 +297,17 @@ export class MissionTickService {
         const outstanding = await this.workProposalRepo.countOutstandingByMission(mission.id);
         const cap = await this.resolveEffectiveCap(mission);
         if (cap !== null && outstanding >= cap) {
+            // PR-3 - the spec's "at-cap event into the activity log"
+            // (spec §1.3) finally lands (review gap G3).
+            await this.recordActivity(
+                mission,
+                ActivityActionType.MISSION_TICK_CAPPED,
+                'tick-capped',
+                {
+                    outstanding,
+                    cap,
+                },
+            );
             return {
                 outcome: 'cap-hit',
                 outstanding,
@@ -265,9 +344,24 @@ export class MissionTickService {
 
             let queued = 0;
             if (mission.autoBuildWorks) {
+                // PR-4 (review finding P3): when the executor flag is ON we
+                // ALSO create a WorkAgentGoal per queued Idea and enqueue it
+                // (mirroring the API build() path), so Mission-auto-queued
+                // Ideas actually produce goals for the executor instead of
+                // being stranded in QUEUED. When the flag is OFF this is
+                // exactly today's behavior — queueForBuild only, no goal,
+                // nothing executes.
+                const executorEnabled = config.ideaBuildExecutor.isEnabled();
                 for (const proposal of result.proposals) {
-                    const ok = await this.workProposals.queueForBuild(mission.userId, proposal.id);
-                    if (ok) queued += 1;
+                    const queuedProposal = await this.workProposals.queueForBuild(
+                        mission.userId,
+                        proposal.id,
+                    );
+                    if (!queuedProposal) continue;
+                    queued += 1;
+                    if (executorEnabled) {
+                        await this.createAndEnqueueBuildGoal(mission.userId, queuedProposal);
+                    }
                 }
             }
 
@@ -284,7 +378,72 @@ export class MissionTickService {
                 `Mission ${mission.id} tick failed for user ${mission.userId}: ${message}`,
                 err as Error,
             );
+            // PR-3 (review finding P4) - persist the fatal failure so the
+            // FAILED status is finally reachable. Revivable: the user's
+            // resume endpoint accepts FAILED. Best-effort - a persistence
+            // error must not mask the original failure.
+            try {
+                await this.missions.update(
+                    { id: mission.id, status: MissionStatus.ACTIVE },
+                    { status: MissionStatus.FAILED },
+                );
+                await this.recordActivity(
+                    mission,
+                    ActivityActionType.MISSION_FAILED,
+                    'tick-failed',
+                    {
+                        message: message.slice(0, 500),
+                    },
+                );
+            } catch (persistErr) {
+                this.logger.warn(
+                    `Mission ${mission.id}: failed to persist FAILED status: ${
+                        persistErr instanceof Error ? persistErr.message : String(persistErr)
+                    }`,
+                );
+            }
             return { outcome: 'failed', message };
+        }
+    }
+
+    /**
+     * PR-4 (review finding P3) — mirror the API `build()` path for a
+     * Mission-auto-queued Idea: create a `WorkAgentGoal`
+     * (`maxWorksPerRun=1` + `ideaId`) and enqueue it onto the Idea
+     * build executor. Only called when the executor flag is on.
+     *
+     * Best-effort per Idea: a failure here (e.g. the Mission owner has
+     * not enabled the Work agent, so `createGoal` throws) is logged and
+     * swallowed — the Idea is already QUEUED (today's behavior), so the
+     * tick is never failed and other Ideas in the batch still proceed.
+     */
+    private async createAndEnqueueBuildGoal(userId: string, proposal: WorkProposal): Promise<void> {
+        try {
+            // PR-4 x PR-5 — the build-request factory was renamed from
+            // createGoal → createBuildRequest ({ goal } → { buildRequest }).
+            const { buildRequest } = await this.workAgent.createBuildRequest(userId, {
+                instruction: proposal.generatedPrompt?.trim() || proposal.description.trim(),
+                maxWorksPerRun: 1,
+                ideaId: proposal.id,
+            });
+            if (this.ideaBuildDispatcher) {
+                await this.ideaBuildDispatcher.enqueue({
+                    goalId: buildRequest.id,
+                    userId,
+                    ideaId: proposal.id,
+                });
+            } else {
+                this.logger.warn(
+                    `Idea build executor enabled but no dispatcher bound; ` +
+                        `mission build request ${buildRequest.id} for idea ${proposal.id} will not execute.`,
+                );
+            }
+        } catch (err) {
+            const message = err instanceof Error ? err.message : String(err);
+            this.logger.warn(
+                `Mission auto-build goal creation failed for idea ${proposal.id} ` +
+                    `(user ${userId}): ${message}`,
+            );
         }
     }
 
@@ -320,5 +479,31 @@ export class MissionTickService {
             );
         }
         return PLATFORM_DEFAULT_OUTSTANDING_CAP;
+    }
+
+    /** PR-3 - best-effort activity write; no-ops when unwired. */
+    private async recordActivity(
+        mission: Mission,
+        actionType: ActivityActionType,
+        action: string,
+        details: Record<string, unknown>,
+    ): Promise<void> {
+        if (!this.activityLog) return;
+        try {
+            await this.activityLog.log({
+                userId: mission.userId,
+                actionType,
+                action,
+                status: ActivityStatus.COMPLETED,
+                summary: `Mission ${action}: ${mission.title}`,
+                details: { missionId: mission.id, ...details } as Record<string, any>,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Mission ${mission.id}: activity write failed (${actionType}): ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
     }
 }

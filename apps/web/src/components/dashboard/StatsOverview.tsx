@@ -10,6 +10,7 @@ import {
     ListChecks,
     ListTodo,
     Target,
+    Users,
     Wallet,
     type LucideIcon,
 } from 'lucide-react';
@@ -47,6 +48,14 @@ interface StatsOverviewProps {
     agentsActive?: number;
     tasksInProgress?: number;
     tasksBlocked?: number;
+    /**
+     * Dashboard blocks (spec §4.1, change 1) — Teams count for the 9th
+     * tile. Optional on purpose: the Teams API lands with the Teams
+     * feature (PR #1647), so until it is wired this is `undefined` and
+     * the tile is omitted entirely (the grid falls back to 8 tiles).
+     * It lights up automatically once Teams merges.
+     */
+    teamsTotal?: number;
 }
 
 function formatMoney(cents: number, currency: string): string {
@@ -73,6 +82,7 @@ export function StatsOverview({
     agentsActive = 0,
     tasksInProgress = 0,
     tasksBlocked = 0,
+    teamsTotal,
 }: StatsOverviewProps) {
     const t = useTranslations('dashboard.stats');
 
@@ -85,8 +95,13 @@ export function StatsOverview({
         dotColor: string;
         /** When set, the tile renders as a Link. */
         href?: string;
-        /** Optional secondary line under the title (e.g. "2 active"). */
-        sublabel?: string;
+        /**
+         * Dashboard blocks (spec §4.2) — the parenthetical fact folded
+         * inline onto the subtitle line (e.g. `Agents (0 active)`).
+         * Optional decoration; a tile without one is still exactly two
+         * lines, so qualified and unqualified tiles share a height.
+         */
+        qualifier?: string;
     }> = [
         {
             title: t('totalMissions'),
@@ -148,7 +163,7 @@ export function StatsOverview({
             change: '+0%',
             changeType: 'neutral',
             href: ROUTES.DASHBOARD_AGENTS,
-            sublabel: t('agentsActive', { count: agentsActive }),
+            qualifier: t('agentsActive', { count: agentsActive }),
         },
         {
             title: t('tasksInFlight'),
@@ -158,11 +173,30 @@ export function StatsOverview({
             change: '+0%',
             changeType: 'neutral',
             href: ROUTES.DASHBOARD_TASKS,
-            sublabel:
-                tasksBlocked > 0
-                    ? t('tasksBlocked', { count: tasksBlocked })
-                    : t('tasksNoBlockers'),
+            // When there are blockers, keep the `(N blocked)` qualifier;
+            // a healthy tile stays clean as plain "Tasks in flight" (no
+            // `(no blockers)` filler — spec §4.2).
+            qualifier: tasksBlocked > 0 ? t('tasksBlocked', { count: tasksBlocked }) : undefined,
         },
+        // Dashboard blocks (spec §4.1, change 1) — 9th tile: Teams count
+        // for the active Organization. Guarded so it only appears once
+        // the Teams feature (PR #1647) wires `teamsTotal`; while it is
+        // `undefined` the grid stays at 8 tiles. Route constant
+        // `ROUTES.DASHBOARD_TEAMS` also lands with that PR, so the href
+        // is inlined here (same pattern as the Month Spend tile).
+        ...(teamsTotal !== undefined
+            ? [
+                  {
+                      title: t('teams'),
+                      value: teamsTotal,
+                      icon: Users,
+                      dotColor: 'bg-teal-500',
+                      change: '+0%',
+                      changeType: 'neutral' as const,
+                      href: '/teams',
+                  },
+              ]
+            : []),
     ];
 
     return (
@@ -171,7 +205,7 @@ export function StatsOverview({
                 const tileBody = (
                     <div
                         className={cn(
-                            'group relative flex flex-col gap-2 rounded-xl px-4 py-4 h-full overflow-hidden',
+                            'group relative flex flex-col gap-1.5 rounded-xl px-3 py-3 h-full overflow-hidden',
                             'bg-card dark:bg-surface-secondary-dark',
                             'border border-card-border dark:border-border-dark',
                             'transition-all duration-200',
@@ -182,37 +216,30 @@ export function StatsOverview({
                         {/* Decorative top-center glow accent */}
                         <div className="card-top-accent pointer-events-none absolute left-1/2 -translate-x-1/2 top-0 w-2/5 h-px z-10 opacity-30 rounded-full" />
 
-                        {/* Icon + Value */}
+                        {/* Line 1 — icon + value */}
                         <div className="flex items-end gap-2 min-w-0">
-                            <div className="w-8 h-8 rounded-lg flex items-center justify-center shrink-0 bg-surface-secondary dark:bg-white/6 border border-border/40 dark:border-white/8">
+                            <div className="w-7 h-7 rounded-lg flex items-center justify-center shrink-0 bg-surface-secondary dark:bg-white/6 border border-border/40 dark:border-white/8">
                                 <stat.icon
-                                    className="w-4 h-4 text-text-secondary dark:text-text-secondary-dark"
+                                    className="w-3.5 h-3.5 text-text-secondary dark:text-text-secondary-dark"
                                     strokeWidth={1.4}
                                 />
                             </div>
-                            <p className="text-2xl font-semibold tracking-tight tabular-nums text-text dark:text-text-dark leading-none truncate">
+                            <p className="text-xl font-semibold tracking-tight tabular-nums text-text dark:text-text-dark leading-none truncate">
                                 {stat.value}
                             </p>
                         </div>
 
-                        {/* Label */}
-                        <div className="min-w-0">
-                            <div className="flex items-center gap-1.5">
-                                <span
-                                    className={cn(
-                                        'w-1.5 h-1.5 rounded-full shrink-0',
-                                        stat.dotColor,
-                                    )}
-                                />
-                                <p className="text-xs text-text-muted dark:text-text-muted-dark truncate">
-                                    {stat.title}
-                                </p>
-                            </div>
-                            {stat.sublabel ? (
-                                <p className="mt-0.5 pl-3 text-[11px] text-text-muted dark:text-text-muted-dark truncate opacity-70">
-                                    {stat.sublabel}
-                                </p>
-                            ) : null}
+                        {/* Line 2 — dot + subtitle (qualifier inline, never a 3rd line) */}
+                        <div className="flex items-center gap-1.5 min-w-0">
+                            <span
+                                className={cn('w-1.5 h-1.5 rounded-full shrink-0', stat.dotColor)}
+                            />
+                            <p className="text-xs text-text-muted dark:text-text-muted-dark truncate">
+                                {stat.title}
+                                {stat.qualifier ? (
+                                    <span className="opacity-70"> ({stat.qualifier})</span>
+                                ) : null}
+                            </p>
                         </div>
                     </div>
                 );

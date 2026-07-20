@@ -141,9 +141,17 @@
             "types": "./dist/missions/index.d.ts",
             "default": "./dist/missions/index.js"
         },
+        "./goals": {
+            "types": "./dist/goals/index.d.ts",
+            "default": "./dist/goals/index.js"
+        },
         "./agents": {
             "types": "./dist/agents/index.d.ts",
             "default": "./dist/agents/index.js"
+        },
+        "./agent-approvals": {
+            "types": "./dist/agent-approvals/index.d.ts",
+            "default": "./dist/agent-approvals/index.js"
         },
         "./skills": {
             "types": "./dist/skills/index.d.ts",
@@ -156,6 +164,18 @@
         "./titler": {
             "types": "./dist/titler/index.d.ts",
             "default": "./dist/titler/index.js"
+        },
+        "./teams": {
+            "types": "./dist/teams/index.d.ts",
+            "default": "./dist/teams/index.js"
+        },
+        "./schedules": {
+            "types": "./dist/schedules/index.d.ts",
+            "default": "./dist/schedules/index.js"
+        },
+        "./triggers": {
+            "types": "./dist/triggers/index.d.ts",
+            "default": "./dist/triggers/index.js"
         }
     },
     "scripts": {

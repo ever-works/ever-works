@@ -18,7 +18,19 @@ export * from './task-tracker.interface.js';
 // Notifications v2 (EW-650 + siblings) — email + chat channel contracts.
 export * from './email-provider.interface.js';
 export * from './notification-channel.interface.js';
+// Connectors ("Connector fabric") — first-party BIDIRECTIONAL comms
+// plugins (outbound send + inbound route-to-Agent). Additive superset of
+// the notification-channel contract; see `connector.interface.ts` and
+// `docs/specs/features/connectors/spec.md`. Interface + types only for the
+// inbound leg in this increment (routing/pairing runtime lands in P2).
+export * from './connector.interface.js';
 export * from './agent-memory.interface.js';
+// Org-wide Memory (Cortex P2) — pluggable ORG memory framework +
+// multi-doc-type RAG pipeline contracts. Additive, beside the existing
+// `agent-memory` / `vector-store` / `content-extractor` seams. See
+// `docs/specs/features/memory/spec.md` §5.
+export * from './memory.interface.js';
+export * from './rag.interface.js';
 // EW-642 — pluggable vector-store backends.
 export * from './vector-store.interface.js';
 // EW-734 / EW-735 — pluggable DNS providers (Cloudflare today; BYO Cloudflare
@@ -36,3 +48,7 @@ export * from './job-runtime.interface.js';
 // default lives in @ever-works/agent (zero external deps); every other
 // scheme ships as a plugin package under packages/plugins/secret-store-*/.
 export * from './secret-store.interface.js';
+// Goals feature PR-7 — read-only metrics collectors (custom-http, Stripe;
+// PostHog + Google Analytics in PR-9). Consumed by MetricsFacadeService
+// and, from PR-8 on, by Goal evaluation.
+export * from './metrics-provider.interface.js';

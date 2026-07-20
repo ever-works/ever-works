@@ -18,6 +18,7 @@ import { WorkKnowledgeCitationRepository } from '../database/repositories/work-k
 import { WorkKnowledgeChunkRepository } from '../database/repositories/work-knowledge-chunk.repository';
 import { WorkKnowledgeChunkCoordinateRepository } from '../database/repositories/work-knowledge-chunk-coordinate.repository';
 import { KnowledgeBaseService } from './knowledge-base.service';
+import { MemoryConsolidationService } from './memory-consolidation.service';
 import { KnowledgeBaseGitMirrorService } from './knowledge-base-git-mirror.service';
 import { KnowledgeBaseBufferExtractorService } from './knowledge-base-buffer-extractor.service';
 import { KnowledgeBaseMediaNormalizeService } from './knowledge-base-media-normalize.service';
@@ -90,6 +91,12 @@ import { WorkOwnershipService } from './work-ownership.service';
         WorkKnowledgeChunkRepository,
         WorkKnowledgeChunkCoordinateRepository,
         KnowledgeBaseService,
+        // Memory Consolidation — org-wide curation pass over the same
+        // KB tables (POST /api/memory/consolidate). Depends on
+        // KnowledgeBaseService + the document repository (this module)
+        // plus the optional WorkRepository (DatabaseModule) and
+        // AiFacadeService (FacadesModule), both already imported above.
+        MemoryConsolidationService,
         KnowledgeBaseGitMirrorService,
         KnowledgeBaseBufferExtractorService,
         KnowledgeBaseMediaNormalizeService,
@@ -107,6 +114,7 @@ import { WorkOwnershipService } from './work-ownership.service';
         WorkKnowledgeChunkRepository,
         WorkKnowledgeChunkCoordinateRepository,
         KnowledgeBaseService,
+        MemoryConsolidationService,
         KnowledgeBaseGitMirrorService,
         KnowledgeBaseBufferExtractorService,
         KnowledgeBaseMediaNormalizeService,

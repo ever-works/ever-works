@@ -34,7 +34,6 @@ import { test, expect, type Page } from '@playwright/test';
  *     /register        → 'Create Account | Ever Works'
  *     /forgot-password → 'Forgot Password | Ever Works'
  *     /reset-password  → 'Reset Password | Ever Works'
- *     /discover (auth) → 'Discover | Ever Works'        (fr: 'Découvrir …')
  *     /        (auth)  → 'Dashboard | Ever Works'
  *   Locale title cross-check (messages/<locale>.json metadata.pages.signIn):
  *     en 'Sign In' · fr 'Se connecter' · de 'Anmelden' · es 'Iniciar sesión'

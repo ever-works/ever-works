@@ -23,6 +23,15 @@ export const PLUGIN_CATEGORIES = [
 	// `capabilities/notification-channel.interface.ts`.
 	'email-provider',
 	'notification-channel',
+	// Connectors ("Connector fabric") — first-party, BIDIRECTIONAL
+	// communication-channel plugins that both send outbound (messages /
+	// records) AND accept inbound control (a message → routes to an
+	// Agent/Team → replies). A superset of the outbound-only
+	// `notification-channel`; distinct from the third-party `pipeline`
+	// aggregators (Composio / Make / SIM / Zapier / Activepieces). All
+	// three families coexist. See `capabilities/connector.interface.ts`
+	// and `docs/specs/features/connectors/spec.md`.
+	'connector',
 	// EW-642 — pluggable vector-store backends (pgvector, Qdrant, Pinecone, …).
 	// See `capabilities/vector-store.interface.ts` and the RFC at
 	// `docs/specs/features/knowledge-base/phase-2-vector-plugin-design.md`.
@@ -62,7 +71,26 @@ export const PLUGIN_CATEGORIES = [
 	// on real customer demand because each runtime's operational model
 	// differs significantly (push vs pull, namespace vs prefix vs schema
 	// isolation, retry/backoff semantics).
-	'job-runtime'
+	'job-runtime',
+	// Org-wide Memory (Cortex P2) — pluggable ORG memory frameworks and
+	// multi-doc-type RAG pipelines, sitting BESIDE the existing
+	// `vector-store` + `content-extractor` seams (not replacing them).
+	//   - `memory`: the org's storage / retrieval / synthesis framework
+	//     (mem0 / zep / langmem-style backends). See
+	//     `capabilities/memory.interface.ts` (`IMemoryPlugin`).
+	//   - `rag`: a composed retrieval pipeline that orchestrates an
+	//     extractor + embedder + vector-store behind one contract. See
+	//     `capabilities/rag.interface.ts` (`IRagPlugin`).
+	// Contract-only for now — no concrete plugin ships under either
+	// category yet; the built-in per-Work KB behavior is unchanged.
+	// See `docs/specs/features/memory/spec.md` §5.
+	'memory',
+	'rag',
+	// Goals feature PR-7 — read-only metrics collectors (capability
+	// `metrics-provider`). First-party plugins: `custom-http` + `stripe`
+	// (PostHog + Google Analytics follow in PR-9). See
+	// `capabilities/metrics-provider.interface.ts`.
+	'metrics'
 ] as const;
 
 export type PluginCategory = (typeof PLUGIN_CATEGORIES)[number];
@@ -201,6 +229,13 @@ export interface PluginUiHints {
 	completionFields?: string[];
 	/** User-friendly step description shown in the onboarding wizard (separate from the plugin description). */
 	onboardingDescription?: string;
+	/**
+	 * Render this plugin's `readme` (markdown setup guide) inline in the
+	 * first-time onboarding config step, beneath the settings fields. Opt-in
+	 * per plugin so we surface setup steps (e.g. "Get a Vercel token") without
+	 * dumping every plugin's readme into the wizard.
+	 */
+	showReadmeInOnboarding?: boolean;
 	/** Exposes a plugin-managed device auth flow, such as a backend-started CLI device-code session. */
 	deviceAuth?: {
 		/** Settings field that selects the auth mode when device auth is available. */

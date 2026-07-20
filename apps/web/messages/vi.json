@@ -263,7 +263,8 @@
             "savedSuccess": "Cài đặt đã được lưu.",
             "noSettings": "Không yêu cầu cấu hình cho plugin này.",
             "getTokenPrompt": "Tạo một token trước, sau đó dán nó bên dưới và lưu để xác minh kết nối.",
-            "loadingStatus": "Đang tải trạng thái kết nối..."
+            "loadingStatus": "Đang tải trạng thái kết nối...",
+            "setupGuide": "Setup guide"
         },
         "plugins": {
             "byokDescription": "Kết nối khóa của riêng bạn để mở khóa cấu hình đầy đủ.",
@@ -455,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "Phê duyệt hành động",
+                "subtitle": "Các agent của bạn đã đề xuất những hành động có tác dụng phụ này. Hãy phê duyệt hoặc từ chối từng hành động."
+            },
+            "actions": {
+                "approve": "Phê duyệt",
+                "reject": "Từ chối",
+                "approveAll": "Phê duyệt tất cả"
+            },
+            "actionType": {
+                "spawn_agent": "Tạo agent",
+                "schedule_task": "Lên lịch nhiệm vụ",
+                "send_message": "Gửi tin nhắn",
+                "budget_override": "Ghi đè ngân sách",
+                "other": "Hành động"
+            },
+            "riskFlags": {
+                "budget_override": "Ghi đè ngân sách",
+                "destructive": "Phá hủy",
+                "cross_scope": "Liên phạm vi",
+                "high_fanout": "Phân nhánh cao"
+            },
+            "toast": {
+                "approved": "Đã phê duyệt hành động",
+                "rejected": "Đã từ chối hành động",
+                "bulkApproved": "Đã phê duyệt {count} hành động",
+                "bulkApprovedSkipped": "Đã phê duyệt {approved} hành động, {skipped} đã được quyết định",
+                "error": "Đã xảy ra lỗi. Vui lòng thử lại."
+            }
+        },
         "title": "Bảng điều khiển",
         "connectGithub": {
             "title": "Kết nối tài khoản GitHub của bạn",
@@ -546,17 +578,9 @@
             "title": "Missions",
             "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
             "newMission": "+ New Mission",
-            "quickAdd": {
-                "label": "Bắt đầu Nhiệm vụ mới",
-                "submitTitle": "Tạo Nhiệm vụ",
-                "minLength": "Mô tả phải có ít nhất 10 ký tự.",
-                "created": "Nhiệm vụ đã được tạo",
-                "error": "Không thể tạo Nhiệm vụ. Vui lòng thử lại."
-            },
             "empty": {
                 "title": "No Missions yet.",
-                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting.",
-                "openNew": "Mở trình tạo thống nhất"
+                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting."
             },
             "card": {
                 "scheduled": "Scheduled",
@@ -568,15 +592,56 @@
                 "capUnlimited": "Unlimited",
                 "capPrefix": "Outstanding cap:",
                 "clonedFromPrefix": "Cloned from another Mission"
-            },
-            "filterBar": {
-                "search": "Tìm kiếm",
-                "searchPlaceholder": "Tiêu đề hoặc mô tả",
-                "status": "Trạng thái",
-                "anyStatus": "Bất kỳ trạng thái",
-                "apply": "Áp dụng",
-                "reset": "Đặt lại"
             }
+        },
+        "memoryPage": {
+            "consolidation": {
+                "action": "Hợp nhất",
+                "title": "Hợp nhất bộ nhớ",
+                "previewIntro": "Xem trước những gì việc hợp nhất sẽ làm. Không có gì thay đổi cho đến khi bạn áp dụng.",
+                "scanned": "Đã quét {count}",
+                "promoted": "Đã đề bạt {count}",
+                "synthesized": "Đã tổng hợp {count}",
+                "superseded": "Đã thay thế {count}",
+                "promotedHeading": "Đã đề bạt",
+                "supersededHeading": "Đã thay thế",
+                "more": "+{count} nữa",
+                "apply": "Áp dụng",
+                "cancel": "Hủy",
+                "applied": "Đã hợp nhất: {promoted} đề bạt, {synthesized} tổng hợp, {superseded} thay thế",
+                "failed": "Hợp nhất thất bại. Vui lòng thử lại.",
+                "badgePromoted": "Đã đề bạt",
+                "badgeSuperseded": "Đã thay thế"
+            },
+            "title": "Memory",
+            "subtitle": "Mọi thứ tổ chức của bạn biết, ở cùng một nơi — được tổng hợp từ Knowledge Base của mọi Công việc.",
+            "searchPlaceholder": "Tìm kiếm trong mọi thứ tổ chức biết…",
+            "newDocument": "Mới",
+            "documentsIndexed": "{count, plural, =0 {Chưa lập chỉ mục tài liệu nào} other {Đã lập chỉ mục # tài liệu}}",
+            "worksCovered": "{count, plural, =0 {không có Công việc} other {# Công việc}}",
+            "filters": {
+                "type": "Loại",
+                "work": "Công việc",
+                "source": "Nguồn",
+                "status": "Trạng thái",
+                "clearAll": "Xóa tất cả"
+            },
+            "source": {
+                "workKb": "Work KB",
+                "orgKb": "Org KB",
+                "user": "Manual",
+                "agent": "Agent",
+                "imported": "Imported",
+                "seeded": "Seeded"
+            },
+            "empty": {
+                "title": "Chưa có gì trong Memory.",
+                "subtitle": "Khi các Công việc của bạn xây dựng Knowledge Base của chúng — tài liệu thương hiệu, chân dung người dùng, nghiên cứu, hướng dẫn phong cách — mọi thứ sẽ xuất hiện ở đây, có thể tìm kiếm trên toàn tổ chức.",
+                "noOrg": "Chọn hoặc tạo một Tổ chức để xem Memory tổng hợp của nó. Memory trải rộng trên mọi Công việc trong Tổ chức đang hoạt động.",
+                "noResults": "Không có tài liệu nào khớp với tìm kiếm và bộ lọc của bạn."
+            },
+            "orgScoped": "Tổ chức",
+            "openInWork": "Mở trong Công việc"
         },
         "agentsPage": {
             "title": "Agents",
@@ -622,7 +687,47 @@
                 "cancel": "Hủy",
                 "back": "Trước",
                 "next": "Tiếp",
-                "create": "Tạo Agent"
+                "create": "Tạo Agent",
+                "teamLabel": "Nhóm",
+                "teamNone": "Không có nhóm",
+                "reportsToLabel": "Báo cáo cho",
+                "reportsToNone": "Không có quản lý"
+            },
+            "settings": {
+                "orgCard": {
+                    "title": "Tổ chức",
+                    "teamLabel": "Nhóm",
+                    "teamNone": "Không có nhóm",
+                    "reportsToLabel": "Báo cáo cho",
+                    "reportsToNone": "Không có quản lý",
+                    "save": "Lưu",
+                    "saving": "Đang lưu…"
+                }
+            },
+            "guardrails": {
+                "title": "Rào chắn an toàn",
+                "subtitle": "Quyết định hành động được đề xuất nào cần chờ bạn phê duyệt, chạy tự động, hoặc bị chặn.",
+                "modeLabel": "Chế độ điều phối",
+                "modeRequireApproval": "Yêu cầu phê duyệt",
+                "modeRequireApprovalHint": "Mọi hành động được đề xuất sẽ chờ trong hàng đợi phê duyệt cho đến khi bạn quyết định.",
+                "modeAutonomous": "Tự hành",
+                "modeAutonomousHint": "Các hành động an toàn chạy ngay không cần chờ. Hành động có cờ rủi ro luôn vào hàng đợi phê duyệt của bạn.",
+                "autoApproveLabel": "Loại hành động được tự động phê duyệt",
+                "autoApproveHint": "Chỉ các loại hành động được chọn mới chạy tự động; phần còn lại vẫn vào hàng đợi.",
+                "blockedLabel": "Loại hành động bị chặn",
+                "blockedHint": "Hành động bị chặn sẽ tự động bị từ chối và được ghi lại trong lịch sử hàng đợi.",
+                "actionTypes": {
+                    "spawn_agent": "Tạo Agent",
+                    "schedule_task": "Lên lịch nhiệm vụ",
+                    "send_message": "Gửi tin nhắn",
+                    "budget_override": "Ghi đè ngân sách",
+                    "other": "Khác"
+                },
+                "save": "Lưu rào chắn",
+                "reset": "Đặt lại về mặc định",
+                "saveSuccess": "Đã lưu rào chắn",
+                "saveError": "Không thể lưu rào chắn",
+                "resetSuccess": "Đã đặt lại rào chắn về mặc định"
             }
         },
         "tasksPage": {
@@ -796,6 +901,33 @@
             "empty": "No budget data yet."
         },
         "missionDetail": {
+            "attachedWorks": {
+                "pickerTruncated": "Showing your 100 most recent Works - open the Works page for the full list.",
+                "title": "Attached Works",
+                "empty": "No Works attached to this Mission yet. Attach one below.",
+                "attachTitle": "Attach a Work",
+                "workLabel": "Work",
+                "workPlaceholder": "Select a Work",
+                "relationLabel": "Relation",
+                "attach": "Attach",
+                "detach": "Detach",
+                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "noWorksToAttach": "You have no Works to attach yet.",
+                "relations": {
+                    "created": "Created",
+                    "improves": "Improves",
+                    "operates": "Operates",
+                    "markets": "Markets",
+                    "researches": "Researches",
+                    "retires": "Retires"
+                },
+                "toasts": {
+                    "attached": "Work attached",
+                    "attachError": "Couldn't attach Work",
+                    "detached": "Work detached",
+                    "detachError": "Couldn't detach Work"
+                }
+            },
             "backToMissions": "Back to Missions",
             "badges": {
                 "scheduled": "Scheduled",
@@ -861,6 +993,23 @@
                 "cancel": "Cancel",
                 "confirm": "Clone Mission"
             },
+            "completeDialog": {
+                "title": "Complete this Mission",
+                "description": "Optionally record a conclusion verdict for this Mission. \"No verdict\" completes it without recording an outcome.",
+                "outcomeLabel": "Outcome (optional)",
+                "noVerdict": "No verdict",
+                "cancel": "Cancel",
+                "confirm": "Complete Mission"
+            },
+            "outcomes": {
+                "succeeded": "Succeeded",
+                "partially_succeeded": "Partially succeeded",
+                "failed": "Failed",
+                "cancelled": "Cancelled",
+                "superseded": "Superseded"
+            },
+            "outcomeTooltip": "Outcome recorded when this Mission was completed",
+            "completedAtLabel": "Completed",
             "toasts": {
                 "settingsSaved": "Mission settings saved",
                 "settingsError": "Couldn't save settings",
@@ -893,7 +1042,6 @@
                 "label": "Add a new Idea",
                 "placeholder": "Describe an Idea — e.g. \"A curated list of the best AI coding agents released this year\"",
                 "submit": "Add",
-                "submitTitle": "Thêm Ý tưởng",
                 "minLength": "Description must be at least 10 characters."
             },
             "toggles": {
@@ -937,11 +1085,31 @@
                 "anyStatus": "Bất kỳ trạng thái",
                 "apply": "Áp dụng",
                 "reset": "Đặt lại"
+            },
+            "newPage": {
+                "link": "Tạo thủ công",
+                "or": "Hoặc",
+                "title": "Idea mới",
+                "subtitle": "Viết Idea của riêng bạn. Mô tả Work bạn muốn tạo — sau đó bạn có thể đưa vào hàng đợi để dựng.",
+                "nameLabel": "Tiêu đề",
+                "namePlaceholder": "Tùy chọn — để trống để tự suy ra từ mô tả",
+                "descriptionLabel": "Mô tả",
+                "descriptionPlaceholder": "Mô tả Work mà Idea này sẽ trở thành — ví dụ “Một thư mục được tuyển chọn về các framework agent AI nguồn mở, sắp xếp theo loại framework và giấy phép.”",
+                "descriptionHint": "Ít nhất 10 ký tự.",
+                "cancel": "Hủy",
+                "create": "Tạo Idea",
+                "creating": "Đang tạo…",
+                "minLength": "Mô tả phải có ít nhất 10 ký tự.",
+                "error": "Không thể tạo Idea. Vui lòng thử lại."
+            },
+            "linkedWorks": {
+                "title": "Linked Works",
+                "kind": {
+                    "built": "Built",
+                    "linked": "Linked",
+                    "rebuilt": "Rebuilt"
+                }
             }
-        },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
         },
         "header": {
             "welcome": "Chào mừng trở lại, {username}!",
@@ -1127,6 +1295,10 @@
                     "failed": "Thất bại",
                     "cancelled": "Đã hủy"
                 }
+            },
+            "viewToggle": {
+                "log": "Nhật ký",
+                "schedules": "Lịch trình"
             }
         },
         "works": {
@@ -1190,6 +1362,7 @@
             "subtitle": "Quản lý cài đặt và sở thích tài khoản của bạn",
             "tabs": {
                 "profile": "Hồ sơ",
+                "organization": "Organization",
                 "security": "Bảo mật",
                 "apiKeys": "Khóa API",
                 "data": "Dữ liệu",
@@ -1226,14 +1399,14 @@
                 "sections": {
                     "agent": {
                         "title": "Work agent planning",
-                        "description": "Prepare approval-ready Work plans from high-level goals. Live execution stays blocked until an executor is connected."
+                        "description": "Prepare approval-ready Work plans from high-level build requests. Live execution stays blocked until an executor is connected."
                     },
                     "guardrails": {
                         "title": "Guardrails",
                         "description": "Set hard limits that future live execution must follow before creating Works, adding items, or spending budget."
                     },
                     "queue": {
-                        "title": "Queue a goal",
+                        "title": "Queue a build request",
                         "description": "Give the agent a broad instruction. It creates an approval-ready plan inside your guardrails."
                     },
                     "liveRun": {
@@ -1241,7 +1414,7 @@
                         "description": "Current state and recent agent activity."
                     },
                     "recentGoals": {
-                        "title": "Recent goals",
+                        "title": "Recent build requests",
                         "description": "Pending, running, and completed Work agent instructions."
                     },
                     "autoGenerateIdeas": {
@@ -1272,7 +1445,7 @@
                     "approvalThreshold": "Approval threshold",
                     "confirmBeforeCreate": "Confirm before creating Works",
                     "confirmBeforeDelete": "Confirm before deleting items",
-                    "dryRunThisGoal": "Dry run this goal",
+                    "dryRunThisGoal": "Dry run this build request",
                     "autoGenerateCadenceMinutes": "Run every N minutes",
                     "autoGenerateBatchSize": "Ideas per cycle",
                     "autoBuildThrottlePerDay": "Daily auto-build cap",
@@ -1288,7 +1461,7 @@
                     "saveSettings": "Save settings",
                     "saveSection": "Save",
                     "useDefault": "Use default",
-                    "queueGoal": "Queue goal",
+                    "queueGoal": "Queue build request",
                     "preparePlan": "Prepare plan",
                     "stop": "Stop"
                 },
@@ -1305,16 +1478,16 @@
                 },
                 "empty": {
                     "noActiveRun": "No active Work agent run.",
-                    "noGoals": "No Work agent goals yet.",
+                    "noGoals": "No Work agent build requests yet.",
                     "waitingForUpdate": "Waiting for the first run update."
                 },
                 "toasts": {
                     "settingsSaved": "Work agent settings saved",
                     "settingsError": "Failed to save settings",
                     "goalQueued": "Work agent plan prepared",
-                    "goalError": "Failed to queue goal",
-                    "goalCanceled": "Work agent goal canceled",
-                    "cancelError": "Failed to cancel goal"
+                    "goalError": "Failed to queue build request",
+                    "goalCanceled": "Work agent build request canceled",
+                    "cancelError": "Failed to cancel build request"
                 }
             },
             "data": {
@@ -1573,7 +1746,45 @@
             "totalItems": "Tổng mục",
             "activeWebsites": "Trang web hoạt động",
             "monthSpend": "Month Spend",
-            "fromLastMonth": "từ tháng trước"
+            "fromLastMonth": "từ tháng trước",
+            "teams": "Nhóm"
+        },
+        "attention": {
+            "title": "Cần chú ý",
+            "kinds": {
+                "agentError": {
+                    "title": "Agent “{name}” gặp lỗi",
+                    "subtitle": "Tự động tạm dừng sau nhiều lần thất bại"
+                },
+                "scheduleFailed": {
+                    "title": "Chạy theo lịch thất bại",
+                    "subtitle": "Lần chạy gần nhất của “{name}” chưa hoàn tất"
+                },
+                "schedulePaused": {
+                    "title": "Lịch đã tạm dừng",
+                    "subtitle": "“{name}” đã tạm dừng sau nhiều lần thất bại"
+                },
+                "generationFailed": {
+                    "title": "Tạo thất bại",
+                    "subtitle": "Không thể tạo “{name}”"
+                },
+                "taskBlocked": {
+                    "title": "Task bị chặn",
+                    "subtitle": "“{name}” cần dữ liệu nhập để tiếp tục"
+                },
+                "budgetExceeded": {
+                    "title": "Vượt ngân sách",
+                    "subtitle": "Chi tiêu tài khoản đã đạt giới hạn"
+                }
+            }
+        },
+        "soon": {
+            "title": "Sắp tới",
+            "more": "+{n} khác",
+            "source": {
+                "work": "Công việc",
+                "mission": "Mission"
+            }
         },
         "adminUsage": {
             "title": "Platform usage",
@@ -1639,6 +1850,18 @@
             "createButton": "Tạo công việc"
         },
         "workDetail": {
+            "missions": {
+                "title": "Missions",
+                "subtitle": "Your Missions that relate to this Work. Missions never own Works — these are references.",
+                "relations": {
+                    "created": "Created",
+                    "improves": "Improves",
+                    "operates": "Operates",
+                    "markets": "Markets",
+                    "researches": "Researches",
+                    "retires": "Retires"
+                }
+            },
             "agentsDropdown": {
                 "trigger": "Agents",
                 "heading": "Agents của Công việc này",
@@ -3394,7 +3617,7 @@
         },
         "newPage": {
             "title": "+ New",
-            "subtitle": "Tell the agent what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
+            "subtitle": "Tell us what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
             "promptLabel": "What do you want to build?",
             "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
             "chipLabel": "Pick a kind",
@@ -3409,19 +3632,21 @@
                 "company": "Company"
             },
             "chipDescriptions": {
-                "mission": "Một Mục tiêu liên tục mà Agent tiếp tục làm việc - tạo ra các Ý tưởng theo lịch trình hoặc một lần.",
-                "idea": "Một brief một lần mà Agent biến thành kế hoạch Công việc mà bạn có thể xây dựng.",
-                "website": "Một trang web đa trang cho doanh nghiệp, dịch vụ hoặc thương hiệu - nội dung được tạo ra + mã.",
-                "landing-page": "Một trang một trang tập trung - danh sách chờ, ra mắt sản phẩm, đăng ký webinar, thu thập khách hàng tiềm năng.",
-                "blog": "Một blog với danh mục, RSS, làm nổi bật mã và nội dung sẵn sàng SEO.",
-                "directory": "Một trang web thư mục được biên tập với tìm kiếm, bộ lọc và dữ liệu cấu trúc hóa mục.",
-                "awesome-repo": "Kho awesome-list - chỉ mục markdown, liên kết được phân loại và metadata có thể làm mới.",
+                "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
+                "idea": "A one-shot brief the agent turns into a Work plan you can build.",
+                "agent": "An AI teammate that acts across Missions, Works, or your whole Workspace.",
+                "task": "A trackable item assigned to a person or an Agent.",
+                "website": "A multi-page site for a business, service, or brand — generated content + code.",
+                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
+                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
+                "directory": "A curated directory site with search, filters, and structured item data.",
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
                 "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
-            "submitTitle": "Tạo",
             "or": "or",
             "hints": {
+                "pickChip": "Pick a chip above to enable Create.",
                 "minLength": "Add a description (at least 10 characters) to enable Create."
             },
             "toasts": {
@@ -3929,6 +4154,177 @@
                 "unexpectedError": "Đã xảy ra lỗi không mong muốn"
             }
         },
+        "goalsPage": {
+            "title": "Goals",
+            "subtitle": "Measurable targets evaluated automatically against your metrics providers. Each Goal tracks a live metric toward a target — open one to see its progress, run a check, or set an outcome.",
+            "newGoal": "New Goal",
+            "statuses": {
+                "draft": "Draft",
+                "active": "Active",
+                "paused": "Paused",
+                "completed": "Completed"
+            },
+            "outcomes": {
+                "achieved": "Achieved",
+                "missed": "Missed",
+                "abandoned": "Abandoned"
+            },
+            "filterBar": {
+                "status": "Status",
+                "anyStatus": "Any status",
+                "apply": "Apply",
+                "reset": "Reset"
+            },
+            "loadError": {
+                "title": "Could not load Goals."
+            },
+            "empty": {
+                "title": "No Goals yet.",
+                "subtitle": "Create a Goal to track a business metric toward a target — income, signups, churn, error rate — evaluated automatically on a schedule."
+            },
+            "pagination": {
+                "showing": "Showing {from}-{to}",
+                "noResults": "No results on this page",
+                "previous": "Previous",
+                "next": "Next"
+            },
+            "card": {
+                "comparator": {
+                    "gte": "At least",
+                    "lte": "At most"
+                },
+                "nextCheckPrefix": "Next check:",
+                "windowPrefix": "Window:",
+                "window": {
+                    "day": "Daily",
+                    "week": "Weekly",
+                    "month": "Monthly",
+                    "total": "Total",
+                    "point": "Point-in-time"
+                }
+            }
+        },
+        "goalNew": {
+            "title": "New Goal",
+            "subtitle": "Define a measurable target and the metric that tracks it. New Goals start as a draft — activate from the detail page to begin scheduled evaluation.",
+            "backToGoals": "Back to Goals",
+            "created": "Goal created",
+            "sections": {
+                "metricSource": "Metric source",
+                "target": "Target",
+                "cadence": "Evaluation cadence"
+            },
+            "fields": {
+                "title": "Title",
+                "titlePlaceholder": "e.g. Monthly Stripe income of $1,000",
+                "description": "Description",
+                "descriptionPlaceholder": "Optional context for this Goal",
+                "pluginId": "Provider plugin ID",
+                "metricId": "Metric ID",
+                "params": "Parameters (JSON)",
+                "paramsHint": "Optional provider-specific parameters as a JSON object (e.g. a currency filter).",
+                "paramsInvalid": "Parameters must be valid JSON.",
+                "paramsNotObject": "Parameters must be a JSON object.",
+                "comparator": "Direction",
+                "targetValue": "Target value",
+                "unit": "Unit",
+                "window": "Window",
+                "deadline": "Deadline (optional)",
+                "checkFrequency": "Check frequency (minutes)",
+                "checkFrequencyHint": "Minimum {min} minutes; lower values are clamped."
+            },
+            "comparators": {
+                "gte": "At least (grow to target)",
+                "lte": "At most (shrink to target)"
+            },
+            "windows": {
+                "day": "Daily",
+                "week": "Weekly",
+                "month": "Monthly",
+                "total": "Total",
+                "point": "Point-in-time"
+            },
+            "errors": {
+                "titleRequired": "Title is required.",
+                "metricSourceRequired": "Provider plugin ID and metric ID are required.",
+                "targetInvalid": "Target value must be a number.",
+                "unitRequired": "Unit is required.",
+                "deadlineInvalid": "Deadline is not a valid date.",
+                "createFailed": "Couldn't create the Goal. Please try again."
+            },
+            "actions": {
+                "create": "Create Goal",
+                "cancel": "Cancel"
+            }
+        },
+        "goalDetail": {
+            "backToGoals": "Back to Goals",
+            "actions": {
+                "evaluateNow": "Evaluate now",
+                "activate": "Activate",
+                "pause": "Pause",
+                "delete": "Delete"
+            },
+            "sections": {
+                "progress": "Progress",
+                "details": "Details",
+                "outcome": "Outcome"
+            },
+            "progress": {
+                "current": "Current",
+                "target": "Target",
+                "noSamples": "No observations yet. Activate the Goal or run an evaluation to start collecting samples.",
+                "sampleCount": "{count} observations"
+            },
+            "comparator": {
+                "gte": "At least",
+                "lte": "At most"
+            },
+            "window": {
+                "day": "Daily",
+                "week": "Weekly",
+                "month": "Monthly",
+                "total": "Total",
+                "point": "Point-in-time"
+            },
+            "details": {
+                "plugin": "Provider",
+                "metric": "Metric",
+                "window": "Window",
+                "baseline": "Baseline",
+                "checkFrequency": "Check frequency",
+                "minutes": "{count} min",
+                "nextCheck": "Next check",
+                "deadline": "Deadline",
+                "noDeadline": "Open-ended",
+                "lastObserved": "Last observed"
+            },
+            "outcome": {
+                "hint": "How this Goal ended. Auto-set by evaluation, and always overridable by you.",
+                "overrideLabel": "Override outcome",
+                "overrideNote": "Setting an outcome completes the Goal; clearing it re-opens the outcome.",
+                "none": "None"
+            },
+            "outcomes": {
+                "achieved": "Achieved",
+                "missed": "Missed",
+                "abandoned": "Abandoned"
+            },
+            "toasts": {
+                "activated": "Goal activated",
+                "paused": "Goal paused",
+                "lifecycleError": "Couldn't update the Goal.",
+                "evaluated": "Evaluation complete",
+                "evaluateError": "Couldn't evaluate the Goal.",
+                "outcomeSaved": "Outcome updated",
+                "outcomeError": "Couldn't update the outcome.",
+                "deleted": "Goal deleted",
+                "deleteError": "Couldn't delete the Goal."
+            },
+            "confirm": {
+                "delete": "Delete this Goal? Its observation history and Mission links will be removed. This cannot be undone."
+            }
+        },
         "sidebar": {
             "menu": "Menu",
             "aiChat": "Trò chuyện AI",
@@ -3939,14 +4335,17 @@
                 "dashboard": "Bảng điều khiển",
                 "activity": "Hoạt động",
                 "missions": "Missions",
+                "goals": "Goals",
                 "ideas": "Ideas",
                 "works": "Công việc",
                 "tasks": "Tasks",
                 "agents": "Agents",
+                "memory": "Memory",
                 "plugins": "Plugin",
                 "skills": "Skills",
                 "templates": "Mẫu",
-                "settings": "Cài đặt"
+                "settings": "Cài đặt",
+                "teams": "Nhóm"
             },
             "tooltips": {
                 "expandSidebar": "Mở rộng thanh bên",
@@ -4240,7 +4639,9 @@
                 "defaultSelected": "Mặc định được chọn",
                 "makeDefault": "Đặt làm mặc định",
                 "fork": "Fork",
-                "useTemplate": "Use this Template",
+                "useTemplate": "Use",
+                "useTemplateFull": "Use this Template",
+                "moreActions": "More actions",
                 "edit": "Chỉnh sửa",
                 "archive": "Lưu trữ",
                 "customizeAgain": "Customize again",
@@ -4413,11 +4814,30 @@
             }
         },
         "templateSelector": {
+            "label": "Mẫu",
             "defaultOption": "Sử dụng mặc định",
             "defaultOptionWithName": "Sử dụng mặc định ({name})",
             "optionLabel": "{name}",
             "optionDefaultLabel": "{name} (Mặc định)",
             "changeAnywayLink": "Thay đổi ngay comunque",
+            "typeLabel": "Loại mẫu",
+            "chipType": {
+                "website": "Website",
+                "landing": "Landing",
+                "blog": "Blog",
+                "directory": "Directory",
+                "store": "Store",
+                "company": "Company",
+                "awesome": "Awesome"
+            },
+            "searchPlaceholder": "Tìm kiếm mẫu…",
+            "searchAriaLabel": "Tìm kiếm mẫu",
+            "groupYourTemplates": "Mẫu của bạn",
+            "groupBlueprints": "Blueprints",
+            "featuredBadge": "Nổi bật",
+            "defaultBadge": "Mặc định",
+            "empty": "Không có mẫu nào khớp với tìm kiếm của bạn.",
+            "resultCount": "{count, plural, =0 {Không có mẫu} other {# mẫu}}",
             "origin": {
                 "standard": "Chuẩn",
                 "forked": "Đã fork",
@@ -4485,332 +4905,186 @@
             "system": "Hệ thống",
             "goToPluginSettings": "Đi đến cài đặt plugin"
         },
-        "proposals": {
-            "header": {
-                "title": "Ideas",
-                "titleWithName": "Ideas"
-            },
-            "actions": {
-                "accept": "Build",
-                "viewWork": "View Work",
-                "dismiss": "Dismiss",
-                "dismissAria": "Dismiss this idea",
-                "refresh": "Suggest more"
-            },
-            "researching": {
-                "title": "Drafting ideas from your profile…",
-                "subtitle": "This usually takes under a minute."
-            },
-            "empty": {
-                "title": "No ideas right now.",
-                "subtitle": "New suggestions will appear here when they are ready."
-            },
-            "errors": {
-                "rateLimited": "Daily limit reached. Try again tomorrow.",
-                "generic": "Couldn't refresh ideas. Please try again."
-            },
-            "plugins": {
-                "label": "Suggested plugins"
-            },
-            "failureKinds": {
-                "transient-network": "Network blip",
-                "transient-rate-limit": "Rate limited",
-                "transient-upstream-5xx": "Upstream service error",
-                "transient-plugin": "Plugin timeout",
-                "permanent-invalid-input": "Invalid input",
-                "permanent-unknown": "Build failed"
-            }
-        },
-        "missionsPreview": {
-            "title": "Missions",
-            "viewAll": "View all ({n}) →",
-            "empty": {
-                "title": "No Missions yet.",
-                "subtitleRich": "<link>Start one</link> to give the agent a persistent Goal that keeps generating Ideas for you."
-            },
-            "badges": {
-                "scheduled": "Scheduled"
-            },
-            "counters": {
-                "ideas": "Ideas",
-                "works": "Works",
-                "sites": "Sites"
-            }
-        },
-        "missionsPage": {
-            "title": "Missions",
-            "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
-            "newMission": "+ New Mission",
-            "empty": {
-                "title": "No Missions yet.",
-                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting."
-            },
-            "card": {
-                "scheduled": "Scheduled",
-                "oneShot": "One-shot",
-                "schedulePrefix": "Cron:",
-                "autoBuildOn": "Auto-build on",
-                "autoBuildOff": "Auto-build off",
-                "capInherit": "Inherit user default",
-                "capUnlimited": "Unlimited",
-                "capPrefix": "Outstanding cap:",
-                "clonedFromPrefix": "Cloned from another Mission"
-            }
-        },
-        "budgetSummary": {
-            "period": "{period}",
-            "currentSpend": "Current spend",
-            "cap": "Monthly cap",
-            "noCap": "No cap set",
-            "percentUsed": "{percent}% used",
-            "blocked": "Over cap — blocked",
-            "overCap": "Over cap",
-            "loading": "Loading budget…",
-            "empty": "No budget data yet."
-        },
-        "missionDetail": {
-            "backToMissions": "Back to Missions",
-            "badges": {
-                "scheduled": "Scheduled",
-                "oneShot": "One-shot",
-                "cloned": "Cloned",
-                "clonedTooltip": "This Mission is a Full Fork of another"
-            },
-            "sections": {
-                "settings": "Mission settings",
-                "guardrails": "Guardrails override",
-                "liveRuns": "Live runs",
-                "ideas": "Ideas",
-                "relatedWorks": "Related Works",
-                "inheritedWorks": "Related Works (inherited)",
-                "activity": "Activity",
-                "spend": "Spend over time"
-            },
-            "fields": {
-                "schedule": "Schedule (cron, UTC)",
-                "autoBuildWorks": "Auto-build Works from spawned Ideas",
-                "capInherit": "Inherit user-level default cap",
-                "outstandingCap": "Outstanding-Ideas cap (-1 = unlimited)"
-            },
-            "actions": {
-                "saveSettings": "Save settings",
-                "pause": "Pause",
-                "resume": "Resume",
-                "complete": "Complete",
-                "delete": "Delete",
-                "runNow": "Run now",
-                "clone": "Clone"
-            },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
-            },
-            "guardrails": {
-                "activeOverride": "Custom guardrail overrides are active on this Mission.",
-                "inheriting": "No overrides set — using your global Work-agent guardrails."
-            },
-            "liveRuns": {
-                "empty": "No active runs."
-            },
-            "ideas": {
-                "empty": "No Ideas spawned by this Mission yet."
-            },
-            "works": {
-                "empty": "No Works have been built from this Mission's Ideas yet."
-            },
-            "inherited": {
-                "fromSource": "Inherited from",
-                "empty": "The source Mission has no Works to inherit."
-            },
-            "activity": {
-                "empty": "Activity timeline will appear here once Mission ticks start running."
-            },
-            "spend": {
-                "empty": "Spend chart will appear here once budgets are wired."
-            },
-            "clone": {
-                "title": "Clone this Mission",
-                "description": "Full Fork: copies metadata + non-dismissed Ideas (as Pending). Works are NOT cloned — they remain attached to the source.",
-                "titleLabel": "Title for the new Mission (optional)",
-                "cancel": "Cancel",
-                "confirm": "Clone Mission"
-            },
-            "toasts": {
-                "settingsSaved": "Mission settings saved",
-                "settingsError": "Couldn't save settings",
-                "paused": "Mission paused",
-                "pauseError": "Couldn't pause",
-                "resumed": "Mission resumed",
-                "resumeError": "Couldn't resume",
-                "completed": "Mission marked complete",
-                "completeError": "Couldn't complete",
-                "deleted": "Mission deleted",
-                "deleteError": "Couldn't delete",
-                "runNowError": "Couldn't run now",
-                "cloned": "Cloned: {ideasCloned} idea(s) carried, {ideasSkipped} dismissed skipped.",
-                "cloneError": "Couldn't clone Mission",
-                "runNow": {
-                    "noop-placeholder": "Run-now queued (placeholder)",
-                    "queued": "Tick queued",
-                    "spawned": "New Ideas spawned",
-                    "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
-                    "no-ideas": "Tick ran but generated no Ideas",
-                    "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
-                }
-            }
-        },
-        "ideasPage": {
-            "title": "Ideas",
-            "subtitle": "Everything the platform has drafted for you, plus anything you've typed in. Build the ones worth building.",
-            "quickAdd": {
-                "label": "Add a new Idea",
-                "placeholder": "Describe an Idea — e.g. \"A curated list of the best AI coding agents released this year\"",
-                "submit": "Add",
-                "minLength": "Description must be at least 10 characters."
-            },
-            "toggles": {
-                "showAccepted": "Show accepted",
-                "showDismissed": "Show dismissed"
-            },
-            "filters": {
-                "all": "All",
-                "pending": "Pending",
-                "queued": "Queued",
-                "building": "Building",
-                "failed": "Failed",
-                "accepted": "Accepted",
-                "dismissed": "Dismissed",
-                "done": "Done",
-                "doneTooltip": "Ideas that became Works. Click a card to open its Work."
-            },
-            "gears": {
-                "menuLabel": "Settings",
-                "autoGenerate": "Auto-generate Ideas…",
-                "autoBuild": "Auto-build Works…",
-                "autoRetry": "Auto-retry policy…",
-                "accountBudgets": "Account-wide budgets…"
-            },
-            "toasts": {
-                "ideaCreated": "Idea added",
-                "ideaCreateError": "Couldn't add idea. Please try again.",
-                "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again.",
-                "ideaGone": "Ý tưởng này không còn khả dụng."
-            },
-            "empty": {
-                "title": "No Ideas match these filters.",
-                "subtitle": "Toggle accepted / dismissed, or add one with the field above."
-            },
-            "viewAll": "View all ({n}) →",
-            "filterBar": {
-                "search": "Tìm kiếm",
-                "searchPlaceholder": "Tiêu đề hoặc mô tả",
-                "status": "Trạng thái",
-                "anyStatus": "Bất kỳ trạng thái",
-                "apply": "Áp dụng",
-                "reset": "Đặt lại"
-            },
-            "newPage": {
-                "link": "Tạo thủ công",
-                "or": "Hoặc",
-                "title": "Idea mới",
-                "subtitle": "Viết Idea của riêng bạn. Mô tả Work bạn muốn tạo — sau đó bạn có thể đưa vào hàng đợi để dựng.",
-                "nameLabel": "Tiêu đề",
-                "namePlaceholder": "Tùy chọn — để trống để tự suy ra từ mô tả",
-                "descriptionLabel": "Mô tả",
-                "descriptionPlaceholder": "Mô tả Work mà Idea này sẽ trở thành — ví dụ “Một thư mục được tuyển chọn về các framework agent AI nguồn mở, sắp xếp theo loại framework và giấy phép.”",
-                "descriptionHint": "Ít nhất 10 ký tự.",
-                "cancel": "Hủy",
-                "create": "Tạo Idea",
-                "creating": "Đang tạo…",
-                "minLength": "Mô tả phải có ít nhất 10 ký tự.",
-                "error": "Không thể tạo Idea. Vui lòng thử lại."
-            }
-        },
         "discover": {
             "title": "Discover",
             "subtitle": "AI-curated Work ideas tailored to you."
         },
-        "adminUsage": {
-            "title": "Platform usage",
-            "description": "Cross-user, cross-directory spend for the current period. Self-hosted operators only.",
-            "periodLabel": "{period}",
-            "totalSpend": "Total spend: {amount}",
-            "empty": "No usage recorded this period.",
-            "columnUser": "User",
-            "columnEmail": "Email",
-            "columnWork": "Directory",
-            "columnUnits": "Units",
-            "columnCost": "Cost",
-            "loadFailed": "Could not load admin usage. You may not have platform-admin access."
-        },
-        "budgets": {
-            "overviewTitle": "Spend in {period}",
-            "overviewProgressLabel": "{percent}% of {cap} cap",
-            "overviewOverageSuffix": " (overage allowed)",
-            "overviewEmpty": "No monthly cap set. Add one in Budgets & Usage to enable alerts.",
-            "topPluginsTitle": "Top plugins by spend",
-            "topPluginsEmpty": "No usage recorded yet this period.",
-            "trendTitle": "Daily spend — {period}",
-            "trendEmpty": "No usage recorded yet this period.",
-            "trendDayLabel": "Day {day}"
-        },
-        "newPage": {
-            "title": "+ New",
-            "subtitle": "Tell us what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
-            "promptLabel": "What do you want to build?",
-            "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
-            "chipLabel": "Pick a kind",
-            "chips": {
-                "mission": "Mission",
-                "idea": "Idea",
-                "website": "Website",
-                "landing-page": "Landing Page",
-                "blog": "Blog",
-                "directory": "Directory",
-                "awesome-repo": "Awesome Repo",
-                "company": "Company"
+        "teamsPage": {
+            "title": "Nhóm",
+            "subtitle": "Sắp xếp các Agent và thành viên của bạn thành các nhóm trong tổ chức này.",
+            "orgChartCta": "Sơ đồ tổ chức",
+            "newTeamCta": "Nhóm mới",
+            "empty": {
+                "title": "Chưa có nhóm nào",
+                "description": "Tạo nhóm đầu tiên để gom các Agent và thành viên, sau đó sắp xếp họ trên sơ đồ tổ chức.",
+                "cta": "Tạo nhóm"
             },
-            "chipDescriptions": {
-                "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
-                "idea": "A one-shot brief the agent turns into a Work plan you can build.",
-                "agent": "An AI teammate that acts across Missions, Works, or your whole Workspace.",
-                "task": "A trackable item assigned to a person or an Agent.",
-                "website": "A multi-page site for a business, service, or brand — generated content + code.",
-                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
-                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
-                "directory": "A curated directory site with search, filters, and structured item data.",
-                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
-                "company": "Register a new entity. Becomes an Organization in your account."
+            "noOrg": {
+                "title": "Nhóm tồn tại trong một tổ chức",
+                "description": "Hãy tạo tổ chức trước — sau đó bạn có thể gom các Agent và thành viên của tổ chức thành các nhóm.",
+                "cta": "Tạo tổ chức"
             },
-            "submit": "Create",
-            "or": "or",
-            "hints": {
-                "pickChip": "Pick a chip above to enable Create.",
-                "minLength": "Add a description (at least 10 characters) to enable Create."
+            "card": {
+                "agents": "{count, plural, other {# Agent}}",
+                "members": "{count, plural, other {# thành viên}}",
+                "subTeams": "{count, plural, other {# nhóm con}}"
             },
-            "toasts": {
-                "missionCreated": "Mission created",
-                "ideaCreated": "Idea added",
-                "submitError": "Couldn't create. Please try again."
+            "newDialog": {
+                "title": "Nhóm mới",
+                "nameLabel": "Tên",
+                "namePlaceholder": "vd: Kỹ thuật",
+                "descriptionLabel": "Mô tả",
+                "descriptionPlaceholder": "Nhóm này phụ trách gì (không bắt buộc)",
+                "parentLabel": "Nhóm cha",
+                "parentNone": "Không có nhóm cha (cấp cao nhất)",
+                "managerLabel": "Agent quản lý",
+                "managerNone": "Không có quản lý",
+                "submit": "Tạo nhóm",
+                "creating": "Đang tạo…",
+                "cancel": "Hủy"
             },
-            "cards": {
-                "ai": {
-                    "title": "Create Work with AI",
-                    "subtitle": "Describe what you want and let the agent prepare an approval-ready plan.",
-                    "cta": "Get started"
-                },
-                "manual": {
-                    "title": "Create Work Manually",
-                    "subtitle": "Configure every step yourself — provider, template, items, and deploy.",
-                    "cta": "Configure now"
-                },
-                "import": {
-                    "title": "Import Existing Work",
-                    "subtitle": "Bring in a Work you already have — repo, items, and provider settings.",
-                    "cta": "Import now"
-                }
+            "detail": {
+                "overviewTab": "Tổng quan",
+                "settingsTab": "Cài đặt",
+                "rosterTitle": "Danh sách thành viên",
+                "subTeamsTitle": "Nhóm con",
+                "managerLabel": "Quản lý",
+                "parentLabel": "Nhóm cha",
+                "addMemberCta": "Thêm thành viên",
+                "addMemberTypeLabel": "Loại",
+                "addMemberAgent": "Agent",
+                "addMemberUser": "Thành viên",
+                "addMemberSelectLabel": "Ai",
+                "addMemberSubmit": "Thêm",
+                "adding": "Đang thêm…",
+                "removeMember": "Xóa",
+                "roleLead": "Trưởng nhóm",
+                "roleMember": "Thành viên",
+                "emptyRoster": "Chưa có thành viên nào — hãy thêm Agent hoặc đồng nghiệp vào nhóm này."
+            },
+            "settings": {
+                "title": "Cài đặt nhóm",
+                "nameLabel": "Tên",
+                "descriptionLabel": "Mô tả",
+                "parentLabel": "Nhóm cha",
+                "managerLabel": "Agent quản lý",
+                "save": "Lưu thay đổi",
+                "saving": "Đang lưu…",
+                "saved": "Đã cập nhật nhóm",
+                "deleteTitle": "Vùng nguy hiểm",
+                "deleteDescription": "Xóa nhóm sẽ chuyển các nhóm con lên một cấp và xóa danh sách thành viên. Agent và thành viên không bị xóa.",
+                "deleteCta": "Xóa nhóm",
+                "deleteConfirm": "Xóa nhóm này? Các nhóm con sẽ được chuyển lên một cấp; Agent và thành viên được giữ lại.",
+                "deleting": "Đang xóa…"
+            },
+            "errors": {
+                "createFailed": "Không thể tạo nhóm",
+                "updateFailed": "Không thể cập nhật nhóm",
+                "deleteFailed": "Không thể xóa nhóm",
+                "memberAddFailed": "Không thể thêm thành viên",
+                "memberRemoveFailed": "Không thể xóa thành viên"
             }
+        },
+        "orgChartPage": {
+            "title": "Sơ đồ tổ chức",
+            "subtitle": "Nhóm, Agent và thành viên của tổ chức này.",
+            "backToTeams": "Nhóm",
+            "zoomIn": "Phóng to",
+            "zoomOut": "Thu nhỏ",
+            "fitView": "Vừa khung hình",
+            "unassignedGroup": "Chưa phân bổ",
+            "membersBadge": "{count, plural, other {# thành viên}}",
+            "empty": "Chưa có gì để hiển thị — hãy tạo nhóm hoặc Agent trong tổ chức này trước.",
+            "noOrg": "Tạo một tổ chức để xem sơ đồ tổ chức của nó."
+        },
+        "schedules": {
+            "title": "Lịch trình",
+            "subtitle": "Mọi thứ được lên lịch để chạy trên các công việc, Agents, Missions và Tasks của bạn",
+            "fetchFailed": "Không tải được lịch trình",
+            "retry": "Thử lại",
+            "columns": {
+                "owner": "Chủ sở hữu",
+                "cadence": "Chu kỳ",
+                "nextRun": "Lần chạy tiếp theo",
+                "status": "Trạng thái"
+            },
+            "filters": {
+                "all": "Tất cả",
+                "activeOnly": "Chỉ hoạt động"
+            },
+            "sourceTypes": {
+                "recurringTask": "Tác vụ định kỳ",
+                "agentHeartbeat": "Nhịp Agent",
+                "workSchedule": "Lịch công việc",
+                "missionTick": "Tick Mission",
+                "sourceValidation": "Xác thực nguồn",
+                "dataSync": "Đồng bộ dữ liệu",
+                "inboundTrigger": "Trình kích hoạt đến"
+            },
+            "statuses": {
+                "active": "Hoạt động",
+                "paused": "Tạm dừng",
+                "disabled": "Đã tắt",
+                "error": "Lỗi",
+                "ended": "Đã kết thúc"
+            },
+            "empty": {
+                "title": "Chưa có gì được lên lịch",
+                "description": "Tác vụ định kỳ, nhịp Agent, lịch công việc, tick Mission, xác thực nguồn và đồng bộ dữ liệu sẽ xuất hiện ở đây sau khi bạn thiết lập.",
+                "noResults": "Không có lịch trình nào khớp với bộ lọc hiện tại."
+            }
+        },
+        "triggers": {
+            "title": "Trình kích hoạt đến",
+            "subtitle": "Webhook và lệnh gọi API đã ký tạo một Nhiệm vụ khi được kích hoạt.",
+            "new": "Trình kích hoạt mới",
+            "empty": "Chưa có trình kích hoạt. Tạo một cái để nhận webhook đã ký.",
+            "firedCount": "{count} lần kích hoạt",
+            "lastFired": "kích hoạt gần nhất",
+            "status": {
+                "active": "Hoạt động",
+                "paused": "Tạm dừng"
+            },
+            "createTitle": "Trình kích hoạt đến mới",
+            "createDescription": "Bạn nhận được URL webhook đã ký và một khóa bí mật. Hệ thống bên ngoài gửi POST để tạo Nhiệm vụ.",
+            "form": {
+                "name": "Tên",
+                "namePlaceholder": "Thông báo triển khai",
+                "description": "Mô tả",
+                "descriptionPlaceholder": "Điều gì kích hoạt trình này?",
+                "taskTitle": "Mẫu tiêu đề nhiệm vụ",
+                "taskTitlePlaceholder": "Trình kích hoạt: {name}",
+                "taskTitleHint": "{name} sẽ thành tên trình kích hoạt."
+            },
+            "actions": {
+                "pause": "Tạm dừng",
+                "resume": "Tiếp tục",
+                "rotate": "Xoay khóa bí mật",
+                "delete": "Xóa",
+                "cancel": "Hủy",
+                "create": "Tạo"
+            },
+            "reveal": {
+                "title": "Khóa bí mật của trình kích hoạt",
+                "warning": "Sao chép khóa bí mật ngay — bạn sẽ không thể xem lại.",
+                "url": "URL webhook",
+                "secret": "Khóa bí mật để ký",
+                "curl": "Ví dụ yêu cầu đã ký",
+                "copy": "Sao chép",
+                "done": "Xong"
+            },
+            "toast": {
+                "created": "Đã tạo trình kích hoạt",
+                "createFailed": "Không thể tạo trình kích hoạt",
+                "rotated": "Đã xoay khóa bí mật",
+                "rotateFailed": "Không thể xoay khóa bí mật",
+                "toggleFailed": "Không thể cập nhật trình kích hoạt",
+                "deleted": "Đã xóa trình kích hoạt",
+                "deleteFailed": "Không thể xóa trình kích hoạt",
+                "loadFailed": "Không thể tải trình kích hoạt",
+                "copyFailed": "Không thể sao chép vào bảng nhớ tạm"
+            },
+            "confirmDelete": "Xóa trình kích hoạt này? URL webhook của nó ngừng hoạt động ngay lập tức và không thể hoàn tác."
         }
     },
     "layout": {
@@ -4881,7 +5155,6 @@
             "dashboard": "Bảng điều khiển",
             "activity": "Nhật ký Hoạt động",
             "works": "Công việc",
-            "discover": "Discover",
             "newWork": "Công việc Mới",
             "work": "Công việc",
             "overview": "Tổng quan",
@@ -4898,7 +5171,8 @@
             "security": "Bảo mật",
             "apiKeys": "Khóa API",
             "dangerZone": "Vùng Nguy hiểm",
-            "pluginSettings": "Cài đặt Plugin"
+            "pluginSettings": "Cài đặt Plugin",
+            "discover": "Discover"
         }
     },
     "api": {
@@ -5075,12 +5349,35 @@
         }
     },
     "organizations": {
+        "settings": {
+            "title": "Organization",
+            "subtitle": "Manage your Organization's shared context.",
+            "loading": "Loading…",
+            "selectLabel": "Organization",
+            "visionLabel": "Vision",
+            "visionPlaceholder": "e.g. Become the go-to platform where small teams launch and grow AI-run businesses.",
+            "visionHelp": "Shared with every AI agent working in this Organization — Idea generation, Mission runs, and agent tasks all receive it as context.",
+            "lastUpdated": "Vision last updated",
+            "save": "Save",
+            "saved": "Saved",
+            "empty": {
+                "title": "No Organization yet",
+                "description": "Create an Organization from the workspace switcher to set a company vision."
+            },
+            "errors": {
+                "generic": "Failed to save. Please try again."
+            }
+        },
         "switcher": {
             "heading": "Switch Organization",
             "createNew": "Create Organization",
             "loading": "Loading…"
         },
         "create": {
+            "visionToggle": "Add company vision (optional)",
+            "visionLabel": "Vision",
+            "visionPlaceholder": "e.g. Become the go-to platform where small teams launch and grow AI-run businesses.",
+            "visionHelp": "Optional. Guides all agents working in this Organization — Idea generation, Mission runs, and agent tasks receive it as context. You can add or edit it later in Settings.",
             "title": "Create Organization",
             "description": "Give your Organization a name. We'll allocate a unique slug for its URL.",
             "nameLabel": "Name",
@@ -5097,6 +5394,14 @@
                 "nameRequired": "Name is required",
                 "nameTooLong": "Name must be 200 characters or fewer",
                 "generic": "Failed to create Organization"
+            },
+            "templates": {
+                "label": "Bắt đầu từ",
+                "blankTitle": "Tổ chức trống",
+                "blankDescription": "Bắt đầu từ đầu — thêm nhóm và agent sau.",
+                "meta": "{agents, plural, other {# agent}} · {teams, plural, other {# nhóm}}",
+                "submitImport": "Tạo từ mẫu",
+                "importError": "Không thể tạo tổ chức từ mẫu này"
             }
         },
         "upgrade": {

@@ -64,15 +64,32 @@ export interface CreateIdeaInput {
 
 export interface BuildIdeaResponse {
     idea: WorkProposal;
-    goalId: string;
+    buildRequestId: string;
 }
 
 // Raw wire shape of `POST /me/work-proposals/:id/{build,retry,rebuild}` —
-// matches the API's `BuildWorkProposalResponseDto`. The client method
-// flattens this into `BuildIdeaResponse` for callers.
+// matches the API's `BuildWorkProposalResponseDto` (whose legacy `goal`
+// response key carries the WorkBuildRequest — the key name is the public
+// wire contract). The client method flattens this into `BuildIdeaResponse`
+// for callers.
 interface BuildApiResponse {
     proposal: WorkProposal;
     goal: { id: string; instruction: string; status: string; dryRun: boolean; createdAt: string };
+}
+
+// PR-1 (Idea↔Work provenance) — one row of the authoritative 0..N
+// Idea→Work link table (`idea_works`, ADR-009). `acceptedWorkId` on the
+// proposal stays as the denormalized primary/most-recent pointer; these
+// rows carry the full history, each joined with the linked Work's
+// name/slug (null when unavailable).
+export interface IdeaWorkLink {
+    id: string;
+    ideaId: string;
+    workId: string;
+    kind: 'built' | 'linked' | 'rebuilt';
+    createdAt: string;
+    workName: string | null;
+    workSlug: string | null;
 }
 
 export const workProposalsAPI = {
@@ -175,6 +192,15 @@ export const workProposalsAPI = {
         });
     },
 
+    // PR-1 (Idea↔Work provenance) — list ALL Works linked to an Idea
+    // via the authoritative `idea_works` table, newest first. 404s when
+    // the Idea doesn't exist for the caller (matching `get`).
+    async listWorks(id: string): Promise<{ links: IdeaWorkLink[] }> {
+        return serverFetch<{ links: IdeaWorkLink[] }>(`/me/work-proposals/${id}/works`, {
+            method: 'GET',
+        });
+    },
+
     // Phase 1 PR B — user-manual Idea create (`+ Add` button on the
     // dedicated /ideas page, Phase 5 PR N).
     async createUserManual(input: CreateIdeaInput): Promise<WorkProposal> {
@@ -187,16 +213,16 @@ export const workProposalsAPI = {
     },
 
     // Phase 1 PR B — queue an existing Idea for build (transitions
-    // PENDING/FAILED → QUEUED + creates a WorkAgentGoal under the
-    // hood). Returns the freshly-loaded Idea + the new goal id.
+    // PENDING/FAILED → QUEUED + creates a WorkBuildRequest under the
+    // hood). Returns the freshly-loaded Idea + the new build-request id.
     //
     // The API DTO (`BuildWorkProposalResponseDto`) is the public
     // OpenAPI/MCP contract and uses `{ proposal, goal: { id, ... } }`;
     // the web client's internal `BuildIdeaResponse` flattens it to
-    // `{ idea, goalId }` for ergonomics. We transform at the boundary
-    // here (rather than reshaping the API) so external API consumers
-    // and the existing OpenAPI/MCP whitelist entries stay untouched.
-    // (Codex review on PR #1013.)
+    // `{ idea, buildRequestId }` for ergonomics. We transform at the
+    // boundary here (rather than reshaping the API) so external API
+    // consumers and the existing OpenAPI/MCP whitelist entries stay
+    // untouched. (Codex review on PR #1013.)
     async build(id: string): Promise<BuildIdeaResponse> {
         const raw = await serverMutation<BuildApiResponse>({
             endpoint: `/me/work-proposals/${id}/build`,
@@ -204,7 +230,7 @@ export const workProposalsAPI = {
             method: 'POST',
             wrapInData: false,
         });
-        return { idea: raw.proposal, goalId: raw.goal.id };
+        return { idea: raw.proposal, buildRequestId: raw.goal.id };
     },
 
     // Phase 7 PR U — per-Idea current-period spend + GLOBAL cap

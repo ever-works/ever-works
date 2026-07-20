@@ -1,7 +1,11 @@
 import { MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT } from './minimal-template.prompt';
+import { WEB_TEMPLATE_CUSTOMIZATION_PROMPT } from './web-template.prompt';
+import { WEB_MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT } from './web-minimal-template.prompt';
 
 const CUSTOMIZATION_PROMPTS: Record<string, string> = {
     minimal: MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT,
+    web: WEB_TEMPLATE_CUSTOMIZATION_PROMPT,
+    'web-minimal': WEB_MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT,
 };
 
 export function getCustomizationPromptForBaseTemplate(
@@ -14,4 +18,8 @@ export function hasCustomizationPromptForBaseTemplate(id: string | null | undefi
     return getCustomizationPromptForBaseTemplate(id) !== null;
 }
 
-export { MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT };
+export {
+    MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT,
+    WEB_TEMPLATE_CUSTOMIZATION_PROMPT,
+    WEB_MINIMAL_TEMPLATE_CUSTOMIZATION_PROMPT,
+};

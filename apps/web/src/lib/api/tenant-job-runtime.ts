@@ -54,7 +54,12 @@ export interface TenantJobRuntimeAvailableProvidersResponse {
     providers: TenantJobRuntimeProviderId[];
 }
 
-const BASE = '/api/account/job-runtime';
+// NOTE: no leading `/api` here — `serverFetch`/`serverMutation` prepend
+// `API_URL`, which `lib/constants.ts` normalises to already end in `/api`.
+// Including `/api` here would compose to `/api/api/account/job-runtime/...`
+// → the Nest app 404s with "Cannot GET /api/api/...". Matches every other
+// helper in this folder (see the 52e590a4 operator-allowlist fix).
+const BASE = '/account/job-runtime';
 
 export const tenantJobRuntimeAPI = {
     getConfig: async () => {

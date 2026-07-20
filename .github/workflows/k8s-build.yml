@@ -37,8 +37,8 @@ jobs:
             pkg: apps/docs/package.json
     steps:
       - uses: actions/checkout@v7
-      - uses: docker/setup-buildx-action@v4
-      - uses: docker/login-action@v4
+      - uses: docker/setup-buildx-action@v4.2.0
+      - uses: docker/login-action@v4.4.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -60,7 +60,45 @@ jobs:
           VERSION=$(grep -m1 '"version"' "${{ matrix.pkg }}" | sed -E 's/.*"version"[[:space:]]*:[[:space:]]*"([^"]+)".*/\1/')
           echo "version=${VERSION:-0.0.0}" >> "$GITHUB_OUTPUT"
           echo "build_time=$(date -u +%Y-%m-%dT%H:%M:%SZ)" >> "$GITHUB_OUTPUT"
-      - uses: docker/build-push-action@v7
+      # First build + push attempt. ghcr.io intermittently returns
+      # `403 Forbidden` on the blob HEAD when several matrix images push
+      # concurrently under the same GITHUB_TOKEN — a transient registry
+      # rate-limit / session race, NOT a package-permission problem (a
+      # different image fails on each run: web+docs one build, mcp+docs the
+      # next). So we don't fail the job on the first attempt; we back off
+      # and retry. The build layers are cached by `cache-to` on the first
+      # pass, so the retry only re-pushes and is fast.
+      - id: buildpush
+        uses: docker/build-push-action@v7.3.0
+        continue-on-error: true
+        with:
+          context: ${{ matrix.context }}
+          file: ${{ matrix.dockerfile }}
+          push: true
+          build-args: |
+            NODE_ENV=production
+            BUILD_VERSION=${{ steps.meta.outputs.version }}
+            GIT_SHA=${{ github.sha }}
+            GIT_REF=${{ github.ref_name }}
+            BUILD_RUN=${{ github.run_number }}
+            BUILD_TIME=${{ steps.meta.outputs.build_time }}
+            NEXT_PUBLIC_BUILD_VERSION=${{ steps.meta.outputs.version }}
+            NEXT_PUBLIC_BUILD_SHA=${{ github.sha }}
+            NEXT_PUBLIC_BUILD_REF=${{ github.ref_name }}
+            NEXT_PUBLIC_BUILD_RUN=${{ github.run_number }}
+            NEXT_PUBLIC_BUILD_TIME=${{ steps.meta.outputs.build_time }}
+          tags: |
+            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:${{ steps.t.outputs.tag }}
+            ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:sha-${{ github.sha }}
+          cache-from: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:buildcache
+          cache-to: type=registry,ref=ghcr.io/${{ github.repository_owner }}/${{ matrix.image }}:buildcache,mode=max
+      # Back off to let the transient ghcr rate-limit window clear.
+      - if: steps.buildpush.outcome == 'failure'
+        run: sleep 45
+      # Retry (cached build → push-only, fast). This step is NOT
+      # continue-on-error, so a genuine/persistent failure still fails the job.
+      - if: steps.buildpush.outcome == 'failure'
+        uses: docker/build-push-action@v7.3.0
         with:
           context: ${{ matrix.context }}
           file: ${{ matrix.dockerfile }}

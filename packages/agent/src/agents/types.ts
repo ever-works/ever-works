@@ -4,11 +4,13 @@ import type {
     AgentIdleBehavior,
     AgentPermissions,
     AgentScope,
+    AgentScorecardMetric,
     AgentStatus,
     AgentTarget,
 } from '../entities/agent.entity';
 import type { AgentBudget, AgentBudgetIntervalUnit } from '../entities/agent-budget.entity';
 import type { AgentRun, AgentRunStatus, AgentRunTriggerKind } from '../entities/agent-run.entity';
+import type { AgentGuardrails } from './guardrails';
 
 /**
  * Wire-format projection of `Agent` returned by `AgentsService`.
@@ -35,6 +37,7 @@ export interface AgentDto {
     status: AgentStatus;
     permissions: AgentPermissions;
     targets: AgentTarget[] | null;
+    guardrails: AgentGuardrails | null;
     heartbeatCadence: string | null;
     idleBehavior: AgentIdleBehavior;
     nextHeartbeatAt: Date | null;
@@ -50,6 +53,10 @@ export interface AgentDto {
     // email) without dropping into the database.
     committerName: string | null;
     committerEmail: string | null;
+    /** Direct manager for the Org Chart (teams-and-companies spec §1.2). */
+    reportsToAgentId: string | null;
+    // Agent Scorecards increment 1 — quantified per-Agent goals.
+    scorecard: AgentScorecardMetric[] | null;
     hasInlineFiles: boolean;
     contentHash: string | null;
     createdAt: Date;
@@ -77,6 +84,7 @@ export function toAgentDto(agent: Agent): AgentDto {
         status: agent.status,
         permissions: agent.permissions,
         targets: agent.targets ?? null,
+        guardrails: agent.guardrails ?? null,
         heartbeatCadence: agent.heartbeatCadence ?? null,
         idleBehavior: agent.idleBehavior,
         nextHeartbeatAt: agent.nextHeartbeatAt ?? null,
@@ -89,6 +97,8 @@ export function toAgentDto(agent: Agent): AgentDto {
         avatarImageUploadId: agent.avatarImageUploadId ?? null,
         committerName: agent.committerName ?? null,
         committerEmail: agent.committerEmail ?? null,
+        reportsToAgentId: agent.reportsToAgentId ?? null,
+        scorecard: agent.scorecard ?? null,
         hasInlineFiles,
         contentHash: agent.contentHash ?? null,
         createdAt: agent.createdAt,

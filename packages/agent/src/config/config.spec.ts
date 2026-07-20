@@ -763,6 +763,11 @@ describe('agent/config', () => {
                 'git',
                 'github',
                 'githubApp',
+                // PR-4 (domain-model evolution) — `ideaBuildExecutor.*`
+                // group gates the dormant Idea → Work build executor
+                // (EVER_WORKS_IDEA_BUILD_EXECUTOR_ENABLED, default off, +
+                // DRY_RUN default on). Pinned alphabetically.
+                'ideaBuildExecutor',
                 'isCli',
                 // EW-683 / EW-685 P0 T3 — `jobRuntime.*` group adds the
                 // `EVER_WORKS_JOB_RUNTIME` selector for the pluggable

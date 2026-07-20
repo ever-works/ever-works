@@ -45,13 +45,29 @@ export const PLUGIN_CAPABILITIES = {
 	NOTIFICATION_CHANNEL_TELEGRAM: 'notification-channel-telegram',
 	NOTIFICATION_CHANNEL_WHATSAPP: 'notification-channel-whatsapp',
 	NOTIFICATION_CHANNEL_NOVU: 'notification-channel-novu',
+	// Connectors ("Connector fabric") — first-party BIDIRECTIONAL
+	// communication-channel plugins. Each connector declares `CONNECTOR`
+	// (umbrella, for discovery/grouping) plus its `CONNECTOR_<provider>`
+	// constant. Superset of the outbound-only notification channels; see
+	// `capabilities/connector.interface.ts`.
+	CONNECTOR: 'connector',
+	CONNECTOR_SLACK: 'connector-slack',
+	CONNECTOR_DISCORD: 'connector-discord',
+	CONNECTOR_WHATSAPP: 'connector-whatsapp',
+	CONNECTOR_NOTION: 'connector-notion',
+	CONNECTOR_MICROSOFT_365: 'connector-microsoft-365',
 	// Pluggable persistent memory for AI coding / generation agents.
 	// First-party implementation: `@ever-works/agentmemory-plugin`
 	// (talks to the `agentmemory` standalone Node server on :3111 —
 	// runs locally OR hosted via a configurable `baseUrl` + bearer
 	// token). Community plugins (mem0, zep, langmem) implement the
 	// same `IAgentMemoryPlugin` contract.
-	AGENT_MEMORY: 'agent-memory'
+	AGENT_MEMORY: 'agent-memory',
+	// Goals feature PR-7 — read-only metrics collectors. First-party
+	// providers: `custom-http` (GET-only, SSRF-guarded) and `stripe`
+	// (official SDK; balance + income windows). See
+	// `capabilities/metrics-provider.interface.ts` for the contract.
+	METRICS_PROVIDER: 'metrics-provider'
 } as const;
 
 export type PluginCapability = (typeof PLUGIN_CAPABILITIES)[keyof typeof PLUGIN_CAPABILITIES];

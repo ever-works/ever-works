@@ -263,7 +263,8 @@
             "savedSuccess": "บันทึกการตั้งค่าแล้ว",
             "noSettings": "ไม่ต้องตั้งค่าสำหรับปลั๊กอินนี้",
             "getTokenPrompt": "สร้างโทเค็นก่อน จากนั้นวางด้านล่างและบันทึกเพื่อยืนยันการเชื่อมต่อ",
-            "loadingStatus": "กำลังโหลดสถานะการเชื่อมต่อ..."
+            "loadingStatus": "กำลังโหลดสถานะการเชื่อมต่อ...",
+            "setupGuide": "Setup guide"
         },
         "plugins": {
             "byokDescription": "เชื่อมต่อคีย์ของคุณเองเพื่อปลดล็อกการตั้งค่าเต็มรูปแบบ",
@@ -455,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "การอนุมัติการดำเนินการ",
+                "subtitle": "เอเจนต์ของคุณเสนอการดำเนินการที่มีผลข้างเคียงเหล่านี้ อนุมัติหรือปฏิเสธแต่ละรายการ"
+            },
+            "actions": {
+                "approve": "อนุมัติ",
+                "reject": "ปฏิเสธ",
+                "approveAll": "อนุมัติทั้งหมด"
+            },
+            "actionType": {
+                "spawn_agent": "สร้างเอเจนต์",
+                "schedule_task": "กำหนดเวลางาน",
+                "send_message": "ส่งข้อความ",
+                "budget_override": "แทนที่งบประมาณ",
+                "other": "การดำเนินการ"
+            },
+            "riskFlags": {
+                "budget_override": "แทนที่งบประมาณ",
+                "destructive": "เชิงทำลาย",
+                "cross_scope": "ข้ามขอบเขต",
+                "high_fanout": "การแตกแขนงสูง"
+            },
+            "toast": {
+                "approved": "อนุมัติการดำเนินการแล้ว",
+                "rejected": "ปฏิเสธการดำเนินการแล้ว",
+                "bulkApproved": "อนุมัติแล้ว {count} รายการ",
+                "bulkApprovedSkipped": "อนุมัติแล้ว {approved} รายการ, {skipped} รายการมีการตัดสินแล้ว",
+                "error": "เกิดข้อผิดพลาด โปรดลองอีกครั้ง"
+            }
+        },
         "title": "แดชบอร์ด",
         "connectGithub": {
             "title": "เชื่อมต่อบัญชี GitHub ของคุณ",
@@ -546,17 +578,9 @@
             "title": "Missions",
             "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
             "newMission": "+ New Mission",
-            "quickAdd": {
-                "label": "เริ่มภารกิจใหม่",
-                "submitTitle": "สร้างภารกิจ",
-                "minLength": "คำบรรยายต้องมีอย่างน้อย 10 ตัวอักษร",
-                "created": "สร้างภารกิจเรียบร้อยแล้ว",
-                "error": "ไม่สามารถสร้างภารกิจได้ กรุณาลองใหม่อีกครั้ง"
-            },
             "empty": {
                 "title": "No Missions yet.",
-                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting.",
-                "openNew": "เปิดสร้างสรรค์รวม"
+                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting."
             },
             "card": {
                 "scheduled": "Scheduled",
@@ -568,15 +592,56 @@
                 "capUnlimited": "Unlimited",
                 "capPrefix": "Outstanding cap:",
                 "clonedFromPrefix": "Cloned from another Mission"
-            },
-            "filterBar": {
-                "search": "ค้นหา",
-                "searchPlaceholder": "ชื่อหรือคำอธิบาย",
-                "status": "สถานะ",
-                "anyStatus": "สถานะใดก็ได้",
-                "apply": "นำไปใช้",
-                "reset": "รีเซ็ต"
             }
+        },
+        "memoryPage": {
+            "consolidation": {
+                "action": "รวมข้อมูล",
+                "title": "รวมหน่วยความจำ",
+                "previewIntro": "ตัวอย่างสิ่งที่การรวมข้อมูลจะทำ ไม่มีอะไรเปลี่ยนแปลงจนกว่าคุณจะนำไปใช้",
+                "scanned": "สแกนแล้ว {count}",
+                "promoted": "เลื่อนระดับ {count}",
+                "synthesized": "สังเคราะห์ {count}",
+                "superseded": "แทนที่ {count}",
+                "promotedHeading": "เลื่อนระดับแล้ว",
+                "supersededHeading": "ถูกแทนที่",
+                "more": "อีก +{count}",
+                "apply": "นำไปใช้",
+                "cancel": "ยกเลิก",
+                "applied": "รวมข้อมูลแล้ว: เลื่อนระดับ {promoted}, สังเคราะห์ {synthesized}, แทนที่ {superseded}",
+                "failed": "การรวมข้อมูลล้มเหลว โปรดลองอีกครั้ง",
+                "badgePromoted": "เลื่อนระดับแล้ว",
+                "badgeSuperseded": "ถูกแทนที่"
+            },
+            "title": "Memory",
+            "subtitle": "ทุกสิ่งที่องค์กรของคุณรู้ รวมไว้ในที่เดียว — รวบรวมจาก Knowledge Base ของทุกงาน",
+            "searchPlaceholder": "ค้นหาทุกสิ่งที่องค์กรรู้…",
+            "newDocument": "ใหม่",
+            "documentsIndexed": "{count, plural, =0 {ไม่มีเอกสารที่จัดทำดัชนี} other {จัดทำดัชนีเอกสารแล้ว # รายการ}}",
+            "worksCovered": "{count, plural, =0 {ไม่มีงาน} other {# งาน}}",
+            "filters": {
+                "type": "ประเภท",
+                "work": "งาน",
+                "source": "แหล่งที่มา",
+                "status": "สถานะ",
+                "clearAll": "ล้างทั้งหมด"
+            },
+            "source": {
+                "workKb": "Work KB",
+                "orgKb": "Org KB",
+                "user": "Manual",
+                "agent": "Agent",
+                "imported": "Imported",
+                "seeded": "Seeded"
+            },
+            "empty": {
+                "title": "ยังไม่มีอะไรใน Memory",
+                "subtitle": "เมื่องานของคุณสร้าง Knowledge Base ของตน — เอกสารแบรนด์ เพอร์โซนา งานวิจัย สไตล์ไกด์ — ทุกอย่างจะปรากฏที่นี่ ค้นหาได้ทั่วทั้งองค์กร",
+                "noOrg": "เลือกหรือสร้างองค์กรเพื่อดู Memory ที่รวบรวมไว้ Memory ครอบคลุมทุกงานในองค์กรที่ใช้งานอยู่",
+                "noResults": "ไม่มีเอกสารที่ตรงกับการค้นหาและตัวกรองของคุณ"
+            },
+            "orgScoped": "องค์กร",
+            "openInWork": "เปิดในงาน"
         },
         "agentsPage": {
             "title": "เอเจนต์",
@@ -622,7 +687,47 @@
                 "cancel": "ยกเลิก",
                 "back": "ย้อนกลับ",
                 "next": "ถัดไป",
-                "create": "สร้างเอเจนต์"
+                "create": "สร้างเอเจนต์",
+                "teamLabel": "ทีม",
+                "teamNone": "ไม่มีทีม",
+                "reportsToLabel": "รายงานต่อ",
+                "reportsToNone": "ไม่มีผู้จัดการ"
+            },
+            "settings": {
+                "orgCard": {
+                    "title": "องค์กร",
+                    "teamLabel": "ทีม",
+                    "teamNone": "ไม่มีทีม",
+                    "reportsToLabel": "รายงานต่อ",
+                    "reportsToNone": "ไม่มีผู้จัดการ",
+                    "save": "บันทึก",
+                    "saving": "กำลังบันทึก…"
+                }
+            },
+            "guardrails": {
+                "title": "การ์ดเรล",
+                "subtitle": "กำหนดว่าการดำเนินการที่เสนอแบบใดต้องรอการอนุมัติจากคุณ ทำงานอัตโนมัติ หรือถูกบล็อก",
+                "modeLabel": "โหมดการทำงาน",
+                "modeRequireApproval": "ต้องได้รับอนุมัติ",
+                "modeRequireApprovalHint": "ทุกการดำเนินการที่เสนอจะรอในคิวอนุมัติของคุณจนกว่าคุณจะตัดสินใจ",
+                "modeAutonomous": "อัตโนมัติ",
+                "modeAutonomousHint": "การดำเนินการที่ปลอดภัยจะทำงานทันทีโดยไม่ต้องรอ ส่วนการดำเนินการที่มีธงความเสี่ยงจะเข้าคิวอนุมัติของคุณเสมอ",
+                "autoApproveLabel": "ประเภทการดำเนินการที่อนุมัติอัตโนมัติ",
+                "autoApproveHint": "เฉพาะประเภทที่เลือกเท่านั้นที่ทำงานอัตโนมัติ ส่วนที่เหลือยังคงเข้าคิว",
+                "blockedLabel": "ประเภทการดำเนินการที่ถูกบล็อก",
+                "blockedHint": "การดำเนินการที่ถูกบล็อกจะถูกปฏิเสธโดยอัตโนมัติและบันทึกไว้ในประวัติคิว",
+                "actionTypes": {
+                    "spawn_agent": "สร้างเอเจนต์",
+                    "schedule_task": "กำหนดเวลางาน",
+                    "send_message": "ส่งข้อความ",
+                    "budget_override": "แก้ไขงบประมาณ",
+                    "other": "อื่น ๆ"
+                },
+                "save": "บันทึกการ์ดเรล",
+                "reset": "รีเซ็ตเป็นค่าเริ่มต้น",
+                "saveSuccess": "บันทึกการ์ดเรลแล้ว",
+                "saveError": "ไม่สามารถบันทึกการ์ดเรลได้",
+                "resetSuccess": "รีเซ็ตการ์ดเรลเป็นค่าเริ่มต้นแล้ว"
             }
         },
         "tasksPage": {
@@ -796,6 +901,33 @@
             "empty": "No budget data yet."
         },
         "missionDetail": {
+            "attachedWorks": {
+                "pickerTruncated": "Showing your 100 most recent Works - open the Works page for the full list.",
+                "title": "Attached Works",
+                "empty": "No Works attached to this Mission yet. Attach one below.",
+                "attachTitle": "Attach a Work",
+                "workLabel": "Work",
+                "workPlaceholder": "Select a Work",
+                "relationLabel": "Relation",
+                "attach": "Attach",
+                "detach": "Detach",
+                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "noWorksToAttach": "You have no Works to attach yet.",
+                "relations": {
+                    "created": "Created",
+                    "improves": "Improves",
+                    "operates": "Operates",
+                    "markets": "Markets",
+                    "researches": "Researches",
+                    "retires": "Retires"
+                },
+                "toasts": {
+                    "attached": "Work attached",
+                    "attachError": "Couldn't attach Work",
+                    "detached": "Work detached",
+                    "detachError": "Couldn't detach Work"
+                }
+            },
             "backToMissions": "Back to Missions",
             "badges": {
                 "scheduled": "Scheduled",
@@ -861,6 +993,23 @@
                 "cancel": "Cancel",
                 "confirm": "Clone Mission"
             },
+            "completeDialog": {
+                "title": "Complete this Mission",
+                "description": "Optionally record a conclusion verdict for this Mission. \"No verdict\" completes it without recording an outcome.",
+                "outcomeLabel": "Outcome (optional)",
+                "noVerdict": "No verdict",
+                "cancel": "Cancel",
+                "confirm": "Complete Mission"
+            },
+            "outcomes": {
+                "succeeded": "Succeeded",
+                "partially_succeeded": "Partially succeeded",
+                "failed": "Failed",
+                "cancelled": "Cancelled",
+                "superseded": "Superseded"
+            },
+            "outcomeTooltip": "Outcome recorded when this Mission was completed",
+            "completedAtLabel": "Completed",
             "toasts": {
                 "settingsSaved": "Mission settings saved",
                 "settingsError": "Couldn't save settings",
@@ -893,7 +1042,6 @@
                 "label": "Add a new Idea",
                 "placeholder": "Describe an Idea — e.g. \"A curated list of the best AI coding agents released this year\"",
                 "submit": "Add",
-                "submitTitle": "เพิ่มความคิด",
                 "minLength": "Description must be at least 10 characters."
             },
             "toggles": {
@@ -937,11 +1085,31 @@
                 "anyStatus": "สถานะใดก็ได้",
                 "apply": "นำไปใช้",
                 "reset": "รีเซ็ต"
+            },
+            "newPage": {
+                "link": "สร้างด้วยตนเอง",
+                "or": "หรือ",
+                "title": "Idea ใหม่",
+                "subtitle": "เขียน Idea ของคุณเอง อธิบาย Work ที่คุณต้องการสร้าง — จากนั้นคุณสามารถจัดคิวเพื่อสร้างได้",
+                "nameLabel": "ชื่อเรื่อง",
+                "namePlaceholder": "ไม่บังคับ — เว้นว่างไว้เพื่อให้สร้างจากคำอธิบาย",
+                "descriptionLabel": "คำอธิบาย",
+                "descriptionPlaceholder": "อธิบาย Work ที่ Idea นี้ควรจะกลายเป็น — เช่น “ไดเรกทอรีที่คัดสรรของเฟรมเวิร์กเอเจนต์ AI โอเพนซอร์ส จัดระเบียบตามประเภทเฟรมเวิร์กและสัญญาอนุญาต”",
+                "descriptionHint": "อย่างน้อย 10 ตัวอักษร",
+                "cancel": "ยกเลิก",
+                "create": "สร้าง Idea",
+                "creating": "กำลังสร้าง…",
+                "minLength": "คำอธิบายต้องมีอย่างน้อย 10 ตัวอักษร",
+                "error": "ไม่สามารถสร้าง Idea ได้ โปรดลองอีกครั้ง"
+            },
+            "linkedWorks": {
+                "title": "Linked Works",
+                "kind": {
+                    "built": "Built",
+                    "linked": "Linked",
+                    "rebuilt": "Rebuilt"
+                }
             }
-        },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
         },
         "header": {
             "welcome": "ยินดีต้อนรับกลับ, {username}!",
@@ -1127,6 +1295,10 @@
                     "failed": "ล้มเหลว",
                     "cancelled": "ยกเลิก"
                 }
+            },
+            "viewToggle": {
+                "log": "บันทึก",
+                "schedules": "กำหนดการ"
             }
         },
         "works": {
@@ -1190,6 +1362,7 @@
             "subtitle": "จัดการการตั้งค่าบัญชีและความชอบของคุณ",
             "tabs": {
                 "profile": "โปรไฟล์",
+                "organization": "Organization",
                 "security": "ความปลอดภัย",
                 "apiKeys": "คีย์ API",
                 "data": "ข้อมูล",
@@ -1226,14 +1399,14 @@
                 "sections": {
                     "agent": {
                         "title": "Work agent planning",
-                        "description": "Prepare approval-ready Work plans from high-level goals. Live execution stays blocked until an executor is connected."
+                        "description": "Prepare approval-ready Work plans from high-level build requests. Live execution stays blocked until an executor is connected."
                     },
                     "guardrails": {
                         "title": "Guardrails",
                         "description": "Set hard limits that future live execution must follow before creating Works, adding items, or spending budget."
                     },
                     "queue": {
-                        "title": "Queue a goal",
+                        "title": "Queue a build request",
                         "description": "Give the agent a broad instruction. It creates an approval-ready plan inside your guardrails."
                     },
                     "liveRun": {
@@ -1241,7 +1414,7 @@
                         "description": "Current state and recent agent activity."
                     },
                     "recentGoals": {
-                        "title": "Recent goals",
+                        "title": "Recent build requests",
                         "description": "Pending, running, and completed Work agent instructions."
                     },
                     "autoGenerateIdeas": {
@@ -1272,7 +1445,7 @@
                     "approvalThreshold": "Approval threshold",
                     "confirmBeforeCreate": "Confirm before creating Works",
                     "confirmBeforeDelete": "Confirm before deleting items",
-                    "dryRunThisGoal": "Dry run this goal",
+                    "dryRunThisGoal": "Dry run this build request",
                     "autoGenerateCadenceMinutes": "Run every N minutes",
                     "autoGenerateBatchSize": "Ideas per cycle",
                     "autoBuildThrottlePerDay": "Daily auto-build cap",
@@ -1288,7 +1461,7 @@
                     "saveSettings": "Save settings",
                     "saveSection": "Save",
                     "useDefault": "Use default",
-                    "queueGoal": "Queue goal",
+                    "queueGoal": "Queue build request",
                     "preparePlan": "Prepare plan",
                     "stop": "Stop"
                 },
@@ -1305,16 +1478,16 @@
                 },
                 "empty": {
                     "noActiveRun": "No active Work agent run.",
-                    "noGoals": "No Work agent goals yet.",
+                    "noGoals": "No Work agent build requests yet.",
                     "waitingForUpdate": "Waiting for the first run update."
                 },
                 "toasts": {
                     "settingsSaved": "Work agent settings saved",
                     "settingsError": "Failed to save settings",
                     "goalQueued": "Work agent plan prepared",
-                    "goalError": "Failed to queue goal",
-                    "goalCanceled": "Work agent goal canceled",
-                    "cancelError": "Failed to cancel goal"
+                    "goalError": "Failed to queue build request",
+                    "goalCanceled": "Work agent build request canceled",
+                    "cancelError": "Failed to cancel build request"
                 }
             },
             "data": {
@@ -1573,7 +1746,45 @@
             "totalItems": "รายการทั้งหมด",
             "activeWebsites": "เว็บไซต์ที่ใช้งานอยู่",
             "monthSpend": "Month Spend",
-            "fromLastMonth": "จากเดือนที่แล้ว"
+            "fromLastMonth": "จากเดือนที่แล้ว",
+            "teams": "ทีม"
+        },
+        "attention": {
+            "title": "ต้องการความสนใจ",
+            "kinds": {
+                "agentError": {
+                    "title": "เอเจนต์ “{name}” เกิดข้อผิดพลาด",
+                    "subtitle": "หยุดชั่วคราวอัตโนมัติหลังล้มเหลวซ้ำ ๆ"
+                },
+                "scheduleFailed": {
+                    "title": "การทำงานตามกำหนดการล้มเหลว",
+                    "subtitle": "การทำงานล่าสุดของ “{name}” ไม่เสร็จสมบูรณ์"
+                },
+                "schedulePaused": {
+                    "title": "กำหนดการถูกหยุดชั่วคราว",
+                    "subtitle": "“{name}” ถูกหยุดชั่วคราวหลังล้มเหลวซ้ำ ๆ"
+                },
+                "generationFailed": {
+                    "title": "การสร้างล้มเหลว",
+                    "subtitle": "ไม่สามารถสร้าง “{name}” ได้"
+                },
+                "taskBlocked": {
+                    "title": "งานถูกบล็อก",
+                    "subtitle": "“{name}” ต้องการข้อมูลป้อนเข้าเพื่อดำเนินการต่อ"
+                },
+                "budgetExceeded": {
+                    "title": "เกินงบประมาณ",
+                    "subtitle": "การใช้จ่ายของบัญชีถึงขีดจำกัดแล้ว"
+                }
+            }
+        },
+        "soon": {
+            "title": "เร็ว ๆ นี้",
+            "more": "+{n} เพิ่มเติม",
+            "source": {
+                "work": "งาน",
+                "mission": "Mission"
+            }
         },
         "adminUsage": {
             "title": "Platform usage",
@@ -1639,6 +1850,18 @@
             "createButton": "สร้างงาน"
         },
         "workDetail": {
+            "missions": {
+                "title": "Missions",
+                "subtitle": "Your Missions that relate to this Work. Missions never own Works — these are references.",
+                "relations": {
+                    "created": "Created",
+                    "improves": "Improves",
+                    "operates": "Operates",
+                    "markets": "Markets",
+                    "researches": "Researches",
+                    "retires": "Retires"
+                }
+            },
             "agentsDropdown": {
                 "trigger": "เอเจนต์",
                 "heading": "เอเจนต์สำหรับงานนี้",
@@ -3394,7 +3617,7 @@
         },
         "newPage": {
             "title": "+ New",
-            "subtitle": "Tell the agent what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
+            "subtitle": "Tell us what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
             "promptLabel": "What do you want to build?",
             "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
             "chipLabel": "Pick a kind",
@@ -3409,19 +3632,21 @@
                 "company": "Company"
             },
             "chipDescriptions": {
-                "mission": "เป้าหมายที่ดำเนินต่อไป — สร้างความคิดตามกำหนดการหรือครั้งเดียว",
-                "idea": "คำอธิบายครั้งเดียวที่เอเจนต์แปลงเป็นแผนงานที่คุณสามารถสร้างต่อได้",
-                "website": "เว็บไซต์หลายหน้าสำหรับธุรกิจ บริการ หรือแบรนด์ — เนื้อหา + โค้ดที่สร้างขึ้น",
-                "landing-page": "หน้าเดียวที่มุ่งเน้น — รายชื่อรอ การเปิดตัวผลิตภัณฑ์ การลงทะเบียนเวบินาร์ การดึงลูกค้า",
-                "blog": "บล็อกที่มีหมวดหมู่ RSS การเน้นโค้ด และเนื้อหาที่พร้อมใช้กับ SEO",
-                "directory": "เว็บไดเรกทอรี่ที่คัดสรรมาแล้ว พร้อมค้นหา ตัวกรอง และข้อมูลรายการที่มโนรม",
-                "awesome-repo": "เรโพซิทอรี่อะไรก็ได้ที่น่าทึ่ง — ดัชนี markdown ลิงก์ที่จัดหมวดหมู่ และเมตาดาทาที่รีเฟรชได้",
+                "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
+                "idea": "A one-shot brief the agent turns into a Work plan you can build.",
+                "agent": "An AI teammate that acts across Missions, Works, or your whole Workspace.",
+                "task": "A trackable item assigned to a person or an Agent.",
+                "website": "A multi-page site for a business, service, or brand — generated content + code.",
+                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
+                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
+                "directory": "A curated directory site with search, filters, and structured item data.",
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
                 "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
-            "submitTitle": "สร้าง",
             "or": "or",
             "hints": {
+                "pickChip": "Pick a chip above to enable Create.",
                 "minLength": "Add a description (at least 10 characters) to enable Create."
             },
             "toasts": {
@@ -3929,6 +4154,177 @@
                 "unexpectedError": "เกิดข้อผิดพลาดที่ไม่คาดคิด"
             }
         },
+        "goalsPage": {
+            "title": "Goals",
+            "subtitle": "Measurable targets evaluated automatically against your metrics providers. Each Goal tracks a live metric toward a target — open one to see its progress, run a check, or set an outcome.",
+            "newGoal": "New Goal",
+            "statuses": {
+                "draft": "Draft",
+                "active": "Active",
+                "paused": "Paused",
+                "completed": "Completed"
+            },
+            "outcomes": {
+                "achieved": "Achieved",
+                "missed": "Missed",
+                "abandoned": "Abandoned"
+            },
+            "filterBar": {
+                "status": "Status",
+                "anyStatus": "Any status",
+                "apply": "Apply",
+                "reset": "Reset"
+            },
+            "loadError": {
+                "title": "Could not load Goals."
+            },
+            "empty": {
+                "title": "No Goals yet.",
+                "subtitle": "Create a Goal to track a business metric toward a target — income, signups, churn, error rate — evaluated automatically on a schedule."
+            },
+            "pagination": {
+                "showing": "Showing {from}-{to}",
+                "noResults": "No results on this page",
+                "previous": "Previous",
+                "next": "Next"
+            },
+            "card": {
+                "comparator": {
+                    "gte": "At least",
+                    "lte": "At most"
+                },
+                "nextCheckPrefix": "Next check:",
+                "windowPrefix": "Window:",
+                "window": {
+                    "day": "Daily",
+                    "week": "Weekly",
+                    "month": "Monthly",
+                    "total": "Total",
+                    "point": "Point-in-time"
+                }
+            }
+        },
+        "goalNew": {
+            "title": "New Goal",
+            "subtitle": "Define a measurable target and the metric that tracks it. New Goals start as a draft — activate from the detail page to begin scheduled evaluation.",
+            "backToGoals": "Back to Goals",
+            "created": "Goal created",
+            "sections": {
+                "metricSource": "Metric source",
+                "target": "Target",
+                "cadence": "Evaluation cadence"
+            },
+            "fields": {
+                "title": "Title",
+                "titlePlaceholder": "e.g. Monthly Stripe income of $1,000",
+                "description": "Description",
+                "descriptionPlaceholder": "Optional context for this Goal",
+                "pluginId": "Provider plugin ID",
+                "metricId": "Metric ID",
+                "params": "Parameters (JSON)",
+                "paramsHint": "Optional provider-specific parameters as a JSON object (e.g. a currency filter).",
+                "paramsInvalid": "Parameters must be valid JSON.",
+                "paramsNotObject": "Parameters must be a JSON object.",
+                "comparator": "Direction",
+                "targetValue": "Target value",
+                "unit": "Unit",
+                "window": "Window",
+                "deadline": "Deadline (optional)",
+                "checkFrequency": "Check frequency (minutes)",
+                "checkFrequencyHint": "Minimum {min} minutes; lower values are clamped."
+            },
+            "comparators": {
+                "gte": "At least (grow to target)",
+                "lte": "At most (shrink to target)"
+            },
+            "windows": {
+                "day": "Daily",
+                "week": "Weekly",
+                "month": "Monthly",
+                "total": "Total",
+                "point": "Point-in-time"
+            },
+            "errors": {
+                "titleRequired": "Title is required.",
+                "metricSourceRequired": "Provider plugin ID and metric ID are required.",
+                "targetInvalid": "Target value must be a number.",
+                "unitRequired": "Unit is required.",
+                "deadlineInvalid": "Deadline is not a valid date.",
+                "createFailed": "Couldn't create the Goal. Please try again."
+            },
+            "actions": {
+                "create": "Create Goal",
+                "cancel": "Cancel"
+            }
+        },
+        "goalDetail": {
+            "backToGoals": "Back to Goals",
+            "actions": {
+                "evaluateNow": "Evaluate now",
+                "activate": "Activate",
+                "pause": "Pause",
+                "delete": "Delete"
+            },
+            "sections": {
+                "progress": "Progress",
+                "details": "Details",
+                "outcome": "Outcome"
+            },
+            "progress": {
+                "current": "Current",
+                "target": "Target",
+                "noSamples": "No observations yet. Activate the Goal or run an evaluation to start collecting samples.",
+                "sampleCount": "{count} observations"
+            },
+            "comparator": {
+                "gte": "At least",
+                "lte": "At most"
+            },
+            "window": {
+                "day": "Daily",
+                "week": "Weekly",
+                "month": "Monthly",
+                "total": "Total",
+                "point": "Point-in-time"
+            },
+            "details": {
+                "plugin": "Provider",
+                "metric": "Metric",
+                "window": "Window",
+                "baseline": "Baseline",
+                "checkFrequency": "Check frequency",
+                "minutes": "{count} min",
+                "nextCheck": "Next check",
+                "deadline": "Deadline",
+                "noDeadline": "Open-ended",
+                "lastObserved": "Last observed"
+            },
+            "outcome": {
+                "hint": "How this Goal ended. Auto-set by evaluation, and always overridable by you.",
+                "overrideLabel": "Override outcome",
+                "overrideNote": "Setting an outcome completes the Goal; clearing it re-opens the outcome.",
+                "none": "None"
+            },
+            "outcomes": {
+                "achieved": "Achieved",
+                "missed": "Missed",
+                "abandoned": "Abandoned"
+            },
+            "toasts": {
+                "activated": "Goal activated",
+                "paused": "Goal paused",
+                "lifecycleError": "Couldn't update the Goal.",
+                "evaluated": "Evaluation complete",
+                "evaluateError": "Couldn't evaluate the Goal.",
+                "outcomeSaved": "Outcome updated",
+                "outcomeError": "Couldn't update the outcome.",
+                "deleted": "Goal deleted",
+                "deleteError": "Couldn't delete the Goal."
+            },
+            "confirm": {
+                "delete": "Delete this Goal? Its observation history and Mission links will be removed. This cannot be undone."
+            }
+        },
         "sidebar": {
             "menu": "เมนู",
             "aiChat": "แชท AI",
@@ -3939,14 +4335,17 @@
                 "dashboard": "แดชบอร์ด",
                 "activity": "กิจกรรม",
                 "missions": "Missions",
+                "goals": "Goals",
                 "ideas": "Ideas",
                 "works": "งาน",
                 "tasks": "งาน",
                 "agents": "เอเจนต์",
+                "memory": "Memory",
                 "plugins": "ปลั๊กอิน",
                 "skills": "ทักษะ",
                 "templates": "เทมเพลต",
-                "settings": "การตั้งค่า"
+                "settings": "การตั้งค่า",
+                "teams": "ทีม"
             },
             "tooltips": {
                 "expandSidebar": "ขยายแถบด้านข้าง",
@@ -4240,7 +4639,9 @@
                 "defaultSelected": "เลือกค่าเริ่มต้นแล้ว",
                 "makeDefault": "ตั้งเป็นค่าเริ่มต้น",
                 "fork": "ฟอร์ก",
-                "useTemplate": "Use this Template",
+                "useTemplate": "Use",
+                "useTemplateFull": "Use this Template",
+                "moreActions": "More actions",
                 "edit": "แก้ไข",
                 "archive": "จัดเก็บถาวร",
                 "customizeAgain": "Customize again",
@@ -4413,11 +4814,30 @@
             }
         },
         "templateSelector": {
+            "label": "เทมเพลต",
             "defaultOption": "ใช้ค่าเริ่มต้น",
             "defaultOptionWithName": "ใช้ค่าเริ่มต้น ({name})",
             "optionLabel": "{name}",
             "optionDefaultLabel": "{name} (ค่าเริ่มต้น)",
             "changeAnywayLink": "เปลี่ยนแปลงอยู่ดี",
+            "typeLabel": "ประเภทเทมเพลต",
+            "chipType": {
+                "website": "Website",
+                "landing": "Landing",
+                "blog": "Blog",
+                "directory": "Directory",
+                "store": "Store",
+                "company": "Company",
+                "awesome": "Awesome"
+            },
+            "searchPlaceholder": "ค้นหาเทมเพลต…",
+            "searchAriaLabel": "ค้นหาเทมเพลต",
+            "groupYourTemplates": "เทมเพลตของคุณ",
+            "groupBlueprints": "Blueprints",
+            "featuredBadge": "แนะนำ",
+            "defaultBadge": "ค่าเริ่มต้น",
+            "empty": "ไม่มีเทมเพลตที่ตรงกับการค้นหาของคุณ",
+            "resultCount": "{count, plural, =0 {ไม่มีเทมเพลต} other {# เทมเพลต}}",
             "origin": {
                 "standard": "มาตรฐาน",
                 "forked": "ฟอร์ก",
@@ -4485,332 +4905,186 @@
             "system": "ระบบ",
             "goToPluginSettings": "ไปที่การตั้งค่าส่วนเสริม"
         },
-        "proposals": {
-            "header": {
-                "title": "Ideas",
-                "titleWithName": "Ideas"
-            },
-            "actions": {
-                "accept": "Build",
-                "viewWork": "View Work",
-                "dismiss": "Dismiss",
-                "dismissAria": "Dismiss this idea",
-                "refresh": "Suggest more"
-            },
-            "researching": {
-                "title": "Drafting ideas from your profile…",
-                "subtitle": "This usually takes under a minute."
-            },
-            "empty": {
-                "title": "No ideas right now.",
-                "subtitle": "New suggestions will appear here when they are ready."
-            },
-            "errors": {
-                "rateLimited": "Daily limit reached. Try again tomorrow.",
-                "generic": "Couldn't refresh ideas. Please try again."
-            },
-            "plugins": {
-                "label": "Suggested plugins"
-            },
-            "failureKinds": {
-                "transient-network": "Network blip",
-                "transient-rate-limit": "Rate limited",
-                "transient-upstream-5xx": "Upstream service error",
-                "transient-plugin": "Plugin timeout",
-                "permanent-invalid-input": "Invalid input",
-                "permanent-unknown": "Build failed"
-            }
-        },
-        "missionsPreview": {
-            "title": "Missions",
-            "viewAll": "View all ({n}) →",
-            "empty": {
-                "title": "No Missions yet.",
-                "subtitleRich": "<link>Start one</link> to give the agent a persistent Goal that keeps generating Ideas for you."
-            },
-            "badges": {
-                "scheduled": "Scheduled"
-            },
-            "counters": {
-                "ideas": "Ideas",
-                "works": "Works",
-                "sites": "Sites"
-            }
-        },
-        "missionsPage": {
-            "title": "Missions",
-            "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
-            "newMission": "+ New Mission",
-            "empty": {
-                "title": "No Missions yet.",
-                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting."
-            },
-            "card": {
-                "scheduled": "Scheduled",
-                "oneShot": "One-shot",
-                "schedulePrefix": "Cron:",
-                "autoBuildOn": "Auto-build on",
-                "autoBuildOff": "Auto-build off",
-                "capInherit": "Inherit user default",
-                "capUnlimited": "Unlimited",
-                "capPrefix": "Outstanding cap:",
-                "clonedFromPrefix": "Cloned from another Mission"
-            }
-        },
-        "budgetSummary": {
-            "period": "{period}",
-            "currentSpend": "Current spend",
-            "cap": "Monthly cap",
-            "noCap": "No cap set",
-            "percentUsed": "{percent}% used",
-            "blocked": "Over cap — blocked",
-            "overCap": "Over cap",
-            "loading": "Loading budget…",
-            "empty": "No budget data yet."
-        },
-        "missionDetail": {
-            "backToMissions": "Back to Missions",
-            "badges": {
-                "scheduled": "Scheduled",
-                "oneShot": "One-shot",
-                "cloned": "Cloned",
-                "clonedTooltip": "This Mission is a Full Fork of another"
-            },
-            "sections": {
-                "settings": "Mission settings",
-                "guardrails": "Guardrails override",
-                "liveRuns": "Live runs",
-                "ideas": "Ideas",
-                "relatedWorks": "Related Works",
-                "inheritedWorks": "Related Works (inherited)",
-                "activity": "Activity",
-                "spend": "Spend over time"
-            },
-            "fields": {
-                "schedule": "Schedule (cron, UTC)",
-                "autoBuildWorks": "Auto-build Works from spawned Ideas",
-                "capInherit": "Inherit user-level default cap",
-                "outstandingCap": "Outstanding-Ideas cap (-1 = unlimited)"
-            },
-            "actions": {
-                "saveSettings": "Save settings",
-                "pause": "Pause",
-                "resume": "Resume",
-                "complete": "Complete",
-                "delete": "Delete",
-                "runNow": "Run now",
-                "clone": "Clone"
-            },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
-            },
-            "guardrails": {
-                "activeOverride": "Custom guardrail overrides are active on this Mission.",
-                "inheriting": "No overrides set — using your global Work-agent guardrails."
-            },
-            "liveRuns": {
-                "empty": "No active runs."
-            },
-            "ideas": {
-                "empty": "No Ideas spawned by this Mission yet."
-            },
-            "works": {
-                "empty": "No Works have been built from this Mission's Ideas yet."
-            },
-            "inherited": {
-                "fromSource": "Inherited from",
-                "empty": "The source Mission has no Works to inherit."
-            },
-            "activity": {
-                "empty": "Activity timeline will appear here once Mission ticks start running."
-            },
-            "spend": {
-                "empty": "Spend chart will appear here once budgets are wired."
-            },
-            "clone": {
-                "title": "Clone this Mission",
-                "description": "Full Fork: copies metadata + non-dismissed Ideas (as Pending). Works are NOT cloned — they remain attached to the source.",
-                "titleLabel": "Title for the new Mission (optional)",
-                "cancel": "Cancel",
-                "confirm": "Clone Mission"
-            },
-            "toasts": {
-                "settingsSaved": "Mission settings saved",
-                "settingsError": "Couldn't save settings",
-                "paused": "Mission paused",
-                "pauseError": "Couldn't pause",
-                "resumed": "Mission resumed",
-                "resumeError": "Couldn't resume",
-                "completed": "Mission marked complete",
-                "completeError": "Couldn't complete",
-                "deleted": "Mission deleted",
-                "deleteError": "Couldn't delete",
-                "runNowError": "Couldn't run now",
-                "cloned": "Cloned: {ideasCloned} idea(s) carried, {ideasSkipped} dismissed skipped.",
-                "cloneError": "Couldn't clone Mission",
-                "runNow": {
-                    "noop-placeholder": "Run-now queued (placeholder)",
-                    "queued": "Tick queued",
-                    "spawned": "New Ideas spawned",
-                    "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
-                    "no-ideas": "Tick ran but generated no Ideas",
-                    "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
-                }
-            }
-        },
-        "ideasPage": {
-            "title": "Ideas",
-            "subtitle": "Everything the platform has drafted for you, plus anything you've typed in. Build the ones worth building.",
-            "quickAdd": {
-                "label": "Add a new Idea",
-                "placeholder": "Describe an Idea — e.g. \"A curated list of the best AI coding agents released this year\"",
-                "submit": "Add",
-                "minLength": "Description must be at least 10 characters."
-            },
-            "toggles": {
-                "showAccepted": "Show accepted",
-                "showDismissed": "Show dismissed"
-            },
-            "filters": {
-                "all": "All",
-                "pending": "Pending",
-                "queued": "Queued",
-                "building": "Building",
-                "failed": "Failed",
-                "accepted": "Accepted",
-                "dismissed": "Dismissed",
-                "done": "Done",
-                "doneTooltip": "Ideas that became Works. Click a card to open its Work."
-            },
-            "gears": {
-                "menuLabel": "Settings",
-                "autoGenerate": "Auto-generate Ideas…",
-                "autoBuild": "Auto-build Works…",
-                "autoRetry": "Auto-retry policy…",
-                "accountBudgets": "Account-wide budgets…"
-            },
-            "toasts": {
-                "ideaCreated": "Idea added",
-                "ideaCreateError": "Couldn't add idea. Please try again.",
-                "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again.",
-                "ideaGone": "ไอเดียนี้ไม่พร้อมใช้งานอีกต่อไป"
-            },
-            "empty": {
-                "title": "No Ideas match these filters.",
-                "subtitle": "Toggle accepted / dismissed, or add one with the field above."
-            },
-            "viewAll": "View all ({n}) →",
-            "filterBar": {
-                "search": "ค้นหา",
-                "searchPlaceholder": "ชื่อหรือคำอธิบาย",
-                "status": "สถานะ",
-                "anyStatus": "สถานะใดก็ได้",
-                "apply": "นำไปใช้",
-                "reset": "รีเซ็ต"
-            },
-            "newPage": {
-                "link": "สร้างด้วยตนเอง",
-                "or": "หรือ",
-                "title": "Idea ใหม่",
-                "subtitle": "เขียน Idea ของคุณเอง อธิบาย Work ที่คุณต้องการสร้าง — จากนั้นคุณสามารถจัดคิวเพื่อสร้างได้",
-                "nameLabel": "ชื่อเรื่อง",
-                "namePlaceholder": "ไม่บังคับ — เว้นว่างไว้เพื่อให้สร้างจากคำอธิบาย",
-                "descriptionLabel": "คำอธิบาย",
-                "descriptionPlaceholder": "อธิบาย Work ที่ Idea นี้ควรจะกลายเป็น — เช่น “ไดเรกทอรีที่คัดสรรของเฟรมเวิร์กเอเจนต์ AI โอเพนซอร์ส จัดระเบียบตามประเภทเฟรมเวิร์กและสัญญาอนุญาต”",
-                "descriptionHint": "อย่างน้อย 10 ตัวอักษร",
-                "cancel": "ยกเลิก",
-                "create": "สร้าง Idea",
-                "creating": "กำลังสร้าง…",
-                "minLength": "คำอธิบายต้องมีอย่างน้อย 10 ตัวอักษร",
-                "error": "ไม่สามารถสร้าง Idea ได้ โปรดลองอีกครั้ง"
-            }
-        },
         "discover": {
             "title": "Discover",
             "subtitle": "AI-curated Work ideas tailored to you."
         },
-        "adminUsage": {
-            "title": "Platform usage",
-            "description": "Cross-user, cross-directory spend for the current period. Self-hosted operators only.",
-            "periodLabel": "{period}",
-            "totalSpend": "Total spend: {amount}",
-            "empty": "No usage recorded this period.",
-            "columnUser": "User",
-            "columnEmail": "Email",
-            "columnWork": "Directory",
-            "columnUnits": "Units",
-            "columnCost": "Cost",
-            "loadFailed": "Could not load admin usage. You may not have platform-admin access."
-        },
-        "budgets": {
-            "overviewTitle": "Spend in {period}",
-            "overviewProgressLabel": "{percent}% of {cap} cap",
-            "overviewOverageSuffix": " (overage allowed)",
-            "overviewEmpty": "No monthly cap set. Add one in Budgets & Usage to enable alerts.",
-            "topPluginsTitle": "Top plugins by spend",
-            "topPluginsEmpty": "No usage recorded yet this period.",
-            "trendTitle": "Daily spend — {period}",
-            "trendEmpty": "No usage recorded yet this period.",
-            "trendDayLabel": "Day {day}"
-        },
-        "newPage": {
-            "title": "+ New",
-            "subtitle": "Tell us what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
-            "promptLabel": "What do you want to build?",
-            "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
-            "chipLabel": "Pick a kind",
-            "chips": {
-                "mission": "Mission",
-                "idea": "Idea",
-                "website": "Website",
-                "landing-page": "Landing Page",
-                "blog": "Blog",
-                "directory": "Directory",
-                "awesome-repo": "Awesome Repo",
-                "company": "Company"
+        "teamsPage": {
+            "title": "ทีม",
+            "subtitle": "จัดระเบียบเอเจนต์และสมาชิกของคุณเป็นทีมภายในองค์กรนี้",
+            "orgChartCta": "แผนผังองค์กร",
+            "newTeamCta": "ทีมใหม่",
+            "empty": {
+                "title": "ยังไม่มีทีม",
+                "description": "สร้างทีมแรกของคุณเพื่อจัดกลุ่มเอเจนต์และสมาชิก จากนั้นจัดวางบนแผนผังองค์กร",
+                "cta": "สร้างทีม"
             },
-            "chipDescriptions": {
-                "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
-                "idea": "A one-shot brief the agent turns into a Work plan you can build.",
-                "agent": "An AI teammate that acts across Missions, Works, or your whole Workspace.",
-                "task": "A trackable item assigned to a person or an Agent.",
-                "website": "A multi-page site for a business, service, or brand — generated content + code.",
-                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
-                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
-                "directory": "A curated directory site with search, filters, and structured item data.",
-                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
-                "company": "Register a new entity. Becomes an Organization in your account."
+            "noOrg": {
+                "title": "ทีมอยู่ภายในองค์กร",
+                "description": "สร้างองค์กรก่อน จากนั้นคุณจะจัดกลุ่มเอเจนต์และสมาชิกขององค์กรเป็นทีมได้",
+                "cta": "สร้างองค์กร"
             },
-            "submit": "Create",
-            "or": "or",
-            "hints": {
-                "pickChip": "Pick a chip above to enable Create.",
-                "minLength": "Add a description (at least 10 characters) to enable Create."
+            "card": {
+                "agents": "{count, plural, other {เอเจนต์ #}}",
+                "members": "{count, plural, other {สมาชิก # คน}}",
+                "subTeams": "{count, plural, other {ทีมย่อย # ทีม}}"
             },
-            "toasts": {
-                "missionCreated": "Mission created",
-                "ideaCreated": "Idea added",
-                "submitError": "Couldn't create. Please try again."
+            "newDialog": {
+                "title": "ทีมใหม่",
+                "nameLabel": "ชื่อ",
+                "namePlaceholder": "เช่น วิศวกรรม",
+                "descriptionLabel": "คำอธิบาย",
+                "descriptionPlaceholder": "ทีมนี้รับผิดชอบอะไร (ไม่บังคับ)",
+                "parentLabel": "ทีมหลัก",
+                "parentNone": "ไม่มีทีมหลัก (ระดับบนสุด)",
+                "managerLabel": "เอเจนต์ผู้จัดการ",
+                "managerNone": "ไม่มีผู้จัดการ",
+                "submit": "สร้างทีม",
+                "creating": "กำลังสร้าง…",
+                "cancel": "ยกเลิก"
             },
-            "cards": {
-                "ai": {
-                    "title": "Create Work with AI",
-                    "subtitle": "Describe what you want and let the agent prepare an approval-ready plan.",
-                    "cta": "Get started"
-                },
-                "manual": {
-                    "title": "Create Work Manually",
-                    "subtitle": "Configure every step yourself — provider, template, items, and deploy.",
-                    "cta": "Configure now"
-                },
-                "import": {
-                    "title": "Import Existing Work",
-                    "subtitle": "Bring in a Work you already have — repo, items, and provider settings.",
-                    "cta": "Import now"
-                }
+            "detail": {
+                "overviewTab": "ภาพรวม",
+                "settingsTab": "การตั้งค่า",
+                "rosterTitle": "รายชื่อสมาชิก",
+                "subTeamsTitle": "ทีมย่อย",
+                "managerLabel": "ผู้จัดการ",
+                "parentLabel": "ทีมหลัก",
+                "addMemberCta": "เพิ่มสมาชิก",
+                "addMemberTypeLabel": "ประเภท",
+                "addMemberAgent": "เอเจนต์",
+                "addMemberUser": "สมาชิก",
+                "addMemberSelectLabel": "ใคร",
+                "addMemberSubmit": "เพิ่ม",
+                "adding": "กำลังเพิ่ม…",
+                "removeMember": "นำออก",
+                "roleLead": "หัวหน้าทีม",
+                "roleMember": "สมาชิก",
+                "emptyRoster": "ยังไม่มีสมาชิก — เพิ่มเอเจนต์หรือเพื่อนร่วมทีมในทีมนี้"
+            },
+            "settings": {
+                "title": "การตั้งค่าทีม",
+                "nameLabel": "ชื่อ",
+                "descriptionLabel": "คำอธิบาย",
+                "parentLabel": "ทีมหลัก",
+                "managerLabel": "เอเจนต์ผู้จัดการ",
+                "save": "บันทึกการเปลี่ยนแปลง",
+                "saving": "กำลังบันทึก…",
+                "saved": "อัปเดตทีมแล้ว",
+                "deleteTitle": "โซนอันตราย",
+                "deleteDescription": "การลบทีมจะย้ายทีมย่อยขึ้นไปหนึ่งระดับและนำรายชื่อสมาชิกออก เอเจนต์และสมาชิกจะไม่ถูกลบ",
+                "deleteCta": "ลบทีม",
+                "deleteConfirm": "ลบทีมนี้หรือไม่? ทีมย่อยจะเลื่อนขึ้นหนึ่งระดับ ส่วนเอเจนต์และสมาชิกจะยังคงอยู่",
+                "deleting": "กำลังลบ…"
+            },
+            "errors": {
+                "createFailed": "ไม่สามารถสร้างทีมได้",
+                "updateFailed": "ไม่สามารถอัปเดตทีมได้",
+                "deleteFailed": "ไม่สามารถลบทีมได้",
+                "memberAddFailed": "ไม่สามารถเพิ่มสมาชิกได้",
+                "memberRemoveFailed": "ไม่สามารถนำสมาชิกออกได้"
             }
+        },
+        "orgChartPage": {
+            "title": "แผนผังองค์กร",
+            "subtitle": "ทีม เอเจนต์ และสมาชิกขององค์กรนี้",
+            "backToTeams": "ทีม",
+            "zoomIn": "ซูมเข้า",
+            "zoomOut": "ซูมออก",
+            "fitView": "พอดีหน้าจอ",
+            "unassignedGroup": "ยังไม่ได้กำหนด",
+            "membersBadge": "{count, plural, other {สมาชิก # คน}}",
+            "empty": "ยังไม่มีอะไรให้แสดง — สร้างทีมหรือเอเจนต์ในองค์กรนี้ก่อน",
+            "noOrg": "สร้างองค์กรเพื่อดูแผนผังองค์กร"
+        },
+        "schedules": {
+            "title": "กำหนดการ",
+            "subtitle": "ทุกสิ่งที่กำหนดให้ทำงานในงาน เอเจนต์ Missions และงานของคุณ",
+            "fetchFailed": "โหลดกำหนดการล้มเหลว",
+            "retry": "ลองใหม่",
+            "columns": {
+                "owner": "เจ้าของ",
+                "cadence": "รอบการทำงาน",
+                "nextRun": "รันครั้งถัดไป",
+                "status": "สถานะ"
+            },
+            "filters": {
+                "all": "ทั้งหมด",
+                "activeOnly": "เฉพาะที่ใช้งานอยู่"
+            },
+            "sourceTypes": {
+                "recurringTask": "งานที่ทำซ้ำ",
+                "agentHeartbeat": "การเต้นของเอเจนต์",
+                "workSchedule": "กำหนดการของงาน",
+                "missionTick": "ทิกของ Mission",
+                "sourceValidation": "การตรวจสอบแหล่งที่มา",
+                "dataSync": "การซิงค์ข้อมูล",
+                "inboundTrigger": "ทริกเกอร์ขาเข้า"
+            },
+            "statuses": {
+                "active": "ใช้งานอยู่",
+                "paused": "หยุดชั่วคราว",
+                "disabled": "ปิดใช้งาน",
+                "error": "ผิดพลาด",
+                "ended": "สิ้นสุดแล้ว"
+            },
+            "empty": {
+                "title": "ยังไม่มีอะไรกำหนดไว้",
+                "description": "งานที่ทำซ้ำ การเต้นของเอเจนต์ กำหนดการของงาน ทิกของ Mission การตรวจสอบแหล่งที่มา และการซิงค์ข้อมูลจะปรากฏที่นี่เมื่อคุณตั้งค่าแล้ว",
+                "noResults": "ไม่มีกำหนดการที่ตรงกับตัวกรองปัจจุบัน"
+            }
+        },
+        "triggers": {
+            "title": "ทริกเกอร์ขาเข้า",
+            "subtitle": "เว็บฮุกและการเรียก API ที่ลงนามซึ่งสร้างงานเมื่อถูกกระตุ้น",
+            "new": "ทริกเกอร์ใหม่",
+            "empty": "ยังไม่มีทริกเกอร์ สร้างขึ้นเพื่อรับเว็บฮุกที่ลงนาม",
+            "firedCount": "กระตุ้น {count} ครั้ง",
+            "lastFired": "กระตุ้นล่าสุด",
+            "status": {
+                "active": "ใช้งาน",
+                "paused": "หยุดชั่วคราว"
+            },
+            "createTitle": "ทริกเกอร์ขาเข้าใหม่",
+            "createDescription": "คุณจะได้ URL เว็บฮุกที่ลงนามและรหัสลับ ระบบภายนอกส่ง POST เพื่อสร้างงาน",
+            "form": {
+                "name": "ชื่อ",
+                "namePlaceholder": "การแจ้งเตือนการดีพลอย",
+                "description": "คำอธิบาย",
+                "descriptionPlaceholder": "อะไรกระตุ้นทริกเกอร์นี้?",
+                "taskTitle": "เทมเพลตชื่องาน",
+                "taskTitlePlaceholder": "ทริกเกอร์: {name}",
+                "taskTitleHint": "{name} จะถูกแทนที่ด้วยชื่อทริกเกอร์"
+            },
+            "actions": {
+                "pause": "หยุดชั่วคราว",
+                "resume": "ดำเนินการต่อ",
+                "rotate": "หมุนรหัสลับ",
+                "delete": "ลบ",
+                "cancel": "ยกเลิก",
+                "create": "สร้าง"
+            },
+            "reveal": {
+                "title": "รหัสลับของทริกเกอร์",
+                "warning": "คัดลอกรหัสลับตอนนี้ — คุณจะไม่สามารถเห็นได้อีก",
+                "url": "URL เว็บฮุก",
+                "secret": "รหัสลับสำหรับลงนาม",
+                "curl": "ตัวอย่างคำขอที่ลงนาม",
+                "copy": "คัดลอก",
+                "done": "เสร็จสิ้น"
+            },
+            "toast": {
+                "created": "สร้างทริกเกอร์แล้ว",
+                "createFailed": "ไม่สามารถสร้างทริกเกอร์",
+                "rotated": "หมุนรหัสลับแล้ว",
+                "rotateFailed": "ไม่สามารถหมุนรหัสลับ",
+                "toggleFailed": "ไม่สามารถอัปเดตทริกเกอร์",
+                "deleted": "ลบทริกเกอร์แล้ว",
+                "deleteFailed": "ไม่สามารถลบทริกเกอร์",
+                "loadFailed": "ไม่สามารถโหลดทริกเกอร์",
+                "copyFailed": "ไม่สามารถคัดลอกไปยังคลิปบอร์ด"
+            },
+            "confirmDelete": "ลบทริกเกอร์นี้หรือไม่? URL เว็บฮุกของมันจะหยุดทำงานทันทีและไม่สามารถเลิกทำได้"
         }
     },
     "layout": {
@@ -4881,7 +5155,6 @@
             "dashboard": "แดชบอร์ด",
             "activity": "บันทึกกิจกรรม",
             "works": "งาน",
-            "discover": "Discover",
             "newWork": "งานใหม่",
             "work": "งาน",
             "overview": "ภาพรวม",
@@ -4898,7 +5171,8 @@
             "security": "ความปลอดภัย",
             "apiKeys": "คีย์ API",
             "dangerZone": "เขตอันตราย",
-            "pluginSettings": "การตั้งค่าปลั๊กอิน"
+            "pluginSettings": "การตั้งค่าปลั๊กอิน",
+            "discover": "Discover"
         }
     },
     "api": {
@@ -5075,12 +5349,35 @@
         }
     },
     "organizations": {
+        "settings": {
+            "title": "Organization",
+            "subtitle": "Manage your Organization's shared context.",
+            "loading": "Loading…",
+            "selectLabel": "Organization",
+            "visionLabel": "Vision",
+            "visionPlaceholder": "e.g. Become the go-to platform where small teams launch and grow AI-run businesses.",
+            "visionHelp": "Shared with every AI agent working in this Organization — Idea generation, Mission runs, and agent tasks all receive it as context.",
+            "lastUpdated": "Vision last updated",
+            "save": "Save",
+            "saved": "Saved",
+            "empty": {
+                "title": "No Organization yet",
+                "description": "Create an Organization from the workspace switcher to set a company vision."
+            },
+            "errors": {
+                "generic": "Failed to save. Please try again."
+            }
+        },
         "switcher": {
             "heading": "Switch Organization",
             "createNew": "Create Organization",
             "loading": "Loading…"
         },
         "create": {
+            "visionToggle": "Add company vision (optional)",
+            "visionLabel": "Vision",
+            "visionPlaceholder": "e.g. Become the go-to platform where small teams launch and grow AI-run businesses.",
+            "visionHelp": "Optional. Guides all agents working in this Organization — Idea generation, Mission runs, and agent tasks receive it as context. You can add or edit it later in Settings.",
             "title": "Create Organization",
             "description": "Give your Organization a name. We'll allocate a unique slug for its URL.",
             "nameLabel": "Name",
@@ -5097,6 +5394,14 @@
                 "nameRequired": "Name is required",
                 "nameTooLong": "Name must be 200 characters or fewer",
                 "generic": "Failed to create Organization"
+            },
+            "templates": {
+                "label": "เริ่มจาก",
+                "blankTitle": "องค์กรว่างเปล่า",
+                "blankDescription": "เริ่มจากศูนย์ — เพิ่มทีมและเอเจนต์ภายหลัง",
+                "meta": "{agents, plural, other {เอเจนต์ #}} · {teams, plural, other {# ทีม}}",
+                "submitImport": "สร้างจากเทมเพลต",
+                "importError": "ไม่สามารถสร้างองค์กรจากเทมเพลตนี้ได้"
             }
         },
         "upgrade": {

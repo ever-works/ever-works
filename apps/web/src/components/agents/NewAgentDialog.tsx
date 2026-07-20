@@ -4,10 +4,16 @@ import { useEffect, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { Bot, ChevronLeft, ChevronRight } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import type { AgentScope, CreateAgentInput } from '@/lib/api/agents';
+// Teams & Companies spec §4.3 — post-create wiring for the optional
+// Team / Reports-to selects on the details step. Both are best-effort
+// side-effects after the Agent exists; failures toast, never block.
+import { updateAgentAction } from '@/app/actions/agents';
+import { addTeamMemberAction } from '@/app/actions/dashboard/teams';
 // PASS-4 review fix (CRITICAL): templates browser was a dead end —
 // "Use template" routed to /agents/new?from=<slug> but the dialog
 // never read searchParams. Pre-fill name + title from the fallback
@@ -75,6 +81,17 @@ export interface NewAgentDialogProps {
      * the step is skipped entirely so it never renders blank.
      */
     templates?: AstTemplateEntry[];
+    /**
+     * Teams & Companies spec §4.3 — active Organization context for the
+     * optional Team / Reports-to selects on the details step. All three
+     * props are optional and ADDITIVE: when absent (or empty) neither
+     * select renders and the create flow is unchanged.
+     */
+    activeOrgId?: string;
+    /** Teams of the active Organization (Team select candidates). */
+    teams?: ScopeParentOption[];
+    /** Existing Agents (Reports-to select candidates). */
+    agentOptions?: ScopeParentOption[];
 }
 
 export function NewAgentDialog({
@@ -84,6 +101,9 @@ export function NewAgentDialog({
     works = [],
     ideas = [],
     templates = [],
+    activeOrgId,
+    teams = [],
+    agentOptions = [],
 }: NewAgentDialogProps) {
     const t = useTranslations('dashboard.agentsPage.newDialog');
     const router = useRouter();
@@ -97,6 +117,9 @@ export function NewAgentDialog({
     );
     const [name, setName] = useState('');
     const [title, setTitle] = useState('');
+    // Teams & Companies spec §4.3 — optional org placement, '' = none.
+    const [teamId, setTeamId] = useState('');
+    const [reportsToId, setReportsToId] = useState('');
     const [templateSlug, setTemplateSlug] = useState<string | null>(null);
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
@@ -238,6 +261,30 @@ export function NewAgentDialog({
                         workId: pinned?.workId ?? (scope === 'work' ? parentId : undefined),
                         ideaId: pinned?.ideaId ?? (scope === 'idea' ? parentId : undefined),
                     });
+                    // Teams & Companies spec §4.3 — best-effort org
+                    // placement AFTER the Agent exists. Each wiring
+                    // failure toasts but never blocks the navigation:
+                    // the Agent was created and stays editable from
+                    // its Settings page.
+                    if (reportsToId) {
+                        try {
+                            await updateAgentAction(created.id, {
+                                reportsToAgentId: reportsToId,
+                            });
+                        } catch {
+                            toast.error('Agent created, but setting its manager failed');
+                        }
+                    }
+                    if (activeOrgId && teamId) {
+                        try {
+                            await addTeamMemberAction(activeOrgId, teamId, {
+                                memberType: 'agent',
+                                memberId: created.id,
+                            });
+                        } catch {
+                            toast.error('Agent created, but adding it to the Team failed');
+                        }
+                    }
                     router.push(ROUTES.DASHBOARD_AGENT(created.id));
                 } catch (err) {
                     setError(err instanceof Error ? err.message : 'Failed to create Agent');
@@ -453,6 +500,58 @@ export function NewAgentDialog({
                         className="w-full mt-2 rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark"
                         maxLength={120}
                     />
+                    {/* Teams & Companies spec §4.3 — optional Team +
+                        Reports-to placement. Hidden entirely when the
+                        page passed no active-org context (or the org
+                        has no teams / no other agents). */}
+                    {activeOrgId && teams.length > 0 && (
+                        <div className="mt-3">
+                            <label
+                                htmlFor="agent-create-team"
+                                className="block text-xs text-text-secondary dark:text-text-secondary-dark mb-1"
+                            >
+                                {t('teamLabel')}
+                            </label>
+                            <select
+                                id="agent-create-team"
+                                data-testid="agent-create-team"
+                                value={teamId}
+                                onChange={(e) => setTeamId(e.target.value)}
+                                className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark"
+                            >
+                                <option value="">{t('teamNone')}</option>
+                                {teams.map((opt) => (
+                                    <option key={opt.id} value={opt.id}>
+                                        {opt.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+                    {agentOptions.length > 0 && (
+                        <div className="mt-3">
+                            <label
+                                htmlFor="agent-create-reports-to"
+                                className="block text-xs text-text-secondary dark:text-text-secondary-dark mb-1"
+                            >
+                                {t('reportsToLabel')}
+                            </label>
+                            <select
+                                id="agent-create-reports-to"
+                                data-testid="agent-create-reports-to"
+                                value={reportsToId}
+                                onChange={(e) => setReportsToId(e.target.value)}
+                                className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark"
+                            >
+                                <option value="">{t('reportsToNone')}</option>
+                                {agentOptions.map((opt) => (
+                                    <option key={opt.id} value={opt.id}>
+                                        {opt.label}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
                     {error && (
                         <p className="text-xs text-danger mt-2" role="alert">
                             {error}

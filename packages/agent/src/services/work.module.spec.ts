@@ -105,6 +105,7 @@ jest.mock('@src/ever-works-providers', () => ({
     EVER_WORKS_DEPLOY_QUOTA_COUNTER: Symbol('EVER_WORKS_DEPLOY_QUOTA_COUNTER'),
     EverWorksDeployQuotaService: class EverWorksDeployQuotaService {},
     EverWorksGitProvider: class EverWorksGitProvider {},
+    EverWorksK8sDeployProvider: class EverWorksK8sDeployProvider {},
     EverWorksDnsService: class EverWorksDnsService {},
 }));
 jest.mock('@src/database/repositories/work.repository', () => ({
@@ -116,6 +117,7 @@ import {
     EVER_WORKS_DEPLOY_QUOTA_COUNTER,
     EverWorksDeployQuotaService,
     EverWorksGitProvider,
+    EverWorksK8sDeployProvider,
     EverWorksDnsService,
 } from '@src/ever-works-providers';
 import { WorkDetailService } from './work-detail.service';
@@ -159,7 +161,7 @@ const meta = (key: string): unknown[] => Reflect.getMetadata(key, WorkModule) ??
 
 describe('WorkModule', () => {
     describe('imports', () => {
-        it('imports the documented 12-module set (DatabaseModule + 6 generator/feature modules + Subscriptions/Notifications/CommunityPr/ComparisonGenerator/TemplateCatalog)', () => {
+        it('imports the documented 13-module set (DatabaseModule + 6 generator/feature modules + Subscriptions/Notifications/CommunityPr/ComparisonGenerator/TemplateCatalog + ActivityLogModule)', () => {
             const imports = meta('imports') as Array<{ name?: string }>;
             const names = imports.map((m) => m?.name).filter(Boolean) as string[];
 
@@ -177,10 +179,13 @@ describe('WorkModule', () => {
                     'CommunityPrModule',
                     'ComparisonGeneratorModule',
                     'TemplateCatalogModule',
+                    // Schedules P2: provides ActivityLogService so the schedule
+                    // dispatcher can emit schedule_executed activity rows.
+                    'ActivityLogModule',
                 ]),
             );
             // Pin the count too — silent additions break this regression guard.
-            expect(imports).toHaveLength(12);
+            expect(imports).toHaveLength(13);
         });
 
         it('does NOT import PluginsModule directly (it is registered globally via forRoot at the app root, per JSDoc)', () => {
@@ -227,6 +232,7 @@ describe('WorkModule', () => {
             WebhookSecretService,
             WorkRuntimeEnvService,
             EverWorksGitProvider,
+            EverWorksK8sDeployProvider,
             EverWorksDnsService,
             ZeroFrictionFunnelService,
             DeployReadyPollerService,
@@ -287,10 +293,13 @@ describe('WorkModule', () => {
                     provider === PluginOperationsService ||
                     provider === EverWorksDeployQuotaService ||
                     provider === EverWorksGitProvider ||
+                    provider === EverWorksK8sDeployProvider ||
                     provider === EverWorksDnsService
                 ) {
                     // EW-614: EverWorksGitProvider is consumed inside the
                     // module (by WorkLifecycleService.createWork); not exported.
+                    // EverWorksK8sDeployProvider is likewise consumed internally
+                    // by DeployService and not exported through WorkModule.
                     // EW-617 G5: EverWorksDnsService is consumed by DeployService;
                     // not exported through WorkModule.
                     expect(exports).not.toContain(provider);

@@ -1,4 +1,4 @@
-﻿name: CI
+name: CI
 
 on:
   push:
@@ -18,6 +18,14 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Raise the Node heap for every step in every job. The `@ever-works/plugin`
+# tsup build emits `.d.ts` for ~18 entry points, which exhausts the default
+# ~2 GB heap and fails the plugin-matrix + secret-store-matrix + lint-and-test
+# jobs with ERR_WORKER_OUT_OF_MEMORY (the ESM/CJS outputs build fine; only the
+# DTS worker OOMs). 6 GB clears it with headroom on the standard runner.
+env:
+  NODE_OPTIONS: --max-old-space-size=6144
+
 jobs:
   lint-and-test:
     runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
@@ -33,7 +41,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Install pnpm
-        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d  # v3
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271  # v3
         with:
           version: 10.33.3
 
@@ -52,8 +60,38 @@ jobs:
       # CI-enforced so a new transitive doesn't slip through unnoticed.
       # Moderate findings stay as Dependabot work (re-evaluate the threshold
       # if the backlog becomes too noisy).
+      # NOTE (2026-07): npm retired the legacy audit endpoints
+      # (`/-/npm/v1/security/audits` + `/quick`) — they now return HTTP 410,
+      # so `pnpm audit` fails with `ERR_PNPM_AUDIT_BAD_RESPONSE` regardless of
+      # whether any vulnerability exists. That is an endpoint outage, not a
+      # security finding, and it was red-lining every PR in the repo. Degrade
+      # gracefully: a genuine HIGH/CRITICAL finding still fails CI, but an
+      # endpoint-unavailable error only warns. Self-healing — the gate re-arms
+      # automatically once pnpm/npm expose a working (bulk) advisory endpoint.
       - name: Audit production dependencies (high+)
-        run: pnpm audit --prod --audit-level=high
+        shell: bash
+        run: |
+          set +e
+          output="$(pnpm audit --prod --audit-level=high 2>&1)"
+          code=$?
+          printf '%s\n' "$output"
+          if [ "$code" -eq 0 ]; then
+            exit 0
+          fi
+          # Detect the endpoint outage by pnpm's OWN error CODE only — not by
+          # human-language phrases like "410"/"retired", which could legitimately
+          # appear inside a real CVE advisory description and wrongly soft-pass a
+          # run that has actual vulnerabilities. `ERR_PNPM_AUDIT_BAD_RESPONSE` is
+          # emitted only when the audit endpoint returns an unusable response; a
+          # genuine high/critical finding never prints this token, so it still
+          # hard-fails below. Any other non-endpoint error (e.g. a network blip)
+          # also hard-fails — the conservative default.
+          if printf '%s' "$output" | grep -qF 'ERR_PNPM_AUDIT_BAD_RESPONSE'; then
+            echo "::warning title=Dependency audit skipped::npm's audit endpoint is unavailable (ERR_PNPM_AUDIT_BAD_RESPONSE — legacy audit API retired, HTTP 410). The high/critical audit gate is soft for this run and re-arms automatically once a working endpoint is restored."
+            exit 0
+          fi
+          echo "::error title=Dependency audit failed::pnpm audit reported HIGH/CRITICAL production vulnerabilities (or an unexpected error). See the output above."
+          exit "$code"
 
       - name: Check formatting
         run: pnpm format:check
@@ -118,6 +156,10 @@ jobs:
   # only the slice it needs, so a failing aggregate doesn't block this
   # signal (and vice versa).
   job-runtime-plugin-matrix:
+    # Pool-relief (2026-07-18): these already passed on the PR; skip on main/stage
+    # promotion pushes so k8s-build (the deploy build) is not starved on the shared
+    # ARC pool. Still runs on PRs + develop pushes. Reversible: remove this if line.
+    if: ${{ !(github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/stage')) }}
     runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
 
     strategy:
@@ -137,7 +179,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Install pnpm
-        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d  # v3
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271  # v3
         with:
           version: 10.33.3
 
@@ -216,7 +258,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Install pnpm
-        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d  # v3
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271  # v3
         with:
           version: 10.33.3
 
@@ -257,6 +299,10 @@ jobs:
   # plugins via `<plugin>-conformance.spec.ts`). Same rationale as the
   # job-runtime matrix above: per-provider failure signal.
   secret-store-plugin-matrix:
+    # Pool-relief (2026-07-18): these already passed on the PR; skip on main/stage
+    # promotion pushes so k8s-build (the deploy build) is not starved on the shared
+    # ARC pool. Still runs on PRs + develop pushes. Reversible: remove this if line.
+    if: ${{ !(github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/stage')) }}
     runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
 
     strategy:
@@ -279,7 +325,7 @@ jobs:
           ref: ${{ github.event.pull_request.head.sha || github.sha }}
 
       - name: Install pnpm
-        uses: pnpm/action-setup@a3252b78c470c02df07e9d59298aecedc3ccdd6d  # v3
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271  # v3
         with:
           version: 10.33.3
 
