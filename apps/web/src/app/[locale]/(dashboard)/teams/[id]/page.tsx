@@ -1,7 +1,9 @@
 import { notFound } from 'next/navigation';
-import { teamsAPI, type Team } from '@/lib/api/teams';
+import { teamsAPI, type Team, type TeamResourcesGrouped } from '@/lib/api/teams';
 import { agentsAPI, type Agent } from '@/lib/api/agents';
+import { getWorks } from '@/app/actions/dashboard/works';
 import { TeamDetailClient } from '@/components/teams/TeamDetailClient';
+import type { ResourceOption } from '@/components/teams/TeamResourcesSection';
 
 /**
  * Teams & Prebuilt Companies §4.2 — `/teams/[id]` overview. Active-org
@@ -16,13 +18,23 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ id:
     if (orgs.length === 0) notFound();
     const org = orgs[0];
 
-    const [team, teams, agentsResp] = await Promise.all([
+    const emptyResources: TeamResourcesGrouped = {
+        work: [],
+        task: [],
+        agent: [],
+        mission: [],
+        idea: [],
+    };
+
+    const [team, teams, agentsResp, resources, worksResp] = await Promise.all([
         teamsAPI.get(org.id, id),
         teamsAPI.list(org.id).catch(() => [] as Team[]),
         agentsAPI.list({ limit: 100 }).catch(() => ({
             data: [] as Agent[],
             meta: { total: 0, limit: 100, offset: 0 },
         })),
+        teamsAPI.listResources(org.id, id).catch(() => emptyResources),
+        getWorks({ limit: 100, offset: 0 }).catch(() => ({ success: false, works: [], total: 0 })),
     ]);
     if (!team) notFound();
 
@@ -32,5 +44,20 @@ export default async function TeamDetailPage({ params }: { params: Promise<{ id:
         title: agent.title,
     }));
 
-    return <TeamDetailClient org={org} team={team} teams={teams} agents={agents} />;
+    const works: ResourceOption[] = (worksResp.works ?? []).map((work) => ({
+        id: work.id,
+        name: work.name,
+        subtitle: work.slug ?? null,
+    }));
+
+    return (
+        <TeamDetailClient
+            org={org}
+            team={team}
+            teams={teams}
+            agents={agents}
+            resources={resources}
+            works={works}
+        />
+    );
 }

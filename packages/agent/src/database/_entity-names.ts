@@ -106,6 +106,7 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     // Teams & Prebuilt Companies (teams-and-companies spec §2) ──
     'Team',
     'TeamMember',
+    'TeamResource',
     // ──────────────────────────
     'Template',
     'TemplateCustomization',

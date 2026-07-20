@@ -26,12 +26,17 @@ import { Button } from '@/components/ui/button';
 import { Link, useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { addTeamMemberAction, removeTeamMemberAction } from '@/app/actions/dashboard/teams';
+import {
+    TeamResourcesSection,
+    type ResourceOption,
+} from '@/components/teams/TeamResourcesSection';
 import type {
     Team,
     TeamDetail,
     TeamMemberRole,
     TeamMemberType,
     TeamMemberView,
+    TeamResourcesGrouped,
     TeamsOrganization,
 } from '@/lib/api/teams';
 
@@ -75,6 +80,10 @@ export interface TeamDetailClientProps {
     teams: Team[];
     /** Org Agents — add-member select + manager/member name resolution. */
     agents: TeamAgentOption[];
+    /** Resources (Works/Agents/…) attached to this team, grouped by type. */
+    resources: TeamResourcesGrouped;
+    /** Org Works available to attach in the Resources section. */
+    works: ResourceOption[];
 }
 
 /**
@@ -85,7 +94,14 @@ export interface TeamDetailClientProps {
  * actions then `router.refresh()` so the server payload stays the
  * single source of truth.
  */
-export function TeamDetailClient({ org, team, teams, agents }: TeamDetailClientProps) {
+export function TeamDetailClient({
+    org,
+    team,
+    teams,
+    agents,
+    resources,
+    works,
+}: TeamDetailClientProps) {
     const t = useTranslations('dashboard.teamsPage');
     const router = useRouter();
     const [memberType, setMemberType] = useState<TeamMemberType>('agent');
@@ -349,6 +365,19 @@ export function TeamDetailClient({ org, team, teams, agents }: TeamDetailClientP
                     </div>
                 </div>
             </section>
+
+            {/* Resources (Works/Agents/Missions/Ideas/Tasks that belong to this team) */}
+            <TeamResourcesSection
+                org={org}
+                teamId={team.id}
+                resources={resources}
+                works={works}
+                agents={agents.map((agent) => ({
+                    id: agent.id,
+                    name: agent.name,
+                    subtitle: agent.title,
+                }))}
+            />
 
             {/* Sub-teams */}
             {subTeams.length > 0 ? (

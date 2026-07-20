@@ -8,7 +8,8 @@ import {
     Matches,
     MaxLength,
 } from 'class-validator';
-import type { TeamMemberRole, TeamMemberType } from '@ever-works/agent/teams';
+import type { TeamMemberRole, TeamMemberType, TeamResourceType } from '@ever-works/agent/teams';
+import { TEAM_RESOURCE_TYPES } from '@ever-works/agent/teams';
 
 /**
  * Teams & Prebuilt Companies — request DTOs
@@ -109,4 +110,26 @@ export class RemoveTeamMemberQueryDto {
     @ApiProperty({ enum: ['agent', 'user'] })
     @IsIn(['agent', 'user'])
     memberType: TeamMemberType;
+}
+
+/** Attach a Work/Task/Agent/Mission/Idea to a Team. */
+export class AttachTeamResourceDto {
+    @ApiProperty({ enum: [...TEAM_RESOURCE_TYPES] })
+    @IsIn([...TEAM_RESOURCE_TYPES])
+    resourceType: TeamResourceType;
+
+    @ApiProperty({ description: 'Id of the resource to attach (per resourceType)' })
+    @IsUUID()
+    resourceId: string;
+}
+
+/** Reverse lookup query: which Teams own `(resourceType, resourceId)`. */
+export class ResourceTeamsQueryDto {
+    @ApiProperty({ enum: [...TEAM_RESOURCE_TYPES] })
+    @IsIn([...TEAM_RESOURCE_TYPES])
+    resourceType: TeamResourceType;
+
+    @ApiProperty({ description: 'Id of the resource to look up' })
+    @IsUUID()
+    resourceId: string;
 }

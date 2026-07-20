@@ -7,6 +7,7 @@ import {
     type CreateTeamInput,
     type TeamMemberRole,
     type TeamMemberType,
+    type TeamResourceType,
     type UpdateTeamInput,
 } from '@/lib/api/teams';
 import { getAuthFromCookie } from '@/lib/auth';
@@ -75,5 +76,27 @@ export async function removeTeamMemberAction(
 ) {
     await requireTeamsAuth();
     await teamsAPI.removeMember(orgId, teamId, memberType, memberId);
+    revalidateTeamSurfaces();
+}
+
+export async function attachTeamResourceAction(
+    orgId: string,
+    teamId: string,
+    input: { resourceType: TeamResourceType; resourceId: string },
+) {
+    await requireTeamsAuth();
+    const resource = await teamsAPI.attachResource(orgId, teamId, input);
+    revalidateTeamSurfaces();
+    return resource;
+}
+
+export async function detachTeamResourceAction(
+    orgId: string,
+    teamId: string,
+    resourceType: TeamResourceType,
+    resourceId: string,
+) {
+    await requireTeamsAuth();
+    await teamsAPI.detachResource(orgId, teamId, resourceType, resourceId);
     revalidateTeamSurfaces();
 }

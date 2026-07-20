@@ -14,9 +14,15 @@ import {
 } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import type { Team } from '@ever-works/agent/teams';
-import { OrgChartService, TeamsService } from '@ever-works/agent/teams';
-import type { OrgChartPayload, TeamMemberView } from '@ever-works/agent/teams';
+import type { Team, TeamResourceType } from '@ever-works/agent/teams';
+import { OrgChartService, TeamResourcesService, TeamsService } from '@ever-works/agent/teams';
+import type {
+    OrgChartPayload,
+    ResourceTeamRef,
+    TeamMemberView,
+    TeamResourceItem,
+    TeamResourcesGrouped,
+} from '@ever-works/agent/teams';
 import { AuthSessionGuard, CurrentUser } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
 import {
@@ -25,8 +31,10 @@ import {
 } from '../organizations/guards/organization-ownership.guard';
 import {
     AddTeamMemberDto,
+    AttachTeamResourceDto,
     CreateTeamDto,
     RemoveTeamMemberQueryDto,
+    ResourceTeamsQueryDto,
     UpdateTeamDto,
 } from './dto/team.dto';
 
@@ -69,6 +77,7 @@ export class TeamsController {
     constructor(
         private readonly teamsService: TeamsService,
         private readonly orgChart: OrgChartService,
+        private readonly teamResources: TeamResourcesService,
     ) {}
 
     @Get('teams')
@@ -180,6 +189,67 @@ export class TeamsController {
         @Query() query: RemoveTeamMemberQueryDto,
     ): Promise<void> {
         await this.teamsService.removeMember(orgId, teamId, query.memberType, memberId);
+    }
+
+    @Get('teams/:teamId/resources')
+    @ApiOperation({
+        summary: 'List resources attached to a team',
+        description: 'Attached Works/Tasks/Agents/Missions/Ideas, resolved + grouped by type.',
+    })
+    @ApiResponse({ status: 200, description: 'Team resources listed' })
+    async listResources(
+        @Param('orgId', ParseUUIDPipe) orgId: string,
+        @Param('teamId', ParseUUIDPipe) teamId: string,
+    ): Promise<TeamResourcesGrouped> {
+        return this.teamResources.listForTeam(orgId, teamId);
+    }
+
+    @Post('teams/:teamId/resources')
+    @OrgAdmin()
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    @ApiOperation({
+        summary: 'Attach a resource (Work/Task/Agent/Mission/Idea) to a team',
+        description: 'The resource must belong to the same Organization (404-never-403 on mismatch).',
+    })
+    @ApiResponse({ status: 201, description: 'Resource attached' })
+    @ApiResponse({ status: 404, description: 'Team or resource not found in this Organization' })
+    @ApiResponse({ status: 409, description: 'Resource already attached to this team' })
+    async attachResource(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('orgId', ParseUUIDPipe) orgId: string,
+        @Param('teamId', ParseUUIDPipe) teamId: string,
+        @Body() dto: AttachTeamResourceDto,
+    ): Promise<TeamResourceItem> {
+        return this.teamResources.attach(auth.userId, orgId, teamId, dto);
+    }
+
+    @Delete('teams/:teamId/resources/:resourceType/:resourceId')
+    @OrgAdmin()
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    @HttpCode(HttpStatus.NO_CONTENT)
+    @ApiOperation({ summary: 'Detach a resource from a team' })
+    @ApiResponse({ status: 204, description: 'Resource detached' })
+    @ApiResponse({ status: 404, description: 'Resource is not attached to this team' })
+    async detachResource(
+        @Param('orgId', ParseUUIDPipe) orgId: string,
+        @Param('teamId', ParseUUIDPipe) teamId: string,
+        @Param('resourceType') resourceType: TeamResourceType,
+        @Param('resourceId', ParseUUIDPipe) resourceId: string,
+    ): Promise<void> {
+        await this.teamResources.detach(orgId, teamId, resourceType, resourceId);
+    }
+
+    @Get('resource-teams')
+    @ApiOperation({
+        summary: 'Reverse lookup: teams that own a given resource',
+        description: 'Which Teams in this Organization a Work/Task/Agent/Mission/Idea belongs to.',
+    })
+    @ApiResponse({ status: 200, description: 'Owning teams listed' })
+    async resourceTeams(
+        @Param('orgId', ParseUUIDPipe) orgId: string,
+        @Query() query: ResourceTeamsQueryDto,
+    ): Promise<ResourceTeamRef[]> {
+        return this.teamResources.listTeamsForResource(orgId, query.resourceType, query.resourceId);
     }
 
     @Get('org-chart')
