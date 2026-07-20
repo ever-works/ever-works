@@ -594,6 +594,37 @@
                 "clonedFromPrefix": "Cloned from another Mission"
             }
         },
+        "memoryPage": {
+            "title": "Memory",
+            "subtitle": "Tutto ciò che la tua organizzazione sa, in un unico posto — aggregato dalla Knowledge Base di ogni Lavoro.",
+            "searchPlaceholder": "Cerca in tutto ciò che l'organizzazione sa…",
+            "newDocument": "Nuovo",
+            "documentsIndexed": "{count, plural, =0 {Nessun documento indicizzato} one {# documento indicizzato} other {# documenti indicizzati}}",
+            "worksCovered": "{count, plural, =0 {nessun Lavoro} one {# Lavoro} other {# Lavori}}",
+            "filters": {
+                "type": "Tipo",
+                "work": "Lavoro",
+                "source": "Fonte",
+                "status": "Stato",
+                "clearAll": "Cancella tutto"
+            },
+            "source": {
+                "workKb": "Work KB",
+                "orgKb": "Org KB",
+                "user": "Manual",
+                "agent": "Agent",
+                "imported": "Imported",
+                "seeded": "Seeded"
+            },
+            "empty": {
+                "title": "Ancora nulla in Memory.",
+                "subtitle": "Man mano che i tuoi Lavori costruiscono la loro Knowledge Base — documenti di brand, personas, ricerche, guide di stile — tutto compare qui, ricercabile in tutta l’organizzazione.",
+                "noOrg": "Seleziona o crea un’Organizzazione per vedere la sua Memory aggregata. Memory copre ogni Lavoro nell’Organizzazione attiva.",
+                "noResults": "Nessun documento corrisponde alla tua ricerca e ai filtri."
+            },
+            "orgScoped": "Organizzazione",
+            "openInWork": "Apri nel Lavoro"
+        },
         "agentsPage": {
             "title": "Agenti",
             "subtitle": "I tuoi compagni di squadra IA. Ogni agente porta con sé un'anima (chi è), istruzioni e un budget — e agisce su Missioni, Lavori o l'intero tenant.",
@@ -4266,6 +4297,7 @@
                 "works": "Lavori",
                 "tasks": "Task",
                 "agents": "Agenti",
+                "memory": "Memory",
                 "plugins": "Plugin",
                 "skills": "Competenze",
                 "templates": "Modelli",

@@ -20,6 +20,8 @@ import {
     Globe,
     Cog,
     KeyRound,
+    Library,
+    Network,
     type LucideIcon,
 } from 'lucide-react';
 import { PluginCategory, PLUGIN_CATEGORIES } from '@ever-works/plugin';
@@ -56,6 +58,10 @@ export const CATEGORY_ICONS: Record<PluginCategory, LucideIcon> = {
     // EW-685 / EW-742 — pluggable job-runtime providers (BullMQ,
     // pg-boss, Temporal, Inngest, Trigger.dev).
     'job-runtime': Cog,
+    // Org-wide Memory (Cortex P2) — pluggable org memory frameworks +
+    // multi-doc-type RAG pipelines.
+    memory: Library,
+    rag: Network,
     // First-party bidirectional connectors (Slack, Discord, …).
     connector: Plug,
     // Domain-model evolution PR-7 — metrics-provider backends
@@ -87,6 +93,8 @@ export const CATEGORY_LABELS: Record<PluginCategory, string> = {
     dns: 'DNS Providers',
     'secret-store-resolver': 'Secret Stores',
     'job-runtime': 'Job Runtimes',
+    memory: 'Memory Frameworks',
+    rag: 'RAG Pipelines',
     connector: 'Connectors',
     metrics: 'Metrics',
 };

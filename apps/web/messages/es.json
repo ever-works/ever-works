@@ -641,6 +641,37 @@
                 "reset": "Restablecer"
             }
         },
+        "memoryPage": {
+            "title": "Memory",
+            "subtitle": "Todo lo que sabe tu organización, en un solo lugar — agregado desde la Knowledge Base de cada Trabajo.",
+            "searchPlaceholder": "Busca en todo lo que sabe la organización…",
+            "newDocument": "Nuevo",
+            "documentsIndexed": "{count, plural, =0 {No hay documentos indexados} one {# documento indexado} other {# documentos indexados}}",
+            "worksCovered": "{count, plural, =0 {ningún Trabajo} one {# Trabajo} other {# Trabajos}}",
+            "filters": {
+                "type": "Tipo",
+                "work": "Trabajo",
+                "source": "Fuente",
+                "status": "Estado",
+                "clearAll": "Borrar todo"
+            },
+            "source": {
+                "workKb": "Work KB",
+                "orgKb": "Org KB",
+                "user": "Manual",
+                "agent": "Agent",
+                "imported": "Imported",
+                "seeded": "Seeded"
+            },
+            "empty": {
+                "title": "Aún no hay nada en Memory.",
+                "subtitle": "A medida que tus Trabajos construyen su Knowledge Base — documentos de marca, personas, investigación, guías de estilo — todo aparece aquí, con búsqueda en toda la organización.",
+                "noOrg": "Selecciona o crea una Organización para ver su Memory agregada. Memory abarca todos los Trabajos de la Organización activa.",
+                "noResults": "Ningún documento coincide con tu búsqueda y filtros."
+            },
+            "orgScoped": "Organización",
+            "openInWork": "Abrir en el Trabajo"
+        },
         "agentsPage": {
             "title": "Agentes",
             "subtitle": "Tus compañeros de IA. Cada uno lleva un alma (quién es), instrucciones y un presupuesto — y actúa en Misiones, Trabajos, o todo tu inquilino.",
@@ -4498,6 +4529,7 @@
                 "works": "Trabajos",
                 "tasks": "Tareas",
                 "agents": "Agentes",
+                "memory": "Memory",
                 "plugins": "Plugins",
                 "skills": "Habilidades",
                 "templates": "Plantillas",

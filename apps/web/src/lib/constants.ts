@@ -109,6 +109,11 @@ export const ROUTES = {
     // Plugins
     DASHBOARD_PLUGINS: '/plugins',
     DASHBOARD_PLUGIN_DETAIL: (pluginId: string) => `/plugins/${pluginId}`,
+    // Org-wide Memory (Cortex P1) — aggregated view of everything the
+    // active Organization knows, fanned in across all its Works' KB
+    // documents. Sits BELOW Agents in the sidebar. Session-scoped
+    // (`/memory`); the org is resolved from the active scope context.
+    DASHBOARD_MEMORY: '/memory',
     // Templates
     DASHBOARD_TEMPLATES: '/templates',
     // Agents (Agents/Skills/Tasks PR #1017 — Phase 5)

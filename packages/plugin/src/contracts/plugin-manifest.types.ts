@@ -72,6 +72,20 @@ export const PLUGIN_CATEGORIES = [
 	// differs significantly (push vs pull, namespace vs prefix vs schema
 	// isolation, retry/backoff semantics).
 	'job-runtime',
+	// Org-wide Memory (Cortex P2) — pluggable ORG memory frameworks and
+	// multi-doc-type RAG pipelines, sitting BESIDE the existing
+	// `vector-store` + `content-extractor` seams (not replacing them).
+	//   - `memory`: the org's storage / retrieval / synthesis framework
+	//     (mem0 / zep / langmem-style backends). See
+	//     `capabilities/memory.interface.ts` (`IMemoryPlugin`).
+	//   - `rag`: a composed retrieval pipeline that orchestrates an
+	//     extractor + embedder + vector-store behind one contract. See
+	//     `capabilities/rag.interface.ts` (`IRagPlugin`).
+	// Contract-only for now — no concrete plugin ships under either
+	// category yet; the built-in per-Work KB behavior is unchanged.
+	// See `docs/specs/features/memory/spec.md` §5.
+	'memory',
+	'rag',
 	// Goals feature PR-7 — read-only metrics collectors (capability
 	// `metrics-provider`). First-party plugins: `custom-http` + `stripe`
 	// (PostHog + Google Analytics follow in PR-9). See

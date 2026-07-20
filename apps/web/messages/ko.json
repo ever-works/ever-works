@@ -602,6 +602,37 @@
                 "status": "상태"
             }
         },
+        "memoryPage": {
+            "title": "Memory",
+            "subtitle": "조직이 아는 모든 것을 한곳에 — 모든 워크의 Knowledge Base에서 집계됩니다.",
+            "searchPlaceholder": "조직이 아는 모든 것을 검색…",
+            "newDocument": "새로",
+            "documentsIndexed": "{count, plural, =0 {색인된 문서 없음} other {문서 #개 색인됨}}",
+            "worksCovered": "{count, plural, =0 {워크 없음} other {워크 #개}}",
+            "filters": {
+                "type": "유형",
+                "work": "워크",
+                "source": "소스",
+                "status": "상태",
+                "clearAll": "모두 지우기"
+            },
+            "source": {
+                "workKb": "Work KB",
+                "orgKb": "Org KB",
+                "user": "Manual",
+                "agent": "Agent",
+                "imported": "Imported",
+                "seeded": "Seeded"
+            },
+            "empty": {
+                "title": "아직 Memory에 아무것도 없습니다.",
+                "subtitle": "워크가 Knowledge Base(브랜드 문서, 페르소나, 리서치, 스타일 가이드)를 구축하면 모든 것이 여기에 표시되며 조직 전체에서 검색할 수 있습니다.",
+                "noOrg": "집계된 Memory를 보려면 조직을 선택하거나 만드세요. Memory는 활성 조직의 모든 워크에 걸쳐 있습니다.",
+                "noResults": "검색 및 필터와 일치하는 문서가 없습니다."
+            },
+            "orgScoped": "조직",
+            "openInWork": "워크에서 열기"
+        },
         "agentsPage": {
             "title": "에이전트",
             "subtitle": "당신의 AI 팀원들입니다. 각 에이전트는 자신의 정체성(누구인지), 지시사항, 그리고 예산을 가지며 - 임무, 작업, 또는 전체 테넌트에서 활동합니다.",
@@ -4274,6 +4305,7 @@
                 "works": "워크",
                 "tasks": "작업",
                 "agents": "에이전트",
+                "memory": "Memory",
                 "plugins": "플러그인",
                 "skills": "기술",
                 "templates": "템플릿",

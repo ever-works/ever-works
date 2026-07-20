@@ -594,6 +594,37 @@
                 "clonedFromPrefix": "Cloned from another Mission"
             }
         },
+        "memoryPage": {
+            "title": "Memory",
+            "subtitle": "Semua yang diketahui organisasi Anda, dalam satu tempat — dikumpulkan dari Knowledge Base setiap Karya.",
+            "searchPlaceholder": "Cari di semua yang diketahui organisasi…",
+            "newDocument": "Baru",
+            "documentsIndexed": "{count, plural, =0 {Tidak ada dokumen terindeks} other {# dokumen terindeks}}",
+            "worksCovered": "{count, plural, =0 {tidak ada Karya} other {# Karya}}",
+            "filters": {
+                "type": "Tipe",
+                "work": "Karya",
+                "source": "Sumber",
+                "status": "Status",
+                "clearAll": "Hapus semua"
+            },
+            "source": {
+                "workKb": "Work KB",
+                "orgKb": "Org KB",
+                "user": "Manual",
+                "agent": "Agent",
+                "imported": "Imported",
+                "seeded": "Seeded"
+            },
+            "empty": {
+                "title": "Belum ada apa pun di Memory.",
+                "subtitle": "Saat Karya Anda membangun Knowledge Base mereka — dokumen merek, persona, riset, panduan gaya — semuanya muncul di sini, dapat dicari di seluruh organisasi.",
+                "noOrg": "Pilih atau buat Organisasi untuk melihat Memory gabungannya. Memory mencakup setiap Karya di Organisasi aktif.",
+                "noResults": "Tidak ada dokumen yang cocok dengan pencarian dan filter Anda."
+            },
+            "orgScoped": "Organisasi",
+            "openInWork": "Buka di Karya"
+        },
         "agentsPage": {
             "title": "Agen",
             "subtitle": "Rekan AI Anda. Setiap agen membawa jiwa (identitas mereka), petunjuk, dan anggaran - dan bertindak pada Misi, Karya, atau seluruh penyewa Anda.",
@@ -4266,6 +4297,7 @@
                 "works": "Karya",
                 "tasks": "Tugas",
                 "agents": "Agen",
+                "memory": "Memory",
                 "plugins": "Plugin",
                 "skills": "Keterampilan",
                 "templates": "Template",

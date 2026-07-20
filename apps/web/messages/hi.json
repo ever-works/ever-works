@@ -594,6 +594,37 @@
                 "clonedFromPrefix": "Cloned from another Mission"
             }
         },
+        "memoryPage": {
+            "title": "Memory",
+            "subtitle": "आपका संगठन जो कुछ भी जानता है, सब एक ही जगह — हर कार्य के Knowledge Base से एकत्रित।",
+            "searchPlaceholder": "संगठन जो कुछ भी जानता है उसमें खोजें…",
+            "newDocument": "नया",
+            "documentsIndexed": "{count, plural, =0 {कोई दस्तावेज़ अनुक्रमित नहीं} one {# दस्तावेज़ अनुक्रमित} other {# दस्तावेज़ अनुक्रमित}}",
+            "worksCovered": "{count, plural, =0 {कोई कार्य नहीं} one {# कार्य} other {# कार्य}}",
+            "filters": {
+                "type": "प्रकार",
+                "work": "कार्य",
+                "source": "स्रोत",
+                "status": "स्थिति",
+                "clearAll": "सभी साफ़ करें"
+            },
+            "source": {
+                "workKb": "Work KB",
+                "orgKb": "Org KB",
+                "user": "Manual",
+                "agent": "Agent",
+                "imported": "Imported",
+                "seeded": "Seeded"
+            },
+            "empty": {
+                "title": "Memory में अभी कुछ नहीं है।",
+                "subtitle": "जैसे-जैसे आपके कार्य अपना Knowledge Base बनाते हैं — ब्रांड दस्तावेज़, पर्सोना, शोध, स्टाइल गाइड — सब कुछ यहाँ दिखता है, पूरे संगठन में खोजने योग्य।",
+                "noOrg": "इसकी एकत्रित Memory देखने के लिए कोई संगठन चुनें या बनाएं। Memory सक्रिय संगठन के हर कार्य तक फैली होती है।",
+                "noResults": "आपकी खोज और फ़िल्टर से कोई दस्तावेज़ मेल नहीं खाता।"
+            },
+            "orgScoped": "संगठन",
+            "openInWork": "कार्य में खोलें"
+        },
         "agentsPage": {
             "title": "एजेंट",
             "subtitle": "आपके AI टीम सदस्य। प्रत्येक एक आत्मा (वे कौन हैं), निर्देश, और बजट लेकर आता है — और मिशन, काम, या आपके पूरे टेनेंट पर कार्य करता है।",
@@ -4266,6 +4297,7 @@
                 "works": "कार्यज़",
                 "tasks": "कार्य",
                 "agents": "एजेंट",
+                "memory": "Memory",
                 "plugins": "प्लगइन्स",
                 "skills": "कौशल",
                 "templates": "टेम्प्लेट",

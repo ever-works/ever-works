@@ -594,6 +594,37 @@
                 "clonedFromPrefix": "Cloned from another Mission"
             }
         },
+        "memoryPage": {
+            "title": "Memory",
+            "subtitle": "您的组织所知道的一切，尽在一处 — 从每个作品的 Knowledge Base 中汇总。",
+            "searchPlaceholder": "搜索组织所知道的一切…",
+            "newDocument": "新建",
+            "documentsIndexed": "{count, plural, =0 {尚未索引任何文档} other {已索引 # 个文档}}",
+            "worksCovered": "{count, plural, =0 {无作品} other {# 个作品}}",
+            "filters": {
+                "type": "类型",
+                "work": "作品",
+                "source": "来源",
+                "status": "状态",
+                "clearAll": "清除全部"
+            },
+            "source": {
+                "workKb": "Work KB",
+                "orgKb": "Org KB",
+                "user": "Manual",
+                "agent": "Agent",
+                "imported": "Imported",
+                "seeded": "Seeded"
+            },
+            "empty": {
+                "title": "Memory 中暂无内容。",
+                "subtitle": "随着您的作品构建各自的 Knowledge Base — 品牌文档、用户画像、研究、风格指南 — 一切都会显示在这里，可在整个组织范围内搜索。",
+                "noOrg": "选择或创建一个组织以查看其汇总的 Memory。Memory 涵盖活动组织中的每个作品。",
+                "noResults": "没有与您的搜索和筛选条件匹配的文档。"
+            },
+            "orgScoped": "组织",
+            "openInWork": "在作品中打开"
+        },
         "agentsPage": {
             "title": "代理",
             "subtitle": "您的AI队友。每个代理都有一个灵魂（他们的身份）、指令和预算——可以在任务、工作或整个租户上执行。",
@@ -4266,6 +4297,7 @@
                 "works": "作品",
                 "tasks": "任务",
                 "agents": "代理",
+                "memory": "Memory",
                 "plugins": "插件",
                 "skills": "技能",
                 "templates": "模板",

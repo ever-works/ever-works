@@ -602,6 +602,37 @@
                 "status": "Status"
             }
         },
+        "memoryPage": {
+            "title": "Memory",
+            "subtitle": "Alles wat je organisatie weet, op één plek — samengevoegd uit de Knowledge Base van elk Werk.",
+            "searchPlaceholder": "Zoek in alles wat de organisatie weet…",
+            "newDocument": "Nieuw",
+            "documentsIndexed": "{count, plural, =0 {Geen documenten geïndexeerd} one {# document geïndexeerd} other {# documenten geïndexeerd}}",
+            "worksCovered": "{count, plural, =0 {geen Werken} one {# Werk} other {# Werken}}",
+            "filters": {
+                "type": "Type",
+                "work": "Werk",
+                "source": "Bron",
+                "status": "Status",
+                "clearAll": "Alles wissen"
+            },
+            "source": {
+                "workKb": "Work KB",
+                "orgKb": "Org KB",
+                "user": "Manual",
+                "agent": "Agent",
+                "imported": "Imported",
+                "seeded": "Seeded"
+            },
+            "empty": {
+                "title": "Nog niets in Memory.",
+                "subtitle": "Naarmate je Werken hun Knowledge Base opbouwen — merkdocumenten, persona’s, onderzoek, stijlgidsen — verschijnt alles hier, doorzoekbaar in de hele organisatie.",
+                "noOrg": "Selecteer of maak een Organisatie om de samengevoegde Memory te zien. Memory omvat elk Werk in de actieve Organisatie.",
+                "noResults": "Geen documenten komen overeen met je zoekopdracht en filters."
+            },
+            "orgScoped": "Organisatie",
+            "openInWork": "Openen in Werk"
+        },
         "agentsPage": {
             "title": "Agenten",
             "subtitle": "Je AI-collega's. Elke agent heeft een ziel (wie ze zijn), instructies, en een budget — en handelt op Missies, Works, of je hele tenant.",
@@ -4274,6 +4305,7 @@
                 "works": "Werken",
                 "tasks": "Taken",
                 "agents": "Agenten",
+                "memory": "Memory",
                 "plugins": "Plugins",
                 "skills": "Vaardigheden",
                 "templates": "Sjablonen",

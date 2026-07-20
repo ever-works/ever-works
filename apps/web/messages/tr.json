@@ -594,6 +594,37 @@
                 "clonedFromPrefix": "Cloned from another Mission"
             }
         },
+        "memoryPage": {
+            "title": "Memory",
+            "subtitle": "Kuruluşunuzun bildiği her şey tek bir yerde — her İşin Knowledge Base'inden bir araya getirildi.",
+            "searchPlaceholder": "Kuruluşun bildiği her şeyde arayın…",
+            "newDocument": "Yeni",
+            "documentsIndexed": "{count, plural, =0 {Dizine eklenmiş belge yok} one {# belge dizine eklendi} other {# belge dizine eklendi}}",
+            "worksCovered": "{count, plural, =0 {İş yok} one {# İş} other {# İş}}",
+            "filters": {
+                "type": "Tür",
+                "work": "İş",
+                "source": "Kaynak",
+                "status": "Durum",
+                "clearAll": "Tümünü temizle"
+            },
+            "source": {
+                "workKb": "Work KB",
+                "orgKb": "Org KB",
+                "user": "Manual",
+                "agent": "Agent",
+                "imported": "Imported",
+                "seeded": "Seeded"
+            },
+            "empty": {
+                "title": "Memory'de henüz hiçbir şey yok.",
+                "subtitle": "İşleriniz Knowledge Base'lerini oluşturdukça — marka belgeleri, kişiler, araştırmalar, stil kılavuzları — her şey burada görünür ve kuruluşun tamamında aranabilir.",
+                "noOrg": "Toplu Memory'sini görmek için bir Kuruluş seçin veya oluşturun. Memory, etkin Kuruluştaki her İşi kapsar.",
+                "noResults": "Aramanız ve filtrelerinizle eşleşen belge yok."
+            },
+            "orgScoped": "Kuruluş",
+            "openInWork": "İşte aç"
+        },
         "agentsPage": {
             "title": "Ajanlar",
             "subtitle": "Yapay zeka arkadaşlarınız. Her biri bir ruh (kim oldukları), talimatlar ve bir bütçe taşır ve Görevler, İşler veya tüm kiracınız üzerinde hareket eder.",
@@ -4266,6 +4297,7 @@
                 "works": "İşler",
                 "tasks": "Görevler",
                 "agents": "Ajanlar",
+                "memory": "Memory",
                 "plugins": "Eklentiler",
                 "skills": "Yetenekler",
                 "templates": "Şablonlar",
