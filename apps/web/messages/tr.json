@@ -5018,7 +5018,8 @@
                 "workSchedule": "İş zamanlaması",
                 "missionTick": "Mission tik'i",
                 "sourceValidation": "Kaynak doğrulama",
-                "dataSync": "Veri senkronizasyonu"
+                "dataSync": "Veri senkronizasyonu",
+                "inboundTrigger": "Gelen tetikleyici"
             },
             "statuses": {
                 "active": "Aktif",
@@ -5032,6 +5033,58 @@
                 "description": "Yinelenen görevler, ajan sinyalleri, iş zamanlamaları, Mission tik'leri, kaynak doğrulama ve veri senkronizasyonu, bunları ayarladığınızda burada görünecek.",
                 "noResults": "Geçerli filtreyle eşleşen zamanlama yok."
             }
+        },
+        "triggers": {
+            "title": "Gelen tetikleyiciler",
+            "subtitle": "Tetiklendiğinde bir Görev oluşturan imzalı webhook ve API çağrıları.",
+            "new": "Yeni tetikleyici",
+            "empty": "Henüz tetikleyici yok. İmzalı webhook almak için bir tane oluşturun.",
+            "firedCount": "{count} tetikleme",
+            "lastFired": "son tetikleme",
+            "status": {
+                "active": "Etkin",
+                "paused": "Duraklatıldı"
+            },
+            "createTitle": "Yeni gelen tetikleyici",
+            "createDescription": "İmzalı bir webhook URL’si ve bir gizli anahtar alırsınız. Dış sistemler Görev oluşturmak için POST gönderir.",
+            "form": {
+                "name": "Ad",
+                "namePlaceholder": "Dağıtım bildirimleri",
+                "description": "Açıklama",
+                "descriptionPlaceholder": "Bu tetikleyiciyi ne tetikler?",
+                "taskTitle": "Görev başlığı şablonu",
+                "taskTitlePlaceholder": "Tetikleyici: {name}",
+                "taskTitleHint": "{name}, tetikleyici adına dönüşür."
+            },
+            "actions": {
+                "pause": "Duraklat",
+                "resume": "Sürdür",
+                "rotate": "Gizli anahtarı değiştir",
+                "delete": "Sil",
+                "cancel": "İptal",
+                "create": "Oluştur"
+            },
+            "reveal": {
+                "title": "Tetikleyici gizli anahtarı",
+                "warning": "Gizli anahtarı şimdi kopyalayın — bir daha göremezsiniz.",
+                "url": "Webhook URL’si",
+                "secret": "İmzalama gizli anahtarı",
+                "curl": "İmzalı istek örneği",
+                "copy": "Kopyala",
+                "done": "Tamam"
+            },
+            "toast": {
+                "created": "Tetikleyici oluşturuldu",
+                "createFailed": "Tetikleyici oluşturulamadı",
+                "rotated": "Gizli anahtar değiştirildi",
+                "rotateFailed": "Gizli anahtar değiştirilemedi",
+                "toggleFailed": "Tetikleyici güncellenemedi",
+                "deleted": "Tetikleyici silindi",
+                "deleteFailed": "Tetikleyici silinemedi",
+                "loadFailed": "Tetikleyiciler yüklenemedi",
+                "copyFailed": "Panoya kopyalanamadı"
+            },
+            "confirmDelete": "Bu tetikleyici silinsin mi? Webhook URL’si hemen çalışmayı durdurur ve bu işlem geri alınamaz."
         }
     },
     "layout": {

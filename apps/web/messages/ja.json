@@ -5026,7 +5026,8 @@
                 "workSchedule": "ワークのスケジュール",
                 "missionTick": "Mission のティック",
                 "sourceValidation": "ソースの検証",
-                "dataSync": "データ同期"
+                "dataSync": "データ同期",
+                "inboundTrigger": "受信トリガー"
             },
             "statuses": {
                 "active": "アクティブ",
@@ -5040,6 +5041,58 @@
                 "description": "定期タスク、エージェントのハートビート、ワークのスケジュール、Mission のティック、ソースの検証、データ同期を設定すると、ここに表示されます。",
                 "noResults": "現在のフィルターに一致するスケジュールはありません。"
             }
+        },
+        "triggers": {
+            "title": "受信トリガー",
+            "subtitle": "発火時にタスクを生成する署名付き Webhook / API 呼び出し。",
+            "new": "新規トリガー",
+            "empty": "トリガーはまだありません。作成すると署名付き Webhook を受信できます。",
+            "firedCount": "{count} 回発火",
+            "lastFired": "最終発火",
+            "status": {
+                "active": "有効",
+                "paused": "一時停止"
+            },
+            "createTitle": "新規受信トリガー",
+            "createDescription": "署名付き Webhook URL とシークレットが発行されます。外部システムが POST するとタスクが生成されます。",
+            "form": {
+                "name": "名前",
+                "namePlaceholder": "デプロイ通知",
+                "description": "説明",
+                "descriptionPlaceholder": "このトリガーを発火させるもの",
+                "taskTitle": "タスクタイトルのテンプレート",
+                "taskTitlePlaceholder": "トリガー: {name}",
+                "taskTitleHint": "{name} はトリガー名に展開されます。"
+            },
+            "actions": {
+                "pause": "一時停止",
+                "resume": "再開",
+                "rotate": "シークレットを再生成",
+                "delete": "削除",
+                "cancel": "キャンセル",
+                "create": "作成"
+            },
+            "reveal": {
+                "title": "トリガーのシークレット",
+                "warning": "今すぐシークレットをコピーしてください。再表示はできません。",
+                "url": "Webhook URL",
+                "secret": "署名シークレット",
+                "curl": "署名付きリクエストの例",
+                "copy": "コピー",
+                "done": "完了"
+            },
+            "toast": {
+                "created": "トリガーを作成しました",
+                "createFailed": "トリガーを作成できませんでした",
+                "rotated": "シークレットを再生成しました",
+                "rotateFailed": "シークレットを再生成できませんでした",
+                "toggleFailed": "トリガーを更新できませんでした",
+                "deleted": "トリガーを削除しました",
+                "deleteFailed": "トリガーを削除できませんでした",
+                "loadFailed": "トリガーを読み込めませんでした",
+                "copyFailed": "クリップボードにコピーできませんでした"
+            },
+            "confirmDelete": "このトリガーを削除しますか？ Webhook URL は直ちに使用できなくなり、元に戻せません。"
         }
     },
     "layout": {

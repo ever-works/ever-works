@@ -5,6 +5,7 @@ export {
     describeRrule,
     describeWorkCadence,
     describeIntervalMinutes,
+    describeEventDriven,
     computeNextCronFire,
 } from './cadence';
 export type {

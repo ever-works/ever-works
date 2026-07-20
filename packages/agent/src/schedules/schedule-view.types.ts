@@ -20,10 +20,15 @@ export type ScheduleSourceType =
     | 'work_schedule'
     | 'mission_tick'
     | 'source_validation'
-    | 'data_sync';
+    | 'data_sync'
+    | 'inbound_trigger';
 
-/** The kind of entity that owns the schedule. */
-export type ScheduleOwnerType = 'task' | 'agent' | 'work' | 'mission';
+/**
+ * The kind of entity that owns the schedule. `trigger` is used by
+ * inbound-trigger rows with no target Agent; when a target Agent is
+ * set the row reuses `agent` (and links to that Agent).
+ */
+export type ScheduleOwnerType = 'task' | 'agent' | 'work' | 'mission' | 'trigger';
 
 /**
  * Normalized status label so the UI renders one pill vocabulary across

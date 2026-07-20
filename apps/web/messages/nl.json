@@ -5026,7 +5026,8 @@
                 "workSchedule": "Werkplanning",
                 "missionTick": "Mission-tick",
                 "sourceValidation": "Bronvalidatie",
-                "dataSync": "Gegevenssynchronisatie"
+                "dataSync": "Gegevenssynchronisatie",
+                "inboundTrigger": "Inkomende trigger"
             },
             "statuses": {
                 "active": "Actief",
@@ -5040,6 +5041,58 @@
                 "description": "Terugkerende taken, agent-heartbeats, werkplanningen, Mission-ticks, bronvalidatie en gegevenssynchronisatie verschijnen hier zodra je ze hebt ingesteld.",
                 "noResults": "Geen planningen komen overeen met het huidige filter."
             }
+        },
+        "triggers": {
+            "title": "Inkomende triggers",
+            "subtitle": "Ondertekende webhooks en API-aanroepen die een Taak aanmaken bij activering.",
+            "new": "Nieuwe trigger",
+            "empty": "Nog geen triggers. Maak er een om ondertekende webhooks te ontvangen.",
+            "firedCount": "{count} keer geactiveerd",
+            "lastFired": "laatst geactiveerd",
+            "status": {
+                "active": "Actief",
+                "paused": "Gepauzeerd"
+            },
+            "createTitle": "Nieuwe inkomende trigger",
+            "createDescription": "Je krijgt een ondertekende webhook-URL en een geheim. Externe systemen POST-en ernaartoe om een Taak aan te maken.",
+            "form": {
+                "name": "Naam",
+                "namePlaceholder": "Deploy-meldingen",
+                "description": "Beschrijving",
+                "descriptionPlaceholder": "Wat activeert deze trigger?",
+                "taskTitle": "Sjabloon voor taaktitel",
+                "taskTitlePlaceholder": "Trigger: {name}",
+                "taskTitleHint": "{name} wordt vervangen door de triggernaam."
+            },
+            "actions": {
+                "pause": "Pauzeren",
+                "resume": "Hervatten",
+                "rotate": "Geheim roteren",
+                "delete": "Verwijderen",
+                "cancel": "Annuleren",
+                "create": "Aanmaken"
+            },
+            "reveal": {
+                "title": "Triggergeheim",
+                "warning": "Kopieer het geheim nu — je kunt het later niet meer zien.",
+                "url": "Webhook-URL",
+                "secret": "Ondertekeningsgeheim",
+                "curl": "Voorbeeld van ondertekend verzoek",
+                "copy": "Kopiëren",
+                "done": "Klaar"
+            },
+            "toast": {
+                "created": "Trigger aangemaakt",
+                "createFailed": "Kon de trigger niet aanmaken",
+                "rotated": "Geheim geroteerd",
+                "rotateFailed": "Kon het geheim niet roteren",
+                "toggleFailed": "Kon de trigger niet bijwerken",
+                "deleted": "Trigger verwijderd",
+                "deleteFailed": "Kon de trigger niet verwijderen",
+                "loadFailed": "Kon de triggers niet laden",
+                "copyFailed": "Kon niet naar klembord kopiëren"
+            },
+            "confirmDelete": "Deze trigger verwijderen? De webhook-URL werkt onmiddellijk niet meer en dit kan niet ongedaan worden gemaakt."
         }
     },
     "layout": {

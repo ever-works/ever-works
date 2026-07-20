@@ -113,6 +113,15 @@ export function describeWorkCadence(
     }
 }
 
+/**
+ * Cadence label for event-driven sources (inbound triggers). They have
+ * no timer at all — an external system decides when they fire — so the
+ * label is a fixed phrase rather than a derived schedule.
+ */
+export function describeEventDriven(): string {
+    return 'On event';
+}
+
 /** Human label for an N-minute polling interval. */
 export function describeIntervalMinutes(minutes: number | null | undefined): string {
     if (!minutes || minutes <= 0) return '';

@@ -12,6 +12,7 @@ import {
     RefreshCw,
     CalendarX,
     ArrowUpRight,
+    Webhook,
     type LucideProps,
 } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
@@ -29,7 +30,8 @@ type SourceLabelKey =
     | 'workSchedule'
     | 'missionTick'
     | 'sourceValidation'
-    | 'dataSync';
+    | 'dataSync'
+    | 'inboundTrigger';
 
 const SOURCE_META: Record<ScheduleSourceType, { icon: IconType; labelKey: SourceLabelKey }> = {
     recurring_task: { icon: Repeat, labelKey: 'recurringTask' },
@@ -38,6 +40,7 @@ const SOURCE_META: Record<ScheduleSourceType, { icon: IconType; labelKey: Source
     mission_tick: { icon: Target, labelKey: 'missionTick' },
     source_validation: { icon: ShieldCheck, labelKey: 'sourceValidation' },
     data_sync: { icon: RefreshCw, labelKey: 'dataSync' },
+    inbound_trigger: { icon: Webhook, labelKey: 'inboundTrigger' },
 };
 
 const SOURCE_ORDER: ScheduleSourceType[] = [
@@ -47,6 +50,7 @@ const SOURCE_ORDER: ScheduleSourceType[] = [
     'mission_tick',
     'source_validation',
     'data_sync',
+    'inbound_trigger',
 ];
 
 const STATUS_STYLES: Record<ScheduleStatus, string> = {

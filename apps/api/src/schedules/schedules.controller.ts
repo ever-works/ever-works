@@ -35,7 +35,7 @@ export class SchedulesController {
     @ApiOperation({
         summary: "List the current user's schedules",
         description:
-            'Read-only aggregation of every scheduled source the user owns (recurring tasks, agent heartbeats, work schedules, mission ticks, source-validation, data-sync), sorted by next run ascending (nulls last).',
+            'Read-only aggregation of every scheduled source the user owns (recurring tasks, agent heartbeats, work schedules, mission ticks, source-validation, data-sync, inbound triggers), sorted by next run ascending (nulls last).',
     })
     @ApiResponse({ status: 200, description: 'Unified schedule read-model' })
     async list(
