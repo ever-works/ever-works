@@ -13,6 +13,12 @@ export interface CreateOrganizationRequest {
 	name: string;
 	/** Optional slug override. If omitted, allocated from `name`. */
 	slug?: string;
+	/**
+	 * PR-6 (domain-model evolution §23.5) — optional company vision
+	 * statement. Trimmed + capped at 5000 chars server-side; empty /
+	 * whitespace-only collapses to null.
+	 */
+	vision?: string | null;
 }
 
 /**
@@ -39,6 +45,12 @@ export interface UpdateOrganizationRequest {
 	displayName?: string;
 	legalName?: string;
 	countryCode?: string;
+	/**
+	 * PR-6 — company vision. Omit to leave unchanged; explicit `null`
+	 * clears it. Any present value (including `null`) bumps
+	 * `visionUpdatedAt` to now.
+	 */
+	vision?: string | null;
 }
 
 export interface OrganizationResponse {
@@ -51,6 +63,10 @@ export interface OrganizationResponse {
 	registrationProvider: string | null;
 	registrationStatus: string | null;
 	linkedWorkId: string | null;
+	/** PR-6 — company vision statement (null = never set / cleared). */
+	vision: string | null;
+	/** PR-6 — ISO timestamp of the last vision change (null = never set). */
+	visionUpdatedAt: string | null;
 	createdAt: string;
 	updatedAt: string;
 }

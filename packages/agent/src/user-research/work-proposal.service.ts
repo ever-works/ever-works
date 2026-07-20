@@ -19,6 +19,7 @@ import { WorkProposalAttachment } from '../entities/work-proposal-attachment.ent
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserUpload } from '../entities/user-upload.entity';
+import { VisionContextService } from '../services/vision-context.service';
 
 // Upload IDs are SHA-256 hex strings (the `id` field returned by
 // POST /api/uploads/file). 64 lowercase hex chars — NOT UUID-shaped
@@ -185,6 +186,13 @@ export class WorkProposalService {
         // Best-effort at call sites - an activity failure never fails the op.
         @Optional()
         private readonly activityLog?: ActivityLogService,
+        // PR-6 (review §23.5) — company-vision prompt context for
+        // `generate()`. Trailing + `@Optional()` so hand-rolled test
+        // constructors that omit it keep working; production DI provides
+        // it via UserResearchModule. When absent (or when the user has
+        // no active Org / no vision) generation proceeds vision-less.
+        @Optional()
+        private readonly visionContext?: VisionContextService,
     ) {}
 
     /**
@@ -379,6 +387,18 @@ export class WorkProposalService {
             status: p.status,
         }));
 
+        // PR-6 (review §23.5) — resolve the active Organization's vision
+        // (users.lastScopeOrganizationId → organizations.vision, trimmed
+        // + capped by VisionContextService) so every generated Idea can
+        // bias toward the company's long-term direction. Best-effort:
+        // the service is @Optional() and resolveForUser degrades to null
+        // internally, so vision can never block generation. This also
+        // covers Mission-tick generation — MissionTickService drives
+        // this same generate() path.
+        const companyVision = this.visionContext
+            ? await this.visionContext.resolveForUser(userId)
+            : null;
+
         try {
             // Use the permissive schema so low-quality model output (sloppy
             // slugs, wrong enum values, off-by-one length bounds) doesn't
@@ -394,6 +414,7 @@ export class WorkProposalService {
                         existingIdeasContext,
                         opts.missionContext,
                         opts.targetCount ?? undefined,
+                        companyVision,
                     ),
                 ].join('\n\n'),
                 permissiveWorkProposalsBatchSchema,

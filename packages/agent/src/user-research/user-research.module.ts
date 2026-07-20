@@ -9,7 +9,10 @@ import { WorkProposalAttachment } from '../entities/work-proposal-attachment.ent
 import { IdeaWork } from '../entities/idea-work.entity';
 import { IdeaWorkRepository } from '../database/repositories/idea-work.repository';
 import { UserUpload } from '../entities/user-upload.entity';
+import { User } from '../entities/user.entity';
+import { Organization } from '../entities/organization.entity';
 import { WorkProposalAttachmentRepository } from '../database/repositories/attachment.repositories';
+import { VisionContextService } from '../services/vision-context.service';
 import { UserResearchService } from './user-research.service';
 import { WorkProposalService } from './work-proposal.service';
 import { WorkProposalRepository } from './work-proposal.repository';
@@ -28,7 +31,16 @@ import {
         DatabaseModule,
         FacadesModule,
         TitlerModule,
-        TypeOrmModule.forFeature([WorkProposal, WorkProposalAttachment, UserUpload, IdeaWork]),
+        // PR-6 — User + Organization back VisionContextService's
+        // active-Org vision lookup for Idea-generation prompts.
+        TypeOrmModule.forFeature([
+            WorkProposal,
+            WorkProposalAttachment,
+            UserUpload,
+            IdeaWork,
+            User,
+            Organization,
+        ]),
     ],
     providers: [
         UserResearchService,
@@ -36,6 +48,7 @@ import {
         WorkProposalRepository,
         IdeaWorkRepository,
         WorkProposalAttachmentRepository,
+        VisionContextService,
         {
             provide: USER_RESEARCH_LIMITS_CONFIG,
             useFactory: buildUserResearchLimitsConfig,
@@ -47,6 +60,7 @@ import {
         WorkProposalService,
         WorkProposalRepository,
         WorkProposalAttachmentRepository,
+        VisionContextService,
         UserResearchLimitsService,
     ],
 })

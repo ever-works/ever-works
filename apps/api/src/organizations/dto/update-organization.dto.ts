@@ -1,4 +1,4 @@
-import { IsOptional, IsString, Length, ValidateIf } from 'class-validator';
+import { IsOptional, IsString, Length, MaxLength, ValidateIf } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 /**
@@ -34,4 +34,18 @@ export class UpdateOrganizationDto {
     @IsString()
     @Length(2, 2)
     countryCode?: string;
+
+    @ApiPropertyOptional({
+        description:
+            'PR-6 (review §23.5) — company vision statement. Omit to leave unchanged; explicit null clears it. Any present value (including null) bumps `visionUpdatedAt` to now.',
+        maxLength: 5000,
+        nullable: true,
+    })
+    // `vision` maps to a NULLABLE column, so it keeps `@IsOptional()` —
+    // an explicit null is a valid "clear this field" operation (same
+    // posture as legalName / countryCode above).
+    @IsOptional()
+    @IsString()
+    @MaxLength(5000)
+    vision?: string | null;
 }
