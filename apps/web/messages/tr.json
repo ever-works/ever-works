@@ -1190,6 +1190,10 @@
                     "failed": "Başarısız",
                     "cancelled": "İptal edildi"
                 }
+            },
+            "viewToggle": {
+                "log": "Günlük",
+                "schedules": "Zamanlamalar"
             }
         },
         "works": {
@@ -4886,6 +4890,42 @@
             "membersBadge": "{count, plural, one {# üye} other {# üye}}",
             "empty": "Henüz gösterilecek bir şey yok — önce bu organizasyonda ekipler veya Ajanlar oluşturun.",
             "noOrg": "Organizasyon şemasını görmek için bir organizasyon oluşturun."
+        },
+        "schedules": {
+            "title": "Zamanlamalar",
+            "subtitle": "İşlerinizde, ajanlarınızda, Missions ve görevlerinizde çalışması planlanan her şey",
+            "fetchFailed": "Zamanlamalar yüklenemedi",
+            "retry": "Yeniden dene",
+            "columns": {
+                "owner": "Sahip",
+                "cadence": "Sıklık",
+                "nextRun": "Sonraki çalıştırma",
+                "status": "Durum"
+            },
+            "filters": {
+                "all": "Tümü",
+                "activeOnly": "Yalnızca etkin"
+            },
+            "sourceTypes": {
+                "recurringTask": "Yinelenen görev",
+                "agentHeartbeat": "Ajan sinyali",
+                "workSchedule": "İş zamanlaması",
+                "missionTick": "Mission tik'i",
+                "sourceValidation": "Kaynak doğrulama",
+                "dataSync": "Veri senkronizasyonu"
+            },
+            "statuses": {
+                "active": "Aktif",
+                "paused": "Duraklatıldı",
+                "disabled": "Devre dışı",
+                "error": "Hata",
+                "ended": "Sona erdi"
+            },
+            "empty": {
+                "title": "Henüz hiçbir şey zamanlanmadı",
+                "description": "Yinelenen görevler, ajan sinyalleri, iş zamanlamaları, Mission tik'leri, kaynak doğrulama ve veri senkronizasyonu, bunları ayarladığınızda burada görünecek.",
+                "noResults": "Geçerli filtreyle eşleşen zamanlama yok."
+            }
         }
     },
     "layout": {

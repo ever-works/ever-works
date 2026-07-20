@@ -123,7 +123,10 @@ export class MissionTickService {
         private readonly workProposals: WorkProposalService,
         private readonly workProposalRepo: WorkProposalRepository,
         private readonly workAgent: WorkAgentService,
-        // PR-3 - lifecycle activity + FAILED persistence (review P4/G3).
+        // Idea/mission lifecycle activity (PR-3) + Schedules P2 `mission_tick`
+        // coverage — same @Optional() ActivityLogService (hand-rolled unit-test
+        // constructors omit it; production DI provides it via ActivityLogModule
+        // imported by MissionsModule).
         @Optional()
         private readonly activityLog?: ActivityLogService,
         // PR-4 — Idea build executor dispatch seam (same token the API
@@ -179,8 +182,57 @@ export class MissionTickService {
             if (outcome.outcome === 'spawned') summary.ran += 1;
             else if (outcome.outcome === 'failed') summary.failed += 1;
             else summary.skipped += 1;
+
+            // Schedules P2 — record every FIRED scheduled tick in the
+            // Activity feed. A tick "fires" when its cron matched this
+            // cycle; the no-match minutes — the vast majority — are
+            // intentionally NOT logged so the feed isn't flooded once
+            // per minute. The domain-model tick already emits a dedicated
+            // lifecycle row for `failed` (mission_failed) and `cap-hit`
+            // (mission_tick_capped), so only the outcomes without their
+            // own row emit the generic `mission_tick`. Every fired tick
+            // therefore lands exactly one Activity row, with no
+            // double-logging. Best-effort + user-scoped to the owner.
+            if (outcome.outcome === 'spawned' || outcome.outcome === 'no-ideas') {
+                void this.emitMissionTick(mission, outcome);
+            }
         }
         return summary;
+    }
+
+    /**
+     * Emit a `mission_tick` ActivityLog row for a scheduled Mission whose
+     * cron fired this cycle. FAILED status only for the generator-threw
+     * outcome; every other fired outcome (spawned / no-ideas / cap-hit) is
+     * a COMPLETED tick. Best-effort — wrapped so a logging failure can
+     * never disrupt the tick loop.
+     */
+    private async emitMissionTick(mission: Mission, outcome: MissionTickOutcome): Promise<void> {
+        if (!this.activityLog) return;
+        try {
+            await this.activityLog.log({
+                userId: mission.userId,
+                actionType: ActivityActionType.MISSION_TICK,
+                action: 'mission.tick',
+                status:
+                    outcome.outcome === 'failed' ? ActivityStatus.FAILED : ActivityStatus.COMPLETED,
+                summary: `Mission "${mission.title}" ticked (${outcome.outcome})`,
+                details: {
+                    missionId: mission.id,
+                    outcome: outcome.outcome,
+                    ideasCreated: outcome.ideasCreated ?? 0,
+                    ideasQueued: outcome.ideasQueued ?? 0,
+                    outstanding: outcome.outstanding ?? null,
+                    cap: outcome.cap ?? null,
+                    message: outcome.message ?? null,
+                },
+            });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            this.logger.warn(
+                `Failed to emit mission_tick activity for mission ${mission.id}: ${message}`,
+            );
+        }
     }
 
     /**

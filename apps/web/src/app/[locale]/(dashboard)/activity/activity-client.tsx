@@ -10,9 +10,12 @@ import { ActivityFilters } from '@/components/activity-log/ActivityFilters';
 import { ActivityEmptyState } from '@/components/activity-log/ActivityEmptyState';
 import { ActivityKanbanView } from '@/components/activity-log/ActivityKanbanView';
 import { ViewModeSwitch, type ViewMode } from '@/components/works/ViewModeSwitch';
+import { SchedulesList } from '@/components/schedules/SchedulesList';
 import { toast } from 'sonner';
-import { Activity as ActivityIcon, Download, Loader2 } from 'lucide-react';
+import { Activity as ActivityIcon, Download, Loader2, List, CalendarClock } from 'lucide-react';
 import { PageHeader } from '@/components/common/PageHeader';
+
+type ActivityTab = 'log' | 'schedules';
 
 const POLL_INTERVAL = 5000;
 const ITEMS_PER_PAGE = 25;
@@ -66,6 +69,41 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
         setViewMode(mode);
         localStorage.setItem('activity-view-mode', mode);
     };
+
+    // Log | Schedules segmented view. localStorage is the primary
+    // persistence; the `?view=schedules` query param enables shareable
+    // links and is kept in sync by the URL-sync effect below.
+    //
+    // Initialise to a deterministic default (the URL ?view= param, else
+    // 'log') so server and first client render agree — the persisted
+    // localStorage value is restored in the mount effect below to avoid
+    // a hydration mismatch.
+    const [activeTab, setActiveTab] = useState<ActivityTab>(() => {
+        const fromUrl = searchParams.get('view');
+        return fromUrl === 'schedules' || fromUrl === 'log' ? fromUrl : 'log';
+    });
+
+    // Restore the persisted tab after mount (localStorage is unavailable
+    // during SSR). The URL ?view= param always wins when present.
+    useEffect(() => {
+        const fromUrl = searchParams.get('view');
+        if (fromUrl === 'schedules' || fromUrl === 'log') return;
+        const stored = localStorage.getItem('activity-tab');
+        if (stored === 'schedules' || stored === 'log') {
+            setActiveTab(stored);
+        }
+        // Mount-only restore; intentionally not reactive to searchParams.
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    const handleTabChange = (tab: ActivityTab) => {
+        setActiveTab(tab);
+        if (typeof window !== 'undefined') {
+            localStorage.setItem('activity-tab', tab);
+        }
+    };
+
+    const isLogTab = activeTab === 'log';
     const hasActiveFilters = actionType !== '' || status !== '' || debouncedSearch !== '';
 
     // Sync filters → URL query params
@@ -75,13 +113,14 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
             return;
         }
         const params = new URLSearchParams();
+        if (activeTab === 'schedules') params.set('view', 'schedules');
         if (actionType) params.set('actionType', actionType);
         if (status) params.set('status', status);
         if (debouncedSearch) params.set('search', debouncedSearch);
         if (page > 1) params.set('page', String(page));
         const query = params.toString();
         router.replace(`${pathname}${query ? `?${query}` : ''}`, { scroll: false });
-    }, [actionType, status, debouncedSearch, page, pathname, router]);
+    }, [activeTab, actionType, status, debouncedSearch, page, pathname, router]);
 
     // Debounce search
     useEffect(() => {
@@ -165,8 +204,9 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
         setPage(1);
     }, [actionType, status, debouncedSearch]);
 
-    // Fetch for the current page + filters
+    // Fetch for the current page + filters (Log tab only)
     useEffect(() => {
+        if (!isLogTab) return;
         void fetchActivities(
             page,
             {
@@ -176,21 +216,24 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
             },
             false,
         );
-    }, [page, actionType, status, debouncedSearch, fetchActivities]);
+    }, [isLogTab, page, actionType, status, debouncedSearch, fetchActivities]);
 
     useEffect(() => {
+        if (!isLogTab) return;
         void fetchSummary();
-    }, [fetchSummary]);
+    }, [isLogTab, fetchSummary]);
 
     // Fetch all activities for kanban view (no pagination)
     useEffect(() => {
-        if (viewMode === 'kanban') {
+        if (isLogTab && viewMode === 'kanban') {
             void fetchKanbanActivities({ actionType, status, search: debouncedSearch });
         }
-    }, [viewMode, actionType, status, debouncedSearch, fetchKanbanActivities]);
+    }, [isLogTab, viewMode, actionType, status, debouncedSearch, fetchKanbanActivities]);
 
-    // Polling — silent refresh, paused when tab is hidden
+    // Polling — silent refresh, paused when tab is hidden or when the
+    // Schedules view is active (there are no live activity rows to poll).
     useEffect(() => {
+        if (!isLogTab) return;
         let interval: ReturnType<typeof setInterval>;
 
         const startPolling = () => {
@@ -235,7 +278,7 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
             clearInterval(interval);
             document.removeEventListener('visibilitychange', handleVisibility);
         };
-    }, [fetchActivities, fetchSummary, page, actionType, status, debouncedSearch]);
+    }, [isLogTab, fetchActivities, fetchSummary, page, actionType, status, debouncedSearch]);
 
     const handlePageChange = (newPage: number) => {
         setPage(newPage);
@@ -338,135 +381,180 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
                 tone="primary"
                 actions={
                     <>
-                        <ViewModeSwitch
-                            mode={viewMode}
-                            onChange={handleViewModeChange}
-                            cardLabel={t('viewMode.table')}
-                            kanbanLabel={t('viewMode.board')}
-                        />
-                        <button
-                            onClick={handleExport}
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-border dark:border-border-dark text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors whitespace-nowrap"
+                        <div
+                            data-testid="activity-view-toggle"
+                            className="flex items-center gap-0.5 rounded-lg border border-border dark:border-border-dark bg-surface dark:bg-surface-dark p-0.5"
                         >
-                            <Download className="w-3.5 h-3.5" />
-                            {t('actions.export')}
-                        </button>
+                            <button
+                                onClick={() => handleTabChange('log')}
+                                aria-pressed={isLogTab}
+                                aria-label={t('viewToggle.log')}
+                                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all duration-150 ${
+                                    isLogTab
+                                        ? 'bg-card dark:bg-card-primary-dark text-text dark:text-text-dark shadow-sm'
+                                        : 'text-text-muted dark:text-text-muted-dark hover:text-text-secondary dark:hover:text-text-secondary-dark'
+                                }`}
+                            >
+                                <List className="w-3.5 h-3.5" />
+                                <span className="hidden @xs/main:inline">
+                                    {t('viewToggle.log')}
+                                </span>
+                            </button>
+                            <button
+                                onClick={() => handleTabChange('schedules')}
+                                aria-pressed={!isLogTab}
+                                aria-label={t('viewToggle.schedules')}
+                                className={`flex items-center gap-1.5 px-2.5 py-1.5 rounded-md text-xs font-medium transition-all duration-150 ${
+                                    !isLogTab
+                                        ? 'bg-card dark:bg-card-primary-dark text-text dark:text-text-dark shadow-sm'
+                                        : 'text-text-muted dark:text-text-muted-dark hover:text-text-secondary dark:hover:text-text-secondary-dark'
+                                }`}
+                            >
+                                <CalendarClock className="w-3.5 h-3.5" />
+                                <span className="hidden @xs/main:inline">
+                                    {t('viewToggle.schedules')}
+                                </span>
+                            </button>
+                        </div>
+                        {isLogTab && (
+                            <>
+                                <ViewModeSwitch
+                                    mode={viewMode}
+                                    onChange={handleViewModeChange}
+                                    cardLabel={t('viewMode.table')}
+                                    kanbanLabel={t('viewMode.board')}
+                                />
+                                <button
+                                    onClick={handleExport}
+                                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-border dark:border-border-dark text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors whitespace-nowrap"
+                                >
+                                    <Download className="w-3.5 h-3.5" />
+                                    {t('actions.export')}
+                                </button>
+                            </>
+                        )}
                     </>
                 }
             />
 
-            <div className="grid gap-2 @sm/main:grid-cols-2 @xl/main:grid-cols-5">
-                {summaryCards.map((card) => {
-                    const isActive = status === card.key;
-                    const config = statusConfig[card.key];
+            {!isLogTab && <SchedulesList />}
 
-                    return (
-                        <button
-                            key={card.key}
-                            type="button"
-                            onClick={() => {
-                                if (!isActive) {
-                                    setPendingStatusKey(card.key);
-                                }
-                                setStatus(isActive ? '' : card.key);
-                            }}
-                            disabled={loading}
-                            aria-busy={loading && pendingStatusKey === card.key}
-                            className={`rounded-lg cursor-pointer border px-4 py-3.5 text-left transition-all duration-150 ${
-                                isActive
-                                    ? `${config.activeBorder} ${config.activeBg}`
-                                    : 'border-border dark:border-border-dark bg-card dark:bg-card-primary-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark'
-                            } ${loading ? 'opacity-70 cursor-wait' : ''}`}
-                        >
-                            <div className="flex items-center gap-1.5 mb-2">
-                                <span
-                                    className={`w-1.5 h-1.5 rounded-full shrink-0 ${config.dot}`}
-                                />
-                                <p className="text-xs font-medium text-text-muted dark:text-text-muted-dark">
-                                    {card.label}
-                                </p>
-                                {loading && pendingStatusKey === card.key && (
-                                    <Loader2 className="w-3 h-3 animate-spin text-text-muted dark:text-text-muted-dark" />
-                                )}
-                            </div>
-                            <p className="text-xl font-normal tabular-nums text-text dark:text-text-dark">
-                                {card.count.toLocaleString()}
-                            </p>
-                        </button>
-                    );
-                })}
-            </div>
-
-            <ActivityFilters
-                actionType={actionType}
-                onActionTypeChange={setActionType}
-                status={status}
-                onStatusChange={setStatus}
-                search={search}
-                onSearchChange={setSearch}
-                loading={loading}
-                hasActiveFilters={hasActiveFilters}
-                onClearFilters={handleClearFilters}
-            />
-
-            {activities.length === 0 && !loading ? (
-                <ActivityEmptyState
-                    filtered={hasActiveFilters}
-                    onClearFilters={handleClearFilters}
-                />
-            ) : (
+            {isLogTab && (
                 <>
-                    {viewMode === 'kanban' ? (
-                        kanbanLoading ? (
-                            <div className="flex justify-center py-16">
-                                <Loader2 className="w-6 h-6 animate-spin text-text-muted dark:text-text-muted-dark" />
-                            </div>
-                        ) : (
-                            <ActivityKanbanView
-                                activities={kanbanActivities}
-                                onStopRequested={refreshCurrentPage}
-                            />
-                        )
-                    ) : (
-                        <ActivityTable
-                            activities={activities}
-                            loading={loading}
-                            onStopRequested={refreshCurrentPage}
-                        />
-                    )}
+                    <div className="grid gap-2 @sm/main:grid-cols-2 @xl/main:grid-cols-5">
+                        {summaryCards.map((card) => {
+                            const isActive = status === card.key;
+                            const config = statusConfig[card.key];
 
-                    {/* Pagination + view mode switch — hidden in kanban mode */}
-                    {viewMode !== 'kanban' && totalPages > 1 && (
-                        <div className="flex items-center justify-between">
-                            <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                                {t('showing', {
-                                    from: (page - 1) * ITEMS_PER_PAGE + 1,
-                                    to: Math.min(page * ITEMS_PER_PAGE, total),
-                                    total,
-                                })}
-                            </p>
-                            <div className="flex items-center gap-3">
-                                <span className="text-sm text-text-muted dark:text-text-muted-dark">
-                                    {t('pagination.pageOf', { page, total: totalPages })}
-                                </span>
-                                <div className="flex gap-1.5">
-                                    <button
-                                        onClick={() => handlePageChange(page - 1)}
-                                        disabled={page <= 1}
-                                        className="px-2.5 py-1 text-xs rounded-md border border-border dark:border-border-dark disabled:opacity-40 hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
-                                    >
-                                        {t('pagination.previous')}
-                                    </button>
-                                    <button
-                                        onClick={() => handlePageChange(page + 1)}
-                                        disabled={page >= totalPages}
-                                        className="px-2.5 py-1 text-xs rounded-md border border-border dark:border-border-dark disabled:opacity-40 hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
-                                    >
-                                        {t('pagination.next')}
-                                    </button>
+                            return (
+                                <button
+                                    key={card.key}
+                                    type="button"
+                                    onClick={() => {
+                                        if (!isActive) {
+                                            setPendingStatusKey(card.key);
+                                        }
+                                        setStatus(isActive ? '' : card.key);
+                                    }}
+                                    disabled={loading}
+                                    aria-busy={loading && pendingStatusKey === card.key}
+                                    className={`rounded-lg cursor-pointer border px-4 py-3.5 text-left transition-all duration-150 ${
+                                        isActive
+                                            ? `${config.activeBorder} ${config.activeBg}`
+                                            : 'border-border dark:border-border-dark bg-card dark:bg-card-primary-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark'
+                                    } ${loading ? 'opacity-70 cursor-wait' : ''}`}
+                                >
+                                    <div className="flex items-center gap-1.5 mb-2">
+                                        <span
+                                            className={`w-1.5 h-1.5 rounded-full shrink-0 ${config.dot}`}
+                                        />
+                                        <p className="text-xs font-medium text-text-muted dark:text-text-muted-dark">
+                                            {card.label}
+                                        </p>
+                                        {loading && pendingStatusKey === card.key && (
+                                            <Loader2 className="w-3 h-3 animate-spin text-text-muted dark:text-text-muted-dark" />
+                                        )}
+                                    </div>
+                                    <p className="text-xl font-normal tabular-nums text-text dark:text-text-dark">
+                                        {card.count.toLocaleString()}
+                                    </p>
+                                </button>
+                            );
+                        })}
+                    </div>
+
+                    <ActivityFilters
+                        actionType={actionType}
+                        onActionTypeChange={setActionType}
+                        status={status}
+                        onStatusChange={setStatus}
+                        search={search}
+                        onSearchChange={setSearch}
+                        loading={loading}
+                        hasActiveFilters={hasActiveFilters}
+                        onClearFilters={handleClearFilters}
+                    />
+
+                    {activities.length === 0 && !loading ? (
+                        <ActivityEmptyState
+                            filtered={hasActiveFilters}
+                            onClearFilters={handleClearFilters}
+                        />
+                    ) : (
+                        <>
+                            {viewMode === 'kanban' ? (
+                                kanbanLoading ? (
+                                    <div className="flex justify-center py-16">
+                                        <Loader2 className="w-6 h-6 animate-spin text-text-muted dark:text-text-muted-dark" />
+                                    </div>
+                                ) : (
+                                    <ActivityKanbanView
+                                        activities={kanbanActivities}
+                                        onStopRequested={refreshCurrentPage}
+                                    />
+                                )
+                            ) : (
+                                <ActivityTable
+                                    activities={activities}
+                                    loading={loading}
+                                    onStopRequested={refreshCurrentPage}
+                                />
+                            )}
+
+                            {/* Pagination + view mode switch — hidden in kanban mode */}
+                            {viewMode !== 'kanban' && totalPages > 1 && (
+                                <div className="flex items-center justify-between">
+                                    <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                                        {t('showing', {
+                                            from: (page - 1) * ITEMS_PER_PAGE + 1,
+                                            to: Math.min(page * ITEMS_PER_PAGE, total),
+                                            total,
+                                        })}
+                                    </p>
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-sm text-text-muted dark:text-text-muted-dark">
+                                            {t('pagination.pageOf', { page, total: totalPages })}
+                                        </span>
+                                        <div className="flex gap-1.5">
+                                            <button
+                                                onClick={() => handlePageChange(page - 1)}
+                                                disabled={page <= 1}
+                                                className="px-2.5 py-1 text-xs rounded-md border border-border dark:border-border-dark disabled:opacity-40 hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
+                                            >
+                                                {t('pagination.previous')}
+                                            </button>
+                                            <button
+                                                onClick={() => handlePageChange(page + 1)}
+                                                disabled={page >= totalPages}
+                                                className="px-2.5 py-1 text-xs rounded-md border border-border dark:border-border-dark disabled:opacity-40 hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
+                                            >
+                                                {t('pagination.next')}
+                                            </button>
+                                        </div>
+                                    </div>
                                 </div>
-                            </div>
-                        </div>
+                            )}
+                        </>
                     )}
                 </>
             )}

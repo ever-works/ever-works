@@ -1,6 +1,8 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { config } from '@src/config';
 import { WorkScheduleRepository } from '@src/database/repositories/work-schedule.repository';
+import { ActivityLogService } from '@src/activity-log/activity-log.service';
+import { ActivityActionType, ActivityStatus } from '@src/entities/activity-log.types';
 import { WorkGenerationService } from './work-generation.service';
 import { WorkScheduleService } from './work-schedule.service';
 import type { WorkSchedule } from '@src/entities/work-schedule.entity';
@@ -65,6 +67,14 @@ export class WorkScheduleDispatcherService {
         private readonly scheduleRepository: WorkScheduleRepository,
         private readonly workGenerationService: WorkGenerationService,
         private readonly workScheduleService: WorkScheduleService,
+        // Schedules P2 — automated-run activity coverage. `@Optional()` so
+        // the hand-rolled unit-test constructors (which omit it) keep
+        // booting; production DI provides it via `ActivityLogModule`
+        // (imported by `WorkModule`). The manual "Run now" endpoint already
+        // emits `schedule_executed` from `works.controller.ts`; this closes
+        // the gap for CRON-fired scheduled updates so they surface in the
+        // Activity (Log) feed too.
+        @Optional() private readonly activityLog?: ActivityLogService,
     ) {}
 
     async dispatchDue(
@@ -112,6 +122,14 @@ export class WorkScheduleDispatcherService {
                     continue;
                 }
 
+                // A worker owns this run now (the claim above is the atomic
+                // fence). Record the fire in the Activity feed BEFORE running
+                // — best-effort, so a logging hiccup never blocks the actual
+                // generation — mirroring how the manual endpoint emits then
+                // dispatches. Automated runs were previously invisible in the
+                // feed (only WorkGenerationHistory captured them).
+                void this.emitScheduleExecuted(reservedSchedule);
+
                 const result =
                     await this.workGenerationService.runScheduledUpdate(reservedSchedule);
                 const resultData = result && typeof result === 'object' ? result : null;
@@ -158,6 +176,40 @@ export class WorkScheduleDispatcherService {
         }
 
         return summary;
+    }
+
+    /**
+     * Emit a `schedule_executed` ActivityLog row for an automated
+     * (cron-fired) scheduled update. User-scoped to the schedule owner
+     * so it lands in that user's Activity feed. Best-effort: the emit is
+     * wrapped so a logging failure can never fail the dispatch loop.
+     */
+    private async emitScheduleExecuted(schedule: WorkSchedule): Promise<void> {
+        if (!this.activityLog) return;
+        try {
+            await this.activityLog.log({
+                userId: schedule.userId,
+                workId: schedule.workId,
+                actionType: ActivityActionType.SCHEDULE_EXECUTED,
+                action: 'schedule.executed',
+                status: ActivityStatus.COMPLETED,
+                summary: 'Scheduled update ran automatically',
+                details: {
+                    scheduleId: schedule.id,
+                    trigger: 'cron',
+                    cadence: schedule.cadence ?? null,
+                    scheduledFor:
+                        schedule.scheduledFor?.toISOString() ??
+                        schedule.nextRunAt?.toISOString() ??
+                        null,
+                },
+            });
+        } catch (error) {
+            const message = error instanceof Error ? error.message : String(error);
+            this.logger.warn(
+                `Failed to emit schedule_executed activity for schedule ${schedule.id}: ${message}`,
+            );
+        }
     }
 
     private buildEntry(

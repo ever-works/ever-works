@@ -1190,6 +1190,10 @@
                     "failed": "Nieudane",
                     "cancelled": "Anulowane"
                 }
+            },
+            "viewToggle": {
+                "log": "Dziennik",
+                "schedules": "Harmonogramy"
             }
         },
         "works": {
@@ -4886,6 +4890,42 @@
             "membersBadge": "{count, plural, one {# członek} few {# członków} many {# członków} other {# członka}}",
             "empty": "Nie ma jeszcze nic do pokazania — najpierw utwórz zespoły lub Agentów w tej organizacji.",
             "noOrg": "Utwórz organizację, aby zobaczyć jej schemat organizacyjny."
+        },
+        "schedules": {
+            "title": "Harmonogramy",
+            "subtitle": "Wszystko, co zaplanowano do uruchomienia w Twoich pracach, agentach, Missions i zadaniach",
+            "fetchFailed": "Nie udało się załadować harmonogramów",
+            "retry": "Ponów próbę",
+            "columns": {
+                "owner": "Właściciel",
+                "cadence": "Interwał",
+                "nextRun": "Następne uruchomienie",
+                "status": "Status"
+            },
+            "filters": {
+                "all": "Wszystkie",
+                "activeOnly": "Tylko aktywne"
+            },
+            "sourceTypes": {
+                "recurringTask": "Zadanie cykliczne",
+                "agentHeartbeat": "Puls agenta",
+                "workSchedule": "Harmonogram pracy",
+                "missionTick": "Takt Mission",
+                "sourceValidation": "Walidacja źródła",
+                "dataSync": "Synchronizacja danych"
+            },
+            "statuses": {
+                "active": "Aktywny",
+                "paused": "Wstrzymany",
+                "disabled": "Wyłączono",
+                "error": "Błąd",
+                "ended": "Zakończono"
+            },
+            "empty": {
+                "title": "Nic jeszcze nie zaplanowano",
+                "description": "Zadania cykliczne, pulsy agentów, harmonogramy pracy, takty Mission, walidacja źródeł i synchronizacja danych pojawią się tutaj po ich skonfigurowaniu.",
+                "noResults": "Żadne harmonogramy nie pasują do bieżącego filtra."
+            }
         }
     },
     "layout": {

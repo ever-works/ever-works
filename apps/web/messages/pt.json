@@ -1190,6 +1190,10 @@
                     "failed": "Falhou",
                     "cancelled": "Cancelado"
                 }
+            },
+            "viewToggle": {
+                "log": "Registro",
+                "schedules": "Agendamentos"
             }
         },
         "works": {
@@ -4886,6 +4890,42 @@
             "membersBadge": "{count, plural, one {# membro} other {# membros}}",
             "empty": "Nada para exibir ainda — crie equipes ou Agentes nesta organização primeiro.",
             "noOrg": "Crie uma organização para ver seu organograma."
+        },
+        "schedules": {
+            "title": "Agendamentos",
+            "subtitle": "Tudo o que está agendado para ser executado em seus trabalhos, agentes, Missions e tarefas",
+            "fetchFailed": "Falha ao carregar os agendamentos",
+            "retry": "Tentar novamente",
+            "columns": {
+                "owner": "Proprietário",
+                "cadence": "Ritmo",
+                "nextRun": "Próxima execução",
+                "status": "Status"
+            },
+            "filters": {
+                "all": "Todas",
+                "activeOnly": "Apenas ativos"
+            },
+            "sourceTypes": {
+                "recurringTask": "Tarefa recorrente",
+                "agentHeartbeat": "Heartbeat do agente",
+                "workSchedule": "Agendamento de trabalho",
+                "missionTick": "Tick de Mission",
+                "sourceValidation": "Validação de fonte",
+                "dataSync": "Sincronização de dados"
+            },
+            "statuses": {
+                "active": "Ativo",
+                "paused": "Pausado",
+                "disabled": "Desativada",
+                "error": "Erro",
+                "ended": "Encerrada"
+            },
+            "empty": {
+                "title": "Nada agendado ainda",
+                "description": "Tarefas recorrentes, heartbeats de agentes, agendamentos de trabalho, ticks de Mission, validação de fontes e sincronização de dados aparecerão aqui assim que você os configurar.",
+                "noResults": "Nenhum agendamento corresponde ao filtro atual."
+            }
         }
     },
     "layout": {

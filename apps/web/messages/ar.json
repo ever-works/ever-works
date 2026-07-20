@@ -1250,8 +1250,48 @@
                 }
             }
         },
+        "schedules": {
+            "title": "الجداول الزمنية",
+            "subtitle": "كل ما هو مُجدوَل للتشغيل عبر أعمالك ووكلائك وMissions ومهامك",
+            "fetchFailed": "فشل تحميل الجداول الزمنية",
+            "retry": "إعادة المحاولة",
+            "columns": {
+                "owner": "المالك",
+                "cadence": "التكرار",
+                "nextRun": "التشغيل التالي",
+                "status": "الحالة"
+            },
+            "filters": {
+                "all": "الكل",
+                "activeOnly": "النشطة فقط"
+            },
+            "sourceTypes": {
+                "recurringTask": "مهمة متكررة",
+                "agentHeartbeat": "نبض الوكيل",
+                "workSchedule": "جدولة العمل",
+                "missionTick": "نبضة Mission",
+                "sourceValidation": "التحقق من المصدر",
+                "dataSync": "مزامنة البيانات"
+            },
+            "statuses": {
+                "active": "نشط",
+                "paused": "موقوف",
+                "disabled": "معطلة",
+                "error": "خطأ",
+                "ended": "منتهية"
+            },
+            "empty": {
+                "title": "لا يوجد شيء مُجدوَل بعد",
+                "description": "ستظهر هنا المهام المتكررة ونبضات الوكلاء وجداول العمل ونبضات Mission والتحقق من المصادر ومزامنة البيانات بمجرد إعدادها.",
+                "noResults": "لا توجد جداول زمنية تطابق عامل التصفية الحالي."
+            }
+        },
         "activity": {
-            "title": "سجل النشاط",
+            "viewToggle": {
+                "log": "السجل",
+                "schedules": "الجداول الزمنية"
+            },
+            "title": "النشاط",
             "subtitle": "تتبع جميع العمليات عبر أعمالك",
             "loading": "جار التحميل...",
             "fetchFailed": "فشل في تحميل الأنشطة",
@@ -5146,7 +5186,7 @@
             "resetPassword": "إعادة تعيين كلمة المرور",
             "authError": "خطأ في المصادقة",
             "dashboard": "لوحة التحكم",
-            "activity": "سجل النشاط",
+            "activity": "النشاط",
             "works": "الأعمال",
             "newWork": "عمل جديد",
             "work": "العمل",

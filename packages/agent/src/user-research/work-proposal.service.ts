@@ -87,8 +87,8 @@ function extractFailureMessage(input: unknown): string {
 import { resolveAiProviderForResearch } from './provider-resolver';
 import {
     WorkProposalStatus,
+    WorkProposalSource,
     type WorkProposal,
-    type WorkProposalSource,
 } from '../entities/work-proposal.entity';
 
 export interface GenerateProposalsResult {
@@ -180,7 +180,8 @@ export class WorkProposalService {
         @Optional()
         @InjectRepository(UserUpload)
         private readonly uploadsRepo?: Repository<UserUpload>,
-        // PR-3 - Idea lifecycle activity logging (mirrors MissionsService).
+        // PR-3 Idea lifecycle activity logging (mirrors MissionsService) +
+        // Schedules P2 `idea_generated` coverage — same @Optional() service.
         // TRAILING `@Optional()` param: hand-rolled tests construct this
         // service positionally, so existing params must keep their order.
         // Best-effort at call sites - an activity failure never fails the op.
@@ -525,7 +526,9 @@ export class WorkProposalService {
             `Generated ${saved.length} proposal(s) for ${userId} via "${providerName}" (${modelName}), tokens=${tokensUsed}`,
         );
 
-        // PR-3 - ONE activity row per generation batch (not per Idea).
+        // ONE activity row per generation batch (not per Idea). PR-3's
+        // recordIdeaActivity covers every source (incl. MISSION-sourced
+        // scheduled ticks), subsuming the Schedules-P2 idea_generated intent.
         await this.recordIdeaActivity(userId, ActivityActionType.IDEA_GENERATED, 'generate', {
             count: saved.length,
             source: opts.source,

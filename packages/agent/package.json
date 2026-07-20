@@ -164,6 +164,10 @@
         "./teams": {
             "types": "./dist/teams/index.d.ts",
             "default": "./dist/teams/index.js"
+        },
+        "./schedules": {
+            "types": "./dist/schedules/index.d.ts",
+            "default": "./dist/schedules/index.js"
         }
     },
     "scripts": {

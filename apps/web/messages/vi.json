@@ -1190,6 +1190,10 @@
                     "failed": "Thất bại",
                     "cancelled": "Đã hủy"
                 }
+            },
+            "viewToggle": {
+                "log": "Nhật ký",
+                "schedules": "Lịch trình"
             }
         },
         "works": {
@@ -4886,6 +4890,42 @@
             "membersBadge": "{count, plural, other {# thành viên}}",
             "empty": "Chưa có gì để hiển thị — hãy tạo nhóm hoặc Agent trong tổ chức này trước.",
             "noOrg": "Tạo một tổ chức để xem sơ đồ tổ chức của nó."
+        },
+        "schedules": {
+            "title": "Lịch trình",
+            "subtitle": "Mọi thứ được lên lịch để chạy trên các công việc, Agents, Missions và Tasks của bạn",
+            "fetchFailed": "Không tải được lịch trình",
+            "retry": "Thử lại",
+            "columns": {
+                "owner": "Chủ sở hữu",
+                "cadence": "Chu kỳ",
+                "nextRun": "Lần chạy tiếp theo",
+                "status": "Trạng thái"
+            },
+            "filters": {
+                "all": "Tất cả",
+                "activeOnly": "Chỉ hoạt động"
+            },
+            "sourceTypes": {
+                "recurringTask": "Tác vụ định kỳ",
+                "agentHeartbeat": "Nhịp Agent",
+                "workSchedule": "Lịch công việc",
+                "missionTick": "Tick Mission",
+                "sourceValidation": "Xác thực nguồn",
+                "dataSync": "Đồng bộ dữ liệu"
+            },
+            "statuses": {
+                "active": "Hoạt động",
+                "paused": "Tạm dừng",
+                "disabled": "Đã tắt",
+                "error": "Lỗi",
+                "ended": "Đã kết thúc"
+            },
+            "empty": {
+                "title": "Chưa có gì được lên lịch",
+                "description": "Tác vụ định kỳ, nhịp Agent, lịch công việc, tick Mission, xác thực nguồn và đồng bộ dữ liệu sẽ xuất hiện ở đây sau khi bạn thiết lập.",
+                "noResults": "Không có lịch trình nào khớp với bộ lọc hiện tại."
+            }
         }
     },
     "layout": {
