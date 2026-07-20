@@ -129,7 +129,10 @@ function mapCompany(row: RawManifestCompany): OrgTemplatePackage | null {
 
     const files = Array.isArray(row.files)
         ? row.files
-              .filter((f): f is string => typeof f === 'string' && SAFE_FILE_RE.test(f) && !f.includes('..'))
+              .filter(
+                  (f): f is string =>
+                      typeof f === 'string' && SAFE_FILE_RE.test(f) && !f.includes('..'),
+              )
               .slice(0, MAX_FILES)
         : [];
 
@@ -143,13 +146,22 @@ function mapCompany(row: RawManifestCompany): OrgTemplatePackage | null {
         slug: row.slug,
         path,
         name: stripHtml(typeof row.name === 'string' ? row.name : row.slug).slice(0, MAX_NAME_LEN),
-        description: stripHtml(typeof row.description === 'string' ? row.description : '').slice(0, MAX_DESC_LEN),
-        category: stripHtml(typeof row.category === 'string' ? row.category : 'general').slice(0, MAX_TAG_LEN),
+        description: stripHtml(typeof row.description === 'string' ? row.description : '').slice(
+            0,
+            MAX_DESC_LEN,
+        ),
+        category: stripHtml(typeof row.category === 'string' ? row.category : 'general').slice(
+            0,
+            MAX_TAG_LEN,
+        ),
         agents: asCount(row.agents),
         teams: asCount(row.teams),
         skills: asCount(row.skills),
         projects: asCount(row.projects),
-        iconName: typeof row.avatarIcon === 'string' ? kebabToPascal(stripHtml(row.avatarIcon)) : undefined,
+        iconName:
+            typeof row.avatarIcon === 'string'
+                ? kebabToPascal(stripHtml(row.avatarIcon))
+                : undefined,
         tags: rawTags.length > 0 ? rawTags : undefined,
         featured: row.featured === true ? true : undefined,
         files,
@@ -238,7 +250,12 @@ export class OrgTemplateCatalogService {
                 );
                 content = file?.content ?? null;
             } else {
-                content = await fetchPublicRawFile(ORGS_REPO_OWNER, ORGS_REPO_NAME, ref, MANIFEST_PATH);
+                content = await fetchPublicRawFile(
+                    ORGS_REPO_OWNER,
+                    ORGS_REPO_NAME,
+                    ref,
+                    MANIFEST_PATH,
+                );
             }
             if (!content) return [];
             const manifest = JSON.parse(content) as { companies?: RawManifestCompany[] };

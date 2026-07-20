@@ -1,4 +1,11 @@
-import { MigrationInterface, QueryRunner, Table, TableColumn, TableForeignKey, TableIndex } from 'typeorm';
+import {
+    MigrationInterface,
+    QueryRunner,
+    Table,
+    TableColumn,
+    TableForeignKey,
+    TableIndex,
+} from 'typeorm';
 
 /**
  * Teams & Prebuilt Companies — Phase 1 data model.

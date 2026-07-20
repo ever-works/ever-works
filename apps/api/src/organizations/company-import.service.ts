@@ -159,7 +159,9 @@ export class CompanyImportService {
         // ── COMPANY.md (required pivot input) ──
         const companyRaw = await fetchFile('COMPANY.md');
         if (!companyRaw) {
-            throw new NotFoundException(`Company template ${input.templateSlug} is missing COMPANY.md`);
+            throw new NotFoundException(
+                `Company template ${input.templateSlug} is missing COMPANY.md`,
+            );
         }
         const company = splitFrontmatter(companyRaw);
         const orgName = input.name?.trim() || str(company.fm.name) || pkg.name;
@@ -167,7 +169,9 @@ export class CompanyImportService {
         // ── collect package docs by convention (inventory-driven, spec §6.1) ──
         // Cap truncation is REPORTED, never silent (PR #1647 review).
         const byPattern = (re: RegExp, cap: number, kind: string) => {
-            const all = pkg.files.filter((f) => re.test(f)).map((f) => ({ path: f, slug: f.split('/')[1] }));
+            const all = pkg.files
+                .filter((f) => re.test(f))
+                .map((f) => ({ path: f, slug: f.split('/')[1] }));
             for (const dropped of all.slice(cap)) {
                 skipped.push({ path: dropped.path, reason: `over the ${kind} cap (${cap})` });
             }
@@ -236,7 +240,12 @@ export class CompanyImportService {
                         created.agents++;
                         if (doc.body) {
                             await this.agentFiles
-                                .write({ userId, agentId: agent.id, name: 'AGENTS.md', body: doc.body })
+                                .write({
+                                    userId,
+                                    agentId: agent.id,
+                                    name: 'AGENTS.md',
+                                    body: doc.body,
+                                })
                                 .catch((err: unknown) =>
                                     skipped.push({
                                         path: doc.path,
@@ -259,7 +268,10 @@ export class CompanyImportService {
                     if (!agentId || !managerSlug) continue;
                     const managerId = agentIdBySlug.get(managerSlug);
                     if (!managerId) {
-                        skipped.push({ path: doc.path, reason: `reportsTo "${managerSlug}" not found in package` });
+                        skipped.push({
+                            path: doc.path,
+                            reason: `reportsTo "${managerSlug}" not found in package`,
+                        });
                         continue;
                     }
                     await this.agentsService
@@ -291,7 +303,9 @@ export class CompanyImportService {
                             name: str(doc.fm.name) ?? doc.slug,
                             slug: doc.slug,
                             description: str(doc.fm.description),
-                            managerAgentId: managerSlug ? (agentIdBySlug.get(managerSlug) ?? null) : null,
+                            managerAgentId: managerSlug
+                                ? (agentIdBySlug.get(managerSlug) ?? null)
+                                : null,
                             metadata: {
                                 source: {
                                     repo: `${ORGS_REPO_OWNER}/${ORGS_REPO_NAME}`,
@@ -330,7 +344,10 @@ export class CompanyImportService {
                                 await this.teamsService
                                     .update(org.id, childId, { parentTeamId: teamId })
                                     .catch(() =>
-                                        skipped.push({ path: doc.path, reason: `could not nest team "${childTeamSlug}"` }),
+                                        skipped.push({
+                                            path: doc.path,
+                                            reason: `could not nest team "${childTeamSlug}"`,
+                                        }),
                                     );
                             }
                         }
@@ -384,15 +401,25 @@ export class CompanyImportService {
                     const agentId = agentIdBySlug.get(doc.slug);
                     if (!agentId || !Array.isArray(doc.fm.skills)) continue;
                     for (const shortname of doc.fm.skills) {
-                        const skillId = typeof shortname === 'string' ? skillIdBySlug.get(shortname) : undefined;
+                        const skillId =
+                            typeof shortname === 'string'
+                                ? skillIdBySlug.get(shortname)
+                                : undefined;
                         if (!skillId) {
                             if (typeof shortname === 'string') {
-                                skipped.push({ path: doc.path, reason: `skill "${shortname}" not found in package` });
+                                skipped.push({
+                                    path: doc.path,
+                                    reason: `skill "${shortname}" not found in package`,
+                                });
                             }
                             continue;
                         }
                         await this.skillsService
-                            .createBinding(userId, { skillId, targetType: 'agent', targetId: agentId })
+                            .createBinding(userId, {
+                                skillId,
+                                targetType: 'agent',
+                                targetId: agentId,
+                            })
                             .catch((err: unknown) =>
                                 skipped.push({
                                     path: doc.path,

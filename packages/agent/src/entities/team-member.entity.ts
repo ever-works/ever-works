@@ -1,10 +1,4 @@
-import {
-    Column,
-    CreateDateColumn,
-    Entity,
-    Index,
-    PrimaryGeneratedColumn,
-} from 'typeorm';
+import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 
 /**
  * Teams & Prebuilt Companies — `docs/specs/features/teams-and-companies/spec.md` §2.2.

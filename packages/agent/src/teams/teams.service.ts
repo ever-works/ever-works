@@ -93,7 +93,9 @@ export class TeamsService {
             return await this.teams.save(team);
         } catch (error) {
             if (this.isUniqueViolation(error)) {
-                throw new ConflictException(`A team with slug "${slug}" already exists in this organization`);
+                throw new ConflictException(
+                    `A team with slug "${slug}" already exists in this organization`,
+                );
             }
             throw error;
         }
@@ -131,10 +133,12 @@ export class TeamsService {
     async remove(orgId: string, teamId: string): Promise<void> {
         const team = await this.getOrThrow(orgId, teamId);
         await this.teams.manager.transaction(async (em) => {
-            await em.getRepository(Team).update(
-                { parentTeamId: teamId, organizationId: orgId },
-                { parentTeamId: team.parentTeamId ?? null },
-            );
+            await em
+                .getRepository(Team)
+                .update(
+                    { parentTeamId: teamId, organizationId: orgId },
+                    { parentTeamId: team.parentTeamId ?? null },
+                );
             await em.getRepository(Team).delete({ id: teamId });
         });
     }
@@ -326,7 +330,9 @@ export class TeamsService {
         const agentIds = rows.filter((r) => r.memberType === 'agent').map((r) => r.memberId);
         const userIds = rows.filter((r) => r.memberType === 'user').map((r) => r.memberId);
         const [agentRows, userRows] = await Promise.all([
-            agentIds.length ? this.agents.find({ where: { id: In(agentIds) } }) : Promise.resolve([]),
+            agentIds.length
+                ? this.agents.find({ where: { id: In(agentIds) } })
+                : Promise.resolve([]),
             userIds.length ? this.users.find({ where: { id: In(userIds) } }) : Promise.resolve([]),
         ]);
         const agentsById = new Map(agentRows.map((a) => [a.id, a]));
@@ -340,7 +346,8 @@ export class TeamsService {
                 r.memberType === 'agent'
                     ? (agentsById.get(r.memberId)?.name ?? null)
                     : (usersById.get(r.memberId)?.username ?? null),
-            title: r.memberType === 'agent' ? (agentsById.get(r.memberId)?.title ?? null) : undefined,
+            title:
+                r.memberType === 'agent' ? (agentsById.get(r.memberId)?.title ?? null) : undefined,
             createdAt: r.createdAt,
         }));
     }

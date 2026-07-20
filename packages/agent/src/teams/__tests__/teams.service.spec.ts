@@ -34,7 +34,12 @@ function repoMock(): RepoMock {
     };
 }
 
-const ORG: Partial<Organization> = { id: 'org-1', tenantId: 'ten-1', slug: 'acme', displayName: 'Acme' };
+const ORG: Partial<Organization> = {
+    id: 'org-1',
+    tenantId: 'ten-1',
+    slug: 'acme',
+    displayName: 'Acme',
+};
 
 function makeTeam(overrides: Partial<Team> = {}): Team {
     return {
@@ -177,9 +182,18 @@ describe('TeamsService', () => {
         it('adds a same-tenant agent and stamps scope columns', async () => {
             const { service, teams, members, agents } = build();
             teams.findOne.mockResolvedValue(makeTeam());
-            agents.findOne.mockResolvedValue({ id: 'ag-1', name: 'CEO', title: null, tenantId: 'ten-1' });
+            agents.findOne.mockResolvedValue({
+                id: 'ag-1',
+                name: 'CEO',
+                title: null,
+                tenantId: 'ten-1',
+            });
             agents.find.mockResolvedValue([{ id: 'ag-1', name: 'CEO', title: null }]);
-            members.save.mockImplementation(async (x: object) => ({ id: 'tm-1', createdAt: new Date(), ...x }));
+            members.save.mockImplementation(async (x: object) => ({
+                id: 'tm-1',
+                createdAt: new Date(),
+                ...x,
+            }));
             const view = await service.addMember('u1', 'org-1', 'team-1', {
                 memberType: 'agent',
                 memberId: 'ag-1',
@@ -202,7 +216,10 @@ describe('TeamsService', () => {
             teams.findOne.mockResolvedValue(makeTeam());
             agents.findOne.mockResolvedValue({ id: 'ag-2', tenantId: 'OTHER' });
             await expect(
-                service.addMember('u1', 'org-1', 'team-1', { memberType: 'agent', memberId: 'ag-2' }),
+                service.addMember('u1', 'org-1', 'team-1', {
+                    memberType: 'agent',
+                    memberId: 'ag-2',
+                }),
             ).rejects.toThrow(NotFoundException);
         });
 
@@ -221,7 +238,10 @@ describe('TeamsService', () => {
             agents.findOne.mockResolvedValue({ id: 'ag-1', tenantId: 'ten-1' });
             members.save.mockRejectedValue({ message: 'UNIQUE constraint failed: team_members' });
             await expect(
-                service.addMember('u1', 'org-1', 'team-1', { memberType: 'agent', memberId: 'ag-1' }),
+                service.addMember('u1', 'org-1', 'team-1', {
+                    memberType: 'agent',
+                    memberId: 'ag-1',
+                }),
             ).rejects.toThrow(ConflictException);
         });
 
@@ -263,7 +283,13 @@ describe('OrgChartService', () => {
         // org-stamped agents + tenant-stamped org-less agents
         agents.find
             .mockResolvedValueOnce([
-                { id: 'ag-1', name: 'CTO', title: 'CTO', status: 'active', reportsToAgentId: 'ag-2' },
+                {
+                    id: 'ag-1',
+                    name: 'CTO',
+                    title: 'CTO',
+                    status: 'active',
+                    reportsToAgentId: 'ag-2',
+                },
             ])
             .mockResolvedValueOnce([
                 { id: 'ag-2', name: 'CEO', title: null, status: 'draft', reportsToAgentId: null },

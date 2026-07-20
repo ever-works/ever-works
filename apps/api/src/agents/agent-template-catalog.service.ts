@@ -197,7 +197,12 @@ export class AgentTemplateCatalogService {
                 );
                 content = file?.content ?? null;
             } else {
-                content = await fetchPublicRawFile(AGENTS_REPO_OWNER, AGENTS_REPO_NAME, ref, MANIFEST_PATH);
+                content = await fetchPublicRawFile(
+                    AGENTS_REPO_OWNER,
+                    AGENTS_REPO_NAME,
+                    ref,
+                    MANIFEST_PATH,
+                );
             }
             if (!content) return [];
             const manifest = JSON.parse(content) as { templates?: RawManifestTemplate[] };

@@ -7,6 +7,7 @@
 **Internal codename:** `teams-and-companies`
 
 **Related code today:**
+
 - `packages/agent/src/entities/agent.entity.ts` — Agent scope model (`tenant|mission|idea|work`), `targets`, `agent_memberships`
 - `packages/agent/src/entities/organization.entity.ts` — Organization (`linkedWorkId`, registration fields)
 - `apps/api/src/organizations/` — org routes, `OrganizationOwnershipGuard`, `organization-membership.service.ts`
@@ -28,18 +29,18 @@
 Ever Works already has 5 of the 6 entities of the open **Agent Companies** spec
 (`agentcompanies/v1`, https://agentcompanies.io/specification):
 
-| agentcompanies/v1 | Ever Works | Status |
-|---|---|---|
-| Company (`COMPANY.md`) | **Organization** (user-facing "Company") | exists |
-| Project (`PROJECT.md`) | **Work** (internal name unchanged) | exists |
-| Task (`TASK.md`) | **Task** | exists |
-| Skill (`SKILL.md`) | **Skill** (Agent Skills format, unchanged) | exists |
-| Agent (`AGENTS.md`) | **Agent** | exists |
-| Team (`TEAM.md`) | **Team** | **NEW — this spec** |
+| agentcompanies/v1      | Ever Works                                 | Status              |
+| ---------------------- | ------------------------------------------ | ------------------- |
+| Company (`COMPANY.md`) | **Organization** (user-facing "Company")   | exists              |
+| Project (`PROJECT.md`) | **Work** (internal name unchanged)         | exists              |
+| Task (`TASK.md`)       | **Task**                                   | exists              |
+| Skill (`SKILL.md`)     | **Skill** (Agent Skills format, unchanged) | exists              |
+| Agent (`AGENTS.md`)    | **Agent**                                  | exists              |
+| Team (`TEAM.md`)       | **Team**                                   | **NEW — this spec** |
 
 This feature adds:
 
-1. **Teams** — a first-class, optional grouping of Agents *and* human members inside an
+1. **Teams** — a first-class, optional grouping of Agents _and_ human members inside an
    Organization, with team-in-team hierarchy (`parentTeamId`) and agent-reports-to-agent
    hierarchy (`Agent.reportsToAgentId`).
 2. **Org Chart** — a per-Organization chart of Teams, Agents and Members.
@@ -77,7 +78,7 @@ A Team is a named, optional container **inside one Organization**:
 - Groups **Agents and human members** via a roster (`team_members`), not via columns on
   the member entities. An agent/user may belong to several Teams.
 - Nests via `parentTeamId` (service-enforced acyclic, max depth 10). This satisfies the
-  locked tenants-and-orgs decision "no nested Organizations": hierarchy lives *inside*
+  locked tenants-and-orgs decision "no nested Organizations": hierarchy lives _inside_
   an Org, never between Orgs.
 - Optionally names a **manager agent** (`managerAgentId`) — mirrors `TEAM.md`'s
   `manager:` field and anchors the subtree in the org chart.
@@ -109,32 +110,32 @@ agent templates (ADR-011 fork-on-use): nothing stays subscribed to the repo.
 
 ### 2.1 `teams` (Tier A: `tenantId` + `organizationId`, auto-stamped)
 
-| column | type | notes |
-|---|---|---|
-| `id` | uuid PK | |
-| `userId` | uuid | creator/owner (house pattern) |
-| `name` | varchar(200) | |
-| `slug` | varchar(100) | `^[a-z0-9][a-z0-9-]*$`; **UNIQUE(organizationId, slug)** |
-| `description` | text, null | |
-| `parentTeamId` | uuid, null | raw column (no `@ManyToOne`), FK in migration `ON DELETE SET NULL` |
-| `managerAgentId` | uuid, null | raw column, FK in migration `ON DELETE SET NULL` |
-| `avatarIcon` | varchar(64), null | kebab-case lucide id (same convention as agent templates) |
-| `metadata` | simple-json, null | provenance: `{source: {repo, path, slug, contentHash}}` on import |
-| `tenantId` / `organizationId` | uuid, null | Tier A scope columns → `ScopeStampingSubscriber` auto-stamps |
-| `createdAt` / `updatedAt` | `PortableDateColumn` | |
+| column                        | type                 | notes                                                              |
+| ----------------------------- | -------------------- | ------------------------------------------------------------------ |
+| `id`                          | uuid PK              |                                                                    |
+| `userId`                      | uuid                 | creator/owner (house pattern)                                      |
+| `name`                        | varchar(200)         |                                                                    |
+| `slug`                        | varchar(100)         | `^[a-z0-9][a-z0-9-]*$`; **UNIQUE(organizationId, slug)**           |
+| `description`                 | text, null           |                                                                    |
+| `parentTeamId`                | uuid, null           | raw column (no `@ManyToOne`), FK in migration `ON DELETE SET NULL` |
+| `managerAgentId`              | uuid, null           | raw column, FK in migration `ON DELETE SET NULL`                   |
+| `avatarIcon`                  | varchar(64), null    | kebab-case lucide id (same convention as agent templates)          |
+| `metadata`                    | simple-json, null    | provenance: `{source: {repo, path, slug, contentHash}}` on import  |
+| `tenantId` / `organizationId` | uuid, null           | Tier A scope columns → `ScopeStampingSubscriber` auto-stamps       |
+| `createdAt` / `updatedAt`     | `PortableDateColumn` |                                                                    |
 
 ### 2.2 `team_members` (Tier C: both scope columns denormalized)
 
-| column | type | notes |
-|---|---|---|
-| `id` | uuid PK | |
-| `teamId` | uuid | FK in migration `ON DELETE CASCADE` |
-| `memberType` | varchar(16) | `'agent' \| 'user'` (mirrors `TaskAssignee.actorType`) |
-| `memberId` | uuid | agents.id or users.id (polymorphic, service-validated) |
-| `role` | varchar(16) | `'lead' \| 'member'`, default `'member'` — display-only in v1, **not** authz |
-| `addedById` | uuid, null | |
-| `tenantId` / `organizationId` | uuid, null | |
-| `createdAt` | `PortableDateColumn` | |
+| column                        | type                 | notes                                                                        |
+| ----------------------------- | -------------------- | ---------------------------------------------------------------------------- |
+| `id`                          | uuid PK              |                                                                              |
+| `teamId`                      | uuid                 | FK in migration `ON DELETE CASCADE`                                          |
+| `memberType`                  | varchar(16)          | `'agent' \| 'user'` (mirrors `TaskAssignee.actorType`)                       |
+| `memberId`                    | uuid                 | agents.id or users.id (polymorphic, service-validated)                       |
+| `role`                        | varchar(16)          | `'lead' \| 'member'`, default `'member'` — display-only in v1, **not** authz |
+| `addedById`                   | uuid, null           |                                                                              |
+| `tenantId` / `organizationId` | uuid, null           |                                                                              |
+| `createdAt`                   | `PortableDateColumn` |                                                                              |
 
 UNIQUE(`teamId`, `memberType`, `memberId`).
 
@@ -283,28 +284,38 @@ ever-works/orgs
 
 ```jsonc
 {
-  "$schema": "./schema/orgs-manifest.schema.json",
-  "version": 1,
-  "companies": [{
-    "slug": "ever-starter", "path": "companies/ever-starter",
-    "name": "Ever Starter Co", "description": "…", "category": "general",
-    "agents": 8, "teams": 2, "skills": 4, "projects": 1,
-    "avatarIcon": "rocket", "tags": ["starter"], "featured": true
-  }]
+	"$schema": "./schema/orgs-manifest.schema.json",
+	"version": 1,
+	"companies": [
+		{
+			"slug": "ever-starter",
+			"path": "companies/ever-starter",
+			"name": "Ever Starter Co",
+			"description": "…",
+			"category": "general",
+			"agents": 8,
+			"teams": 2,
+			"skills": 4,
+			"projects": 1,
+			"avatarIcon": "rocket",
+			"tags": ["starter"],
+			"featured": true
+		}
+	]
 }
 ```
 
 ### 6.2 Import mapping (`CompanyImportService`)
 
-| Package file | Creates | Notes |
-|---|---|---|
-| `COMPANY.md` | **Organization** | name/slug (user may override name in the wizard); goals → org `metadata`; lazy Tenant as usual |
-| `teams/*/TEAM.md` | **Team** rows | `manager:` path → `managerAgentId`; `includes:` agent paths → roster rows; nested team includes → `parentTeamId` |
-| `agents/*/AGENTS.md` | **Agent** rows | scope `tenant`, org-stamped; markdown body → DB-inline `agentsMd` (the tenant-scope E9 path); `reportsTo` slug → `reportsToAgentId` (second pass after all slugs resolve, Paperclip-style); **heartbeat disabled + status paused** on arrival |
-| `AGENTS.md skills:` shortnames | **Skill** rows + `SkillBinding(targetType='agent')` | resolved against the package's `skills/` dir; unknown shortnames skipped with a warning in the import report |
-| `projects/*/PROJECT.md` | **draft Work** | new `createDraftWork` sibling of `createCompanyWork` (bare row, `kind:'default'`, `status:'draft'`, no repo/generation side-effects); body → Work description |
-| `projects/*/tasks/*/TASK.md`, `tasks/*` | **Task** rows | `assignee:` slug → `TaskAssignee(actorType='agent')`; `project:` → the created Work's `workId` |
-| `.works/company.yml` | hints | §6.3; unknown vendor files (e.g. `.paperclip.yaml`) are **ignored silently** — required for cross-vendor compat |
+| Package file                            | Creates                                             | Notes                                                                                                                                                                                                                                         |
+| --------------------------------------- | --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `COMPANY.md`                            | **Organization**                                    | name/slug (user may override name in the wizard); goals → org `metadata`; lazy Tenant as usual                                                                                                                                                |
+| `teams/*/TEAM.md`                       | **Team** rows                                       | `manager:` path → `managerAgentId`; `includes:` agent paths → roster rows; nested team includes → `parentTeamId`                                                                                                                              |
+| `agents/*/AGENTS.md`                    | **Agent** rows                                      | scope `tenant`, org-stamped; markdown body → DB-inline `agentsMd` (the tenant-scope E9 path); `reportsTo` slug → `reportsToAgentId` (second pass after all slugs resolve, Paperclip-style); **heartbeat disabled + status paused** on arrival |
+| `AGENTS.md skills:` shortnames          | **Skill** rows + `SkillBinding(targetType='agent')` | resolved against the package's `skills/` dir; unknown shortnames skipped with a warning in the import report                                                                                                                                  |
+| `projects/*/PROJECT.md`                 | **draft Work**                                      | new `createDraftWork` sibling of `createCompanyWork` (bare row, `kind:'default'`, `status:'draft'`, no repo/generation side-effects); body → Work description                                                                                 |
+| `projects/*/tasks/*/TASK.md`, `tasks/*` | **Task** rows                                       | `assignee:` slug → `TaskAssignee(actorType='agent')`; `project:` → the created Work's `workId`                                                                                                                                                |
+| `.works/company.yml`                    | hints                                               | §6.3; unknown vendor files (e.g. `.paperclip.yaml`) are **ignored silently** — required for cross-vendor compat                                                                                                                               |
 
 Fetching uses the existing `GitFacadeService.getFileContent` path with the platform
 GitHub App / `EVER_WORKS_ORGS_TOKEN` / `GITHUB_TOKEN` fallback chain (tokenless →
@@ -330,23 +341,23 @@ secrets:
 ```yaml
 schema: everworks/v1
 agents:
-  ceo:
-    template: starter-pm        # optional ever-works/agents slug to merge identity files from
-    heartbeatCadence: null      # stays off unless the user enables it post-import
+    ceo:
+        template: starter-pm # optional ever-works/agents slug to merge identity files from
+        heartbeatCadence: null # stays off unless the user enables it post-import
 company:
-  suggestedWorkKind: default
+    suggestedWorkKind: default
 ```
 
 ### 6.4 Content & licensing rules for `ever-works/orgs`
 
-- **Original prose only.** Companies are *inspired by* the paperclipai/companies catalog
+- **Original prose only.** Companies are _inspired by_ the paperclipai/companies catalog
   (same idea: engineering shop, research lab, game studio, …) but every COMPANY/TEAM/
   AGENTS/SKILL body is written fresh for Ever Works. No `.paperclip.yaml`, no
   SOUL/HEARTBEAT/TOOLS runtime scaffolding, no `paperclip`/`para-memory-files` skill
   refs, no "Generated with company-creator" credit lines.
 - **Credit up front:** README credits `paperclipai/companies` (and agentcompanies.io)
   with links, as the catalog that pioneered the format. Where a company adapts the
-  *structure* of an upstream one, its COMPANY.md carries `metadata.sources` with
+  _structure_ of an upstream one, its COMPANY.md carries `metadata.sources` with
   `usage: referenced` per the spec.
 - **License hygiene:** repo is MIT. Nothing derived from CC-BY-SA sources (i.e. no
   Trail-of-Bits-derived content) ships in v1 — share-alike doesn't mix with MIT.

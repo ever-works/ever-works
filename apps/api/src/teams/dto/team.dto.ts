@@ -69,7 +69,10 @@ export class UpdateTeamDto {
     @MaxLength(4000)
     description?: string;
 
-    @ApiPropertyOptional({ description: 'New parent team id, or null to move to top level', nullable: true })
+    @ApiPropertyOptional({
+        description: 'New parent team id, or null to move to top level',
+        nullable: true,
+    })
     @IsOptional()
     @IsUUID()
     parentTeamId?: string;
