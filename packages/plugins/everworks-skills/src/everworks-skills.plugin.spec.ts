@@ -88,7 +88,10 @@ describe('EverWorksSkillsPlugin (builtin fallback catalog)', () => {
 
 	it('falls back to the builtin catalog when the manifest is malformed', async () => {
 		// 200 OK but not a skills array -> loader throws -> builtin fallback.
-		vi.stubGlobal('fetch', vi.fn(async () => textResponse(JSON.stringify({ nope: true }))));
+		vi.stubGlobal(
+			'fetch',
+			vi.fn(async () => textResponse(JSON.stringify({ nope: true })))
+		);
 		const fresh = new EverWorksSkillsPlugin();
 		await fresh.onLoad({
 			logger: { log: () => undefined, warn: () => undefined, error: () => undefined }

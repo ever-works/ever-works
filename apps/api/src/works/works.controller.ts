@@ -403,6 +403,10 @@ export class WorksController {
             deployProvider: dto.deployProvider,
             storageProvider: dto.storageProvider,
             websiteTemplateId: dto.websiteTemplateId,
+            // Work-kind choice → kind-aware default website template
+            // (already normalized/whitelisted by the QuickCreateWorkDto
+            // transform; createWork re-normalizes defensively).
+            kind: dto.kind,
             readmeConfig: dto.readmeConfig,
             correlationId: dto.correlationId,
         });

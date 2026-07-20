@@ -1,4 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { TenantRuntimeBindingResolverService } from '../trigger/worker/services/tenant-runtime-binding-resolver.service';
 
 const {
     taskMock,
@@ -33,7 +34,10 @@ vi.mock('@trigger.dev/sdk', () => ({
     logger: { info: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() },
 }));
 
-vi.mock('@ever-works/agent/tasks', () => ({}));
+// CredentialVersionService is imported by the worker graph (an @Optional()
+// dep on TenantRuntimeBindingResolverService); the full-module mock must
+// provide it or vitest 400s the file on the missing export.
+vi.mock('@ever-works/agent/tasks', () => ({ CredentialVersionService: class {} }));
 
 vi.mock('@ever-works/agent/entities', () => ({
     GenerateStatusType,
@@ -56,6 +60,13 @@ vi.mock('../trigger/worker/utils/task-context.utils', () => ({
     createTaskContext: createTaskContextMock,
 }));
 
+// EW-742 P3.2 T22: run() resolves this from the worker appContext and skips
+// on a 'drained' binding. Mock it to a fake DI-token class; the test returns
+// a stub instance from `appContext.get` and drives the binding status.
+vi.mock('../trigger/worker/services/tenant-runtime-binding-resolver.service', () => ({
+    TenantRuntimeBindingResolverService: class TenantRuntimeBindingResolverService {},
+}));
+
 type TaskConfig = {
     id: string;
     maxDuration: number;
@@ -68,6 +79,7 @@ let registeredConfig: TaskConfig;
 
 describe('workGenerationTask', () => {
     let appContext: { get: ReturnType<typeof vi.fn> };
+    let bindingResolver: { resolveForWork: ReturnType<typeof vi.fn> };
     let orchestrator: {
         run: ReturnType<typeof vi.fn>;
         handleFailure: ReturnType<typeof vi.fn>;
@@ -103,8 +115,13 @@ describe('workGenerationTask', () => {
         work = { id: 'w-1' };
         user = { id: 'u-1' };
 
+        // Default: a resolved (non-drained) binding so run() proceeds to the
+        // orchestrator. Individual tests override resolveForWork for the
+        // drained-skip path.
+        bindingResolver = { resolveForWork: vi.fn().mockResolvedValue({ status: 'no-binding' }) };
         appContext.get.mockImplementation((token: any) => {
             if (token === WorkScheduleServiceToken) return scheduleService;
+            if (token === TenantRuntimeBindingResolverService) return bindingResolver;
             throw new Error(`Unexpected DI token: ${String(token)}`);
         });
 
