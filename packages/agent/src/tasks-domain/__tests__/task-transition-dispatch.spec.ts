@@ -46,7 +46,10 @@ describe('TaskTransitionService — Phase 15.3 agent dispatch hook', () => {
         blocks = { findByTaskId: jest.fn().mockResolvedValue([]) };
         approvers = { allApproved: jest.fn().mockResolvedValue(true) };
         assignees = { findAgentAssignees: jest.fn().mockResolvedValue([]) };
-        runs = { createQueued: jest.fn().mockResolvedValue({ id: 'r1' }) };
+        runs = {
+            createQueued: jest.fn().mockResolvedValue({ id: 'r1' }),
+            markFailed: jest.fn().mockResolvedValue(undefined),
+        };
         dispatcher = { enqueue: jest.fn().mockResolvedValue({ runId: 'trd-1' }) };
     });
 
@@ -129,7 +132,6 @@ describe('TaskTransitionService — Phase 15.3 agent dispatch hook', () => {
 
     it('catches dispatcher failures, transitions AgentRun to failed, and does not fail transition', async () => {
         const svc = makeSvc();
-        runs.markFailed = jest.fn().mockResolvedValue(undefined);
         dispatcher.enqueue.mockRejectedValueOnce(new Error('Trigger.dev down'));
         const task = makeTask({ status: TaskStatus.TODO });
         tasks.findById.mockResolvedValueOnce({ ...task, status: TaskStatus.IN_PROGRESS });
@@ -139,11 +141,49 @@ describe('TaskTransitionService — Phase 15.3 agent dispatch hook', () => {
         const result = await svc.transition(task, TaskStatus.IN_PROGRESS);
         expect(result.status).toBe(TaskStatus.IN_PROGRESS); // transition itself succeeded
         await new Promise((r) => setImmediate(r));
-        expect(runs.markFailed).toHaveBeenCalledWith('r1', expect.stringContaining('Trigger.dev down'));
+        // The `dispatch-failed:` prefix is the contract the Activity tab and any
+        // future triage tooling reads — pin it, not just the underlying cause.
+        expect(runs.markFailed).toHaveBeenCalledWith(
+            'r1',
+            expect.stringContaining('dispatch-failed: Trigger.dev down'),
+        );
+    });
+
+    it('skips reconciliation when the queued run was never created, and keeps fanning out', async () => {
+        const svc = makeSvc();
+        // createQueued fails for the FIRST assignee only — `run` stays null, so
+        // the catch block has nothing to reconcile.
+        runs.createQueued.mockRejectedValueOnce(new Error('DB down'));
+        const task = makeTask({ status: TaskStatus.TODO });
+        tasks.findById.mockResolvedValueOnce({ ...task, status: TaskStatus.IN_PROGRESS });
+        assignees.findAgentAssignees.mockResolvedValueOnce([
+            { assigneeType: 'agent', assigneeId: 'agent-a' },
+            { assigneeType: 'agent', assigneeId: 'agent-b' },
+        ]);
+        const result = await svc.transition(task, TaskStatus.IN_PROGRESS);
+        expect(result.status).toBe(TaskStatus.IN_PROGRESS); // transition itself succeeded
+        await new Promise((r) => setImmediate(r));
+
+        expect(runs.markFailed).not.toHaveBeenCalled();
+        // The `if (run)` guard is load-bearing: without it the catch block
+        // dereferences a null `run`, and because the fan-out `for` loop awaits
+        // each iteration that TypeError escapes the loop and silently strands
+        // every remaining assignee. agent-b must still be dispatched.
+        expect(dispatcher.enqueue).toHaveBeenCalledTimes(1);
+        expect(dispatcher.enqueue).toHaveBeenCalledWith(
+            expect.objectContaining({ agentId: 'agent-b', runId: 'r1' }),
+        );
     });
 
     it('catches dispatcher failures gracefully when runs repository is missing', async () => {
-        const svc = new TaskTransitionService(tasks, blocks, approvers, assignees, undefined, dispatcher);
+        const svc = new TaskTransitionService(
+            tasks,
+            blocks,
+            approvers,
+            assignees,
+            undefined,
+            dispatcher,
+        );
         dispatcher.enqueue.mockRejectedValueOnce(new Error('Trigger.dev down'));
         const task = makeTask({ status: TaskStatus.TODO });
         tasks.findById.mockResolvedValueOnce({ ...task, status: TaskStatus.IN_PROGRESS });
@@ -153,5 +193,13 @@ describe('TaskTransitionService — Phase 15.3 agent dispatch hook', () => {
         const result = await svc.transition(task, TaskStatus.IN_PROGRESS);
         expect(result.status).toBe(TaskStatus.IN_PROGRESS); // transition itself succeeded
         await new Promise((r) => setImmediate(r));
+        // No runs repository ⇒ no row was ever persisted, so dispatch still had to
+        // be attempted with an undefined runId, and reconciliation must be skipped
+        // rather than throwing. Asserting the runId pins the `run?.id` behaviour
+        // that hoisting `run` out of the try block could silently have broken.
+        expect(dispatcher.enqueue).toHaveBeenCalledWith(
+            expect.objectContaining({ runId: undefined }),
+        );
+        expect(runs.markFailed).not.toHaveBeenCalled();
     });
 });

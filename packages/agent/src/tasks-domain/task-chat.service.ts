@@ -173,7 +173,17 @@ export class TaskChatService {
                             }
                         }
                     }
-                })();
+                })().catch((err) =>
+                    // Belt-and-braces: everything above is already inside a
+                    // try/catch, but this IIFE is fire-and-forget, so anything
+                    // that still escapes (e.g. a throwing logger) would become an
+                    // unhandled rejection — process-fatal on Node >= 15. The
+                    // sibling fan-out in task-transition.service.ts is guarded the
+                    // same way.
+                    this.logger.warn(
+                        `Agent chat-reply fan-out failed for message ${row.id}: ${err}`,
+                    ),
+                );
             }
         }
         return row;
