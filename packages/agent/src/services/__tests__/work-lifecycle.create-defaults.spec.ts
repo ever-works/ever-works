@@ -488,6 +488,65 @@ describe('WorkLifecycleService.createWork — provider defaults + quota', () => 
         expect(deps.workRepo.create).not.toHaveBeenCalled();
     });
 
+    // ─────────────────────────────────────────────────────────────────────
+    // Work-kind persistence — the create path stamps `work.kind` from the
+    // DTO (normalized + whitelisted) so the kind-aware default website
+    // template (PR #1681) can key off it. Omitted → the column default
+    // `'default'` applies (workData must NOT carry a kind key at all).
+    // ─────────────────────────────────────────────────────────────────────
+    describe('work.kind persistence', () => {
+        it.each(['website', 'landing-page', 'blog', 'directory', 'awesome-repo'])(
+            'persists a user-selectable kind (%s) from the DTO',
+            async (kind) => {
+                const { service, deps } = makeService(null);
+
+                await service.createWork({ ...baseDto, kind }, baseUser);
+
+                const persisted = deps.workRepo.create.mock.calls[0][0];
+                expect(persisted.kind).toBe(kind);
+            },
+        );
+
+        it('normalizes the `landing` alias to the canonical `landing-page`', async () => {
+            const { service, deps } = makeService(null);
+
+            await service.createWork({ ...baseDto, kind: 'landing' }, baseUser);
+
+            const persisted = deps.workRepo.create.mock.calls[0][0];
+            expect(persisted.kind).toBe('landing-page');
+        });
+
+        it('leaves kind unset when the DTO omits it (column default applies)', async () => {
+            const { service, deps } = makeService(null);
+
+            await service.createWork(baseDto, baseUser);
+
+            const persisted = deps.workRepo.create.mock.calls[0][0];
+            expect('kind' in persisted).toBe(false);
+        });
+
+        it('coerces unknown kinds to `default` — arbitrary input never reaches the column', async () => {
+            const { service, deps } = makeService(null);
+
+            await service.createWork(
+                { ...baseDto, kind: '<script>alert(1)</script>' } as CreateWorkDto,
+                baseUser,
+            );
+
+            const persisted = deps.workRepo.create.mock.calls[0][0];
+            expect(persisted.kind).toBe('default');
+        });
+
+        it('coerces `company` to `default` — Company Works only via the Register-Company flow', async () => {
+            const { service, deps } = makeService(null);
+
+            await service.createWork({ ...baseDto, kind: 'company' } as CreateWorkDto, baseUser);
+
+            const persisted = deps.workRepo.create.mock.calls[0][0];
+            expect(persisted.kind).toBe('default');
+        });
+    });
+
     it('EW-614: non-ever-works-git storage → provider never called even if flag on', async () => {
         const state: OnboardingWizardStateV2 = {
             version: 2,

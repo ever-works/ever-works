@@ -172,6 +172,14 @@ describe('WorksController.quickCreateWork (EW-617 G4)', () => {
         expect(createDtoArg.websiteTemplateId).toBe('modern');
     });
 
+    it('forwards the work-kind choice into createWork', async () => {
+        const { controller, createWork } = makeController({});
+
+        await (controller as any).quickCreateWork(auth, { ...baseDto, kind: 'landing-page' });
+
+        expect(createWork.mock.calls[0][0].kind).toBe('landing-page');
+    });
+
     it('forwards model to the generator DTO but never to createWork', async () => {
         const { controller, createWork, generateItems } = makeController({});
 
