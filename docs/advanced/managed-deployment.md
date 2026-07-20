@@ -33,12 +33,12 @@ are operator secrets, never documentation.
 
 ## Deploy targets at a glance
 
-| Target                       | What it is                                          | Who can pick it                       |
-| ---------------------------- | --------------------------------------------------- | ------------------------------------- |
-| **Vercel** (and other PaaS)  | Provider-agnostic managed hosting via a deploy plugin | Anyone with the provider configured   |
-| `k8s-works`                  | The Ever Works **internal** cluster                 | Platform admins, `ever-works` org only |
-| `k8s-works-shared`           | The Ever Works **shared customer** cluster (default) | Everyone                              |
-| `custom-kubeconfig`          | The user's **own** cluster (paste a kubeconfig)     | Everyone _except_ Ever Works-shared orgs |
+| Target                      | What it is                                            | Who can pick it                          |
+| --------------------------- | ----------------------------------------------------- | ---------------------------------------- |
+| **Vercel** (and other PaaS) | Provider-agnostic managed hosting via a deploy plugin | Anyone with the provider configured      |
+| `k8s-works`                 | The Ever Works **internal** cluster                   | Platform admins, `ever-works` org only   |
+| `k8s-works-shared`          | The Ever Works **shared customer** cluster (default)  | Everyone                                 |
+| `custom-kubeconfig`         | The user's **own** cluster (paste a kubeconfig)       | Everyone _except_ Ever Works-shared orgs |
 
 For Kubernetes deploys, the **cluster source** (`ClusterSource` union in
 `cluster-source-matrix.ts`) selects which of the three k8s targets a Work
