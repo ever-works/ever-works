@@ -131,9 +131,7 @@ export class TemplateCatalogService implements OnModuleInit {
             ...listMissionTemplates().map((template) =>
                 this.toBuiltInMissionTemplateRecord(template),
             ),
-            ...listWorkTemplates().map((template) =>
-                this.toBuiltInWorkTemplateRecord(template),
-            ),
+            ...listWorkTemplates().map((template) => this.toBuiltInWorkTemplateRecord(template)),
         ];
 
         await Promise.all(
