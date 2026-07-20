@@ -1266,8 +1266,48 @@
                 }
             }
         },
+        "schedules": {
+            "title": "Programaciones",
+            "subtitle": "Todo lo programado para ejecutarse en tus trabajos, agentes, Missions y tareas",
+            "fetchFailed": "Error al cargar las programaciones",
+            "retry": "Reintentar",
+            "columns": {
+                "owner": "Propietario",
+                "cadence": "Cadencia",
+                "nextRun": "Siguiente ejecución",
+                "status": "Estado"
+            },
+            "filters": {
+                "all": "Todas",
+                "activeOnly": "Solo activas"
+            },
+            "sourceTypes": {
+                "recurringTask": "Tarea recurrente",
+                "agentHeartbeat": "Latido de agente",
+                "workSchedule": "Programación de trabajo",
+                "missionTick": "Tick de Mission",
+                "sourceValidation": "Validación de fuente",
+                "dataSync": "Sincronización de datos"
+            },
+            "statuses": {
+                "active": "Activo",
+                "paused": "Pausado",
+                "disabled": "Desactivada",
+                "error": "Error",
+                "ended": "Finalizada"
+            },
+            "empty": {
+                "title": "Nada programado todavía",
+                "description": "Las tareas recurrentes, los latidos de agentes, las programaciones de trabajo, los ticks de Mission, la validación de fuentes y la sincronización de datos aparecerán aquí una vez que los configures.",
+                "noResults": "Ninguna programación coincide con el filtro actual."
+            }
+        },
         "activity": {
-            "title": "Registro de actividad",
+            "viewToggle": {
+                "log": "Registro",
+                "schedules": "Programaciones"
+            },
+            "title": "Actividad",
             "subtitle": "Sigue todas las operaciones en tus trabajos",
             "loading": "Cargando...",
             "fetchFailed": "Error al cargar actividades",
@@ -5074,7 +5114,7 @@
             "resetPassword": "Restablecer contraseña",
             "authError": "Error de autenticación",
             "dashboard": "Panel",
-            "activity": "Registro de actividad",
+            "activity": "Actividad",
             "works": "Trabajos",
             "newWork": "Nuevo trabajo",
             "work": "Trabajo",

@@ -160,6 +160,10 @@
         "./titler": {
             "types": "./dist/titler/index.d.ts",
             "default": "./dist/titler/index.js"
+        },
+        "./schedules": {
+            "types": "./dist/schedules/index.d.ts",
+            "default": "./dist/schedules/index.js"
         }
     },
     "scripts": {

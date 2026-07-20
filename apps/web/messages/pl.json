@@ -547,17 +547,9 @@
             "title": "Missions",
             "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
             "newMission": "+ New Mission",
-            "quickAdd": {
-                "label": "Rozpocznij nową Misję",
-                "submitTitle": "Utwórz Misję",
-                "minLength": "Opis musi zawierać co najmniej 10 znaków.",
-                "created": "Misja utworzona",
-                "error": "Nie można utworzyć Misji. Spróbuj ponownie."
-            },
             "empty": {
                 "title": "No Missions yet.",
-                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting.",
-                "openNew": "Otwórz scentralizowany kreator"
+                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting."
             },
             "card": {
                 "scheduled": "Scheduled",
@@ -569,14 +561,6 @@
                 "capUnlimited": "Unlimited",
                 "capPrefix": "Outstanding cap:",
                 "clonedFromPrefix": "Cloned from another Mission"
-            },
-            "filterBar": {
-                "search": "Szukaj",
-                "searchPlaceholder": "Tytuł lub opis",
-                "status": "Status",
-                "anyStatus": "Dowolny status",
-                "apply": "Zastosuj",
-                "reset": "Resetuj"
             }
         },
         "memoryPage": {
@@ -969,7 +953,6 @@
                 "label": "Add a new Idea",
                 "placeholder": "Describe an Idea — e.g. \"A curated list of the best AI coding agents released this year\"",
                 "submit": "Add",
-                "submitTitle": "Dodaj Pomysł",
                 "minLength": "Description must be at least 10 characters."
             },
             "toggles": {
@@ -1013,6 +996,22 @@
                 "anyStatus": "Dowolny status",
                 "apply": "Zastosuj",
                 "reset": "Resetuj"
+            },
+            "newPage": {
+                "link": "Utwórz ręcznie",
+                "or": "Lub",
+                "title": "Nowa Idea",
+                "subtitle": "Napisz własną Idea. Opisz Work, który chcesz utworzyć — później możesz dodać go do kolejki budowania.",
+                "nameLabel": "Tytuł",
+                "namePlaceholder": "Opcjonalnie — pozostaw puste, aby wygenerować na podstawie opisu",
+                "descriptionLabel": "Opis",
+                "descriptionPlaceholder": "Opisz Work, w który ma się przekształcić ta Idea — np. „Wyselekcjonowany katalog otwartoźródłowych frameworków agentów AI, uporządkowany według typu frameworka i licencji.”",
+                "descriptionHint": "Co najmniej 10 znaków.",
+                "cancel": "Anuluj",
+                "create": "Utwórz Idea",
+                "creating": "Tworzenie…",
+                "minLength": "Opis musi mieć co najmniej 10 znaków.",
+                "error": "Nie udało się utworzyć Idea. Spróbuj ponownie."
             },
             "linkedWorks": {
                 "title": "Linked Works",
@@ -1207,6 +1206,10 @@
                     "failed": "Nieudane",
                     "cancelled": "Anulowane"
                 }
+            },
+            "viewToggle": {
+                "log": "Dziennik",
+                "schedules": "Harmonogramy"
             }
         },
         "works": {
@@ -3525,7 +3528,7 @@
         },
         "newPage": {
             "title": "+ New",
-            "subtitle": "Tell the agent what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
+            "subtitle": "Tell us what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
             "promptLabel": "What do you want to build?",
             "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
             "chipLabel": "Pick a kind",
@@ -3540,19 +3543,21 @@
                 "company": "Company"
             },
             "chipDescriptions": {
-                "mission": "Trwający Cel, nad którym Agent stale pracuje — generuje Pomysły według harmonogramu lub jednorazowo.",
-                "idea": "Jednorazowy brief, który Agent przekształca w plan Pracy, który możesz rozbudować.",
-                "website": "Wielostronicowa strona dla firmy, usługi lub marki — wygenerowana treść + kod.",
-                "landing-page": "Skoncentrowana strona jednopodstronowa — listy oczekujących, uruchomienia produktów, zapisy na webinary, przechwytywanie leadów.",
-                "blog": "Blog z kategoriami, RSS, podświetlaniem kodu i treścią gotową do SEO.",
-                "directory": "Kuratorska strona katalogowa z wyszukiwarką, filtrami i strukturyzowanymi danymi.",
-                "awesome-repo": "Repozytorium awesome-list — indeks markdown, kategoryzowane linki i odświeżalne metadane.",
+                "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
+                "idea": "A one-shot brief the agent turns into a Work plan you can build.",
+                "agent": "An AI teammate that acts across Missions, Works, or your whole Workspace.",
+                "task": "A trackable item assigned to a person or an Agent.",
+                "website": "A multi-page site for a business, service, or brand — generated content + code.",
+                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
+                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
+                "directory": "A curated directory site with search, filters, and structured item data.",
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
                 "company": "Register a new entity. Becomes an Organization in your account."
             },
             "submit": "Create",
-            "submitTitle": "Utwórz",
             "or": "or",
             "hints": {
+                "pickChip": "Pick a chip above to enable Create.",
                 "minLength": "Add a description (at least 10 characters) to enable Create."
             },
             "toasts": {
@@ -4810,379 +4815,44 @@
             "system": "System",
             "goToPluginSettings": "Przejdź do ustawień wtyczki"
         },
-        "proposals": {
-            "header": {
-                "title": "Ideas",
-                "titleWithName": "Ideas"
-            },
-            "actions": {
-                "accept": "Build",
-                "viewWork": "View Work",
-                "dismiss": "Dismiss",
-                "dismissAria": "Dismiss this idea",
-                "refresh": "Suggest more"
-            },
-            "researching": {
-                "title": "Drafting ideas from your profile…",
-                "subtitle": "This usually takes under a minute."
-            },
-            "empty": {
-                "title": "No ideas right now.",
-                "subtitle": "New suggestions will appear here when they are ready."
-            },
-            "errors": {
-                "rateLimited": "Daily limit reached. Try again tomorrow.",
-                "generic": "Couldn't refresh ideas. Please try again."
-            },
-            "plugins": {
-                "label": "Suggested plugins"
-            },
-            "failureKinds": {
-                "transient-network": "Network blip",
-                "transient-rate-limit": "Rate limited",
-                "transient-upstream-5xx": "Upstream service error",
-                "transient-plugin": "Plugin timeout",
-                "permanent-invalid-input": "Invalid input",
-                "permanent-unknown": "Build failed"
-            }
+        "discover": {
+            "title": "Discover",
+            "subtitle": "AI-curated Work ideas tailored to you."
         },
-        "missionsPreview": {
-            "title": "Missions",
-            "viewAll": "View all ({n}) →",
-            "empty": {
-                "title": "No Missions yet.",
-                "subtitleRich": "<link>Start one</link> to give the agent a persistent Goal that keeps generating Ideas for you."
-            },
-            "badges": {
-                "scheduled": "Scheduled"
-            },
-            "counters": {
-                "ideas": "Ideas",
-                "works": "Works",
-                "sites": "Sites"
-            }
-        },
-        "missionsPage": {
-            "title": "Missions",
-            "subtitle": "Long-running Goals that keep generating Ideas (and Works) for you. Open one to tune its cadence, cap, or auto-build behavior.",
-            "newMission": "+ New Mission",
-            "empty": {
-                "title": "No Missions yet.",
-                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting."
-            },
-            "card": {
-                "scheduled": "Scheduled",
-                "oneShot": "One-shot",
-                "schedulePrefix": "Cron:",
-                "autoBuildOn": "Auto-build on",
-                "autoBuildOff": "Auto-build off",
-                "capInherit": "Inherit user default",
-                "capUnlimited": "Unlimited",
-                "capPrefix": "Outstanding cap:",
-                "clonedFromPrefix": "Cloned from another Mission"
-            }
-        },
-        "budgetSummary": {
-            "period": "{period}",
-            "currentSpend": "Current spend",
-            "cap": "Monthly cap",
-            "noCap": "No cap set",
-            "percentUsed": "{percent}% used",
-            "blocked": "Over cap — blocked",
-            "overCap": "Over cap",
-            "loading": "Loading budget…",
-            "empty": "No budget data yet."
-        },
-        "missionDetail": {
-            "attachedWorks": {
-                "pickerTruncated": "Showing your 100 most recent Works - open the Works page for the full list.",
-                "title": "Attached Works",
-                "empty": "No Works attached to this Mission yet. Attach one below.",
-                "attachTitle": "Attach a Work",
-                "workLabel": "Work",
-                "workPlaceholder": "Select a Work",
-                "relationLabel": "Relation",
-                "attach": "Attach",
-                "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
-                "noWorksToAttach": "You have no Works to attach yet.",
-                "relations": {
-                    "created": "Created",
-                    "improves": "Improves",
-                    "operates": "Operates",
-                    "markets": "Markets",
-                    "researches": "Researches",
-                    "retires": "Retires"
-                },
-                "toasts": {
-                    "attached": "Work attached",
-                    "attachError": "Couldn't attach Work",
-                    "detached": "Work detached",
-                    "detachError": "Couldn't detach Work"
-                }
-            },
-            "backToMissions": "Back to Missions",
-            "badges": {
-                "scheduled": "Scheduled",
-                "oneShot": "One-shot",
-                "cloned": "Cloned",
-                "clonedTooltip": "This Mission is a Full Fork of another"
-            },
-            "sections": {
-                "settings": "Mission settings",
-                "guardrails": "Guardrails override",
-                "liveRuns": "Live runs",
-                "ideas": "Ideas",
-                "relatedWorks": "Related Works",
-                "inheritedWorks": "Related Works (inherited)",
-                "activity": "Activity",
-                "spend": "Spend over time"
-            },
-            "fields": {
-                "schedule": "Schedule (cron, UTC)",
-                "autoBuildWorks": "Auto-build Works from spawned Ideas",
-                "capInherit": "Inherit user-level default cap",
-                "outstandingCap": "Outstanding-Ideas cap (-1 = unlimited)"
-            },
-            "actions": {
-                "saveSettings": "Save settings",
-                "pause": "Pause",
-                "resume": "Resume",
-                "complete": "Complete",
-                "delete": "Delete",
-                "runNow": "Run now",
-                "clone": "Clone"
-            },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
-            },
-            "guardrails": {
-                "activeOverride": "Custom guardrail overrides are active on this Mission.",
-                "inheriting": "No overrides set — using your global Work-agent guardrails."
-            },
-            "liveRuns": {
-                "empty": "No active runs."
-            },
-            "ideas": {
-                "empty": "No Ideas spawned by this Mission yet."
-            },
-            "works": {
-                "empty": "No Works have been built from this Mission's Ideas yet."
-            },
-            "inherited": {
-                "fromSource": "Inherited from",
-                "empty": "The source Mission has no Works to inherit."
-            },
-            "activity": {
-                "empty": "Activity timeline will appear here once Mission ticks start running."
-            },
-            "spend": {
-                "empty": "Spend chart will appear here once budgets are wired."
-            },
-            "clone": {
-                "title": "Clone this Mission",
-                "description": "Full Fork: copies metadata + non-dismissed Ideas (as Pending). Works are NOT cloned — they remain attached to the source.",
-                "titleLabel": "Title for the new Mission (optional)",
-                "cancel": "Cancel",
-                "confirm": "Clone Mission"
-            },
-            "completeDialog": {
-                "title": "Complete this Mission",
-                "description": "Optionally record a conclusion verdict for this Mission. \"No verdict\" completes it without recording an outcome.",
-                "outcomeLabel": "Outcome (optional)",
-                "noVerdict": "No verdict",
-                "cancel": "Cancel",
-                "confirm": "Complete Mission"
-            },
-            "outcomes": {
-                "succeeded": "Succeeded",
-                "partially_succeeded": "Partially succeeded",
-                "failed": "Failed",
-                "cancelled": "Cancelled",
-                "superseded": "Superseded"
-            },
-            "outcomeTooltip": "Outcome recorded when this Mission was completed",
-            "completedAtLabel": "Completed",
-            "toasts": {
-                "settingsSaved": "Mission settings saved",
-                "settingsError": "Couldn't save settings",
-                "paused": "Mission paused",
-                "pauseError": "Couldn't pause",
-                "resumed": "Mission resumed",
-                "resumeError": "Couldn't resume",
-                "completed": "Mission marked complete",
-                "completeError": "Couldn't complete",
-                "deleted": "Mission deleted",
-                "deleteError": "Couldn't delete",
-                "runNowError": "Couldn't run now",
-                "cloned": "Cloned: {ideasCloned} idea(s) carried, {ideasSkipped} dismissed skipped.",
-                "cloneError": "Couldn't clone Mission",
-                "runNow": {
-                    "noop-placeholder": "Run-now queued (placeholder)",
-                    "queued": "Tick queued",
-                    "spawned": "New Ideas spawned",
-                    "cap-hit": "Outstanding-Ideas cap reached; nothing spawned",
-                    "no-ideas": "Tick ran but generated no Ideas",
-                    "failed": "Run now failed",
-                    "cron-no-match": "Tick ran (cron skipped)"
-                }
-            }
-        },
-        "ideasPage": {
-            "title": "Ideas",
-            "subtitle": "Everything the platform has drafted for you, plus anything you've typed in. Build the ones worth building.",
-            "quickAdd": {
-                "label": "Add a new Idea",
-                "placeholder": "Describe an Idea — e.g. \"A curated list of the best AI coding agents released this year\"",
-                "submit": "Add",
-                "minLength": "Description must be at least 10 characters."
-            },
-            "toggles": {
-                "showAccepted": "Show accepted",
-                "showDismissed": "Show dismissed"
+        "schedules": {
+            "title": "Harmonogramy",
+            "subtitle": "Wszystko, co zaplanowano do uruchomienia w Twoich pracach, agentach, Missions i zadaniach",
+            "fetchFailed": "Nie udało się załadować harmonogramów",
+            "retry": "Ponów próbę",
+            "columns": {
+                "owner": "Właściciel",
+                "cadence": "Interwał",
+                "nextRun": "Następne uruchomienie",
+                "status": "Status"
             },
             "filters": {
-                "all": "All",
-                "pending": "Pending",
-                "queued": "Queued",
-                "building": "Building",
-                "failed": "Failed",
-                "accepted": "Accepted",
-                "dismissed": "Dismissed",
-                "done": "Done",
-                "doneTooltip": "Ideas that became Works. Click a card to open its Work."
+                "all": "Wszystkie",
+                "activeOnly": "Tylko aktywne"
             },
-            "gears": {
-                "menuLabel": "Settings",
-                "autoGenerate": "Auto-generate Ideas…",
-                "autoBuild": "Auto-build Works…",
-                "autoRetry": "Auto-retry policy…",
-                "accountBudgets": "Account-wide budgets…"
+            "sourceTypes": {
+                "recurringTask": "Zadanie cykliczne",
+                "agentHeartbeat": "Puls agenta",
+                "workSchedule": "Harmonogram pracy",
+                "missionTick": "Takt Mission",
+                "sourceValidation": "Walidacja źródła",
+                "dataSync": "Synchronizacja danych"
             },
-            "toasts": {
-                "ideaCreated": "Idea added",
-                "ideaCreateError": "Couldn't add idea. Please try again.",
-                "ideaQueued": "Build queued",
-                "ideaQueueError": "Couldn't queue build. Please try again.",
-                "ideaGone": "Ten pomysł nie jest już dostępny."
+            "statuses": {
+                "active": "Aktywny",
+                "paused": "Wstrzymany",
+                "disabled": "Wyłączono",
+                "error": "Błąd",
+                "ended": "Zakończono"
             },
             "empty": {
-                "title": "No Ideas match these filters.",
-                "subtitle": "Toggle accepted / dismissed, or add one with the field above."
-            },
-            "viewAll": "View all ({n}) →",
-            "filterBar": {
-                "search": "Szukaj",
-                "searchPlaceholder": "Tytuł lub opis",
-                "status": "Status",
-                "anyStatus": "Dowolny status",
-                "apply": "Zastosuj",
-                "reset": "Resetuj"
-            },
-            "newPage": {
-                "link": "Utwórz ręcznie",
-                "or": "Lub",
-                "title": "Nowa Idea",
-                "subtitle": "Napisz własną Idea. Opisz Work, który chcesz utworzyć — później możesz dodać go do kolejki budowania.",
-                "nameLabel": "Tytuł",
-                "namePlaceholder": "Opcjonalnie — pozostaw puste, aby wygenerować na podstawie opisu",
-                "descriptionLabel": "Opis",
-                "descriptionPlaceholder": "Opisz Work, w który ma się przekształcić ta Idea — np. „Wyselekcjonowany katalog otwartoźródłowych frameworków agentów AI, uporządkowany według typu frameworka i licencji.”",
-                "descriptionHint": "Co najmniej 10 znaków.",
-                "cancel": "Anuluj",
-                "create": "Utwórz Idea",
-                "creating": "Tworzenie…",
-                "minLength": "Opis musi mieć co najmniej 10 znaków.",
-                "error": "Nie udało się utworzyć Idea. Spróbuj ponownie."
-            },
-            "linkedWorks": {
-                "title": "Linked Works",
-                "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
-                }
-            }
-        },
-        "adminUsage": {
-            "title": "Platform usage",
-            "description": "Cross-user, cross-directory spend for the current period. Self-hosted operators only.",
-            "periodLabel": "{period}",
-            "totalSpend": "Total spend: {amount}",
-            "empty": "No usage recorded this period.",
-            "columnUser": "User",
-            "columnEmail": "Email",
-            "columnWork": "Directory",
-            "columnUnits": "Units",
-            "columnCost": "Cost",
-            "loadFailed": "Could not load admin usage. You may not have platform-admin access."
-        },
-        "budgets": {
-            "overviewTitle": "Spend in {period}",
-            "overviewProgressLabel": "{percent}% of {cap} cap",
-            "overviewOverageSuffix": " (overage allowed)",
-            "overviewEmpty": "No monthly cap set. Add one in Budgets & Usage to enable alerts.",
-            "topPluginsTitle": "Top plugins by spend",
-            "topPluginsEmpty": "No usage recorded yet this period.",
-            "trendTitle": "Daily spend — {period}",
-            "trendEmpty": "No usage recorded yet this period.",
-            "trendDayLabel": "Day {day}"
-        },
-        "newPage": {
-            "title": "+ New",
-            "subtitle": "Tell us what you want to build. Pick a chip to bias toward a specific kind, or use one of the cards below for the per-mode flow.",
-            "promptLabel": "What do you want to build?",
-            "promptPlaceholder": "Describe what you want — e.g. \"A weekly curated list of new AI coding agents\" or \"Landing page for my SaaS launch\".",
-            "chipLabel": "Pick a kind",
-            "chips": {
-                "mission": "Mission",
-                "idea": "Idea",
-                "website": "Website",
-                "landing-page": "Landing Page",
-                "blog": "Blog",
-                "directory": "Directory",
-                "awesome-repo": "Awesome Repo",
-                "company": "Company"
-            },
-            "chipDescriptions": {
-                "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
-                "idea": "A one-shot brief the agent turns into a Work plan you can build.",
-                "agent": "An AI teammate that acts across Missions, Works, or your whole Workspace.",
-                "task": "A trackable item assigned to a person or an Agent.",
-                "website": "A multi-page site for a business, service, or brand — generated content + code.",
-                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
-                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
-                "directory": "A curated directory site with search, filters, and structured item data.",
-                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata.",
-                "company": "Register a new entity. Becomes an Organization in your account."
-            },
-            "submit": "Create",
-            "or": "or",
-            "hints": {
-                "pickChip": "Pick a chip above to enable Create.",
-                "minLength": "Add a description (at least 10 characters) to enable Create."
-            },
-            "toasts": {
-                "missionCreated": "Mission created",
-                "ideaCreated": "Idea added",
-                "submitError": "Couldn't create. Please try again."
-            },
-            "cards": {
-                "ai": {
-                    "title": "Create Work with AI",
-                    "subtitle": "Describe what you want and let the agent prepare an approval-ready plan.",
-                    "cta": "Get started"
-                },
-                "manual": {
-                    "title": "Create Work Manually",
-                    "subtitle": "Configure every step yourself — provider, template, items, and deploy.",
-                    "cta": "Configure now"
-                },
-                "import": {
-                    "title": "Import Existing Work",
-                    "subtitle": "Bring in a Work you already have — repo, items, and provider settings.",
-                    "cta": "Import now"
-                }
+                "title": "Nic jeszcze nie zaplanowano",
+                "description": "Zadania cykliczne, pulsy agentów, harmonogramy pracy, takty Mission, walidacja źródeł i synchronizacja danych pojawią się tutaj po ich skonfigurowaniu.",
+                "noResults": "Żadne harmonogramy nie pasują do bieżącego filtra."
             }
         }
     },
@@ -5270,7 +4940,8 @@
             "security": "Bezpieczeństwo",
             "apiKeys": "Klucz API",
             "dangerZone": "Strefa niebezpieczeństwa",
-            "pluginSettings": "Ustawienia wtyczek"
+            "pluginSettings": "Ustawienia wtyczek",
+            "discover": "Discover"
         }
     },
     "api": {

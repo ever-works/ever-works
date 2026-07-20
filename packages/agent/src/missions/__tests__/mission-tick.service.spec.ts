@@ -581,7 +581,7 @@ describe('MissionTickService', () => {
             );
         });
 
-        it('does not write activity on a successful spawn', async () => {
+        it('writes a mission_tick (not a lifecycle) activity on a successful spawn (Schedules P2)', async () => {
             const activityLog = makeActivityLog();
             build({
                 activityLog,
@@ -593,7 +593,19 @@ describe('MissionTickService', () => {
             missionRepo._seed({ id: 'm1', userId: 'u1', schedule: '* * * * *' });
             const summary = await service.tickDue(new Date('2026-05-24T10:00:00Z'));
             expect(summary.entries[0].outcome).toBe('spawned');
-            expect(activityLog.log).not.toHaveBeenCalled();
+            // A successful spawn writes no mission *lifecycle* row
+            // (mission_failed / mission_tick_capped); the Schedules P2
+            // fired-tick audit row is the generic mission_tick — exactly one.
+            expect(activityLog.log).toHaveBeenCalledTimes(1);
+            expect(activityLog.log).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    userId: 'u1',
+                    actionType: ActivityActionType.MISSION_TICK,
+                    action: 'mission.tick',
+                    status: ActivityStatus.COMPLETED,
+                    details: expect.objectContaining({ missionId: 'm1', outcome: 'spawned' }),
+                }),
+            );
         });
 
         it('no-ops cleanly when activityLog is absent (cap-hit outcome unchanged)', async () => {
