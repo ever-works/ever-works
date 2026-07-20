@@ -85,6 +85,10 @@ vi.mock('@ever-works/agent/tasks', () => ({
     WORK_IMPORT_DISPATCHER: Symbol('WORK_IMPORT_DISPATCHER'),
     TEMPLATE_CUSTOMIZATION_DISPATCHER: Symbol('TEMPLATE_CUSTOMIZATION_DISPATCHER'),
     KB_ORG_OVERLAY_FANOUT_DISPATCHER: Symbol('KB_ORG_OVERLAY_FANOUT_DISPATCHER'),
+    // The worker graph imports CredentialVersionService (an @Optional() dep
+    // on TenantRuntimeBindingResolverService). The full-module mock must
+    // provide it or vitest 400s the whole file on the missing export.
+    CredentialVersionService: class {},
 }));
 
 vi.mock('../../tasks/trigger/work-generation.task', () => ({

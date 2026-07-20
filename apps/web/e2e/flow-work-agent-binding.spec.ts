@@ -7,7 +7,8 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  * `apps/api/src/work-agent/work-agent.controller.ts` →
  * `@ever-works/agent/work-agent` `WorkAgentService`). This is the singleton
  * autonomous Work-builder bound to the CURRENT USER (preferences/guardrails +
- * queued GOALS that each spawn a RUN + run LOGS), NOT the per-work Agent row.
+ * queued BUILD REQUESTS (formerly "goals", renamed per review §23.3) that each
+ * spawn a RUN + run LOGS), NOT the per-work Agent row.
  *
  * Every status code, message, and JSON shape asserted below was PROBED against
  * the LIVE keyless sqlite-in-memory CI driver at http://127.0.0.1:3100 BEFORE a
@@ -46,37 +47,40 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *        maxAutoRetries Max 5; guardrail
  *        maxWorksPerRun Max 25; accountWideMonthlyCapCents must be a digit
  *        string; an unknown body key is rejected (forbidNonWhitelisted).
- *     4. POST /goals GATE: a goal is REJECTED 400 "Work agent is disabled." until
- *        the user's preference `enabled` is true — the enable-gate that fronts
- *        the whole goal pipeline.
- *     5. POST /goals DTO validation: instruction MinLength 10 / required /
+ *     4. POST /build-requests GATE: a build request is REJECTED 400 "Work agent is
+ *        disabled." until the user's preference `enabled` is true — the enable-gate
+ *        that fronts the whole build-request pipeline.
+ *     5. POST /build-requests DTO validation: instruction MinLength 10 / required /
  *        unknown-key rejected — and `ideaId` (present on the service interface
- *        but NOT whitelisted on CreateWorkAgentGoalDto) is REJECTED, a real
+ *        but NOT whitelisted on CreateWorkBuildRequestDto) is REJECTED, a real
  *        contract gap worth pinning.
- *     6. POST /goals SUCCESS contract (enabled): a goal + its run are created in
- *        one transaction — goal.status='waiting-for-approval', source='user',
+ *     6. POST /build-requests SUCCESS contract (enabled): a build request + its run
+ *        are created in one transaction — status='waiting-for-approval', source='user',
  *        dryRun defaults to the pref guardrail's dryRunByDefault (true), the run
- *        mirrors goalId + status + progressPercent 10 + a summary rollup; the
- *        goal then appears in GET /goals (DESC) and the run becomes the
+ *        mirrors buildRequestId + status + progressPercent 10 + a summary rollup; the
+ *        build request then appears in GET /build-requests (DESC) and the run becomes the
  *        GET /runs/active row, with two seeded INFO logs on GET /runs/:id/logs.
- *     7. Goal guardrail-OVERRIDE: passing guardrail sub-keys on the goal body
- *        records them as `guardrailsOverride` on the goal (only the supplied
+ *     7. Build-request guardrail-OVERRIDE: passing guardrail sub-keys on the body
+ *        records them as `guardrailsOverride` on the build request (only the supplied
  *        keys), and `dryRun:false` flips the plan/approval summary to the live
  *        copy — without mutating the user's stored preference guardrails.
- *     8. CANCEL lifecycle: PATCH /goals/:id/cancel flips the goal to 'canceled'
+ *     8. CANCEL lifecycle: PATCH /build-requests/:id/cancel flips it to 'canceled'
  *        AND cancels its active run (runs/active goes empty); a SECOND cancel is
  *        a 400 "can no longer be canceled." terminal-state guard.
- *     9. OWNERSHIP SCOPING + id validation: a foreign user's goal-cancel / run-
+ *     9. OWNERSHIP SCOPING + id validation: a foreign user's build-request-cancel / run-
  *        logs read is an opaque 404 (no existence leak), an unknown well-formed
  *        uuid is 404, a malformed id is a 400 ParseUUIDPipe failure, and the
- *        goals list is per-user isolated. anon (empty storageState) → 401 on
+ *        build-requests list is per-user isolated. anon (empty storageState) → 401 on
  *        every verb.
+ *    13. DEPRECATED /goals ALIAS (review §23.3): the old /goals + /goals/:id/cancel
+ *        routes stay as thin aliases of /build-requests for one release window —
+ *        pinned so removing them is a conscious contract change.
  *
  * GOTCHAS honored: FRESH registerUserViaAPI() user per test (full isolation,
  * never the shared seeded user); unique suffix from a per-test counter (NOT a
  * module-scope clock); NO module-scope await / loadSeededTestUser; anon uses an
  * EXPLICIT empty storageState so it cannot inherit the shared auth cookie;
- * keyless/no-LLM/no-Trigger CI ⇒ we assert the goal/run RECORD contracts (the
+ * keyless/no-LLM/no-Trigger CI ⇒ we assert the build-request/run RECORD contracts (the
  * approval-gated plan), NEVER a generation/run COMPLETION; generous timeouts.
  */
 
@@ -109,7 +113,7 @@ interface PreferencesDto {
     accountWideAllowOverage: boolean;
 }
 
-interface GoalDto {
+interface BuildRequestDto {
     id: string;
     instruction: string;
     status: string;
@@ -124,6 +128,8 @@ interface GoalDto {
 
 interface RunDto {
     id: string;
+    buildRequestId: string;
+    /** Deprecated one-release compat mirror of `buildRequestId` (review §23.3). */
     goalId: string;
     status: string;
     dryRun: boolean;
@@ -150,8 +156,11 @@ interface RunLogDto {
 }
 
 const prefsUrl = `${API_BASE}/api/me/work-agent/preferences`;
-const goalsUrl = `${API_BASE}/api/me/work-agent/goals`;
-const cancelUrl = (id: string) => `${goalsUrl}/${id}/cancel`;
+const buildRequestsUrl = `${API_BASE}/api/me/work-agent/build-requests`;
+const cancelUrl = (id: string) => `${buildRequestsUrl}/${id}/cancel`;
+// DEPRECATED alias routes (kept for one release window — review §23.3).
+const legacyGoalsUrl = `${API_BASE}/api/me/work-agent/goals`;
+const legacyCancelUrl = (id: string) => `${legacyGoalsUrl}/${id}/cancel`;
 const activeRunUrl = `${API_BASE}/api/me/work-agent/runs/active`;
 const runLogsUrl = (id: string) => `${API_BASE}/api/me/work-agent/runs/${id}/logs`;
 
@@ -183,17 +192,17 @@ async function enableAgent(request: APIRequestContext, token: string): Promise<v
     expect((await res.json()).enabled).toBe(true);
 }
 
-async function createGoal(
+async function createBuildRequest(
     request: APIRequestContext,
     token: string,
     data: Record<string, unknown>,
 ) {
-    return request.post(goalsUrl, { headers: authedHeaders(token), data, timeout: 30_000 });
+    return request.post(buildRequestsUrl, { headers: authedHeaders(token), data, timeout: 30_000 });
 }
 
 const VALID_INSTRUCTION = 'Create a Work covering the leading AI developer tools of 2026';
 
-test.describe('Work agent (api/me/work-agent): preferences + goal/run lifecycle + scoping', () => {
+test.describe('Work agent (api/me/work-agent): preferences + build-request/run lifecycle + scoping', () => {
     test('1. fresh user preferences expose the well-formed default/zero Work-agent state', async ({
         request,
     }) => {
@@ -313,7 +322,7 @@ test.describe('Work agent (api/me/work-agent): preferences + goal/run lifecycle 
         expect(after.accountWideMonthlyCapCents, 'rejected cents edit never persisted').toBeNull();
     });
 
-    test('4. POST goal is gated by the enable flag: disabled → 400, enabling unlocks the same body', async ({
+    test('4. POST build request is gated by the enable flag: disabled → 400, enabling unlocks the same body', async ({
         request,
     }) => {
         const owner = await registerUserViaAPI(request, {
@@ -321,26 +330,30 @@ test.describe('Work agent (api/me/work-agent): preferences + goal/run lifecycle 
         });
         const token = owner.access_token;
 
-        // Default-disabled agent rejects the goal with the enable-gate message.
-        const blocked = await createGoal(request, token, { instruction: VALID_INSTRUCTION });
-        expect(blocked.status(), 'goal blocked while the agent is disabled').toBe(400);
+        // Default-disabled agent rejects the build request with the enable-gate message.
+        const blocked = await createBuildRequest(request, token, {
+            instruction: VALID_INSTRUCTION,
+        });
+        expect(blocked.status(), 'build request blocked while the agent is disabled').toBe(400);
         expect((await blocked.json()).message).toBe('Work agent is disabled.');
 
-        // The list is still empty — the blocked goal was never persisted.
-        const empty = await request.get(goalsUrl, {
+        // The list is still empty — the blocked build request was never persisted.
+        const empty = await request.get(buildRequestsUrl, {
             headers: authedHeaders(token),
             timeout: 30_000,
         });
         expect(empty.status()).toBe(200);
-        expect((await empty.json()) as GoalDto[]).toEqual([]);
+        expect((await empty.json()) as BuildRequestDto[]).toEqual([]);
 
         // Enable, then the SAME body is accepted (202 Accepted on the controller).
         await enableAgent(request, token);
-        const ok = await createGoal(request, token, { instruction: VALID_INSTRUCTION });
-        expect(ok.status(), `enabled goal body=${await ok.text().catch(() => '')}`).toBe(202);
+        const ok = await createBuildRequest(request, token, { instruction: VALID_INSTRUCTION });
+        expect(ok.status(), `enabled build request body=${await ok.text().catch(() => '')}`).toBe(
+            202,
+        );
     });
 
-    test('5. POST goal DTO validation: short/missing instruction, unknown key, and the un-whitelisted ideaId are 400', async ({
+    test('5. POST build request DTO validation: short/missing instruction, unknown key, and the un-whitelisted ideaId are 400', async ({
         request,
     }) => {
         const owner = await registerUserViaAPI(request, {
@@ -350,28 +363,28 @@ test.describe('Work agent (api/me/work-agent): preferences + goal/run lifecycle 
         // Enable first so we know a 400 is the DTO talking, not the enable-gate.
         await enableAgent(request, token);
 
-        const tooShort = await createGoal(request, token, { instruction: 'short' });
+        const tooShort = await createBuildRequest(request, token, { instruction: 'short' });
         expect(tooShort.status()).toBe(400);
         expect(JSON.stringify((await tooShort.json()).message)).toContain(
             'instruction must be longer than or equal to 10 characters',
         );
 
-        const missing = await createGoal(request, token, {});
+        const missing = await createBuildRequest(request, token, {});
         expect(missing.status()).toBe(400);
 
-        const unknownKey = await createGoal(request, token, {
+        const unknownKey = await createBuildRequest(request, token, {
             instruction: VALID_INSTRUCTION,
             bogus: 'x',
         });
-        expect(unknownKey.status(), 'unknown goal key rejected').toBe(400);
+        expect(unknownKey.status(), 'unknown build-request key rejected').toBe(400);
         expect(JSON.stringify((await unknownKey.json()).message)).toContain(
             'property bogus should not exist',
         );
 
         // `ideaId` exists on the service input interface but is NOT declared on
-        // CreateWorkAgentGoalDto — so forbidNonWhitelisted rejects it. Pinning the
+        // CreateWorkBuildRequestDto — so forbidNonWhitelisted rejects it. Pinning the
         // gap so a future DTO that adds ideaId is a conscious contract change.
-        const idea = await createGoal(request, token, {
+        const idea = await createBuildRequest(request, token, {
             instruction: VALID_INSTRUCTION,
             ideaId: UNKNOWN_UUID,
         });
@@ -380,14 +393,14 @@ test.describe('Work agent (api/me/work-agent): preferences + goal/run lifecycle 
             'property ideaId should not exist',
         );
 
-        // Nothing in this test created a real goal.
-        const goals = (await (
-            await request.get(goalsUrl, { headers: authedHeaders(token), timeout: 30_000 })
-        ).json()) as GoalDto[];
-        expect(goals).toEqual([]);
+        // Nothing in this test created a real build request.
+        const listed = (await (
+            await request.get(buildRequestsUrl, { headers: authedHeaders(token), timeout: 30_000 })
+        ).json()) as BuildRequestDto[];
+        expect(listed).toEqual([]);
     });
 
-    test('6. enabled goal creates a goal+run+logs in one transaction and surfaces across list/active/logs', async ({
+    test('6. enabled create makes a build-request+run+logs in one transaction and surfaces across list/active/logs', async ({
         request,
     }) => {
         const owner = await registerUserViaAPI(request, {
@@ -396,25 +409,33 @@ test.describe('Work agent (api/me/work-agent): preferences + goal/run lifecycle 
         const token = owner.access_token;
         await enableAgent(request, token);
 
-        const res = await createGoal(request, token, { instruction: VALID_INSTRUCTION });
-        expect(res.status(), `create goal body=${await res.text().catch(() => '')}`).toBe(202);
-        const { goal, run } = (await res.json()) as { goal: GoalDto; run: RunDto };
+        const res = await createBuildRequest(request, token, { instruction: VALID_INSTRUCTION });
+        expect(res.status(), `create build request body=${await res.text().catch(() => '')}`).toBe(
+            202,
+        );
+        const { buildRequest, run } = (await res.json()) as {
+            buildRequest: BuildRequestDto;
+            run: RunDto;
+        };
 
-        // GOAL contract: approval-gated, user-sourced, trimmed instruction, dryRun
+        // BUILD-REQUEST contract: approval-gated, user-sourced, trimmed instruction, dryRun
         // defaults to the pref guardrail's dryRunByDefault (true), no override set.
-        expect(goal.id).toMatch(UUID_RE);
-        expect(goal.status).toBe('waiting-for-approval');
-        expect(goal.source).toBe('user');
-        expect(goal.instruction).toBe(VALID_INSTRUCTION);
-        expect(goal.dryRun, 'dryRun inherits dryRunByDefault=true').toBe(true);
-        expect(goal.guardrailsOverride, 'no guardrail keys on the body ⇒ null override').toBeNull();
-        expect(goal.agentPlanSummary).toContain('dry-run');
-        expect(goal.approvalSummary).toContain('Dry-run plan prepared');
+        expect(buildRequest.id).toMatch(UUID_RE);
+        expect(buildRequest.status).toBe('waiting-for-approval');
+        expect(buildRequest.source).toBe('user');
+        expect(buildRequest.instruction).toBe(VALID_INSTRUCTION);
+        expect(buildRequest.dryRun, 'dryRun inherits dryRunByDefault=true').toBe(true);
+        expect(
+            buildRequest.guardrailsOverride,
+            'no guardrail keys on the body ⇒ null override',
+        ).toBeNull();
+        expect(buildRequest.agentPlanSummary).toContain('dry-run');
+        expect(buildRequest.approvalSummary).toContain('Dry-run plan prepared');
 
-        // RUN contract: mirrors the goal, born waiting-for-approval at 10%, with a
+        // RUN contract: mirrors the build request, born waiting-for-approval at 10%, with a
         // planning summary rollup (nothing actually created — keyless CI).
         expect(run.id).toMatch(UUID_RE);
-        expect(run.goalId).toBe(goal.id);
+        expect(run.buildRequestId).toBe(buildRequest.id);
         expect(run.status).toBe('waiting-for-approval');
         expect(run.dryRun).toBe(true);
         expect(run.progressPercent).toBe(10);
@@ -424,11 +445,11 @@ test.describe('Work agent (api/me/work-agent): preferences + goal/run lifecycle 
         expect(run.summary.approvalsRequired).toBe(1);
         expect(run.finishedAt).toBeNull();
 
-        // The goal shows up at the head of the DESC list.
+        // The build request shows up at the head of the DESC list.
         const list = (await (
-            await request.get(goalsUrl, { headers: authedHeaders(token), timeout: 30_000 })
-        ).json()) as GoalDto[];
-        expect(list[0]?.id, 'newest goal is first (DESC)').toBe(goal.id);
+            await request.get(buildRequestsUrl, { headers: authedHeaders(token), timeout: 30_000 })
+        ).json()) as BuildRequestDto[];
+        expect(list[0]?.id, 'newest build request is first (DESC)').toBe(buildRequest.id);
 
         // The run is THE active run.
         const activeRes = await request.get(activeRunUrl, {
@@ -456,7 +477,7 @@ test.describe('Work agent (api/me/work-agent): preferences + goal/run lifecycle 
         expect(logs[0].metadata).toMatchObject({ dryRun: true });
     });
 
-    test('7. goal guardrail-override is recorded on the goal and dryRun:false flips to live, without touching stored prefs', async ({
+    test('7. guardrail-override is recorded on the build request and dryRun:false flips to live, without touching stored prefs', async ({
         request,
     }) => {
         const owner = await registerUserViaAPI(request, {
@@ -465,30 +486,36 @@ test.describe('Work agent (api/me/work-agent): preferences + goal/run lifecycle 
         const token = owner.access_token;
         await enableAgent(request, token);
 
-        // Live goal carrying a PARTIAL guardrail override on the body.
-        const res = await createGoal(request, token, {
+        // Live build request carrying a PARTIAL guardrail override on the body.
+        const res = await createBuildRequest(request, token, {
             instruction: 'Run a live build with elevated per-run guardrails for this probe',
             dryRun: false,
             maxWorksPerRun: 5,
             requireApprovalBeforeCreate: false,
         });
-        expect(res.status(), `override goal body=${await res.text().catch(() => '')}`).toBe(202);
-        const { goal, run } = (await res.json()) as { goal: GoalDto; run: RunDto };
+        expect(
+            res.status(),
+            `override build request body=${await res.text().catch(() => '')}`,
+        ).toBe(202);
+        const { buildRequest, run } = (await res.json()) as {
+            buildRequest: BuildRequestDto;
+            run: RunDto;
+        };
 
-        // dryRun:false flips both the goal flag and the plan/approval copy to live.
-        expect(goal.dryRun).toBe(false);
+        // dryRun:false flips both the build-request flag and the plan/approval copy to live.
+        expect(buildRequest.dryRun).toBe(false);
         expect(run.dryRun).toBe(false);
-        expect(goal.agentPlanSummary).toContain('live');
-        expect(goal.approvalSummary).toContain('Live execution requires approval');
+        expect(buildRequest.agentPlanSummary).toContain('live');
+        expect(buildRequest.approvalSummary).toContain('Live execution requires approval');
 
         // Only the SUPPLIED guardrail keys are captured in guardrailsOverride
         // (untouched keys are absent, not defaulted into the override blob).
-        expect(goal.guardrailsOverride).toEqual({
+        expect(buildRequest.guardrailsOverride).toEqual({
             maxWorksPerRun: 5,
             requireApprovalBeforeCreate: false,
         });
 
-        // The override is goal-scoped: the user's STORED preference guardrails are
+        // The override is request-scoped: the user's STORED preference guardrails are
         // untouched (still the conservative defaults).
         const prefs = await getPreferences(request, token);
         expect(prefs.guardrails.maxWorksPerRun, 'override did not leak into stored prefs').toBe(1);
@@ -496,7 +523,7 @@ test.describe('Work agent (api/me/work-agent): preferences + goal/run lifecycle 
         expect(prefs.guardrails.dryRunByDefault, 'stored dryRunByDefault untouched').toBe(true);
     });
 
-    test('8. cancel flips the goal + its active run to canceled, then a re-cancel is a terminal-state 400', async ({
+    test('8. cancel flips the build request + its active run to canceled, then a re-cancel is a terminal-state 400', async ({
         request,
     }) => {
         const owner = await registerUserViaAPI(request, {
@@ -506,9 +533,9 @@ test.describe('Work agent (api/me/work-agent): preferences + goal/run lifecycle 
         await enableAgent(request, token);
 
         const created = (await (
-            await createGoal(request, token, { instruction: VALID_INSTRUCTION })
-        ).json()) as { goal: GoalDto; run: RunDto };
-        const goalId = created.goal.id;
+            await createBuildRequest(request, token, { instruction: VALID_INSTRUCTION })
+        ).json()) as { buildRequest: BuildRequestDto; run: RunDto };
+        const buildRequestId = created.buildRequest.id;
         const runId = created.run.id;
 
         // Precondition: the run is active before the cancel.
@@ -517,8 +544,8 @@ test.describe('Work agent (api/me/work-agent): preferences + goal/run lifecycle 
         ).json()) as RunDto | null;
         expect(before?.id).toBe(runId);
 
-        // Cancel returns the goal flipped to 'canceled'.
-        const cancelRes = await request.patch(cancelUrl(goalId), {
+        // Cancel returns the build request flipped to 'canceled'.
+        const cancelRes = await request.patch(cancelUrl(buildRequestId), {
             headers: authedHeaders(token),
             timeout: 30_000,
         });
@@ -527,7 +554,7 @@ test.describe('Work agent (api/me/work-agent): preferences + goal/run lifecycle 
         );
         expect((await cancelRes.json()).status).toBe('canceled');
 
-        // The active run was cancelled alongside the goal ⇒ no active run remains.
+        // The active run was cancelled alongside the build request ⇒ no active run remains.
         const afterRes = await request.get(activeRunUrl, {
             headers: authedHeaders(token),
             timeout: 30_000,
@@ -540,16 +567,18 @@ test.describe('Work agent (api/me/work-agent): preferences + goal/run lifecycle 
             `no active run after cancel (got "${afterText}")`,
         ).toBe(true);
 
-        // A SECOND cancel on the now-terminal goal is a 400 with the guard message.
-        const reCancel = await request.patch(cancelUrl(goalId), {
+        // A SECOND cancel on the now-terminal build request is a 400 with the guard message.
+        const reCancel = await request.patch(cancelUrl(buildRequestId), {
             headers: authedHeaders(token),
             timeout: 30_000,
         });
-        expect(reCancel.status(), 're-cancel of a terminal goal is 400').toBe(400);
-        expect((await reCancel.json()).message).toBe('Work agent goal can no longer be canceled.');
+        expect(reCancel.status(), 're-cancel of a terminal build request is 400').toBe(400);
+        expect((await reCancel.json()).message).toBe(
+            'Work build request can no longer be canceled.',
+        );
     });
 
-    test('9. goals/runs are owner-scoped + id-validated: foreign→404, unknown→404, malformed→400, anon→401', async ({
+    test('9. build-requests/runs are owner-scoped + id-validated: foreign→404, unknown→404, malformed→400, anon→401', async ({
         request,
         browser,
     }) => {
@@ -560,8 +589,8 @@ test.describe('Work agent (api/me/work-agent): preferences + goal/run lifecycle 
         await enableAgent(request, token);
 
         const mine = (await (
-            await createGoal(request, token, { instruction: VALID_INSTRUCTION })
-        ).json()) as { goal: GoalDto; run: RunDto };
+            await createBuildRequest(request, token, { instruction: VALID_INSTRUCTION })
+        ).json()) as { buildRequest: BuildRequestDto; run: RunDto };
 
         // A DIFFERENT authenticated user.
         const intruder = await registerUserViaAPI(request, {
@@ -569,13 +598,13 @@ test.describe('Work agent (api/me/work-agent): preferences + goal/run lifecycle 
         });
         const atk = authedHeaders(intruder.access_token);
 
-        // Foreign cancel of my goal ⇒ opaque 404 (existence not leaked as 403).
-        const foreignCancel = await request.patch(cancelUrl(mine.goal.id), {
+        // Foreign cancel of my build request ⇒ opaque 404 (existence not leaked as 403).
+        const foreignCancel = await request.patch(cancelUrl(mine.buildRequest.id), {
             headers: atk,
             timeout: 30_000,
         });
-        expect(foreignCancel.status(), 'foreign goal cancel denied as 404').toBe(404);
-        expect((await foreignCancel.json()).message).toBe('Work agent goal not found.');
+        expect(foreignCancel.status(), 'foreign build-request cancel denied as 404').toBe(404);
+        expect((await foreignCancel.json()).message).toBe('Work build request not found.');
 
         // Foreign read of my run logs ⇒ opaque 404.
         const foreignLogs = await request.get(runLogsUrl(mine.run.id), {
@@ -585,11 +614,11 @@ test.describe('Work agent (api/me/work-agent): preferences + goal/run lifecycle 
         expect(foreignLogs.status(), 'foreign run-logs read denied as 404').toBe(404);
         expect((await foreignLogs.json()).message).toBe('Work agent run not found.');
 
-        // The intruder's own goals list is empty — per-user isolation.
-        const intruderGoals = (await (
-            await request.get(goalsUrl, { headers: atk, timeout: 30_000 })
-        ).json()) as GoalDto[];
-        expect(intruderGoals, 'goals are per-user isolated').toEqual([]);
+        // The intruder's own build-requests list is empty — per-user isolation.
+        const intruderBuildRequests = (await (
+            await request.get(buildRequestsUrl, { headers: atk, timeout: 30_000 })
+        ).json()) as BuildRequestDto[];
+        expect(intruderBuildRequests, 'build requests are per-user isolated').toEqual([]);
 
         // An UNKNOWN well-formed uuid is a 404 (not a leak, not a 500).
         const ghostCancel = await request.patch(cancelUrl(UNKNOWN_UUID), {
@@ -608,7 +637,7 @@ test.describe('Work agent (api/me/work-agent): preferences + goal/run lifecycle 
             headers: authedHeaders(token),
             timeout: 30_000,
         });
-        expect(badCancel.status(), 'malformed goal id is a 400').toBe(400);
+        expect(badCancel.status(), 'malformed build-request id is a 400').toBe(400);
         const badLogs = await request.get(runLogsUrl('not-a-uuid'), {
             headers: authedHeaders(token),
             timeout: 30_000,
@@ -626,7 +655,7 @@ test.describe('Work agent (api/me/work-agent): preferences + goal/run lifecycle 
         const anon = await browser.newContext({ storageState: { cookies: [], origins: [] } });
         const anonGets: Array<{ label: string; url: string }> = [
             { label: 'preferences', url: prefsUrl },
-            { label: 'goals', url: goalsUrl },
+            { label: 'build-requests', url: buildRequestsUrl },
             { label: 'runs/active', url: activeRunUrl },
             { label: 'run logs', url: runLogsUrl(mine.run.id) },
         ];
@@ -634,17 +663,19 @@ test.describe('Work agent (api/me/work-agent): preferences + goal/run lifecycle 
             const res = await anon.request.get(url, { timeout: 30_000 });
             expect(res.status(), `anon GET ${label} is 401`).toBe(401);
         }
-        const anonCancel = await anon.request.patch(cancelUrl(mine.goal.id), { timeout: 30_000 });
+        const anonCancel = await anon.request.patch(cancelUrl(mine.buildRequest.id), {
+            timeout: 30_000,
+        });
         expect(anonCancel.status(), 'anon PATCH cancel is 401').toBe(401);
-        const anonCreate = await anon.request.post(goalsUrl, {
+        const anonCreate = await anon.request.post(buildRequestsUrl, {
             data: { instruction: VALID_INSTRUCTION },
             timeout: 30_000,
         });
-        expect(anonCreate.status(), 'anon POST goal is 401').toBe(401);
+        expect(anonCreate.status(), 'anon POST build request is 401').toBe(401);
         await anon.close();
     });
 
-    test('10. runs/active is empty for a fresh agent and for one whose only goal was canceled', async ({
+    test('10. runs/active is empty for a fresh agent and for one whose only build request was canceled', async ({
         request,
     }) => {
         const owner = await registerUserViaAPI(request, {
@@ -652,7 +683,7 @@ test.describe('Work agent (api/me/work-agent): preferences + goal/run lifecycle 
         });
         const token = owner.access_token;
 
-        // Fresh agent (no goals yet): no active run — empty body, 200.
+        // Fresh agent (no build requests yet): no active run — empty body, 200.
         const fresh = await request.get(activeRunUrl, {
             headers: authedHeaders(token),
             timeout: 30_000,
@@ -664,17 +695,17 @@ test.describe('Work agent (api/me/work-agent): preferences + goal/run lifecycle 
             `fresh agent has no active run (got "${freshText}")`,
         ).toBe(true);
 
-        // Create then cancel the sole goal; the active run drains back to empty.
+        // Create then cancel the sole build request; the active run drains back to empty.
         await enableAgent(request, token);
         const created = (await (
-            await createGoal(request, token, { instruction: VALID_INSTRUCTION })
-        ).json()) as { goal: GoalDto; run: RunDto };
+            await createBuildRequest(request, token, { instruction: VALID_INSTRUCTION })
+        ).json()) as { buildRequest: BuildRequestDto; run: RunDto };
         const activeMid = (await (
             await request.get(activeRunUrl, { headers: authedHeaders(token), timeout: 30_000 })
         ).json()) as RunDto | null;
         expect(activeMid?.id, 'run is active between create and cancel').toBe(created.run.id);
 
-        const cancel = await request.patch(cancelUrl(created.goal.id), {
+        const cancel = await request.patch(cancelUrl(created.buildRequest.id), {
             headers: authedHeaders(token),
             timeout: 30_000,
         });
@@ -692,7 +723,7 @@ test.describe('Work agent (api/me/work-agent): preferences + goal/run lifecycle 
         ).toBe(true);
     });
 
-    test('11. multiple goals accumulate in the list and getActiveRun returns a single in-flight run', async ({
+    test('11. multiple build requests accumulate in the list and getActiveRun returns a single in-flight run', async ({
         request,
     }) => {
         const owner = await registerUserViaAPI(request, {
@@ -702,31 +733,31 @@ test.describe('Work agent (api/me/work-agent): preferences + goal/run lifecycle 
         await enableAgent(request, token);
 
         const g1 = (await (
-            await createGoal(request, token, {
-                instruction: 'First queued Work-agent goal for the accumulation probe',
+            await createBuildRequest(request, token, {
+                instruction: 'First queued Work-agent build request for the accumulation probe',
             })
-        ).json()) as { goal: GoalDto; run: RunDto };
+        ).json()) as { buildRequest: BuildRequestDto; run: RunDto };
         const g2 = (await (
-            await createGoal(request, token, {
-                instruction: 'Second queued Work-agent goal for the accumulation probe',
+            await createBuildRequest(request, token, {
+                instruction: 'Second queued Work-agent build request for the accumulation probe',
             })
-        ).json()) as { goal: GoalDto; run: RunDto };
-        expect(g1.goal.id).not.toBe(g2.goal.id);
+        ).json()) as { buildRequest: BuildRequestDto; run: RunDto };
+        expect(g1.buildRequest.id).not.toBe(g2.buildRequest.id);
         expect(g1.run.id).not.toBe(g2.run.id);
 
-        // listGoals returns BOTH goals (DESC by createdAt — but createdAt is
+        // listBuildRequests returns BOTH requests (DESC by createdAt — but createdAt is
         // second-granular, so two rapid creates can share a second and the
         // intra-second tiebreak is non-deterministic; we therefore pin SET
         // membership, not the head, to stay flake-free).
         const list = (await (
-            await request.get(goalsUrl, { headers: authedHeaders(token), timeout: 30_000 })
-        ).json()) as GoalDto[];
+            await request.get(buildRequestsUrl, { headers: authedHeaders(token), timeout: 30_000 })
+        ).json()) as BuildRequestDto[];
         const ids = list.map((g) => g.id);
-        expect(ids, 'both goals present in the list').toEqual(
-            expect.arrayContaining([g1.goal.id, g2.goal.id]),
+        expect(ids, 'both build requests present in the list').toEqual(
+            expect.arrayContaining([g1.buildRequest.id, g2.buildRequest.id]),
         );
-        expect(ids.length, 'exactly the two created goals for this fresh user').toBe(2);
-        // Every listed goal is approval-gated + user-sourced (the create contract).
+        expect(ids.length, 'exactly the two created build requests for this fresh user').toBe(2);
+        // Every listed build request is approval-gated + user-sourced (the create contract).
         expect(list.every((g) => g.status === 'waiting-for-approval' && g.source === 'user')).toBe(
             true,
         );
@@ -739,12 +770,12 @@ test.describe('Work agent (api/me/work-agent): preferences + goal/run lifecycle 
         expect([g1.run.id, g2.run.id], 'active run is one of the created runs').toContain(
             active?.id,
         );
-        expect([g1.goal.id, g2.goal.id]).toContain(active?.goalId);
+        expect([g1.buildRequest.id, g2.buildRequest.id]).toContain(active?.buildRequestId);
         expect(active?.status).toBe('waiting-for-approval');
         expect(active?.progressPercent).toBe(10);
     });
 
-    test('12. account-wide budget knobs round-trip (cap digit-string + overage flag) independent of the goal pipeline', async ({
+    test('12. account-wide budget knobs round-trip (cap digit-string + overage flag) independent of the build pipeline', async ({
         request,
     }) => {
         const owner = await registerUserViaAPI(request, {
@@ -779,5 +810,68 @@ test.describe('Work agent (api/me/work-agent): preferences + goal/run lifecycle 
         const persisted = await getPreferences(request, token);
         expect(persisted.accountWideMonthlyCapCents).toBeNull();
         expect(persisted.enabled, 'budget edits do not enable the agent').toBe(false);
+    });
+    test('13. DEPRECATED /goals alias still serves the build-request queue (back-compat contract)', async ({
+        request,
+    }) => {
+        const owner = await registerUserViaAPI(request, {
+            email: `e2e-wa-alias-${uniq('al')}@test.local`,
+        });
+        const token = owner.access_token;
+        await enableAgent(request, token);
+
+        // The OLD create route still accepts a build request (202, same handler).
+        const created = await request.post(legacyGoalsUrl, {
+            headers: authedHeaders(token),
+            data: { instruction: VALID_INSTRUCTION },
+            timeout: 30_000,
+        });
+        expect(
+            created.status(),
+            `deprecated POST /goals alias body=${await created.text().catch(() => '')}`,
+        ).toBe(202);
+        // PRE-RENAME envelope: the deprecated create alias answers with the
+        // OLD `{ goal, run }` keys (NOT `{ buildRequest, run }`) so clients
+        // built before the rename keep parsing it.
+        const legacyCreateBody = (await created.json()) as {
+            goal: BuildRequestDto;
+            run: RunDto;
+        };
+        expect(legacyCreateBody.goal, 'alias create envelope uses the old `goal` key').toBeTruthy();
+        expect(
+            (legacyCreateBody as unknown as Record<string, unknown>).buildRequest,
+            'alias create envelope does NOT use the new `buildRequest` key',
+        ).toBeUndefined();
+        const buildRequest = legacyCreateBody.goal;
+        // Run DTOs carry the deprecated `goalId` compat mirror alongside
+        // `buildRequestId` (same value) for one release window.
+        expect(legacyCreateBody.run.goalId, 'run.goalId compat mirror is present').toBe(
+            legacyCreateBody.run.buildRequestId,
+        );
+        expect(legacyCreateBody.run.buildRequestId).toBe(buildRequest.id);
+
+        // The OLD list route responds 200 and shows the same queue.
+        const legacyList = await request.get(legacyGoalsUrl, {
+            headers: authedHeaders(token),
+            timeout: 30_000,
+        });
+        expect(legacyList.status(), 'deprecated GET /goals alias is 200').toBe(200);
+        const rows = (await legacyList.json()) as BuildRequestDto[];
+        expect(rows.map((r) => r.id)).toContain(buildRequest.id);
+
+        // And the row is the SAME row the new primary route serves (one queue,
+        // two paths — the alias delegates, it does not fork state).
+        const primaryList = (await (
+            await request.get(buildRequestsUrl, { headers: authedHeaders(token), timeout: 30_000 })
+        ).json()) as BuildRequestDto[];
+        expect(primaryList.map((r) => r.id)).toContain(buildRequest.id);
+
+        // The OLD cancel route still cancels (200, same handler + guard).
+        const legacyCancel = await request.patch(legacyCancelUrl(buildRequest.id), {
+            headers: authedHeaders(token),
+            timeout: 30_000,
+        });
+        expect(legacyCancel.status(), 'deprecated PATCH /goals/:id/cancel alias is 200').toBe(200);
+        expect((await legacyCancel.json()).status).toBe('canceled');
     });
 });

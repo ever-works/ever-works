@@ -6,6 +6,8 @@ import { KnowledgeBaseModule, WorkModule } from '@ever-works/agent/services';
 import { NotificationsModule } from '@ever-works/agent/notifications';
 import { FacadesModule } from '@ever-works/agent/facades';
 import { MissionsModule } from '@ever-works/agent/missions';
+import { WorkAgentModule } from '@ever-works/agent/work-agent';
+import { GoalsModule } from '@ever-works/agent/goals';
 import { AgentsModule } from '@ever-works/agent/agents';
 import { TasksDomainModule } from '@ever-works/agent/tasks-domain';
 import { WorkProposalsModule } from '../work-proposals/work-proposals.module';
@@ -46,6 +48,17 @@ import { OrganizationsModule } from '../organizations/organizations.module';
         // packages/tasks) can call tickDue() each minute without
         // direct DB access from worker scope.
         MissionsModule,
+        // PR-4 — exposes IdeaBuildExecutorService through the
+        // remote-proxy controller so the idea-build-execute one-shot
+        // task (in packages/tasks) can drive executeBuild() over the
+        // internal RPC channel without direct DB access from worker
+        // scope. WorkAgentModule exports the service.
+        WorkAgentModule,
+        // Goals & Metrics PR-8 — exposes GoalEvaluationService through
+        // the remote-proxy controller so the goal-evaluate-dispatcher
+        // cron task (in packages/tasks) can call evaluateDue() each
+        // minute without direct DB access from worker scope.
+        GoalsModule,
         // Agents/Skills/Tasks PR #1017 — Phase 6. Exposes
         // AgentScheduleDispatcherService + AgentRepository +
         // AgentRunRepository through the remote-proxy controller so

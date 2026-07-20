@@ -37,6 +37,13 @@ export enum WorkProposalStatus {
 export enum WorkProposalSource {
     AUTO_SIGNUP = 'auto-signup',
     USER_REFRESH = 'user-refresh',
+    /**
+     * @deprecated The /discover page (this source's only intended writer)
+     * was removed in domain-model-evolution PR-10; no production code ever
+     * wrote this value and no rows carry it. The member is retained so the
+     * varchar column's historical value space stays documented — do not
+     * write it.
+     */
     DISCOVER = 'discover',
     SCHEDULED = 'scheduled',
     /** Idea typed in by the user via `+ Add` (spec §3.4). */

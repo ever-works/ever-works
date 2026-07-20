@@ -8,7 +8,7 @@ import {
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from 'typeorm';
-import { WorkAgentGoal } from './work-agent-goal.entity';
+import { WorkBuildRequest } from './work-build-request.entity';
 import { TimestampColumn } from './_types';
 import type { ClassToObject } from './types';
 import { User } from './user.entity';
@@ -48,11 +48,11 @@ export class WorkAgentRun {
     user?: ClassToObject<User>;
 
     @Column('uuid')
-    goalId: string;
+    buildRequestId: string;
 
-    @ManyToOne(() => WorkAgentGoal, { onDelete: 'CASCADE' })
-    @JoinColumn({ name: 'goalId' })
-    goal?: ClassToObject<WorkAgentGoal>;
+    @ManyToOne(() => WorkBuildRequest, { onDelete: 'CASCADE' })
+    @JoinColumn({ name: 'buildRequestId' })
+    buildRequest?: ClassToObject<WorkBuildRequest>;
 
     @Column({ type: 'varchar', default: WorkAgentRunStatus.QUEUED })
     status: WorkAgentRunStatus;

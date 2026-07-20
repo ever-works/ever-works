@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { useTranslations } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import {
     AlertTriangle,
     ArrowLeft,
@@ -13,7 +13,7 @@ import {
 } from 'lucide-react';
 import { Link, useRouter } from '@/i18n/navigation';
 import { toast } from 'sonner';
-import type { WorkProposal, WorkProposalStatus } from '@/lib/api/work-proposals';
+import type { IdeaWorkLink, WorkProposal, WorkProposalStatus } from '@/lib/api/work-proposals';
 import { getProposalAction } from '@/app/actions/dashboard/work-proposals';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
@@ -35,8 +35,27 @@ const POLL_MAX_MS = 10 * 60_000;
  */
 const IN_PROGRESS: ReadonlySet<WorkProposalStatus> = new Set(['queued', 'building']);
 
+/**
+ * Badge tints for the Idea→Work link kinds (PR-1, `idea_works`).
+ * Mirrors the `STATUS_STYLES` palette so kinds read like statuses:
+ * success-green for a Work the platform built, sky for a manually
+ * linked Work, amber for a rebuild.
+ */
+const KIND_BADGE: Record<IdeaWorkLink['kind'], string> = {
+    built: 'bg-success/10 text-success ring-success/20',
+    linked: 'bg-sky-500/10 text-sky-600 dark:text-sky-300 ring-sky-500/20',
+    rebuilt: 'bg-amber-500/10 text-amber-600 dark:text-amber-300 ring-amber-500/20',
+};
+
 interface IdeaDetailClientProps {
     idea: WorkProposal;
+    /**
+     * PR-1 (Idea↔Work provenance) — the Idea's `idea_works` links,
+     * server-resolved by the page (newest first). Initial-only: the
+     * component has no in-place accept action (Accept navigates to
+     * `/works/new`), so there's no client refresh to hook into.
+     */
+    initialLinks?: IdeaWorkLink[];
 }
 
 /**
@@ -46,9 +65,10 @@ interface IdeaDetailClientProps {
  * "View Work" the moment the background build finishes. Terminal
  * Ideas render exactly once with no polling.
  */
-export function IdeaDetailClient({ idea: initialIdea }: IdeaDetailClientProps) {
+export function IdeaDetailClient({ idea: initialIdea, initialLinks = [] }: IdeaDetailClientProps) {
     const t = useTranslations('dashboard.proposals');
     const tPage = useTranslations('dashboard.ideasPage');
+    const locale = useLocale();
     const router = useRouter();
 
     const [idea, setIdea] = useState<WorkProposal>(initialIdea);
@@ -294,6 +314,52 @@ export function IdeaDetailClient({ idea: initialIdea }: IdeaDetailClientProps) {
                         <Bot className="w-3.5 h-3.5" aria-hidden="true" />
                     </Link>
                 </div>
+
+                {/* Linked Works — every Work this Idea became or was
+                    attached to (authoritative `idea_works`, PR-1). Hidden
+                    entirely when the Idea has no links yet. */}
+                {initialLinks.length > 0 && (
+                    <section
+                        aria-labelledby="idea-linked-works-heading"
+                        className="mt-6 border-t border-border/60 dark:border-white/10 pt-5"
+                    >
+                        <h2
+                            id="idea-linked-works-heading"
+                            className="mb-3 text-sm font-semibold text-text dark:text-text-dark"
+                        >
+                            {tPage('linkedWorks.title')}
+                        </h2>
+                        <ul className="space-y-2">
+                            {initialLinks.map((link) => (
+                                <li key={link.id}>
+                                    <Link
+                                        href={ROUTES.DASHBOARD_WORK(link.workId)}
+                                        className="flex items-center gap-3 rounded-md border border-border/60 dark:border-white/10 bg-surface-secondary/60 dark:bg-white/5 px-3 py-2 hover:border-primary/40 transition-colors"
+                                    >
+                                        <span className="min-w-0 flex-1 truncate text-sm font-medium text-text dark:text-text-dark">
+                                            {link.workName ?? link.workId.slice(0, 8)}
+                                        </span>
+                                        <span
+                                            className={cn(
+                                                'shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ring-inset',
+                                                KIND_BADGE[link.kind],
+                                            )}
+                                        >
+                                            {tPage(`linkedWorks.kind.${link.kind}`)}
+                                        </span>
+                                        <span className="shrink-0 text-xs text-text-muted dark:text-text-muted-dark">
+                                            {new Date(link.createdAt).toLocaleDateString(locale, {
+                                                year: 'numeric',
+                                                month: 'short',
+                                                day: 'numeric',
+                                            })}
+                                        </span>
+                                    </Link>
+                                </li>
+                            ))}
+                        </ul>
+                    </section>
+                )}
             </article>
         </div>
     );

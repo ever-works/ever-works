@@ -12,6 +12,8 @@ import {
 import { redirect } from 'next/navigation';
 import NewWorkClient, { ALL_WORK_KIND_CHIP_VALUES, type CreationMode } from './new-work-client';
 import { getDisabledWorkKinds } from '@/lib/feature-flags/work-kinds';
+import { fetchWorkTemplateCatalog } from '@/lib/api/work-templates.server';
+import type { WorkBlueprintEntry } from '@/lib/api/work-templates';
 import type { DeployProvider } from './deploy-provider-selector';
 import { workProposalsAPI } from '@/lib/api/work-proposals';
 import type { WorkProposal } from '@/lib/api/work-proposals';
@@ -121,6 +123,18 @@ export default async function NewWorkPage({ searchParams }: NewWorkPageProps) {
         websiteTemplates = [];
     }
 
+    // Works Templates catalog (ADR-014) — manifest Work blueprints from
+    // `ever-works/works`, layered ADDITIVELY on top of the per-user website
+    // templates above. Always resolves to an array (built-in fallback on any
+    // failure), so the Create-Work chips + selector never break.
+    let workBlueprints: WorkBlueprintEntry[] = [];
+    try {
+        workBlueprints = await fetchWorkTemplateCatalog();
+    } catch (error) {
+        console.error('Failed to fetch work blueprints:', error);
+        workBlueprints = [];
+    }
+
     let proposal: WorkProposal | null = null;
     if (proposalId) {
         // `get` now rethrows transient failures (only 404/403 → null). This
@@ -161,6 +175,7 @@ export default async function NewWorkPage({ searchParams }: NewWorkPageProps) {
             deployProviders={deployProviders}
             defaultDeployProviderId={defaultDeployProviderId}
             websiteTemplates={websiteTemplates}
+            workBlueprints={workBlueprints}
             proposal={proposal}
             initialMode={initialMode}
             initialPrompt={initialPrompt}

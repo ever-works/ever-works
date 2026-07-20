@@ -131,7 +131,10 @@ export const createIdea = tool({
         'Server auto-derives the title from the description when omitted (PR I title-fallback).',
     ].join(' '),
     inputSchema: z.object({
-        description: z.string().min(10).describe('What the Idea is — used to seed the AI Goal.'),
+        description: z
+            .string()
+            .min(10)
+            .describe('What the Idea is — used to seed the AI build request.'),
         title: z.string().optional().describe('Optional display title.'),
         attachmentIds: z
             .array(z.string())
@@ -177,8 +180,8 @@ export const refreshIdeas = tool({
 
 export const buildIdea = tool({
     description: [
-        'Queue an Idea for build. Transitions status PENDING/FAILED → QUEUED and spawns a WorkAgentGoal under the hood.',
-        'Returns the new goal id so the user can navigate to the live-run view.',
+        'Queue an Idea for build. Transitions status PENDING/FAILED → QUEUED and spawns a WorkBuildRequest under the hood.',
+        'Returns the new build-request id so the user can navigate to the live-run view.',
     ].join(' '),
     inputSchema: z.object({
         ideaId: z.string().describe('Idea ID to queue for build'),
@@ -188,7 +191,7 @@ export const buildIdea = tool({
         return {
             queued: true,
             idea: summarizeIdea(result.idea),
-            goalId: result.goalId,
+            buildRequestId: result.buildRequestId,
         };
     },
 });

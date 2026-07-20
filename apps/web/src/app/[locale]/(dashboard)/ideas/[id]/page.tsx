@@ -2,7 +2,7 @@ import { cache } from 'react';
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getTranslations } from 'next-intl/server';
-import { workProposalsAPI } from '@/lib/api/work-proposals';
+import { workProposalsAPI, type IdeaWorkLink } from '@/lib/api/work-proposals';
 import { IdeaDetailClient } from '@/components/ideas';
 
 /**
@@ -29,6 +29,17 @@ type Params = Promise<{ id: string; locale: string }>;
  */
 const getIdea = cache((id: string) => workProposalsAPI.get(id).catch(() => null));
 
+/**
+ * PR-1 (Idea↔Work provenance) — the Idea's `idea_works` links for the
+ * "Linked Works" panel. A failure here (transient blip or a 404 racing
+ * a delete) degrades to an empty list so the panel simply doesn't
+ * render instead of erroring the whole page.
+ */
+const getIdeaWorks = cache(
+    (id: string): Promise<{ links: IdeaWorkLink[] }> =>
+        workProposalsAPI.listWorks(id).catch(() => ({ links: [] })),
+);
+
 export async function generateMetadata({ params }: { params: Params }): Promise<Metadata> {
     const { id } = await params;
     const idea = await getIdea(id);
@@ -41,10 +52,10 @@ export async function generateMetadata({ params }: { params: Params }): Promise<
 
 export default async function IdeaDetailPage({ params }: { params: Params }) {
     const { id } = await params;
-    const idea = await getIdea(id);
+    const [idea, ideaWorks] = await Promise.all([getIdea(id), getIdeaWorks(id)]);
     if (!idea) {
         notFound();
     }
 
-    return <IdeaDetailClient idea={idea} />;
+    return <IdeaDetailClient idea={idea} initialLinks={ideaWorks.links} />;
 }

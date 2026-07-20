@@ -797,6 +797,33 @@
             "empty": "No budget data yet."
         },
         "missionDetail": {
+            "attachedWorks": {
+				"pickerTruncated": "Showing your 100 most recent Works - open the Works page for the full list.",
+                "title": "Attached Works",
+                "empty": "No Works attached to this Mission yet. Attach one below.",
+                "attachTitle": "Attach a Work",
+                "workLabel": "Work",
+                "workPlaceholder": "Select a Work",
+                "relationLabel": "Relation",
+                "attach": "Attach",
+                "detach": "Detach",
+                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "noWorksToAttach": "You have no Works to attach yet.",
+                "relations": {
+                    "created": "Created",
+                    "improves": "Improves",
+                    "operates": "Operates",
+                    "markets": "Markets",
+                    "researches": "Researches",
+                    "retires": "Retires"
+                },
+                "toasts": {
+                    "attached": "Work attached",
+                    "attachError": "Couldn't attach Work",
+                    "detached": "Work detached",
+                    "detachError": "Couldn't detach Work"
+                }
+            },
             "backToMissions": "Back to Missions",
             "badges": {
                 "scheduled": "Scheduled",
@@ -862,6 +889,23 @@
                 "cancel": "Cancel",
                 "confirm": "Clone Mission"
             },
+            "completeDialog": {
+                "title": "Complete this Mission",
+                "description": "Optionally record a conclusion verdict for this Mission. \"No verdict\" completes it without recording an outcome.",
+                "outcomeLabel": "Outcome (optional)",
+                "noVerdict": "No verdict",
+                "cancel": "Cancel",
+                "confirm": "Complete Mission"
+            },
+            "outcomes": {
+                "succeeded": "Succeeded",
+                "partially_succeeded": "Partially succeeded",
+                "failed": "Failed",
+                "cancelled": "Cancelled",
+                "superseded": "Superseded"
+            },
+            "outcomeTooltip": "Outcome recorded when this Mission was completed",
+            "completedAtLabel": "Completed",
             "toasts": {
                 "settingsSaved": "Mission settings saved",
                 "settingsError": "Couldn't save settings",
@@ -938,11 +982,15 @@
                 "anyStatus": "Bất kỳ trạng thái",
                 "apply": "Áp dụng",
                 "reset": "Đặt lại"
+            },
+            "linkedWorks": {
+                "title": "Linked Works",
+                "kind": {
+                    "built": "Built",
+                    "linked": "Linked",
+                    "rebuilt": "Rebuilt"
+                }
             }
-        },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
         },
         "header": {
             "welcome": "Chào mừng trở lại, {username}!",
@@ -1191,6 +1239,7 @@
             "subtitle": "Quản lý cài đặt và sở thích tài khoản của bạn",
             "tabs": {
                 "profile": "Hồ sơ",
+                "organization": "Organization",
                 "security": "Bảo mật",
                 "apiKeys": "Khóa API",
                 "data": "Dữ liệu",
@@ -1227,14 +1276,14 @@
                 "sections": {
                     "agent": {
                         "title": "Work agent planning",
-                        "description": "Prepare approval-ready Work plans from high-level goals. Live execution stays blocked until an executor is connected."
+                        "description": "Prepare approval-ready Work plans from high-level build requests. Live execution stays blocked until an executor is connected."
                     },
                     "guardrails": {
                         "title": "Guardrails",
                         "description": "Set hard limits that future live execution must follow before creating Works, adding items, or spending budget."
                     },
                     "queue": {
-                        "title": "Queue a goal",
+                        "title": "Queue a build request",
                         "description": "Give the agent a broad instruction. It creates an approval-ready plan inside your guardrails."
                     },
                     "liveRun": {
@@ -1242,7 +1291,7 @@
                         "description": "Current state and recent agent activity."
                     },
                     "recentGoals": {
-                        "title": "Recent goals",
+                        "title": "Recent build requests",
                         "description": "Pending, running, and completed Work agent instructions."
                     },
                     "autoGenerateIdeas": {
@@ -1273,7 +1322,7 @@
                     "approvalThreshold": "Approval threshold",
                     "confirmBeforeCreate": "Confirm before creating Works",
                     "confirmBeforeDelete": "Confirm before deleting items",
-                    "dryRunThisGoal": "Dry run this goal",
+                    "dryRunThisGoal": "Dry run this build request",
                     "autoGenerateCadenceMinutes": "Run every N minutes",
                     "autoGenerateBatchSize": "Ideas per cycle",
                     "autoBuildThrottlePerDay": "Daily auto-build cap",
@@ -1289,7 +1338,7 @@
                     "saveSettings": "Save settings",
                     "saveSection": "Save",
                     "useDefault": "Use default",
-                    "queueGoal": "Queue goal",
+                    "queueGoal": "Queue build request",
                     "preparePlan": "Prepare plan",
                     "stop": "Stop"
                 },
@@ -1306,16 +1355,16 @@
                 },
                 "empty": {
                     "noActiveRun": "No active Work agent run.",
-                    "noGoals": "No Work agent goals yet.",
+                    "noGoals": "No Work agent build requests yet.",
                     "waitingForUpdate": "Waiting for the first run update."
                 },
                 "toasts": {
                     "settingsSaved": "Work agent settings saved",
                     "settingsError": "Failed to save settings",
                     "goalQueued": "Work agent plan prepared",
-                    "goalError": "Failed to queue goal",
-                    "goalCanceled": "Work agent goal canceled",
-                    "cancelError": "Failed to cancel goal"
+                    "goalError": "Failed to queue build request",
+                    "goalCanceled": "Work agent build request canceled",
+                    "cancelError": "Failed to cancel build request"
                 }
             },
             "data": {
@@ -1574,7 +1623,45 @@
             "totalItems": "Tổng mục",
             "activeWebsites": "Trang web hoạt động",
             "monthSpend": "Month Spend",
-            "fromLastMonth": "từ tháng trước"
+            "fromLastMonth": "từ tháng trước",
+            "teams": "Nhóm"
+        },
+        "attention": {
+            "title": "Cần chú ý",
+            "kinds": {
+                "agentError": {
+                    "title": "Agent “{name}” gặp lỗi",
+                    "subtitle": "Tự động tạm dừng sau nhiều lần thất bại"
+                },
+                "scheduleFailed": {
+                    "title": "Chạy theo lịch thất bại",
+                    "subtitle": "Lần chạy gần nhất của “{name}” chưa hoàn tất"
+                },
+                "schedulePaused": {
+                    "title": "Lịch đã tạm dừng",
+                    "subtitle": "“{name}” đã tạm dừng sau nhiều lần thất bại"
+                },
+                "generationFailed": {
+                    "title": "Tạo thất bại",
+                    "subtitle": "Không thể tạo “{name}”"
+                },
+                "taskBlocked": {
+                    "title": "Task bị chặn",
+                    "subtitle": "“{name}” cần dữ liệu nhập để tiếp tục"
+                },
+                "budgetExceeded": {
+                    "title": "Vượt ngân sách",
+                    "subtitle": "Chi tiêu tài khoản đã đạt giới hạn"
+                }
+            }
+        },
+        "soon": {
+            "title": "Sắp tới",
+            "more": "+{n} khác",
+            "source": {
+                "work": "Công việc",
+                "mission": "Mission"
+            }
         },
         "adminUsage": {
             "title": "Platform usage",
@@ -1640,6 +1727,18 @@
             "createButton": "Tạo công việc"
         },
         "workDetail": {
+            "missions": {
+                "title": "Missions",
+                "subtitle": "Your Missions that relate to this Work. Missions never own Works — these are references.",
+                "relations": {
+                    "created": "Created",
+                    "improves": "Improves",
+                    "operates": "Operates",
+                    "markets": "Markets",
+                    "researches": "Researches",
+                    "retires": "Retires"
+                }
+            },
             "agentsDropdown": {
                 "trigger": "Agents",
                 "heading": "Agents của Công việc này",
@@ -3930,6 +4029,177 @@
                 "unexpectedError": "Đã xảy ra lỗi không mong muốn"
             }
         },
+        "goalsPage": {
+            "title": "Goals",
+            "subtitle": "Measurable targets evaluated automatically against your metrics providers. Each Goal tracks a live metric toward a target — open one to see its progress, run a check, or set an outcome.",
+            "newGoal": "New Goal",
+            "statuses": {
+                "draft": "Draft",
+                "active": "Active",
+                "paused": "Paused",
+                "completed": "Completed"
+            },
+            "outcomes": {
+                "achieved": "Achieved",
+                "missed": "Missed",
+                "abandoned": "Abandoned"
+            },
+            "filterBar": {
+                "status": "Status",
+                "anyStatus": "Any status",
+                "apply": "Apply",
+                "reset": "Reset"
+            },
+            "loadError": {
+                "title": "Could not load Goals."
+            },
+            "empty": {
+                "title": "No Goals yet.",
+                "subtitle": "Create a Goal to track a business metric toward a target — income, signups, churn, error rate — evaluated automatically on a schedule."
+            },
+            "pagination": {
+                "showing": "Showing {from}-{to}",
+                "noResults": "No results on this page",
+                "previous": "Previous",
+                "next": "Next"
+            },
+            "card": {
+                "comparator": {
+                    "gte": "At least",
+                    "lte": "At most"
+                },
+                "nextCheckPrefix": "Next check:",
+                "windowPrefix": "Window:",
+                "window": {
+                    "day": "Daily",
+                    "week": "Weekly",
+                    "month": "Monthly",
+                    "total": "Total",
+                    "point": "Point-in-time"
+                }
+            }
+        },
+        "goalNew": {
+            "title": "New Goal",
+            "subtitle": "Define a measurable target and the metric that tracks it. New Goals start as a draft — activate from the detail page to begin scheduled evaluation.",
+            "backToGoals": "Back to Goals",
+            "created": "Goal created",
+            "sections": {
+                "metricSource": "Metric source",
+                "target": "Target",
+                "cadence": "Evaluation cadence"
+            },
+            "fields": {
+                "title": "Title",
+                "titlePlaceholder": "e.g. Monthly Stripe income of $1,000",
+                "description": "Description",
+                "descriptionPlaceholder": "Optional context for this Goal",
+                "pluginId": "Provider plugin ID",
+                "metricId": "Metric ID",
+                "params": "Parameters (JSON)",
+                "paramsHint": "Optional provider-specific parameters as a JSON object (e.g. a currency filter).",
+                "paramsInvalid": "Parameters must be valid JSON.",
+                "paramsNotObject": "Parameters must be a JSON object.",
+                "comparator": "Direction",
+                "targetValue": "Target value",
+                "unit": "Unit",
+                "window": "Window",
+                "deadline": "Deadline (optional)",
+                "checkFrequency": "Check frequency (minutes)",
+                "checkFrequencyHint": "Minimum {min} minutes; lower values are clamped."
+            },
+            "comparators": {
+                "gte": "At least (grow to target)",
+                "lte": "At most (shrink to target)"
+            },
+            "windows": {
+                "day": "Daily",
+                "week": "Weekly",
+                "month": "Monthly",
+                "total": "Total",
+                "point": "Point-in-time"
+            },
+            "errors": {
+                "titleRequired": "Title is required.",
+                "metricSourceRequired": "Provider plugin ID and metric ID are required.",
+                "targetInvalid": "Target value must be a number.",
+                "unitRequired": "Unit is required.",
+                "deadlineInvalid": "Deadline is not a valid date.",
+                "createFailed": "Couldn't create the Goal. Please try again."
+            },
+            "actions": {
+                "create": "Create Goal",
+                "cancel": "Cancel"
+            }
+        },
+        "goalDetail": {
+            "backToGoals": "Back to Goals",
+            "actions": {
+                "evaluateNow": "Evaluate now",
+                "activate": "Activate",
+                "pause": "Pause",
+                "delete": "Delete"
+            },
+            "sections": {
+                "progress": "Progress",
+                "details": "Details",
+                "outcome": "Outcome"
+            },
+            "progress": {
+                "current": "Current",
+                "target": "Target",
+                "noSamples": "No observations yet. Activate the Goal or run an evaluation to start collecting samples.",
+                "sampleCount": "{count} observations"
+            },
+            "comparator": {
+                "gte": "At least",
+                "lte": "At most"
+            },
+            "window": {
+                "day": "Daily",
+                "week": "Weekly",
+                "month": "Monthly",
+                "total": "Total",
+                "point": "Point-in-time"
+            },
+            "details": {
+                "plugin": "Provider",
+                "metric": "Metric",
+                "window": "Window",
+                "baseline": "Baseline",
+                "checkFrequency": "Check frequency",
+                "minutes": "{count} min",
+                "nextCheck": "Next check",
+                "deadline": "Deadline",
+                "noDeadline": "Open-ended",
+                "lastObserved": "Last observed"
+            },
+            "outcome": {
+                "hint": "How this Goal ended. Auto-set by evaluation, and always overridable by you.",
+                "overrideLabel": "Override outcome",
+                "overrideNote": "Setting an outcome completes the Goal; clearing it re-opens the outcome.",
+                "none": "None"
+            },
+            "outcomes": {
+                "achieved": "Achieved",
+                "missed": "Missed",
+                "abandoned": "Abandoned"
+            },
+            "toasts": {
+                "activated": "Goal activated",
+                "paused": "Goal paused",
+                "lifecycleError": "Couldn't update the Goal.",
+                "evaluated": "Evaluation complete",
+                "evaluateError": "Couldn't evaluate the Goal.",
+                "outcomeSaved": "Outcome updated",
+                "outcomeError": "Couldn't update the outcome.",
+                "deleted": "Goal deleted",
+                "deleteError": "Couldn't delete the Goal."
+            },
+            "confirm": {
+                "delete": "Delete this Goal? Its observation history and Mission links will be removed. This cannot be undone."
+            }
+        },
         "sidebar": {
             "menu": "Menu",
             "aiChat": "Trò chuyện AI",
@@ -3940,6 +4210,7 @@
                 "dashboard": "Bảng điều khiển",
                 "activity": "Hoạt động",
                 "missions": "Missions",
+                "goals": "Goals",
                 "ideas": "Ideas",
                 "works": "Công việc",
                 "tasks": "Tasks",
@@ -4416,11 +4687,30 @@
             }
         },
         "templateSelector": {
+            "label": "Mẫu",
             "defaultOption": "Sử dụng mặc định",
             "defaultOptionWithName": "Sử dụng mặc định ({name})",
             "optionLabel": "{name}",
             "optionDefaultLabel": "{name} (Mặc định)",
             "changeAnywayLink": "Thay đổi ngay comunque",
+            "typeLabel": "Loại mẫu",
+            "chipType": {
+                "website": "Website",
+                "landing": "Landing",
+                "blog": "Blog",
+                "directory": "Directory",
+                "store": "Store",
+                "company": "Company",
+                "awesome": "Awesome"
+            },
+            "searchPlaceholder": "Tìm kiếm mẫu…",
+            "searchAriaLabel": "Tìm kiếm mẫu",
+            "groupYourTemplates": "Mẫu của bạn",
+            "groupBlueprints": "Blueprints",
+            "featuredBadge": "Nổi bật",
+            "defaultBadge": "Mặc định",
+            "empty": "Không có mẫu nào khớp với tìm kiếm của bạn.",
+            "resultCount": "{count, plural, =0 {Không có mẫu} other {# mẫu}}",
             "origin": {
                 "standard": "Chuẩn",
                 "forked": "Đã fork",
@@ -4572,6 +4862,33 @@
             "empty": "No budget data yet."
         },
         "missionDetail": {
+            "attachedWorks": {
+				"pickerTruncated": "Showing your 100 most recent Works - open the Works page for the full list.",
+                "title": "Attached Works",
+                "empty": "No Works attached to this Mission yet. Attach one below.",
+                "attachTitle": "Attach a Work",
+                "workLabel": "Work",
+                "workPlaceholder": "Select a Work",
+                "relationLabel": "Relation",
+                "attach": "Attach",
+                "detach": "Detach",
+                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "noWorksToAttach": "You have no Works to attach yet.",
+                "relations": {
+                    "created": "Created",
+                    "improves": "Improves",
+                    "operates": "Operates",
+                    "markets": "Markets",
+                    "researches": "Researches",
+                    "retires": "Retires"
+                },
+                "toasts": {
+                    "attached": "Work attached",
+                    "attachError": "Couldn't attach Work",
+                    "detached": "Work detached",
+                    "detachError": "Couldn't detach Work"
+                }
+            },
             "backToMissions": "Back to Missions",
             "badges": {
                 "scheduled": "Scheduled",
@@ -4637,6 +4954,23 @@
                 "cancel": "Cancel",
                 "confirm": "Clone Mission"
             },
+            "completeDialog": {
+                "title": "Complete this Mission",
+                "description": "Optionally record a conclusion verdict for this Mission. \"No verdict\" completes it without recording an outcome.",
+                "outcomeLabel": "Outcome (optional)",
+                "noVerdict": "No verdict",
+                "cancel": "Cancel",
+                "confirm": "Complete Mission"
+            },
+            "outcomes": {
+                "succeeded": "Succeeded",
+                "partially_succeeded": "Partially succeeded",
+                "failed": "Failed",
+                "cancelled": "Cancelled",
+                "superseded": "Superseded"
+            },
+            "outcomeTooltip": "Outcome recorded when this Mission was completed",
+            "completedAtLabel": "Completed",
             "toasts": {
                 "settingsSaved": "Mission settings saved",
                 "settingsError": "Couldn't save settings",
@@ -4728,11 +5062,15 @@
                 "creating": "Đang tạo…",
                 "minLength": "Mô tả phải có ít nhất 10 ký tự.",
                 "error": "Không thể tạo Idea. Vui lòng thử lại."
+            },
+            "linkedWorks": {
+                "title": "Linked Works",
+                "kind": {
+                    "built": "Built",
+                    "linked": "Linked",
+                    "rebuilt": "Rebuilt"
+                }
             }
-        },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
         },
         "adminUsage": {
             "title": "Platform usage",
@@ -4884,7 +5222,6 @@
             "dashboard": "Bảng điều khiển",
             "activity": "Nhật ký Hoạt động",
             "works": "Công việc",
-            "discover": "Discover",
             "newWork": "Công việc Mới",
             "work": "Công việc",
             "overview": "Tổng quan",
@@ -5078,12 +5415,35 @@
         }
     },
     "organizations": {
+        "settings": {
+            "title": "Organization",
+            "subtitle": "Manage your Organization's shared context.",
+            "loading": "Loading…",
+            "selectLabel": "Organization",
+            "visionLabel": "Vision",
+            "visionPlaceholder": "e.g. Become the go-to platform where small teams launch and grow AI-run businesses.",
+            "visionHelp": "Shared with every AI agent working in this Organization — Idea generation, Mission runs, and agent tasks all receive it as context.",
+            "lastUpdated": "Vision last updated",
+            "save": "Save",
+            "saved": "Saved",
+            "empty": {
+                "title": "No Organization yet",
+                "description": "Create an Organization from the workspace switcher to set a company vision."
+            },
+            "errors": {
+                "generic": "Failed to save. Please try again."
+            }
+        },
         "switcher": {
             "heading": "Switch Organization",
             "createNew": "Create Organization",
             "loading": "Loading…"
         },
         "create": {
+            "visionToggle": "Add company vision (optional)",
+            "visionLabel": "Vision",
+            "visionPlaceholder": "e.g. Become the go-to platform where small teams launch and grow AI-run businesses.",
+            "visionHelp": "Optional. Guides all agents working in this Organization — Idea generation, Mission runs, and agent tasks receive it as context. You can add or edit it later in Settings.",
             "title": "Create Organization",
             "description": "Give your Organization a name. We'll allocate a unique slug for its URL.",
             "nameLabel": "Name",

@@ -1,3 +1,4 @@
+import { Logger } from '@nestjs/common';
 import { WorkProposalSource } from '../../entities/work-proposal.entity';
 import { WorkProposalService } from '../work-proposal.service';
 
@@ -46,9 +47,15 @@ function makeService(
     const works = {
         findByUser: jest.fn().mockResolvedValue([]),
         // Owns work 'w1'; the IDOR guard in acceptInternal reads this.
+        // `acceptedFromIdeaId: null` = never stamped, so the provenance
+        // path treats the work as unclaimed (first writer wins).
         findById: jest.fn(async (id: string) =>
-            id === 'w1' ? { id: 'w1', userId: 'u1' } : { id, userId: 'other-user' },
+            id === 'w1'
+                ? { id: 'w1', userId: 'u1', acceptedFromIdeaId: null }
+                : { id, userId: 'other-user', acceptedFromIdeaId: null },
         ),
+        // Provenance back-pointer stamp (works.acceptedFromIdeaId).
+        update: jest.fn().mockResolvedValue(null),
     };
     const registry = {
         getReady: jest.fn().mockReturnValue([{ plugin: { id: 'github' } }]),
@@ -88,9 +95,18 @@ function makeService(
         // acceptInternal path: proposal 'p1' exists for 'u1'; markAccepted
         // succeeds. The IDOR guard sits between these two.
         findByIdForUser: jest.fn(async (id: string) =>
-            id === 'p1' ? { id: 'p1', userId: 'u1', status: 'pending' } : null,
+            id === 'p1'
+                ? { id: 'p1', userId: 'u1', status: 'pending', acceptedWorkId: null }
+                : null,
         ),
         markAccepted: jest.fn().mockResolvedValue(true),
+    };
+    // Authoritative Idea↔Work provenance repository (review §23.1).
+    const ideaWorks = {
+        recordLink: jest.fn().mockResolvedValue(undefined),
+        listForIdeaWithWork: jest.fn().mockResolvedValue([]),
+        listForWork: jest.fn().mockResolvedValue([]),
+        countForIdea: jest.fn().mockResolvedValue(0),
     };
     const titler = { generateTitle: jest.fn().mockResolvedValue('Manual idea') };
 
@@ -100,10 +116,11 @@ function makeService(
         registry as never,
         aiFacade as never,
         repo as never,
+        ideaWorks as never,
         titler as never,
     );
 
-    return { service, aiFacade, repo, works };
+    return { service, aiFacade, repo, works, ideaWorks };
 }
 
 describe('WorkProposalService proposal limits and dedupe', () => {
@@ -209,5 +226,170 @@ describe('WorkProposalService.acceptInternal — workId ownership (IDOR guard)',
         expect(ok).toBe(false);
         expect(works.findById).not.toHaveBeenCalled();
         expect(repo.markAccepted).not.toHaveBeenCalled();
+    });
+});
+
+describe('WorkProposalService.acceptInternal — Idea↔Work provenance (review §23.1)', () => {
+    it('records an idea_works link (kind "linked") and stamps works.acceptedFromIdeaId when unset', async () => {
+        const { service, ideaWorks, works } = makeService();
+
+        const ok = await service.acceptInternal('u1', 'p1', 'w1');
+
+        expect(ok).toBe(true);
+        expect(ideaWorks.recordLink).toHaveBeenCalledWith({
+            ideaId: 'p1',
+            workId: 'w1',
+            userId: 'u1',
+            kind: 'linked',
+        });
+        expect(works.update).toHaveBeenCalledWith('w1', { acceptedFromIdeaId: 'p1' });
+    });
+
+    it('still records the link but never overwrites an existing acceptedFromIdeaId (first writer wins)', async () => {
+        const { service, ideaWorks, works } = makeService();
+        works.findById.mockResolvedValueOnce({
+            id: 'w1',
+            userId: 'u1',
+            acceptedFromIdeaId: 'p-earlier',
+        });
+
+        const ok = await service.acceptInternal('u1', 'p1', 'w1');
+
+        expect(ok).toBe(true);
+        expect(ideaWorks.recordLink).toHaveBeenCalledWith({
+            ideaId: 'p1',
+            workId: 'w1',
+            userId: 'u1',
+            kind: 'linked',
+        });
+        expect(works.update).not.toHaveBeenCalled();
+    });
+
+    it('records nothing when the accept is refused (work owned by another user)', async () => {
+        const { service, ideaWorks, works } = makeService();
+
+        const ok = await service.acceptInternal('u1', 'p1', 'w-foreign');
+
+        expect(ok).toBe(false);
+        expect(ideaWorks.recordLink).not.toHaveBeenCalled();
+        expect(works.update).not.toHaveBeenCalled();
+    });
+
+    it('records nothing when markAccepted refuses the status transition', async () => {
+        const { service, repo, ideaWorks, works } = makeService();
+        repo.markAccepted.mockResolvedValueOnce(false);
+
+        const ok = await service.acceptInternal('u1', 'p1', 'w1');
+
+        expect(ok).toBe(false);
+        expect(ideaWorks.recordLink).not.toHaveBeenCalled();
+        expect(works.update).not.toHaveBeenCalled();
+    });
+
+    it('still resolves true and logs a warning when provenance recording fails (best-effort contract)', async () => {
+        const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+        try {
+            const { service, ideaWorks, works } = makeService();
+            ideaWorks.recordLink.mockRejectedValueOnce(new Error('connection reset'));
+
+            const ok = await service.acceptInternal('u1', 'p1', 'w1');
+
+            // The primary transition (markAccepted) already committed —
+            // a provenance failure must not fail the accept.
+            expect(ok).toBe(true);
+            expect(works.update).not.toHaveBeenCalled();
+            expect(warnSpy).toHaveBeenCalledWith(
+                expect.stringContaining('Failed to record Idea↔Work provenance'),
+            );
+        } finally {
+            warnSpy.mockRestore();
+        }
+    });
+});
+
+describe('WorkProposalService.handleGoalCompletion — provenance link kinds', () => {
+    const policy = { maxAutoRetries: 3, backoffSeconds: 60, exponentialBackoffFactor: 2 };
+
+    it('records a "built" link on first success (no previous accepted Work)', async () => {
+        const { service, ideaWorks } = makeService();
+
+        const decision = await service.handleGoalCompletion({
+            userId: 'u1',
+            ideaId: 'p1',
+            outcome: { kind: 'success', workId: 'w-new' },
+            attempts: 1,
+            policy,
+        });
+
+        expect(decision).toEqual({ outcome: 'accepted', ideaId: 'p1', workId: 'w-new' });
+        expect(ideaWorks.recordLink).toHaveBeenCalledWith({
+            ideaId: 'p1',
+            workId: 'w-new',
+            userId: 'u1',
+            kind: 'built',
+        });
+    });
+
+    it('records a "rebuilt" link when the Idea already had an accepted Work', async () => {
+        const { service, repo, ideaWorks } = makeService();
+        repo.findByIdForUser.mockResolvedValueOnce({
+            id: 'p1',
+            userId: 'u1',
+            status: 'building',
+            acceptedWorkId: 'w-old',
+        });
+
+        const decision = await service.handleGoalCompletion({
+            userId: 'u1',
+            ideaId: 'p1',
+            outcome: { kind: 'success', workId: 'w-new' },
+            attempts: 1,
+            policy,
+        });
+
+        expect(decision).toEqual({
+            outcome: 'rebuild-accepted',
+            ideaId: 'p1',
+            workId: 'w-new',
+            previousWorkId: 'w-old',
+        });
+        expect(ideaWorks.recordLink).toHaveBeenCalledWith({
+            ideaId: 'p1',
+            workId: 'w-new',
+            userId: 'u1',
+            kind: 'rebuilt',
+        });
+    });
+});
+
+describe('WorkProposalService.listLinkedWorks', () => {
+    it('returns null (404-shaped) when the Idea does not exist for the user', async () => {
+        const { service, ideaWorks } = makeService();
+
+        const result = await service.listLinkedWorks('u1', 'p-missing');
+
+        expect(result).toBeNull();
+        expect(ideaWorks.listForIdeaWithWork).not.toHaveBeenCalled();
+    });
+
+    it('delegates to ideaWorks.listForIdeaWithWork for an owned Idea', async () => {
+        const { service, ideaWorks } = makeService();
+        const links = [
+            {
+                id: 'l1',
+                ideaId: 'p1',
+                workId: 'w1',
+                kind: 'linked',
+                createdAt: new Date('2026-07-01T00:00:00Z'),
+                workName: 'AI Agent Frameworks',
+                workSlug: 'ai-agent-frameworks',
+            },
+        ];
+        ideaWorks.listForIdeaWithWork.mockResolvedValueOnce(links);
+
+        const result = await service.listLinkedWorks('u1', 'p1');
+
+        expect(ideaWorks.listForIdeaWithWork).toHaveBeenCalledWith('p1', 'u1');
+        expect(result).toBe(links);
     });
 });
