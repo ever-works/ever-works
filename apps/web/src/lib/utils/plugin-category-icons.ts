@@ -83,6 +83,7 @@ export const CATEGORY_LABELS: Record<PluginCategory, string> = {
     dns: 'DNS Providers',
     'secret-store-resolver': 'Secret Stores',
     'job-runtime': 'Job Runtimes',
+    connector: 'Connectors',
 };
 
 // Type-safe assertion that all categories are covered
