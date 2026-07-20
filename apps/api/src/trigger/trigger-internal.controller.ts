@@ -35,7 +35,9 @@ import { WorkOperationsService } from '@ever-works/agent/work-operations';
 import { WorkContextResponse } from '@ever-works/agent/tasks';
 import { SkipThrottle } from '@nestjs/throttler';
 import {
+    AnonymousUserCleanupService,
     DeployReadyPollerService,
+    KnowledgeBaseReconcileService,
     WorkOwnershipService,
     WorkScheduleDispatcherService,
     WorkScheduleService,
@@ -242,6 +244,14 @@ export class TriggerInternalController implements OnModuleInit {
         // the worker-side resolver can derive tenantId for the
         // webhook-delivery task.
         private readonly webhookSubscriptionRepository: WebhookSubscriptionRepository,
+        // EW-617 G2 / EW-637 - exposes AnonymousUserCleanupService for the
+        // nightly `anonymous-user-cleanup` cron task. Provided by WorkModule,
+        // already imported by TriggerInternalModule.
+        private readonly anonymousUserCleanupService: AnonymousUserCleanupService,
+        // EW-643 Phase 3 slice 4a - exposes KnowledgeBaseReconcileService for
+        // the daily `kb-reconcile` cron task. Provided by KnowledgeBaseModule,
+        // already imported by TriggerInternalModule.
+        private readonly knowledgeBaseReconcileService: KnowledgeBaseReconcileService,
         @Optional()
         @Inject(forwardRef(() => WorkProposalsApiService))
         private readonly workProposalsApiService?: WorkProposalsApiService,
@@ -298,6 +308,11 @@ export class TriggerInternalController implements OnModuleInit {
             // EW-742 P3.2 T22 — exposed for resolveForSubscription on
             // the worker-host resolver (webhook-delivery task).
             WebhookSubscriptionRepository: this.webhookSubscriptionRepository,
+            // EW-617 G2 / EW-637 - `anonymous-user-cleanup` calls
+            // `purgeExpired()` here (allow-list auto-derived).
+            AnonymousUserCleanupService: this.anonymousUserCleanupService,
+            // EW-643 Phase 3 slice 4a - `kb-reconcile` calls `reconcile()`.
+            KnowledgeBaseReconcileService: this.knowledgeBaseReconcileService,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),
