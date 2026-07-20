@@ -229,6 +229,7 @@ describe('CredentialVersionService (integration via controller-touching paths)',
                 createdAt: now,
             } as TenantJobRuntimeConfig);
             snapshotRepo.findOne.mockResolvedValueOnce({
+                id: 'snap-hist-1',
                 tenantId,
                 providerId: 'trigger',
                 credentialVersion: 7,

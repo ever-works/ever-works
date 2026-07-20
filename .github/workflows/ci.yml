@@ -18,6 +18,14 @@ concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
 
+# Raise the Node heap for every step in every job. The `@ever-works/plugin`
+# tsup build emits `.d.ts` for ~18 entry points, which exhausts the default
+# ~2 GB heap and fails the plugin-matrix + secret-store-matrix + lint-and-test
+# jobs with ERR_WORKER_OUT_OF_MEMORY (the ESM/CJS outputs build fine; only the
+# DTS worker OOMs). 6 GB clears it with headroom on the standard runner.
+env:
+  NODE_OPTIONS: --max-old-space-size=6144
+
 jobs:
   lint-and-test:
     runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
