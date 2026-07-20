@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import {
+    AnonymousUserCleanupService,
     DeployReadyPollerService,
+    KnowledgeBaseReconcileService,
     WorkScheduleDispatcherService,
     WorkScheduleService,
 } from '@ever-works/agent/services';
@@ -143,6 +145,31 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
                 createRemoteProxy(apiClient, 'NotificationChannelFacadeService'),
             inject: [TriggerInternalApiClient],
         },
+        // EW-617 G2 / EW-637 - the nightly `anonymous-user-cleanup` cron
+        // task resolved this service from a module that never provided it,
+        // so every run since it shipped died with `Nest could not find
+        // AnonymousUserCleanupService element`. Proxied to the API for the
+        // same reason as NotificationChannelFacadeService above: the real
+        // service needs the storage plugins, which are only loaded in the
+        // API process (the task's own local ANON_CLEANUP_STORAGE_PLUGIN
+        // factory imports an apps/api path that never resolves in worker
+        // scope, so file GC silently no-opped).
+        {
+            provide: AnonymousUserCleanupService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'AnonymousUserCleanupService'),
+            inject: [TriggerInternalApiClient],
+        },
+        // EW-643 Phase 3 slice 4a - same defect for the daily
+        // `kb-reconcile` cron task. The real service reads the KB upload
+        // rows and lists the storage backend's `kb-originals/` prefix,
+        // both of which live API-side.
+        {
+            provide: KnowledgeBaseReconcileService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'KnowledgeBaseReconcileService'),
+            inject: [TriggerInternalApiClient],
+        },
     ],
     exports: [
         TriggerInternalApiClient,
@@ -161,6 +188,8 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         TasksService,
         TaskChatService,
         NotificationChannelFacadeService,
+        AnonymousUserCleanupService,
+        KnowledgeBaseReconcileService,
     ],
 })
 export class TriggerInternalModule {}
