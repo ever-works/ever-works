@@ -992,10 +992,6 @@
                 }
             }
         },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
-        },
         "header": {
             "welcome": "स्वागत है वापस, {username}!",
             "subtitle": "अपने AI-संचालित कार्य प्रबंधित करें और उनके प्रदर्शन को ट्रैक करें",
@@ -5019,10 +5015,6 @@
                 }
             }
         },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
-        },
         "adminUsage": {
             "title": "Platform usage",
             "description": "Cross-user, cross-directory spend for the current period. Self-hosted operators only.",
@@ -5173,7 +5165,6 @@
             "dashboard": "डैशबोर्ड",
             "activity": "गतिविधि लॉग",
             "works": "कार्यज़",
-            "discover": "Discover",
             "newWork": "नई कार्य",
             "work": "कार्य",
             "overview": "अवलोकन",

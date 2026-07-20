@@ -992,10 +992,6 @@
                 }
             }
         },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
-        },
         "header": {
             "welcome": "Chào mừng trở lại, {username}!",
             "subtitle": "Quản lý các công việc được hỗ trợ bởi AI của bạn và theo dõi hiệu suất của chúng",
@@ -5019,10 +5015,6 @@
                 }
             }
         },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
-        },
         "adminUsage": {
             "title": "Platform usage",
             "description": "Cross-user, cross-directory spend for the current period. Self-hosted operators only.",
@@ -5173,7 +5165,6 @@
             "dashboard": "Bảng điều khiển",
             "activity": "Nhật ký Hoạt động",
             "works": "Công việc",
-            "discover": "Discover",
             "newWork": "Công việc Mới",
             "work": "Công việc",
             "overview": "Tổng quan",

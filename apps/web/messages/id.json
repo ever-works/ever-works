@@ -992,10 +992,6 @@
                 }
             }
         },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
-        },
         "header": {
             "welcome": "Selamat datang kembali, {username}!",
             "subtitle": "Kelola karya bertenaga AI Anda dan lacak kinerjanya",
@@ -5019,10 +5015,6 @@
                 }
             }
         },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
-        },
         "adminUsage": {
             "title": "Platform usage",
             "description": "Cross-user, cross-directory spend for the current period. Self-hosted operators only.",
@@ -5173,7 +5165,6 @@
             "dashboard": "Dasbor",
             "activity": "Log Aktivitas",
             "works": "Karya",
-            "discover": "Discover",
             "newWork": "Karya Baru",
             "work": "Karya",
             "overview": "Ikhtisar",

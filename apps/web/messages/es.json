@@ -1150,10 +1150,6 @@
                 }
             }
         },
-        "discover": {
-            "title": "Descubrir",
-            "subtitle": "Ideas de trabajo seleccionadas por IA adaptadas para ti."
-        },
         "header": {
             "welcome": "¡Bienvenido de nuevo, {username}!",
             "subtitle": "Gestiona tus trabajos impulsados por IA y sigue su rendimiento",
@@ -4991,7 +4987,6 @@
             "dashboard": "Panel",
             "activity": "Registro de actividad",
             "works": "Trabajos",
-            "discover": "Descubrir",
             "newWork": "Nuevo trabajo",
             "work": "Trabajo",
             "overview": "Resumen",

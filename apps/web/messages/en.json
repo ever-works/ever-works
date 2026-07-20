@@ -1179,10 +1179,6 @@
                 }
             }
         },
-        "discover": {
-            "title": "Discover",
-            "subtitle": "AI-curated Work ideas tailored to you."
-        },
         "header": {
             "welcome": "Welcome back, {username}!",
             "subtitle": "Manage your AI-powered works and track their performance",
@@ -5292,7 +5288,6 @@
             "dashboard": "Dashboard",
             "activity": "Activity Log",
             "works": "Works",
-            "discover": "Discover",
             "newWork": "New Work",
             "work": "Work",
             "overview": "Overview",
