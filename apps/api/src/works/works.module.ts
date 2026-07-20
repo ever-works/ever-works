@@ -20,6 +20,10 @@ import { InvitationsController } from './invitations.controller';
 import { BulkItemsController } from './bulk-items.controller';
 import { KbController } from './kb.controller';
 import { OrgKbController } from './org-kb.controller';
+import { WorkTemplatesController } from './work-templates.controller';
+
+// Services
+import { WorksTemplateCatalogService } from './works-template-catalog.service';
 
 // Tasks
 import { WorkCleanupService } from './tasks/work-cleanup.service';
@@ -50,6 +54,7 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
     ],
     providers: [
         CacheEntryRepository,
+        WorksTemplateCatalogService,
         WorkCleanupService,
         WebsiteTemplateSchedulerService,
         CommunityPrSchedulerService,
@@ -99,6 +104,7 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
         BulkItemsController,
         KbController,
         OrgKbController,
+        WorkTemplatesController,
     ],
 })
 export class WorksModule {}

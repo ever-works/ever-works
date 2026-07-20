@@ -2,6 +2,9 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Mission } from '../entities/mission.entity';
 import { MissionAttachment } from '../entities/mission-attachment.entity';
+import { MissionWork } from '../entities/mission-work.entity';
+import { Work } from '../entities/work.entity';
+import { MissionWorkRepository } from '../database/repositories/mission-work.repository';
 import { WorkProposal } from '../entities/work-proposal.entity';
 import { UserUpload } from '../entities/user-upload.entity';
 import { MissionAttachmentRepository } from '../database/repositories/attachment.repositories';
@@ -35,17 +38,25 @@ import { MissionTickService } from './mission-tick.service';
         // Repository<WorkProposal> for the Idea-copy half of Full
         // Fork, so the entity is registered here as well as via
         // UserResearchModule.
-        TypeOrmModule.forFeature([Mission, MissionAttachment, WorkProposal, UserUpload]),
+        TypeOrmModule.forFeature([
+            Mission,
+            MissionAttachment,
+            MissionWork,
+            Work,
+            WorkProposal,
+            UserUpload,
+        ]),
         TitlerModule,
-        // Schedules P2 — provides `ActivityLogService` so
-        // `MissionTickService` can emit `mission_tick` rows for fired
-        // scheduled ticks. `@Optional()`-injected downstream.
+        // Provides ActivityLogService so MissionTickService can emit
+        // mission_tick rows (Schedules P2) and the mission lifecycle
+        // activity (PR-3) is recorded. `@Optional()`-injected downstream.
         ActivityLogModule,
         UserResearchModule,
         WorkAgentModule,
     ],
     providers: [
         MissionsService,
+        MissionWorkRepository,
         MissionTickService,
         MissionCloneService,
         MissionTemplateManifestService,
@@ -53,6 +64,7 @@ import { MissionTickService } from './mission-tick.service';
     ],
     exports: [
         MissionsService,
+        MissionWorkRepository,
         MissionTickService,
         MissionCloneService,
         MissionTemplateManifestService,

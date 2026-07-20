@@ -20,6 +20,8 @@ import { EmailFacadeService } from '../email.facade';
 import { NotificationChannelFacadeService } from '../notification-channel.facade';
 // EW-724 / EW-725 — vector-store facade.
 import { VectorStoreFacadeService } from '../vector-store.facade';
+// Goals feature PR-7 — metrics-provider capability facade.
+import { MetricsFacadeService } from '../metrics.facade';
 
 /**
  * Pins the `FacadesModule` provider/exports map AND the public
@@ -52,6 +54,8 @@ describe('FacadesModule + barrel re-exports', () => {
         NotificationChannelFacadeService,
         // EW-724 / EW-725 — vector-store facade (KB embeddings).
         VectorStoreFacadeService,
+        // Goals feature PR-7 — metrics-provider capability (custom-http, Stripe).
+        MetricsFacadeService,
     ] as const;
 
     describe('@Module() decorator metadata', () => {
@@ -121,6 +125,7 @@ describe('FacadesModule + barrel re-exports', () => {
             expect(facadesBarrel.NotificationChannelFacadeService).toBe(
                 NotificationChannelFacadeService,
             );
+            expect(facadesBarrel.MetricsFacadeService).toBe(MetricsFacadeService);
         });
 
         it('re-exports each facade-specific error class (one per capability that defines errors)', () => {
@@ -154,6 +159,8 @@ describe('FacadesModule + barrel re-exports', () => {
             // Notifications v2 — email + notification-channel.
             expect(typeof facadesBarrel.EmailFacadeError).toBe('function');
             expect(typeof facadesBarrel.NotificationChannelFacadeError).toBe('function');
+            // Goals feature PR-7 — metrics.
+            expect(typeof facadesBarrel.MetricsFacadeError).toBe('function');
         });
 
         it('re-exports the shared FacadeError + base classes (NoProviderError / ProviderNotFoundError)', () => {
@@ -227,6 +234,9 @@ describe('FacadesModule + barrel re-exports', () => {
                     'EmbeddingModeUnsupportedError',
                     'VectorStoreFacadeService',
                     'VectorStoreNotConfiguredError',
+                    // Goals feature PR-7 — metrics-provider capability facade.
+                    'MetricsFacadeError',
+                    'MetricsFacadeService',
                 ].sort(),
             );
         });

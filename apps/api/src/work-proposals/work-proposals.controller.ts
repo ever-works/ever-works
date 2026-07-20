@@ -269,12 +269,12 @@ export class WorkProposalsController {
     /**
      * Phase 1 PR B — `POST /me/work-proposals/:id/build` queue
      * an Idea for build. Transitions to QUEUED + creates a
-     * WorkAgentGoal (`maxWorksPerRun=1`, `ideaId` set) so the
-     * goal-completion handler (PR FF) can transition the Idea
+     * WorkBuildRequest (`maxWorksPerRun=1`, `ideaId` set) so the
+     * build-completion handler (PR FF) can transition the Idea
      * to ACCEPTED with the new Work when the build finishes.
      */
     @Post(':id/build')
-    @ApiOperation({ summary: 'Queue an Idea for build via the Work Agent goal pipeline' })
+    @ApiOperation({ summary: 'Queue an Idea for build via the Work Agent build-request pipeline' })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 10, ttl: 60_000 } })
     async build(
@@ -292,7 +292,7 @@ export class WorkProposalsController {
      * Phase 1 PR FF — `POST /me/work-proposals/:id/retry` manual
      * Retry button (spec §3.9). Only valid for FAILED Ideas; clears
      * the failureMessage + failureKind, transitions FAILED → QUEUED,
-     * spins up a fresh build Goal.
+     * spins up a fresh build request.
      */
     @Post(':id/retry')
     @ApiOperation({ summary: 'Manually retry a failed Idea build' })
@@ -332,7 +332,8 @@ export class WorkProposalsController {
 
     @Post(':id/accept')
     @ApiOperation({
-        summary: 'Mark a proposal as accepted after the user creates a Work from it',
+        summary:
+            'Accept a proposal against a Work (first link from PENDING; additional links from ACCEPTED)',
     })
     @HttpCode(HttpStatus.OK)
     async accept(
@@ -348,6 +349,25 @@ export class WorkProposalsController {
             throw new NotFoundException('Proposal not found or already finalized');
         }
         return { ok: true };
+    }
+
+    /**
+     * Idea↔Work provenance links (domain-model review §23.1 / ADR-009:
+     * one Idea may link 0..N Works — accept from PENDING for the first
+     * link, from ACCEPTED for additional links; builds and rebuilds
+     * append rows too). Newest first, with Work display fields.
+     */
+    @Get(':id/works')
+    @ApiOperation({ summary: 'List the Works linked to this Idea (provenance, 0..N)' })
+    async listLinkedWorks(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ) {
+        const links = await this.service.listLinkedWorks(auth.userId, id);
+        if (links === null) {
+            throw new NotFoundException('Proposal not found');
+        }
+        return { links };
     }
 
     /**

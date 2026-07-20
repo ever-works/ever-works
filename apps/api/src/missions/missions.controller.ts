@@ -24,14 +24,19 @@ import {
 } from '@ever-works/agent/missions';
 import { BudgetService, type OwnerBudgetSummary } from '@ever-works/agent/budgets';
 import { BudgetOwnerType } from '@ever-works/agent/entities';
+import { GoalsService, type MissionGoalLinkDto } from '@ever-works/agent/goals';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
+import { LinkMissionGoalDto } from '../goals/dto/goal.dto';
 import {
     AddMissionAttachmentDto,
+    AttachMissionWorkDto,
     CloneMissionDto,
+    CompleteMissionDto,
     CreateMissionDto,
     UpdateMissionDto,
 } from './dto/mission.dto';
+import { MISSION_WORK_RELATIONS, MissionOutcome, type MissionWorkRelation } from '@ever-works/agent/entities';
 
 /**
  * Phase 3 PR H — full Missions CRUD + lifecycle surface
@@ -69,6 +74,10 @@ export class MissionsController {
         private readonly cloneService: MissionCloneService,
         // Phase 7 PR U — per-Mission budget summary.
         private readonly budgetService: BudgetService,
+        // Goals & Metrics PR-8 — Mission ↔ Goal link surface. The
+        // GoalsService validates ownership of BOTH sides (Mission and
+        // Goal) with 404-no-leak semantics.
+        private readonly goalsService: GoalsService,
     ) {}
 
     @Get()
@@ -206,8 +215,9 @@ export class MissionsController {
     async complete(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
+        @Body() body?: CompleteMissionDto,
     ): Promise<MissionDto> {
-        return this.service.complete(auth.userId, id);
+        return this.service.complete(auth.userId, id, (body?.outcome ?? null) as MissionOutcome | null);
     }
 
     @Post(':id/clone')
@@ -255,6 +265,69 @@ export class MissionsController {
     }
 
     /**
+     * PR-2 (domain-model evolution) — the explicit Mission↔Work M:N
+     * relation surface. A Mission may relate to any number of the
+     * caller's Works (created|improves|operates|markets|researches|
+     * retires) and one Work may be related to many Missions over its
+     * lifetime. Attaching never transfers ownership and detaching /
+     * deleting the Mission never touches the Work (invariants I-6/I-7).
+     */
+    @Get(':id/works')
+    @ApiOperation({ summary: 'List the Works this Mission relates to' })
+    async listWorks(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ) {
+        return { relations: await this.service.listWorks(auth.userId, id) };
+    }
+
+    @Post(':id/works')
+    @ApiOperation({ summary: 'Attach an existing Work to this Mission with a typed relation' })
+    @HttpCode(HttpStatus.CREATED)
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
+    async attachWork(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: AttachMissionWorkDto,
+    ) {
+        return {
+            relations: await this.service.attachWork(auth.userId, id, body.workId, body.relation),
+        };
+    }
+
+    @Delete(':id/works/:workId/:relation')
+    @ApiOperation({ summary: 'Detach a Mission↔Work relation (the Work is untouched)' })
+    @HttpCode(HttpStatus.OK)
+    async detachWork(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('workId', ParseUUIDPipe) workId: string,
+        @Param('relation') relation: string,
+    ) {
+        if (!MISSION_WORK_RELATIONS.includes(relation as MissionWorkRelation)) {
+            throw new BadRequestException(
+                `Invalid relation "${relation}". Allowed: ${MISSION_WORK_RELATIONS.join(', ')}.`,
+            );
+        }
+        return this.service.detachWork(auth.userId, id, workId, relation as MissionWorkRelation);
+    }
+
+    /**
+     * PR-2 — reverse lookup for the Work-detail "Missions" panel:
+     * which of my Missions relate to this Work. Kept under /me/missions
+     * (owner-scoped like everything else here); declared with a static
+     * prefix so it can't shadow the ':id' param routes.
+     */
+    @Get('related-to-work/:workId')
+    @ApiOperation({ summary: 'List my Missions related to a Work' })
+    async listMissionsForWork(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('workId', ParseUUIDPipe) workId: string,
+    ) {
+        return { relations: await this.service.listMissionsForWork(auth.userId, workId) };
+    }
+
+    /**
      * Mission attachment surface — list/add/remove `MissionAttachment`
      * edges (FK to `work_knowledge_uploads`). Backs the
      * PromptComposer's "files attached when creating a Mission" flow:
@@ -294,6 +367,58 @@ export class MissionsController {
         @Param('attachmentId', ParseUUIDPipe) attachmentId: string,
     ) {
         return this.service.removeAttachment(auth.userId, id, attachmentId);
+    }
+
+    /**
+     * Goals & Metrics PR-8 — Mission ↔ Goal links (spec FR-11).
+     * Goals are created standalone via `POST /api/me/goals` and
+     * attached here. At most one primary Goal per Mission — linking
+     * with `isPrimary: true` demotes any existing primary.
+     *
+     * Invariant I-4 note: Goal state never feeds back into Mission
+     * status through these endpoints (or anywhere else) — a Mission
+     * is completed only by an explicit human action.
+     */
+    @Get(':id/goals')
+    @ApiOperation({ summary: "List a Mission's attached Goals (with isPrimary flags)" })
+    @HttpCode(HttpStatus.OK)
+    async listGoals(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<MissionGoalLinkDto[]> {
+        return this.goalsService.listForMission(auth.userId, id);
+    }
+
+    @Post(':id/goals')
+    @ApiOperation({
+        summary:
+            'Attach a Goal to a Mission (idempotent; re-POST updates isPrimary; one primary per Mission)',
+    })
+    @HttpCode(HttpStatus.CREATED)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async linkGoal(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: LinkMissionGoalDto,
+    ): Promise<MissionGoalLinkDto> {
+        return this.goalsService.linkToMission(
+            auth.userId,
+            id,
+            body.goalId,
+            body.isPrimary ?? false,
+        );
+    }
+
+    @Delete(':id/goals/:goalId')
+    @ApiOperation({ summary: 'Detach a Goal from a Mission (the Goal itself is untouched)' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async unlinkGoal(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('goalId', ParseUUIDPipe) goalId: string,
+    ): Promise<{ deleted: true }> {
+        return this.goalsService.unlinkFromMission(auth.userId, id, goalId);
     }
 
     private parseStatus(value?: string): MissionStatus | undefined {

@@ -40,13 +40,17 @@ export function WebsiteTemplateSelector({
     value,
     onChange,
     disabled = false,
-    label = 'Website Template',
+    label,
     helperText,
     helperLinkHref,
     helperLinkOnClick,
     className,
 }: WebsiteTemplateSelectorProps) {
     const t = useTranslations('dashboard.templateSelector');
+    // User-facing rename "Website Template" → "Template" (i18n value only —
+    // key names, entity names, routes, and test ids are unchanged). Callers
+    // that pass no `label` (e.g. WorkAICreator) pick up the i18n value.
+    const resolvedLabel = label ?? t('label');
     const { defaultTemplate, effectiveTemplate, isInheritedSelection } =
         resolveWebsiteTemplateSelection(templates, value);
 
@@ -64,7 +68,9 @@ export function WebsiteTemplateSelector({
     return (
         <div className={cn('space-y-2', className)}>
             <div className="space-y-1">
-                <label className="text-sm font-medium text-text dark:text-text-dark">{label}</label>
+                <label className="text-sm font-medium text-text dark:text-text-dark">
+                    {resolvedLabel}
+                </label>
                 <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
                     {effectiveTemplate.description}
                 </p>

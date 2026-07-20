@@ -3,7 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import type {
-    CreateWorkAgentGoalInput,
+    CreateWorkBuildRequestInput,
     UpdateWorkAgentPreferencesInput,
 } from '@/lib/api/work-agent';
 import { workAgentAPI } from '@/lib/api/work-agent';
@@ -15,7 +15,7 @@ const SETTINGS_PAGE_PATTERN = '/[locale]/(dashboard)/settings/work-agent';
 // Security (authn): defense-in-depth auth guard for every work-agent
 // Server Action — mirrors `ensureAuth()` in actions/agents.ts and
 // `requireAuth()` in actions/dashboard/budgets.ts. The API tier
-// (`/me/work-agent/*`, which scopes every goal/preference to the
+// (`/me/work-agent/*`, which scopes every build request/preference to the
 // authenticated caller) is the final guard, but re-verifying identity
 // at the web-action boundary closes the layered-defense gap so a
 // confused-deputy / CSRF-style POST to a Server Action endpoint can't
@@ -37,21 +37,23 @@ export async function updateWorkAgentPreferencesAction(input: UpdateWorkAgentPre
     return result;
 }
 
-export async function createWorkAgentGoalAction(input: CreateWorkAgentGoalInput) {
+export async function createWorkBuildRequestAction(input: CreateWorkBuildRequestInput) {
     await ensureAuth();
-    const result = await workAgentAPI.createGoal(input);
+    const result = await workAgentAPI.createBuildRequest(input);
     revalidatePath(SETTINGS_PAGE_PATTERN, 'page');
     return result;
 }
 
-export async function cancelWorkAgentGoalAction(goalId: string) {
+export async function cancelWorkBuildRequestAction(buildRequestId: string) {
     await ensureAuth();
-    // Security (authz): `goalId` is never used to scope authorization in the
-    // web tier — the request is forwarded to `/me/work-agent/goals/${goalId}/cancel`,
-    // so the API resolves the goal *within the authenticated caller's own
-    // `/me` namespace*. A goalId owned by another tenant cannot resolve under
-    // the caller's scope, so there is no cross-tenant IDOR to guard here.
-    const result = await workAgentAPI.cancelGoal(goalId);
+    // Security (authz): `buildRequestId` is never used to scope authorization
+    // in the web tier — the request is forwarded to
+    // `/me/work-agent/build-requests/${buildRequestId}/cancel`, so the API
+    // resolves the build request *within the authenticated caller's own
+    // `/me` namespace*. A buildRequestId owned by another tenant cannot
+    // resolve under the caller's scope, so there is no cross-tenant IDOR to
+    // guard here.
+    const result = await workAgentAPI.cancelBuildRequest(buildRequestId);
     revalidatePath(SETTINGS_PAGE_PATTERN, 'page');
     return result;
 }

@@ -4,7 +4,7 @@ import { describe, expect, it, vi, beforeEach } from 'vitest';
  * Codex review on PR #1013 flagged: the API DTO for
  * `POST /me/work-proposals/:id/build` returns `{ proposal, goal: { id, ... } }`
  * but the client method `workProposalsAPI.build()` claims to return
- * `{ idea, goalId }`. Without a reshape at the boundary, every caller
+ * `{ idea, buildRequestId }`. Without a reshape at the boundary, every caller
  * (chat tool, IdeaCard Build CTA, etc.) saw `undefined` for both
  * fields.
  *
@@ -69,7 +69,7 @@ describe('workProposalsAPI.build — reshape from server DTO to client shape', (
         vi.clearAllMocks();
     });
 
-    it('reshapes { proposal, goal: { id } } → { idea, goalId }', async () => {
+    it('reshapes { proposal, goal: { id } } → { idea, buildRequestId }', async () => {
         const proposal = {
             id: 'p1',
             title: 'Test Idea',
@@ -90,7 +90,7 @@ describe('workProposalsAPI.build — reshape from server DTO to client shape', (
 
         const result = await workProposalsAPI.build('p1');
 
-        expect(result).toEqual({ idea: proposal, goalId: 'g-1' });
+        expect(result).toEqual({ idea: proposal, buildRequestId: 'g-1' });
         expect(serverMutationMock).toHaveBeenCalledWith({
             endpoint: '/me/work-proposals/p1/build',
             data: {},

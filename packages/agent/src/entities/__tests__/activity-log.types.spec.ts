@@ -97,8 +97,12 @@ describe('activity-log.types', () => {
             // KB_UPLOAD_TOMBSTONED, KB_UPLOAD_REVIVED, KB_CONTEXT_TRUNCATED,
             // KB_UPLOAD_TRANSCRIBED, KB_UPLOAD_TRANSCRIPTION_FAILED).
             // Previously bumped by post-PR-1019 follow-up FU-2 (84).
+            // Domain-model evolution (2026-07): +mission_*/idea_* (PR-3) and
+            // +goal_* (PR-8) lifecycle action types took the count 101 -> 114.
+            // The Schedules feature then added MISSION_TICK (idea_generated was
+            // already added by the domain-model train, so it is shared) -> 115.
             const literals = Object.values(ActivityActionType).filter((v) => typeof v === 'string');
-            expect(literals).toHaveLength(103);
+            expect(literals).toHaveLength(115);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {
