@@ -1,0 +1,69 @@
+{
+	"name": "@ever-works/stripe-metrics-plugin",
+	"version": "1.0.0",
+	"description": "Stripe Metrics Plugin - Read-only Stripe business metrics (balance, gross volume) for Ever Works Goals",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"dependencies": {
+		"stripe": "^22.3.0"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"@types/node": "^22.0.0",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.3",
+		"vitest": "^4.1.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "stripe-metrics",
+			"name": "Stripe Metrics",
+			"version": "1.0.0",
+			"category": "metrics",
+			"capabilities": [
+				"metrics-provider"
+			],
+			"description": "Read-only Stripe business metrics — available balance and gross charge volume per day/week/month — for evaluating Goals like \"$100/day balance\" or \"$1000/month income\".",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "AGPL-3.0",
+			"envVars": [
+				{
+					"name": "STRIPE_SECRET_KEY",
+					"required": false,
+					"secret": true,
+					"description": "Stripe secret key (a restricted read-only rk_... key is strongly recommended; can also be set via admin/user settings)"
+				}
+			]
+		}
+	}
+}

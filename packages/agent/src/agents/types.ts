@@ -4,6 +4,7 @@ import type {
     AgentIdleBehavior,
     AgentPermissions,
     AgentScope,
+    AgentScorecardMetric,
     AgentStatus,
     AgentTarget,
 } from '../entities/agent.entity';
@@ -52,6 +53,8 @@ export interface AgentDto {
     committerEmail: string | null;
     /** Direct manager for the Org Chart (teams-and-companies spec §1.2). */
     reportsToAgentId: string | null;
+    // Agent Scorecards increment 1 — quantified per-Agent goals.
+    scorecard: AgentScorecardMetric[] | null;
     hasInlineFiles: boolean;
     contentHash: string | null;
     createdAt: Date;
@@ -92,6 +95,7 @@ export function toAgentDto(agent: Agent): AgentDto {
         committerName: agent.committerName ?? null,
         committerEmail: agent.committerEmail ?? null,
         reportsToAgentId: agent.reportsToAgentId ?? null,
+        scorecard: agent.scorecard ?? null,
         hasInlineFiles,
         contentHash: agent.contentHash ?? null,
         createdAt: agent.createdAt,

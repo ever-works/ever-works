@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { tool } from 'ai';
 import { ROUTES } from '@/lib/constants';
 import { missionsAPI, type Mission } from '@/lib/api/missions';
+import { serverFetch, serverMutation } from '@/lib/api/server-api';
 import {
     attachUploadToMissionAction,
     cloneMissionAction,
@@ -287,5 +288,127 @@ export const cloneMission = tool({
             ideasCloned: result.ideasCloned,
             ideasSkipped: result.ideasSkipped,
         };
+    },
+});
+
+// ────────────────────────────────────────────────────────────────
+// PR-2 (domain-model evolution) — Mission ↔ Work relations
+// ────────────────────────────────────────────────────────────────
+
+/**
+ * Wire mirror of the agent-side `MISSION_WORK_RELATIONS` const
+ * (`packages/agent/src/entities/mission-work.entity.ts`). Kept in
+ * lockstep manually — same rule as the Mission DTO mirror in
+ * `@/lib/api/missions`: apps/web takes no runtime dep on the agent
+ * package for a tiny const.
+ */
+const MISSION_WORK_RELATION_VALUES = [
+    'created',
+    'improves',
+    'operates',
+    'markets',
+    'researches',
+    'retires',
+] as const;
+
+/** Row shape returned by `GET/POST /me/missions/:id/works` (`relations[]`). */
+interface MissionWorkRelationRow {
+    id: string;
+    missionId: string;
+    workId: string;
+    relation: (typeof MISSION_WORK_RELATION_VALUES)[number];
+    createdAt: string;
+    workName: string;
+    workSlug: string;
+}
+
+// These three tools hit the REST surface via `serverFetch`/`serverMutation`
+// directly — the same wire layer `missionsAPI.listWorks/attachWork/detachWork`
+// (added in this PR) are built on — because the tools want the raw
+// `{relations}` envelope plus tool-shaped `{error}` returns rather than the
+// client methods' unwrapped shapes. Auth + ownership stay server-side:
+// every route is `@CurrentUser()`-gated and 404s on foreign Missions/Works.
+
+export const listMissionWorks = tool({
+    description: [
+        'List the Works a Mission relates to. Each entry carries one of the 6 relation kinds',
+        '(created, improves, operates, markets, researches, retires) plus the Work name/slug.',
+        'A Mission never owns Works — the same Work can relate to many Missions over its lifetime.',
+    ].join(' '),
+    inputSchema: z.object({
+        // Security: UUID validation prevents prompt-injection attacks substituting arbitrary strings as IDs
+        missionId: z.string().uuid().describe('Mission ID'),
+    }),
+    execute: async ({ missionId }) => {
+        try {
+            const { relations } = await serverFetch<{ relations: MissionWorkRelationRow[] }>(
+                `/me/missions/${missionId}/works`,
+                { method: 'GET' },
+            );
+            return { relations, total: relations.length };
+        } catch (err) {
+            return { error: err instanceof Error ? err.message : 'Failed to list Mission works' };
+        }
+    },
+});
+
+export const attachWorkToMission = tool({
+    description: [
+        'Attach an existing Work to a Mission with a typed relation — one of created, improves,',
+        'operates, markets, researches, retires. This only records how the Mission relates to the',
+        'Work; it never transfers or changes ownership of the Work. The same Work may be attached',
+        'to the same Mission under several different relation kinds. Returns the updated relation',
+        'list. Use listWorks / listMissions first to resolve the IDs.',
+    ].join(' '),
+    inputSchema: z.object({
+        // Security: UUID validation prevents prompt-injection attacks substituting arbitrary strings as IDs
+        missionId: z.string().uuid().describe('Mission ID'),
+        workId: z.string().uuid().describe('ID of an existing Work owned by the user'),
+        relation: z
+            .enum(MISSION_WORK_RELATION_VALUES)
+            .describe('How the Mission relates to the Work'),
+    }),
+    execute: async ({ missionId, workId, relation }) => {
+        try {
+            const { relations } = await serverMutation<{ relations: MissionWorkRelationRow[] }>({
+                endpoint: `/me/missions/${missionId}/works`,
+                data: { workId, relation },
+                method: 'POST',
+                wrapInData: false,
+            });
+            return { attached: true, relations, total: relations.length };
+        } catch (err) {
+            return { error: err instanceof Error ? err.message : 'Failed to attach Work' };
+        }
+    },
+});
+
+export const detachWorkFromMission = tool({
+    description: [
+        'Detach one Mission↔Work relation, identified by workId + relation kind (one of created,',
+        'improves, operates, markets, researches, retires). Only the relation record is removed —',
+        'the Work itself is never modified or deleted, and any other relations between the same',
+        'Mission and Work remain in place.',
+    ].join(' '),
+    inputSchema: z.object({
+        // Security: UUID validation prevents prompt-injection attacks substituting arbitrary strings as IDs
+        missionId: z.string().uuid().describe('Mission ID'),
+        workId: z.string().uuid().describe('Work ID of the relation to detach'),
+        relation: z
+            .enum(MISSION_WORK_RELATION_VALUES)
+            .describe('Relation kind of the edge to detach'),
+    }),
+    execute: async ({ missionId, workId, relation }) => {
+        try {
+            await serverMutation<{ deleted: true }>({
+                endpoint: `/me/missions/${missionId}/works/${workId}/${relation}`,
+                data: {},
+                method: 'DELETE',
+                wrapInData: false,
+            });
+            return { detached: true, missionId, workId, relation };
+        } catch (err) {
+            return { error: err instanceof Error ? err.message : 'Failed to detach Work' };
+        }
     },
 });

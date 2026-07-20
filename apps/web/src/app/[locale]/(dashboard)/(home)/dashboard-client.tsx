@@ -16,8 +16,11 @@ import type { WorkProposal } from '@/lib/api/work-proposals';
 import type { Mission } from '@/lib/api/missions';
 import { RecentTasks } from '@/components/dashboard/RecentTasks';
 import { AgentsPreviewSection } from '@/components/dashboard/AgentsPreviewSection';
+import { AttentionSection } from '@/components/dashboard/AttentionSection';
+import { SoonSection } from '@/components/dashboard/SoonSection';
 import type { Task } from '@/lib/api/tasks';
 import type { Agent } from '@/lib/api/agents';
+import type { AttentionItem, SoonRunItem } from '@/components/dashboard/dashboard-signals.types';
 
 interface DashboardClientProps {
     user: AuthUser;
@@ -57,6 +60,21 @@ interface DashboardClientProps {
     /** Dashboard polish (2026-05-27) — recent Agents for the new
      *  Agents preview section that sits below Tasks. */
     initialAgents?: Agent[];
+    /**
+     * Dashboard blocks (spec §4.1/§4.5) — new home surfaces. Each is
+     * optional with a safe default so existing render paths are
+     * unaffected:
+     *   - `teamsTotal` — 9th stat tile; `undefined` ⇒ Teams not wired
+     *     yet ⇒ tile omitted (PR #1647).
+     *   - `attentionItems` — red signal cards ABOVE the Missions list;
+     *     empty ⇒ the block (and its divider) render nothing.
+     *   - `soonItems` / `soonTotal` — upcoming scheduled runs; empty ⇒
+     *     nothing renders (gated on the Schedules front).
+     */
+    teamsTotal?: number;
+    attentionItems?: AttentionItem[];
+    soonItems?: SoonRunItem[];
+    soonTotal?: number;
 }
 
 export default function DashboardClient({
@@ -81,6 +99,10 @@ export default function DashboardClient({
     tasksBlocked = 0,
     initialRecentTasks = [],
     initialAgents = [],
+    teamsTotal,
+    attentionItems = [],
+    soonItems = [],
+    soonTotal = 0,
 }: DashboardClientProps) {
     const router = useRouter();
     const t = useTranslations('dashboard');
@@ -111,10 +133,25 @@ export default function DashboardClient({
                 agentsActive={agentsActive}
                 tasksInProgress={tasksInProgress}
                 tasksBlocked={tasksBlocked}
+                teamsTotal={teamsTotal}
             />
 
             {/* Content sections — divided by a subtle rule for visual rhythm */}
             <div className="mt-10 divide-y divide-border/30 dark:divide-white/6">
+                {/* Dashboard blocks (spec §4.5) — Attention then Soon lead
+                    the stack, ABOVE Missions. Each wrapper is conditional so
+                    an empty block contributes no divider/gap. */}
+                {attentionItems.length > 0 && (
+                    <div className="py-8 lg:py-10">
+                        <AttentionSection items={attentionItems} />
+                    </div>
+                )}
+                {soonItems.length > 0 && (
+                    <div className="py-8 lg:py-10">
+                        <SoonSection items={soonItems} total={soonTotal} />
+                    </div>
+                )}
+
                 <div className="py-8 lg:py-10">
                     <MissionsPreviewSection missions={initialMissions} allIdeas={initialAllIdeas} />
                 </div>

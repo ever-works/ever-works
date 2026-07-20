@@ -19,6 +19,7 @@ import {
 // Teams & Companies spec §4.3 — roster mutations for the Organization
 // card's Team select (v1 UI: one team per Agent).
 import { addTeamMemberAction, removeTeamMemberAction } from '@/app/actions/dashboard/teams';
+import { AgentScorecardCard } from '@/components/agents/AgentScorecardCard';
 import type { Agent, AgentIdleBehavior, AgentPermissions } from '@/lib/api/agents';
 
 const permissionLabels: Array<{ key: keyof AgentPermissions; label: string }> = [
@@ -469,6 +470,9 @@ export function AgentSettingsClient({
                     </div>
                 </section>
             ) : null}
+
+            {/* Scorecard (Agent Scorecards increment 1 — additive section) */}
+            <AgentScorecardCard agent={agent} />
         </div>
     );
 }
