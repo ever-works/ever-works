@@ -6,8 +6,15 @@
 // and this is a pure unit test (no Nest DI), so stub them out.
 jest.mock('@ever-works/agent/facades', () => ({ GitFacadeService: class {} }));
 jest.mock('@ever-works/agent/cache', () => ({ CACHE_MANAGER: 'CACHE_MANAGER', Cache: class {} }));
+// ever-works/agents is public (#1647): a token is an optimization, not a
+// requirement — token-less reads go through `fetchPublicRawFile`
+// (raw.githubusercontent.com). Mock it so no network is touched.
+jest.mock('../organizations/org-template-catalog.service', () => ({
+    fetchPublicRawFile: jest.fn(),
+}));
 
 import { AgentTemplateCatalogService } from './agent-template-catalog.service';
+import { fetchPublicRawFile } from '../organizations/org-template-catalog.service';
 
 /**
  * Unit coverage for the agent-template catalog (ADR-011, spec FR-26..FR-30).
@@ -82,11 +89,25 @@ describe('AgentTemplateCatalogService', () => {
         });
     });
 
-    it('returns [] and does not call git when no token is configured', async () => {
+    it('no token: reads the public repo (not git) and returns [] when it yields nothing', async () => {
         delete process.env.EVER_WORKS_AGENTS_TOKEN;
         delete process.env.GITHUB_TOKEN;
+        // No env token and no App installation token -> the service reads the
+        // public ever-works/agents repo unauthenticated. Public read yields
+        // nothing here, so the mapped catalog is empty.
+        (fetchPublicRawFile as jest.Mock).mockResolvedValue(null);
         const { svc, git } = make(jest.fn(async () => ({ content: MANIFEST, encoding: 'utf-8' })));
         await expect(svc.list('agent')).resolves.toEqual([]);
+        expect(git.getFileContent).not.toHaveBeenCalled();
+    });
+
+    it('no token: maps rows from the public (unauthenticated) repo read', async () => {
+        delete process.env.EVER_WORKS_AGENTS_TOKEN;
+        delete process.env.GITHUB_TOKEN;
+        (fetchPublicRawFile as jest.Mock).mockResolvedValue(MANIFEST);
+        const { svc, git } = make(jest.fn());
+        const rows = await svc.list('agent');
+        expect(rows.map((r) => r.slug)).toEqual(['ceo', 'starter-coder']);
         expect(git.getFileContent).not.toHaveBeenCalled();
     });
 
