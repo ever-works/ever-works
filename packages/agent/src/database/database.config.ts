@@ -57,6 +57,8 @@ import {
     Organization,
     // Agents/Skills/Tasks (PR #1017 specs)
     Agent,
+    // Agent Action Approval Queue — human-in-the-loop gate.
+    AgentActionProposal,
     AgentRun,
     AgentRunLog,
     AgentBudget,
@@ -192,6 +194,8 @@ export const ENTITIES = [
     Organization,
     // Agents / Skills / Tasks (PR #1017 specs, Phase 1 + Phase 8)
     Agent,
+    // Agent Action Approval Queue — human-in-the-loop gate for side-effectful actions.
+    AgentActionProposal,
     AgentRun,
     AgentRunLog,
     AgentBudget,

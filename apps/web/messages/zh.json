@@ -456,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "操作审批",
+                "subtitle": "您的代理提出了这些具有副作用的操作。请逐一批准或拒绝。"
+            },
+            "actions": {
+                "approve": "批准",
+                "reject": "拒绝",
+                "approveAll": "全部批准"
+            },
+            "actionType": {
+                "spawn_agent": "创建代理",
+                "schedule_task": "安排任务",
+                "send_message": "发送消息",
+                "budget_override": "预算覆盖",
+                "other": "操作"
+            },
+            "riskFlags": {
+                "budget_override": "预算覆盖",
+                "destructive": "破坏性",
+                "cross_scope": "跨范围",
+                "high_fanout": "高扇出"
+            },
+            "toast": {
+                "approved": "操作已批准",
+                "rejected": "操作已拒绝",
+                "bulkApproved": "已批准 {count} 项操作",
+                "bulkApprovedSkipped": "已批准 {approved} 项操作，{skipped} 项已有决定",
+                "error": "出现问题，请重试。"
+            }
+        },
         "title": "仪表板",
         "connectGithub": {
             "title": "连接您的 GitHub 帐户",

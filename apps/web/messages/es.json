@@ -456,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "Aprobaciones de acciones",
+                "subtitle": "Tus agentes propusieron estas acciones con efectos secundarios. Aprueba o rechaza cada una."
+            },
+            "actions": {
+                "approve": "Aprobar",
+                "reject": "Rechazar",
+                "approveAll": "Aprobar todas"
+            },
+            "actionType": {
+                "spawn_agent": "Crear agente",
+                "schedule_task": "Programar tarea",
+                "send_message": "Enviar mensaje",
+                "budget_override": "Anulación de presupuesto",
+                "other": "Acción"
+            },
+            "riskFlags": {
+                "budget_override": "Anulación de presupuesto",
+                "destructive": "Destructiva",
+                "cross_scope": "Entre ámbitos",
+                "high_fanout": "Alta ramificación"
+            },
+            "toast": {
+                "approved": "Acción aprobada",
+                "rejected": "Acción rechazada",
+                "bulkApproved": "{count} acciones aprobadas",
+                "bulkApprovedSkipped": "{approved} acciones aprobadas, {skipped} ya decididas",
+                "error": "Algo salió mal. Inténtalo de nuevo."
+            }
+        },
         "title": "Tablero",
         "connectGithub": {
             "title": "Conecta tu cuenta de GitHub",

@@ -456,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "Утверждение действий",
+                "subtitle": "Ваши агенты предложили эти действия с побочными эффектами. Утвердите или отклоните каждое из них."
+            },
+            "actions": {
+                "approve": "Утвердить",
+                "reject": "Отклонить",
+                "approveAll": "Утвердить все"
+            },
+            "actionType": {
+                "spawn_agent": "Создание агента",
+                "schedule_task": "Планирование задачи",
+                "send_message": "Отправка сообщения",
+                "budget_override": "Превышение бюджета",
+                "other": "Действие"
+            },
+            "riskFlags": {
+                "budget_override": "Превышение бюджета",
+                "destructive": "Разрушительное",
+                "cross_scope": "Между областями",
+                "high_fanout": "Высокое ветвление"
+            },
+            "toast": {
+                "approved": "Действие утверждено",
+                "rejected": "Действие отклонено",
+                "bulkApproved": "Утверждено действий: {count}",
+                "bulkApprovedSkipped": "Утверждено действий: {approved}, уже решено: {skipped}",
+                "error": "Что-то пошло не так. Пожалуйста, попробуйте ещё раз."
+            }
+        },
         "title": "Панель управления",
         "connectGithub": {
             "title": "Подключите аккаунт GitHub",

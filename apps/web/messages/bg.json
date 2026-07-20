@@ -456,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "Одобрения на действия",
+                "subtitle": "Вашите агенти предложиха тези действия със странични ефекти. Одобрете или отхвърлете всяко от тях."
+            },
+            "actions": {
+                "approve": "Одобри",
+                "reject": "Отхвърли",
+                "approveAll": "Одобри всички"
+            },
+            "actionType": {
+                "spawn_agent": "Създаване на агент",
+                "schedule_task": "Планиране на задача",
+                "send_message": "Изпращане на съобщение",
+                "budget_override": "Надвишаване на бюджета",
+                "other": "Действие"
+            },
+            "riskFlags": {
+                "budget_override": "Надвишаване на бюджета",
+                "destructive": "Деструктивно",
+                "cross_scope": "Между обхвати",
+                "high_fanout": "Голямо разклоняване"
+            },
+            "toast": {
+                "approved": "Действието е одобрено",
+                "rejected": "Действието е отхвърлено",
+                "bulkApproved": "Одобрени {count} действия",
+                "bulkApprovedSkipped": "Одобрени {approved} действия, {skipped} вече решени",
+                "error": "Нещо се обърка. Моля, опитайте отново."
+            }
+        },
         "title": "Табло",
         "connectGithub": {
             "title": "Свържете GitHub акаунта си",

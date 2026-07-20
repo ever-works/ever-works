@@ -149,6 +149,10 @@
             "types": "./dist/agents/index.d.ts",
             "default": "./dist/agents/index.js"
         },
+        "./agent-approvals": {
+            "types": "./dist/agent-approvals/index.d.ts",
+            "default": "./dist/agent-approvals/index.js"
+        },
         "./skills": {
             "types": "./dist/skills/index.d.ts",
             "default": "./dist/skills/index.js"

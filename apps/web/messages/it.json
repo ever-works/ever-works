@@ -456,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "Approvazioni delle azioni",
+                "subtitle": "I tuoi agenti hanno proposto queste azioni con effetti collaterali. Approva o rifiuta ciascuna."
+            },
+            "actions": {
+                "approve": "Approva",
+                "reject": "Rifiuta",
+                "approveAll": "Approva tutte"
+            },
+            "actionType": {
+                "spawn_agent": "Crea agente",
+                "schedule_task": "Pianifica attività",
+                "send_message": "Invia messaggio",
+                "budget_override": "Sostituzione del budget",
+                "other": "Azione"
+            },
+            "riskFlags": {
+                "budget_override": "Sostituzione del budget",
+                "destructive": "Distruttiva",
+                "cross_scope": "Tra ambiti",
+                "high_fanout": "Ramificazione elevata"
+            },
+            "toast": {
+                "approved": "Azione approvata",
+                "rejected": "Azione rifiutata",
+                "bulkApproved": "{count} azioni approvate",
+                "bulkApprovedSkipped": "{approved} azioni approvate, {skipped} già decise",
+                "error": "Qualcosa è andato storto. Riprova."
+            }
+        },
         "title": "Cruscotto",
         "connectGithub": {
             "title": "Collega il tuo account GitHub",

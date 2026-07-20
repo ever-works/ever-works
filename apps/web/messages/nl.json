@@ -456,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "Actie-goedkeuringen",
+                "subtitle": "Je agents hebben deze acties met bijwerkingen voorgesteld. Keur elke actie goed of wijs deze af."
+            },
+            "actions": {
+                "approve": "Goedkeuren",
+                "reject": "Afwijzen",
+                "approveAll": "Alles goedkeuren"
+            },
+            "actionType": {
+                "spawn_agent": "Agent aanmaken",
+                "schedule_task": "Taak inplannen",
+                "send_message": "Bericht versturen",
+                "budget_override": "Budgetoverschrijving",
+                "other": "Actie"
+            },
+            "riskFlags": {
+                "budget_override": "Budgetoverschrijving",
+                "destructive": "Destructief",
+                "cross_scope": "Scope-overschrijdend",
+                "high_fanout": "Hoge fan-out"
+            },
+            "toast": {
+                "approved": "Actie goedgekeurd",
+                "rejected": "Actie afgewezen",
+                "bulkApproved": "{count} acties goedgekeurd",
+                "bulkApprovedSkipped": "{approved} acties goedgekeurd, {skipped} al beslist",
+                "error": "Er is iets misgegaan. Probeer het opnieuw."
+            }
+        },
         "title": "Dashboard",
         "connectGithub": {
             "title": "Verbind je GitHub-account",

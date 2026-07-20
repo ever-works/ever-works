@@ -456,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "Затвердження дій",
+                "subtitle": "Ваші агенти запропонували ці дії з побічними ефектами. Затвердьте або відхиліть кожну з них."
+            },
+            "actions": {
+                "approve": "Затвердити",
+                "reject": "Відхилити",
+                "approveAll": "Затвердити всі"
+            },
+            "actionType": {
+                "spawn_agent": "Створення агента",
+                "schedule_task": "Планування завдання",
+                "send_message": "Надсилання повідомлення",
+                "budget_override": "Перевищення бюджету",
+                "other": "Дія"
+            },
+            "riskFlags": {
+                "budget_override": "Перевищення бюджету",
+                "destructive": "Руйнівна",
+                "cross_scope": "Між областями",
+                "high_fanout": "Високе розгалуження"
+            },
+            "toast": {
+                "approved": "Дію затверджено",
+                "rejected": "Дію відхилено",
+                "bulkApproved": "Затверджено дій: {count}",
+                "bulkApprovedSkipped": "Затверджено дій: {approved}, вже вирішено: {skipped}",
+                "error": "Щось пішло не так. Будь ласка, спробуйте ще раз."
+            }
+        },
         "title": "Панель керування",
         "connectGithub": {
             "title": "Підключіть свій обліковий запис GitHub",

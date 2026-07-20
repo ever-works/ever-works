@@ -456,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "Persetujuan tindakan",
+                "subtitle": "Agen Anda mengusulkan tindakan dengan efek samping berikut. Setujui atau tolak masing-masing."
+            },
+            "actions": {
+                "approve": "Setujui",
+                "reject": "Tolak",
+                "approveAll": "Setujui semua"
+            },
+            "actionType": {
+                "spawn_agent": "Buat agen",
+                "schedule_task": "Jadwalkan tugas",
+                "send_message": "Kirim pesan",
+                "budget_override": "Penggantian anggaran",
+                "other": "Tindakan"
+            },
+            "riskFlags": {
+                "budget_override": "Penggantian anggaran",
+                "destructive": "Destruktif",
+                "cross_scope": "Lintas lingkup",
+                "high_fanout": "Fan-out tinggi"
+            },
+            "toast": {
+                "approved": "Tindakan disetujui",
+                "rejected": "Tindakan ditolak",
+                "bulkApproved": "{count} tindakan disetujui",
+                "bulkApprovedSkipped": "{approved} tindakan disetujui, {skipped} sudah diputuskan",
+                "error": "Terjadi kesalahan. Silakan coba lagi."
+            }
+        },
         "title": "Dasbor",
         "connectGithub": {
             "title": "Hubungkan akun GitHub Anda",

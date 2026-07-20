@@ -456,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "Aktionsfreigaben",
+                "subtitle": "Ihre Agenten haben diese Aktionen mit Nebenwirkungen vorgeschlagen. Genehmigen oder lehnen Sie jede einzelne ab."
+            },
+            "actions": {
+                "approve": "Genehmigen",
+                "reject": "Ablehnen",
+                "approveAll": "Alle genehmigen"
+            },
+            "actionType": {
+                "spawn_agent": "Agent erstellen",
+                "schedule_task": "Aufgabe planen",
+                "send_message": "Nachricht senden",
+                "budget_override": "Budgetüberschreibung",
+                "other": "Aktion"
+            },
+            "riskFlags": {
+                "budget_override": "Budgetüberschreibung",
+                "destructive": "Destruktiv",
+                "cross_scope": "Bereichsübergreifend",
+                "high_fanout": "Hohe Verzweigung"
+            },
+            "toast": {
+                "approved": "Aktion genehmigt",
+                "rejected": "Aktion abgelehnt",
+                "bulkApproved": "{count} Aktionen genehmigt",
+                "bulkApprovedSkipped": "{approved} Aktionen genehmigt, {skipped} bereits entschieden",
+                "error": "Etwas ist schiefgelaufen. Bitte versuchen Sie es erneut."
+            }
+        },
         "title": "Übersicht",
         "connectGithub": {
             "title": "Verbinden Sie Ihr GitHub-Konto",

@@ -456,6 +456,37 @@
         }
     },
     "dashboard": {
+        "approvals": {
+            "header": {
+                "title": "الموافقات على الإجراءات",
+                "subtitle": "اقترح وكلاؤك هذه الإجراءات ذات الآثار الجانبية. وافق على كل منها أو ارفضه."
+            },
+            "actions": {
+                "approve": "موافقة",
+                "reject": "رفض",
+                "approveAll": "الموافقة على الكل"
+            },
+            "actionType": {
+                "spawn_agent": "إنشاء وكيل",
+                "schedule_task": "جدولة مهمة",
+                "send_message": "إرسال رسالة",
+                "budget_override": "تجاوز الميزانية",
+                "other": "إجراء"
+            },
+            "riskFlags": {
+                "budget_override": "تجاوز الميزانية",
+                "destructive": "تدميري",
+                "cross_scope": "عبر النطاقات",
+                "high_fanout": "تفرع كبير"
+            },
+            "toast": {
+                "approved": "تمت الموافقة على الإجراء",
+                "rejected": "تم رفض الإجراء",
+                "bulkApproved": "تمت الموافقة على {count} إجراءات",
+                "bulkApprovedSkipped": "تمت الموافقة على {approved} إجراءات، و{skipped} تم البت فيها مسبقًا",
+                "error": "حدث خطأ ما. يُرجى المحاولة مرة أخرى."
+            }
+        },
         "title": "لوحة التحكم",
         "connectGithub": {
             "title": "ربط حساب GitHub الخاص بك",
