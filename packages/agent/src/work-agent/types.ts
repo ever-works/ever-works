@@ -1,6 +1,6 @@
 import type {
-    WorkAgentGoalSource,
-    WorkAgentGoalStatus,
+    WorkBuildRequestSource,
+    WorkBuildRequestStatus,
     WorkAgentGuardrails,
     WorkAgentRunLogLevel,
     WorkAgentRunStatus,
@@ -36,20 +36,20 @@ export interface UpdateWorkAgentPreferencesInput extends Partial<WorkAgentGuardr
     accountWideAllowOverage?: boolean;
 }
 
-export interface CreateWorkAgentGoalInput extends Partial<WorkAgentGuardrails> {
+export interface CreateWorkBuildRequestInput extends Partial<WorkAgentGuardrails> {
     instruction: string;
     dryRun?: boolean;
     /**
      * Optional FK to the originating `WorkProposal` (Idea) when this
-     * Goal was created by the build-from-Idea path (Phase 1 PR B,
-     * `POST /me/work-proposals/:id/build`). Persisted on the Goal
-     * so the Goal-completion handler (Phase 1 PR FF) can join back
+     * build request was created by the build-from-Idea path (Phase 1 PR B,
+     * `POST /me/work-proposals/:id/build`). Persisted on the build request
+     * so the build-completion handler (Phase 1 PR FF) can join back
      * to the Idea — on success calls `acceptInternal(ideaId, workId)`
      * to transition the Idea to ACCEPTED with the new Work; on
      * failure persists `failureMessage` + `failureKind` on the Idea.
      *
      * NULL for the existing direct-queue path
-     * (`POST /me/work-agent/goals`). PLAN Decision A3.
+     * (`POST /me/work-agent/build-requests`). PLAN Decision A3.
      */
     ideaId?: string;
 }
@@ -65,7 +65,7 @@ export interface WorkAgentPreferencesDto {
      * consumer reads `value ?? <hardcoded>`. Wired consumers:
      *   - autoGenerateCadence    → scheduled-rerun dispatcher due filter.
      *   - autoGenerateBatchSize  → proposal generator target Idea count.
-     *   - autoBuildThrottlePerDay → Phase 1 PR FF goal-completion
+     *   - autoBuildThrottlePerDay → Phase 1 PR FF build-completion
      *                              throttle on auto-built Works.
      *   - missionDefaultOutstandingCap → Phase 3 PR J Mission tick
      *                              worker fallback for Mission.outstandingIdeasCap.
@@ -83,11 +83,11 @@ export interface WorkAgentPreferencesDto {
     accountWideAllowOverage: boolean;
 }
 
-export interface WorkAgentGoalDto {
+export interface WorkBuildRequestDto {
     id: string;
     instruction: string;
-    status: WorkAgentGoalStatus;
-    source: WorkAgentGoalSource;
+    status: WorkBuildRequestStatus;
+    source: WorkBuildRequestSource;
     dryRun: boolean;
     guardrailsOverride?: Partial<WorkAgentGuardrails> | null;
     agentPlanSummary?: string | null;
@@ -98,6 +98,8 @@ export interface WorkAgentGoalDto {
 
 export interface WorkAgentRunDto {
     id: string;
+    buildRequestId: string;
+    /** @deprecated compat mirror for one release — read buildRequestId */
     goalId: string;
     status: WorkAgentRunStatus;
     dryRun: boolean;

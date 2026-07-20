@@ -41,7 +41,7 @@ export * from './mission.entity';
 export * from './tenant.entity';
 export * from './organization.entity';
 export * from './work-agent-preference.entity';
-export * from './work-agent-goal.entity';
+export * from './work-build-request.entity';
 export * from './work-agent-run.entity';
 export * from './work-agent-run-log.entity';
 export * from './work-knowledge-document.entity';
@@ -74,7 +74,9 @@ export * from './task-watcher.entity';
 export * from './task-kb-mention.entity';
 export * from './user-task-counter.entity';
 export * from './mission-attachment.entity';
+export * from './mission-work.entity';
 export * from './work-proposal-attachment.entity';
+export * from './idea-work.entity';
 export * from './agent-attachment.entity';
 // Notifications v2 (EW-650 + siblings) — email + multi-channel + per-user prefs
 export * from './tenant-email-address.entity';
@@ -88,6 +90,11 @@ export * from './user-notification-subscription.entity';
 export * from './user-notification-preference.entity';
 export * from './user-notification-category-mute.entity';
 export * from './organization-notification-default.entity';
+
+// Goals & Metrics (PR-8) — measurable targets + samples + Mission link
+export * from './goal.entity';
+export * from './goal-metric-sample.entity';
+export * from './mission-goal.entity';
 
 // Composio triggers (EW-684 PR-D)
 export * from './composio-trigger-subscription.entity';

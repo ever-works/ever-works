@@ -1,7 +1,7 @@
 import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
 
-export type WorkAgentGoalStatus =
+export type WorkBuildRequestStatus =
     | 'pending'
     | 'planning'
     | 'waiting-for-approval'
@@ -55,10 +55,10 @@ export interface WorkAgentPreferences {
     accountWideAllowOverage: boolean;
 }
 
-export interface WorkAgentGoal {
+export interface WorkBuildRequest {
     id: string;
     instruction: string;
-    status: WorkAgentGoalStatus;
+    status: WorkBuildRequestStatus;
     source: string;
     dryRun: boolean;
     guardrailsOverride?: Partial<WorkAgentGuardrails> | null;
@@ -70,7 +70,7 @@ export interface WorkAgentGoal {
 
 export interface WorkAgentRun {
     id: string;
-    goalId: string;
+    buildRequestId: string;
     status: WorkAgentRunStatus;
     dryRun: boolean;
     progressPercent: number;
@@ -118,7 +118,7 @@ export interface UpdateWorkAgentPreferencesInput extends Partial<WorkAgentGuardr
     accountWideAllowOverage?: boolean;
 }
 
-export interface CreateWorkAgentGoalInput extends Partial<WorkAgentGuardrails> {
+export interface CreateWorkBuildRequestInput extends Partial<WorkAgentGuardrails> {
     instruction: string;
     dryRun?: boolean;
 }
@@ -139,24 +139,24 @@ export const workAgentAPI = {
         });
     },
 
-    listGoals(): Promise<WorkAgentGoal[]> {
-        return serverFetch<WorkAgentGoal[]>('/me/work-agent/goals', { method: 'GET' });
+    listBuildRequests(): Promise<WorkBuildRequest[]> {
+        return serverFetch<WorkBuildRequest[]>('/me/work-agent/build-requests', { method: 'GET' });
     },
 
-    createGoal(
-        input: CreateWorkAgentGoalInput,
-    ): Promise<{ goal: WorkAgentGoal; run: WorkAgentRun }> {
-        return serverMutation<{ goal: WorkAgentGoal; run: WorkAgentRun }>({
-            endpoint: '/me/work-agent/goals',
+    createBuildRequest(
+        input: CreateWorkBuildRequestInput,
+    ): Promise<{ buildRequest: WorkBuildRequest; run: WorkAgentRun }> {
+        return serverMutation<{ buildRequest: WorkBuildRequest; run: WorkAgentRun }>({
+            endpoint: '/me/work-agent/build-requests',
             data: input,
             method: 'POST',
             wrapInData: false,
         });
     },
 
-    cancelGoal(id: string): Promise<WorkAgentGoal> {
-        return serverMutation<WorkAgentGoal>({
-            endpoint: `/me/work-agent/goals/${id}/cancel`,
+    cancelBuildRequest(id: string): Promise<WorkBuildRequest> {
+        return serverMutation<WorkBuildRequest>({
+            endpoint: `/me/work-agent/build-requests/${id}/cancel`,
             data: {},
             method: 'PATCH',
             wrapInData: false,

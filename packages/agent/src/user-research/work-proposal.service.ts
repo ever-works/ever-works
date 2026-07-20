@@ -6,15 +6,20 @@ import {
     Optional,
 } from '@nestjs/common';
 import { AiFacadeService } from '../facades/ai.facade';
+import { ActivityLogService } from '../activity-log/activity-log.service';
+import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import { UserRepository } from '../database/repositories/user.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { WorkProposalRepository } from './work-proposal.repository';
+import { IdeaWorkRepository } from '../database/repositories/idea-work.repository';
+import type { IdeaWorkKind } from '../entities/idea-work.entity';
 import { WorkProposalAttachmentRepository } from '../database/repositories/attachment.repositories';
 import { WorkProposalAttachment } from '../entities/work-proposal-attachment.entity';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { UserUpload } from '../entities/user-upload.entity';
+import { VisionContextService } from '../services/vision-context.service';
 
 // Upload IDs are SHA-256 hex strings (the `id` field returned by
 // POST /api/uploads/file). 64 lowercase hex chars — NOT UUID-shaped
@@ -82,8 +87,8 @@ function extractFailureMessage(input: unknown): string {
 import { resolveAiProviderForResearch } from './provider-resolver';
 import {
     WorkProposalStatus,
+    WorkProposalSource,
     type WorkProposal,
-    type WorkProposalSource,
 } from '../entities/work-proposal.entity';
 
 export interface GenerateProposalsResult {
@@ -158,6 +163,7 @@ export class WorkProposalService {
         private readonly registry: PluginRegistryService,
         private readonly aiFacade: AiFacadeService,
         private readonly repo: WorkProposalRepository,
+        private readonly ideaWorks: IdeaWorkRepository,
         // Phase 3 PR I — shared titler service. Replaces the inline
         // `deriveTitle` placeholder from Phase 1 PR B with a real
         // service that future PRs can swap to an AI-backed impl
@@ -174,7 +180,50 @@ export class WorkProposalService {
         @Optional()
         @InjectRepository(UserUpload)
         private readonly uploadsRepo?: Repository<UserUpload>,
+        // PR-3 Idea lifecycle activity logging (mirrors MissionsService) +
+        // Schedules P2 `idea_generated` coverage — same @Optional() service.
+        // TRAILING `@Optional()` param: hand-rolled tests construct this
+        // service positionally, so existing params must keep their order.
+        // Best-effort at call sites - an activity failure never fails the op.
+        @Optional()
+        private readonly activityLog?: ActivityLogService,
+        // PR-6 (review §23.5) — company-vision prompt context for
+        // `generate()`. Trailing + `@Optional()` so hand-rolled test
+        // constructors that omit it keep working; production DI provides
+        // it via UserResearchModule. When absent (or when the user has
+        // no active Org / no vision) generation proceeds vision-less.
+        @Optional()
+        private readonly visionContext?: VisionContextService,
     ) {}
+
+    /**
+     * PR-3 - best-effort Idea activity write (never fails the operation;
+     * no-ops when the service isn't wired, e.g. hand-rolled tests).
+     */
+    private async recordIdeaActivity(
+        userId: string,
+        actionType: ActivityActionType,
+        action: string,
+        details: Record<string, unknown>,
+    ): Promise<void> {
+        if (!this.activityLog) return;
+        try {
+            await this.activityLog.log({
+                userId,
+                actionType,
+                action,
+                status: ActivityStatus.COMPLETED,
+                summary: `Idea ${action}`,
+                details: details as Record<string, any>,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Failed to write idea activity (${actionType}): ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+    }
 
     /**
      * List the Upload edges attached to an Idea. Validates ownership
@@ -339,6 +388,18 @@ export class WorkProposalService {
             status: p.status,
         }));
 
+        // PR-6 (review §23.5) — resolve the active Organization's vision
+        // (users.lastScopeOrganizationId → organizations.vision, trimmed
+        // + capped by VisionContextService) so every generated Idea can
+        // bias toward the company's long-term direction. Best-effort:
+        // the service is @Optional() and resolveForUser degrades to null
+        // internally, so vision can never block generation. This also
+        // covers Mission-tick generation — MissionTickService drives
+        // this same generate() path.
+        const companyVision = this.visionContext
+            ? await this.visionContext.resolveForUser(userId)
+            : null;
+
         try {
             // Use the permissive schema so low-quality model output (sloppy
             // slugs, wrong enum values, off-by-one length bounds) doesn't
@@ -354,6 +415,7 @@ export class WorkProposalService {
                         existingIdeasContext,
                         opts.missionContext,
                         opts.targetCount ?? undefined,
+                        companyVision,
                     ),
                 ].join('\n\n'),
                 permissiveWorkProposalsBatchSchema,
@@ -464,6 +526,15 @@ export class WorkProposalService {
             `Generated ${saved.length} proposal(s) for ${userId} via "${providerName}" (${modelName}), tokens=${tokensUsed}`,
         );
 
+        // ONE activity row per generation batch (not per Idea). PR-3's
+        // recordIdeaActivity covers every source (incl. MISSION-sourced
+        // scheduled ticks), subsuming the Schedules-P2 idea_generated intent.
+        await this.recordIdeaActivity(userId, ActivityActionType.IDEA_GENERATED, 'generate', {
+            count: saved.length,
+            source: opts.source,
+            missionId: opts.missionId ?? null,
+        });
+
         return { status: 'generated', proposals: saved, tokensUsed };
     }
 
@@ -527,7 +598,13 @@ export class WorkProposalService {
     }
 
     async dismiss(userId: string, proposalId: string): Promise<boolean> {
-        return this.repo.markDismissed(proposalId, userId);
+        const ok = await this.repo.markDismissed(proposalId, userId);
+        if (ok) {
+            await this.recordIdeaActivity(userId, ActivityActionType.IDEA_DISMISSED, 'dismiss', {
+                proposalId,
+            });
+        }
+        return ok;
     }
 
     async markAccepted(userId: string, proposalId: string, workId: string): Promise<boolean> {
@@ -550,6 +627,7 @@ export class WorkProposalService {
         proposalId: string,
         workId: string,
         fromStatuses: WorkProposalStatus[] = [WorkProposalStatus.PENDING],
+        opts: { linkKind?: IdeaWorkKind } = {},
     ): Promise<boolean> {
         const proposal = await this.repo.findByIdForUser(proposalId, userId);
         if (!proposal) return false;
@@ -564,7 +642,56 @@ export class WorkProposalService {
         // Work owned by this user, so the legitimate path is unaffected.
         const work = await this.works.findById(workId);
         if (!work || work.userId !== userId) return false;
-        return this.repo.markAccepted(proposalId, userId, workId, fromStatuses);
+        const ok = await this.repo.markAccepted(proposalId, userId, workId, fromStatuses);
+        if (!ok) return false;
+        // Review §23.1 — provenance is authoritative in `idea_works` (0..N),
+        // and the Work-side back-pointer is stamped first-writer-wins.
+        // `acceptedWorkId` (written by markAccepted above) stays as the
+        // denormalized "primary / most recent" pointer.
+        await this.recordProvenance(userId, proposalId, workId, opts.linkKind ?? 'linked', {
+            workAlreadyLoadedFromIdeaId: work.acceptedFromIdeaId ?? null,
+        });
+        // PR-3 — audit trail for a successful accept (ok is guaranteed true here).
+        await this.recordIdeaActivity(userId, ActivityActionType.IDEA_ACCEPTED, 'accept', {
+            proposalId,
+            workId,
+        });
+        return true;
+    }
+
+    /**
+     * Append the Idea↔Work provenance link and stamp the Work-side
+     * back-pointer (`works.acceptedFromIdeaId`) when the Work has no
+     * source Idea yet (a Work keeps at most ONE source Idea — review
+     * §23.1). Best-effort by design: the primary state transition
+     * (`markAccepted`) has already committed when this runs, so a
+     * failure here must not surface as a 5xx on an accept that DID
+     * succeed — it is logged and the backfill-shaped migration can
+     * repair stragglers.
+     */
+    private async recordProvenance(
+        userId: string,
+        ideaId: string,
+        workId: string,
+        kind: IdeaWorkKind,
+        opts: { workAlreadyLoadedFromIdeaId?: string | null } = {},
+    ): Promise<void> {
+        try {
+            await this.ideaWorks.recordLink({ ideaId, workId, userId, kind });
+            let sourceIdeaId = opts.workAlreadyLoadedFromIdeaId;
+            if (sourceIdeaId === undefined) {
+                sourceIdeaId = (await this.works.findById(workId))?.acceptedFromIdeaId ?? null;
+            }
+            if (sourceIdeaId === null) {
+                await this.works.update(workId, { acceptedFromIdeaId: ideaId });
+            }
+        } catch (error) {
+            this.logger.warn(
+                `Failed to record Idea↔Work provenance (idea=${ideaId}, work=${workId}, kind=${kind}): ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
     }
 
     /**
@@ -576,6 +703,9 @@ export class WorkProposalService {
     async queueForBuild(userId: string, proposalId: string): Promise<WorkProposal | null> {
         const ok = await this.repo.markQueuedForBuild(proposalId, userId);
         if (!ok) return null;
+        await this.recordIdeaActivity(userId, ActivityActionType.IDEA_QUEUED, 'queue', {
+            proposalId,
+        });
         return this.repo.findByIdForUser(proposalId, userId);
     }
 
@@ -618,7 +748,7 @@ export class WorkProposalService {
      * status).
      *
      * Caller (`WorkProposalsApiService.retry`) is responsible for
-     * also creating the new `WorkAgentGoal`. This service method
+     * also creating the new `WorkBuildRequest`. This service method
      * only owns the Idea-side state transition.
      */
     async retryFailed(userId: string, proposalId: string): Promise<WorkProposal | null> {
@@ -637,6 +767,9 @@ export class WorkProposalService {
     async beginRebuild(userId: string, proposalId: string): Promise<WorkProposal | null> {
         const ok = await this.repo.markRebuildingFromAccepted(proposalId, userId);
         if (!ok) return null;
+        await this.recordIdeaActivity(userId, ActivityActionType.IDEA_REBUILD_STARTED, 'rebuild', {
+            proposalId,
+        });
         return this.repo.findByIdForUser(proposalId, userId);
     }
 
@@ -689,6 +822,14 @@ export class WorkProposalService {
             if (!ok) {
                 return { outcome: 'noop', reason: 'idea-not-in-building' };
             }
+            // Review §23.1 — append the provenance link (history is
+            // append-only; the previous link row survives a rebuild).
+            await this.recordProvenance(
+                input.userId,
+                input.ideaId,
+                input.outcome.workId,
+                previousWorkId !== null ? 'rebuilt' : 'built',
+            );
             // Re-build flow: previousWorkId was non-null before the
             // accept overwrote it. The Decision A27 "original Work
             // is NOT deleted" guarantee is enforced by the absence
@@ -731,11 +872,26 @@ export class WorkProposalService {
         // Terminal failure — either non-transient or retry budget
         // exhausted. Mark FAILED with the classified kind + message.
         await this.repo.markFailed(input.ideaId, input.userId, message, kind);
+        await this.recordIdeaActivity(input.userId, ActivityActionType.IDEA_FAILED, 'fail', {
+            ideaId: input.ideaId,
+            kind,
+        });
         return { outcome: 'failed', ideaId: input.ideaId, kind, message };
     }
 
     async getForUser(userId: string, proposalId: string) {
         return this.repo.findByIdForUser(proposalId, userId);
+    }
+
+    /**
+     * All Works linked to this Idea (review §23.1 — 0..N), newest
+     * first, with Work display fields for the "Linked Works" panel.
+     * 404-shaped `null` when the Idea doesn't exist for this user.
+     */
+    async listLinkedWorks(userId: string, proposalId: string) {
+        const proposal = await this.repo.findByIdForUser(proposalId, userId);
+        if (!proposal) return null;
+        return this.ideaWorks.listForIdeaWithWork(proposalId, userId);
     }
 
     async countPending(userId: string): Promise<number> {

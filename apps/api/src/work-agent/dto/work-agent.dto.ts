@@ -13,9 +13,9 @@ import {
     MinLength,
 } from 'class-validator';
 import type {
-    CreateWorkAgentGoalInput,
+    CreateWorkBuildRequestInput,
     UpdateWorkAgentPreferencesInput,
-    WorkAgentGoalDto,
+    WorkBuildRequestDto,
     WorkAgentGuardrails,
     WorkAgentPreferencesDto,
     WorkAgentRunDto,
@@ -23,8 +23,8 @@ import type {
     WorkAgentRunSummary,
 } from '@ever-works/agent/work-agent';
 import {
-    WorkAgentGoalSource,
-    WorkAgentGoalStatus,
+    WorkBuildRequestSource,
+    WorkBuildRequestStatus,
     WorkAgentRunLogLevel,
     WorkAgentRunStatus,
     SUPPORTED_AUTO_GENERATE_CADENCE_PATTERN,
@@ -144,12 +144,12 @@ export class UpdateWorkAgentPreferencesDto
     accountWideAllowOverage?: boolean;
 }
 
-export class CreateWorkAgentGoalDto
+export class CreateWorkBuildRequestDto
     extends WorkAgentGuardrailsDto
-    implements CreateWorkAgentGoalInput
+    implements CreateWorkBuildRequestInput
 {
     @ApiProperty({
-        description: 'High-level goal for the Work agent.',
+        description: 'High-level build instruction for the Work agent.',
         example: 'Create a Work covering the top 50 AI startups in healthcare.',
     })
     @IsString()
@@ -169,11 +169,11 @@ export interface WorkAgentPreferencesResponseDto extends WorkAgentPreferencesDto
     guardrails: WorkAgentGuardrails;
 }
 
-export interface WorkAgentGoalResponseDto extends WorkAgentGoalDto {
+export interface WorkBuildRequestResponseDto extends WorkBuildRequestDto {
     id: string;
     instruction: string;
-    status: WorkAgentGoalStatus;
-    source: WorkAgentGoalSource;
+    status: WorkBuildRequestStatus;
+    source: WorkBuildRequestSource;
     dryRun: boolean;
     guardrailsOverride?: Partial<WorkAgentGuardrails> | null;
     agentPlanSummary?: string | null;
@@ -184,7 +184,7 @@ export interface WorkAgentGoalResponseDto extends WorkAgentGoalDto {
 
 export interface WorkAgentRunResponseDto extends WorkAgentRunDto {
     id: string;
-    goalId: string;
+    buildRequestId: string;
     status: WorkAgentRunStatus;
     dryRun: boolean;
     progressPercent: number;

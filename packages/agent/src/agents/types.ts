@@ -4,6 +4,7 @@ import type {
     AgentIdleBehavior,
     AgentPermissions,
     AgentScope,
+    AgentScorecardMetric,
     AgentStatus,
     AgentTarget,
 } from '../entities/agent.entity';
@@ -50,6 +51,8 @@ export interface AgentDto {
     // email) without dropping into the database.
     committerName: string | null;
     committerEmail: string | null;
+    // Agent Scorecards increment 1 — quantified per-Agent goals.
+    scorecard: AgentScorecardMetric[] | null;
     hasInlineFiles: boolean;
     contentHash: string | null;
     createdAt: Date;
@@ -89,6 +92,7 @@ export function toAgentDto(agent: Agent): AgentDto {
         avatarImageUploadId: agent.avatarImageUploadId ?? null,
         committerName: agent.committerName ?? null,
         committerEmail: agent.committerEmail ?? null,
+        scorecard: agent.scorecard ?? null,
         hasInlineFiles,
         contentHash: agent.contentHash ?? null,
         createdAt: agent.createdAt,

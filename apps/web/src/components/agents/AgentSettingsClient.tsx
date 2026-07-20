@@ -15,6 +15,7 @@ import {
     resumeAgentAction,
     updateAgentAction,
 } from '@/app/actions/agents';
+import { AgentScorecardCard } from '@/components/agents/AgentScorecardCard';
 import type { Agent, AgentIdleBehavior, AgentPermissions } from '@/lib/api/agents';
 
 const permissionLabels: Array<{ key: keyof AgentPermissions; label: string }> = [
@@ -315,6 +316,9 @@ export function AgentSettingsClient({ agent: initialAgent }: AgentSettingsClient
                     </Button>
                 </div>
             </section>
+
+            {/* Scorecard (Agent Scorecards increment 1 — additive section) */}
+            <AgentScorecardCard agent={agent} />
         </div>
     );
 }

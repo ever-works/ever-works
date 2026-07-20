@@ -38,7 +38,7 @@ import {
     WebhookDelivery,
     WorkProposal,
     WorkAgentPreference,
-    WorkAgentGoal,
+    WorkBuildRequest,
     WorkAgentRun,
     WorkAgentRunLog,
     WorkKnowledgeDocument,
@@ -48,6 +48,10 @@ import {
     WorkKnowledgeChunk,
     WorkKnowledgeChunkCoordinate,
     Mission,
+    // Goals & Metrics (PR-8)
+    Goal,
+    GoalMetricSample,
+    MissionGoal,
     // Tenants & Organizations (EW-651 epic) — Phase 1 / EW-653
     Tenant,
     Organization,
@@ -73,7 +77,9 @@ import {
     TaskKbMention,
     UserTaskCounter,
     MissionAttachment,
+    MissionWork,
     WorkProposalAttachment,
+    IdeaWork,
     AgentAttachment,
     // Notifications v2 (EW-650 + siblings)
     TenantEmailAddress,
@@ -171,11 +177,18 @@ export const ENTITIES = [
     WebhookDelivery,
     WorkProposal,
     WorkAgentPreference,
-    WorkAgentGoal,
+    WorkBuildRequest,
     WorkAgentRun,
     WorkAgentRunLog,
     // Missions / Ideas / Works (spec 2026-05-24, Phase 0 PR 0.2)
     Mission,
+    // Goals & Metrics (PR-8) — goals + append-only samples + Mission link.
+    // Registered here AND in entities/index.ts (bug-class: a
+    // forFeature'd-but-unregistered entity throws
+    // EntityMetadataNotFoundError → unmapped 500 on every query).
+    Goal,
+    GoalMetricSample,
+    MissionGoal,
     // Tenants & Organizations (EW-651 epic) — Phase 1 / EW-653
     Tenant,
     Organization,
@@ -204,7 +217,9 @@ export const ENTITIES = [
     UserTaskCounter,
     // PR #1044 — Mission/Idea attachment edge tables
     MissionAttachment,
+    MissionWork,
     WorkProposalAttachment,
+    IdeaWork,
     // Knowledge Base entities (EW-639 / EW-640)
     WorkKnowledgeDocument,
     WorkKnowledgeUpload,

@@ -1,6 +1,7 @@
 import type {
     Mission,
     MissionGuardrailsOverride,
+    MissionOutcome,
     MissionStatus,
     MissionType,
 } from '../entities/mission.entity';
@@ -18,6 +19,9 @@ export interface MissionDto {
     description: string;
     type: MissionType;
     status: MissionStatus;
+    /** PR-3 - conclusion verdict; NULL until a human records one at Complete. */
+    outcome: MissionOutcome | null;
+    completedAt: Date | null;
     schedule: string | null;
     autoBuildWorks: boolean;
     outstandingIdeasCap: number | null;
@@ -43,6 +47,8 @@ export function toMissionDto(mission: Mission): MissionDto {
         description: mission.description,
         type: mission.type,
         status: mission.status,
+        outcome: mission.outcome ?? null,
+        completedAt: mission.completedAt ?? null,
         schedule: mission.schedule ?? null,
         autoBuildWorks: mission.autoBuildWorks,
         outstandingIdeasCap: mission.outstandingIdeasCap ?? null,
