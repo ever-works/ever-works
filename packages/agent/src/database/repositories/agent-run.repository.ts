@@ -111,14 +111,24 @@ export class AgentRunRepository {
     async cancel(
         runId: string,
         userId: string,
-    ): Promise<{ found: boolean; previousStatus?: AgentRunStatus }> {
+    ): Promise<{
+        found: boolean;
+        previousStatus?: AgentRunStatus;
+        /**
+         * Trigger.dev run id of the cancelled row, so the caller can also
+         * cancel the remote run. Null when the run was never stamped —
+         * dispatch failed, or the enqueue-time stamp lost the race and the
+         * worker had not yet reached `markStarted`.
+         */
+        triggerRunId?: string | null;
+    }> {
         const run = await this.repository.findOne({
             where: { id: runId, userId },
-            select: ['id', 'status'],
+            select: ['id', 'status', 'triggerRunId'],
         });
         if (!run) return { found: false };
         if (run.status !== 'queued' && run.status !== 'running') {
-            return { found: true, previousStatus: run.status };
+            return { found: true, previousStatus: run.status, triggerRunId: run.triggerRunId };
         }
         const result = await this.repository
             .createQueryBuilder()
@@ -137,11 +147,17 @@ export class AgentRunRepository {
         if ((result.affected ?? 0) === 0) {
             const fresh = await this.repository.findOne({
                 where: { id: runId },
-                select: ['id', 'status'],
+                select: ['id', 'status', 'triggerRunId'],
             });
-            return { found: true, previousStatus: fresh?.status ?? run.status };
+            return {
+                found: true,
+                previousStatus: fresh?.status ?? run.status,
+                // Re-read: the worker may have stamped `triggerRunId` via
+                // markStarted between our first read and this CAS.
+                triggerRunId: fresh?.triggerRunId ?? run.triggerRunId,
+            };
         }
-        return { found: true, previousStatus: run.status };
+        return { found: true, previousStatus: run.status, triggerRunId: run.triggerRunId };
     }
 
     async createQueued(args: {
@@ -162,12 +178,61 @@ export class AgentRunRepository {
         return this.repository.save(run);
     }
 
-    async markStarted(runId: string, triggerRunId: string | null): Promise<void> {
-        await this.repository.update(runId, {
-            status: 'running',
-            startedAt: new Date(),
-            triggerRunId,
-        });
+    /**
+     * Stamp the Trigger.dev run id onto a row that has just been enqueued,
+     * so a cancel arriving before the worker starts still has something to
+     * cancel remotely. Without this the column stayed NULL for a run's whole
+     * lifetime and cancelling could only ever update our own DB.
+     *
+     * No-clobber by construction (`triggerRunId IS NULL`): the worker can
+     * reach `markStarted` before this stamp commits, and both write the same
+     * value, so whichever lands second must not overwrite. Best-effort —
+     * callers swallow failures, since losing the stamp costs a remote cancel,
+     * not correctness.
+     */
+    async setTriggerRunId(runId: string, triggerRunId: string): Promise<void> {
+        await this.repository
+            .createQueryBuilder()
+            .update(AgentRun)
+            .set({ triggerRunId })
+            .where('id = :id', { id: runId })
+            .andWhere('triggerRunId IS NULL')
+            .execute();
+    }
+
+    /**
+     * Claim a run for execution. CAS-guarded so a cancel that lands between
+     * the worker's status check and this write is not silently reverted
+     * `cancelled -> running`.
+     *
+     * That mattered little while cancel was DB-only, but now that cancelling
+     * actually kills the Trigger.dev run, losing this race would strand the
+     * row in `running` with no worker alive to finalize it — and there is no
+     * `agent_runs` sweeper to reap it. Returns whether the claim succeeded so
+     * the worker can bail instead of executing a cancelled run.
+     *
+     * Allows `queued|running` (NOT queued-only): heartbeat re-resolves an
+     * already-`running` row via `findInFlightForAgent` on retry, and a
+     * queued-only guard would no-op every legitimate retry.
+     *
+     * `triggerRunId` is only written when non-null, so a worker passing null
+     * cannot erase a value stamped at enqueue time by {@link setTriggerRunId}.
+     */
+    async markStarted(runId: string, triggerRunId: string | null): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(AgentRun)
+            .set({
+                status: 'running',
+                startedAt: new Date(),
+                ...(triggerRunId ? { triggerRunId } : {}),
+            })
+            .where('id = :id', { id: runId })
+            .andWhere('status IN (:...statuses)', { statuses: NON_TERMINAL })
+            .execute();
+        const ok = (result.affected ?? 0) > 0;
+        if (!ok) await this.warnTerminalNoOp(runId, 'markStarted');
+        return ok;
     }
 
     /**

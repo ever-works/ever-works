@@ -207,6 +207,19 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
         });
     });
 
+    describe('Trigger.dev run id', () => {
+        it('records ctx.run.id on the AgentRun so the run can be cancelled remotely', async () => {
+            // Before this, markStarted was hard-coded to null and
+            // AgentRun.triggerRunId was NULL for a run's entire lifetime — so
+            // cancelling could only ever update our own DB, never stop the
+            // actual Trigger.dev run.
+            await registeredConfig.run(basePayload(OWNED_TASK_ID), {
+                ctx: { run: { id: 'run_abc123' } },
+            });
+            expect(runs.markStarted).toHaveBeenCalledWith('run-1', 'run_abc123');
+        });
+    });
+
     describe('legitimate owner path (unchanged)', () => {
         it('resolves the owned task, creates + starts + executes the run, and completes', async () => {
             const result = await registeredConfig.run(basePayload(OWNED_TASK_ID));
@@ -218,6 +231,8 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
                 triggerKind: 'task',
                 taskId: OWNED_TASK_ID,
             });
+            // Null here only because this call omits the Trigger.dev run
+            // params; see the ctx test below for the real-runtime path.
             expect(runs.markStarted).toHaveBeenCalledWith('run-1', null);
             expect(runner.execute).toHaveBeenCalledTimes(1);
             expect(runner.execute.mock.calls[0][0]).toMatchObject({

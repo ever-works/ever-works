@@ -150,7 +150,7 @@ export class TaskChatService {
                                   chatMessageId: row.id,
                               })
                             : null;
-                        await this.chatDispatcher!.enqueue({
+                        const handle = await this.chatDispatcher!.enqueue({
                             agentId: mention.id,
                             userId,
                             taskId: task.id,
@@ -158,6 +158,23 @@ export class TaskChatService {
                             dedupKey,
                             runId: run?.id,
                         });
+                        // Stamp the Trigger.dev id so a cancel arriving before
+                        // the worker starts can still reach the remote run.
+                        // Swallowed separately so a stamp failure cannot reach
+                        // the catch below and mark a successfully-dispatched
+                        // run as dispatch-failed.
+                        if (run && handle?.runId) {
+                            // try/catch, not .catch() — a synchronous throw
+                            // would escape before .catch() could attach and
+                            // mark a dispatched run as dispatch-failed.
+                            try {
+                                await this.runs?.setTriggerRunId(run.id, handle.runId);
+                            } catch (stampErr) {
+                                this.logger.warn(
+                                    `Failed to stamp triggerRunId on AgentRun ${run.id}: ${stampErr}`,
+                                );
+                            }
+                        }
                     } catch (err) {
                         const message = err instanceof Error ? err.message : String(err);
                         this.logger.warn(

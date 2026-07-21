@@ -129,6 +129,93 @@ describe('AgentRunRepository — terminal transitions', () => {
         });
     });
 
+    describe('setTriggerRunId', () => {
+        it('only stamps a row that has none, so it cannot clobber markStarted', async () => {
+            await runs.setTriggerRunId('r1', 'run_abc');
+            expect(queryBuilder.set).toHaveBeenCalledWith({ triggerRunId: 'run_abc' });
+            // The worker can reach markStarted before this stamp commits. Both
+            // write the same value, so whichever lands second must no-op rather
+            // than overwrite.
+            expect(
+                queryBuilder.andWhere.mock.calls.some(([sql]) =>
+                    String(sql).includes('triggerRunId IS NULL'),
+                ),
+            ).toBe(true);
+        });
+    });
+
+    describe('markStarted', () => {
+        it('CAS-guards the claim so a cancelled run is never resurrected', async () => {
+            const ok = await runs.markStarted('r1', 'run_abc');
+            expect(ok).toBe(true);
+            // Must allow queued|running, NOT queued-only: heartbeat re-resolves
+            // an already-running row via findInFlightForAgent on retry.
+            expect(statusGuard()).toEqual(['queued', 'running']);
+        });
+
+        it('returns false and warns when the run was cancelled first', async () => {
+            queryBuilder.execute.mockResolvedValue({ affected: 0 });
+            repository.findOne.mockResolvedValue({ id: 'r1', status: 'cancelled' });
+            await expect(runs.markStarted('r1', 'run_abc')).resolves.toBe(false);
+            expect(warn).toHaveBeenCalledWith(expect.stringContaining("already 'cancelled'"));
+        });
+
+        it('does not erase an enqueue-time triggerRunId when the worker passes null', async () => {
+            await runs.markStarted('r1', null);
+            const patch = queryBuilder.set.mock.calls[0][0];
+            expect(patch).not.toHaveProperty('triggerRunId');
+            expect(patch.status).toBe('running');
+        });
+    });
+
+    describe('cancel', () => {
+        beforeEach(() => {
+            repository.findOne.mockResolvedValue({
+                id: 'r1',
+                status: 'running',
+                triggerRunId: 'run_abc',
+            });
+        });
+
+        it('returns triggerRunId so the caller can cancel the remote run', async () => {
+            // Without this the endpoint has no id to cancel and silently
+            // degrades to a DB-only cancel.
+            await expect(runs.cancel('r1', 'u1')).resolves.toEqual(
+                expect.objectContaining({ found: true, triggerRunId: 'run_abc' }),
+            );
+        });
+
+        it('returns triggerRunId for an already-terminal run too', async () => {
+            repository.findOne.mockResolvedValue({
+                id: 'r1',
+                status: 'completed',
+                triggerRunId: 'run_abc',
+            });
+            await expect(runs.cancel('r1', 'u1')).resolves.toEqual({
+                found: true,
+                previousStatus: 'completed',
+                triggerRunId: 'run_abc',
+            });
+        });
+
+        it('re-reads triggerRunId when the CAS loses, since markStarted may have stamped it', async () => {
+            repository.findOne
+                .mockResolvedValueOnce({ id: 'r1', status: 'queued', triggerRunId: null })
+                .mockResolvedValueOnce({ id: 'r1', status: 'running', triggerRunId: 'run_late' });
+            queryBuilder.execute.mockResolvedValue({ affected: 0 });
+            await expect(runs.cancel('r1', 'u1')).resolves.toEqual({
+                found: true,
+                previousStatus: 'running',
+                triggerRunId: 'run_late',
+            });
+        });
+
+        it('reports found:false without a triggerRunId for an unknown run', async () => {
+            repository.findOne.mockResolvedValue(null);
+            await expect(runs.cancel('r1', 'u1')).resolves.toEqual({ found: false });
+        });
+    });
+
     describe('durationMs', () => {
         it('is derived from startedAt when the run had started', async () => {
             const startedAt = new Date(Date.now() - 5_000);

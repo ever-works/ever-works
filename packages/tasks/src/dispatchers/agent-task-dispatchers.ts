@@ -1,5 +1,10 @@
 import { tasks } from '@trigger.dev/sdk';
-import type { AgentHeartbeatTrigger } from '@ever-works/agent/agents';
+import type {
+    AgentHeartbeatTrigger,
+    AgentRunCanceller,
+    AgentRunCancelOutcome,
+} from '@ever-works/agent/agents';
+import type { TriggerService } from '../trigger/trigger.service';
 import type {
     AgentChatReplyDispatcher,
     AgentChatReplyDispatchPayload,
@@ -78,3 +83,26 @@ export const agentChatReplyTriggerAdapter: AgentChatReplyDispatcher = {
         return { runId: handle.id };
     },
 };
+
+/**
+ * Cancels the Trigger.dev run behind an AgentRun. Bound to
+ * `AGENT_RUN_CANCELLER` in the API-side `AgentsModule`.
+ *
+ * A factory rather than a `useValue` literal because it delegates to the
+ * injectable `TriggerService` instead of calling `runs.cancel` directly. That
+ * matters for two reasons: `TriggerService.cancel` already try/catches and
+ * logs, so the port's never-throw contract holds without a third copy of that
+ * body; and its `isEnabled()` gate lets us report "Trigger.dev is off" as a
+ * distinct outcome rather than folding a misconfiguration into the same signal
+ * as a benign already-terminal run.
+ *
+ * Unlike the stateless adapters above, this never touches the SDK directly, so
+ * it does not inherit their implicit "someone constructed TriggerService first"
+ * ordering dependency.
+ */
+export const createAgentRunCancellerAdapter = (trigger: TriggerService): AgentRunCanceller => ({
+    async cancel(triggerRunId: string): Promise<AgentRunCancelOutcome> {
+        if (!trigger.isEnabled()) return 'not-configured';
+        return (await trigger.cancel(triggerRunId)) ? 'cancelled' : 'failed';
+    },
+});

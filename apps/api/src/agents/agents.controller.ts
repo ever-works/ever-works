@@ -9,6 +9,7 @@ import {
     HttpStatus,
     Inject,
     InternalServerErrorException,
+    Logger,
     NotFoundException,
     Optional,
     Param,
@@ -30,6 +31,8 @@ import {
     AgentsService,
     AgentExportService,
     AgentScope,
+    AGENT_RUN_CANCELLER,
+    type AgentRunCanceller,
     SkillBindingRepository,
     type AgentDto,
     type AgentExportEnvelope,
@@ -106,6 +109,8 @@ const AGENT_LIFECYCLE_EVENT_TYPES: ActivityActionType[] = [
 @ApiTags('agents')
 @Controller('api/agents')
 export class AgentsController {
+    private readonly logger = new Logger(AgentsController.name);
+
     constructor(
         private readonly service: AgentsService,
         // Phase 4 — file read/write endpoints.
@@ -129,6 +134,13 @@ export class AgentsController {
         @Optional()
         @Inject(AGENT_TASK_EXECUTE_DISPATCHER)
         private readonly taskExecuteDispatcher?: AgentTaskExecuteDispatcher,
+        // Appended LAST on purpose — every `new AgentsController(...)` in the
+        // specs is positional, so a new trailing optional param keeps them
+        // compiling. Unlike assignTask, cancel must degrade rather than 500
+        // when this is unbound: the DB transition is the authoritative answer.
+        @Optional()
+        @Inject(AGENT_RUN_CANCELLER)
+        private readonly runCanceller?: AgentRunCanceller,
     ) {}
 
     @Get()
@@ -622,6 +634,26 @@ export class AgentsController {
             throw new NotFoundException(`AgentRun ${runId} not found.`);
         }
         const wasOpen = result.previousStatus === 'queued' || result.previousStatus === 'running';
+        // DB first, then the remote run. The reverse order risks a cancelled
+        // Trigger.dev run behind a row still reading `running`, which nothing
+        // would ever reap — there is no agent_runs sweeper. This way the worst
+        // case is wasted compute, and the worker cannot resurrect the row
+        // because markCompleted/markFailed are CAS-guarded.
+        //
+        // Awaited, not fire-and-forget: the port cannot throw by contract, so
+        // awaiting costs nothing and keeps the endpoint deterministic to test.
+        if (wasOpen && result.triggerRunId && this.runCanceller) {
+            const outcome = await this.runCanceller.cancel(result.triggerRunId);
+            if (outcome !== 'cancelled') {
+                // Deliberately not an error response — the run IS cancelled as
+                // far as the platform is concerned. Logged with both ids so an
+                // operator seeing a wall of 'not-configured' can tell a missing
+                // TRIGGER_SECRET_KEY from the benign already-terminal race.
+                this.logger.warn(
+                    `AgentRun ${runId}: DB cancel committed but Trigger.dev cancel of ${result.triggerRunId} returned '${outcome}'.`,
+                );
+            }
+        }
         if (wasOpen) {
             void this.tryLog({
                 userId: auth.userId,
@@ -749,8 +781,9 @@ export class AgentsController {
             triggerKind: 'task',
             taskId: body.taskId,
         });
+        let handle: { runId: string } | undefined;
         try {
-            await this.taskExecuteDispatcher.enqueue({
+            handle = await this.taskExecuteDispatcher.enqueue({
                 agentId: id,
                 userId: auth.userId,
                 taskId: body.taskId,
@@ -772,6 +805,12 @@ export class AgentsController {
                 .markDispatchFailed(run.id, `enqueue-failed: ${message}`)
                 .catch(() => undefined);
             throw new InternalServerErrorException(`assign-task enqueue failed: ${message}`);
+        }
+        // Stamp OUTSIDE the try above: the enqueue has already succeeded, so a
+        // stamp failure must not take the rollback path and 500 a request that
+        // did dispatch. Losing the stamp only costs a remote cancel.
+        if (handle?.runId) {
+            await this.agentRuns.setTriggerRunId(run.id, handle.runId).catch(() => undefined);
         }
         void this.tryLog({
             userId: auth.userId,
