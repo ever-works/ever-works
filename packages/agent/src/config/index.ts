@@ -496,6 +496,49 @@ export const config = {
             const raw = parseInt(process.env.AGENT_MAX_RUN_DURATION_SECONDS || '1800', 10);
             return Number.isFinite(raw) && raw > 0 ? raw : 1800;
         },
+        /** Kill switch for the agent_runs stuck-run sweeper. Default on. */
+        getRunSweeperEnabled() {
+            return process.env.AGENT_RUN_SWEEPER_ENABLED !== 'false';
+        },
+        /**
+         * Age past which a `queued`/`running` AgentRun is considered abandoned.
+         *
+         * Deliberately generous, because the two error costs are wildly
+         * asymmetric. Sweeping too LATE means one task-agent pair cannot
+         * dispatch for a few extra hours — recoverable. Sweeping too EARLY
+         * destroys a live run's real result: the row reads `failed`, the
+         * worker's `markCompleted` then no-ops against the CAS, and the user
+         * sees the sweeper's message in the Activity tab where the summary
+         * should be. That is unrecoverable, and it manufactures exactly the
+         * class of corruption the terminal-transition CAS exists to prevent.
+         *
+         * Derived from the run-duration ceiling rather than hard-coded, so it
+         * self-corrects if that ceiling is raised. The ceiling is the largest
+         * `maxDuration` across the three agent tasks (agent-task-execute pins
+         * 3600s), not just this config's value.
+         *
+         * The floor clamp is the most important line here: a worker may burn
+         * up to 3 attempts, so anything below 3x the ceiling can reap a run
+         * that is legitimately still retrying. Without the clamp,
+         * `AGENT_RUN_STUCK_SWEEP_MINUTES=30` would silently reintroduce that.
+         */
+        getRunStuckSweepMinutes() {
+            const ceilingMinutes = Math.ceil(Math.max(3600, this.getMaxRunDurationSeconds()) / 60);
+            const floor = ceilingMinutes * 3;
+            const raw = parseInt(process.env.AGENT_RUN_STUCK_SWEEP_MINUTES || '', 10);
+            const configured = Number.isFinite(raw) && raw > 0 ? raw : ceilingMinutes * 6;
+            return Math.max(floor, configured);
+        },
+        /**
+         * Rows swept per tick. Bounded on purpose — `agent_runs` is the
+         * high-cardinality child table, and a post-outage backlog is precisely
+         * when this runs. Successive ticks drain; there is no pagination loop,
+         * so a runaway predicate cannot become an unbounded write storm.
+         */
+        getRunStuckSweepBatch() {
+            const raw = parseInt(process.env.AGENT_RUN_STUCK_SWEEP_BATCH || '200', 10);
+            return Number.isFinite(raw) && raw > 0 ? raw : 200;
+        },
     },
 
     /**

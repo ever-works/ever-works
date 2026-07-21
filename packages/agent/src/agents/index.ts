@@ -9,6 +9,7 @@ export * from './prompt-assembler.service';
 export * from './agent-run.service';
 export * from './agent-run-canceller';
 export * from './agent-run-abort';
+export * from './agent-run-sweeper.service';
 export * from './agent-run-post-processor';
 export * from './agent-ai-dispatch-facade';
 export * from './agent-git-facade';

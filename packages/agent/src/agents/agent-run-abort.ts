@@ -107,7 +107,13 @@ export function createAgentRunAbortSource(
             } catch {
                 return;
             }
-            if (status === 'cancelled') {
+            // `failed` counts as a stop signal too, not just `cancelled`: the
+            // stuck-run sweeper reaps abandoned rows to `failed`, and if it
+            // ever lands on a worker that is somehow still alive, that worker
+            // must bail here rather than run to completion and then discover
+            // its terminal write no-ops against the CAS — having already
+            // applied the side effects.
+            if (status === 'cancelled' || status === 'failed') {
                 latched = true;
                 throw createGenerationCancelledError();
             }
