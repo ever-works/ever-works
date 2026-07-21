@@ -49,6 +49,7 @@ describe('TaskTransitionService — Phase 15.3 agent dispatch hook', () => {
         runs = {
             createQueued: jest.fn().mockResolvedValue({ id: 'r1' }),
             markDispatchFailed: jest.fn().mockResolvedValue(undefined),
+            setTriggerRunId: jest.fn().mockResolvedValue(undefined),
         };
         dispatcher = { enqueue: jest.fn().mockResolvedValue({ runId: 'trd-1' }) };
     });
@@ -128,6 +129,36 @@ describe('TaskTransitionService — Phase 15.3 agent dispatch hook', () => {
         await svc.transition(task, TaskStatus.DONE);
         await new Promise((r) => setImmediate(r));
         expect(dispatcher.enqueue).not.toHaveBeenCalled();
+    });
+
+    it('stamps the Trigger.dev run id so a cancel before start can reach the remote run', async () => {
+        const svc = makeSvc();
+        const task = makeTask({ status: TaskStatus.TODO });
+        tasks.findById.mockResolvedValueOnce({ ...task, status: TaskStatus.IN_PROGRESS });
+        assignees.findAgentAssignees.mockResolvedValueOnce([
+            { assigneeType: 'agent', assigneeId: 'agent-a' },
+        ]);
+        await svc.transition(task, TaskStatus.IN_PROGRESS);
+        await new Promise((r) => setImmediate(r));
+        expect(runs.setTriggerRunId).toHaveBeenCalledWith('r1', 'trd-1');
+    });
+
+    it('does not mark a dispatched run failed when stamping the Trigger.dev id throws', async () => {
+        const svc = makeSvc();
+        // Synchronous throw, not a rejected promise: a `.catch()` would never
+        // attach, so the error would escape into the dispatch catch and report
+        // a run that DID dispatch as dispatch-failed.
+        runs.setTriggerRunId.mockImplementationOnce(() => {
+            throw new Error('DB down');
+        });
+        const task = makeTask({ status: TaskStatus.TODO });
+        tasks.findById.mockResolvedValueOnce({ ...task, status: TaskStatus.IN_PROGRESS });
+        assignees.findAgentAssignees.mockResolvedValueOnce([
+            { assigneeType: 'agent', assigneeId: 'agent-a' },
+        ]);
+        await svc.transition(task, TaskStatus.IN_PROGRESS);
+        await new Promise((r) => setImmediate(r));
+        expect(runs.markDispatchFailed).not.toHaveBeenCalled();
     });
 
     it('catches dispatcher failures, transitions AgentRun to failed, and does not fail transition', async () => {
