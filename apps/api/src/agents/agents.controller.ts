@@ -104,6 +104,14 @@ const AGENT_LIFECYCLE_EVENT_TYPES: ActivityActionType[] = [
     ActivityActionType.AGENT_EXPORTED,
     ActivityActionType.AGENT_IMPORTED,
     ActivityActionType.AGENT_BUDGET_EXCEEDED,
+    // Run-lifecycle events. All three are emitted by this controller via
+    // tryLog() — run-now, cancel, and assign-task — but were absent from this
+    // list, so every one of them was written to activity_logs and then never
+    // returned by GET :id/events. Nothing surfaced the fact that a run was
+    // triggered, cancelled, or assigned.
+    ActivityActionType.AGENT_RUN_TRIGGERED,
+    ActivityActionType.AGENT_RUN_CANCELLED,
+    ActivityActionType.AGENT_TASK_ASSIGNED,
 ];
 
 @ApiTags('agents')
