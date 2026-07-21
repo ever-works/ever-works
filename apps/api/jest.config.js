@@ -36,6 +36,19 @@ module.exports = {
     // 5s budget; 30s matches the agent package and is the standard ts-jest
     // recommendation for CI stability.
     testTimeout: 30000,
+    // Recycle a worker once its heap crosses this after a test file, so ts-jest's
+    // per-file type-check memory cannot ACCUMULATE across the ~195 api specs on a
+    // `--maxWorkers=2` worker and eventually cross the 6 GB `--max-old-space-size`
+    // V8 cap mid-file, at which point jest SIGTERMs the unresponsive worker
+    // ("A jest worker process was terminated by another process: signal=SIGTERM").
+    // Every individual api spec passes in isolation; the failure is purely
+    // accumulation, and it only appears here (not in packages/agent, which runs
+    // 334 suites at the same settings) because the `@src` array fallback below
+    // makes each api spec type-check across into the agent package. Raising the
+    // runner CONTAINER memory does not help — the limit is the per-worker V8 heap.
+    // 2 GB leaves clear margin below the 6 GB cap; `packages/agent` peaks well
+    // under that, so the recycles stay infrequent.
+    workerIdleMemoryLimit: '2GB',
     moduleNameMapper: {
         '^@src/generators/(.*)$': '<rootDir>/../../../packages/agent/src/generators/$1/index.ts',
         // Items-generator's source lives under @ever-works/agent, but
