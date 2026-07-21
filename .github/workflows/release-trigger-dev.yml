@@ -13,6 +13,14 @@ permissions:
 
 jobs:
   deploy:
+    # Legacy Trigger.dev CLOUD path. Unlike release-trigger-{prod,stage}.yml this
+    # job was left ungated when we migrated to self-hosted, so it kept running on
+    # every develop push and authenticating to Trigger.dev CLOUD with the cloud
+    # PAT (secrets.TRIGGER_ACCESS_TOKEN) — the one workload still reaching the
+    # cloud account we are closing. Gated here on the same flag the prod/stage
+    # workflows already use, so it is inert while TRIGGER_SELFHOSTED=true.
+    # Flip the flag back to re-enable this cloud path.
+    if: ${{ vars.TRIGGER_SELFHOSTED != 'true' }}
     runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
 
     environment: dev
