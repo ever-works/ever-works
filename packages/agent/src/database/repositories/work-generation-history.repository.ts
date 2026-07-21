@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Brackets, In, MoreThan, Repository } from 'typeorm';
-import { WorkGenerationHistory, GenerationMetrics } from '@src/entities';
+import { WorkGenerationHistory, GenerationMetrics } from '@src/entities/work-generation-history.entity';
 import { GenerateStatusType } from '@src/entities/types';
 import {
     WorkHistoryActivityType,

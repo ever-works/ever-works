@@ -8,15 +8,8 @@ import {
 import { WorkInvitationRepository } from '../database/repositories/work-invitation.repository';
 import { WorkInvitation } from '../entities/work-invitation.entity';
 import { WorkOwnershipService } from './work-ownership.service';
-import {
-    ALL_INVITATION_ROLES,
-    INVITATION_ROLE_OWNER_CLAIM,
-    InvitationRole,
-    WorkInvitationStatus,
-    WorkInvitationTransferState,
-    WorkInvitationMetadata,
-} from '../entities';
-
+import { ALL_INVITATION_ROLES, INVITATION_ROLE_OWNER_CLAIM, InvitationRole, WorkInvitationStatus, WorkInvitationTransferState } from '../entities/types';
+import { WorkInvitationMetadata } from '../entities/work-invitation.entity';
 export type IssuedInvitation = {
     invitation: WorkInvitation;
     /** Raw token, returned ONCE — only the hash is persisted. */

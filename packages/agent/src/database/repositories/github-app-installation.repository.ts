@@ -1,8 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
-import { GitHubAppInstallation } from '../../entities';
-
+import { GitHubAppInstallation } from '../../entities/github-app-installation.entity';
 export type UpsertGitHubAppInstallationData = {
     installationId: string;
     appSlug?: string | null;

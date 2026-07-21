@@ -1,12 +1,7 @@
-import type {
-    WorkBuildRequestSource,
-    WorkBuildRequestStatus,
-    WorkAgentGuardrails,
-    WorkAgentRunLogLevel,
-    WorkAgentRunStatus,
-    WorkAgentRunSummary,
-} from '../entities';
-
+import type { WorkAgentGuardrails } from '../entities/work-agent-preference.entity';
+import type { WorkAgentRunLogLevel } from '../entities/work-agent-run-log.entity';
+import type { WorkAgentRunStatus, WorkAgentRunSummary } from '../entities/work-agent-run.entity';
+import type { WorkBuildRequestSource, WorkBuildRequestStatus } from '../entities/work-build-request.entity';
 export interface UpdateWorkAgentPreferencesInput extends Partial<WorkAgentGuardrails> {
     enabled?: boolean;
     autoApproveLowImpact?: boolean;
