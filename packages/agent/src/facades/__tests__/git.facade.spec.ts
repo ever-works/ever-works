@@ -1576,6 +1576,133 @@ describe('GitFacadeService', () => {
                 }),
             );
         });
+
+        // Regression: WorkCacheWarmupService fans out workItems/workConfig/
+        // workCount/workCategoriesTags in a Promise.all, and each independently
+        // resolved the same working copy. Because isomorphic-git is pure JS,
+        // those 4 concurrent clones ran on the event loop and starved the HTTP
+        // server until the kubelet SIGKILLed the pod on a failed liveness probe.
+        // Concurrent calls for the same repo must share ONE git operation.
+        it('should coalesce concurrent calls for the same repo into one git operation', async () => {
+            const gitPlugin = createMockGitPlugin('github', 'GitHub');
+            const registered = createRegisteredPlugin(gitPlugin, {
+                capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
+            });
+            registry.get.mockReturnValue(registered);
+            registry.getByCapability.mockReturnValue([registered]);
+
+            let release: (dir: string) => void = () => undefined;
+            gitPlugin.cloneOrPull = jest.fn().mockReturnValue(
+                new Promise<string>((resolve) => {
+                    release = resolve;
+                }),
+            );
+
+            const calls = [
+                service.cloneOrPull(
+                    { owner: 'testuser', repo: 'test-repo' },
+                    { providerId: 'github', token: 'test-token' },
+                ),
+                service.cloneOrPull(
+                    { owner: 'testuser', repo: 'test-repo' },
+                    { providerId: 'github', token: 'test-token' },
+                ),
+                service.cloneOrPull(
+                    { owner: 'testuser', repo: 'test-repo' },
+                    { providerId: 'github', token: 'test-token' },
+                ),
+                service.cloneOrPull(
+                    { owner: 'testuser', repo: 'test-repo' },
+                    { providerId: 'github', token: 'test-token' },
+                ),
+            ];
+
+            // Let the facade resolve the plugin/token for every caller before
+            // the underlying git operation settles.
+            await Promise.resolve();
+            await Promise.resolve();
+            release('/tmp/repo');
+
+            const results = await Promise.all(calls);
+
+            expect(results).toEqual(['/tmp/repo', '/tmp/repo', '/tmp/repo', '/tmp/repo']);
+            expect(gitPlugin.cloneOrPull).toHaveBeenCalledTimes(1);
+        });
+
+        it('should not coalesce calls for different repos', async () => {
+            const gitPlugin = createMockGitPlugin('github', 'GitHub');
+            const registered = createRegisteredPlugin(gitPlugin, {
+                capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
+            });
+            registry.get.mockReturnValue(registered);
+            registry.getByCapability.mockReturnValue([registered]);
+
+            await Promise.all([
+                service.cloneOrPull(
+                    { owner: 'testuser', repo: 'repo-a' },
+                    { providerId: 'github', token: 'test-token' },
+                ),
+                service.cloneOrPull(
+                    { owner: 'testuser', repo: 'repo-b' },
+                    { providerId: 'github', token: 'test-token' },
+                ),
+            ]);
+
+            expect(gitPlugin.cloneOrPull).toHaveBeenCalledTimes(2);
+        });
+
+        // The map is an in-flight dedupe, NOT a cache: once an operation
+        // settles a later caller must re-pull so it sees new commits.
+        it('should start a fresh operation once the previous one has settled', async () => {
+            const gitPlugin = createMockGitPlugin('github', 'GitHub');
+            const registered = createRegisteredPlugin(gitPlugin, {
+                capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
+            });
+            registry.get.mockReturnValue(registered);
+            registry.getByCapability.mockReturnValue([registered]);
+
+            await service.cloneOrPull(
+                { owner: 'testuser', repo: 'test-repo' },
+                { providerId: 'github', token: 'test-token' },
+            );
+            await service.cloneOrPull(
+                { owner: 'testuser', repo: 'test-repo' },
+                { providerId: 'github', token: 'test-token' },
+            );
+
+            expect(gitPlugin.cloneOrPull).toHaveBeenCalledTimes(2);
+        });
+
+        // A failed clone must not poison later attempts.
+        it('should clear the in-flight entry when the git operation rejects', async () => {
+            const gitPlugin = createMockGitPlugin('github', 'GitHub');
+            const registered = createRegisteredPlugin(gitPlugin, {
+                capabilities: [PLUGIN_CAPABILITIES.GIT_PROVIDER],
+            });
+            registry.get.mockReturnValue(registered);
+            registry.getByCapability.mockReturnValue([registered]);
+
+            gitPlugin.cloneOrPull = jest
+                .fn()
+                .mockRejectedValueOnce(new Error('clone failed'))
+                .mockResolvedValueOnce('/tmp/repo');
+
+            await expect(
+                service.cloneOrPull(
+                    { owner: 'testuser', repo: 'test-repo' },
+                    { providerId: 'github', token: 'test-token' },
+                ),
+            ).rejects.toThrow('clone failed');
+
+            await expect(
+                service.cloneOrPull(
+                    { owner: 'testuser', repo: 'test-repo' },
+                    { providerId: 'github', token: 'test-token' },
+                ),
+            ).resolves.toBe('/tmp/repo');
+
+            expect(gitPlugin.cloneOrPull).toHaveBeenCalledTimes(2);
+        });
     });
 
     describe('add', () => {
