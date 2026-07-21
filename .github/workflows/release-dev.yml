@@ -58,4 +58,8 @@ jobs:
           token: ${{ secrets.GITHUB_TOKEN }}
           tag: ${{ steps.tag_version.outputs.new_tag }}
           name: ${{ steps.tag_version.outputs.new_tag }}
-          body: ${{ steps.tag_version.outputs.changelog }}
+          # No explicit `body`: `generateReleaseNotes: true` above makes GitHub
+          # build the notes. Passing the tag action's `changelog` as well fails the
+          # very FIRST release in a repo with 422 'body is too long (maximum is
+          # 125000 characters)', because with no previous tag its changelog spans
+          # the entire history. That is exactly what happened on v0.0.1 here.
