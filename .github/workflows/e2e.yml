@@ -71,17 +71,18 @@ jobs:
       fail-fast: false
       matrix:
         node-version: [22.x]
-        # 16 shards (was 8, was 4): the suite kept growing (now ~3200 tests
-        # with the +1000 mega-wave). The binding constraint is NOT wall-clock
-        # but MEMORY: `next dev` accumulates compiled-route memory over a long
-        # shard, and on a long run the web (or the API's RegExp route-table
+        # 24 shards (was 16, was 8, was 4): the suite keeps growing (now ~4300
+        # tests after the +1000-newest-features wave). The binding constraint is
+        # NOT wall-clock but MEMORY: the API's in-memory sqlite + resident memory
+        # accumulate over a shard's run and the API (V8 RegExp route-table
         # compiler) eventually OOM-aborts mid-shard â€” every later spec on that
         # shard then fails ERR_CONNECTION_REFUSED, and the casualty shard moves
-        # run-to-run (the classic "random" e2e red). Halving each shard's spec
-        # count (and therefore its peak resident memory + duration) is a pure-
-        # parallelism, zero-behaviour-change mitigation: each runner is its own
-        # 32 GB box, so 16 shards = ~half the per-shard memory accumulation.
-        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16]
+        # run-to-run (the classic "random" e2e red). At 16 shards the suite hit
+        # ~269 tests/shard and OOM'd ~half the shards; dropping to ~180/shard
+        # (24 shards) keeps peak resident memory below the boot+accumulation
+        # threshold. Pure-parallelism, zero-behaviour-change. Each runner is its
+        # own 32 GB box. Keep the `--shard=X/N` total below in sync with this.
+        shard: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24]
 
     # Service containers â€” let the e2e suite exercise features that would
     # otherwise skip themselves because the dependency isn't reachable.
@@ -221,15 +222,18 @@ jobs:
           # --shard=N/M splits the test suite across M machines, deterministic.
           # Each shard runs its own subset; combined across the matrix they
           # cover every test exactly once. Keep --shard total in sync with
-          # the `shard:` matrix length above (16).
-          pnpm exec playwright test --shard=${{ matrix.shard }}/16
+          # the `shard:` matrix length above (24).
+          pnpm exec playwright test --shard=${{ matrix.shard }}/24
           echo "::endgroup::"
         env:
           # Give every Node process (API, web, the swc/tsc type-checker, and
           # Playwright) generous heap headroom on the 32 GB
           # ubicloud-standard-8 runner instead of V8's ~2 GB default old-space,
-          # so a heavy dev-mode e2e run never starves for memory.
-          NODE_OPTIONS: --max-old-space-size=8192
+          # so a heavy e2e run never starves for memory. Raised 8192->16384 with
+          # the +1000 wave: the API's V8 RegExp route-table compiler was OOMing
+          # at boot / mid-shard under the larger suite; 16 GB (still half the
+          # 32 GB box) removes that ceiling alongside the 24-shard split above.
+          NODE_OPTIONS: --max-old-space-size=16384
           # API
           DATABASE_TYPE: sqlite
           DATABASE_IN_MEMORY: 'true'
