@@ -78,6 +78,7 @@ describe('AgentScheduleDispatcherService', () => {
         };
         runRepo = {
             createQueued: jest.fn().mockResolvedValue({ id: 'run-1' }),
+            markDispatchFailed: jest.fn().mockResolvedValue(undefined),
         };
         trigger = { enqueue: jest.fn().mockResolvedValue({ runId: 'trd-1' }) };
         svc = new AgentScheduleDispatcherService(agentRepo, runRepo);
@@ -134,6 +135,59 @@ describe('AgentScheduleDispatcherService', () => {
         expect(summary.failed).toBe(1);
         expect(summary.entries[0].outcome).toBe('failed');
         expect(summary.entries[0].message).toMatch(/Trigger\.dev down/);
+    });
+
+    it('reconciles the pre-created AgentRun when heartbeat enqueue fails', async () => {
+        const agent = makeAgent();
+        agentRepo.findDueForHeartbeat.mockResolvedValueOnce([agent]);
+        agentRepo.tryClaimForRun.mockResolvedValueOnce(agent.nextHeartbeatAt);
+        trigger.enqueue.mockRejectedValueOnce(new Error('Trigger.dev down'));
+
+        await svc.dispatchDue(trigger);
+
+        // Without this the row stays `queued` forever and the next heartbeat
+        // adopts the orphan via findInFlightForAgent instead of recording the
+        // dispatch failure. Mirrors what dispatchOne already does.
+        expect(runRepo.markDispatchFailed).toHaveBeenCalledWith(
+            'run-1',
+            expect.stringContaining('dispatch-failed: Trigger.dev down'),
+        );
+    });
+
+    it('does NOT reconcile a run that was never created (claim lost before createQueued)', async () => {
+        const agent = makeAgent();
+        agentRepo.findDueForHeartbeat.mockResolvedValueOnce([agent]);
+        agentRepo.tryClaimForRun.mockResolvedValueOnce(null);
+
+        await svc.dispatchDue(trigger);
+
+        expect(runRepo.createQueued).not.toHaveBeenCalled();
+        expect(runRepo.markDispatchFailed).not.toHaveBeenCalled();
+    });
+
+    it('does NOT reconcile when the enqueue succeeded', async () => {
+        const agent = makeAgent();
+        agentRepo.findDueForHeartbeat.mockResolvedValueOnce([agent]);
+        agentRepo.tryClaimForRun.mockResolvedValueOnce(agent.nextHeartbeatAt);
+
+        await svc.dispatchDue(trigger);
+
+        expect(runRepo.markDispatchFailed).not.toHaveBeenCalled();
+    });
+
+    it('survives a reconciliation failure without derailing the dispatch loop', async () => {
+        const agent = makeAgent();
+        agentRepo.findDueForHeartbeat.mockResolvedValueOnce([agent]);
+        agentRepo.tryClaimForRun.mockResolvedValueOnce(agent.nextHeartbeatAt);
+        trigger.enqueue.mockRejectedValueOnce(new Error('Trigger.dev down'));
+        runRepo.markDispatchFailed.mockRejectedValueOnce(new Error('DB down'));
+
+        const summary = await svc.dispatchDue(trigger);
+
+        // The CAS claim must still be released even if reconciliation threw —
+        // otherwise the Agent stays stuck in RUNNING until the 30-min sweep.
+        expect(summary.failed).toBe(1);
+        expect(agentRepo.releaseAfterRun).toHaveBeenCalled();
     });
 
     it('Review-fix C11: releases the CAS claim when enqueue fails after a successful claim', async () => {
