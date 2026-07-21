@@ -33,6 +33,8 @@ import {
 } from './agent-ai-dispatch-facade';
 import { AgentMemoryFacadeService } from '../facades/agent-memory.facade';
 import { VisionContextService } from '../services/vision-context.service';
+import { createAgentRunAbortSource } from './agent-run-abort';
+import { isGenerationCancelledError } from '../utils/generation-cancellation.utils';
 import { redactSecrets } from '../utils/secret-scan';
 
 export interface AgentRunContext {
@@ -61,6 +63,12 @@ export interface AgentRunContext {
      * the triggering message (T6 chat-dedup posture).
      */
     chatMessageId?: string | null;
+    /**
+     * Trigger.dev's run AbortSignal, aborted when the run is cancelled. Optional:
+     * absent in unit tests and for runs executed outside a Trigger.dev task, in
+     * which case cooperative abort falls back to the throttled DB status read.
+     */
+    signal?: AbortSignal;
 }
 
 export interface AgentRunBudgetCheck {
@@ -74,14 +82,21 @@ export interface AgentRunBudgetCheck {
 
 export interface AgentRunExecuteResult {
     runId: string;
-    status: 'assembled' | 'budget-blocked' | 'agent-not-found' | 'dispatched' | 'dispatch-failed';
+    status:
+        | 'assembled'
+        | 'budget-blocked'
+        | 'agent-not-found'
+        | 'dispatched'
+        | 'dispatch-failed'
+        /** Cancelled mid-flight; the row is already 'cancelled' and no status was written. */
+        | 'cancelled';
     prompt?: AssembledPrompt;
     budgetCheck?: AgentRunBudgetCheck;
     /** Set when the LLM-dispatch path ran end-to-end. */
     outcome?: AgentRunOutcome;
     /** Set when the LLM-dispatch path ran end-to-end. */
     finalizeResult?: {
-        status: 'completed' | 'failed';
+        status: 'completed' | 'failed' | 'cancelled';
         postedMessageId?: string;
         finishedTaskStatus?: string;
     };
@@ -342,6 +357,23 @@ export class AgentRunService {
         }
 
         const dispatchResult = await this.runToolLoop(context, agent, prompt);
+        if (dispatchResult.cancelled) {
+            const finalizeResult = await this.finalize(
+                context,
+                { ...dispatchResult.outcome, cancelled: true },
+                memorySessionId,
+                agent,
+            );
+            return {
+                runId: context.runId,
+                status: 'cancelled',
+                prompt,
+                budgetCheck,
+                outcome: dispatchResult.outcome,
+                finalizeResult,
+                toolLoopIterations: dispatchResult.iterations,
+            };
+        }
         if (dispatchResult.errored) {
             const finalizeResult = await this.finalize(
                 context,
@@ -404,11 +436,22 @@ export class AgentRunService {
         prompt: AssembledPrompt,
     ): Promise<{
         errored: boolean;
+        /**
+         * The run was cancelled mid-flight. Distinct from `errored`: the DB row
+         * is already `cancelled`, so the caller must write no status and skip
+         * every externally-visible side effect.
+         */
+        cancelled?: boolean;
         errorMessage?: string;
         outcome: AgentRunOutcome;
         iterations: number;
     }> {
         const TOOL_LOOP_MAX_ITERATIONS = 10;
+        const abort = createAgentRunAbortSource({
+            runId: context.runId,
+            signal: context.signal,
+            readStatus: (id) => this.runs.findById(id).then((r) => r?.status ?? null),
+        });
         const editsThisRunByFile = new Set<string>();
         const baseDescriptors: AgentToolDescriptor[] = this.toolService
             ? this.toolService.resolveAllowedTools(agent, {
@@ -460,7 +503,11 @@ export class AgentRunService {
         try {
             while (iterations < TOOL_LOOP_MAX_ITERATIONS) {
                 iterations += 1;
+                // One checkpoint per model round-trip. Bounded at 10 by the cap
+                // above, and the DB is only read when the signal did not fire.
+                await abort.checkpoint();
                 const round = await this.aiDispatch!.dispatch({
+                    abortSignal: abort.signal,
                     messages,
                     tools: toolDefs.length > 0 ? toolDefs : undefined,
                     model: agent.modelId ?? undefined,
@@ -506,6 +553,10 @@ export class AgentRunService {
                 });
 
                 for (const call of round.toolCalls) {
+                    // Signal-only and synchronous — a tool round can be many
+                    // calls, and a DB read per call is not worth it. Anything
+                    // the signal misses is caught by the next loop checkpoint.
+                    abort.throwIfAborted();
                     const result = await this.invokeTool(context.runId, descriptorByName, call);
                     // Security (prompt-injection): tool results frequently
                     // carry attacker-controlled text (fetched web pages, repo
@@ -526,6 +577,30 @@ export class AgentRunService {
                 }
             }
         } catch (err) {
+            // Cancel wins over a coincident provider error: if the signal is
+            // aborted, whatever the provider threw is a consequence of the
+            // abort, not an independent failure. Misclassifying here would
+            // mark a user-cancelled run as failed and, on heartbeat, count it
+            // toward the agent's auto-pause threshold.
+            if (isGenerationCancelledError(err) || abort.aborted) {
+                this.logger.log(
+                    `Run ${context.runId} cancelled after ${iterations} model round-trip(s).`,
+                );
+                await this.runLogs
+                    .append({
+                        runId: context.runId,
+                        level: 'WARN',
+                        step: 'ai-dispatch',
+                        message: 'Run cancelled — stopped before completion.',
+                        metadata: { iteration: iterations, reason: 'cancelled' },
+                    })
+                    .catch(() => undefined);
+                // No parsed outcome — the loop stopped before a final
+                // assistant turn. Deliberately empty so finalize() has no
+                // replyBody / taskFinishStatus to act on even if the
+                // cancelled guard there were ever bypassed.
+                return { errored: false, cancelled: true, outcome: { errored: false }, iterations };
+            }
             const errorMessage = err instanceof Error ? err.message : String(err);
             // Security (secrets): the provider/tool error string can echo a
             // credential (e.g. an upstream gateway reflecting an Authorization
@@ -758,16 +833,32 @@ export class AgentRunService {
      */
     async finalize(
         context: AgentRunContext,
-        outcome: AgentRunOutcome,
+        outcome: AgentRunOutcome & { cancelled?: boolean },
         memorySessionId?: string | null,
         agent?: Agent | null,
     ): Promise<{
         runId: string;
-        status: 'completed' | 'failed';
+        status: 'completed' | 'failed' | 'cancelled';
         postedMessageId?: string;
         finishedTaskStatus?: string;
     }> {
         const summary = outcome.summary ?? null;
+
+        // Cancelled: the controller already CAS'd the row to 'cancelled', so
+        // write NO status here. markFailed/markCompleted would no-op against
+        // the CAS anyway, but they would also emit a misleading
+        // warnTerminalNoOp WARN on every user cancel.
+        //
+        // The CAS protects the row; it does NOT protect the side effects
+        // below. Skipping them is the point: a cancelled chat run must not
+        // post a reply, and a cancelled task run must not flip the Task to
+        // done. Both are externally visible and neither is undoable.
+        // Memory session close still happens — that is why abort routes
+        // through finalize() instead of returning early.
+        if (outcome.cancelled) {
+            await this.tryCloseMemorySession(memorySessionId, context, agent ?? null);
+            return { runId: context.runId, status: 'cancelled' };
+        }
 
         if (outcome.errored) {
             await this.runs

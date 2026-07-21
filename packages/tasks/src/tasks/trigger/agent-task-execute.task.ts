@@ -90,7 +90,9 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
     },
     run: async (
         payload: AgentTaskExecutePayload,
-        { ctx }: { ctx?: { run?: { id?: string } } } = {},
+        // NOTE: this annotation replaces the SDK RunFnParams, so anything omitted
+        // here is silently invisible — which is exactly how `signal` went unused.
+        { ctx, signal }: { ctx?: { run?: { id?: string } }; signal?: AbortSignal } = {},
     ) => {
         // Security: validate payload IDs before any DB access (defense-in-depth, mirrors agent-heartbeat)
         assertUuid(payload.agentId, 'payload.agentId');
@@ -198,6 +200,7 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                 agentId: agent.id,
                 userId: payload.userId,
                 kind: 'task',
+                signal,
                 taskId: payload.taskId,
                 immediateInput,
                 scopeContext: taskRow
