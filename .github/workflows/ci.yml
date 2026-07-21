@@ -27,12 +27,21 @@ env:
   NODE_OPTIONS: --max-old-space-size=6144
 
 jobs:
-  lint-and-test:
+  # Relocated out of `lint-and-test` (body unchanged). It used to run BEFORE
+  # `Check formatting` / `Build all packages` / `run test on all packages`, so a
+  # dependency advisory failed the job and reported those three as `skipped`
+  # rather than run. A red `lint-and-test` then meant "nothing was built or
+  # tested" — indistinguishable at a glance from a real test failure, which is
+  # how a broken spec sat unnoticed on develop for two months.
+  #
+  # As its own job the gate is exactly as strict (still a hard fail on
+  # HIGH/CRITICAL) but it can no longer mask the build/test signal, and the two
+  # surface as separate checks so the cause is obvious from the checks list.
+  #
+  # No `pnpm install` here on purpose: `pnpm audit` resolves from
+  # `pnpm-lock.yaml` alone, so this job is checkout + pnpm + audit.
+  dependency-audit:
     runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
-
-    strategy:
-      matrix:
-        node-version: [22.x]
 
     steps:
       - name: Checkout repository
@@ -45,14 +54,10 @@ jobs:
         with:
           version: 10.33.3
 
-      - name: Setup Node.js ${{ matrix.node-version }}
+      - name: Setup Node.js 22.x
         uses: actions/setup-node@v7
         with:
-          node-version: ${{ matrix.node-version }}
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+          node-version: 22.x
 
       # H-15: fail the build if any production transitive dep has a HIGH or
       # CRITICAL vulnerability. The existing `pnpm.overrides` block proves
@@ -92,6 +97,33 @@ jobs:
           fi
           echo "::error title=Dependency audit failed::pnpm audit reported HIGH/CRITICAL production vulnerabilities (or an unexpected error). See the output above."
           exit "$code"
+
+  lint-and-test:
+    runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
+
+    strategy:
+      matrix:
+        node-version: [22.x]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271  # v3
+        with:
+          version: 10.33.3
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Check formatting
         run: pnpm format:check
