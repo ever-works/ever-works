@@ -21,6 +21,7 @@ import { AgentAttachmentRepository } from '../database/repositories/attachment.r
 import { AgentsService } from './agents.service';
 import { AgentFileService } from './agent-file.service';
 import { AgentScheduleDispatcherService } from './agent-schedule-dispatcher.service';
+import { AgentRunSweeperService } from './agent-run-sweeper.service';
 import { AgentExportService } from './agent-export.service';
 import { PromptAssemblerService } from './prompt-assembler.service';
 import { AgentRunService } from './agent-run.service';
@@ -82,6 +83,7 @@ import { FacadesModule } from '../facades/facades.module';
         AgentsService,
         AgentFileService,
         AgentScheduleDispatcherService,
+        AgentRunSweeperService,
         AgentExportService,
         PromptAssemblerService,
         // PR-6 — company-vision prompt context for AgentRunService's
@@ -100,6 +102,7 @@ import { FacadesModule } from '../facades/facades.module';
         AgentsService,
         AgentFileService,
         AgentScheduleDispatcherService,
+        AgentRunSweeperService,
         AgentExportService,
         PromptAssemblerService,
         AgentRunService,

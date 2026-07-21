@@ -157,6 +157,18 @@ describe('agentHeartbeatTask — cancelled run accounting', () => {
         );
     });
 
+    it('abandons the run when markStarted loses the CAS, without executing', async () => {
+        // The row went terminal first — a user cancel, or the stuck-run sweeper
+        // reaping it. Executing anyway burns the work and then loses it, because
+        // the terminal write at the end no-ops against the same guard.
+        runs.markStarted.mockResolvedValueOnce(false);
+
+        const result = await registeredConfig.run(payload, { ctx: { run: { id: 'run_abc' } } });
+
+        expect(runner.execute).not.toHaveBeenCalled();
+        expect(result).toEqual(expect.objectContaining({ reason: 'run-already-terminal' }));
+    });
+
     it('still releases a completed run as completed', async () => {
         runner.execute.mockResolvedValueOnce({ status: 'dispatched' });
 
