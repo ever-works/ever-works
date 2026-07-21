@@ -122,6 +122,36 @@ export class GitFacadeService implements IGitFacade {
         }
     >();
     private readonly installationTokenRequests = new Map<string, Promise<string | null>>();
+    /**
+     * In-flight `cloneOrPull` calls, keyed by the repo they target.
+     *
+     * `cloneOrPull` is backed by isomorphic-git, which is a *pure JavaScript*
+     * git implementation: inflate, SHA-1 and packfile indexing all run on the
+     * main thread. Every concurrent call is therefore CPU contention on the
+     * single Node event loop, not overlapped I/O.
+     *
+     * Callers routinely fan out several requests for the SAME repo at once —
+     * e.g. WorkCacheWarmupService issues workItems/workConfig/workCount/
+     * workCategoriesTags in a `Promise.all`, and each independently resolves
+     * the same working copy. That produced two failures in production:
+     *
+     *   1. 4x redundant pure-JS git per work starved the event loop for tens
+     *      of seconds, so even the dependency-free /api/health/live route could
+     *      not be served and the kubelet SIGKILLed the pod (exit 137).
+     *   2. Those calls raced on one directory. `cloneOrPull` falls back to
+     *      `removeDirSafe(dir)` + re-clone when a pull fails, so one caller
+     *      could delete the working copy from under another, which then hit
+     *      `git.pull` on a dir with no remote configured and threw
+     *      "The function requires a 'remote OR url' parameter but none was
+     *      provided".
+     *
+     * Coalescing concurrent same-repo calls onto one promise fixes both: the
+     * git work happens once, and only one caller ever touches the directory.
+     * Entries are removed as soon as the operation settles, so this is an
+     * in-flight dedupe, never a cache — a later call still re-pulls and sees
+     * fresh commits.
+     */
+    private readonly cloneOrPullRequests = new Map<string, Promise<string>>();
 
     constructor(
         private readonly registry: PluginRegistryService,
@@ -717,7 +747,35 @@ export class GitFacadeService implements IGitFacade {
         options: GitFacadeOptions,
     ): Promise<string> {
         const { plugin, token } = await this.resolvePluginAndToken(options);
-        return plugin.cloneOrPull({ ...cloneOptions, token });
+
+        // Key on everything that selects a distinct working copy. `token` is
+        // deliberately NOT part of the key: it is a credential, not a
+        // coordinate, and two callers with different tokens still resolve to
+        // the same on-disk directory — sharing the in-flight operation is
+        // exactly what we want, and it keeps secrets out of map keys.
+        const key = [
+            plugin.id,
+            cloneOptions.owner,
+            cloneOptions.repo,
+            cloneOptions.branch ?? '',
+            cloneOptions.autoSwitchToMainBranch === false ? 'no-switch' : 'switch',
+        ].join(' ');
+
+        const inFlight = this.cloneOrPullRequests.get(key);
+        if (inFlight) {
+            this.logger.debug(
+                `Coalescing concurrent cloneOrPull for ${cloneOptions.owner}/${cloneOptions.repo} onto the in-flight request`,
+            );
+            return inFlight;
+        }
+
+        const request = plugin.cloneOrPull({ ...cloneOptions, token }).finally(() => {
+            this.cloneOrPullRequests.delete(key);
+        });
+
+        this.cloneOrPullRequests.set(key, request);
+
+        return request;
     }
 
     async pull(
