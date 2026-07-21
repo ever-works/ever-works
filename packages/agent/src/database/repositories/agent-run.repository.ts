@@ -260,13 +260,6 @@ export class AgentRunRepository {
         if (!ok) await this.warnTerminalNoOp(runId, 'markDispatchFailed');
     }
 
-    async markCancelled(runId: string): Promise<void> {
-        await this.repository.update(runId, {
-            status: 'cancelled',
-            finishedAt: new Date(),
-        });
-    }
-
     /**
      * Persist the agent-memory session id once `AgentRunService.execute()`
      * has opened a session at the start of the run. Best-effort — if
