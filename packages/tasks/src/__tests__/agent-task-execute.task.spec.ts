@@ -120,7 +120,8 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
             findById: vi.fn().mockResolvedValue(null),
             findInFlightForTaskAgent: vi.fn().mockResolvedValue(null),
             createQueued: vi.fn().mockResolvedValue({ id: 'run-1' }),
-            markStarted: vi.fn().mockResolvedValue(undefined),
+            // Returns the CAS result — the task bails when the claim is lost.
+            markStarted: vi.fn().mockResolvedValue(true),
             markCompleted: vi.fn().mockResolvedValue(undefined),
             markFailed: vi.fn().mockResolvedValue(undefined),
         };
