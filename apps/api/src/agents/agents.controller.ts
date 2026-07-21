@@ -764,9 +764,12 @@ export class AgentsController {
             // assign-task calls (because the queued row passes its
             // "in flight" filter). Mark it failed so retries can
             // re-dispatch cleanly.
+            // FU-3: markDispatchFailed is `queued`-only — if this enqueue threw
+            // on a timeout but was nevertheless accepted, the worker owns the
+            // row from `markStarted` onwards and the rollback must no-op.
             const message = err instanceof Error ? err.message : String(err);
             await this.agentRuns
-                .markFailed(run.id, `enqueue-failed: ${message}`)
+                .markDispatchFailed(run.id, `enqueue-failed: ${message}`)
                 .catch(() => undefined);
             throw new InternalServerErrorException(`assign-task enqueue failed: ${message}`);
         }

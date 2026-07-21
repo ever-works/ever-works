@@ -1,0 +1,62 @@
+name: Release Prod
+
+# Mirrors ever-co/ever-gauzy .github/workflows/release-prod.yml.
+#
+# This workflow creates the RELEASE RECORD (git tag + GitHub release with
+# generated notes) on every push to the production branch. It deliberately does
+# NOT deploy anything: k8s-build.yml fires on the same push and publishes the
+# :prod / :sha-<sha> images, and ArgoCD Image Updater rolls them out. Keeping
+# the two decoupled is the ever-gauzy convention — the tag documents what
+# shipped, it does not gate shipping.
+on:
+  push:
+    branches:
+      - main
+      - master
+
+# ever-works house style (see release-trigger-*.yml "M-12"): declare the
+# minimum explicitly rather than inheriting the org default. Pushing a tag and
+# creating a release both need contents: write.
+permissions:
+  contents: write
+
+# Serialize releases per branch. cancel-in-progress is deliberately FALSE:
+# cancelling a half-finished tag bump loses a release, and cascades push
+# several commits in quick succession.
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 300
+
+    strategy:
+      matrix:
+        os: ["${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}"]
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Bump version and push tag
+        uses: mathieudutour/github-tag-action@v6.1
+        id: tag_version
+        with:
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          release_branches: master,main,develop,stage
+          pre_release_branches: something_to_possible_use_later
+
+      - name: Create a GitHub release
+        uses: ncipollo/release-action@v1
+        with:
+          allowUpdates: true
+          generateReleaseNotes: true
+          prerelease: false
+          token: ${{ secrets.GITHUB_TOKEN }}
+          tag: ${{ steps.tag_version.outputs.new_tag }}
+          name: ${{ steps.tag_version.outputs.new_tag }}
+          body: ${{ steps.tag_version.outputs.changelog }}

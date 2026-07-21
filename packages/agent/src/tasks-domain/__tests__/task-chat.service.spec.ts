@@ -155,7 +155,7 @@ describe('TaskChatService', () => {
         it('transitions AgentRun to failed and does not fail comment posting if enqueue throws', async () => {
             const runs = {
                 createQueued: jest.fn().mockResolvedValue({ id: 'run-chat-1' }),
-                markFailed: jest.fn().mockResolvedValue(undefined),
+                markDispatchFailed: jest.fn().mockResolvedValue(undefined),
             };
             const chatDispatcher = {
                 enqueue: jest.fn().mockRejectedValue(new Error('Trigger.dev down')),
@@ -188,16 +188,16 @@ describe('TaskChatService', () => {
 
             // Pin the `dispatch-failed:` prefix, not just the underlying cause —
             // it is what surfaces in the Activity tab for an orphaned run.
-            expect(runs.markFailed).toHaveBeenCalledWith(
+            expect(runs.markDispatchFailed).toHaveBeenCalledWith(
                 'run-chat-1',
                 expect.stringContaining('dispatch-failed: Trigger.dev down'),
             );
         });
 
-        it('does not attempt markFailed when the queued run was never created', async () => {
+        it('does not attempt markDispatchFailed when the queued run was never created', async () => {
             const runs = {
                 createQueued: jest.fn().mockRejectedValue(new Error('DB down')),
-                markFailed: jest.fn().mockResolvedValue(undefined),
+                markDispatchFailed: jest.fn().mockResolvedValue(undefined),
             };
             const chatDispatcher = { enqueue: jest.fn().mockResolvedValue({ runId: 'trd-1' }) };
             const dispatchingSvc = new TaskChatService(
@@ -229,7 +229,7 @@ describe('TaskChatService', () => {
             // `run` is still null here, so the `if (run)` guard must short-circuit.
             // Without it this path throws TypeError on `run.id`.
             expect(chatDispatcher.enqueue).not.toHaveBeenCalled();
-            expect(runs.markFailed).not.toHaveBeenCalled();
+            expect(runs.markDispatchFailed).not.toHaveBeenCalled();
         });
 
         it('gracefully handles enqueue failures when runs repository is missing', async () => {

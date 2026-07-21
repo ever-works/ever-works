@@ -1,10 +1,28 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import { AgentRun, AgentRunStatus, AgentRunTriggerKind } from '../../entities/agent-run.entity';
+
+/**
+ * Statuses a run may be transitioned OUT OF by a normal terminal write.
+ * Anything already terminal (`completed` / `failed` / `cancelled`) is left
+ * alone — see {@link AgentRunRepository.casTerminal}.
+ */
+const NON_TERMINAL: AgentRunStatus[] = ['queued', 'running'];
+
+/**
+ * Dispatch rollback may only touch a run that has NOT been picked up yet.
+ * `running` is deliberately excluded: if `enqueue()` threw on a timeout but
+ * Trigger.dev had in fact accepted the job, the worker is already executing
+ * and marking it failed would stomp a live run.
+ */
+const QUEUED_ONLY: AgentRunStatus[] = ['queued'];
 
 @Injectable()
 export class AgentRunRepository {
+    private readonly logger = new Logger(AgentRunRepository.name);
+
     constructor(
         @InjectRepository(AgentRun)
         private readonly repository: Repository<AgentRun>,
@@ -152,34 +170,94 @@ export class AgentRunRepository {
         });
     }
 
-    async markCompleted(runId: string, summary: string | null): Promise<void> {
+    /**
+     * FU-3 — atomic terminal transition, shared by {@link markCompleted},
+     * {@link markFailed} and {@link markDispatchFailed}.
+     *
+     * These were previously a `findOne` (for `durationMs`) followed by an
+     * unconditional `update(runId, …)` keyed on the primary key alone, so any
+     * of them could overwrite a status a concurrent writer had already
+     * committed:
+     *
+     *  - a dispatch-failure rollback whose `enqueue()` timed out *after*
+     *    Trigger.dev accepted the job would stomp the now-`running` run;
+     *  - `AgentRunService.finalize()` would erase a user's `cancelled` with
+     *    `failed` or `completed`, because cancelling does not stop the worker.
+     *
+     * Same CAS-style WHERE clause {@link cancel} already uses. Returns whether
+     * the row was actually transitioned so callers can report a no-op: there is
+     * NO `agent_runs` sweeper (`recoverStuckRunning()` only touches `agents`
+     * rows), so a silent miss would be both unrecoverable and invisible.
+     *
+     * The `durationMs` read stays non-atomic on purpose (applies equally to
+     * `markFailed` and `markCompleted`). `startedAt` is read before the CAS
+     * write, so a `markStarted` landing in that gap is read as `null` and
+     * `durationMs` is stored as `null` for a run that technically did start.
+     * That is acceptable: to hit the window `markStarted` must land between the
+     * two round-trips, which means the run had been executing for ~0 ms anyway,
+     * so `null` and `0` carry the same information. Closing it properly needs
+     * the subtraction pushed into SQL (`RETURNING`, or `finishedAt - startedAt`
+     * as an expression), which is dialect-specific — the e2e suite runs on
+     * sqlite while production is Postgres — so it would trade a cosmetic
+     * reporting gap for a real portability hazard. `durationMs` is a reporting
+     * field only; nothing branches on it.
+     */
+    private async casTerminal(
+        runId: string,
+        allowedFrom: AgentRunStatus[],
+        patch: QueryDeepPartialEntity<AgentRun>,
+    ): Promise<boolean> {
         const now = new Date();
         const run = await this.repository.findOne({
             where: { id: runId },
             select: ['id', 'startedAt'],
         });
         const durationMs = run?.startedAt ? now.getTime() - run.startedAt.getTime() : null;
-        await this.repository.update(runId, {
-            status: 'completed',
-            finishedAt: now,
-            durationMs,
-            summary,
-        });
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(AgentRun)
+            .set({ ...patch, finishedAt: now, durationMs })
+            .where('id = :id', { id: runId })
+            .andWhere('status IN (:...statuses)', { statuses: allowedFrom })
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Log a CAS no-op with the status that actually won, so an operator can
+     * tell "row vanished" from "a worker beat us to it".
+     */
+    private async warnTerminalNoOp(runId: string, intent: string): Promise<void> {
+        const fresh = await this.repository
+            .findOne({ where: { id: runId }, select: ['id', 'status'] })
+            .catch(() => null);
+        this.logger.warn(
+            `AgentRun ${runId}: ${intent} skipped — row is ${fresh ? `already '${fresh.status}'` : 'missing'}.`,
+        );
+    }
+
+    async markCompleted(runId: string, summary: string | null): Promise<void> {
+        const ok = await this.casTerminal(runId, NON_TERMINAL, { status: 'completed', summary });
+        if (!ok) await this.warnTerminalNoOp(runId, 'markCompleted');
     }
 
     async markFailed(runId: string, errorMessage: string): Promise<void> {
-        const now = new Date();
-        const run = await this.repository.findOne({
-            where: { id: runId },
-            select: ['id', 'startedAt'],
-        });
-        const durationMs = run?.startedAt ? now.getTime() - run.startedAt.getTime() : null;
-        await this.repository.update(runId, {
-            status: 'failed',
-            finishedAt: now,
-            durationMs,
-            errorMessage,
-        });
+        const ok = await this.casTerminal(runId, NON_TERMINAL, { status: 'failed', errorMessage });
+        if (!ok) await this.warnTerminalNoOp(runId, 'markFailed');
+    }
+
+    /**
+     * Roll a pre-created run back to `failed` after the external enqueue threw.
+     *
+     * Narrower than {@link markFailed} by design — only a still-`queued` run may
+     * be rolled back. Callers create the row, then enqueue; if the enqueue call
+     * fails but the job was nevertheless accepted, the worker owns the row from
+     * `markStarted` onwards and this must become a no-op rather than killing a
+     * live run.
+     */
+    async markDispatchFailed(runId: string, errorMessage: string): Promise<void> {
+        const ok = await this.casTerminal(runId, QUEUED_ONLY, { status: 'failed', errorMessage });
+        if (!ok) await this.warnTerminalNoOp(runId, 'markDispatchFailed');
     }
 
     async markCancelled(runId: string): Promise<void> {
