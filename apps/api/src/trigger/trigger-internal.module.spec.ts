@@ -36,6 +36,24 @@ jest.mock('../data-sync/data-sync.module', () => ({
 jest.mock('@ever-works/agent/missions', () => ({
     MissionsModule: class MissionsModule {},
 }));
+// PR-8 — trigger-internal.module imports GoalsModule, and the controller it
+// declares imports GoalEvaluationService, from the goals barrel. That barrel
+// reaches facades/metrics.facade -> usage/plugin-usage.service, which imports
+// `@src/database/repositories/plugin-usage.repository`. `@src/*` is an alias in
+// BOTH packages; apps/api's jest maps it to apps/api/src, where that module
+// does not exist, so the suite failed to run outright. Stub the barrel — both
+// symbols, since this spec loads the module and the module loads the controller.
+jest.mock('@ever-works/agent/goals', () => ({
+    GoalsModule: class GoalsModule {},
+    GoalEvaluationService: class GoalEvaluationService {},
+}));
+// Same class of breakage, different chain: work-agent.module -> database.module
+// -> database.config, which imports `@src/config`. The controller spec already
+// stubs this barrel (for IdeaBuildExecutorService); the module spec needs
+// WorkAgentModule from it.
+jest.mock('@ever-works/agent/work-agent', () => ({
+    WorkAgentModule: class WorkAgentModule {},
+}));
 // FU-2 post-CI fix: trigger-internal.module imports AgentsModule +
 // TasksDomainModule (added by PR #1019). Stub them to avoid pulling
 // the entity transitive imports under jest.

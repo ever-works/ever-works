@@ -49,6 +49,17 @@ jest.mock('@ever-works/agent/missions', () => ({
 jest.mock('@ever-works/agent/work-agent', () => ({
     IdeaBuildExecutorService: class IdeaBuildExecutorService {},
 }));
+// PR-8 — the controller now imports GoalEvaluationService from the goals
+// barrel. That barrel is the deepest chain yet: goals.service ->
+// goal-evaluation.service -> facades/metrics.facade -> usage/plugin-usage.service,
+// which imports `@src/database/repositories/plugin-usage.repository`. The
+// `@src/*` alias belongs to BOTH packages, and apps/api's jest maps it to
+// apps/api/src, where that module does not exist — so the suite died with
+// "Could not locate module ... mapped as apps/api/src/$1" before a single test
+// ran. Stub the barrel, same as every sibling above.
+jest.mock('@ever-works/agent/goals', () => ({
+    GoalEvaluationService: class GoalEvaluationService {},
+}));
 jest.mock('@ever-works/agent/notifications', () => ({
     NotificationService: class NotificationService {},
 }));
