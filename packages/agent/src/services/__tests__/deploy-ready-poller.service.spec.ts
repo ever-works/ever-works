@@ -188,9 +188,9 @@ describe('DeployReadyPollerService.pollOnce', () => {
                 .mockResolvedValue({ status: 200 }) as unknown as typeof fetch;
             const { service } = buildService([work], httpFetch);
 
-            await expect(
-                service.pollOnce({ fetch: httpFetch, now: () => NOW }),
-            ).rejects.toThrow(/host not configured/);
+            await expect(service.pollOnce({ fetch: httpFetch, now: () => NOW })).rejects.toThrow(
+                /host not configured/,
+            );
             expect(httpFetch).not.toHaveBeenCalled();
         });
 
