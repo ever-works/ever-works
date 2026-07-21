@@ -250,7 +250,7 @@ export class TaskTransitionService {
                 );
                 if (run) {
                     try {
-                        await this.runs?.markFailed(run.id, `dispatch-failed: ${message}`);
+                        await this.runs?.markDispatchFailed(run.id, `dispatch-failed: ${message}`);
                     } catch (failErr) {
                         this.logger.warn(
                             `Failed to mark orphan AgentRun ${run.id} failed: ${failErr}`,

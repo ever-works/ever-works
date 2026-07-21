@@ -48,7 +48,7 @@ describe('TaskTransitionService — Phase 15.3 agent dispatch hook', () => {
         assignees = { findAgentAssignees: jest.fn().mockResolvedValue([]) };
         runs = {
             createQueued: jest.fn().mockResolvedValue({ id: 'r1' }),
-            markFailed: jest.fn().mockResolvedValue(undefined),
+            markDispatchFailed: jest.fn().mockResolvedValue(undefined),
         };
         dispatcher = { enqueue: jest.fn().mockResolvedValue({ runId: 'trd-1' }) };
     });
@@ -143,7 +143,7 @@ describe('TaskTransitionService — Phase 15.3 agent dispatch hook', () => {
         await new Promise((r) => setImmediate(r));
         // The `dispatch-failed:` prefix is the contract the Activity tab and any
         // future triage tooling reads — pin it, not just the underlying cause.
-        expect(runs.markFailed).toHaveBeenCalledWith(
+        expect(runs.markDispatchFailed).toHaveBeenCalledWith(
             'r1',
             expect.stringContaining('dispatch-failed: Trigger.dev down'),
         );
@@ -164,7 +164,7 @@ describe('TaskTransitionService — Phase 15.3 agent dispatch hook', () => {
         expect(result.status).toBe(TaskStatus.IN_PROGRESS); // transition itself succeeded
         await new Promise((r) => setImmediate(r));
 
-        expect(runs.markFailed).not.toHaveBeenCalled();
+        expect(runs.markDispatchFailed).not.toHaveBeenCalled();
         // The `if (run)` guard is load-bearing: without it the catch block
         // dereferences a null `run`, and because the fan-out `for` loop awaits
         // each iteration that TypeError escapes the loop and silently strands
@@ -200,6 +200,6 @@ describe('TaskTransitionService — Phase 15.3 agent dispatch hook', () => {
         expect(dispatcher.enqueue).toHaveBeenCalledWith(
             expect.objectContaining({ runId: undefined }),
         );
-        expect(runs.markFailed).not.toHaveBeenCalled();
+        expect(runs.markDispatchFailed).not.toHaveBeenCalled();
     });
 });
