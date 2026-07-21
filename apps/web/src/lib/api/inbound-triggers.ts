@@ -45,36 +45,36 @@ export interface InboundTriggerWithSecret {
 
 export const inboundTriggersAPI = {
     list: async (): Promise<InboundTriggerView[]> => {
-        const res = await serverFetch<{ triggers: InboundTriggerView[] }>('/api/inbound-triggers');
+        const res = await serverFetch<{ triggers: InboundTriggerView[] }>('/inbound-triggers');
         return res.triggers;
     },
 
     create: async (input: CreateInboundTriggerInput): Promise<InboundTriggerWithSecret> => {
-        return serverFetch<InboundTriggerWithSecret>('/api/inbound-triggers', {
+        return serverFetch<InboundTriggerWithSecret>('/inbound-triggers', {
             method: 'POST',
             body: JSON.stringify(input),
         });
     },
 
     rotateSecret: async (id: string): Promise<InboundTriggerWithSecret> => {
-        return serverFetch<InboundTriggerWithSecret>(`/api/inbound-triggers/${id}/rotate-secret`, {
+        return serverFetch<InboundTriggerWithSecret>(`/inbound-triggers/${id}/rotate-secret`, {
             method: 'POST',
         });
     },
 
     pause: async (id: string): Promise<InboundTriggerView> => {
-        return serverFetch<InboundTriggerView>(`/api/inbound-triggers/${id}/pause`, {
+        return serverFetch<InboundTriggerView>(`/inbound-triggers/${id}/pause`, {
             method: 'POST',
         });
     },
 
     resume: async (id: string): Promise<InboundTriggerView> => {
-        return serverFetch<InboundTriggerView>(`/api/inbound-triggers/${id}/resume`, {
+        return serverFetch<InboundTriggerView>(`/inbound-triggers/${id}/resume`, {
             method: 'POST',
         });
     },
 
     remove: async (id: string): Promise<void> => {
-        await serverFetch<void>(`/api/inbound-triggers/${id}`, { method: 'DELETE' });
+        await serverFetch<void>(`/inbound-triggers/${id}`, { method: 'DELETE' });
     },
 };
