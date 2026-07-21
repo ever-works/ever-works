@@ -331,6 +331,15 @@ jobs:
           # exercise their real branches, and the e2e magic-link.spec.ts
           # specs run against a live email round-trip via MailHog.
           MAGIC_LINK_ENABLED: 'true'
+          # Platform-admin bootstrap (EW-743 Phase A). Grants isPlatformAdmin
+          # on register to users whose email matches this glob, so the operator
+          # admin specs (admin-tenant-runtime-allowlist / tenant-job-runtime) can
+          # drive the IsPlatformAdminGuard'd surfaces without an out-of-band DB
+          # write. The glob is 'e2e-admin-*@test.local' (prefix e2e-admin- +
+          # suffix @test.local): ONLY dedicated e2e-admin-<suffix> users are
+          # elevated — regular fresh test users (e2e-<random>@test.local) do NOT
+          # match, so admin-isolation specs stay valid. Prod never sets this.
+          EVER_WORKS_BOOTSTRAP_PLATFORM_ADMIN_EMAILS: 'e2e-admin-*@test.local'
           # OAuth â€” register test sentinels so the providers appear in
           # /api/auth/providers and the OAuth-flow specs can reach
           # /api/oauth/<provider>/authorize. The actual github.com /

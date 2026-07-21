@@ -11,8 +11,9 @@ import { listPluginsViaAPI, getPluginViaAPI } from './helpers/plugins';
  *
  *   - systemPlugin ⇒ ALWAYS enabled (regardless of autoEnable) and CANNOT be
  *     disabled at user OR work level (400 with the same canonical message).
- *   - the `builtIn` flag, `visibility` (public | user-only | hidden) and
- *     `defaultForCapabilities` projection on the response.
+ *   - the `builtIn` flag, `visibility` (public | user-only | operator surface
+ *     in the list; hidden is filtered) and `defaultForCapabilities` projection
+ *     on the response.
  *   - a clean contrast with NON-system plugins (which enable/disable freely).
  *
  * Every shape below was PROBED against the LIVE stack (http://127.0.0.1:3100)
@@ -346,13 +347,19 @@ test.describe('Plugin system-plugin rules', () => {
         expect(single.pluginId, 'single GET pluginId mirrors id').toBe(anchor.id);
     });
 
-    test('Flow 5: visibility & builtIn invariants — public/user-only are valid, hidden is filtered, every system plugin is builtIn', async ({
+    test('Flow 5: visibility & builtIn invariants — public/user-only/operator are valid, hidden is filtered, every system plugin is builtIn', async ({
         request,
     }) => {
         const token = await freshToken(request);
         const { plugins } = await rawPluginList(request, token);
 
-        const VALID_VISIBILITY = new Set(['public', 'user-only', 'hidden']);
+        // PROBED: the list surfaces every plugin whose manifest visibility is
+        // NOT 'hidden' (plugin-operations.service.listPlugins filters ONLY
+        // 'hidden'). Alongside 'public' and 'user-only', the build ships
+        // 'operator'-visibility plugins (job-runtime-* / secret-store-*), so the
+        // valid-visibility universe for the list is these three — 'hidden' is the
+        // one value that is filtered and must never appear (asserted below).
+        const VALID_VISIBILITY = new Set(['public', 'user-only', 'operator']);
         const seenVisibilities = new Set<string>();
 
         for (const p of plugins) {

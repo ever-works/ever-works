@@ -114,15 +114,17 @@ test.describe('Agent lifecycle — status state machine', () => {
         const agent = await createAgentViaAPI(request, token, { name, scope: 'tenant' });
         expect(agent.status).toBe('draft');
 
-        // --- DRAFT renders as the detail Summary status value. ---
+        // --- DRAFT renders as the detail hero's status badge. ---
         // The dashboard tab is the default landing surface for /agents/:id and
-        // shows a "Status" <dt>/<dd> pair (page.tsx). The <dd> is `capitalize`
-        // styled, so the *text content* stays the raw lowercase status word.
+        // renders the status as a pill badge that sits immediately after the
+        // agent-name <h2> in the overview hero (page.tsx) — there is no
+        // <dt>/<dd> Status pair. The badge text is `{agent.status}` verbatim;
+        // the `uppercase` class is presentational only, so the DOM text content
+        // stays the raw lowercase status word ('draft'/'active'/'paused').
         await page.goto(`/agents/${agent.id}`, { waitUntil: 'domcontentloaded' });
-        await expect(page.getByText(name).first()).toBeVisible({ timeout: 30_000 });
-        const statusValue = page
-            .locator('dt', { hasText: /^Status$/ })
-            .locator('xpath=following-sibling::dd[1]');
+        const heroHeading = page.getByRole('heading', { name, level: 2 }).first();
+        await expect(heroHeading).toBeVisible({ timeout: 30_000 });
+        const statusValue = heroHeading.locator('xpath=following-sibling::span[1]');
         await expect(statusValue).toHaveText(/draft/i, { timeout: 30_000 });
 
         // --- Drive the transition through the REAL lifecycle endpoint that the

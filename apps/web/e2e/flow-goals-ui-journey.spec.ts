@@ -556,20 +556,29 @@ test.describe('Goals — /goals/new create form (UI)', () => {
             timeout: 30_000,
         });
 
-        await page.getByLabel('Title').fill(title);
+        // The `/goals/new` route is a first-hit compile in CI; wait for the
+        // client form to actually be present (Title input visible) before we
+        // start filling, so the fills never race the cold render/hydration.
+        const titleInput = page.getByLabel('Title');
+        await expect(titleInput).toBeVisible({ timeout: 30_000 });
+        await titleInput.fill(title);
         await page.getByLabel('Provider plugin ID').fill('stripe');
         await page.getByLabel('Metric ID').fill('income');
         await page.getByLabel('Target value').fill('2500');
         await page.getByLabel('Unit').fill('usd');
         await page.getByRole('button', { name: 'Create Goal' }).click();
 
-        // Server action creates the draft and routes to its detail page.
-        await page.waitForURL(/\/goals\/[0-9a-f]{8}-[0-9a-f]{4}-/, { timeout: 30_000 });
+        // Server action creates the draft and routes to its detail page via a
+        // client soft-nav (`router.push`). Use toHaveURL (auto-retrying) rather
+        // than waitForURL('load') — the load event never re-fires on a soft nav.
+        await expect(page).toHaveURL(/\/goals\/[0-9a-f]{8}-[0-9a-f]{4}-/, { timeout: 30_000 });
         await expect(page.getByRole('heading', { name: title, level: 1 })).toBeVisible({
             timeout: 30_000,
         });
-        // Fresh draft: the metric value + comparator we entered are shown.
-        await expect(page.getByText('2,500 usd').first()).toBeVisible();
+        // Fresh draft: the metric value + comparator we entered are shown. The
+        // `/goals/[id]` detail is another first-hit compile, so give the target
+        // value line a generous window (the default expect timeout is only 5s).
+        await expect(page.getByText('2,500 usd').first()).toBeVisible({ timeout: 30_000 });
 
         // And it now appears back in the catalog.
         await page.goto('/en/goals', { waitUntil: 'domcontentloaded' });

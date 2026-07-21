@@ -202,20 +202,42 @@ test.describe('flow: device-auth ⟂ plugin-oauth are orthogonal per-user namesp
             expect(c.body.connected, `${p.id} still not connected after device start`).toBe(false);
         }
 
+        // Reference: the DEVICE-surface state produced by the start. This is
+        // env-adaptive — where the Codex CLI is absent (local + the keyless CI
+        // driver's usual state) `start` is a no-op `pending:false`; where the
+        // CLI is present or installable (a CI worker that cached/downloaded the
+        // codex binary) `start` legitimately spawns a `pending:true` device-code
+        // session (packages/plugins/codex/src/device-auth.ts:startDeviceAuth →
+        // ensureBinary → spawn `codex login --device-auth`). We assert the OAuth
+        // probe does not PERTURB this state, not a fixed `pending:false`.
+        const deviceAfterStart = await getDeviceStatus(request, token);
+
         // Now mutate the OAUTH surface (connect/url — 400 unconfigured here) and
-        // confirm the device session bit is likewise unaffected: the two
-        // namespaces do not share state.
+        // confirm the device session is likewise unaffected: the two namespaces
+        // do not share state.
         const connect = await request.get(`${API_BASE}/api/oauth/github/connect/url`, {
             headers: authedHeaders(token),
         });
         expect(connect.status(), 'oauth connect/url is a clean non-5xx').toBeLessThan(500);
         const deviceAfter = await getDeviceStatus(request, token);
+        // An OAuth GET never installs/uninstalls the Codex CLI, nor connects the
+        // device session — both bits are owned by the codex subprocess, not oauth.
         expect(deviceAfter.installed, 'device install bit stable across oauth probe').toBe(
-            deviceBefore.installed,
+            deviceAfterStart.installed,
         );
-        expect(deviceAfter.pending, 'oauth probe did not create a pending device session').toBe(
-            false,
+        expect(deviceAfter.connected, 'oauth probe never connects the device session').toBe(
+            deviceAfterStart.connected,
         );
+        // Orthogonality core: probing OAuth can never SPIN UP a device session.
+        // Any pending session observed after the probe must have already existed
+        // (from the start), so this holds whether Codex is absent (both false) or
+        // present (session predates the probe) — never `false → true` via oauth.
+        if (deviceAfter.pending) {
+            expect(
+                deviceAfterStart.pending,
+                'oauth probe did not create a pending device session',
+            ).toBe(true);
+        }
     });
 
     test('an idempotent OAuth disconnect (204 twice) leaves the codex device-auth status completely unchanged', async ({

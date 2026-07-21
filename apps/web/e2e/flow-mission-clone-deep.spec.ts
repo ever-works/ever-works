@@ -46,13 +46,13 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *      a partial field set; this pins schedule/cap/autoBuild/guardrails both
  *      ways and re-GETs both rows after each direction).
  *   5. NO acceptedWork / idea / work linkage is carried over — the cloned
- *      mission DTO carries EXACTLY the 14 modeled columns and no extra linkage
+ *      mission DTO carries EXACTLY the 16 modeled columns and no extra linkage
  *      key, its Mission-scoped Idea list is empty, and it gets its OWN
  *      zero-state budget bucket keyed on the CLONE's id (a cross-feature angle
  *      the budget spec, which never clones, does not cover).
  *
  * ── PROBED LIVE (http://127.0.0.1:3100, 2026-06-12) ──
- *   POST /api/me/missions                       → 201 MissionDto (14 keys)
+ *   POST /api/me/missions                       → 201 MissionDto (16 keys)
  *   POST /api/me/missions/:id/clone  {title?}    → 201 { mission, ideasCloned, ideasSkipped }
  *     · copies: description,type,schedule,autoBuildWorks,outstandingIdeasCap(-1 too),
  *               guardrailsOverride,missionTemplateRepo  (verbatim)
@@ -73,14 +73,20 @@ const UNKNOWN_UUID = '00000000-0000-0000-0000-000000000000';
 
 // The complete modeled mission-DTO key set — used to prove the clone carries
 // NO extra linkage column (acceptedWork / ideaIds / workIds / etc.).
+// This is the FULL 16-key projection emitted by `toMissionDto`
+// (packages/agent/src/missions/types.ts) — the `outcome` + `completedAt`
+// pair was added by the PR-3 domain-model evolution and is present on every
+// mission DTO (null until a human records a conclusion at Complete).
 const MISSION_KEYS = [
     'autoBuildWorks',
+    'completedAt',
     'createdAt',
     'description',
     'guardrailsOverride',
     'id',
     'missionRepo',
     'missionTemplateRepo',
+    'outcome',
     'outstandingIdeasCap',
     'schedule',
     'sourceMissionId',
@@ -96,6 +102,8 @@ interface MissionDto {
     description: string;
     type: 'one-shot' | 'scheduled';
     status: 'active' | 'paused' | 'completed' | 'failed';
+    outcome: string | null;
+    completedAt: string | null;
     schedule: string | null;
     autoBuildWorks: boolean;
     outstandingIdeasCap: number | null;
@@ -618,7 +626,7 @@ test.describe('Mission clone — deep copy-vs-reset semantics', () => {
 
     /**
      * NO acceptedWork / idea / work linkage is carried over: the cloned mission
-     * DTO carries EXACTLY the 14 modeled columns (no linkage key), and its
+     * DTO carries EXACTLY the 16 modeled columns (no linkage key), and its
      * Mission-scoped Idea list is empty (the owner's standalone unlinked Idea
      * never surfaces on it).
      */

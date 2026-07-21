@@ -109,13 +109,19 @@ export async function createOrganizationViaUI(page: Page, name: string): Promise
     await nameInput.fill(name);
 
     await page.waitForTimeout(600); // let the debounced slug check settle
-    await page.getByRole('button', { name: 'Create', exact: true }).click();
 
-    const emptyOption = page.getByText('Start empty', { exact: false });
-    if (await emptyOption.isVisible({ timeout: 4_000 }).catch(() => false)) {
-        await emptyOption.click();
-        await page.getByRole('button', { name: 'Continue', exact: true }).click();
+    // The org-template list is now inline in the create modal. The "Start
+    // empty" (blank) card is the default selection; click it by its stable
+    // testid to be explicit — the visible "Start empty — add teams…"
+    // description is a non-interactive <div>, not the clickable target, so
+    // clicking the text hangs. Prebuilt-company templates are the other cards.
+    const blank = page.getByTestId('org-template-chip-blank');
+    if (await blank.isVisible({ timeout: 4_000 }).catch(() => false)) {
+        await blank.click();
     }
+
+    // Submit via the stable testid (the button label is locale-dependent).
+    await page.getByTestId('org-create-submit').click();
 
     await page.waitForURL(/\/[^/]+\/dashboard(\?|$)/, { timeout: 30_000 });
 }

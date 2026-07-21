@@ -1,4 +1,5 @@
 import { test, expect } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
 /**
  * EW-742 P2.2 T19 — e2e for the tenant job-runtime settings page,
@@ -18,9 +19,51 @@ import { test, expect } from '@playwright/test';
  * The test deliberately does NOT submit the form (would require a
  * working secret-store wired in test env). Submit-then-verify-audit
  * is layered on top once a fixture seed exists.
+ *
+ * NOTE on the pickers: the form renders every picker as a custom
+ * `Select` (a <button> trigger + a portalled role="listbox" panel —
+ * see components/ui/select.tsx), NOT a native <select>. Playwright's
+ * `selectOption()` only drives native <select> and `locator('select')`
+ * matches nothing here, so we open a picker by its stable testid and
+ * click the `role="option"` row keyed by `data-value`.
  */
 
 const PAGE = '/en/settings/job-runtime';
+
+const PROVIDER_PICKER = 'job-runtime-provider-picker';
+const MODE_PICKER = 'job-runtime-mode-picker';
+
+/**
+ * Open a custom Select by its testid, click the option whose
+ * `data-value` matches, and wait for the portalled panel to close.
+ */
+async function pickOption(page: Page, pickerTestId: string, value: string): Promise<void> {
+    const trigger = page.locator(`[data-testid="${pickerTestId}"]`);
+    await expect(trigger).toBeVisible({ timeout: 30_000 });
+    await trigger.click();
+    const option = page.locator(`[role="option"][data-value="${value}"]`);
+    await expect(option).toBeVisible({ timeout: 10_000 });
+    await option.click();
+    // The panel closes on selection.
+    await expect(page.locator('[role="listbox"]')).toHaveCount(0, { timeout: 10_000 });
+}
+
+/**
+ * Read the `data-value` of every option the given custom Select
+ * exposes, then close the panel (Escape) without changing selection.
+ */
+async function readOptionValues(page: Page, pickerTestId: string): Promise<string[]> {
+    const trigger = page.locator(`[data-testid="${pickerTestId}"]`);
+    await expect(trigger).toBeVisible({ timeout: 30_000 });
+    await trigger.click();
+    await expect(page.locator('[role="listbox"]')).toBeVisible({ timeout: 10_000 });
+    const values = await page
+        .locator('[role="listbox"] [role="option"]')
+        .evaluateAll((rows) => rows.map((r) => r.getAttribute('data-value') ?? ''));
+    await page.keyboard.press('Escape');
+    await expect(page.locator('[role="listbox"]')).toHaveCount(0, { timeout: 10_000 });
+    return values;
+}
 
 test.describe('Tenant job-runtime overlay — schema-driven credentials form', () => {
     test.setTimeout(90_000);
@@ -39,9 +82,11 @@ test.describe('Tenant job-runtime overlay — schema-driven credentials form', (
         const body = await page.locator('body').innerText();
         expect(body.length).toBeGreaterThan(100);
 
-        // Provider picker is the canonical first interactive control on the form.
-        const providerSelect = page.locator('select').first();
-        await expect(providerSelect).toBeVisible({ timeout: 10_000 });
+        // Provider picker is the canonical first interactive control on the
+        // form. It's a custom Select (button trigger + portalled listbox),
+        // targeted by its stable testid rather than a native <select>.
+        const providerPicker = page.locator(`[data-testid="${PROVIDER_PICKER}"]`);
+        await expect(providerPicker).toBeVisible({ timeout: 30_000 });
     });
 
     test('switching mode to byo reveals the credentials form; inherit hides it', async ({
@@ -50,33 +95,37 @@ test.describe('Tenant job-runtime overlay — schema-driven credentials form', (
         await page.goto(PAGE, { waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(1_500);
 
-        const selects = page.locator('select');
-        // Two selects on the page: provider + mode. Mode is the second.
-        const modeSelect = selects.nth(1);
-        await expect(modeSelect).toBeVisible({ timeout: 10_000 });
+        // Custom Select — the mode picker has its own stable testid.
+        const modePicker = page.locator(`[data-testid="${MODE_PICKER}"]`);
+        await expect(modePicker).toBeVisible({ timeout: 30_000 });
 
         // Flip to byo
-        await modeSelect.selectOption('byo');
+        await pickOption(page, MODE_PICKER, 'byo');
         await page.waitForTimeout(500);
 
-        // At least one credential input should now be visible.
+        // At least one credential input should now be visible. (The default
+        // provider is `trigger`, whose byo field set includes password +
+        // text inputs — see job-runtime-schemas.ts.)
         const credentialInputs = page.locator(
             'input[type="password"], input[type="text"], textarea',
         );
         const count = await credentialInputs.count();
-        expect(
-            count,
-            'byo mode should render at least the secret-ref input + per-provider fields',
-        ).toBeGreaterThan(1);
+        expect(count, 'byo mode should render the per-provider credential fields').toBeGreaterThan(
+            1,
+        );
 
         // Flip back to inherit
-        await modeSelect.selectOption('inherit');
+        await pickOption(page, MODE_PICKER, 'inherit');
         await page.waitForTimeout(500);
 
-        // The per-provider fields disappear; only the readout block remains
-        // (the secret-ref input + textarea both belong to the credentials block).
-        const credentialInputsAfter = page.locator('input[type="password"], textarea');
-        await expect(credentialInputsAfter).toHaveCount(0, { timeout: 10_000 });
+        // The whole credentials block is suppressed in inherit mode
+        // (JobRuntimeSettings: `needsCredentials = mode !== 'inherit'`), so the
+        // credentials form itself unmounts. Assert the form container is gone —
+        // more robust than counting raw inputs (a stray secret-ref field can
+        // linger elsewhere on the page).
+        await expect(page.getByTestId('job-runtime-credentials-form')).toHaveCount(0, {
+            timeout: 10_000,
+        });
     });
 
     test('switching provider changes the field set (proves schema-driven, not opaque)', async ({
@@ -85,30 +134,25 @@ test.describe('Tenant job-runtime overlay — schema-driven credentials form', (
         await page.goto(PAGE, { waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(1_500);
 
-        const selects = page.locator('select');
-        const providerSelect = selects.first();
-        const modeSelect = selects.nth(1);
-
-        await modeSelect.selectOption('byo');
+        // Fields only render when mode != inherit — reveal the block first.
+        await pickOption(page, MODE_PICKER, 'byo');
         await page.waitForTimeout(500);
 
         // We can't depend on a fixed allow-list across envs, so probe what
-        // options the picker exposes and just verify the field count
-        // changes when we flip between two options (proves the form is
-        // reading the provider, not a hard-coded textarea).
-        const optionValues = await providerSelect
-            .locator('option')
-            .evaluateAll((opts) => opts.map((o) => (o as HTMLOptionElement).value));
-        const distinct = optionValues.filter((v) => v && v !== 'trigger');
+        // options the picker exposes (role="option" rows keyed by data-value)
+        // and just verify the field set changes when we flip between two
+        // options (proves the form reads the provider, not a hard-coded blob).
+        const optionVals = await readOptionValues(page, PROVIDER_PICKER);
+        const distinct = optionVals.filter((v) => v && v !== 'trigger');
         test.skip(distinct.length < 2, 'need at least 2 non-trigger providers enabled');
 
-        await providerSelect.selectOption(distinct[0]);
+        await pickOption(page, PROVIDER_PICKER, distinct[0]);
         await page.waitForTimeout(500);
         const fieldsBefore = await page
             .locator('input[type="password"], input[type="text"], textarea')
             .count();
 
-        await providerSelect.selectOption(distinct[1]);
+        await pickOption(page, PROVIDER_PICKER, distinct[1]);
         await page.waitForTimeout(500);
         const fieldsAfter = await page
             .locator('input[type="password"], input[type="text"], textarea')
@@ -131,8 +175,7 @@ test.describe('Tenant job-runtime overlay — schema-driven credentials form', (
         await page.goto(PAGE, { waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(1_500);
 
-        const modeSelect = page.locator('select').nth(1);
-        await modeSelect.selectOption('byo');
+        await pickOption(page, MODE_PICKER, 'byo');
         await page.waitForTimeout(500);
 
         const secretInputs = page.locator('input[type="password"]');
@@ -158,20 +201,14 @@ test.describe('Tenant job-runtime overlay — schema-driven credentials form', (
             await page.goto(PAGE, { waitUntil: 'domcontentloaded' });
             await page.waitForTimeout(1_500);
 
-            const providerSelect = page.locator('select').first();
-            const providerOptions = await providerSelect
-                .locator('option')
-                .evaluateAll((opts) => opts.map((o) => (o as HTMLOptionElement).value));
+            const providerOptions = await readOptionValues(page, PROVIDER_PICKER);
             test.skip(
                 !providerOptions.includes('trigger'),
                 'trigger provider not in operator allow-list for this env',
             );
-            await providerSelect.selectOption('trigger');
+            await pickOption(page, PROVIDER_PICKER, 'trigger');
 
-            const modeSelect = page.locator('select').nth(1);
-            const modeOptions = await modeSelect
-                .locator('option')
-                .evaluateAll((opts) => opts.map((o) => (o as HTMLOptionElement).value));
+            const modeOptions = await readOptionValues(page, MODE_PICKER);
             expect(modeOptions).toEqual(expect.arrayContaining(['inherit', 'byo', 'override']));
         });
 
@@ -181,20 +218,15 @@ test.describe('Tenant job-runtime overlay — schema-driven credentials form', (
             await page.goto(PAGE, { waitUntil: 'domcontentloaded' });
             await page.waitForTimeout(1_500);
 
-            const providerSelect = page.locator('select').first();
-            const providerOptions = await providerSelect
-                .locator('option')
-                .evaluateAll((opts) => opts.map((o) => (o as HTMLOptionElement).value));
+            const providerOptions = await readOptionValues(page, PROVIDER_PICKER);
             test.skip(
                 !providerOptions.includes('trigger'),
                 'trigger provider not in operator allow-list for this env',
             );
-            await providerSelect.selectOption('trigger');
-
-            const modeSelect = page.locator('select').nth(1);
+            await pickOption(page, PROVIDER_PICKER, 'trigger');
 
             // inherit: no credentials form, but per-mode banner is visible
-            await modeSelect.selectOption('inherit');
+            await pickOption(page, MODE_PICKER, 'inherit');
             await page.waitForTimeout(500);
             await expect(
                 page.locator('[data-testid="job-runtime-mode-banner-trigger-inherit"]'),
@@ -204,7 +236,7 @@ test.describe('Tenant job-runtime overlay — schema-driven credentials form', (
             );
 
             // byo: credentials form appears + at least the access token + secret key fields
-            await modeSelect.selectOption('byo');
+            await pickOption(page, MODE_PICKER, 'byo');
             await page.waitForTimeout(500);
             await expect(page.locator('[data-testid="job-runtime-credentials-form"]')).toBeVisible({
                 timeout: 5_000,
@@ -222,18 +254,14 @@ test.describe('Tenant job-runtime overlay — schema-driven credentials form', (
             await page.goto(PAGE, { waitUntil: 'domcontentloaded' });
             await page.waitForTimeout(1_500);
 
-            const providerSelect = page.locator('select').first();
-            const providerOptions = await providerSelect
-                .locator('option')
-                .evaluateAll((opts) => opts.map((o) => (o as HTMLOptionElement).value));
+            const providerOptions = await readOptionValues(page, PROVIDER_PICKER);
             test.skip(
                 !providerOptions.includes('trigger'),
                 'trigger provider not in operator allow-list for this env',
             );
-            await providerSelect.selectOption('trigger');
+            await pickOption(page, PROVIDER_PICKER, 'trigger');
 
-            const modeSelect = page.locator('select').nth(1);
-            await modeSelect.selectOption('byo');
+            await pickOption(page, MODE_PICKER, 'byo');
             await page.waitForTimeout(500);
 
             // Fill the first password field (Trigger.dev PAT) with a marker
@@ -243,14 +271,14 @@ test.describe('Tenant job-runtime overlay — schema-driven credentials form', (
             await expect(firstPassword).toHaveValue(SENTINEL);
 
             // Flip to inherit — credentials block disappears
-            await modeSelect.selectOption('inherit');
+            await pickOption(page, MODE_PICKER, 'inherit');
             await page.waitForTimeout(500);
             await expect(page.locator('[data-testid="job-runtime-credentials-form"]')).toHaveCount(
                 0,
             );
 
             // Flip back to byo — value should still be there (parent preserved it)
-            await modeSelect.selectOption('byo');
+            await pickOption(page, MODE_PICKER, 'byo');
             await page.waitForTimeout(500);
             const firstPasswordAfter = page.locator('input[type="password"]').first();
             await expect(firstPasswordAfter).toHaveValue(SENTINEL);
@@ -262,20 +290,16 @@ test.describe('Tenant job-runtime overlay — schema-driven credentials form', (
             await page.goto(PAGE, { waitUntil: 'domcontentloaded' });
             await page.waitForTimeout(1_500);
 
-            const providerSelect = page.locator('select').first();
-            const providerOptions = await providerSelect
-                .locator('option')
-                .evaluateAll((opts) => opts.map((o) => (o as HTMLOptionElement).value));
+            const providerOptions = await readOptionValues(page, PROVIDER_PICKER);
             test.skip(
                 !providerOptions.includes('trigger'),
                 'trigger provider not in operator allow-list for this env',
             );
-            await providerSelect.selectOption('trigger');
-            const modeSelect = page.locator('select').nth(1);
+            await pickOption(page, PROVIDER_PICKER, 'trigger');
 
             const banners: Record<string, string> = {};
             for (const m of ['inherit', 'byo', 'override'] as const) {
-                await modeSelect.selectOption(m);
+                await pickOption(page, MODE_PICKER, m);
                 await page.waitForTimeout(400);
                 const banner = page.locator(`[data-testid="job-runtime-mode-banner-trigger-${m}"]`);
                 await expect(banner).toBeVisible({ timeout: 5_000 });
