@@ -67,7 +67,10 @@ export const agentChatReplyTask = task<'agent-chat-reply', AgentChatReplyPayload
             // Best-effort — stuck-row sweep will recover.
         }
     },
-    run: async (payload: AgentChatReplyPayload) => {
+    run: async (
+        payload: AgentChatReplyPayload,
+        { ctx }: { ctx?: { run?: { id?: string } } } = {},
+    ) => {
         // Security: validate payload IDs before any DB access (defense-in-depth, mirrors agent-heartbeat).
         // triggeringMessageId is also asserted: it is a TaskChatMessage uuid PK and its raw value
         // flows into the prompt fallback (`Chat message ${...}`) and the AgentRun row.
@@ -138,7 +141,7 @@ export const agentChatReplyTask = task<'agent-chat-reply', AgentChatReplyPayload
                 });
             }
 
-            await runs.markStarted(run.id, null);
+            await runs.markStarted(run.id, ctx?.run?.id ?? null);
 
             const [taskRow, messages] = await Promise.all([
                 tasks.getOne(payload.userId, payload.taskId).catch(() => null),

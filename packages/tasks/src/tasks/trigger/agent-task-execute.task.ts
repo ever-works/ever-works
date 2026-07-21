@@ -88,7 +88,10 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
             // Best-effort — stuck-row sweep will recover.
         }
     },
-    run: async (payload: AgentTaskExecutePayload) => {
+    run: async (
+        payload: AgentTaskExecutePayload,
+        { ctx }: { ctx?: { run?: { id?: string } } } = {},
+    ) => {
         // Security: validate payload IDs before any DB access (defense-in-depth, mirrors agent-heartbeat)
         assertUuid(payload.agentId, 'payload.agentId');
         assertUuid(payload.userId, 'payload.userId');
@@ -172,7 +175,7 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                 });
             }
 
-            await runs.markStarted(run.id, null);
+            await runs.markStarted(run.id, ctx?.run?.id ?? null);
 
             // `taskRow` was resolved above (owner-scoped) before any run
             // mutation; it is guaranteed non-null here.

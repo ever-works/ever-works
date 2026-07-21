@@ -145,6 +145,7 @@ export class AgentScheduleDispatcherService {
                     runId: run.id,
                 });
                 enqueueSucceeded = true;
+                await this.stampTriggerRunId(run.id, handle.runId);
 
                 summary.dispatched += 1;
                 summary.entries.push(
@@ -261,6 +262,7 @@ export class AgentScheduleDispatcherService {
                 runId: run.id,
             });
             enqueueSucceeded = true;
+            await this.stampTriggerRunId(run.id, handle.runId);
             return { outcome: 'dispatched', runId: run?.id ?? handle.runId };
         } catch (error) {
             const message = error instanceof Error ? error.message : String(error);
@@ -308,6 +310,25 @@ export class AgentScheduleDispatcherService {
      * leaving the row in RUNNING forever would make it invisible to
      * the dispatcher.
      */
+    /**
+     * Record the Trigger.dev handle id on the AgentRun so a cancel arriving
+     * before the worker starts can still reach the remote run.
+     *
+     * Deliberately swallows: this runs AFTER `enqueueSucceeded = true`, and a
+     * throw escaping here would land in the dispatch catch block and report a
+     * successful dispatch as failed — releasing the CAS claim and, before the
+     * `enqueueSucceeded` guard, marking the run dispatch-failed while its
+     * Trigger.dev run was happily executing. Losing the stamp only costs a
+     * remote cancel.
+     */
+    private async stampTriggerRunId(runId: string, triggerRunId: string): Promise<void> {
+        try {
+            await this.agentRunRepository.setTriggerRunId(runId, triggerRunId);
+        } catch (err) {
+            this.logger.warn(`Failed to stamp triggerRunId on AgentRun ${runId}: ${err}`);
+        }
+    }
+
     private async recoverStuckRunning(): Promise<number> {
         const stuckTimeoutMinutes = config.agents.getStuckTimeoutMinutes();
         const cutoff = new Date(Date.now() - stuckTimeoutMinutes * 60_000);

@@ -155,6 +155,7 @@ describe('TaskChatService', () => {
         it('transitions AgentRun to failed and does not fail comment posting if enqueue throws', async () => {
             const runs = {
                 createQueued: jest.fn().mockResolvedValue({ id: 'run-chat-1' }),
+                setTriggerRunId: jest.fn().mockResolvedValue(undefined),
                 markDispatchFailed: jest.fn().mockResolvedValue(undefined),
             };
             const chatDispatcher = {
@@ -197,6 +198,7 @@ describe('TaskChatService', () => {
         it('does not attempt markDispatchFailed when the queued run was never created', async () => {
             const runs = {
                 createQueued: jest.fn().mockRejectedValue(new Error('DB down')),
+                setTriggerRunId: jest.fn().mockResolvedValue(undefined),
                 markDispatchFailed: jest.fn().mockResolvedValue(undefined),
             };
             const chatDispatcher = { enqueue: jest.fn().mockResolvedValue({ runId: 'trd-1' }) };
