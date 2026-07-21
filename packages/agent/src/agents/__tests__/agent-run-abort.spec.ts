@@ -258,6 +258,19 @@ describe('AgentRunService — cooperative mid-run abort', () => {
         expect(runs.markFailed).not.toHaveBeenCalled();
     });
 
+    it('treats a swept (failed) run as a stop signal, not just a cancelled one', async () => {
+        // The stuck-run sweeper reaps abandoned rows to `failed`. If it ever
+        // lands on a worker that is somehow still alive, that worker must bail
+        // here — otherwise it runs to completion, applies its side effects, and
+        // only then discovers its terminal write no-ops against the CAS.
+        runs.findById
+            .mockResolvedValueOnce({ id: 'r1', status: 'running' })
+            .mockResolvedValue({ id: 'r1', status: 'failed' });
+        const result = await makeSvc().execute(baseContext);
+        expect(ai.dispatch).toHaveBeenCalledTimes(1);
+        expect(result.status).toBe('cancelled');
+    });
+
     it('proceeds normally when the status read throws', async () => {
         runs.findById.mockRejectedValue(new Error('DB down'));
         ai.dispatch.mockResolvedValue({
