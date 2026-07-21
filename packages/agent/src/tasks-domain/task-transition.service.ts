@@ -236,13 +236,31 @@ export class TaskTransitionService {
                           taskId: task.id,
                       })
                     : null;
-                await this.dispatcher.enqueue({
+                const handle = await this.dispatcher.enqueue({
                     agentId: assignee.assigneeId,
                     userId: task.userId,
                     taskId: task.id,
                     dedupKey,
                     runId: run?.id,
                 });
+                // Stamp the Trigger.dev id so a cancel arriving before the
+                // worker starts can still reach the remote run. Swallowed
+                // separately: the enqueue already succeeded, so a stamp
+                // failure must not reach the catch below and mark this run
+                // dispatch-failed while its Trigger.dev run is executing.
+                if (run && handle?.runId) {
+                    // try/catch, not .catch() — a synchronous throw (or a
+                    // repository stub without the method) would escape before
+                    // .catch() could attach, land in the catch below, and mark
+                    // a successfully-dispatched run as dispatch-failed.
+                    try {
+                        await this.runs?.setTriggerRunId(run.id, handle.runId);
+                    } catch (stampErr) {
+                        this.logger.warn(
+                            `Failed to stamp triggerRunId on AgentRun ${run.id}: ${stampErr}`,
+                        );
+                    }
+                }
             } catch (err) {
                 const message = err instanceof Error ? err.message : String(err);
                 this.logger.warn(

@@ -74,7 +74,10 @@ export const agentHeartbeatTask = task<'agent-heartbeat', AgentHeartbeatPayload>
             // unstick the row at the next tick window.
         }
     },
-    run: async (payload: AgentHeartbeatPayload) => {
+    run: async (
+        payload: AgentHeartbeatPayload,
+        { ctx }: { ctx?: { run?: { id?: string } } } = {},
+    ) => {
         // Security: validate payload IDs before any DB access (defense-in-depth, mirrors createTaskContext)
         assertUuid(payload.agentId, 'payload.agentId');
         assertUuid(payload.userId, 'payload.userId');
@@ -132,7 +135,7 @@ export const agentHeartbeatTask = task<'agent-heartbeat', AgentHeartbeatPayload>
                 });
             }
 
-            await runs.markStarted(run.id, null);
+            await runs.markStarted(run.id, ctx?.run?.id ?? null);
             const result = await runner.execute({
                 runId: run.id,
                 agentId: agent.id,

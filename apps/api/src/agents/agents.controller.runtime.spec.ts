@@ -5,6 +5,7 @@
 jest.mock('@ever-works/agent/agents', () => ({
     __esModule: true,
     AGENT_HEARTBEAT_TRIGGER: 'AGENT_HEARTBEAT_TRIGGER',
+    AGENT_RUN_CANCELLER: 'AGENT_RUN_CANCELLER',
     AGENT_FILE_NAMES: ['SOUL.md', 'AGENTS.md', 'HEARTBEAT.md', 'TOOLS.md', 'agent.yml'],
     AgentScope: {
         TENANT: 'tenant',
@@ -78,6 +79,7 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
     let activityLog: any;
     let heartbeatTrigger: any;
     let taskExecuteDispatcher: any;
+    let runCanceller: any;
     let controller: AgentsController;
 
     const auth = { userId: 'u1' } as any;
@@ -108,6 +110,7 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
             findInFlightForTaskAgent: jest.fn().mockResolvedValue(null),
             markFailed: jest.fn().mockResolvedValue(undefined),
             markDispatchFailed: jest.fn().mockResolvedValue(undefined),
+            setTriggerRunId: jest.fn().mockResolvedValue(undefined),
             findByIdAndUser: jest.fn().mockResolvedValue(null),
         };
         agentRunLogs = { findByRun: jest.fn().mockResolvedValue([]) };
@@ -120,6 +123,7 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
         };
         heartbeatTrigger = { enqueue: jest.fn() };
         taskExecuteDispatcher = { enqueue: jest.fn().mockResolvedValue({ runId }) };
+        runCanceller = { cancel: jest.fn().mockResolvedValue('cancelled') };
 
         controller = new AgentsController(
             service,
@@ -134,6 +138,7 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
             activityLog,
             heartbeatTrigger,
             taskExecuteDispatcher,
+            runCanceller,
         );
     });
 
@@ -387,6 +392,82 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
             agentRuns.cancel.mockResolvedValueOnce({ found: false });
             await expect(controller.cancelRun(auth, agentId, runId)).rejects.toBeInstanceOf(
                 NotFoundException,
+            );
+        });
+
+        it('also cancels the Trigger.dev run when the row carries a triggerRunId', async () => {
+            agentRuns.cancel.mockResolvedValueOnce({
+                found: true,
+                previousStatus: 'running',
+                triggerRunId: 'run_abc',
+            });
+            const result = await controller.cancelRun(auth, agentId, runId);
+            expect(result.cancelled).toBe(true);
+            // The whole point: cancelling must stop real compute, not just
+            // flip a DB row. Passes the Trigger.dev id, NOT the AgentRun UUID.
+            expect(runCanceller.cancel).toHaveBeenCalledWith('run_abc');
+        });
+
+        it('skips the remote cancel when the run was never stamped', async () => {
+            agentRuns.cancel.mockResolvedValueOnce({
+                found: true,
+                previousStatus: 'queued',
+                triggerRunId: null,
+            });
+            const result = await controller.cancelRun(auth, agentId, runId);
+            expect(result.cancelled).toBe(true);
+            expect(runCanceller.cancel).not.toHaveBeenCalled();
+        });
+
+        it('does not cancel remotely for an already-terminal run', async () => {
+            agentRuns.cancel.mockResolvedValueOnce({
+                found: true,
+                previousStatus: 'completed',
+                triggerRunId: 'run_abc',
+            });
+            const result = await controller.cancelRun(auth, agentId, runId);
+            expect(result.cancelled).toBe(false);
+            expect(runCanceller.cancel).not.toHaveBeenCalled();
+        });
+
+        it('still reports cancelled when the canceller reports a non-cancelled outcome', async () => {
+            // Trigger.dev disabled, or the run was already terminal on their
+            // side. The DB CAS is the authoritative answer, so the endpoint
+            // must not turn a benign race into a 5xx.
+            runCanceller.cancel.mockResolvedValueOnce('not-configured');
+            agentRuns.cancel.mockResolvedValueOnce({
+                found: true,
+                previousStatus: 'running',
+                triggerRunId: 'run_abc',
+            });
+            await expect(controller.cancelRun(auth, agentId, runId)).resolves.toEqual(
+                expect.objectContaining({ cancelled: true }),
+            );
+        });
+
+        it('degrades to a DB-only cancel when AGENT_RUN_CANCELLER is unbound', async () => {
+            const noCanceller = new AgentsController(
+                service,
+                files,
+                exportService,
+                dispatcher,
+                agentRuns,
+                agentRunLogs,
+                skillBindings,
+                pluginUsage,
+                tasks,
+                activityLog,
+                heartbeatTrigger,
+                taskExecuteDispatcher,
+                undefined,
+            );
+            agentRuns.cancel.mockResolvedValueOnce({
+                found: true,
+                previousStatus: 'running',
+                triggerRunId: 'run_abc',
+            });
+            await expect(noCanceller.cancelRun(auth, agentId, runId)).resolves.toEqual(
+                expect.objectContaining({ cancelled: true }),
             );
         });
     });

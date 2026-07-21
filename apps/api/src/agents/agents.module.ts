@@ -3,6 +3,7 @@ import {
     AgentsModule as AgentAgentsModule,
     AgentRepository,
     AGENT_HEARTBEAT_TRIGGER,
+    AGENT_RUN_CANCELLER,
     AGENT_RUN_CHAT_BACK_POSTER,
     AGENT_RUN_TASK_FINISHER,
     AGENT_PLUGIN_TOOLS_FACADE,
@@ -31,7 +32,12 @@ import {
     INBOUND_EMAIL_TASK_SPAWNER,
     type InboundEmailTaskSpawner,
 } from '@ever-works/agent/notifications';
-import { agentHeartbeatTriggerAdapter } from '@ever-works/trigger-tasks';
+import {
+    agentHeartbeatTriggerAdapter,
+    createAgentRunCancellerAdapter,
+    TriggerModule as TasksTriggerModule,
+    TriggerService,
+} from '@ever-works/trigger-tasks';
 
 // Phase 16.6 / 16.7 — commitToRepo / openPullRequest tools.
 // The `AGENT_GIT_FACADE` token (exported from `@ever-works/agent/agents`)
@@ -120,11 +126,19 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
         // Notifications v2 (EW-670) — EmailModule provides EmailService,
         // consumed by the AGENT_EMAIL_FACADE binding below.
         EmailModule,
+        // Provides TriggerService, which backs the AGENT_RUN_CANCELLER factory
+        // below. Same alias works.module.ts / webhooks.module.ts already use.
+        TasksTriggerModule,
     ],
     controllers: [AgentsController, AgentTemplatesController],
     providers: [
         AgentTemplateCatalogService,
         { provide: AGENT_HEARTBEAT_TRIGGER, useValue: agentHeartbeatTriggerAdapter },
+        {
+            provide: AGENT_RUN_CANCELLER,
+            inject: [TriggerService],
+            useFactory: createAgentRunCancellerAdapter,
+        },
         {
             provide: AGENT_RUN_CHAT_BACK_POSTER,
             inject: [TaskChatService],
