@@ -67,7 +67,13 @@ export class AiOperations {
 			const tracker = new TokenUsageTracker();
 			const messages = this.toLangChainMessages(options.messages);
 
-			const response = await llm.invoke(messages, { callbacks: [tracker] });
+			const response = await llm.invoke(messages, {
+				callbacks: [tracker],
+				// Cancels the underlying HTTP request when the run is aborted.
+				// withParamRetry only retries on a parsed rejected-param message,
+				// which an AbortError never matches, so an abort is not re-issued.
+				signal: options.signal
+			});
 			const content = typeof response.content === 'string' ? response.content : '';
 
 			// Extract tool calls from LangChain response
