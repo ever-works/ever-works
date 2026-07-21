@@ -348,7 +348,9 @@ test.describe('Prebuilt Companies — materialized org structure', () => {
 
         const templates = await listTemplates(request, token);
         test.skip(templates.length === 0, 'org-templates catalog unreachable in this environment');
-        const tmpl = pickSmall(templates)!;
+        const tmpl = pickSmall(templates);
+        test.skip(!tmpl, 'no catalog template with teams >= 1 and agents >= 1 in this environment');
+        if (!tmpl) return;
 
         const res = await importCompanyRaw(request, token, { templateSlug: tmpl.slug });
         expect(res.status(), `import body=${await res.text().catch(() => '')}`).toBe(201);
@@ -395,7 +397,9 @@ test.describe('Prebuilt Companies — materialized org structure', () => {
 
         const templates = await listTemplates(request, token);
         test.skip(templates.length === 0, 'org-templates catalog unreachable in this environment');
-        const tmpl = pickSmall(templates)!;
+        const tmpl = pickSmall(templates);
+        test.skip(!tmpl, 'no catalog template with teams >= 1 and agents >= 1 in this environment');
+        if (!tmpl) return;
 
         const displayName = `Override Co ${s}`;
         const res = await importCompanyRaw(request, token, {
@@ -420,7 +424,9 @@ test.describe('Prebuilt Companies — materialized org structure', () => {
 
         const templates = await listTemplates(request, token);
         test.skip(templates.length === 0, 'org-templates catalog unreachable in this environment');
-        const tmpl = pickSmall(templates)!;
+        const tmpl = pickSmall(templates);
+        test.skip(!tmpl, 'no catalog template with teams >= 1 and agents >= 1 in this environment');
+        if (!tmpl) return;
 
         const org = (
             await (await importCompanyRaw(request, token, { templateSlug: tmpl.slug })).json()
@@ -453,7 +459,9 @@ test.describe('Prebuilt Companies — materialized org structure', () => {
 
         const templates = await listTemplates(request, token);
         test.skip(templates.length === 0, 'org-templates catalog unreachable in this environment');
-        const tmpl = pickSmall(templates)!;
+        const tmpl = pickSmall(templates);
+        test.skip(!tmpl, 'no catalog template with teams >= 1 and agents >= 1 in this environment');
+        if (!tmpl) return;
 
         const report = (await (
             await importCompanyRaw(request, token, { templateSlug: tmpl.slug })
@@ -490,7 +498,9 @@ test.describe('Prebuilt Companies — materialized org structure', () => {
 
         const templates = await listTemplates(request, token);
         test.skip(templates.length === 0, 'org-templates catalog unreachable in this environment');
-        const tmpl = pickSmall(templates)!;
+        const tmpl = pickSmall(templates);
+        test.skip(!tmpl, 'no catalog template with teams >= 1 and agents >= 1 in this environment');
+        if (!tmpl) return;
 
         const report = (await (
             await importCompanyRaw(request, token, { templateSlug: tmpl.slug })
@@ -532,7 +542,9 @@ test.describe('Prebuilt Companies — materialized org structure', () => {
 
         const templates = await listTemplates(request, token);
         test.skip(templates.length === 0, 'org-templates catalog unreachable in this environment');
-        const tmpl = pickSmall(templates)!;
+        const tmpl = pickSmall(templates);
+        test.skip(!tmpl, 'no catalog template with teams >= 1 and agents >= 1 in this environment');
+        if (!tmpl) return;
 
         const report = (await (
             await importCompanyRaw(request, token, { templateSlug: tmpl.slug })
@@ -571,7 +583,9 @@ test.describe('Prebuilt Companies — materialized org structure', () => {
 
         const templates = await listTemplates(request, token);
         test.skip(templates.length === 0, 'org-templates catalog unreachable in this environment');
-        const tmpl = pickSmall(templates)!;
+        const tmpl = pickSmall(templates);
+        test.skip(!tmpl, 'no catalog template with teams >= 1 and agents >= 1 in this environment');
+        if (!tmpl) return;
 
         const report = (await (
             await importCompanyRaw(request, token, { templateSlug: tmpl.slug })
@@ -629,7 +643,9 @@ test.describe('Prebuilt Companies — slug namespace & cross-owner isolation', (
 
         const templates = await listTemplates(request, token);
         test.skip(templates.length === 0, 'org-templates catalog unreachable in this environment');
-        const tmpl = pickSmall(templates)!;
+        const tmpl = pickSmall(templates);
+        test.skip(!tmpl, 'no catalog template with teams >= 1 and agents >= 1 in this environment');
+        if (!tmpl) return;
 
         const first = (
             await (await importCompanyRaw(request, token, { templateSlug: tmpl.slug })).json()
@@ -653,7 +669,9 @@ test.describe('Prebuilt Companies — slug namespace & cross-owner isolation', (
 
         const templates = await listTemplates(request, owner.access_token);
         test.skip(templates.length === 0, 'org-templates catalog unreachable in this environment');
-        const tmpl = pickSmall(templates)!;
+        const tmpl = pickSmall(templates);
+        test.skip(!tmpl, 'no catalog template with teams >= 1 and agents >= 1 in this environment');
+        if (!tmpl) return;
 
         const org = (
             await (
