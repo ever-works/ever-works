@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
-import { TenantEmailAddress, EmailAddressDirection } from '../../entities/tenant-email-address.entity';
+import {
+    TenantEmailAddress,
+    EmailAddressDirection,
+} from '../../entities/tenant-email-address.entity';
 /**
  * Notifications v2 — Email Providers (EW-650, EW-667).
  *

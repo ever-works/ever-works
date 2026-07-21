@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { OnboardingRequest, type OnboardingFailureDetail, type OnboardingStatus } from '../../entities/onboarding-request.entity';
+import {
+    OnboardingRequest,
+    type OnboardingFailureDetail,
+    type OnboardingStatus,
+} from '../../entities/onboarding-request.entity';
 @Injectable()
 export class OnboardingRequestRepository {
     constructor(

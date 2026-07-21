@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { LessThan, Repository } from 'typeorm';
-import { WebhookDelivery, type WebhookDeliveryStatus } from '../../entities/webhook-delivery.entity';
+import {
+    WebhookDelivery,
+    type WebhookDeliveryStatus,
+} from '../../entities/webhook-delivery.entity';
 export interface RecordAttemptInput {
     readonly status: WebhookDeliveryStatus;
     readonly lastResponseStatus?: number | null;
