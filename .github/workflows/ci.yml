@@ -291,11 +291,13 @@ jobs:
         # headroom (start-period 45s + 18x10s = 225s) so a slow warm-up or a
         # postgres-not-yet-queryable retry can't tip it over.
         options: --health-cmd "nc -z localhost 7233" --health-interval 10s --health-timeout 5s --health-retries 18 --health-start-period 45s
-      inngest:
-        # Pinned (was `:latest`) — same moving-tag hardening as temporal above.
-        image: inngest/inngest:v1.38.1
-        ports: ['8288:8288']
-        options: --health-cmd "wget -qO- http://localhost:8288/ || exit 1" --health-interval 5s --health-timeout 3s --health-retries 10 --health-start-period 15s
+      # NOTE: inngest is intentionally NOT a service container. The
+      # `inngest/inngest` image's default entrypoint is the CLI (it just prints
+      # help and exits) — the dev server only starts under the `dev` subcommand,
+      # and GitHub `services:` cannot override a container's command. So the
+      # container never listened on 8288 and the job failed at "Initialize
+      # containers". Started as a `docker run` step below instead (which CAN pass
+      # `dev`), reachable at localhost:8288 the same way the service containers are.
 
     steps:
       - name: Checkout repository
@@ -334,6 +336,26 @@ jobs:
         env:
           EW_TEST_REAL_TEMPORAL_ADDRESS: localhost:7233
         run: pnpm --filter @ever-works/job-runtime-temporal-plugin test
+
+      # Start the Inngest dev server via `docker run` (not a service container —
+      # see the note in `services:` above). `dev` is the subcommand that actually
+      # serves; `--host 0.0.0.0` binds all interfaces so the loopback probe and
+      # the test's http://localhost:8288 both reach it; `--no-discovery` skips the
+      # auto-scan for a local app (there is none here). Same pinned image tag.
+      - name: Start Inngest dev server
+        run: |
+          docker run -d --name inngest -p 8288:8288 \
+            inngest/inngest:v1.38.1 dev --no-discovery --host 0.0.0.0
+          echo "Waiting for Inngest on http://localhost:8288 ..."
+          for i in $(seq 1 45); do
+            if curl -sf -o /dev/null http://localhost:8288/; then
+              echo "Inngest is ready."; exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Inngest dev server did not become ready in time"
+          docker logs inngest || true
+          exit 1
 
       - name: Inngest real-infra
         env:
