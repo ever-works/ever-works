@@ -267,21 +267,35 @@ jobs:
         ports: ['5432:5432']
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
       temporal:
-        image: temporalio/auto-setup:latest
+        # Pinned (was `:latest`). A moving `:latest` is why this job flipped red:
+        # the tag advanced and the frontend now binds to the container's eth0 IP
+        # instead of the loopback the healthcheck probes. 1.29.3 == what `:latest`
+        # resolved to when this was fixed; bump deliberately, not by drift.
+        image: temporalio/auto-setup:1.29.3
         env:
           DB: postgres12
           DB_PORT: '5432'
           POSTGRES_USER: test
           POSTGRES_PWD: test
           POSTGRES_SEEDS: postgres
+          # THE fix: bind the frontend on all interfaces so the loopback
+          # healthcheck below can reach it. Without this, temporal binds only the
+          # container IP (e.g. 172.18.0.x:7233) and `nc -z localhost 7233` fails
+          # for the whole window -> the container is marked unhealthy and
+          # "Initialize containers" fails even though the server is up. Verified
+          # on a k8s repro: with BIND_ON_IP=0.0.0.0 the loopback probe passes ~80s
+          # in; without it, never.
+          BIND_ON_IP: '0.0.0.0'
         ports: ['7233:7233']
-        # auto-setup boots in 60-90s; generous start-period + retries
-        # absorb the warm-up without flaking the job.
-        options: --health-cmd "nc -z localhost 7233" --health-interval 10s --health-timeout 5s --health-retries 12 --health-start-period 30s
+        # Schema setup + boot measured ~80s on a ready DB; give it comfortable
+        # headroom (start-period 45s + 18x10s = 225s) so a slow warm-up or a
+        # postgres-not-yet-queryable retry can't tip it over.
+        options: --health-cmd "nc -z localhost 7233" --health-interval 10s --health-timeout 5s --health-retries 18 --health-start-period 45s
       inngest:
-        image: inngest/inngest:latest
+        # Pinned (was `:latest`) — same moving-tag hardening as temporal above.
+        image: inngest/inngest:v1.38.1
         ports: ['8288:8288']
-        options: --health-cmd "wget -qO- http://localhost:8288/ || exit 1" --health-interval 5s --health-timeout 3s --health-retries 5
+        options: --health-cmd "wget -qO- http://localhost:8288/ || exit 1" --health-interval 5s --health-timeout 3s --health-retries 10 --health-start-period 15s
 
     steps:
       - name: Checkout repository
