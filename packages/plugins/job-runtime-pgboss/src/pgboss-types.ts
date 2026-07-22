@@ -22,6 +22,15 @@
  * Structural subset of `PgBoss` the plugin uses. Maps to pg-boss >=8.0.
  */
 export interface PgBossInstance {
+	/**
+	 * Create a queue (idempotent). REQUIRED before `send`/`work` since pg-boss
+	 * v10 — v9 auto-created queues on first send, but v10 makes creation
+	 * explicit and `send()` to a non-existent queue silently returns `null`
+	 * (the job is dropped). The dispatcher and worker-host factories call this
+	 * before their first `send`/`work` on a queue so a missing bootstrap can't
+	 * silently swallow every job.
+	 */
+	createQueue?(name: string, options?: Readonly<Record<string, unknown>>): Promise<void>;
 	/** Enqueue one job. Returns the pg-boss job id, or `null` on dedup hit. */
 	send(name: string, data: unknown, options?: Readonly<Record<string, unknown>>): Promise<string | null>;
 	/**
@@ -33,8 +42,8 @@ export interface PgBossInstance {
 		options: Readonly<Record<string, unknown>>,
 		handler: (job: PgBossJobView | readonly PgBossJobView[]) => Promise<unknown>
 	): Promise<string>;
-	/** Cancel an in-flight job by id. Idempotent — returns void either way. */
-	cancel(id: string): Promise<void>;
+	/** Cancel an in-flight job. pg-boss v10 takes the queue name AND the id. */
+	cancel(name: string, id: string): Promise<void>;
 	/** Lookup a single job by id. Returns shape includes a `state` field. */
 	getJobById?(id: string): Promise<PgBossJobRecord | null>;
 	/** Register a cron-like recurring job. */
