@@ -1,4 +1,4 @@
-import type { User } from '../entities';
+import type { User } from '../entities/user.entity';
 import type { InferredProfile } from './schemas';
 
 export class UserResearchCompletedEvent {

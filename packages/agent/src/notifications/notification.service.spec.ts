@@ -1,7 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
 import { NotificationService } from './notification.service';
-import { NotificationType, NotificationCategory } from '@src/entities';
-
+import { NotificationType, NotificationCategory } from '@src/entities/notification.types';
 function makeRepository(overrides: Record<string, jest.Mock> = {}) {
     return {
         findByDeduplicationKey: jest.fn(),

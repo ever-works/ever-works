@@ -1,7 +1,6 @@
 import type { Repository } from 'typeorm';
 import { WebhookSubscriptionRepository } from '../webhook-subscription.repository';
-import { WebhookSubscription } from '../../../entities';
-
+import { WebhookSubscription } from '../../../entities/webhook-subscription.entity';
 type Mocked = jest.Mocked<
     Pick<
         Repository<WebhookSubscription>,

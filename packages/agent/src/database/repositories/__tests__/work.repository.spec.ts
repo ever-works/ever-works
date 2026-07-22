@@ -2,9 +2,9 @@ import type { Repository, SelectQueryBuilder, Brackets } from 'typeorm';
 import { In, IsNull, LessThanOrEqual } from 'typeorm';
 import { WorkRepository } from '../work.repository';
 import { Work } from '../../../entities/work.entity';
-import { Mission, WorkProposal } from '../../../entities';
-import type { User } from '../../../entities';
-
+import { Mission } from '../../../entities/mission.entity';
+import { WorkProposal } from '../../../entities/work-proposal.entity';
+import type { User } from '../../../entities/user.entity';
 type Mocked = jest.Mocked<
     Pick<
         Repository<Work>,

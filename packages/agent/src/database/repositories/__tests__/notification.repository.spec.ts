@@ -1,7 +1,7 @@
 import type { Repository, SelectQueryBuilder, DeleteQueryBuilder } from 'typeorm';
 import { NotificationRepository } from '../notification.repository';
-import { Notification, NotificationCategory, NotificationType } from '../../../entities';
-
+import { Notification } from '../../../entities/notification.entity';
+import { NotificationCategory, NotificationType } from '../../../entities/notification.types';
 type Mocked = jest.Mocked<
     Pick<Repository<Notification>, 'create' | 'save' | 'findOne' | 'update' | 'createQueryBuilder'>
 >;
