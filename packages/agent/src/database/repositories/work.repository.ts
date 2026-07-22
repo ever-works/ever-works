@@ -2,7 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull, Brackets, Raw, LessThanOrEqual, In } from 'typeorm';
 import { Work } from '../../entities/work.entity';
-import { User, Mission, WorkProposal } from '../../entities';
+import { Mission } from '../../entities/mission.entity';
+import { User } from '../../entities/user.entity';
+import { WorkProposal } from '../../entities/work-proposal.entity';
 import { buildCaseInsensitiveLikeClause, prepareCaseInsensitiveContainsPattern } from '../utils';
 import { config } from '../../config';
 

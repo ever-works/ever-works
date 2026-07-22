@@ -1,8 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { WebhookSubscription } from '../../entities';
-
+import { WebhookSubscription } from '../../entities/webhook-subscription.entity';
 @Injectable()
 export class WebhookSubscriptionRepository {
     constructor(

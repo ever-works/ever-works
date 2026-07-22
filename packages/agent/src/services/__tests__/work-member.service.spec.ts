@@ -3,8 +3,7 @@ import { WorkMemberService } from '../work-member.service';
 import { WorkMemberRole, ASSIGNABLE_MEMBER_ROLES } from '@src/entities/types';
 import type { WorkMember } from '@src/entities/work-member.entity';
 import type { User } from '@src/entities/user.entity';
-import type { Work } from '@src/entities';
-
+import type { Work } from '@src/entities/work.entity';
 describe('WorkMemberService', () => {
     let memberRepository: {
         findByWork: jest.Mock;

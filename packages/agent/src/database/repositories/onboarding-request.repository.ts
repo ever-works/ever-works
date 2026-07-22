@@ -5,8 +5,7 @@ import {
     OnboardingRequest,
     type OnboardingFailureDetail,
     type OnboardingStatus,
-} from '../../entities';
-
+} from '../../entities/onboarding-request.entity';
 @Injectable()
 export class OnboardingRequestRepository {
     constructor(

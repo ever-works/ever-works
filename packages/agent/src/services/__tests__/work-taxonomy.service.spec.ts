@@ -11,7 +11,7 @@ import { WorkTaxonomyService } from '../work-taxonomy.service';
 import { GenerateStatusType } from '@src/entities/types';
 import { WorkHistoryActivityType } from '@ever-works/contracts/api';
 import type { User } from '@src/entities/user.entity';
-import type { Work } from '@src/entities';
+import type { Work } from '@src/entities/work.entity';
 import type { Category, Collection, Tag } from '@ever-works/contracts';
 
 describe('WorkTaxonomyService', () => {
