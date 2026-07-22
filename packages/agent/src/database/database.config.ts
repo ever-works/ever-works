@@ -1,119 +1,24 @@
 import { registerAs } from '@nestjs/config';
 import { TypeOrmModuleOptions } from '@nestjs/typeorm';
-import { CacheEntry } from '../entities/cache.entity';
-import {
-    ApiKey,
-    RefreshToken,
-    User,
-    UserUpload,
-    Work,
-    WorkAdvancedPrompts,
-    WorkCustomDomain,
-    WorkDeployment,
-    WorkMember,
-    WorkInvitation,
-    WorkGenerationHistory,
-    SubscriptionPlan,
-    UserSubscription,
-    WorkSchedule,
-    UsageLedgerEntry,
-    PluginUsageEvent,
-    WorkBudget,
-    WorkBudgetAlertState,
-    Notification,
-    ActivityLog,
-    Conversation,
-    ConversationMessage,
-    AuthAccount,
-    AuthSession,
-    AuthVerification,
-    GitHubAppInstallation,
-    GitHubAppInstallationRepository,
-    GitHubAppUserLink,
-    OnboardingRequest,
-    Template,
-    TemplateCustomization,
-    UserTemplatePreference,
-    WebhookSubscription,
-    WebhookDelivery,
-    WorkProposal,
-    WorkAgentPreference,
-    WorkBuildRequest,
-    WorkAgentRun,
-    WorkAgentRunLog,
-    WorkKnowledgeDocument,
-    WorkKnowledgeUpload,
-    WorkKnowledgeTag,
-    WorkKnowledgeCitation,
-    WorkKnowledgeChunk,
-    WorkKnowledgeChunkCoordinate,
-    Mission,
-    // Goals & Metrics (PR-8)
-    Goal,
-    GoalMetricSample,
-    MissionGoal,
-    // Tenants & Organizations (EW-651 epic) — Phase 1 / EW-653
-    Tenant,
-    Organization,
-    // Agents/Skills/Tasks (PR #1017 specs)
-    Agent,
-    // Agent Action Approval Queue — human-in-the-loop gate.
-    AgentActionProposal,
-    AgentRun,
-    AgentRunLog,
-    AgentBudget,
-    AgentMembership,
-    Team,
-    TeamMember,
-    TeamResource,
-    Skill,
-    SkillBinding,
-    Task,
-    TaskAssignee,
-    TaskReviewer,
-    TaskApprover,
-    TaskBlock,
-    TaskRelation,
-    TaskChatMessage,
-    TaskAttachment,
-    TaskWatcher,
-    TaskKbMention,
-    UserTaskCounter,
-    MissionAttachment,
-    MissionWork,
-    WorkProposalAttachment,
-    IdeaWork,
-    AgentAttachment,
-    // Notifications v2 (EW-650 + siblings)
-    TenantEmailAddress,
-    AgentEmailAssignment,
-    EmailConversation,
-    EmailMessage,
-    NotificationChannel,
-    NotificationChannelDeliveryLog,
-    NotificationEventType,
-    UserNotificationSubscription,
-    UserNotificationPreference,
-    UserNotificationCategoryMute,
-    OrganizationNotificationDefault,
-    ComposioTriggerSubscription,
-    // Tenant-scoped job-runtime overlay (EW-742 P1)
-    TenantJobRuntimeConfig,
-    TenantJobRuntimeAudit,
-    // Per-tenant runtime provider allow-list overlay (EW-752 P5.1)
-    TenantRuntimeProviderAllowlist,
-    // Per-version credential snapshot history (EW-742 P1 T11 follow-up)
-    TenantCredentialSnapshot,
-    // Inbound Triggers (Trigger Schedules) — signed webhook/API triggers
-    InboundTrigger,
-} from '../entities';
-import {
-    PluginEntity,
-    UserPluginEntity,
-    WorkPluginEntity,
-    PluginAllowlistEntity,
-} from '../plugins/entities';
-import { UserSyncConfig } from '../account-transfer/entities/user-sync-config.entity';
+
+// Goals & Metrics (PR-8)
+
+// Tenants & Organizations (EW-651 epic) — Phase 1 / EW-653
+
+// Agents/Skills/Tasks (PR #1017 specs)
+
+// Agent Action Approval Queue — human-in-the-loop gate.
+
+// Notifications v2 (EW-650 + siblings)
+
+// Tenant-scoped job-runtime overlay (EW-742 P1)
+
+// Per-tenant runtime provider allow-list overlay (EW-752 P5.1)
+
+// Per-version credential snapshot history (EW-742 P1 T11 follow-up)
+
+// Inbound Triggers (Trigger Schedules) — signed webhook/API triggers
+
 import * as path from 'path';
 import * as os from 'os';
 import * as fs from 'fs';
@@ -144,135 +49,9 @@ export interface DatabaseConfig extends Omit<TypeOrmModuleOptions, 'type'> {
     ssl?: any;
 }
 
-export const ENTITIES = [
-    ApiKey,
-    UserUpload,
-    Work,
-    WorkAdvancedPrompts,
-    WorkCustomDomain,
-    WorkDeployment,
-    WorkMember,
-    WorkInvitation,
-    User,
-    RefreshToken,
-    CacheEntry,
-    WorkGenerationHistory,
-    SubscriptionPlan,
-    UserSubscription,
-    WorkSchedule,
-    UsageLedgerEntry,
-    PluginUsageEvent,
-    WorkBudget,
-    WorkBudgetAlertState,
-    Notification,
-    ActivityLog,
-    Conversation,
-    ConversationMessage,
-    AuthAccount,
-    AuthSession,
-    AuthVerification,
-    GitHubAppInstallation,
-    GitHubAppInstallationRepository,
-    GitHubAppUserLink,
-    OnboardingRequest,
-    Template,
-    TemplateCustomization,
-    UserTemplatePreference,
-    WebhookSubscription,
-    WebhookDelivery,
-    WorkProposal,
-    WorkAgentPreference,
-    WorkBuildRequest,
-    WorkAgentRun,
-    WorkAgentRunLog,
-    // Missions / Ideas / Works (spec 2026-05-24, Phase 0 PR 0.2)
-    Mission,
-    // Goals & Metrics (PR-8) — goals + append-only samples + Mission link.
-    // Registered here AND in entities/index.ts (bug-class: a
-    // forFeature'd-but-unregistered entity throws
-    // EntityMetadataNotFoundError → unmapped 500 on every query).
-    Goal,
-    GoalMetricSample,
-    MissionGoal,
-    // Tenants & Organizations (EW-651 epic) — Phase 1 / EW-653
-    Tenant,
-    Organization,
-    // Agents / Skills / Tasks (PR #1017 specs, Phase 1 + Phase 8)
-    Agent,
-    // Agent Action Approval Queue — human-in-the-loop gate for side-effectful actions.
-    AgentActionProposal,
-    AgentRun,
-    AgentRunLog,
-    AgentBudget,
-    AgentMembership,
-    AgentAttachment,
-    // Teams & Prebuilt Companies (teams-and-companies spec §2)
-    Team,
-    TeamMember,
-    // Team ↔ resource association (Works/Agents/Missions/Ideas/Tasks belong to Teams)
-    TeamResource,
-    Skill,
-    SkillBinding,
-    // Phase 11 — Tasks family
-    Task,
-    TaskAssignee,
-    TaskReviewer,
-    TaskApprover,
-    TaskBlock,
-    TaskRelation,
-    TaskChatMessage,
-    TaskAttachment,
-    TaskWatcher,
-    TaskKbMention,
-    UserTaskCounter,
-    // PR #1044 — Mission/Idea attachment edge tables
-    MissionAttachment,
-    MissionWork,
-    WorkProposalAttachment,
-    IdeaWork,
-    // Knowledge Base entities (EW-639 / EW-640)
-    WorkKnowledgeDocument,
-    WorkKnowledgeUpload,
-    WorkKnowledgeTag,
-    WorkKnowledgeCitation,
-    WorkKnowledgeChunk,
-    WorkKnowledgeChunkCoordinate,
-    // Plugin entities
-    PluginEntity,
-    UserPluginEntity,
-    WorkPluginEntity,
-    // EW-693 — dynamic plugin distribution allowlist (gates non-first-party installs)
-    PluginAllowlistEntity,
-    // Composio Triggers (EW-684 PR-D) — webhook trigger subscriptions
-    ComposioTriggerSubscription,
-    // Account transfer entities
-    UserSyncConfig,
-    // Notifications v2 (EW-650 + siblings)
-    TenantEmailAddress,
-    AgentEmailAssignment,
-    EmailConversation,
-    EmailMessage,
-    NotificationChannel,
-    NotificationChannelDeliveryLog,
-    NotificationEventType,
-    UserNotificationSubscription,
-    UserNotificationPreference,
-    UserNotificationCategoryMute,
-    OrganizationNotificationDefault,
-    // Tenant-scoped job-runtime overlay (EW-742 P1)
-    TenantJobRuntimeConfig,
-    TenantJobRuntimeAudit,
-    // Per-tenant runtime provider allow-list overlay (EW-752 P5.1)
-    TenantRuntimeProviderAllowlist,
-    // Per-version credential snapshot history (EW-742 P1 T11 follow-up) —
-    // backs CredentialVersionService.resolveSnapshot for v < current so
-    // in-flight runs can bind to their captured credentials after a
-    // rotation (ADR-017 §3 Q4).
-    TenantCredentialSnapshot,
-    // Inbound Triggers (Trigger Schedules) — signed webhook/API triggers
-    // that spawn Tasks on verified HMAC deliveries.
-    InboundTrigger,
-];
+import { ENTITIES } from './_entities-inventory';
+// Re-exported so existing importers of `database.config` keep working.
+export { ENTITIES };
 
 /**
  * Resolve TypeORM migration globs for the runtime path. TypeORM accepts

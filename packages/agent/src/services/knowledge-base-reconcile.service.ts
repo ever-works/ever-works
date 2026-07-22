@@ -90,8 +90,17 @@ export class KnowledgeBaseReconcileService {
 
     constructor(
         private readonly uploads: WorkKnowledgeUploadRepository,
+        // Optional so consumers that import KnowledgeBaseModule but never run a
+        // reconcile (e.g. internal-cli's WorkModule import chain, which bootstraps
+        // the whole Nest graph without wiring KbStorageModule) still CONSTRUCT.
+        // The API provides KB_STORAGE_PLUGIN via the @Global() KbStorageModule.
+        // Mirrors KnowledgeBaseMediaNormalizeService, whose KB_STORAGE_PLUGIN is
+        // @Optional() for exactly this reason — without it the CLI bootstrap dies
+        // with "Nest can't resolve dependencies of the KnowledgeBaseReconcileService
+        // … KB_STORAGE_PLUGIN at index [1]". `findOrphanObjects` guards on it below.
+        @Optional()
         @Inject(KB_STORAGE_PLUGIN)
-        private readonly storage: IStoragePlugin & StorageListingBackend,
+        private readonly storage?: IStoragePlugin & StorageListingBackend,
         @Optional()
         @Inject(KB_RECONCILE_POSTHOG_CLIENT)
         private readonly posthog?: KbReconcilePostHogClient,
@@ -147,6 +156,20 @@ export class KnowledgeBaseReconcileService {
     }
 
     private async findOrphanObjects(opts: { workId?: string }): Promise<number> {
+        // Storage is @Optional() (see the constructor) — absent in DI scopes that
+        // import KnowledgeBaseModule without KbStorageModule. The orphan scan is
+        // the only step that needs it; skip it (markStaleUploads still runs) rather
+        // than crash, exactly as the missing-listObjects() case below does.
+        if (!this.storage) {
+            if (!STORAGE_CAPABILITY_WARN_ONCE.has(this)) {
+                STORAGE_CAPABILITY_WARN_ONCE.add(this);
+                this.logger.warn(
+                    'kb-reconcile: KB_STORAGE_PLUGIN is not provided in this DI scope — ' +
+                        'skipping orphan scan. Wire KbStorageModule to enable it.',
+                );
+            }
+            return 0;
+        }
         if (typeof this.storage.listObjects !== 'function') {
             // Warn once per storage instance — the cron runs daily; one log
             // line per backend is enough signal without flooding aggregation.

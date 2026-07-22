@@ -33,7 +33,7 @@ import {
 } from '../database/repositories/auth-account.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { GitHubAppInstallationRepository } from '../database/repositories/github-app-installation.repository';
-import type { AuthAccount } from '../entities';
+import type { AuthAccount } from '../entities/auth-account.entity';
 import { FacadeError } from './base.facade';
 import { config } from '@src/config';
 import { requestGitHubAppInstallationAccessTokenDetails } from '@src/utils';

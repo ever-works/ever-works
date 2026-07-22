@@ -1,6 +1,6 @@
 import type { Repository, SelectQueryBuilder, UpdateQueryBuilder } from 'typeorm';
 import { OnboardingRequestRepository } from '../onboarding-request.repository';
-import { OnboardingRequest } from '../../../entities';
+import { OnboardingRequest } from '../../../entities/onboarding-request.entity';
 import type { OnboardingStatus } from '../../../entities/onboarding-request.entity';
 
 type Mocked = jest.Mocked<

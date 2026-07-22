@@ -13,6 +13,17 @@ module.exports = {
                     // 2307: cross-package @src path alias not resolved by TS (handled by moduleNameMapper)
                     // 2589: deep type instantiation in zodToJsonSchema chain reachable via @ever-works/agent
                     ignoreCodes: [151002, 2305, 2307, 2589],
+                    // Type-check THIS app's sources only. Sibling workspace packages are
+                    // already type-checked by their own `build`/`test`, so re-checking their
+                    // source here is redundant - and actively harmful: pulled in through the
+                    // `@src` fallback below, `packages/agent` drags the whole entity/zod graph
+                    // past TypeScript's instantiation limits, at which point `z.infer` silently
+                    // widens fields to `unknown` and rains TS2345/TS2322 on code that is
+                    // perfectly correct (and that `zod.parse()` guarantees at runtime). That is
+                    // the same bailout already waived as 2589 above. Waiving 2345/2322 globally
+                    // instead would hide REAL type errors in apps/api, so scope the diagnostics
+                    // rather than widen the ignore list.
+                    exclude: ['**/packages/**', '**/node_modules/**'],
                 },
             },
         ],
@@ -32,7 +43,22 @@ module.exports = {
         // so cross-package tests (claim-account.service.spec,
         // deploy.e2e.spec, etc.) can load entities without TS2307.
         '^@src/items-generator/(.*)$': '<rootDir>/../../../packages/agent/src/items-generator/$1',
-        '^@src/(.*)$': '<rootDir>/$1',
+        // `@src/...` is ambiguous across the monorepo: apps/api AND packages/agent
+        // each define it for their own `src`. An api spec that transitively pulls in
+        // an agent file hits that file's own `@src/...` import, which this mapper then
+        // resolves against apps/api/src and fails the suite before a single test runs:
+        //   Configuration error: Could not locate module
+        //   @src/database/repositories/plugin-usage.repository
+        // Jest accepts an ARRAY of targets and tries them in order, so prefer api's own
+        // src and fall back to the agent package. The one-off `@src/generators` and
+        // `@src/items-generator` rules above were this same bug patched per-path;
+        // packages/agent has 148 `@src/entities/`, 57 `@src/database/` and 41
+        // `@src/works-config/` imports, so per-path patching was never going to hold.
+        //
+        // This matters beyond tidiness: while these suites failed to RUN, no api-side
+        // module-compile test could execute at all - which is how the
+        // InboundTriggersModule DI regression reached production unnoticed.
+        '^@src/(.*)$': ['<rootDir>/$1', '<rootDir>/../../../packages/agent/src/$1'],
         // Map workspace packages to their source TypeScript files for testing
         '^@ever-works/plugin$': '<rootDir>/../../../packages/plugin/src/index.ts',
         // Specific subpath: `@ever-works/plugin/helpers/ssrf-guard` is a single
