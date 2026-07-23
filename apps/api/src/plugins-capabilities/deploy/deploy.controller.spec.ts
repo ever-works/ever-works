@@ -65,6 +65,7 @@ describe('DeployController', () => {
         addDomain: jest.Mock;
         removeDomain: jest.Mock;
         verifyDomain: jest.Mock;
+        setWorkDbOverride: jest.Mock;
     };
     let ownershipService: {
         ensureCanEdit: jest.Mock;
@@ -123,6 +124,9 @@ describe('DeployController', () => {
             addDomain: jest.fn(),
             removeDomain: jest.fn(),
             verifyDomain: jest.fn(),
+            // Mirrors the per-Work DB override into the PostgreSQL DB plugin;
+            // the controller calls this best-effort (.catch) on runtime-env save.
+            setWorkDbOverride: jest.fn().mockResolvedValue(undefined),
         };
         ownershipService = {
             ensureCanEdit: jest.fn(),

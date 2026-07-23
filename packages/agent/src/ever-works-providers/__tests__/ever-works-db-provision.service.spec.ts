@@ -8,11 +8,16 @@ import type { WorkRuntimeEnvService } from '../../services/work-runtime-env.serv
  */
 describe('EverWorksDbProvisionService', () => {
     const ORIGINAL_ENV = { ...process.env };
-    let runtimeEnv: jest.Mocked<Pick<WorkRuntimeEnvService, 'getDatabaseUrl'>>;
+    let runtimeEnv: jest.Mocked<
+        Pick<WorkRuntimeEnvService, 'getDatabaseUrl' | 'setDatabaseUrlIfNull'>
+    >;
     let service: EverWorksDbProvisionService;
 
     beforeEach(() => {
-        runtimeEnv = { getDatabaseUrl: jest.fn() } as never;
+        runtimeEnv = {
+            getDatabaseUrl: jest.fn(),
+            setDatabaseUrlIfNull: jest.fn(),
+        } as never;
         service = new EverWorksDbProvisionService(runtimeEnv as unknown as WorkRuntimeEnvService);
     });
 
@@ -44,6 +49,40 @@ describe('EverWorksDbProvisionService', () => {
             const result = await service.testConnection('mysql://user:pw@host/db');
             expect(result.ok).toBe(false);
             expect(result.error).toMatch(/postgres/i);
+        });
+    });
+
+    describe('resolveFromPluginSettings', () => {
+        it('uses a work-scoped override connection string as-is (trimmed)', async () => {
+            runtimeEnv.setDatabaseUrlIfNull.mockResolvedValue('postgresql://o:p@h/db');
+            const url = await service.resolveFromPluginSettings('w1', {
+                overrideConnectionString: '  postgresql://o:p@h/db  ',
+            });
+            expect(runtimeEnv.setDatabaseUrlIfNull).toHaveBeenCalledWith(
+                'w1',
+                'postgresql://o:p@h/db',
+            );
+            expect(url).toBe('postgresql://o:p@h/db');
+        });
+
+        it('returns null for custom mode with a blank connection string', async () => {
+            await expect(
+                service.resolveFromPluginSettings('w1', {
+                    mode: 'custom',
+                    customConnectionString: '   ',
+                }),
+            ).resolves.toBeNull();
+            expect(runtimeEnv.setDatabaseUrlIfNull).not.toHaveBeenCalled();
+        });
+
+        it('falls back to the managed Ever Works DB by default (null when not wired)', async () => {
+            delete process.env.DB_EVER_WORKS_SHARED_ENABLED;
+            delete process.env.DB_EVER_WORKS_SHARED_ADMIN_URL;
+            delete process.env.DB_EVER_WORKS_SHARED_HOST;
+            await expect(service.resolveFromPluginSettings('w1', {})).resolves.toBeNull();
+            await expect(
+                service.resolveFromPluginSettings('w1', { mode: 'ever-works-db' }),
+            ).resolves.toBeNull();
         });
     });
 });
