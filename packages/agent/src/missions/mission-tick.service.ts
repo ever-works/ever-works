@@ -13,6 +13,8 @@ import {
 } from '../work-agent/idea-build-executor.dispatcher';
 import { WorkProposalRepository } from '../user-research/work-proposal.repository';
 import { WorkProposalService } from '../user-research/work-proposal.service';
+import { MAX_MISSION_WORKS_IN_PROMPT, type MissionWorkContext } from '../user-research/prompts';
+import { WorkRepository } from '../database/repositories/work.repository';
 import { matchesCron } from './cron-matcher';
 
 /**
@@ -135,6 +137,13 @@ export class MissionTickService {
         @Optional()
         @Inject(IDEA_BUILD_EXECUTE_DISPATCHER)
         private readonly ideaBuildDispatcher?: IdeaBuildExecuteDispatcher,
+        // Existing Works are handed to idea generation so a Mission can
+        // propose improving one instead of always minting a new Work.
+        // Optional so the hand-rolled unit-test constructors keep working;
+        // when absent the generator simply sees no existing Works, which is
+        // the previous behaviour.
+        @Optional()
+        private readonly works?: WorkRepository,
     ) {}
 
     /**
@@ -329,6 +338,7 @@ export class MissionTickService {
                     // KB excerpts wiring lands when Phase 8 PR JJ
                     // mounts the per-Mission KB; until then the
                     // generator just gets the Mission's prose Goal.
+                    existingWorks: await this.loadExistingWorks(mission),
                 },
                 targetCount,
             });
@@ -417,6 +427,41 @@ export class MissionTickService {
      * swallowed — the Idea is already QUEUED (today's behavior), so the
      * tick is never failed and other Ideas in the batch still proceed.
      */
+    /**
+     * The Works idea generation should know about for this Mission.
+     *
+     * A Mission orchestrates Works; without this the generator only sees the
+     * Mission's own prose and can therefore only ever propose building
+     * something new, even when extending an existing Work is the right
+     * answer.
+     *
+     * Scoped to the Mission owner's Works — the same scope every other
+     * Mission read uses. Best-effort: a failure here degrades idea quality,
+     * so it must not abort the tick.
+     */
+    private async loadExistingWorks(mission: Mission): Promise<MissionWorkContext[]> {
+        if (!this.works) {
+            return [];
+        }
+
+        try {
+            const works = await this.works.findByUser(mission.userId);
+            return works.slice(0, MAX_MISSION_WORKS_IN_PROMPT).map((work) => ({
+                name: work.name,
+                slug: work.slug,
+                kind: work.kind ?? null,
+                description: work.description ?? null,
+            }));
+        } catch (error) {
+            this.logger.warn(
+                `Mission ${mission.id}: failed to load existing Works for idea context: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return [];
+        }
+    }
+
     private async createAndEnqueueBuildGoal(userId: string, proposal: WorkProposal): Promise<void> {
         try {
             // PR-4 x PR-5 — the build-request factory was renamed from
