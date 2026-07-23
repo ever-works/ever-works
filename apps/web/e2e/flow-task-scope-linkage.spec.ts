@@ -20,9 +20,9 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *
  *   POST /api/tasks { title, missionId?|ideaId?|workId? }            → 201
  *     - status:'backlog', priority:'p3', slug:'T-n' (per-user counter).
- *     - Scope columns are nullable + additive; service enforces "exactly
- *       zero or one of missionId/ideaId/workId" → popCount>1 is 400
- *       "...exactly zero or one of missionId / ideaId / workId.".
+ *     - Owner columns are nullable + additive AND non-exclusive: a Task may
+ *       carry any combination of missionId/ideaId/workId (and teamId/
+ *       agentId/goalId) at once, and every id round-trips.
  *     - The scope id is FK-enforced AND ownership-enforced at create time
  *       (`assertScopeReachable`): a workId/missionId/ideaId that does not
  *       exist — OR exists but is owned by another user — is a 400
@@ -251,9 +251,12 @@ test.describe('Task ↔ scope linkage (Mission / Idea / Work)', () => {
             slug: `excl-work-${s}`,
         });
 
-        // ALL THREE pairings violate "exactly zero or one" → 400 with the
-        // same server message. (The mission-idea spec only checked the
-        // mission+idea pairing; work+* is the new coverage.)
+        // Task ownership is NON-EXCLUSIVE. A Task raised by a Mission, filed
+        // against a Work, and derived from an Idea is one Task with three
+        // associations — the platform previously rejected that pairing with
+        // "exactly zero or one of missionId / ideaId / workId", which made
+        // the relationship impossible to express. Every pairing must now be
+        // accepted and every id persisted.
         const pairs: Array<[string, Record<string, string>]> = [
             ['mission+idea', { missionId, ideaId }],
             ['mission+work', { missionId, workId }],
@@ -262,18 +265,25 @@ test.describe('Task ↔ scope linkage (Mission / Idea / Work)', () => {
         for (const [label, scope] of pairs) {
             const res = await request.post(`${API_BASE}/api/tasks`, {
                 headers,
-                data: { title: `reject ${label} ${s}`, ...scope },
+                data: { title: `accept ${label} ${s}`, ...scope },
             });
-            expect(res.status(), `${label} should be 400`).toBe(400);
-            expect((await res.json()).message).toMatch(/exactly zero or one/i);
+            expect(res.status(), `${label} should be accepted`).toBe(201);
+            const created = await res.json();
+            for (const [key, value] of Object.entries(scope)) {
+                expect(created[key], `${label} should persist ${key}`).toBe(value);
+            }
         }
 
-        // All three scopes together is ALSO a 400 (popCount 3 > 1).
+        // All three at once is likewise accepted, and all three persist.
         const triple = await request.post(`${API_BASE}/api/tasks`, {
             headers,
-            data: { title: `reject triple ${s}`, missionId, ideaId, workId },
+            data: { title: `accept triple ${s}`, missionId, ideaId, workId },
         });
-        expect(triple.status()).toBe(400);
+        expect(triple.status()).toBe(201);
+        const tripleTask = await triple.json();
+        expect(tripleTask.missionId).toBe(missionId);
+        expect(tripleTask.ideaId).toBe(ideaId);
+        expect(tripleTask.workId).toBe(workId);
 
         // Linkage is FK + ownership enforced (`assertScopeReachable`): a Task
         // pinned to a never-created ghost workId is REJECTED at create time

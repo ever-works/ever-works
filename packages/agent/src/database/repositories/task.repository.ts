@@ -10,6 +10,9 @@ export interface ListTasksFilter {
     missionId?: string;
     ideaId?: string;
     workId?: string;
+    teamId?: string;
+    agentId?: string;
+    goalId?: string;
     parentTaskId?: string;
     label?: string;
     search?: string;
@@ -70,6 +73,12 @@ export class TaskRepository {
             qb.andWhere('task.missionId = :missionId', { missionId: filter.missionId });
         if (filter.ideaId) qb.andWhere('task.ideaId = :ideaId', { ideaId: filter.ideaId });
         if (filter.workId) qb.andWhere('task.workId = :workId', { workId: filter.workId });
+        // Owner filters combine with AND: passing both workId and teamId
+        // means "tasks that belong to this Work AND this Team", which is
+        // what the scoped list views on each owner's tab need.
+        if (filter.teamId) qb.andWhere('task.teamId = :teamId', { teamId: filter.teamId });
+        if (filter.agentId) qb.andWhere('task.agentId = :agentId', { agentId: filter.agentId });
+        if (filter.goalId) qb.andWhere('task.goalId = :goalId', { goalId: filter.goalId });
         if (filter.parentTaskId)
             qb.andWhere('task.parentTaskId = :parentTaskId', { parentTaskId: filter.parentTaskId });
 

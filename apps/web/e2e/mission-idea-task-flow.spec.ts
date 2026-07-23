@@ -17,11 +17,11 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *      missionId:null (the AI research pipeline is what links Ideas to a
  *      Mission, and there's no provider on the e2e stack). We assert that
  *      truthfully rather than inventing a linkage the API rejects.
- *   3. POST /api/tasks links a Task to a parent. Scoping is MUTUALLY
- *      EXCLUSIVE — the API rejects a Task carrying both missionId AND
- *      ideaId ("scoped to exactly zero or one of missionId / ideaId /
- *      workId"). So the hierarchy is expressed as a Mission-scoped Task
- *      and an Idea-scoped Task. Both persist with status:'backlog'.
+ *   3. POST /api/tasks links a Task to its owners. Ownership is NON-
+ *      EXCLUSIVE — a Task may carry missionId AND ideaId together, and
+ *      both persist. The hierarchy is additionally expressed as a
+ *      Mission-scoped Task and an Idea-scoped Task, all with
+ *      status:'backlog'.
  *   4. GET /api/tasks?missionId=<id> returns only the Mission's Task;
  *      GET /api/tasks?ideaId=<id> returns only the Idea's Task. Neither
  *      filter leaks the other scope's Task nor an unscoped Task.
@@ -111,14 +111,16 @@ test.describe('Mission → Idea → Task hierarchy (seeded user)', () => {
         expect((ideaList as Array<{ id: string }>).some((i) => i.id === idea.id)).toBe(false);
 
         // ── 3. A Mission-scoped Task and an Idea-scoped Task persist ───────
-        // (Tasks are scoped to AT MOST ONE parent — missionId+ideaId together
-        // is a 400. Two Tasks express the two branches of the hierarchy.)
+        // Task ownership is non-exclusive, so missionId+ideaId together is a
+        // valid Task that belongs to both, not a 400.
         const both = await request.post(`${API_BASE}/api/tasks`, {
             headers,
-            data: { title: `Reject both ${stamp}`, missionId: mission.id, ideaId: idea.id },
+            data: { title: `Both ${stamp}`, missionId: mission.id, ideaId: idea.id },
         });
-        expect(both.status()).toBe(400);
-        expect((await both.json()).message).toMatch(/exactly zero or one/i);
+        expect(both.status()).toBe(201);
+        const bothTask = await both.json();
+        expect(bothTask.missionId).toBe(mission.id);
+        expect(bothTask.ideaId).toBe(idea.id);
 
         const missionTaskTitle = `Mission Task ${stamp}`;
         const missionTaskRes = await request.post(`${API_BASE}/api/tasks`, {

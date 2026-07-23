@@ -51,6 +51,23 @@ export class CreateTaskDto {
     @IsUUID()
     workId?: string | null;
 
+    /**
+     * Optional, non-exclusive owners. A Task may be filed against any
+     * combination of Work / Team / Agent / Idea / Goal / Mission — these
+     * are independent associations, not a single "parent" choice.
+     */
+    @IsOptional()
+    @IsUUID()
+    teamId?: string | null;
+
+    @IsOptional()
+    @IsUUID()
+    agentId?: string | null;
+
+    @IsOptional()
+    @IsUUID()
+    goalId?: string | null;
+
     @IsOptional()
     @IsUUID()
     parentTaskId?: string | null;
@@ -79,6 +96,34 @@ export class UpdateTaskDto {
     @IsString({ each: true })
     @MaxLength(80, { each: true })
     labels?: string[] | null;
+
+    /**
+     * Re-filing a Task under a different owner. `null` detaches it from
+     * that owner without touching the others.
+     */
+    @IsOptional()
+    @IsUUID()
+    workId?: string | null;
+
+    @IsOptional()
+    @IsUUID()
+    missionId?: string | null;
+
+    @IsOptional()
+    @IsUUID()
+    ideaId?: string | null;
+
+    @IsOptional()
+    @IsUUID()
+    teamId?: string | null;
+
+    @IsOptional()
+    @IsUUID()
+    agentId?: string | null;
+
+    @IsOptional()
+    @IsUUID()
+    goalId?: string | null;
 
     @IsOptional()
     @IsUUID()

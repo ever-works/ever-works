@@ -10,6 +10,8 @@ import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
 import { Task, TaskPriority, TaskStatus, type TaskActorType } from '../entities/task.entity';
 import { Mission } from '../entities/mission.entity';
+import { Team } from '../entities/team.entity';
+import { Goal } from '../entities/goal.entity';
 import { TaskRepository, type ListTasksFilter } from '../database/repositories/task.repository';
 import {
     TaskAssigneeRepository,
@@ -40,6 +42,9 @@ export interface CreateTaskInput {
     missionId?: string | null;
     ideaId?: string | null;
     workId?: string | null;
+    teamId?: string | null;
+    agentId?: string | null;
+    goalId?: string | null;
     parentTaskId?: string | null;
     createdByType: TaskActorType;
     createdById: string;
@@ -51,9 +56,33 @@ export interface UpdateTaskInput {
     description?: string | null;
     priority?: TaskPriority;
     labels?: string[] | null;
+    missionId?: string | null;
+    ideaId?: string | null;
+    workId?: string | null;
+    teamId?: string | null;
+    agentId?: string | null;
+    goalId?: string | null;
     parentTaskId?: string | null;
     requireAllApprovers?: boolean;
 }
+
+/**
+ * The optional owners a Task can be filed against.
+ *
+ * Ownership is non-exclusive by design: a Task raised by a Mission, worked
+ * by an Agent, and belonging to a Work is one Task with three associations,
+ * not three Tasks. Each owner is independently filterable.
+ */
+export const TASK_OWNER_KEYS = [
+    'workId',
+    'missionId',
+    'ideaId',
+    'teamId',
+    'agentId',
+    'goalId',
+] as const;
+
+export type TaskOwnerKey = (typeof TASK_OWNER_KEYS)[number];
 
 @Injectable()
 export class TasksService {
@@ -82,6 +111,12 @@ export class TasksService {
         @InjectRepository(Mission)
         private readonly missions?: Repository<Mission>,
         @Optional() private readonly ideas?: WorkProposalRepository,
+        @Optional()
+        @InjectRepository(Team)
+        private readonly teams?: Repository<Team>,
+        @Optional()
+        @InjectRepository(Goal)
+        private readonly goals?: Repository<Goal>,
     ) {}
 
     /**
@@ -124,7 +159,10 @@ export class TasksService {
     }
 
     async create(userId: string, input: CreateTaskInput): Promise<Task> {
-        this.assertScopeExclusivity(input);
+        // Ownership is deliberately NOT exclusive. A Task may belong to a
+        // Work and a Team and have been raised by a Mission at the same
+        // time; the previous "exactly zero or one of missionId/ideaId/workId"
+        // rule made that impossible to express.
         await this.assertScopeReachable(userId, input);
         this.assertTitle(input.title);
         if (input.description) assertNoSecrets(input.description, 'task.description');
@@ -144,6 +182,9 @@ export class TasksService {
                     missionId: input.missionId ?? null,
                     ideaId: input.ideaId ?? null,
                     workId: input.workId ?? null,
+                    teamId: input.teamId ?? null,
+                    agentId: input.agentId ?? null,
+                    goalId: input.goalId ?? null,
                 },
                 parent,
             );
@@ -190,6 +231,9 @@ export class TasksService {
             missionId: input.missionId ?? null,
             ideaId: input.ideaId ?? null,
             workId: input.workId ?? null,
+            teamId: input.teamId ?? null,
+            agentId: input.agentId ?? null,
+            goalId: input.goalId ?? null,
             parentTaskId: input.parentTaskId ?? null,
             createdByType: input.createdByType,
             createdById: input.createdById,
@@ -221,6 +265,23 @@ export class TasksService {
         if (input.labels !== undefined) patch.labels = input.labels;
         if (input.requireAllApprovers !== undefined)
             patch.requireAllApprovers = input.requireAllApprovers;
+
+        // Re-filing a Task under different owners. Each owner is set
+        // independently — passing `null` detaches just that one. Any newly
+        // supplied owner is validated for reachability exactly as on create,
+        // so a caller cannot attach a Task to something they cannot see.
+        const ownerPatch: Partial<Record<TaskOwnerKey, string | null>> = {};
+        for (const key of TASK_OWNER_KEYS) {
+            if (input[key] !== undefined) {
+                ownerPatch[key] = input[key] ?? null;
+            }
+        }
+        if (Object.keys(ownerPatch).length > 0) {
+            await this.assertScopeReachable(userId, {
+                ...ownerPatch,
+            } as CreateTaskInput);
+            Object.assign(patch, ownerPatch);
+        }
 
         if (input.parentTaskId !== undefined) {
             if (input.parentTaskId === null) {
@@ -600,15 +661,6 @@ export class TasksService {
         }
     }
 
-    private assertScopeExclusivity(input: CreateTaskInput): void {
-        const popCount = [input.missionId, input.ideaId, input.workId].filter(Boolean).length;
-        if (popCount > 1) {
-            throw new BadRequestException(
-                'Task must be scoped to exactly zero or one of missionId / ideaId / workId.',
-            );
-        }
-    }
-
     private async assertScopeReachable(userId: string, input: CreateTaskInput): Promise<void> {
         if (input.workId) {
             if (!this.works) {
@@ -640,11 +692,50 @@ export class TasksService {
                 throw new BadRequestException(`Idea ${input.ideaId} not found.`);
             }
         }
+        // Security: the three newer owners get the same ownership check as
+        // the three above. Without it a caller could file their Task against
+        // another user's Team / Agent / Goal, which both leaks the existence
+        // of that row and pollutes the victim's scoped task lists. The DB
+        // foreign key only guarantees the row exists — not that the caller
+        // may see it.
+        if (input.teamId) {
+            if (!this.teams) {
+                throw new BadRequestException('Team repository not wired in this context.');
+            }
+            const team = await this.teams.findOne({
+                where: { id: input.teamId, userId },
+                select: ['id'],
+            });
+            if (!team) {
+                throw new BadRequestException(`Team ${input.teamId} not found.`);
+            }
+        }
+        if (input.agentId) {
+            if (!this.agents) {
+                throw new BadRequestException('Agent repository not wired in this context.');
+            }
+            const agent = await this.agents.findByIdAndUser(input.agentId, userId);
+            if (!agent) {
+                throw new BadRequestException(`Agent ${input.agentId} not found.`);
+            }
+        }
+        if (input.goalId) {
+            if (!this.goals) {
+                throw new BadRequestException('Goal repository not wired in this context.');
+            }
+            const goal = await this.goals.findOne({
+                where: { id: input.goalId, userId },
+                select: ['id'],
+            });
+            if (!goal) {
+                throw new BadRequestException(`Goal ${input.goalId} not found.`);
+            }
+        }
     }
 
     private assertParentScopeMatches(
-        child: Pick<Task, 'missionId' | 'ideaId' | 'workId'>,
-        parent: Pick<Task, 'missionId' | 'ideaId' | 'workId'>,
+        child: Pick<Task, TaskOwnerKey>,
+        parent: Pick<Task, TaskOwnerKey>,
     ): void {
         const childScope = this.scopeKey(child);
         const parentScope = this.scopeKey(parent);
@@ -655,11 +746,23 @@ export class TasksService {
         }
     }
 
-    private scopeKey(scope: Pick<Task, 'missionId' | 'ideaId' | 'workId'>): string {
-        if (scope.workId) return `work:${scope.workId}`;
-        if (scope.missionId) return `mission:${scope.missionId}`;
-        if (scope.ideaId) return `idea:${scope.ideaId}`;
-        return 'unscoped';
+    /**
+     * Stable key describing the FULL owner tuple of a Task.
+     *
+     * Now that ownership is non-exclusive, a sub-task must agree with its
+     * parent on every owner, not just on whichever one happened to be set
+     * first. Keys are emitted in the fixed `TASK_OWNER_KEYS` order so two
+     * Tasks with the same owners always produce the same string.
+     */
+    private scopeKey(scope: Pick<Task, TaskOwnerKey>): string {
+        const parts: string[] = [];
+        for (const key of TASK_OWNER_KEYS) {
+            const value = scope[key];
+            if (value) {
+                parts.push(`${key.slice(0, -2)}:${value}`);
+            }
+        }
+        return parts.length > 0 ? parts.join('|') : 'unscoped';
     }
 
     private diffFor(before: Task, after: Task): Record<string, unknown> {

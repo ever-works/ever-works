@@ -14,6 +14,8 @@ import { UserTaskCounter } from '../entities/user-task-counter.entity';
 import { WorkKnowledgeUpload } from '../entities/work-knowledge-upload.entity';
 import { Work } from '../entities/work.entity';
 import { Mission } from '../entities/mission.entity';
+import { Team } from '../entities/team.entity';
+import { Goal } from '../entities/goal.entity';
 import { WorkProposal } from '../entities/work-proposal.entity';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { WorkKnowledgeUploadRepository } from '../database/repositories/work-knowledge-upload.repository';
@@ -65,6 +67,13 @@ import { NotificationsModule } from '../notifications/notifications.module';
             Work,
             Mission,
             WorkProposal,
+            // Owner-reachability checks for the Team / Goal task owners.
+            // These MUST also be present in the DataSource ENTITIES array
+            // (`packages/agent/src/database/database.config.ts`) — this repo
+            // has no `autoLoadEntities`, so a forFeature'd-but-unregistered
+            // entity throws EntityMetadataNotFoundError on first query.
+            Team,
+            Goal,
         ]),
         ActivityLogModule,
         // Phase 15 — TaskTransitionService + TaskChatService consume

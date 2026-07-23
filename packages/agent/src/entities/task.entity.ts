@@ -21,11 +21,13 @@ import { PortableDateColumn } from './_types';
  * row is a template; the `task-recurrence-dispatcher` cron clones
  * instances from it and points them back via `parentRecurringTaskId`.
  *
- * Scope columns (missionId/ideaId/workId) are deliberately nullable
- * and additive — a Task may be unscoped (tenant Inbox), or pinned to
- * any one of the three. They are NOT mutually exclusive at the schema
- * level; service-layer validation enforces the "exactly zero or one"
- * rule.
+ * Owner columns (workId/missionId/ideaId/teamId/agentId/goalId) are
+ * deliberately nullable and additive — a Task may be unscoped (tenant
+ * Inbox) or filed against any COMBINATION of them. They are not mutually
+ * exclusive at the schema level, and no longer at the service level
+ * either: a Task raised by a Mission, worked by an Agent and belonging to
+ * a Work is one Task with three associations, not three Tasks. Each owner
+ * is independently filterable via `ListTasksFilter`.
  */
 export enum TaskStatus {
     BACKLOG = 'backlog',
@@ -56,6 +58,11 @@ export type TaskActorType = 'user' | 'agent';
 @Index('idx_tasks_work', ['workId', 'status'])
 @Index('idx_tasks_mission', ['missionId', 'status'])
 @Index('idx_tasks_idea', ['ideaId', 'status'])
+// Same (owner, status) shape as the three above — every owner tab lists
+// "open tasks for X", so status is always the second predicate.
+@Index('idx_tasks_team', ['teamId', 'status'])
+@Index('idx_tasks_agent', ['agentId', 'status'])
+@Index('idx_tasks_goal', ['goalId', 'status'])
 @Index('idx_tasks_parent', ['parentTaskId'])
 // Phase 17 hot path — dispatcher walks rows where (isRecurring, nextOccurrenceAt <= now).
 @Index('idx_tasks_recurrence_due', ['isRecurring', 'nextOccurrenceAt'])
@@ -99,6 +106,30 @@ export class Task {
 
     @Column({ type: 'uuid', nullable: true })
     workId?: string | null;
+
+    /**
+     * Additional optional owners a Task can hang off.
+     *
+     * A Task is not exclusively owned by any one of these — the same Task
+     * may belong to a Work AND be assigned to a Team AND have been raised
+     * by a Mission. They are therefore independent nullable columns rather
+     * than a polymorphic `(subjectType, subjectId)` pair: every one of them
+     * has to be independently filterable ("tasks for this Work",
+     * "tasks for this Team"), which a single discriminated pair cannot do.
+     *
+     * Deliberately NO `@ManyToOne` — the Tier-A scope columns below carry
+     * the same note. Adding relations here reintroduces the entities import
+     * cycle that bit Phase 2; the FKs are enforced at the DB level by the
+     * accompanying migration instead.
+     */
+    @Column({ type: 'uuid', nullable: true })
+    teamId?: string | null;
+
+    @Column({ type: 'uuid', nullable: true })
+    agentId?: string | null;
+
+    @Column({ type: 'uuid', nullable: true })
+    goalId?: string | null;
 
     @Column({ type: 'uuid', nullable: true })
     parentTaskId?: string | null;
