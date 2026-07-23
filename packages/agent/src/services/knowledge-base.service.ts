@@ -884,7 +884,15 @@ export class KnowledgeBaseService {
             classes: [...KB_ALWAYS_INJECTED_CLASSES],
             statuses: [KbDocumentStatus.ACTIVE],
         });
-        return items.map((d) => this.toBodyDto(d));
+        // A consolidation-superseded doc keeps status ACTIVE (the apply
+        // pass writes markers, never deletes), so status alone would let
+        // the archived loser ride into prompts right next to its
+        // survivor — contradictory context served as current truth. The
+        // survivor is part of this same ACTIVE list, so exclusion is the
+        // whole fix here.
+        return items
+            .filter((d) => d.consolidation?.state !== 'superseded')
+            .map((d) => this.toBodyDto(d));
     }
 
     /**
@@ -900,7 +908,12 @@ export class KnowledgeBaseService {
         query: string,
         limit: number,
     ): Promise<KbDocumentBodyDto[]> {
-        const chunks = await this.semanticSearch(workId, query, limit);
+        // Over-fetch chunk hits: supersession substitution below can
+        // CONVERGE several hits onto one survivor (and dead chains drop
+        // out entirely), which would under-fill the requested doc count
+        // if we only pulled `limit` chunks. 2× is a cheap single-query
+        // widening; the loop still cuts off at `limit` distinct docs.
+        const chunks = await this.semanticSearch(workId, query, limit * 2);
         if (chunks.length === 0) return [];
 
         const seen = new Set<string>();
@@ -912,11 +925,53 @@ export class KnowledgeBaseService {
         }
 
         const results: KbDocumentBodyDto[] = [];
+        const included = new Set<string>();
         for (const docId of orderedDocIds) {
-            const doc = await this.documentRepository.findById(workId, docId);
-            if (doc) results.push(this.toBodyDto(doc));
+            if (results.length >= limit) break;
+            const doc = await this.resolveCurrentDocument(workId, docId);
+            if (doc && !included.has(doc.id)) {
+                included.add(doc.id);
+                results.push(this.toBodyDto(doc));
+            }
         }
         return results;
+    }
+
+    /**
+     * Follow the consolidation supersession chain from a semantically
+     * retrieved doc to the doc that should be served as CURRENT truth.
+     *
+     * Retrieval works off chunk embeddings, which outlive a consolidation
+     * run — a hit can land on a doc whose `consolidation.state` is
+     * `superseded`. Serving that doc verbatim would inject the archived
+     * loser as if it were live, so instead its `supersededById` survivor
+     * is served in its place ("demote the archive, promote the
+     * replacement"). A visited-set + hop cap bounds the walk: markers are
+     * plain JSON and a hand-edited or re-consolidated pair could form a
+     * cycle. Dead ends (missing survivor, cycle, no id) return null — a
+     * degraded retrieval slot, never stale truth.
+     */
+    private async resolveCurrentDocument(
+        workId: string,
+        docId: string,
+    ): Promise<WorkKnowledgeDocument | null> {
+        // Hop cap on top of the cycle guard: each link costs a sequential
+        // findById, so a malformed or pathologically re-consolidated chain
+        // must not be able to stall prompt resolution. Real chains from
+        // repeated consolidation are survivor-of-survivor — a handful deep.
+        const MAX_SUPERSESSION_HOPS = 8;
+        const visited = new Set<string>();
+        let currentId = docId;
+        while (!visited.has(currentId) && visited.size < MAX_SUPERSESSION_HOPS) {
+            visited.add(currentId);
+            const doc = await this.documentRepository.findById(workId, currentId);
+            if (!doc) return null;
+            if (doc.consolidation?.state !== 'superseded') return doc;
+            const nextId = doc.consolidation.supersededById;
+            if (!nextId) return null;
+            currentId = nextId;
+        }
+        return null;
     }
 
     /**
