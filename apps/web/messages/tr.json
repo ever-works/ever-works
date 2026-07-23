@@ -3288,7 +3288,14 @@
                         "lastSuccess": "Last successful pull: {time}",
                         "lastError": "Last error: {error}"
                     }
-                }
+                },
+                "providerRepoTitle": "{provider} Deposu",
+                "providerRepoEnableLabel": "{provider} deposunu oluştur",
+                "providerRepoEnableDescription": "Bu İşin yapay zekâ tarafından üretilen, {provider} üzerinde yayımlanan okunabilir sürümü. Hiçbir yere dağıtılmaz — doğrudan {provider} üzerinde okunur.",
+                "providerRepoEnabled": "{provider} deposu oluşturma açıldı",
+                "providerRepoDisabled": "{provider} deposu oluşturma kapatıldı",
+                "providerRepoUpdateFailed": "Depo ayarı güncellenemedi",
+                "providerRepoDisabledNote": "Oluşturma kapalı. Mevcut depoya dokunulmaz — yalnızca güncellenmesi durur."
             },
             "deploy": {
                 "progress": {

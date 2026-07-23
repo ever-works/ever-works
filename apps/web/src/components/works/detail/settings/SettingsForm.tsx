@@ -11,6 +11,7 @@ import { ReadmeConfiguration } from './ReadmeConfiguration';
 import { RepoVisibilitySettings } from './RepoVisibilitySettings';
 import { AdvancedPromptsSettings } from './AdvancedPromptsSettings';
 import { CommunityPrSettings } from './CommunityPrSettings';
+import { ProviderRepositorySettings } from './ProviderRepositorySettings';
 import { WebsiteConfigSettings } from './WebsiteConfigSettings';
 import { ItemImportExportSettings } from './ItemImportExportSettings';
 import { CommitterSettings } from './CommitterSettings';
@@ -40,6 +41,7 @@ export function SettingsForm({ work, user, initialRepositories }: SettingsFormPr
                 <RepoVisibilitySettings initialRepositories={initialRepositories} />
 
                 {/* Community PR Processing Settings */}
+                <ProviderRepositorySettings />
                 <CommunityPrSettings />
 
                 {/* Advanced Prompts Settings */}

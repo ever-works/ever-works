@@ -3288,7 +3288,14 @@
                         "lastSuccess": "Last successful pull: {time}",
                         "lastError": "Last error: {error}"
                     }
-                }
+                },
+                "providerRepoTitle": "Репозиторій {provider}",
+                "providerRepoEnableLabel": "Створювати репозиторій {provider}",
+                "providerRepoEnableDescription": "Згенерована ШІ версія цієї роботи для читання, опублікована в {provider}. Вона ніколи не розгортається — її читають прямо в {provider}.",
+                "providerRepoEnabled": "Створення репозиторію {provider} увімкнено",
+                "providerRepoDisabled": "Створення репозиторію {provider} вимкнено",
+                "providerRepoUpdateFailed": "Не вдалося оновити налаштування репозиторію",
+                "providerRepoDisabledNote": "Створення вимкнено. Наявний репозиторій залишається недоторканим — він просто перестає оновлюватися."
             },
             "deploy": {
                 "progress": {

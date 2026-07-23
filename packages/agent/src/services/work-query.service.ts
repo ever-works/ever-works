@@ -22,6 +22,7 @@ type WorkMethods =
     | 'getDataRepo'
     | 'getWebsiteRepo'
     | 'getMainRepo'
+    | 'shouldGenerateProviderRepository'
     | 'getRepoOwner'
     | 'isCreator'
     | 'getMember'
