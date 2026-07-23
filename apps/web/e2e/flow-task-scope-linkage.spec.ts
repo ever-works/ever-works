@@ -311,7 +311,7 @@ test.describe('Task ↔ scope linkage (Mission / Idea / Work)', () => {
         expect(byGhost.ids).not.toContain(realTask.id);
     });
 
-    test('scope is immutable post-create: PATCH never moves a Task between scopes', async ({
+    test('owners are re-fileable via PATCH: detach + attach in one call, ownership-guarded, filters follow', async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
@@ -379,12 +379,12 @@ test.describe('Task ↔ scope linkage (Mission / Idea / Work)', () => {
         expect(after.workId).toBeNull();
         expect(after.missionId).toBe(missionId);
 
-        // The filters reflect the immutability: still in the work filter,
-        // still NOT in the mission filter after the failed move attempt.
+        // The list filters agree with the re-file: the task LEFT the work
+        // filter (workId is now null) and ENTERED the mission filter.
         const byWork = await listTaskIds(request, token, `workId=${workId}`);
-        expect(byWork.ids).toContain(task.id);
+        expect(byWork.ids).not.toContain(task.id);
         const byMission = await listTaskIds(request, token, `missionId=${missionId}`);
-        expect(byMission.ids).not.toContain(task.id);
+        expect(byMission.ids).toContain(task.id);
     });
 
     test('cross-user scope isolation: each user owns its own work scope, zero leakage; cross-read is 404', async ({

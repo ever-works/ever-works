@@ -276,21 +276,39 @@ export class TasksService {
                 ownerPatch[key] = input[key] ?? null;
             }
         }
-        if (Object.keys(ownerPatch).length > 0) {
+        // Only owners that actually CHANGE count. Re-sending the current
+        // value (a full-object PATCH from a client) must be a no-op, not a
+        // trigger for the sub-task guard below.
+        for (const key of TASK_OWNER_KEYS) {
+            if (key in ownerPatch && ownerPatch[key] === (task[key] ?? null)) {
+                delete ownerPatch[key];
+            }
+        }
+
+        // The owner tuple this row will hold AFTER the patch — every
+        // hierarchy check below validates against this, never against the
+        // stale pre-patch row.
+        const nextOwners = { ...task, ...ownerPatch } as Pick<Task, TaskOwnerKey>;
+        const ownersChanged = Object.keys(ownerPatch).length > 0;
+
+        if (ownersChanged) {
             await this.assertScopeReachable(userId, {
                 ...ownerPatch,
             } as CreateTaskInput);
 
             // Re-filing a Task must not break the sub-task hierarchy. The
             // create path enforces "a child agrees with its parent on every
-            // owner"; without the same check here, a child under a parent
-            // scoped to Work A could be moved to Work B and the two would
-            // silently disagree.
-            const nextOwners = { ...task, ...ownerPatch } as Pick<Task, TaskOwnerKey>;
-
-            const parentId = input.parentTaskId ?? task.parentTaskId;
-            if (parentId) {
-                const parent = await this.tasks.findByIdAndUser(parentId, userId);
+            // owner"; the same must hold against the parent this row will
+            // ACTUALLY have after this request:
+            //   - explicit `parentTaskId: null` detaches — no parent to
+            //     agree with, so no check (`?? task.parentTaskId` here
+            //     would wrongly validate against the parent being severed);
+            //   - a new parentTaskId is validated in the parent block below
+            //     against the same post-patch tuple.
+            const effectiveParentId =
+                input.parentTaskId !== undefined ? input.parentTaskId : task.parentTaskId;
+            if (effectiveParentId) {
+                const parent = await this.tasks.findByIdAndUser(effectiveParentId, userId);
                 if (parent) {
                     this.assertParentScopeMatches(nextOwners, parent);
                 }
@@ -321,7 +339,12 @@ export class TasksService {
                 if (!parent) {
                     throw new BadRequestException(`Parent Task ${input.parentTaskId} not found.`);
                 }
-                this.assertParentScopeMatches(task, parent);
+                // Validate against the POST-patch owner tuple. Using the
+                // stale row here rejected every coherent "move to Work B and
+                // re-parent under a Work-B parent" in one PATCH: the owner
+                // block approved the move, then this check compared the OLD
+                // owners against the NEW parent and threw.
+                this.assertParentScopeMatches(nextOwners, parent);
                 const isCycle = await this.tasks.wouldCreateCycle(id, input.parentTaskId);
                 if (isCycle) {
                     throw new ConflictException(
