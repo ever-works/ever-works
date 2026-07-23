@@ -213,7 +213,7 @@ export interface UseOnboardingFlowResult {
     readonly refresh: () => void;
     readonly jumpTo: (index: number) => void;
     readonly finish: (options?: { dismissed?: boolean }) => void;
-    readonly notePlannedClick: (bucket: 'ai' | 'storage' | 'deploy', choice: string) => void;
+    readonly notePlannedClick: (bucket: 'ai' | 'storage' | 'db' | 'deploy', choice: string) => void;
 }
 
 /**
@@ -358,7 +358,7 @@ export function useOnboardingFlow({
     );
 
     const notePlannedClick = useCallback(
-        (bucket: 'ai' | 'storage' | 'deploy', choice: string) =>
+        (bucket: 'ai' | 'storage' | 'db' | 'deploy', choice: string) =>
             trackEvent('onboarding_planned_card_clicked', { bucket, choice }),
         [trackEvent],
     );

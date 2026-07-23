@@ -1412,7 +1412,7 @@ describe('DeployController', () => {
 
                 expect(ownershipService.ensureCanView).toHaveBeenCalledWith('work-1', 'caller-1');
                 expect(managedSubdomainService.getState).toHaveBeenCalledWith('work-1');
-                expect(result).toEqual(stateOk);
+                expect(result).toEqual({ status: 'success', ...stateOk });
             });
 
             it('propagates an ownership 404 verbatim without touching the service', async () => {
@@ -1442,6 +1442,7 @@ describe('DeployController', () => {
                 const result = await controller.getManagedSubdomain(auth, 'work-1');
 
                 expect(result).toEqual({
+                    status: 'success',
                     subdomain: null,
                     fqdn: null,
                     url: null,
@@ -1471,7 +1472,7 @@ describe('DeployController', () => {
                         details: { subdomain: 'my-site', fqdn: 'my-site.ever.works' },
                     }),
                 );
-                expect(result).toEqual(stateOk);
+                expect(result).toEqual({ status: 'success', ...stateOk });
             });
 
             it('does not call the service when ensureCanEdit rejects', async () => {
@@ -1534,7 +1535,7 @@ describe('DeployController', () => {
                     subdomain: 'my-site',
                 });
 
-                expect(result).toEqual(stateOk);
+                expect(result).toEqual({ status: 'success', ...stateOk });
             });
         });
     });

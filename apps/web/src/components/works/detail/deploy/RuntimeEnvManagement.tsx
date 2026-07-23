@@ -220,7 +220,7 @@ function RuntimeEnvContent({ work }: RuntimeEnvManagementProps) {
                                     className="font-mono text-xs"
                                 />
                                 <Button
-                                    variant="outline"
+                                    variant="secondary"
                                     onClick={handleTest}
                                     disabled={isPending || hasLoadError || !value.trim()}
                                     size="sm"
