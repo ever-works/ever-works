@@ -427,7 +427,24 @@ function StepBody({
                     onPlannedClick={(c) => flow.notePlannedClick('storage', c)}
                 />
             );
-        case 'db-choice':
+        case 'db-choice': {
+            // Driven by the PostgreSQL DB plugin: its settingsSchema renders the
+            // Ever Works DB / Custom selector + (for custom) the connection
+            // string, saved as the plugin's user-scoped settings — replacing the
+            // bespoke `db` bucket. Falls back to the choice cards until the
+            // plugin is loaded in the running API image (graceful, additive).
+            const dbPlugin = pluginsById['postgres-db'] ?? null;
+            if (dbPlugin) {
+                return (
+                    <ConfigStep
+                        title="Your DB Storage"
+                        description="Choose where your Works store data — the managed Ever Works DB (a database is provisioned per Work) or your own Postgres server."
+                        plugin={dbPlugin}
+                        connection={connections['postgres-db'] ?? null}
+                        isStatusLoading={isStatusLoading}
+                    />
+                );
+            }
             return (
                 <ChoiceStep
                     title="Your DB Storage"
@@ -439,6 +456,7 @@ function StepBody({
                     onPlannedClick={(c) => flow.notePlannedClick('db', c)}
                 />
             );
+        }
         case 'storage-config': {
             // Only `user-github` reaches here (others are auto-skipped).
             const plugin = pluginsById['github'] ?? null;

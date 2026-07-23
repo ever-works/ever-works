@@ -367,9 +367,18 @@ export class DeployController {
             // Provision (or re-point) the shared DB now so it is set + visible
             // immediately; also re-runs idempotently on the next deploy.
             await this.dbProvisionService.ensureDatabaseForWork(id, { force: true });
+            // Keep the PostgreSQL DB plugin authoritative: clear any per-Work
+            // override so the Work inherits the account-level setting. Best-
+            // effort — never fail the deploy config if the plugin isn't loaded.
+            await this.deployFacade.setWorkDbOverride(id, '').catch(() => {});
         } else {
             await this.workRuntimeEnvService.setDatabaseUrl(id, dto.databaseUrl as string);
             await this.workRuntimeEnvService.setDatabaseMode(id, 'custom');
+            // Mirror the per-Work override into the PostgreSQL DB plugin's
+            // work-scoped setting (source of truth). Best-effort as above.
+            await this.deployFacade
+                .setWorkDbOverride(id, dto.databaseUrl as string)
+                .catch(() => {});
         }
         this.activityLogService
             .log({

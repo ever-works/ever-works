@@ -278,6 +278,9 @@ importers:
       '@ever-works/minio-plugin':
         specifier: workspace:*
         version: link:../../packages/plugins/minio
+      '@ever-works/postgres-db-plugin':
+        specifier: workspace:*
+        version: link:../../packages/plugins/postgres-db
       '@nestjs/cli':
         specifier: ^11.0.18
         version: 11.0.18(@swc/cli@0.8.1(@swc/core@1.15.33(@swc/helpers@0.5.21)))(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(esbuild@0.28.1)
@@ -2535,6 +2538,31 @@ importers:
         version: 0.3.29(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.17.1)(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3))
       typescript:
         specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.0
+        version: 4.1.0(@opentelemetry/api@1.9.0)(@types/node@22.19.11)(jsdom@29.1.1(@noble/hashes@2.2.0))(msw@2.12.10(@types/node@22.19.11)(typescript@5.9.3))(vite@8.0.16(@types/node@22.19.11)(esbuild@0.28.1)(jiti@2.6.1)(terser@5.46.1)(yaml@2.8.3))
+
+  packages/plugins/postgres-db:
+    dependencies:
+      pg:
+        specifier: ^8.16.3
+        version: 8.18.0
+    devDependencies:
+      '@ever-works/plugin':
+        specifier: workspace:*
+        version: link:../../plugin
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.11
+      '@types/pg':
+        specifier: ^8.15.0
+        version: 8.15.6
+      tsup:
+        specifier: ^8.4.0
+        version: 8.5.1(@swc/core@1.15.33(@swc/helpers@0.5.21))(jiti@2.6.1)(postcss@8.5.20)(typescript@5.9.3)(yaml@2.8.3)
+      typescript:
+        specifier: ^5.7.3
         version: 5.9.3
       vitest:
         specifier: ^4.1.0
