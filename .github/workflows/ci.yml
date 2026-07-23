@@ -332,6 +332,26 @@ jobs:
           EW_TEST_REAL_PGBOSS_URL: postgres://test:test@localhost:5432/test
         run: pnpm --filter @ever-works/job-runtime-pgboss-plugin test
 
+      # The temporal-plugin real-infra suite tags workflows with a custom
+      # `tenantId` search attribute (multi-tenant routing). Temporal v10 rejects
+      # `StartWorkflow` with an unregistered search attribute
+      # ("Namespace default has no mapping defined for search attribute tenantId"),
+      # and auto-setup does not create custom attributes. Register it up front,
+      # inside the temporal service container (localhost:7233 = its own frontend)
+      # via the `temporal` CLI the image already ships. Idempotent enough for CI —
+      # `|| true` so a re-run where it already exists doesn't fail the job.
+      - name: Register Temporal search attributes
+        run: |
+          cid="$(docker ps -qf 'ancestor=temporalio/auto-setup:1.29.3' | head -n1)"
+          if [ -z "$cid" ]; then echo "::error::temporal container not found"; exit 1; fi
+          docker exec "$cid" temporal operator search-attribute create \
+            --namespace default --name tenantId --type Keyword || true
+          echo "Registered search attributes:"
+          docker exec "$cid" temporal operator search-attribute list --namespace default || true
+          # Registration propagates to the matching/history services asynchronously;
+          # give it a moment so the first StartWorkflow in the test sees it.
+          sleep 5
+
       - name: Temporal real-infra
         env:
           EW_TEST_REAL_TEMPORAL_ADDRESS: localhost:7233
