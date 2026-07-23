@@ -6,6 +6,7 @@ import type {
     OnboardingCard,
     OnboardingAiChoice,
     OnboardingStorageChoice,
+    OnboardingDbChoice,
     OnboardingDeployChoice,
     OnboardingPluginCard,
 } from '@ever-works/contracts/api';
@@ -31,6 +32,7 @@ export class OnboardingCatalogService {
     getCatalog(): OnboardingCatalogResponse {
         const everWorksGitEnabled = config.everWorks.git.isEnabled();
         const everWorksDeployEnabled = config.everWorks.deploy.isEnabled();
+        const everWorksDbEnabled = config.everWorks.sharedDb.isEnabled();
 
         const ai: ReadonlyArray<OnboardingCard<OnboardingAiChoice>> = [
             {
@@ -127,6 +129,28 @@ export class OnboardingCatalogService {
             },
         ];
 
+        const db: ReadonlyArray<OnboardingCard<OnboardingDbChoice>> = [
+            {
+                choice: 'ever-works-db',
+                title: 'Ever Works DB',
+                description: everWorksDbEnabled
+                    ? 'A managed database, provisioned automatically for your Work. No setup needed.'
+                    : 'Coming soon — a managed database, provisioned automatically for your Work.',
+                default: true,
+                available: everWorksDbEnabled,
+                badges: everWorksDbEnabled ? ['default'] : ['default', 'planned'],
+            },
+            {
+                choice: 'custom',
+                title: 'Custom DB',
+                description:
+                    'Bring your own database — enter the connection details on the Deploy page after your Work is created.',
+                default: false,
+                available: true,
+                badges: ['byok'],
+            },
+        ];
+
         const deploy: ReadonlyArray<OnboardingCard<OnboardingDeployChoice>> = [
             {
                 choice: 'ever-works',
@@ -168,7 +192,7 @@ export class OnboardingCatalogService {
 
         const plugins = this.collectPluginsStepCards(reservedPluginIds);
 
-        return { ai, storage, deploy, plugins };
+        return { ai, storage, db, deploy, plugins };
     }
 
     private collectPluginsStepCards(reservedPluginIds: Set<string>): OnboardingPluginCard[] {

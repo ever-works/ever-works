@@ -5,6 +5,7 @@ import {
     ONBOARDING_DEFAULT_STATE,
     type OnboardingAiChoice,
     type OnboardingCatalogResponse,
+    type OnboardingDbChoice,
     type OnboardingDeployChoice,
     type OnboardingStateResponse,
     type OnboardingStatePatchRequest,
@@ -20,6 +21,7 @@ export type WizardStepKind =
     | 'ai-config'
     | 'storage-choice'
     | 'storage-config'
+    | 'db-choice'
     | 'deploy-choice'
     | 'deploy-config'
     | 'plugins-catalog'
@@ -46,6 +48,10 @@ export function computeStepList(state: OnboardingWizardStateV2): WizardStep[] {
     if (state.storage.choice === 'user-github') {
         steps.push({ kind: 'storage-config', id: `storage-config:${state.storage.choice}` });
     }
+    // "Your DB Storage" — Ever Works DB (managed) vs Custom. Custom needs no
+    // wizard sub-step: the connection details are entered on the Deploy page
+    // after creation (they must not live in the onboarding-state blob).
+    steps.push({ kind: 'db-choice', id: 'db-choice' });
     steps.push({ kind: 'deploy-choice', id: 'deploy-choice' });
     if (state.deploy.choice === 'vercel' || state.deploy.choice === 'k8s') {
         steps.push({ kind: 'deploy-config', id: `deploy-config:${state.deploy.choice}` });
@@ -70,6 +76,7 @@ type FlowAction =
     | { type: 'jumpTo'; index: number }
     | { type: 'setAiChoice'; value: OnboardingAiChoice }
     | { type: 'setStorageChoice'; value: OnboardingStorageChoice }
+    | { type: 'setDbChoice'; value: OnboardingDbChoice }
     | { type: 'setDeployChoice'; value: OnboardingDeployChoice }
     | { type: 'setPrompt'; value: string }
     | { type: 'recordSkip'; stepId: string }
@@ -120,6 +127,11 @@ function reduce(state: FlowReducerState, action: FlowAction): FlowReducerState {
             return {
                 ...state,
                 state: { ...state.state, storage: { choice: action.value } },
+            };
+        case 'setDbChoice':
+            return {
+                ...state,
+                state: { ...state.state, db: { choice: action.value } },
             };
         case 'setDeployChoice':
             return {
@@ -191,6 +203,7 @@ export interface UseOnboardingFlowResult {
     readonly isLastStep: boolean;
     readonly setAiChoice: (value: OnboardingAiChoice) => void;
     readonly setStorageChoice: (value: OnboardingStorageChoice) => void;
+    readonly setDbChoice: (value: OnboardingDbChoice) => void;
     readonly setDeployChoice: (value: OnboardingDeployChoice) => void;
     readonly setPluginsReviewed: (value: boolean) => void;
     readonly setPrompt: (value: string) => void;
@@ -291,6 +304,14 @@ export function useOnboardingFlow({
         [trackEvent],
     );
 
+    const setDbChoice = useCallback(
+        (value: OnboardingDbChoice) => {
+            trackEvent('onboarding_db_choice_selected', { choice: value });
+            dispatch({ type: 'setDbChoice', value });
+        },
+        [trackEvent],
+    );
+
     const setDeployChoice = useCallback(
         (value: OnboardingDeployChoice) => {
             trackEvent('onboarding_deploy_choice_selected', { choice: value });
@@ -359,6 +380,7 @@ export function useOnboardingFlow({
         isLastStep,
         setAiChoice,
         setStorageChoice,
+        setDbChoice,
         setDeployChoice,
         setPluginsReviewed,
         setPrompt,
@@ -374,11 +396,12 @@ export function useOnboardingFlow({
 
 function stripVersion(state: OnboardingWizardStateV2) {
     // The patch endpoint deep-merges by field; `version` is server-managed.
-    const { lastStep, ai, storage, deploy, skippedSteps, pluginsReviewed, prompt } = state;
+    const { lastStep, ai, storage, db, deploy, skippedSteps, pluginsReviewed, prompt } = state;
     return {
         lastStep,
         ai: { choice: ai.choice },
         storage: { choice: storage.choice },
+        db: { choice: db.choice },
         deploy: { choice: deploy.choice },
         skippedSteps: [...skippedSteps],
         pluginsReviewed,

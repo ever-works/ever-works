@@ -140,6 +140,7 @@ function normaliseState(raw: OnboardingWizardStateV2 | null | undefined): Onboar
         lastStep: typeof raw.lastStep === 'number' && raw.lastStep >= 0 ? raw.lastStep : 0,
         ai: { choice: raw.ai?.choice ?? ONBOARDING_DEFAULT_STATE.ai.choice },
         storage: { choice: raw.storage?.choice ?? ONBOARDING_DEFAULT_STATE.storage.choice },
+        db: { choice: raw.db?.choice ?? ONBOARDING_DEFAULT_STATE.db.choice },
         deploy: { choice: raw.deploy?.choice ?? ONBOARDING_DEFAULT_STATE.deploy.choice },
         skippedSteps: Array.isArray(raw.skippedSteps) ? [...raw.skippedSteps] : [],
         pluginsReviewed: raw.pluginsReviewed === true,
@@ -158,6 +159,7 @@ function mergeState(
         lastStep: typeof patch.lastStep === 'number' ? patch.lastStep : current.lastStep,
         ai: { choice: patch.ai?.choice ?? current.ai.choice },
         storage: { choice: patch.storage?.choice ?? current.storage.choice },
+        db: { choice: patch.db?.choice ?? current.db?.choice ?? ONBOARDING_DEFAULT_STATE.db.choice },
         deploy: { choice: patch.deploy?.choice ?? current.deploy.choice },
         skippedSteps: Array.isArray(patch.skippedSteps)
             ? [...patch.skippedSteps]
