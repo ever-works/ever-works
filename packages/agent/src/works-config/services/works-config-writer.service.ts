@@ -145,6 +145,7 @@ export class WorksConfigWriterService {
         return this.withoutUndefined({
             ...baseRaw,
             name: request.name || imported?.name || options.work.name,
+            kind: this.resolveKind(baseRaw.kind, options.work.kind),
             initial_prompt: initialPrompt,
             model,
             providers,
@@ -153,6 +154,35 @@ export class WorksConfigWriterService {
             deployProvider,
             activity_sync: activitySyncBlock,
         });
+    }
+
+    /**
+     * Work kind to write into `.works/works.yml`.
+     *
+     * Two rules, both deliberate:
+     *
+     *  1. **An existing `kind:` in the file always wins.** The file belongs
+     *     to the user and may declare a kind this build does not know
+     *     (a newer server, or hand-authored). Overwriting it with our view
+     *     would corrupt their repository on a routine round-trip write.
+     *
+     *  2. **`default` is never written.** `withoutUndefined` drops the key,
+     *     so a `default`-kind Work's file stays byte-identical to what the
+     *     platform produced before `kind` existed — no diff, no spurious
+     *     commit, and `flow-work-config-cache.spec.ts`'s
+     *     `cacheEmpty === cfgEmpty` invariant holds. Since `default` is
+     *     also the parse-time fallback, omitting it loses no information.
+     */
+    private resolveKind(existing: unknown, workKind?: string | null): string | undefined {
+        const fromFile = this.readString(existing);
+        if (fromFile) {
+            return fromFile;
+        }
+        const fromWork = typeof workKind === 'string' ? workKind.trim() : '';
+        if (!fromWork || fromWork === 'default') {
+            return undefined;
+        }
+        return fromWork;
     }
 
     private resolveActivitySyncMode(args: {
