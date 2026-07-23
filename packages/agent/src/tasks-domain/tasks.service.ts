@@ -280,6 +280,36 @@ export class TasksService {
             await this.assertScopeReachable(userId, {
                 ...ownerPatch,
             } as CreateTaskInput);
+
+            // Re-filing a Task must not break the sub-task hierarchy. The
+            // create path enforces "a child agrees with its parent on every
+            // owner"; without the same check here, a child under a parent
+            // scoped to Work A could be moved to Work B and the two would
+            // silently disagree.
+            const nextOwners = { ...task, ...ownerPatch } as Pick<Task, TaskOwnerKey>;
+
+            const parentId = input.parentTaskId ?? task.parentTaskId;
+            if (parentId) {
+                const parent = await this.tasks.findByIdAndUser(parentId, userId);
+                if (parent) {
+                    this.assertParentScopeMatches(nextOwners, parent);
+                }
+            }
+
+            // The symmetric case: moving a PARENT would strand its children,
+            // which cannot be fixed by validating this row alone. Refuse
+            // rather than leave the tree inconsistent — the caller can move
+            // the children first, or detach them.
+            const { total: childCount } = await this.tasks.findByUserIdFiltered(userId, {
+                parentTaskId: id,
+                limit: 1,
+            });
+            if (childCount > 0) {
+                throw new BadRequestException(
+                    `Task ${id} has ${childCount} sub-task(s); re-file or detach them before changing its owners so parent and child scopes cannot diverge.`,
+                );
+            }
+
             Object.assign(patch, ownerPatch);
         }
 

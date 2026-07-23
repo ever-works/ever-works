@@ -69,24 +69,46 @@ export class AddTaskOwnerScopeColumns1782300000000 implements MigrationInterface
             fk,
             referencedTable,
         } of AddTaskOwnerScopeColumns1782300000000.COLUMNS) {
-            if (await queryRunner.hasColumn('tasks', column)) {
+            // Each step is guarded INDEPENDENTLY rather than skipping the
+            // whole entry once the column exists. Guarding on the column
+            // alone would make a partial run permanent: if a previous
+            // attempt added the column and then died — or ran while the
+            // referenced table did not yet exist — the index and foreign key
+            // would be skipped forever, leaving the column silently without
+            // the referential integrity this migration promises.
+            if (!(await queryRunner.hasColumn('tasks', column))) {
+                await queryRunner.addColumn(
+                    'tasks',
+                    new TableColumn({ name: column, type: 'uuid', isNullable: true }),
+                );
+            }
+
+            const tableBeforeIndex = await queryRunner.getTable('tasks');
+            const hasIndex = tableBeforeIndex?.indices.some(
+                (candidate) => candidate.name === index,
+            );
+            if (!hasIndex) {
+                await queryRunner.createIndex(
+                    'tasks',
+                    new TableIndex({ name: index, columnNames: [column, 'status'] }),
+                );
+            }
+
+            if (!fk) {
                 continue;
             }
 
-            await queryRunner.addColumn(
-                'tasks',
-                new TableColumn({ name: column, type: 'uuid', isNullable: true }),
-            );
-
-            await queryRunner.createIndex(
-                'tasks',
-                new TableIndex({ name: index, columnNames: [column, 'status'] }),
-            );
+            const tableBeforeFk = await queryRunner.getTable('tasks');
+            const hasFk = tableBeforeFk?.foreignKeys.some((candidate) => candidate.name === fk);
+            if (hasFk) {
+                continue;
+            }
 
             // The referenced table may legitimately not exist yet in a
-            // partially-migrated environment; skip the FK rather than fail
-            // the whole migration, the column and index still land.
-            if (fk && (await queryRunner.hasTable(referencedTable))) {
+            // partially-migrated environment. Skip the FK rather than fail
+            // the whole migration — but log it, because the gap is otherwise
+            // invisible and only re-closes on a later re-run.
+            if (await queryRunner.hasTable(referencedTable)) {
                 await queryRunner.createForeignKey(
                     'tasks',
                     new TableForeignKey({
@@ -96,6 +118,11 @@ export class AddTaskOwnerScopeColumns1782300000000 implements MigrationInterface
                         referencedColumnNames: ['id'],
                         onDelete: 'SET NULL',
                     }),
+                );
+            } else {
+                console.warn(
+                    `[${AddTaskOwnerScopeColumns1782300000000.name}] Referenced table "${referencedTable}" does not exist; ` +
+                        `created tasks."${column}" without foreign key "${fk}". Re-run this migration once "${referencedTable}" exists.`,
                 );
             }
         }
