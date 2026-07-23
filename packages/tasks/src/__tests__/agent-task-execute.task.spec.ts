@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 
 /**
  * Security regression — `agent-task-execute` IDOR guard.
@@ -111,9 +111,33 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
     let tasks: { getOne: ReturnType<typeof vi.fn> };
     let registeredConfig: TaskConfig;
 
-    beforeEach(async () => {
-        vi.clearAllMocks();
+    /**
+     * Import the worker module ONCE.
+     *
+     * This used to live in `beforeEach` behind `vi.resetModules()`, which
+     * cold-re-imported the whole worker graph for every test in the file —
+     * 13 times. Under CI load one of those imports would exceed the 30s
+     * hook timeout, and vitest attributes a hook failure to whichever test
+     * it was running for, so the failure surfaced on the trivial
+     * `registers the "agent-task-execute" task` assertion and looked like a
+     * logic bug. It has been reddening `develop` and every open PR.
+     *
+     * A single import is sufficient: the module's only import-time effect is
+     * calling `task()` to register its config, and `run()` resolves all of
+     * its dependencies lazily through the mocked
+     * `createApplicationContext()` — which `beforeEach` still re-stubs per
+     * test. Per-test isolation of the mocks is therefore unchanged; only the
+     * redundant re-import is gone.
+     */
+    beforeAll(async () => {
         vi.resetModules();
+        await import('../tasks/trigger/agent-task-execute.task');
+        const lastCall = taskMock.mock.calls[taskMock.mock.calls.length - 1];
+        registeredConfig = lastCall[0] as TaskConfig;
+    });
+
+    beforeEach(() => {
+        vi.clearAllMocks();
 
         agents = { findByIdAndUser: vi.fn() };
         runs = {
@@ -166,10 +190,6 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
             close: vi.fn().mockResolvedValue(undefined),
         };
         createApplicationContextMock.mockResolvedValue(appContext);
-
-        await import('../tasks/trigger/agent-task-execute.task');
-        const lastCall = taskMock.mock.calls[taskMock.mock.calls.length - 1];
-        registeredConfig = lastCall[0] as TaskConfig;
     });
 
     const basePayload = (taskId: string) => ({

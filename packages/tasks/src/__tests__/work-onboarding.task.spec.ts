@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 
 const { taskMock, loggerInfoMock, loggerWarnMock } = vi.hoisted(() => ({
     taskMock: vi.fn(),
@@ -39,13 +39,20 @@ type TaskConfig = {
 let registeredConfig: TaskConfig;
 
 describe('workOnboardingTask', () => {
-    beforeEach(async () => {
-        vi.clearAllMocks();
-        vi.resetModules();
-
+    /**
+     * Import the worker module ONCE — see the note in
+     * `agent-task-execute.task.spec.ts`. `vi.resetModules()` is removed
+     * rather than moved so the worker and any in-test dynamic import resolve
+     * the same module registry.
+     */
+    beforeAll(async () => {
         await import('../tasks/trigger/work-onboarding.task');
         const lastCall = taskMock.mock.calls[taskMock.mock.calls.length - 1];
         registeredConfig = lastCall[0] as TaskConfig;
+    });
+
+    beforeEach(() => {
+        vi.clearAllMocks();
     });
 
     describe('registration', () => {
