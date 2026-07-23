@@ -85,6 +85,11 @@ export class PgBossWorkerHostFactory {
 			if (hostOpts.concurrency !== undefined && merged['teamSize'] === undefined) {
 				merged['teamSize'] = hostOpts.concurrency;
 			}
+			// pg-boss v10 requires the queue to exist before work() — unlike v9
+			// there is no implicit creation, and work() on a missing queue never
+			// receives jobs. createQueue is idempotent, so this is safe whether
+			// the dispatcher (or a bootstrap) already made it.
+			if (this.opts.boss.createQueue) await this.opts.boss.createQueue(reg.queueName);
 			const id = await this.opts.boss.work(reg.queueName, merged, reg.handler);
 			ids.push(id);
 		}
