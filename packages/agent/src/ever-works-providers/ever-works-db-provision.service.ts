@@ -86,6 +86,88 @@ export class EverWorksDbProvisionService {
     }
 
     /**
+     * Resolve the per-Work `DATABASE_URL` from the **PostgreSQL DB plugin's**
+     * resolved settings (the plugin is the source of truth — see
+     * `PostgresDbPlugin`). Precedence mirrors the plugin's scopes:
+     *  1. `overrideConnectionString` (work-scope) — a full per-Work URL; used
+     *     as-is (their server + their database for this one Work).
+     *  2. `mode: 'custom'` + `customConnectionString` (user-scope) — the user's
+     *     own server used for all their Works; a dedicated per-Work database
+     *     `ew_<hex>` is created on it when the role allows, else the connection
+     *     is used as-is.
+     *  3. `mode: 'ever-works-db'` (default) — the managed shared cluster; a
+     *     dedicated per-Work database is provisioned (`ensureDatabaseForWork`).
+     * Returns the composed URL (persisted for the Work when it wasn't set), or
+     * `null` when nothing is resolvable (custom mode with no string, or
+     * ever-works-db mode while the shared feature isn't wired).
+     */
+    async resolveFromPluginSettings(
+        workId: string,
+        settings: {
+            mode?: unknown;
+            customConnectionString?: unknown;
+            overrideConnectionString?: unknown;
+        },
+    ): Promise<string | null> {
+        const override = this.asTrimmed(settings.overrideConnectionString);
+        if (override) {
+            return this.workRuntimeEnvService.setDatabaseUrlIfNull(workId, override);
+        }
+        const mode = this.asTrimmed(settings.mode) || 'ever-works-db';
+        if (mode === 'custom') {
+            const server = this.asTrimmed(settings.customConnectionString);
+            if (!server) {
+                return null;
+            }
+            const url = await this.provisionOnServer(workId, server);
+            return this.workRuntimeEnvService.setDatabaseUrlIfNull(workId, url);
+        }
+        // Managed "Ever Works DB" (default) — no-op when the feature isn't wired.
+        return this.ensureDatabaseForWork(workId);
+    }
+
+    /**
+     * Create a dedicated per-Work database (`ew_<hex>`) on a **user-supplied**
+     * Postgres server and return a connection string pointing at it (same
+     * host/credentials, swapped database name). If the connecting role can't
+     * `CREATE DATABASE` (or the server is unreachable for DDL), falls back to
+     * returning the supplied connection string unchanged so the Work at least
+     * boots against the user's existing database. Never throws.
+     */
+    async provisionOnServer(workId: string, serverUrl: string): Promise<string> {
+        const hex = workId.replace(/-/g, '').toLowerCase();
+        const dbName = `${config.everWorks.sharedDb.getNamePrefix()}_${hex}`;
+        const client = new Client({
+            connectionString: serverUrl,
+            ssl: this.sslFor(serverUrl),
+            connectionTimeoutMillis: 10000,
+        });
+        try {
+            await client.connect();
+            const db = await client.query('SELECT 1 FROM pg_database WHERE datname = $1', [dbName]);
+            if (!db.rowCount) {
+                // CREATE DATABASE cannot run inside a transaction — the pg client
+                // autocommits each simple query, so this is fine.
+                await client.query(`CREATE DATABASE "${dbName}"`);
+            }
+            const url = this.swapDatabaseName(serverUrl, dbName);
+            this.logger.log(
+                `Provisioned per-Work database "${dbName}" on custom server for work ${workId}`,
+            );
+            return url;
+        } catch (err) {
+            this.logger.warn(
+                `Custom-server per-Work DB provision fell back to as-is for work ${workId}: ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+            return serverUrl;
+        } finally {
+            await client.end().catch(() => {});
+        }
+    }
+
+    /**
      * Validate a user-supplied custom Postgres connection string: attempt a
      * short-timeout connect + `SELECT 1`. Returns `{ ok }` or `{ ok:false,
      * error }` — never throws, so the caller can surface a friendly message.
@@ -172,5 +254,24 @@ export class EverWorksDbProvisionService {
     private randomPassword(): string {
         // 32 hex chars — safe to embed in SQL literals and connection strings.
         return randomBytes(16).toString('hex');
+    }
+
+    private asTrimmed(v: unknown): string {
+        return typeof v === 'string' ? v.trim() : '';
+    }
+
+    /**
+     * Replace the database (pathname) of a Postgres connection string, keeping
+     * host, credentials, and query params (sslmode, etc.). Returns the input
+     * unchanged if it can't be parsed.
+     */
+    private swapDatabaseName(connString: string, dbName: string): string {
+        try {
+            const u = new URL(connString);
+            u.pathname = `/${dbName}`;
+            return u.toString();
+        } catch {
+            return connString;
+        }
     }
 }

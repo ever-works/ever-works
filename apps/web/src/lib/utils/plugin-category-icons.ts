@@ -45,6 +45,9 @@ export const CATEGORY_ICONS: Record<PluginCategory, LucideIcon> = {
     theme: Palette,
     // EW-637 — object storage backends (local-fs, S3, MinIO, GitHub blob)
     storage: HardDrive,
+    // PostgreSQL DB plugin — per-Work relational database backends
+    // (managed "Ever Works DB" or a custom Postgres server).
+    database: Database,
     // EW-650 / EW-663 — Notifications v2 surfaces
     'email-provider': Mail,
     'notification-channel': Bell,
@@ -87,6 +90,7 @@ export const CATEGORY_LABELS: Record<PluginCategory, string> = {
     utility: 'Utilities',
     theme: 'Themes',
     storage: 'Storage',
+    database: 'Databases',
     'email-provider': 'Email Providers',
     'notification-channel': 'Notification Channels',
     'vector-store': 'Vector Stores',
@@ -187,6 +191,7 @@ export const CATEGORY_DISPLAY_ORDER: readonly PluginCategory[] = [
     'deployment',
     'data-source',
     'storage',
+    'database',
     'vector-store',
     'dns',
     'email-provider',

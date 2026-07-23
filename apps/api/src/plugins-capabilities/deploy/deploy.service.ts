@@ -1262,10 +1262,33 @@ export class DeployService {
             await this.setSecret(ctx, 'COOKIE_SECURE', 'true');
 
             let databaseUrl = await this.workRuntimeEnvService.getDatabaseUrl(work.id);
-            // Shared "Ever Works DB": auto-provision a per-Work database on the
-            // first deploy when none is set and the Work isn't explicitly using
-            // a custom connection string. No-op when the feature isn't wired
-            // (isReady() false) or the Work already has a URL.
+            // PostgreSQL DB plugin is the source of truth for per-Work DB
+            // config: resolve from its settings (work-scoped override >
+            // user-scoped custom server > managed "Ever Works DB"). Wrapped so a
+            // missing/unloaded plugin (e.g. older image) falls through to the
+            // legacy mode-based path below rather than failing the deploy.
+            if (!databaseUrl && this.dbProvisionService) {
+                try {
+                    const pgSettings = await this.deployFacade.getOtherPluginSettings(
+                        'postgres-db',
+                        { userId: work.userId, workId: work.id },
+                    );
+                    databaseUrl = await this.dbProvisionService.resolveFromPluginSettings(
+                        work.id,
+                        pgSettings,
+                    );
+                } catch (pluginError) {
+                    this.logger.debug(
+                        `postgres-db plugin settings unavailable for work ${work.id}; using legacy DB resolution: ${
+                            pluginError instanceof Error ? pluginError.message : String(pluginError)
+                        }`,
+                    );
+                }
+            }
+            // Legacy fallback — shared "Ever Works DB": auto-provision a per-Work
+            // database on the first deploy when none is set and the Work isn't
+            // explicitly using a custom connection string. No-op when the feature
+            // isn't wired (isReady() false) or the Work already has a URL.
             if (!databaseUrl && this.dbProvisionService?.isReady()) {
                 const mode = await this.workRuntimeEnvService.getDatabaseMode(work.id);
                 if (mode !== 'custom') {
