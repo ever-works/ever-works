@@ -78,6 +78,9 @@ export function SearchableSelect({
         setIsOpen(false);
         setSearch('');
         setShowCustom(false);
+        // Reset the draft too — reopening with a stale half-typed value
+        // invites committing something the user abandoned.
+        setCustom('');
     }, []);
 
     useEffect(() => {
@@ -160,7 +163,6 @@ export function SearchableSelect({
 
                 {isOpen && !disabled && (
                     <div
-                        role="listbox"
                         data-testid={testId ? `${testId}-panel` : undefined}
                         className="absolute z-50 mt-1 w-full rounded-lg border border-border dark:border-border-dark bg-surface dark:bg-surface-dark shadow-lg max-h-80 overflow-hidden"
                     >
@@ -179,7 +181,10 @@ export function SearchableSelect({
                             </div>
                         )}
 
-                        <div className="max-h-56 overflow-y-auto py-1">
+                        {/* role=listbox sits HERE, not on the panel: a text
+                            input is not a valid listbox descendant, and the
+                            search box + custom-entry live outside this list. */}
+                        <div role="listbox" className="max-h-56 overflow-y-auto py-1">
                             {emptyOptionLabel && !search && (
                                 <button
                                     type="button"

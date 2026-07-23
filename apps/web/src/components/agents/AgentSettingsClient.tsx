@@ -363,10 +363,15 @@ export function AgentSettingsClient({
                             pluginId={aiProviderId}
                             value={modelId}
                             onChange={setModelId}
-                            disabled={!aiProviderId}
+                            // NOT `!aiProviderId` alone: an Agent can hold a
+                            // pinned modelId with no provider (the DTO fields
+                            // are independent), and disabling then would make
+                            // that model uneditable without first adopting a
+                            // provider — which clears the model.
+                            disabled={!aiProviderId && !modelId}
                         />
                         <p className="mt-1 text-xs text-text-muted dark:text-text-muted-dark">
-                            {aiProviderId
+                            {aiProviderId || modelId
                                 ? 'Leave empty to use the provider default.'
                                 : 'Pick an AI provider first.'}
                         </p>
