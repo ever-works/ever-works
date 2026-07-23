@@ -33,9 +33,10 @@ import {
 import { DeployWorkDto, RollbackDto } from './dto/deploy.dto';
 import { BatchDeployDto, BatchDeployResponseDto } from './dto/batch-deploy.dto';
 import { AddDomainDto } from './dto/domain.dto';
-import { SetRuntimeEnvDto } from './dto/runtime-env.dto';
+import { SetRuntimeEnvDto, TestDbConnectionDto, type DatabaseMode } from './dto/runtime-env.dto';
 import { SubdomainResponseDto, UpdateSubdomainDto } from './dto/subdomain.dto';
 import { ManagedSubdomainService } from './managed-subdomain.service';
+import { EverWorksDbProvisionService } from '@ever-works/agent/ever-works-providers';
 
 /**
  * Mask a Postgres connection string for display — keep scheme/host/db, hide the
@@ -83,7 +84,19 @@ export class DeployController {
         private readonly workRuntimeEnvService: WorkRuntimeEnvService,
         private readonly managedSubdomainService: ManagedSubdomainService,
         private readonly userRepository: UserRepository,
+        private readonly dbProvisionService: EverWorksDbProvisionService,
     ) {}
+
+    /**
+     * Resolve the effective DB mode for a Work for display: an explicit
+     * `deployDatabaseMode`, else `'custom'` when a URL is configured, else
+     * `'shared'` when the shared-DB feature can provision, else `'custom'`.
+     */
+    private resolveDbMode(explicit: DatabaseMode | null, configured: boolean): DatabaseMode {
+        if (explicit) return explicit;
+        if (configured) return 'custom';
+        return this.dbProvisionService.isReady() ? 'shared' : 'custom';
+    }
 
     private getProviderName(deployProvider: string | undefined): string {
         if (!deployProvider) return 'Deployment';
@@ -307,14 +320,20 @@ export class DeployController {
     ) {
         await this.ownershipService.ensureCanEdit(id, auth.userId);
         const databaseUrl = await this.workRuntimeEnvService.getDatabaseUrl(id);
+        const explicitMode = await this.workRuntimeEnvService.getDatabaseMode(id);
+        const configured = Boolean(databaseUrl);
         return {
             status: 'success',
+            // 'shared' (platform-managed Ever Works DB) vs 'custom' (BYO URL).
+            mode: this.resolveDbMode(explicitMode, configured),
+            // Whether the "Ever Works DB (shared)" option can be offered.
+            sharedAvailable: this.dbProvisionService.isReady(),
             databaseUrl: {
-                configured: Boolean(databaseUrl),
+                configured,
                 masked: databaseUrl ? maskDatabaseUrl(databaseUrl) : null,
             },
-            // Auto-managed by the deploy feature (minted + rotated server-side),
-            // so they are not editable here.
+            // Auto-managed by the deploy feature (minted server-side), so they
+            // are not editable here.
             managed: ['AUTH_SECRET', 'COOKIE_SECRET', 'COOKIE_SECURE'],
         };
     }
@@ -337,7 +356,21 @@ export class DeployController {
         @Body() dto: SetRuntimeEnvDto,
     ) {
         const { work } = await this.ownershipService.ensureCanEdit(id, auth.userId);
-        await this.workRuntimeEnvService.setDatabaseUrl(id, dto.databaseUrl);
+        const mode: DatabaseMode = dto.mode ?? 'custom';
+        if (mode === 'shared') {
+            if (!this.dbProvisionService.isReady()) {
+                throw new BadRequestException(
+                    'The Ever Works DB (shared) option is not available. Ask an operator to enable it, or use a custom database.',
+                );
+            }
+            await this.workRuntimeEnvService.setDatabaseMode(id, 'shared');
+            // Provision (or re-point) the shared DB now so it is set + visible
+            // immediately; also re-runs idempotently on the next deploy.
+            await this.dbProvisionService.ensureDatabaseForWork(id, { force: true });
+        } else {
+            await this.workRuntimeEnvService.setDatabaseUrl(id, dto.databaseUrl as string);
+            await this.workRuntimeEnvService.setDatabaseMode(id, 'custom');
+        }
         this.activityLogService
             .log({
                 userId: auth.userId,
@@ -345,18 +378,47 @@ export class DeployController {
                 actionType: ActivityActionType.DEPLOYMENT,
                 action: 'work.runtime-env.updated',
                 status: ActivityStatus.COMPLETED,
-                summary: `Updated DATABASE_URL for ${work.name}`,
+                summary: `Updated DATABASE_URL for ${work.name} (${mode})`,
             })
             .catch(() => {});
         const databaseUrl = await this.workRuntimeEnvService.getDatabaseUrl(id);
+        const explicitMode = await this.workRuntimeEnvService.getDatabaseMode(id);
         return {
             status: 'success',
+            mode: this.resolveDbMode(explicitMode, Boolean(databaseUrl)),
+            sharedAvailable: this.dbProvisionService.isReady(),
             databaseUrl: {
                 configured: Boolean(databaseUrl),
                 masked: databaseUrl ? maskDatabaseUrl(databaseUrl) : null,
             },
-            message: 'Runtime env updated. Redeploy to apply it to the live site.',
+            message:
+                mode === 'shared'
+                    ? 'Switched to the Ever Works DB. Redeploy to apply it to the live site.'
+                    : 'Runtime env updated. Redeploy to apply it to the live site.',
         };
+    }
+
+    /**
+     * Validate a custom Postgres connection string (short-timeout connect +
+     * `SELECT 1`) before the user saves it. Never leaks the connection string;
+     * returns `{ ok }` or `{ ok:false, error }`.
+     */
+    @Post('/works/:id/db/test')
+    @ApiOperation({
+        summary: 'Test a custom database connection',
+        description:
+            'Attempts a short-timeout Postgres connection to validate a custom DATABASE_URL.',
+    })
+    @ApiParam({ name: 'id', description: 'Work ID' })
+    @ApiResponse({ status: 200, description: 'Connection test result' })
+    async testDbConnection(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', new ParseUUIDPipe()) id: string,
+        @Body() dto: TestDbConnectionDto,
+    ) {
+        await this.ownershipService.ensureCanEdit(id, auth.userId);
+        const result = await this.dbProvisionService.testConnection(dto.databaseUrl);
+        return { status: 'success', ok: result.ok, error: result.error ?? null };
     }
 
     /**
@@ -800,7 +862,8 @@ export class DeployController {
         @Param('id', new ParseUUIDPipe()) id: string,
     ): Promise<SubdomainResponseDto> {
         await this.ownershipService.ensureCanView(id, auth.userId);
-        return this.managedSubdomainService.getState(id);
+        const state = await this.managedSubdomainService.getState(id);
+        return { status: 'success', ...state };
     }
 
     /**
@@ -846,7 +909,7 @@ export class DeployController {
             })
             .catch(() => {});
 
-        return result;
+        return { status: 'success', ...result };
     }
 
     @Get('/works/:id/deployments')

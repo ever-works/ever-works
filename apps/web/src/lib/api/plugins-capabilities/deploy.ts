@@ -99,6 +99,10 @@ export type VerifyDomainResponseDto = APIResponse<{
 }>;
 
 export interface RuntimeEnvState {
+    /** Where the site DATABASE_URL comes from: managed shared DB vs BYO URL. */
+    mode?: 'shared' | 'custom';
+    /** Whether the "Ever Works DB (shared)" option can be offered. */
+    sharedAvailable?: boolean;
     databaseUrl: { configured: boolean; masked: string | null };
     /** Secrets auto-managed by the deploy feature (not user-editable). */
     managed: string[];
@@ -265,14 +269,28 @@ export const deployAPI = {
     },
 
     /**
-     * Set the per-Work DATABASE_URL (applied on next deploy)
+     * Set the per-Work database config (applied on next deploy). `mode: 'shared'`
+     * selects the managed Ever Works DB (no `databaseUrl` needed); `mode: 'custom'`
+     * (the default) sets a BYO connection string.
      */
-    setRuntimeEnv(workId: string, databaseUrl: string) {
+    setRuntimeEnv(workId: string, body: { mode?: 'shared' | 'custom'; databaseUrl?: string }) {
         return serverMutation<RuntimeEnvResponseDto>({
             // Security: encode workId to prevent path-segment injection
             endpoint: `/deploy/works/${encodeURIComponent(workId)}/runtime-env`,
-            data: { databaseUrl },
+            data: body,
             method: 'PUT',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * Test a custom Postgres connection string before saving it.
+     */
+    testDbConnection(workId: string, databaseUrl: string) {
+        return serverMutation<APIResponse<{ ok: boolean; error: string | null }>>({
+            endpoint: `/deploy/works/${encodeURIComponent(workId)}/db/test`,
+            data: { databaseUrl },
+            method: 'POST',
             wrapInData: false,
         });
     },

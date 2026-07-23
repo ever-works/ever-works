@@ -15,13 +15,14 @@ import { ConfigStep } from './steps/ConfigStep';
 import { PluginsCatalogStep } from './steps/PluginsCatalogStep';
 import { CreateWorkStep } from './steps/CreateWorkStep';
 import { useTurnstile } from './use-turnstile';
-import { AI_ICONS, DEPLOY_ICONS, STORAGE_ICONS } from './brand-icons';
+import { AI_ICONS, DB_ICONS, DEPLOY_ICONS, STORAGE_ICONS } from './brand-icons';
 import { trackOnboardingEvent } from '@/app/actions/onboarding/track';
 import { completeOnboarding, patchOnboardingState } from '@/app/actions/onboarding/state';
 import { getOnboardingPluginStatuses } from '@/app/actions/dashboard/onboarding';
 import type {
     OnboardingAiChoice,
     OnboardingCatalogResponse,
+    OnboardingDbChoice,
     OnboardingDeployChoice,
     OnboardingStateResponse,
     OnboardingStorageChoice,
@@ -417,13 +418,25 @@ function StepBody({
         case 'storage-choice':
             return (
                 <ChoiceStep
-                    title="Your storage"
+                    title="Your Git Storage"
                     description="Where do you want your Work repos to live?"
                     cards={catalog.storage}
                     selected={flow.state.storage.choice}
                     icons={STORAGE_ICONS}
                     onSelect={(choice) => flow.setStorageChoice(choice as OnboardingStorageChoice)}
                     onPlannedClick={(c) => flow.notePlannedClick('storage', c)}
+                />
+            );
+        case 'db-choice':
+            return (
+                <ChoiceStep
+                    title="Your DB Storage"
+                    description="Where should your Work's database live? Ever Works DB is fully managed; with Custom DB you enter connection details on the Deploy page after your Work is created."
+                    cards={catalog.db}
+                    selected={flow.state.db?.choice ?? 'ever-works-db'}
+                    icons={DB_ICONS}
+                    onSelect={(choice) => flow.setDbChoice(choice as OnboardingDbChoice)}
+                    onPlannedClick={(c) => flow.notePlannedClick('db', c)}
                 />
             );
         case 'storage-config': {
@@ -611,9 +624,11 @@ function labelForStep(step: WizardStep): string {
         case 'ai-config':
             return 'Configure AI';
         case 'storage-choice':
-            return 'Your storage';
+            return 'Your Git Storage';
         case 'storage-config':
             return 'Configure storage';
+        case 'db-choice':
+            return 'Your DB Storage';
         case 'deploy-choice':
             return 'Your deployment';
         case 'deploy-config':

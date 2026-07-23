@@ -32,6 +32,7 @@ import {
 import {
     EverWorksDnsService,
     SubdomainAllocator,
+    EverWorksDbProvisionService,
     buildEverWorksTenantNamespace,
 } from '@ever-works/agent/ever-works-providers';
 import { ZERO_FRICTION_FUNNEL_EVENTS } from '@ever-works/contracts/telemetry';
@@ -140,6 +141,11 @@ export class DeployService {
         // custom-domain repo wired) keep working — the merge code treats
         // a missing repo as "no extras".
         private readonly customDomainRepository?: WorkCustomDomainRepository,
+        // Auto-provisions a per-Work database on the shared "Ever Works DB"
+        // when the Work is in shared mode and none is set. Optional in DI so
+        // fixtures that construct DeployService directly keep working (a
+        // missing provider means "don't auto-provision", same as feature-off).
+        private readonly dbProvisionService?: EverWorksDbProvisionService,
     ) {}
 
     /**
@@ -1255,7 +1261,30 @@ export class DeployService {
             );
             await this.setSecret(ctx, 'COOKIE_SECURE', 'true');
 
-            const databaseUrl = await this.workRuntimeEnvService.getDatabaseUrl(work.id);
+            let databaseUrl = await this.workRuntimeEnvService.getDatabaseUrl(work.id);
+            // Shared "Ever Works DB": auto-provision a per-Work database on the
+            // first deploy when none is set and the Work isn't explicitly using
+            // a custom connection string. No-op when the feature isn't wired
+            // (isReady() false) or the Work already has a URL.
+            if (!databaseUrl && this.dbProvisionService?.isReady()) {
+                const mode = await this.workRuntimeEnvService.getDatabaseMode(work.id);
+                if (mode !== 'custom') {
+                    try {
+                        databaseUrl = await this.dbProvisionService.ensureDatabaseForWork(work.id);
+                        if (databaseUrl && !mode) {
+                            await this.workRuntimeEnvService.setDatabaseMode(work.id, 'shared');
+                        }
+                    } catch (provisionError) {
+                        this.logger.warn(
+                            `Shared DB provision failed for work ${work.id}: ${
+                                provisionError instanceof Error
+                                    ? provisionError.message
+                                    : String(provisionError)
+                            }`,
+                        );
+                    }
+                }
+            }
             if (databaseUrl) {
                 await this.setSecret(ctx, 'DATABASE_URL', databaseUrl);
             } else {
