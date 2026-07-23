@@ -6,6 +6,7 @@ export * from './work.module';
 export * from './work-generation.service';
 export * from './work-schedule.service';
 export * from './work-schedule-dispatcher.service';
+export * from './work-memory.service';
 export * from './work-member.service';
 export * from './work-invitation.service';
 export * from './work-import.service';
