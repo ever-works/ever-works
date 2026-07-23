@@ -334,4 +334,58 @@ describe('normalizeTerminalFrame (structured input path)', () => {
 		const crafted = Object.create({ kind: 'stdin', data: B64 });
 		expect(normalizeTerminalFrame(crafted)).toBeNull();
 	});
+
+	it('a throwing getter or hostile Proxy returns null, never throws', () => {
+		const throwingGetter = {
+			get kind(): string {
+				throw new Error('trap');
+			}
+		};
+		expect(normalizeTerminalFrame(throwingGetter)).toBeNull();
+
+		const throwingField = {
+			kind: 'stdin',
+			get data(): string {
+				throw new Error('trap');
+			}
+		};
+		expect(normalizeTerminalFrame(throwingField)).toBeNull();
+
+		const hostileProxy = new Proxy(
+			{},
+			{
+				has() {
+					throw new Error('trap');
+				},
+				get() {
+					throw new Error('trap');
+				},
+				getOwnPropertyDescriptor() {
+					throw new Error('trap');
+				}
+			}
+		);
+		expect(normalizeTerminalFrame(hostileProxy)).toBeNull();
+
+		// encode routes through the same normalizer — equally protected.
+		expect(encodeTerminalFrame(throwingGetter as unknown as TerminalFrame)).toBeNull();
+	});
+});
+
+describe('canonical base64 (unused final-quantum bits must be zero)', () => {
+	it('accepts the canonical representation', () => {
+		// "A" = one byte 0x41 → canonical 'QQ=='; "AB" → 'QUI='.
+		expect(decodeTerminalFrame('{"kind":"stdin","data":"QQ=="}')).not.toBeNull();
+		expect(decodeTerminalFrame('{"kind":"stdin","data":"QUI="}')).not.toBeNull();
+		expect(decodeTerminalFrame('{"kind":"stdin","data":"AA=="}')).not.toBeNull();
+	});
+
+	it('rejects non-canonical padding bits (one byte sequence, one wire form)', () => {
+		// 'AB==' decodes to the same byte as 'AA==' but with dangling
+		// nonzero bits — two wire forms for identical PTY data.
+		expect(decodeTerminalFrame('{"kind":"stdin","data":"AB=="}')).toBeNull();
+		expect(decodeTerminalFrame('{"kind":"stdin","data":"QR=="}')).toBeNull();
+		expect(decodeTerminalFrame('{"kind":"stdin","data":"QUJ="}')).toBeNull();
+		expect(decodeTerminalFrame('{"kind":"stdout","seq":0,"data":"AB=="}')).toBeNull();
+	});
 });

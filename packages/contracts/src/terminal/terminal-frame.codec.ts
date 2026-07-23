@@ -27,11 +27,22 @@ import {
 /**
  * Canonical base64 (RFC 4648, with padding, no whitespace). The data
  * fields carry raw PTY bytes — anything that is not clean base64 is a
- * protocol violation, not something to repair.
+ * protocol violation, not something to repair. Canonical includes the
+ * final quantum's unused bits being zero: a 2-pad quantum must end in
+ * one of `AQgw`, a 1-pad quantum in one of `AEIMQUYcgkosw048` — so a
+ * given byte sequence has exactly ONE wire representation (`AB==` and
+ * `AA==` decode to the same byte; only `AA==` is canonical).
  */
-const BASE64_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/]{2}==|[A-Za-z0-9+/]{3}=)?$/;
+const BASE64_PATTERN = /^(?:[A-Za-z0-9+/]{4})*(?:[A-Za-z0-9+/][AQgw]==|[A-Za-z0-9+/]{2}[AEIMQUYcgkosw048]=)?$/;
 
-/** RFC 4122 UUID (any version) — the shape of an AgentRun id. */
+/**
+ * Shape gate for an AgentRun id: 8-4-4-4-12 hex. Deliberately does NOT
+ * enforce RFC 4122 version/variant bits — this is an injection barrier
+ * in front of registry/DB lookups (no traversal, no metacharacters,
+ * bounded length), not a UUID authenticity check; a well-shaped id that
+ * matches no row is simply not found. Version-agnosticism keeps ids
+ * from fixtures, imports, or a future non-v4 generator valid.
+ */
 const RUN_ID_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /** ASCII control characters (base64/JWT payloads must not contain any). */
@@ -102,8 +113,21 @@ export function decodeTerminalFrame(raw: string | Uint8Array): TerminalFrame | n
  * Validate an already-parsed value and rebuild it as a canonical frame.
  * Exposed for callers that receive structured payloads (e.g. the batch
  * publish endpoint body) rather than raw socket text.
+ *
+ * The JSON.parse path can never hand us live getters, but a STRUCTURED
+ * caller could pass a Proxy / accessor object whose property reads
+ * throw — the try/catch preserves the null-never-throw contract even
+ * against a hostile object graph.
  */
 export function normalizeTerminalFrame(value: unknown): TerminalFrame | null {
+	try {
+		return normalizeTerminalFrameUnsafe(value);
+	} catch {
+		return null;
+	}
+}
+
+function normalizeTerminalFrameUnsafe(value: unknown): TerminalFrame | null {
 	if (!isRecord(value)) {
 		return null;
 	}
