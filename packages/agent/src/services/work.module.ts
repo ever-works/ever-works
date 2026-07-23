@@ -15,6 +15,7 @@ import { WorkOwnershipService } from './work-ownership.service';
 import { WorkQueryService } from './work-query.service';
 import { WorkLifecycleService } from './work-lifecycle.service';
 import { WorkGenerationService } from './work-generation.service';
+import { WorkMemoryService } from './work-memory.service';
 import { WorkScheduleService } from './work-schedule.service';
 import { WorkScheduleDispatcherService } from './work-schedule-dispatcher.service';
 import { AnonymousUserCleanupService } from './anonymous-user-cleanup.service';
@@ -87,6 +88,7 @@ import { WorkRepository } from '@src/database/repositories/work.repository';
         WorkQueryService,
         WorkLifecycleService,
         WorkGenerationService,
+        WorkMemoryService,
         WorkDetailService,
         WorkScheduleService,
         WorkScheduleDispatcherService,
@@ -148,6 +150,7 @@ import { WorkRepository } from '@src/database/repositories/work.repository';
         WorkQueryService,
         WorkLifecycleService,
         WorkGenerationService,
+        WorkMemoryService,
         WorkDetailService,
         WorkScheduleService,
         WorkScheduleDispatcherService,
