@@ -19,12 +19,13 @@ function initialReducerState() {
 }
 
 describe('computeStepList', () => {
-    it('returns the minimal 7-step list when every choice is the Ever Works default', () => {
+    it('returns the minimal 8-step list when every choice is the Ever Works default', () => {
         const list = computeStepList(ONBOARDING_DEFAULT_STATE);
         expect(list.map((s) => s.kind)).toEqual([
             'welcome',
             'ai-choice',
             'storage-choice',
+            'db-choice',
             'deploy-choice',
             'plugins-catalog',
             'create-work',
@@ -60,7 +61,7 @@ describe('computeStepList', () => {
         );
     });
 
-    it('builds the full 9-step list when every BYOK is chosen', () => {
+    it('builds the full 10-step list when every BYOK is chosen', () => {
         const list = computeStepList(
             defaultsWith({
                 ai: { choice: 'claude-code' },
@@ -68,13 +69,14 @@ describe('computeStepList', () => {
                 deploy: { choice: 'vercel' },
             }),
         );
-        expect(list).toHaveLength(9);
+        expect(list).toHaveLength(10);
         expect(list.map((s) => s.kind)).toEqual([
             'welcome',
             'ai-choice',
             'ai-config',
             'storage-choice',
             'storage-config',
+            'db-choice',
             'deploy-choice',
             'deploy-config',
             'plugins-catalog',
