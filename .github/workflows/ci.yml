@@ -344,8 +344,14 @@ jobs:
         run: |
           cid="$(docker ps -qf 'ancestor=temporalio/auto-setup:1.29.3' | head -n1)"
           if [ -z "$cid" ]; then echo "::error::temporal container not found"; exit 1; fi
+          # The temporal-plugin maps three custom search attributes
+          # (temporal-enqueue-options.ts): tenantId + concurrencyKey are single
+          # Keywords; tags is a list -> KeywordList. Register all three, or the
+          # test's StartWorkflow hits the same INVALID_ARGUMENT on the next one.
           docker exec "$cid" temporal operator search-attribute create \
-            --namespace default --name tenantId --type Keyword || true
+            --namespace default --name tenantId --name concurrencyKey --type Keyword || true
+          docker exec "$cid" temporal operator search-attribute create \
+            --namespace default --name tags --type KeywordList || true
           echo "Registered search attributes:"
           docker exec "$cid" temporal operator search-attribute list --namespace default || true
           # Registration propagates to the matching/history services asynchronously;
