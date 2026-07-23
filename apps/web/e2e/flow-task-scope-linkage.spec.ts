@@ -35,13 +35,13 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *       Tasks. An orphan (unscoped) Task appears in NONE of the three.
  *       An unknown scope id → 200 with an empty page (never 4xx/5xx).
  *   PATCH /api/tasks/:id                                              → 200
- *       The UpdateTaskDto whitelists title/description/priority/labels/
- *       parentTaskId/requireAllApprovers ONLY, and the global ValidationPipe
- *       runs `forbidNonWhitelisted` — so a PATCH that even MENTIONS a scope
- *       key (missionId/ideaId/workId) is rejected 400 "property <key> should
- *       not exist". Scope is therefore IMMUTABLE post-create: a Task NEVER
- *       moves between scopes via PATCH (the request is refused outright; a
- *       title-only PATCH succeeds and leaves the scope untouched).
+ *       `UpdateTaskDto` whitelists the six owner keys alongside the mutable
+ *       fields, so owners are RE-FILEABLE: one PATCH may detach an owner
+ *       (`null`) and attach another. A Task raised against the wrong Work
+ *       has to be movable without recreating it and losing its history.
+ *       Re-filing is ownership-checked exactly as creation is — an owner the
+ *       caller cannot reach is a 400, so PATCH is not a way around the
+ *       guard. A title-only PATCH leaves every owner untouched.
  *   GET  /api/tasks/:id (cross-user)                                  → 404
  *       (no existence leak; never 403).
  *
@@ -332,47 +332,52 @@ test.describe('Task ↔ scope linkage (Mission / Idea / Work)', () => {
         });
         expect(asScoped(task).workId).toBe(workId);
 
-        // A PATCH that even MENTIONS a scope key is REFUSED outright: the
-        // UpdateTaskDto whitelists only title/description/priority/labels/
-        // parentTaskId/requireAllApprovers, and the global ValidationPipe runs
-        // `forbidNonWhitelisted`, so {workId, missionId, …} → 400 "property
-        // <key> should not exist". Scope therefore can never move via PATCH.
-        const newTitle = `Renamed but pinned ${s}`;
-        const rejectRes = await request.patch(`${API_BASE}/api/tasks/${task.id}`, {
+        // Owners are RE-FILEABLE via PATCH. `UpdateTaskDto` whitelists the
+        // six owner keys, so a PATCH may detach one (`null`) and attach
+        // another in the same call — a Task raised against the wrong Work has
+        // to be movable without recreating it and losing its history.
+        const newTitle = `Renamed and re-filed ${s}`;
+        const refileRes = await request.patch(`${API_BASE}/api/tasks/${task.id}`, {
             headers,
             data: { workId: null, missionId, title: newTitle },
         });
-        expect(rejectRes.status(), `scope-key patch should be 400`).toBe(400);
-        expect((await rejectRes.json()).message).toEqual(
-            expect.arrayContaining([expect.stringMatching(/should not exist/i)]),
-        );
+        expect(refileRes.status(), `re-file patch body=${await refileRes.text()}`).toBe(200);
+        const refiled = await refileRes.json();
+        expect(refiled.title).toBe(newTitle);
+        expect(refiled.workId).toBeNull(); // detached
+        expect(refiled.missionId).toBe(missionId); // attached
 
-        // The rejected request changed NOTHING — the row is byte-for-byte its
-        // birth state (original title, work scope intact, mission still null).
-        const afterReject = await (
+        // GET-by-id confirms the persisted row agrees.
+        const afterRefile = await (
             await request.get(`${API_BASE}/api/tasks/${task.id}`, { headers })
         ).json();
-        expect(afterReject.title).toBe(`Immutable scope ${s}`); // not renamed
-        expect(afterReject.workId).toBe(workId);
-        expect(afterReject.missionId).toBeNull();
+        expect(afterRefile.workId).toBeNull();
+        expect(afterRefile.missionId).toBe(missionId);
 
-        // A title-only PATCH (whitelisted field) DOES succeed and leaves the
-        // scope untouched — mutable fields move, scope does not.
+        // An owner the caller cannot reach is still refused — re-filing is
+        // ownership-checked exactly as creation is, so PATCH is not a way
+        // around the guard.
+        const foreignRes = await request.patch(`${API_BASE}/api/tasks/${task.id}`, {
+            headers,
+            data: { workId: UNKNOWN_UUID },
+        });
+        expect(foreignRes.status(), `unreachable owner should be refused`).toBe(400);
+
+        // A title-only PATCH leaves every owner untouched.
         const patchRes = await request.patch(`${API_BASE}/api/tasks/${task.id}`, {
             headers,
-            data: { title: newTitle },
+            data: { title: `${newTitle} again` },
         });
         expect(patchRes.status(), `patch body=${await patchRes.text()}`).toBe(200);
         const patched = await patchRes.json();
-        expect(patched.title).toBe(newTitle); // mutable field moved
-        expect(patched.workId).toBe(workId); // scope unchanged
+        expect(patched.title).toBe(`${newTitle} again`);
+        expect(patched.missionId).toBe(missionId); // owners unchanged
 
-        // GET-by-id confirms the persisted row agrees (no eventual move).
         const after = await (
             await request.get(`${API_BASE}/api/tasks/${task.id}`, { headers })
         ).json();
-        expect(after.workId).toBe(workId);
-        expect(after.missionId).toBeNull();
+        expect(after.workId).toBeNull();
+        expect(after.missionId).toBe(missionId);
 
         // The filters reflect the immutability: still in the work filter,
         // still NOT in the mission filter after the failed move attempt.
