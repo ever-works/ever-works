@@ -1265,10 +1265,27 @@ test.describe('Missions — cross-owner isolation under concurrency', () => {
                 timeout: T,
             }),
         ]);
-        expect(ra.status()).toBe(201);
-        expect(rb.status()).toBe(201);
-        const idA = (await ra.json()).mission.id as string;
-        const idB = (await rb.json()).mission.id as string;
+        const statuses = [ra.status(), rb.status()];
+        assertTolerated5xx(statuses, [201]);
+
+        // A clone that lost the global sqlite write-lock is retried SERIALLY
+        // (serial writes never contend), so the owner-scoping invariants below are
+        // always asserted against two real clones.
+        const cloneIdOrRetry = async (
+            res: typeof ra | typeof rb,
+            token: string,
+            missionId: string,
+        ): Promise<string> => {
+            if (res.status() === 201) return (await res.json()).mission.id as string;
+            const retry = await request.post(`${MISSIONS_BASE}/${missionId}/clone`, {
+                headers: { ...authedHeaders(token), 'content-type': 'application/json' },
+                data: { title: sharedTitle },
+            });
+            expect(retry.status(), 'a serial clone retry always succeeds').toBe(201);
+            return (await retry.json()).mission.id as string;
+        };
+        const idA = await cloneIdOrRetry(ra, a.access_token, ma.id);
+        const idB = await cloneIdOrRetry(rb, b.access_token, mb.id);
         expect(idA).not.toBe(idB);
 
         // Each owner sees ONLY their own clone (no cross-owner leak of the same-title row).

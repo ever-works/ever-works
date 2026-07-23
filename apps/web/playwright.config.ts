@@ -34,7 +34,15 @@ export default defineConfig({
     // default) leaves no headroom and produces "T" (timeout) bursts across
     // the profile/settings sweep in CI. 90s removes the cold-compile cliff
     // while keeping genuine hangs surfaced reasonably fast.
-    timeout: 90_000,
+    //
+    // CI gets more: each shard runs ONE API against an in-memory sqlite for the
+    // shard's whole lifetime, so the DB accumulates rows as the shard proceeds
+    // and later tests see progressively slower queries. As the suite grows, the
+    // heaviest data-backed UI specs drift past 90s late in a shard and fail with
+    // a timeout whose visible symptom is downstream noise ("Request context
+    // disposed", "frame was detached") rather than the real cause. 150s absorbs
+    // that drift; a genuine hang still surfaces well inside the job budget.
+    timeout: process.env.CI ? 150_000 : 90_000,
 
     use: {
         baseURL: process.env.PLAYWRIGHT_BASE_URL || 'http://localhost:3000',
