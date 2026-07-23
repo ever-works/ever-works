@@ -1,6 +1,7 @@
 import { notFound } from 'next/navigation';
 import { agentsAPI } from '@/lib/api/agents';
 import { teamsAPI } from '@/lib/api/teams';
+import { pluginsAPI } from '@/lib/api/plugins';
 import {
     AgentSettingsClient,
     type AgentSettingsOrganization,
@@ -18,6 +19,21 @@ export default async function AgentSettingsPage({ params }: { params: Promise<{ 
     // API never 500s the settings page — without an Organization the
     // card simply doesn't render. `currentTeamIds` is derived from the
     // org chart payload (one flat call) instead of N per-team lookups.
+    // Runtime picker options. Both AI categories are offered because either
+    // can back an Agent: a direct `ai-provider` (openai, anthropic, …) or an
+    // `ai-gateway` that fronts many models (openrouter). Failures degrade to
+    // an empty list — the picker still accepts a typed provider id, so a
+    // flaky plugins API never blocks the settings page.
+    const aiProviders = (
+        await Promise.all([
+            pluginsAPI.listByCategory('ai-provider').catch(() => []),
+            pluginsAPI.listByCategory('ai-gateway').catch(() => []),
+        ])
+    )
+        .flat()
+        .map((plugin) => ({ id: plugin.id, name: plugin.name ?? plugin.id }))
+        .sort((a, b) => a.name.localeCompare(b.name));
+
     const orgs = await teamsAPI.listOrganizations().catch(() => []);
     const activeOrg = orgs[0];
     let organization: AgentSettingsOrganization | undefined;
@@ -40,5 +56,7 @@ export default async function AgentSettingsPage({ params }: { params: Promise<{ 
         };
     }
 
-    return <AgentSettingsClient agent={agent} organization={organization} />;
+    return (
+        <AgentSettingsClient agent={agent} organization={organization} aiProviders={aiProviders} />
+    );
 }

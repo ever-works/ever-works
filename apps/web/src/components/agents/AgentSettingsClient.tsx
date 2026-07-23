@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useMemo, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { Archive, Building2, Cpu, IdCard, Pause, Play, Save, ShieldCheck } from 'lucide-react';
 import { toast } from 'sonner';
@@ -20,6 +20,8 @@ import {
 // card's Team select (v1 UI: one team per Agent).
 import { addTeamMemberAction, removeTeamMemberAction } from '@/app/actions/dashboard/teams';
 import { AgentScorecardCard } from '@/components/agents/AgentScorecardCard';
+import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select';
+import { PluginModelSelect } from '@/components/plugins/form/PluginModelSelect';
 import type { Agent, AgentIdleBehavior, AgentPermissions } from '@/lib/api/agents';
 
 const permissionLabels: Array<{ key: keyof AgentPermissions; label: string }> = [
@@ -52,16 +54,48 @@ export interface AgentSettingsOrganization {
     agentOptions: Array<{ id: string; label: string }>;
 }
 
+/**
+ * Common heartbeat cadences, offered as presets.
+ *
+ * The field accepts any cron expression, so this is a shortcut list rather
+ * than an enumeration — `allowCustom` keeps arbitrary crons reachable.
+ */
+const heartbeatCadenceOptions: SearchableSelectOption[] = [
+    { value: 'manual', label: 'Manual', description: 'Only runs when you trigger it' },
+    { value: '0 * * * *', label: 'Hourly', description: '0 * * * *' },
+    { value: '0 */6 * * *', label: 'Every 6 hours', description: '0 */6 * * *' },
+    { value: '0 9 * * *', label: 'Daily at 09:00', description: '0 9 * * *' },
+    { value: '0 9 * * 1', label: 'Weekly on Monday', description: '0 9 * * 1' },
+    { value: '0 9 1 * *', label: 'Monthly on the 1st', description: '0 9 1 * *' },
+];
+
 interface AgentSettingsClientProps {
     agent: Agent;
     organization?: AgentSettingsOrganization;
+    /**
+     * AI provider plugins available to this user, for the Runtime picker.
+     * Empty when the plugins API is unreachable — the picker still renders
+     * and still accepts a typed provider id, so a flaky call degrades the
+     * affordance rather than blocking the page.
+     */
+    aiProviders?: Array<{ id: string; name: string; category?: string }>;
 }
 
 export function AgentSettingsClient({
     agent: initialAgent,
     organization,
+    aiProviders = [],
 }: AgentSettingsClientProps) {
     const router = useRouter();
+    const aiProviderOptions = useMemo<SearchableSelectOption[]>(
+        () =>
+            aiProviders.map((provider) => ({
+                value: provider.id,
+                label: provider.name,
+                description: provider.id,
+            })),
+        [aiProviders],
+    );
     const [agent, setAgent] = useState(initialAgent);
     const [isSaving, startSaving] = useTransition();
     const [isChangingStatus, startChangingStatus] = useTransition();
@@ -289,26 +323,56 @@ export function AgentSettingsClient({
                     </div>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
-                    <Input
-                        label="AI provider id"
-                        variant="form"
+                    {/* Provider and model were free-text id fields, which
+                        required the user to already know the exact string.
+                        Both are pickers now; both still accept a typed value
+                        so an id this build doesn't know about stays reachable. */}
+                    <SearchableSelect
+                        label="AI provider"
                         value={aiProviderId}
-                        onChange={(event) => setAiProviderId(event.target.value)}
+                        onChange={(value) => {
+                            setAiProviderId(value);
+                            // The model list is provider-specific, so a model
+                            // chosen under the previous provider is almost
+                            // certainly invalid under the new one. Clearing
+                            // falls back to the provider default rather than
+                            // silently keeping an unroutable id.
+                            setModelId('');
+                        }}
+                        options={aiProviderOptions}
+                        emptyOptionLabel="Account default"
                         placeholder="Account default"
+                        allowCustom
+                        customLabel="Enter a provider id…"
+                        customPlaceholder="e.g. openrouter"
+                        testId="agent-ai-provider"
                     />
-                    <Input
-                        label="Model id"
-                        variant="form"
-                        value={modelId}
-                        onChange={(event) => setModelId(event.target.value)}
-                        placeholder="Provider default"
-                    />
-                    <Input
+                    <div>
+                        <label className="block text-xs font-medium text-text dark:text-text-dark mb-2">
+                            Model
+                        </label>
+                        <PluginModelSelect
+                            pluginId={aiProviderId}
+                            value={modelId}
+                            onChange={setModelId}
+                            disabled={!aiProviderId}
+                        />
+                        <p className="mt-1 text-xs text-text-muted dark:text-text-muted-dark">
+                            {aiProviderId
+                                ? 'Leave empty to use the provider default.'
+                                : 'Pick an AI provider first.'}
+                        </p>
+                    </div>
+                    <SearchableSelect
                         label="Heartbeat cadence"
-                        variant="form"
                         value={heartbeatCadence}
-                        onChange={(event) => setHeartbeatCadence(event.target.value)}
+                        onChange={setHeartbeatCadence}
+                        options={heartbeatCadenceOptions}
                         placeholder="manual or cron expression"
+                        allowCustom
+                        customLabel="Enter a cron expression…"
+                        customPlaceholder="0 9 * * *"
+                        testId="agent-heartbeat-cadence"
                     />
                     <div>
                         <label className="block text-xs font-medium text-text dark:text-text-dark mb-2">
