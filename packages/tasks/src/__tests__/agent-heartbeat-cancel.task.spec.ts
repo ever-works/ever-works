@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 
 /**
  * Heartbeat cancel accounting.
@@ -79,9 +79,24 @@ describe('agentHeartbeatTask — cancelled run accounting', () => {
     let runner: any;
     let registeredConfig: TaskConfig;
 
-    beforeEach(async () => {
-        vi.clearAllMocks();
+    /**
+     * Import the worker module ONCE — see the same note in
+     * `agent-task-execute.task.spec.ts`. Cold-re-importing the worker graph
+     * per test made this file take ~70s in CI and blow the 30s hook timeout,
+     * surfacing as an unrelated-looking assertion failure. `run()` resolves
+     * its dependencies lazily through the mocked `createApplicationContext()`,
+     * which `beforeEach` still re-stubs per test, so per-test mock isolation
+     * is unchanged.
+     */
+    beforeAll(async () => {
         vi.resetModules();
+        await import('../tasks/trigger/agent-heartbeat.task');
+        const lastCall = taskMock.mock.calls[taskMock.mock.calls.length - 1];
+        registeredConfig = lastCall[0] as TaskConfig;
+    });
+
+    beforeEach(() => {
+        vi.clearAllMocks();
 
         agents = {
             findByIdAndUser: vi.fn().mockResolvedValue({
@@ -117,10 +132,6 @@ describe('agentHeartbeatTask — cancelled run accounting', () => {
             }),
             close: vi.fn().mockResolvedValue(undefined),
         });
-
-        await import('../tasks/trigger/agent-heartbeat.task');
-        const lastCall = taskMock.mock.calls[taskMock.mock.calls.length - 1];
-        registeredConfig = lastCall[0] as TaskConfig;
     });
 
     const payload = {
