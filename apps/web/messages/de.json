@@ -3490,7 +3490,14 @@
                         "lastSuccess": "Last successful pull: {time}",
                         "lastError": "Last error: {error}"
                     }
-                }
+                },
+                "providerRepoTitle": "{provider}-Repository",
+                "providerRepoEnableLabel": "{provider}-Repository generieren",
+                "providerRepoEnableDescription": "Eine KI-generierte, lesbare Fassung dieses Werks, veröffentlicht auf {provider}. Sie wird nie bereitgestellt — man liest sie direkt auf {provider}.",
+                "providerRepoEnabled": "Generierung des {provider}-Repositorys aktiviert",
+                "providerRepoDisabled": "Generierung des {provider}-Repositorys deaktiviert",
+                "providerRepoUpdateFailed": "Repository-Einstellung konnte nicht aktualisiert werden",
+                "providerRepoDisabledNote": "Die Generierung ist aus. Das vorhandene Repository bleibt unverändert — es wird lediglich nicht mehr aktualisiert."
             },
             "deploy": {
                 "progress": {

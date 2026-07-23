@@ -1266,6 +1266,37 @@ export async function updateWebsiteSettings(
     }
 }
 
+/**
+ * Toggle generation of the "{provider} Repository" — the browsable,
+ * AI-generated repo published to the git provider but never deployed.
+ */
+export async function updateProviderRepositorySettings(
+    workId: string,
+    settings: {
+        providerRepositoryEnabled?: boolean;
+    },
+) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const response = await workAPI.update(workId, settings);
+        revalidatePath(`/works/${workId}/settings`);
+
+        return {
+            success: response.status === 'success',
+        };
+    } catch (error) {
+        console.error('Failed to update provider repository settings:', error);
+        return {
+            success: false,
+            error: 'Failed to update settings',
+        };
+    }
+}
+
 export async function updateCommunityPrSettings(
     workId: string,
     settings: {

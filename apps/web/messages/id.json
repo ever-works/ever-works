@@ -3288,7 +3288,14 @@
                         "lastSuccess": "Last successful pull: {time}",
                         "lastError": "Last error: {error}"
                     }
-                }
+                },
+                "providerRepoTitle": "Repositori {provider}",
+                "providerRepoEnableLabel": "Hasilkan repositori {provider}",
+                "providerRepoEnableDescription": "Versi Karya ini yang dihasilkan AI dan dapat dibaca, dipublikasikan di {provider}. Tidak pernah disebarkan — orang membacanya langsung di {provider}.",
+                "providerRepoEnabled": "Pembuatan repositori {provider} diaktifkan",
+                "providerRepoDisabled": "Pembuatan repositori {provider} dinonaktifkan",
+                "providerRepoUpdateFailed": "Gagal memperbarui pengaturan repositori",
+                "providerRepoDisabledNote": "Pembuatan dimatikan. Repositori yang ada dibiarkan apa adanya — hanya berhenti diperbarui."
             },
             "deploy": {
                 "progress": {

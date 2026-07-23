@@ -637,6 +637,11 @@ export class WorkLifecycleService {
                 updateData.websiteTemplateId = nextTemplateId;
             }
 
+            // Provider ("{provider} Repository") generation opt-out.
+            if (updateDto.providerRepositoryEnabled !== undefined) {
+                updateData.providerRepositoryEnabled = updateDto.providerRepositoryEnabled;
+            }
+
             // Handle community PR processing settings
             if (updateDto.communityPrEnabled !== undefined) {
                 updateData.communityPrEnabled = updateDto.communityPrEnabled;

@@ -3288,7 +3288,14 @@
                         "lastSuccess": "Last successful pull: {time}",
                         "lastError": "Last error: {error}"
                     }
-                }
+                },
+                "providerRepoTitle": "Repositório do {provider}",
+                "providerRepoEnableLabel": "Gerar o repositório do {provider}",
+                "providerRepoEnableDescription": "Uma versão deste Trabalho gerada por IA e navegável, publicada no {provider}. Nunca é implantada — as pessoas leem-na diretamente no {provider}.",
+                "providerRepoEnabled": "Geração do repositório do {provider} ativada",
+                "providerRepoDisabled": "Geração do repositório do {provider} desativada",
+                "providerRepoUpdateFailed": "Não foi possível atualizar a definição do repositório",
+                "providerRepoDisabledNote": "A geração está desativada. O repositório existente fica intacto — apenas deixa de ser atualizado."
             },
             "deploy": {
                 "progress": {

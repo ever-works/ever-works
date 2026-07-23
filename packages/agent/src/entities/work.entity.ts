@@ -61,6 +61,7 @@ import type { WorkKbConfig } from './kb-types';
  */
 import {
     USER_SELECTABLE_WORK_KINDS,
+    getWorkCapabilities,
     normalizeWorkKind,
     type UserSelectableWorkKind,
     type WorkKind,
@@ -117,6 +118,38 @@ export function normalizeCreateWorkKind(value?: string | null): WorkKind | undef
  *   - `'archived'` — soft-retired; reserved for a future archive flow.
  */
 export type WorkStatus = 'draft' | 'active' | 'registered' | 'archived';
+
+/**
+ * Whether a Work should provision and maintain the browsable repository
+ * published to its git provider (the "{provider} Repository";
+ * `RepositoryRole` `work`).
+ *
+ * Two independent gates, both of which must allow it:
+ *   1. the Work's kind provisions that repository at all, and
+ *   2. the user has not turned it off.
+ *
+ * Kind wins: switching a Work to a kind that has no provider repository must
+ * stop generating one regardless of the stored flag, and switching back must
+ * not silently re-enable something the user disabled.
+ *
+ * Deliberately a free function taking a structural type rather than only an
+ * entity method. Works reach the generators as plain objects in several
+ * paths — `WorkQueryService` spreads the entity (`{...dir}`) and the
+ * generation pipeline passes those on — so an instance method alone would
+ * throw `is not a function` at runtime for exactly those callers. The entity
+ * keeps a thin method that delegates here.
+ */
+export function shouldGenerateProviderRepository(
+    work: Pick<Work, 'kind'> & { providerRepositoryEnabled?: boolean },
+): boolean {
+    if (!getWorkCapabilities(work.kind).repos.work) {
+        return false;
+    }
+    // `?? true` covers rows written before the column existed, which TypeORM
+    // surfaces as `undefined` on a partially-selected entity. Absent must
+    // read as enabled — the opposite would stop generation platform-wide.
+    return work.providerRepositoryEnabled ?? true;
+}
 
 @Entity({ name: 'works' })
 export class Work {
@@ -369,6 +402,25 @@ export class Work {
     @Column({ type: 'boolean', default: false })
     comparisonsEnabled: boolean;
 
+    /**
+     * Whether to generate the browsable repository published to the git
+     * provider — the one the UI calls the "{provider} Repository" and that
+     * `RepositoryRole` calls `work`.
+     *
+     * Defaults to `true` so every existing Work keeps its current behaviour.
+     * Turning it off is for Works whose output nobody reads on GitHub (an
+     * internal landing page, say) and who would rather not carry a
+     * repository that only ever holds a generated README.
+     *
+     * This is a user override layered ON TOP of the per-kind capability
+     * (`getWorkCapabilities(kind).repos.work`) — a kind that never
+     * provisions the repository ignores the flag entirely. Resolve the two
+     * together through `Work.shouldGenerateProviderRepository()` rather than
+     * reading this column directly.
+     */
+    @Column({ type: 'boolean', default: true })
+    providerRepositoryEnabled: boolean;
+
     @Column({ type: 'varchar', nullable: true, default: null })
     websiteTemplateId?: string | null;
 
@@ -568,6 +620,11 @@ export class Work {
 
     getMainRepo() {
         return this.getRelatedRepository('work').repo;
+    }
+
+    /** @see shouldGenerateProviderRepository — kept for entity-instance callers. */
+    shouldGenerateProviderRepository(): boolean {
+        return shouldGenerateProviderRepository(this);
     }
 
     getRepoOwner(type: RepositoryRole = 'data'): string {
