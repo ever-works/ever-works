@@ -429,6 +429,28 @@ export class WorkRepository {
     }
 
     /**
+     * Conditional UPDATE for the lazy bootstrap of the per-Work `DATABASE_URL`
+     * (`deployDatabaseUrlEncrypted`). Race-safe (see `setDeployAuthSecretIfNull`)
+     * so two concurrent deploys that both auto-provision a shared DB converge
+     * on the first provisioner's connection string instead of clobbering it.
+     */
+    async setDeployDatabaseUrlIfNull(workId: string, encrypted: string): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(Work)
+            .set({ deployDatabaseUrlEncrypted: encrypted })
+            .where('id = :id', { id: workId })
+            .andWhere('deployDatabaseUrlEncrypted IS NULL')
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /** Set the Work's DB mode (`'shared'` | `'custom'`). */
+    async setDeployDatabaseMode(workId: string, mode: 'shared' | 'custom'): Promise<void> {
+        await this.repository.update(workId, { deployDatabaseMode: mode });
+    }
+
+    /**
      * Update platform-sync observability columns after a pull-transport
      * round-trip. Pass `lastSuccessAt` on success or
      * `{ lastErrorAt, lastErrorMessage }` on failure — partial updates are

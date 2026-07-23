@@ -88,6 +88,30 @@ describe('OnboardingCatalogService', () => {
         });
     });
 
+    describe('DB catalog reflects DB_EVER_WORKS_SHARED_ENABLED', () => {
+        it('flag off → Ever Works DB is Planned + unavailable; Custom is always available', async () => {
+            delete process.env.DB_EVER_WORKS_SHARED_ENABLED;
+            const svc = await makeSvc([]);
+            const db = svc.getCatalog().db;
+            const managed = db.find((c) => c.choice === 'ever-works-db')!;
+            const custom = db.find((c) => c.choice === 'custom')!;
+            expect(managed.default).toBe(true);
+            expect(managed.available).toBe(false);
+            expect(managed.badges).toContain('planned');
+            expect(custom.available).toBe(true);
+            expect(custom.badges).toContain('byok');
+        });
+
+        it('flag on → Ever Works DB is available with default badge only', async () => {
+            process.env.DB_EVER_WORKS_SHARED_ENABLED = 'true';
+            const svc = await makeSvc([]);
+            const managed = svc.getCatalog().db.find((c) => c.choice === 'ever-works-db')!;
+            expect(managed.available).toBe(true);
+            expect(managed.badges).toContain('default');
+            expect(managed.badges).not.toContain('planned');
+        });
+    });
+
     describe('Deploy catalog reflects DEPLOY_EVER_WORKS_ENABLED', () => {
         it('flag off → Ever Works is Planned', async () => {
             delete process.env.DEPLOY_EVER_WORKS_ENABLED;

@@ -1,8 +1,9 @@
 'use client';
 
-import { Container, Globe2, GitBranch } from 'lucide-react';
+import { Container, Database, Globe2, GitBranch, Server } from 'lucide-react';
 import type {
     OnboardingAiChoice,
+    OnboardingDbChoice,
     OnboardingDeployChoice,
     OnboardingStorageChoice,
 } from '@ever-works/contracts/api';
@@ -210,4 +211,9 @@ export const DEPLOY_ICONS: Record<OnboardingDeployChoice, React.ReactNode> = {
     'ever-works': <EverWorksDeployMark />,
     vercel: <VercelMark />,
     k8s: <KubernetesMark />,
+};
+
+export const DB_ICONS: Record<OnboardingDbChoice, React.ReactNode> = {
+    'ever-works-db': <Server className="h-5 w-5" />,
+    custom: <Database className="h-5 w-5" />,
 };

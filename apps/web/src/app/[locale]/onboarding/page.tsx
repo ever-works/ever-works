@@ -27,6 +27,7 @@ export const metadata: Metadata = {
 const FALLBACK_CATALOG: OnboardingCatalogResponse = {
     ai: [],
     storage: [],
+    db: [],
     deploy: [],
     plugins: [],
 };
