@@ -800,7 +800,8 @@ export class DeployController {
         @Param('id', new ParseUUIDPipe()) id: string,
     ): Promise<SubdomainResponseDto> {
         await this.ownershipService.ensureCanView(id, auth.userId);
-        return this.managedSubdomainService.getState(id);
+        const state = await this.managedSubdomainService.getState(id);
+        return { status: 'success', ...state };
     }
 
     /**
@@ -846,7 +847,7 @@ export class DeployController {
             })
             .catch(() => {});
 
-        return result;
+        return { status: 'success', ...result };
     }
 
     @Get('/works/:id/deployments')
