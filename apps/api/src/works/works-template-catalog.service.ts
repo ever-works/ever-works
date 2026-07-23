@@ -89,6 +89,17 @@ const DEFAULT_WORKS_REPO = 'ever-works/works';
 const MANIFEST_PATH = 'manifest.json';
 const RAW_HOST = 'https://raw.githubusercontent.com';
 const CACHE_TTL_MS = 60 * 60 * 1000;
+/**
+ * NEGATIVE-cache TTL for a failed/empty catalog read.
+ *
+ * We must not pin `[]` for the full hour on a transient upstream failure — but
+ * caching nothing at all is worse: every subsequent request then re-pays the
+ * whole external fetch (an 8s tokenless timeout plus the Git fallback), so one
+ * slow or rate-limiting upstream turns into a stall on EVERY catalog-touching
+ * request. Remembering the failure briefly bounds that blast radius while still
+ * recovering within seconds once the upstream is healthy again.
+ */
+const EMPTY_CACHE_TTL_MS = 30 * 1000;
 const RAW_FETCH_TIMEOUT_MS = 8000;
 // A real User-Agent — the raw host tolerates empty UAs, but we send one for
 // parity with the CF-proxied `api.ever.works` (which 403s empty UAs) and for
@@ -286,11 +297,14 @@ export class WorksTemplateCatalogService {
             }
 
             catalog = await this.fetchCatalog(ref);
-            // Only cache non-empty results so a transient failure doesn't pin
-            // [] for an hour.
-            if (catalog.length > 0) {
-                await this.cache.set(cacheKey, catalog, CACHE_TTL_MS).catch(() => undefined);
-            }
+            // A successful read is cached for the full TTL; a failed/empty one is
+            // cached only BRIEFLY. Not caching failures at all meant every later
+            // request re-paid the entire external fetch timeout, so a rate-limiting
+            // upstream stalled every catalog-touching request instead of degrading
+            // to the built-in list.
+            await this.cache
+                .set(cacheKey, catalog, catalog.length > 0 ? CACHE_TTL_MS : EMPTY_CACHE_TTL_MS)
+                .catch(() => undefined);
         }
 
         if (!chipType) return catalog;

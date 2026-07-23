@@ -586,11 +586,25 @@ test.describe('Operator tenant runtime allow-list — admin UI (#1516)', () => {
             // starting point; then Tab through the remaining four and verify
             // the focused element id matches the declared order.
             const first = page.locator(`input#runtime-allowlist-${ids[0]}`);
-            await first.focus();
-            await expect(first).toBeFocused();
+            // A single .focus() can silently no-op while the RSC payload is still
+            // hydrating — the element resolves but focus never lands (observed in
+            // CI: toBeFocused "inactive", then activeElement.id reading ""). Retry
+            // until focus actually sticks.
+            await expect(async () => {
+                await first.focus();
+                await expect(first).toBeFocused({ timeout: 2_000 });
+            }).toPass({ timeout: 30_000 });
             for (let i = 1; i < ids.length; i++) {
                 await page.keyboard.press('Tab');
                 const expectedId = `runtime-allowlist-${ids[i]}`;
+                // Give focus a moment to settle before reading it; a bare read can
+                // land between blur and focus and return "" (no activeElement id).
+                await expect
+                    .poll(async () => page.evaluate(() => document.activeElement?.id ?? ''), {
+                        timeout: 5_000,
+                        intervals: [50, 100, 250],
+                    })
+                    .not.toBe('');
                 const focusedId = await page.evaluate(() => document.activeElement?.id ?? '');
                 // Some intervening focusable controls (env-var chips) are not
                 // expected in the checkbox grid; tolerate at most ONE extra
