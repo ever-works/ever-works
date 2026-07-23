@@ -24,7 +24,7 @@ class FakeBoss implements PgBossInstance {
 	) {
 		return 'sub-1';
 	}
-	async cancel(id: string) {
+	async cancel(_name: string, id: string) {
 		this.cancelled.push(id);
 	}
 	async schedule(name: string, cron: string, data?: unknown) {
@@ -88,11 +88,13 @@ describe('PgBossJobRuntimePlugin — operator hooks', () => {
 		const boss = new FakeBoss();
 		const factory = new PgBossDispatcherFactory({ boss });
 		const plugin = new PgBossJobRuntimePlugin().useDispatcherFactory(factory);
-		await expect(plugin.cancel('j1')).resolves.toBe(true);
-		expect(boss.cancelled).toEqual(['j1']);
+		// v10 cancel needs the queue; the dispatcher learns it from the send.
+		const id = await factory.send('q1', {}); // 'jb-1'
+		await expect(plugin.cancel(id!)).resolves.toBe(true);
+		expect(boss.cancelled).toEqual(['jb-1']);
 
 		const orphan = new PgBossJobRuntimePlugin();
-		await expect(orphan.cancel('j1')).resolves.toBe(false);
+		await expect(orphan.cancel('jb-1')).resolves.toBe(false);
 	});
 
 	it('getRunStatus projects pg-boss state onto JobRunStatus', async () => {

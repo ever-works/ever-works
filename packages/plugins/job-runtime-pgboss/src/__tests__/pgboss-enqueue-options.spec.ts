@@ -7,7 +7,7 @@ import type { PgBossInstance, PgBossJobView } from '../pgboss-types.js';
 describe('mapEnqueueOptions (EW-742 P4 T31 pg-boss stamping)', () => {
 	it('translates idempotencyKey → sendOptions.singletonKey', () => {
 		expect(mapEnqueueOptions({ idempotencyKey: 'idem-1' })).toEqual({
-			sendOptions: { singletonKey: 'idem-1' },
+			sendOptions: { singletonKey: 'idem-1', singletonSeconds: 21_600 },
 			metaForPayload: {}
 		});
 	});
@@ -60,7 +60,7 @@ describe('mapEnqueueOptions (EW-742 P4 T31 pg-boss stamping)', () => {
 			machineHint: 'medium-1x'
 		};
 		expect(mapEnqueueOptions(opts)).toEqual({
-			sendOptions: { singletonKey: 'idem-A', expireInSeconds: 600 },
+			sendOptions: { singletonKey: 'idem-A', expireInSeconds: 600, singletonSeconds: 21_600 },
 			metaForPayload: {
 				_ew: {
 					tenantId: 'tenant-A',
@@ -118,7 +118,7 @@ describe('PgBossDispatcherFactory.enqueue (EW-742 P4 T31)', () => {
 				workId: 'w7',
 				_ew: { tenantId: 't-acme', tags: ['kb'] }
 			},
-			options: { singletonKey: 'idem-1', expireInSeconds: 900 }
+			options: { singletonKey: 'idem-1', expireInSeconds: 900, singletonSeconds: 21_600 }
 		});
 	});
 
@@ -146,6 +146,7 @@ describe('PgBossDispatcherFactory.enqueue (EW-742 P4 T31)', () => {
 		);
 		expect(boss.sendCalls[0].options).toEqual({
 			singletonKey: 'idem-operator',
+			singletonSeconds: 21_600,
 			retryLimit: 5
 		});
 	});
