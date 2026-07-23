@@ -129,6 +129,43 @@ describe('selectActiveToolNames — against the real registry', () => {
         expect(missionTools.length).toBeGreaterThanOrEqual(8);
     });
 
+    /**
+     * The budget floor alone does not save the create tools. On a turn that
+     * activates many domains at once, the generated operations are numerous
+     * enough to fill the entire floor by themselves — and because
+     * `buildChatTools` emits generated tools first, the bespoke `createX`
+     * at the tail of each domain would still be sliced off. Ordering
+     * hand-written tools ahead of generated ones within `matched` is what
+     * actually guarantees they survive.
+     */
+    it('keeps every create tool active on a turn that activates many domains at once', () => {
+        const selected = selectActiveToolNames(ALL_TOOL_NAMES, {
+            text:
+                'For this mission and its ideas, create a task for the agent, ' +
+                'check the work deployment, the plugin integration, the knowledge ' +
+                'base document, the notification channel, the team member, the ' +
+                'api key, the budget and the webhook',
+            pageUrl: '/missions',
+        });
+
+        for (const { tool } of CREATE_FLOWS) {
+            expect(selected, `${tool} was crowded out by generated operations`).toContain(tool);
+        }
+    });
+
+    it('orders hand-written tools ahead of generated ones within a matched domain', () => {
+        const selected = selectActiveToolNames(ALL_TOOL_NAMES, {
+            text: 'I want to create a Mission. Weekly roundup',
+            pageUrl: '/missions',
+        });
+
+        const handWrittenIndex = selected.indexOf('createMission');
+        const generatedIndex = selected.indexOf('list_mission_attachments');
+        expect(handWrittenIndex).toBeGreaterThanOrEqual(0);
+        expect(generatedIndex).toBeGreaterThanOrEqual(0);
+        expect(handWrittenIndex).toBeLessThan(generatedIndex);
+    });
+
     it('still drops domains that are irrelevant to the turn', () => {
         const selected = selectActiveToolNames(ALL_TOOL_NAMES, {
             text: 'I want to create a Mission. Weekly roundup',

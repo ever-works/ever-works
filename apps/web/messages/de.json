@@ -663,7 +663,7 @@
                 "created": "Mission erstellt",
                 "minLength": "Die Beschreibung muss mindestens 10 Zeichen lang sein.",
                 "error": "Die Mission konnte nicht erstellt werden. Bitte versuchen Sie es erneut.",
-                "chatUnavailable": "Der Chat ist derzeit nicht verfügbar — nutzen Sie stattdessen „Manuell erstellen\"."
+                "chatUnavailable": "Der Chat ist derzeit nicht verfügbar — nutzen Sie stattdessen „Manuell erstellen“."
             }
         },
         "memoryPage": {

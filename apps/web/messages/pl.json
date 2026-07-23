@@ -616,7 +616,7 @@
                 "created": "Misja utworzona",
                 "minLength": "Opis musi mieć co najmniej 10 znaków.",
                 "error": "Nie udało się utworzyć misji. Spróbuj ponownie.",
-                "chatUnavailable": "Czat jest niedostępny — użyj „Utwórz ręcznie\"."
+                "chatUnavailable": "Czat jest niedostępny — użyj „Utwórz ręcznie”."
             }
         },
         "memoryPage": {

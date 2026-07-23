@@ -256,7 +256,17 @@ export function selectActiveToolNames(
 
     const domains = toolDomainMap();
     const core: string[] = [];
-    const matched: string[] = [];
+    // `matched` is split by provenance and re-joined hand-written-first.
+    //
+    // `buildChatTools` spreads generated tools BEFORE hand-written ones (so
+    // hand-written wins name collisions), which puts every bespoke `createX`
+    // at the tail of its domain — exactly where the cap bites. Reserving a
+    // budget floor for `matched` is not enough on its own: on a turn that
+    // activates several domains, the generated operations alone can fill
+    // that floor and the create tool is still cut. Ordering by provenance
+    // is what actually guarantees it survives.
+    const matchedHandWritten: string[] = [];
+    const matchedGenerated: string[] = [];
     for (const name of allNames) {
         const domain = domains.get(name) ?? 'works';
         // Only EXPLICITLY-mapped tools may be always-on. Generated operations
@@ -265,8 +275,11 @@ export function selectActiveToolNames(
         // active and crowd out the domain the user is actually working in.
         const isExplicit = Object.prototype.hasOwnProperty.call(STATIC_TOOL_DOMAINS, name);
         if (isExplicit && CORE_DOMAINS.has(domain)) core.push(name);
-        else if (activeDomains.has(domain)) matched.push(name);
+        else if (!activeDomains.has(domain)) continue;
+        else if (isExplicit) matchedHandWritten.push(name);
+        else matchedGenerated.push(name);
     }
+    const matched = [...matchedHandWritten, ...matchedGenerated];
 
     // Guarantee the matched domains a floor of the budget before core claims
     // the rest, so a large core can never slice off the bespoke create/update
