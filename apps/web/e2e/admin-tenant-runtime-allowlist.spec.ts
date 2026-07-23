@@ -582,44 +582,42 @@ test.describe('Operator tenant runtime allow-list — admin UI (#1516)', () => {
         const { context, page } = await openAdminAllowlist(browser, freshTenantId());
         try {
             const ids = ['trigger', 'temporal', 'bullmq', 'pgboss', 'inngest'];
-            // Focus the first checkbox via a direct click so we have a known
-            // starting point; then Tab through the remaining four and verify
-            // the focused element id matches the declared order.
+            const expectedIds = ids.map((p) => `runtime-allowlist-${p}`);
+
+            // Focus the first checkbox as a known starting point. A single .focus()
+            // can silently no-op while the RSC payload is still hydrating (observed
+            // in CI: toBeFocused "inactive", then activeElement.id reading ""), so
+            // retry until it actually sticks.
             const first = page.locator(`input#runtime-allowlist-${ids[0]}`);
-            // A single .focus() can silently no-op while the RSC payload is still
-            // hydrating — the element resolves but focus never lands (observed in
-            // CI: toBeFocused "inactive", then activeElement.id reading ""). Retry
-            // until focus actually sticks.
             await expect(async () => {
                 await first.focus();
                 await expect(first).toBeFocused({ timeout: 2_000 });
             }).toPass({ timeout: 30_000 });
-            for (let i = 1; i < ids.length; i++) {
+
+            // The a11y property is that every provider checkbox is keyboard-reachable
+            // IN DECLARED ORDER — NOT that each is a fixed number of Tabs from the
+            // last. Each provider row also renders env-var chips + reveal buttons,
+            // so a VARIABLE number of intervening focusables (with no id) sit between
+            // checkboxes, and that count differs run-to-run under CI hydration. So we
+            // Tab forward within a generous budget and collect the checkbox ids we
+            // land on, then assert they appear in the declared order.
+            const seen: string[] = [`runtime-allowlist-${ids[0]}`];
+            const BUDGET = 60;
+            for (let step = 0; step < BUDGET && seen.length < expectedIds.length; step++) {
                 await page.keyboard.press('Tab');
-                const expectedId = `runtime-allowlist-${ids[i]}`;
-                // Give focus a moment to settle before reading it; a bare read can
-                // land between blur and focus and return "" (no activeElement id).
-                await expect
-                    .poll(async () => page.evaluate(() => document.activeElement?.id ?? ''), {
-                        timeout: 5_000,
-                        intervals: [50, 100, 250],
-                    })
-                    .not.toBe('');
                 const focusedId = await page.evaluate(() => document.activeElement?.id ?? '');
-                // Some intervening focusable controls (env-var chips) are not
-                // expected in the checkbox grid; tolerate at most ONE extra
-                // Tab to reach the next checkbox.
-                if (focusedId !== expectedId) {
-                    await page.keyboard.press('Tab');
-                    const after = await page.evaluate(() => document.activeElement?.id ?? '');
-                    expect(
-                        after,
-                        `expected focus to reach ${expectedId} within 2 Tab presses (got ${focusedId} then ${after})`,
-                    ).toBe(expectedId);
-                } else {
-                    expect(focusedId).toBe(expectedId);
+                if (
+                    expectedIds.includes(focusedId) &&
+                    focusedId !== seen[seen.length - 1] &&
+                    !seen.includes(focusedId)
+                ) {
+                    seen.push(focusedId);
                 }
             }
+            expect(
+                seen,
+                `every provider checkbox reached by Tab in declared order (got ${seen.join(', ')})`,
+            ).toEqual(expectedIds);
         } finally {
             await context.close();
         }
