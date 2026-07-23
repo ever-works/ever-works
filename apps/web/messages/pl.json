@@ -592,6 +592,31 @@
                 "capUnlimited": "Unlimited",
                 "capPrefix": "Outstanding cap:",
                 "clonedFromPrefix": "Cloned from another Mission"
+            },
+            "newPage": {
+                "link": "Utwórz ręcznie",
+                "or": "Lub",
+                "title": "Nowa misja",
+                "subtitle": "Opisz stały cel. Agent generuje z niego Pomysły — jednorazowo lub według harmonogramu.",
+                "nameLabel": "Tytuł",
+                "namePlaceholder": "Opcjonalnie — zostaw puste, aby wywieść go z opisu",
+                "descriptionLabel": "Opis",
+                "descriptionPlaceholder": "Opisz, nad czym ta misja ma pracować — np. „Śledzić nowe otwartoźródłowe frameworki agentów AI i utrzymywać nasz katalog aktualnym\".",
+                "descriptionHint": "Co najmniej 10 znaków.",
+                "typeLabel": "Typ",
+                "typeOneShot": "Jednorazowa — uruchom raz",
+                "typeScheduled": "Zaplanowana — uruchamiaj cyklicznie",
+                "scheduleLabel": "Harmonogram",
+                "schedulePlaceholder": "0 9 * * *",
+                "scheduleHint": "Pięciopolowe wyrażenie cron. Przykład: 0 9 * * * uruchamia się codziennie o 09:00.",
+                "scheduleRequired": "Zaplanowana misja wymaga wyrażenia cron.",
+                "cancel": "Anuluj",
+                "create": "Utwórz misję",
+                "creating": "Tworzenie…",
+                "created": "Misja utworzona",
+                "minLength": "Opis musi mieć co najmniej 10 znaków.",
+                "error": "Nie udało się utworzyć misji. Spróbuj ponownie.",
+                "chatUnavailable": "Czat jest niedostępny — użyj „Utwórz ręcznie\"."
             }
         },
         "memoryPage": {

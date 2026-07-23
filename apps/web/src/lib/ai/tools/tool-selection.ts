@@ -16,7 +16,18 @@ import { ALL_OPERATIONS } from './generated/registry.all';
  * the domain pulls its tools in.
  */
 
-export const MAX_ACTIVE_TOOLS = 90;
+export const MAX_ACTIVE_TOOLS = 128;
+
+/**
+ * Floor on how many matched-domain tools survive the cap.
+ *
+ * The largest single domain is comfortably under this, so in practice a
+ * focused turn ("create a mission") keeps every tool of that domain plus a
+ * generous slice of core. Raising `MAX_ACTIVE_TOOLS` alone would NOT have
+ * been enough — core grows with every new generated operation, so without a
+ * reserved floor the same starvation returns on the next registry wave.
+ */
+export const MIN_MATCHED_SLOTS = 48;
 
 /** Domains that are always available regardless of the message. */
 const CORE_DOMAINS = new Set(['core', 'works']);
@@ -116,7 +127,7 @@ function deriveDomain(path: string): string {
 }
 
 /** Hand-written + canvas tools (camelCase) → domain. */
-const STATIC_TOOL_DOMAINS: Record<string, string> = {
+export const STATIC_TOOL_DOMAINS: Record<string, string> = {
     // navigation + canvas + research → always-on core
     navigate: 'core',
     reloadPage: 'core',
@@ -173,6 +184,12 @@ const STATIC_TOOL_DOMAINS: Record<string, string> = {
     deleteMission: 'missions',
     runMissionNow: 'missions',
     cloneMission: 'missions',
+    // Mission ↔ Work relation tools. Without these three entries they fell
+    // through to `deriveDomain`'s `'works'` catch-all and were treated as
+    // always-on core rather than mission-domain tools.
+    listMissionWorks: 'missions',
+    attachWorkToMission: 'missions',
+    detachWorkFromMission: 'missions',
     listIdeas: 'ideas',
     getIdeaDetails: 'ideas',
     getIdeaBudget: 'ideas',
@@ -199,7 +216,31 @@ function toolDomainMap(): Map<string, string> {
 /**
  * Pick the active tool names for a turn given the user's latest message and the
  * page they're on. Always includes CORE + works; adds keyword/page-matched
- * domains; caps the total (core kept first).
+ * domains; caps the total.
+ *
+ * ## Why the budget is split rather than "core first, then whatever fits"
+ *
+ * The original implementation was `[...core, ...matched].slice(0, cap)` with
+ * `cap = 90`. Two things made that starve the domain the user was actually
+ * talking about:
+ *
+ *  1. `deriveDomain` returns `'works'` as its catch-all, and `'works'` is a
+ *     CORE domain — so every generated operation whose path matched none of
+ *     the explicit prefixes silently became always-on and ate the budget.
+ *  2. `buildChatTools` spreads generated tools FIRST and hand-written tools
+ *     LAST, so a bespoke `createX` sits at the very END of its domain. It is
+ *     therefore the first thing dropped when the tail is sliced.
+ *
+ * Combined, `createIdea` was cut from the active set on *every* turn: the
+ * model was told (by the system prompt) that the tool existed, emitted a call
+ * for it, and the AI SDK raised `NoSuchToolError`. To the user that looked
+ * like "I answered the question and nothing happened".
+ *
+ * The fix is two-part and both halves matter:
+ *  - generated tools can no longer enter `core` (they are still reachable —
+ *    they match on their domain keywords like any other tool);
+ *  - the matched domain gets a guaranteed floor of the budget, so core can
+ *    never consume the whole cap.
  */
 export function selectActiveToolNames(
     allNames: string[],
@@ -218,11 +259,19 @@ export function selectActiveToolNames(
     const matched: string[] = [];
     for (const name of allNames) {
         const domain = domains.get(name) ?? 'works';
-        if (CORE_DOMAINS.has(domain)) core.push(name);
+        // Only EXPLICITLY-mapped tools may be always-on. Generated operations
+        // resolve their domain through `deriveDomain`, whose fallback is the
+        // core `'works'` domain — without this guard they become permanently
+        // active and crowd out the domain the user is actually working in.
+        const isExplicit = Object.prototype.hasOwnProperty.call(STATIC_TOOL_DOMAINS, name);
+        if (isExplicit && CORE_DOMAINS.has(domain)) core.push(name);
         else if (activeDomains.has(domain)) matched.push(name);
     }
 
-    // Core first (never trimmed), then matched up to the cap.
-    const selected = [...core, ...matched].slice(0, cap);
-    return selected;
+    // Guarantee the matched domains a floor of the budget before core claims
+    // the rest, so a large core can never slice off the bespoke create/update
+    // tools that live at the tail of each domain.
+    const matchedFloor = Math.min(matched.length, MIN_MATCHED_SLOTS);
+    const coreBudget = Math.max(0, cap - matchedFloor);
+    return [...core.slice(0, coreBudget), ...matched].slice(0, cap);
 }

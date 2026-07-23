@@ -600,6 +600,31 @@
                 "apply": "적용",
                 "reset": "초기화",
                 "status": "상태"
+            },
+            "newPage": {
+                "link": "직접 만들기",
+                "or": "또는",
+                "title": "새 미션",
+                "subtitle": "지속적인 목표를 설명하세요. 에이전트가 이를 바탕으로 아이디어를 생성합니다 — 1회 또는 예약 실행.",
+                "nameLabel": "제목",
+                "namePlaceholder": "선택 사항 — 비워 두면 설명에서 자동으로 만듭니다",
+                "descriptionLabel": "설명",
+                "descriptionPlaceholder": "이 미션이 계속 수행할 작업을 설명하세요. 예: \"새로운 오픈소스 AI 에이전트 프레임워크를 추적하고 디렉터리를 최신 상태로 유지\"",
+                "descriptionHint": "최소 10자 이상.",
+                "typeLabel": "유형",
+                "typeOneShot": "일회성 — 한 번 실행",
+                "typeScheduled": "예약 — 반복 실행",
+                "scheduleLabel": "일정",
+                "schedulePlaceholder": "0 9 * * *",
+                "scheduleHint": "5개 필드 cron 표현식. 예: 0 9 * * * 는 매일 09:00에 실행됩니다.",
+                "scheduleRequired": "예약 미션에는 cron 표현식이 필요합니다.",
+                "cancel": "취소",
+                "create": "미션 만들기",
+                "creating": "만드는 중…",
+                "created": "미션이 생성되었습니다",
+                "minLength": "설명은 최소 10자 이상이어야 합니다.",
+                "error": "미션을 생성하지 못했습니다. 다시 시도해 주세요.",
+                "chatUnavailable": "채팅을 사용할 수 없습니다 — \"수동으로 만들기\"를 이용하세요."
             }
         },
         "memoryPage": {

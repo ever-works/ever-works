@@ -592,6 +592,31 @@
                 "capUnlimited": "Unlimited",
                 "capPrefix": "Outstanding cap:",
                 "clonedFromPrefix": "Cloned from another Mission"
+            },
+            "newPage": {
+                "link": "मैन्युअल रूप से बनाएँ",
+                "or": "या",
+                "title": "नया मिशन",
+                "subtitle": "एक निरंतर लक्ष्य बताएँ। एजेंट उससे विचार बनाता है — एक बार, या निर्धारित समय पर।",
+                "nameLabel": "शीर्षक",
+                "namePlaceholder": "वैकल्पिक — विवरण से लेने के लिए खाली छोड़ें",
+                "descriptionLabel": "विवरण",
+                "descriptionPlaceholder": "बताएँ कि यह मिशन किस पर काम करता रहे — जैसे \"नए ओपन-सोर्स AI एजेंट फ़्रेमवर्क ट्रैक करें और हमारी डायरेक्टरी अद्यतन रखें।\"",
+                "descriptionHint": "कम से कम 10 अक्षर।",
+                "typeLabel": "प्रकार",
+                "typeOneShot": "एक-बार — एक बार चलाएँ",
+                "typeScheduled": "निर्धारित — बार-बार चलाएँ",
+                "scheduleLabel": "शेड्यूल",
+                "schedulePlaceholder": "0 9 * * *",
+                "scheduleHint": "पाँच-फ़ील्ड वाला cron एक्सप्रेशन। उदाहरण: 0 9 * * * हर दिन 09:00 बजे चलता है।",
+                "scheduleRequired": "निर्धारित मिशन के लिए cron एक्सप्रेशन आवश्यक है।",
+                "cancel": "रद्द करें",
+                "create": "मिशन बनाएँ",
+                "creating": "बना रहे हैं…",
+                "created": "मिशन बनाया गया",
+                "minLength": "विवरण कम से कम 10 अक्षरों का होना चाहिए।",
+                "error": "मिशन नहीं बनाया जा सका। कृपया पुनः प्रयास करें।",
+                "chatUnavailable": "चैट अभी उपलब्ध नहीं है — इसके बजाय \"मैन्युअल रूप से बनाएँ\" का उपयोग करें।"
             }
         },
         "memoryPage": {

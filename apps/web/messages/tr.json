@@ -592,6 +592,31 @@
                 "capUnlimited": "Unlimited",
                 "capPrefix": "Outstanding cap:",
                 "clonedFromPrefix": "Cloned from another Mission"
+            },
+            "newPage": {
+                "link": "Manuel oluştur",
+                "or": "Veya",
+                "title": "Yeni Görev",
+                "subtitle": "Süregelen bir hedef tanımlayın. Ajan bundan Fikirler üretir — bir kez ya da zamanlanmış olarak.",
+                "nameLabel": "Başlık",
+                "namePlaceholder": "İsteğe bağlı — açıklamadan türetmek için boş bırakın",
+                "descriptionLabel": "Açıklama",
+                "descriptionPlaceholder": "Bu görevin üzerinde çalışmayı sürdüreceği konuyu yazın — ör. \"Yeni açık kaynak yapay zekâ ajan çerçevelerini izle ve dizinimizi güncel tut.\"",
+                "descriptionHint": "En az 10 karakter.",
+                "typeLabel": "Tür",
+                "typeOneShot": "Tek seferlik — bir kez çalıştır",
+                "typeScheduled": "Zamanlanmış — düzenli çalıştır",
+                "scheduleLabel": "Zamanlama",
+                "schedulePlaceholder": "0 9 * * *",
+                "scheduleHint": "Beş alanlı cron ifadesi. Örnek: 0 9 * * * her gün 09:00’da çalışır.",
+                "scheduleRequired": "Zamanlanmış bir görev için cron ifadesi gerekir.",
+                "cancel": "İptal",
+                "create": "Görev oluştur",
+                "creating": "Oluşturuluyor…",
+                "created": "Görev oluşturuldu",
+                "minLength": "Açıklama en az 10 karakter olmalıdır.",
+                "error": "Görev oluşturulamadı. Lütfen tekrar deneyin.",
+                "chatUnavailable": "Sohbet şu anda kullanılamıyor — \"Elle oluştur\" seçeneğini kullanın."
             }
         },
         "memoryPage": {

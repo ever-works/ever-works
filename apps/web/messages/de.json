@@ -639,6 +639,31 @@
                 "anyStatus": "Beliebiger Status",
                 "apply": "Übernehmen",
                 "reset": "Zurücksetzen"
+            },
+            "newPage": {
+                "link": "Manuell erstellen",
+                "or": "Oder",
+                "title": "Neue Mission",
+                "subtitle": "Beschreiben Sie ein fortlaufendes Ziel. Der Agent erzeugt daraus Ideen — einmalig oder nach Zeitplan.",
+                "nameLabel": "Titel",
+                "namePlaceholder": "Optional — leer lassen, um ihn aus der Beschreibung abzuleiten",
+                "descriptionLabel": "Beschreibung",
+                "descriptionPlaceholder": "Beschreiben Sie, woran diese Mission arbeiten soll — z. B. \"Neue Open-Source-KI-Agenten-Frameworks verfolgen und unser Verzeichnis aktuell halten.\"",
+                "descriptionHint": "Mindestens 10 Zeichen.",
+                "typeLabel": "Typ",
+                "typeOneShot": "Einmalig — einmal ausführen",
+                "typeScheduled": "Geplant — wiederholt ausführen",
+                "scheduleLabel": "Zeitplan",
+                "schedulePlaceholder": "0 9 * * *",
+                "scheduleHint": "Cron-Ausdruck mit fünf Feldern. Beispiel: 0 9 * * * läuft täglich um 09:00 Uhr.",
+                "scheduleRequired": "Eine geplante Mission benötigt einen Cron-Ausdruck.",
+                "cancel": "Abbrechen",
+                "create": "Mission erstellen",
+                "creating": "Wird erstellt…",
+                "created": "Mission erstellt",
+                "minLength": "Die Beschreibung muss mindestens 10 Zeichen lang sein.",
+                "error": "Die Mission konnte nicht erstellt werden. Bitte versuchen Sie es erneut.",
+                "chatUnavailable": "Der Chat ist derzeit nicht verfügbar — nutzen Sie stattdessen „Manuell erstellen\"."
             }
         },
         "memoryPage": {
