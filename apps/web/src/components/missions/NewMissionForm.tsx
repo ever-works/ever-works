@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Target } from 'lucide-react';
 import { toast } from 'sonner';
@@ -41,17 +41,23 @@ export function NewMissionForm({ createMission }: { createMission: CreateMission
     const [description, setDescription] = useState('');
     const [type, setType] = useState<'one-shot' | 'scheduled'>('one-shot');
     const [schedule, setSchedule] = useState('');
-    const [pending, startTransition] = useTransition();
+    // House rule: explicit isSubmitting over useTransition.pending for
+    // detached-async submits. `startTransition(() => { void (async…)() })`
+    // returns synchronously, so `pending` flips back to false while the
+    // request is still in flight — a double-click then passes every guard
+    // and creates two Missions.
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const trimmedDescription = description.trim();
     const trimmedSchedule = schedule.trim();
     const scheduleMissing = type === 'scheduled' && trimmedSchedule.length === 0;
     const canSubmit =
-        trimmedDescription.length >= MIN_DESCRIPTION_LENGTH && !scheduleMissing && !pending;
+        trimmedDescription.length >= MIN_DESCRIPTION_LENGTH && !scheduleMissing && !isSubmitting;
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        if (isSubmitting) return;
         if (trimmedDescription.length < MIN_DESCRIPTION_LENGTH) {
             setError(t('minLength'));
             return;
@@ -62,26 +68,28 @@ export function NewMissionForm({ createMission }: { createMission: CreateMission
         }
         setError(null);
         const trimmedTitle = title.trim();
-        startTransition(() => {
-            void (async () => {
-                try {
-                    const mission = await createMission({
-                        description: trimmedDescription,
-                        type,
-                        // The server rejects a schedule on a one-shot Mission,
-                        // so send `null` rather than an empty string.
-                        schedule: type === 'scheduled' ? trimmedSchedule : null,
-                        ...(trimmedTitle ? { title: trimmedTitle } : {}),
-                    });
-                    toast.success(t('created'));
-                    router.push(`${ROUTES.DASHBOARD_MISSIONS}/${mission.id}`);
-                } catch {
-                    // Security: never surface raw API error text (it may carry
-                    // internal details). Show a localized generic message.
-                    setError(t('error'));
-                }
-            })();
-        });
+        setIsSubmitting(true);
+        void (async () => {
+            try {
+                const mission = await createMission({
+                    description: trimmedDescription,
+                    type,
+                    // The server rejects a schedule on a one-shot Mission,
+                    // so send `null` rather than an empty string.
+                    schedule: type === 'scheduled' ? trimmedSchedule : null,
+                    ...(trimmedTitle ? { title: trimmedTitle } : {}),
+                });
+                toast.success(t('created'));
+                // Deliberately NOT cleared before navigation — the form stays
+                // locked until the route change unmounts it.
+                router.push(`${ROUTES.DASHBOARD_MISSIONS}/${mission.id}`);
+            } catch {
+                // Security: never surface raw API error text (it may carry
+                // internal details). Show a localized generic message.
+                setError(t('error'));
+                setIsSubmitting(false);
+            }
+        })();
     };
 
     return (
@@ -201,7 +209,7 @@ export function NewMissionForm({ createMission }: { createMission: CreateMission
                         {t('cancel')}
                     </Button>
                     <Button type="submit" size="sm" disabled={!canSubmit}>
-                        {pending ? t('creating') : t('create')}
+                        {isSubmitting ? t('creating') : t('create')}
                     </Button>
                 </div>
             </form>
