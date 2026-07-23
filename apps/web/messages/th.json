@@ -3288,7 +3288,14 @@
                         "lastSuccess": "Last successful pull: {time}",
                         "lastError": "Last error: {error}"
                     }
-                }
+                },
+                "providerRepoTitle": "คลัง {provider}",
+                "providerRepoEnableLabel": "สร้างคลัง {provider}",
+                "providerRepoEnableDescription": "เวอร์ชันของงานนี้ที่ AI สร้างขึ้นให้อ่านได้ และเผยแพร่บน {provider} โดยไม่ถูกนำไปปรับใช้ที่ใด — ผู้คนอ่านโดยตรงบน {provider}",
+                "providerRepoEnabled": "เปิดการสร้างคลัง {provider} แล้ว",
+                "providerRepoDisabled": "ปิดการสร้างคลัง {provider} แล้ว",
+                "providerRepoUpdateFailed": "อัปเดตการตั้งค่าคลังไม่สำเร็จ",
+                "providerRepoDisabledNote": "การสร้างถูกปิดอยู่ คลังที่มีอยู่ยังคงเดิม เพียงแต่จะไม่ถูกอัปเดตอีก"
             },
             "deploy": {
                 "progress": {

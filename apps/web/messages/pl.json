@@ -3288,7 +3288,14 @@
                         "lastSuccess": "Last successful pull: {time}",
                         "lastError": "Last error: {error}"
                     }
-                }
+                },
+                "providerRepoTitle": "Repozytorium {provider}",
+                "providerRepoEnableLabel": "Generuj repozytorium {provider}",
+                "providerRepoEnableDescription": "Wygenerowana przez AI, czytelna wersja tej Pracy publikowana w {provider}. Nigdy nie jest wdrażana — czyta się ją bezpośrednio w {provider}.",
+                "providerRepoEnabled": "Generowanie repozytorium {provider} włączone",
+                "providerRepoDisabled": "Generowanie repozytorium {provider} wyłączone",
+                "providerRepoUpdateFailed": "Nie udało się zaktualizować ustawienia repozytorium",
+                "providerRepoDisabledNote": "Generowanie jest wyłączone. Istniejące repozytorium pozostaje nietknięte — przestaje być tylko aktualizowane."
             },
             "deploy": {
                 "progress": {

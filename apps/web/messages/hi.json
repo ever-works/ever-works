@@ -3288,7 +3288,14 @@
                         "lastSuccess": "Last successful pull: {time}",
                         "lastError": "Last error: {error}"
                     }
-                }
+                },
+                "providerRepoTitle": "{provider} रिपॉजिटरी",
+                "providerRepoEnableLabel": "{provider} रिपॉजिटरी बनाएँ",
+                "providerRepoEnableDescription": "इस Work का AI-निर्मित, पठनीय संस्करण जो {provider} पर प्रकाशित होता है। यह कभी तैनात नहीं होता — लोग इसे सीधे {provider} पर पढ़ते हैं।",
+                "providerRepoEnabled": "{provider} रिपॉजिटरी निर्माण सक्षम",
+                "providerRepoDisabled": "{provider} रिपॉजिटरी निर्माण अक्षम",
+                "providerRepoUpdateFailed": "रिपॉजिटरी सेटिंग अपडेट नहीं हो सकी",
+                "providerRepoDisabledNote": "निर्माण बंद है। मौजूदा रिपॉजिटरी अछूती रहती है — बस उसका अपडेट होना रुक जाता है।"
             },
             "deploy": {
                 "progress": {

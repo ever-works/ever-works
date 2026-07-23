@@ -3490,7 +3490,14 @@
                         "lastSuccess": "Last successful pull: {time}",
                         "lastError": "Last error: {error}"
                     }
-                }
+                },
+                "providerRepoTitle": "מאגר {provider}",
+                "providerRepoEnableLabel": "יצירת מאגר {provider}",
+                "providerRepoEnableDescription": "גרסה קריאה של עבודה זו שנוצרת על ידי AI ומתפרסמת ב-{provider}. היא לעולם אינה נפרסת — קוראים אותה ישירות ב-{provider}.",
+                "providerRepoEnabled": "יצירת מאגר {provider} הופעלה",
+                "providerRepoDisabled": "יצירת מאגר {provider} כובתה",
+                "providerRepoUpdateFailed": "עדכון הגדרת המאגר נכשל",
+                "providerRepoDisabledNote": "היצירה כבויה. המאגר הקיים נשאר כפי שהוא — הוא פשוט מפסיק להתעדכן."
             },
             "deploy": {
                 "progress": {
