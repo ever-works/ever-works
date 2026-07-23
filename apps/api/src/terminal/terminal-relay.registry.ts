@@ -1,4 +1,4 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import {
     encodeTerminalFrame,
     isTerminalServerToClientFrame,
@@ -48,7 +48,12 @@ import {
  * fenced behind {@link TerminalFanoutBus} — the default in-process bus
  * is a no-op, which is correct for the current single-API-replica
  * deployments; a Redis pub/sub implementation can be injected later
- * with zero changes to registry semantics.
+ * (via {@link TERMINAL_FANOUT_BUS}) with zero changes to registry
+ * semantics. BOTH directions traverse the bus: server frames take the
+ * publish path on peers, and role-checked inbound stdin/resize fans to
+ * peers' local clients — a driver and worker attached to different
+ * replicas still form a complete loop. Bus delivery is best-effort;
+ * local truth never depends on it.
  */
 
 export type TerminalClientRole = 'driver' | 'viewer' | 'worker';
@@ -83,7 +88,7 @@ export class InProcessTerminalFanoutBus implements TerminalFanoutBus {
 }
 
 export interface TerminalRelayRegistryOptions {
-    /** Rolling scrollback budget per session, in wire characters. */
+    /** Rolling scrollback budget per session, in DECODED terminal bytes. */
     scrollbackMaxBytes?: number;
     /** Max retained pre-attach banner frames per session. */
     bannersCap?: number;
@@ -116,6 +121,29 @@ interface TerminalSession {
 export const TERMINAL_SCROLLBACK_MAX_BYTES_DEFAULT = 512 * 1024;
 export const TERMINAL_BANNERS_CAP_DEFAULT = 64;
 
+/**
+ * Injection tokens — the constructor parameters are interface-typed, and
+ * TypeScript interfaces are erased at runtime, so without explicit tokens
+ * Nest could never actually supply a configured bus or options object
+ * (the registry would silently fall back to the no-op defaults).
+ */
+export const TERMINAL_FANOUT_BUS = 'TERMINAL_FANOUT_BUS' as const;
+export const TERMINAL_RELAY_REGISTRY_OPTIONS = 'TERMINAL_RELAY_REGISTRY_OPTIONS' as const;
+
+/**
+ * Decoded size of a canonical base64 payload. Frame data is validated
+ * canonical by the codec, so padding is exactly the trailing `=` count.
+ * The scrollback budget counts REAL terminal bytes — wire characters
+ * would silently shrink the promised window by a third.
+ */
+function decodedBase64Bytes(data: string): number {
+    if (data.length === 0) return 0;
+    let padding = 0;
+    if (data.endsWith('==')) padding = 2;
+    else if (data.endsWith('=')) padding = 1;
+    return (data.length / 4) * 3 - padding;
+}
+
 @Injectable()
 export class TerminalRelayRegistry {
     private readonly logger = new Logger(TerminalRelayRegistry.name);
@@ -125,20 +153,32 @@ export class TerminalRelayRegistry {
     private readonly bus: TerminalFanoutBus;
 
     constructor(
-        @Optional() bus?: TerminalFanoutBus,
-        @Optional() options?: TerminalRelayRegistryOptions,
+        @Optional() @Inject(TERMINAL_FANOUT_BUS) bus?: TerminalFanoutBus,
+        @Optional() @Inject(TERMINAL_RELAY_REGISTRY_OPTIONS) options?: TerminalRelayRegistryOptions,
     ) {
         this.bus = bus ?? new InProcessTerminalFanoutBus();
         this.scrollbackMaxBytes =
             options?.scrollbackMaxBytes ?? TERMINAL_SCROLLBACK_MAX_BYTES_DEFAULT;
         this.bannersCap = options?.bannersCap ?? TERMINAL_BANNERS_CAP_DEFAULT;
         // Frames from peer replicas fan out locally but are never
-        // re-broadcast (fromRemote) — no bus loops.
+        // re-broadcast (fromRemote) — no bus loops. Server-direction
+        // frames take the full publish path; inbound stdin/resize from a
+        // driver attached to a PEER replica fans to all local clients
+        // (the role check already ran on the origin replica, and the
+        // sender is not local so nobody is excluded).
         this.bus.onRemote((runId, wire) => {
             const frame = decodeTerminalFrame(wire);
-            if (frame) {
-                this.publish(runId, frame, { fromRemote: true });
+            if (!frame) {
+                return;
             }
+            if (frame.kind === 'stdin' || frame.kind === 'resize') {
+                const session = this.sessions.get(runId);
+                if (session) {
+                    this.fanOut(session, wire, null);
+                }
+                return;
+            }
+            this.publish(runId, frame, { fromRemote: true });
         });
     }
 
@@ -166,13 +206,13 @@ export class TerminalRelayRegistry {
             }
             session.seenSeqMax = frame.seq;
             session.scrollback.push(frame);
-            session.scrollbackBytes += frame.data.length;
+            session.scrollbackBytes += decodedBase64Bytes(frame.data);
             while (
                 session.scrollbackBytes > this.scrollbackMaxBytes &&
                 session.scrollback.length > 0
             ) {
                 const evicted = session.scrollback.shift() as TerminalStdoutFrame;
-                session.scrollbackBytes -= evicted.data.length;
+                session.scrollbackBytes -= decodedBase64Bytes(evicted.data);
             }
         } else if (frame.kind === 'exit') {
             session.ended = true;
@@ -194,7 +234,7 @@ export class TerminalRelayRegistry {
         this.fanOut(session, wire, null);
 
         if (!opts.fromRemote) {
-            this.bus.publishRemote(runId, wire);
+            this.safePublishRemote(runId, wire);
         }
         return true;
     }
@@ -206,6 +246,14 @@ export class TerminalRelayRegistry {
      */
     attach(runId: string, client: TerminalRelayClient): TerminalSessionStatus {
         const session = this.getOrCreate(runId);
+
+        // Snapshot for the reentrancy guard below: the replay loop is
+        // synchronous, but a client.send that synchronously triggers a
+        // publish (a same-process worker adapter) would land frames in
+        // scrollback AFTER this snapshot and BEFORE this client joins
+        // the fan-out set — invisible to both paths without the catch-up.
+        const seqBeforeReplay = session.seenSeqMax;
+        const exitBeforeReplay = session.exit;
 
         const replay: TerminalFrame[] = [...session.banners, ...session.scrollback];
         if (session.exit) {
@@ -225,6 +273,32 @@ export class TerminalRelayRegistry {
 
         session.everAttached = true;
         session.clients.set(client.id, client);
+
+        // Reentrancy catch-up: deliver anything published during replay.
+        if (session.seenSeqMax > seqBeforeReplay) {
+            for (const frame of session.scrollback) {
+                if (frame.seq <= seqBeforeReplay) continue;
+                const wire = encodeTerminalFrame(frame);
+                if (wire !== null) {
+                    try {
+                        client.send(wire);
+                    } catch {
+                        session.clients.delete(client.id);
+                        return this.getStatus(runId);
+                    }
+                }
+            }
+        }
+        if (session.exit && session.exit !== exitBeforeReplay) {
+            const wire = encodeTerminalFrame(session.exit);
+            if (wire !== null) {
+                try {
+                    client.send(wire);
+                } catch {
+                    session.clients.delete(client.id);
+                }
+            }
+        }
         return this.getStatus(runId);
     }
 
@@ -273,7 +347,32 @@ export class TerminalRelayRegistry {
             return false;
         }
         this.fanOut(session, wire, senderId);
+        // A worker for this run may be attached to a PEER replica —
+        // inbound traverses the bus too, or cross-replica stdin would
+        // silently reach nobody. The origin replica already role-checked.
+        this.safePublishRemote(runId, wire);
         return true;
+    }
+
+    /**
+     * Bus delivery is best-effort: local truth (scrollback, seq, local
+     * fan-out) is already committed by the time the bus is invoked, and a
+     * publisher retry would be rejected by the seq gate — so a throwing
+     * bus implementation must degrade to a logged warning, never to an
+     * exception that makes the local replica look failed while it is not.
+     * Cross-replica catch-up on bus outage is the bus implementation's
+     * concern (e.g. Redis client retry), not the registry's.
+     */
+    private safePublishRemote(runId: string, wire: string): void {
+        try {
+            this.bus.publishRemote(runId, wire);
+        } catch (error) {
+            this.logger.warn(
+                `Terminal fan-out bus publish failed for run ${runId}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
     }
 
     getStatus(runId: string): TerminalSessionStatus {

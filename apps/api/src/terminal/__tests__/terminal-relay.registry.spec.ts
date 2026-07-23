@@ -1,5 +1,8 @@
+import { Test } from '@nestjs/testing';
 import {
     InProcessTerminalFanoutBus,
+    TERMINAL_FANOUT_BUS,
+    TERMINAL_RELAY_REGISTRY_OPTIONS,
     TerminalRelayRegistry,
     type TerminalClientRole,
     type TerminalFanoutBus,
@@ -397,6 +400,207 @@ describe('TerminalRelayRegistry', () => {
             const bus = new InProcessTerminalFanoutBus();
             expect(() => bus.publishRemote()).not.toThrow();
             expect(() => bus.onRemote()).not.toThrow();
+        });
+
+        it('a throwing bus never fails the local publish (best-effort remote)', () => {
+            const bus: TerminalFanoutBus = {
+                publishRemote() {
+                    throw new Error('redis down');
+                },
+                onRemote() {
+                    // not needed
+                },
+            };
+            const registry = new TerminalRelayRegistry(bus);
+            const client = makeClient('local');
+            registry.attach(RUN, client);
+
+            expect(() => registry.publish(RUN, stdout(0))).not.toThrow();
+            expect(registry.publish(RUN, stdout(1))).toBe(true);
+            // Local delivery and seq bookkeeping proceeded normally.
+            expect(client.received.filter((f) => f.kind === 'stdout')).toHaveLength(2);
+            expect(registry.getStatus(RUN).lastSeq).toBe(1);
+        });
+
+        function makeLinkedRegistries() {
+            // Two registries joined by a symmetric in-memory bus, the
+            // shape a Redis pub/sub impl will have: publishRemote on one
+            // replica fires onRemote handlers on the OTHER only.
+            const handlersA: Array<(runId: string, wire: string) => void> = [];
+            const handlersB: Array<(runId: string, wire: string) => void> = [];
+            const busA: TerminalFanoutBus = {
+                publishRemote: (runId, wire) => handlersB.forEach((h) => h(runId, wire)),
+                onRemote: (h) => handlersA.push(h),
+            };
+            const busB: TerminalFanoutBus = {
+                publishRemote: (runId, wire) => handlersA.forEach((h) => h(runId, wire)),
+                onRemote: (h) => handlersB.push(h),
+            };
+            return {
+                replicaA: new TerminalRelayRegistry(busA),
+                replicaB: new TerminalRelayRegistry(busB),
+            };
+        }
+
+        it('cross-replica: server frames published on one replica reach clients on the other', () => {
+            const { replicaA, replicaB } = makeLinkedRegistries();
+            const remoteViewer = makeClient('remote-viewer');
+            replicaB.attach(RUN, remoteViewer);
+
+            replicaA.publish(RUN, stdout(0));
+
+            expect(remoteViewer.received).toEqual([stdout(0)]);
+            // And the peer replica's seq bookkeeping advanced.
+            expect(replicaB.getStatus(RUN).lastSeq).toBe(0);
+        });
+
+        it('cross-replica: driver stdin reaches a worker attached to the other replica (no loops)', () => {
+            const { replicaA, replicaB } = makeLinkedRegistries();
+            const driver = makeClient('driver-1', 'driver');
+            const worker = makeClient('worker-1', 'worker');
+            replicaA.attach(RUN, driver);
+            replicaB.attach(RUN, worker);
+
+            expect(replicaA.deliverInbound(RUN, 'driver-1', { kind: 'stdin', data: B64 })).toBe(
+                true,
+            );
+
+            // The worker on replica B received the keystrokes…
+            expect(worker.received).toEqual([{ kind: 'stdin', data: B64 }]);
+            // …and nothing echoed back to the sending driver (no loop).
+            expect(driver.received).toEqual([]);
+        });
+
+        it('cross-replica: remote stdin for a run with no local session is a no-op', () => {
+            const { replicaA, replicaB } = makeLinkedRegistries();
+            const driver = makeClient('driver-1', 'driver');
+            replicaA.attach(RUN, driver);
+
+            expect(() =>
+                replicaA.deliverInbound(RUN, 'driver-1', { kind: 'stdin', data: B64 }),
+            ).not.toThrow();
+            expect(replicaB.getStatus(RUN).exists).toBe(false);
+        });
+    });
+
+    describe('scrollback accounting (decoded bytes, not wire characters)', () => {
+        it('budgets by decoded terminal bytes — a frame at the decoded budget survives', () => {
+            // 12 base64 chars decode to 9 bytes. Under WIRE-character
+            // accounting a 9-byte budget would evict this frame (12 > 9);
+            // under decoded accounting it fits exactly.
+            const registry = new TerminalRelayRegistry(undefined, { scrollbackMaxBytes: 9 });
+            registry.publish(RUN, stdout(0, 'AAAAAAAAAAAA'));
+
+            const late = makeClient('late');
+            registry.attach(RUN, late);
+            expect(late.received.filter((f) => f.kind === 'stdout')).toHaveLength(1);
+        });
+
+        it('padding does not count against the budget', () => {
+            // 'QQ==' is 4 wire chars but exactly 1 decoded byte. Ten of
+            // them fit in a 10-byte budget (40 wire chars would not).
+            const registry = new TerminalRelayRegistry(undefined, { scrollbackMaxBytes: 10 });
+            for (let i = 0; i < 10; i++) {
+                registry.publish(RUN, stdout(i, 'QQ=='));
+            }
+            const late = makeClient('late');
+            registry.attach(RUN, late);
+            expect(late.received.filter((f) => f.kind === 'stdout')).toHaveLength(10);
+        });
+    });
+
+    describe('attach reentrancy', () => {
+        it('a frame published synchronously DURING replay still reaches the attaching client exactly once', () => {
+            const registry = new TerminalRelayRegistry();
+            registry.publish(RUN, stdout(0));
+            registry.publish(RUN, stdout(1));
+
+            let reentered = false;
+            const received: TerminalFrame[] = [];
+            const reentrant: TerminalRelayClient & { received: TerminalFrame[] } = {
+                id: 'reentrant',
+                role: 'viewer',
+                received,
+                send(wire: string) {
+                    const frame = decodeTerminalFrame(wire);
+                    if (!frame) throw new Error(`invalid wire: ${wire}`);
+                    received.push(frame);
+                    if (!reentered) {
+                        reentered = true;
+                        // A same-process worker adapter can publish from
+                        // within a delivery callback.
+                        registry.publish(RUN, stdout(2));
+                    }
+                },
+            };
+
+            registry.attach(RUN, reentrant);
+
+            const seqs = received
+                .filter((f) => f.kind === 'stdout')
+                .map((f) => (f as { seq: number }).seq);
+            expect(seqs).toEqual([0, 1, 2]);
+        });
+
+        it('an exit published during replay is delivered to the attaching client', () => {
+            const registry = new TerminalRelayRegistry();
+            registry.publish(RUN, stdout(0));
+
+            let fired = false;
+            const received: TerminalFrame[] = [];
+            const client: TerminalRelayClient & { received: TerminalFrame[] } = {
+                id: 'x',
+                role: 'viewer',
+                received,
+                send(wire: string) {
+                    const frame = decodeTerminalFrame(wire);
+                    if (!frame) throw new Error('invalid wire');
+                    received.push(frame);
+                    if (!fired) {
+                        fired = true;
+                        registry.publish(RUN, { kind: 'exit', code: 0, reason: 'completed' });
+                    }
+                },
+            };
+
+            registry.attach(RUN, client);
+
+            expect(received.map((f) => f.kind)).toEqual(['stdout', 'exit']);
+        });
+    });
+
+    describe('NestJS injection tokens', () => {
+        it('a DI-provided bus and options actually reach the registry (interfaces are erased at runtime)', async () => {
+            const published: Array<{ runId: string; wire: string }> = [];
+            const bus: TerminalFanoutBus = {
+                publishRemote: (runId, wire) => published.push({ runId, wire }),
+                onRemote: () => undefined,
+            };
+            const moduleRef = await Test.createTestingModule({
+                providers: [
+                    TerminalRelayRegistry,
+                    { provide: TERMINAL_FANOUT_BUS, useValue: bus },
+                    {
+                        provide: TERMINAL_RELAY_REGISTRY_OPTIONS,
+                        useValue: { scrollbackMaxBytes: 9 },
+                    },
+                ],
+            }).compile();
+            const registry = moduleRef.get(TerminalRelayRegistry);
+
+            registry.publish(RUN, stdout(0, 'AAAAAAAAAAAA')); // 9 decoded bytes
+            registry.publish(RUN, stdout(1, 'AAAAAAAAAAAA')); // evicts seq 0
+
+            // The DI-provided bus received the publishes…
+            expect(published).toHaveLength(2);
+            // …and the DI-provided options took effect (9-byte budget
+            // keeps exactly one 9-byte frame).
+            const late = makeClient('late');
+            registry.attach(RUN, late);
+            const seqs = late.received
+                .filter((f) => f.kind === 'stdout')
+                .map((f) => (f as { seq: number }).seq);
+            expect(seqs).toEqual([1]);
         });
     });
 
