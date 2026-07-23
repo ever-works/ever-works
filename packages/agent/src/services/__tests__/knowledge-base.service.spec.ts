@@ -542,6 +542,167 @@ describe('KnowledgeBaseService', () => {
             // (alwaysInjected copy is what got emitted).
             expect(rendered).toContain('Always copy');
         });
+
+        // ── Consolidation supersession (memory M1) ─────────────────────
+        // The consolidation apply pass marks near-duplicate losers
+        // `consolidation.state='superseded'` but leaves status ACTIVE
+        // (never-delete invariant). resolveContext must not serve those
+        // archived docs as current truth.
+
+        function stubSemanticHit(docIds: string[]) {
+            const aiFacadeStub = {
+                embed: jest.fn().mockResolvedValue({ embeddings: [[0.1, 0.2, 0.3]] }),
+            };
+            const chunkRepoStub = {
+                findNearestByEmbedding: jest.fn().mockResolvedValue(
+                    docIds.map((documentId, i) => ({
+                        id: `c${i}`,
+                        workId: WORK_ID,
+                        documentId,
+                        chunkIndex: 0,
+                        content: `chunk ${i}`,
+                        distance: 0.1 * (i + 1),
+                    })),
+                ),
+            };
+            (service as unknown as { chunkRepository: typeof chunkRepoStub }).chunkRepository =
+                chunkRepoStub;
+            (service as unknown as { aiFacade: typeof aiFacadeStub }).aiFacade = aiFacadeStub;
+        }
+
+        it('excludes consolidation-superseded docs from alwaysInjected (survivor stays)', async () => {
+            const survivor = buildDocument({
+                id: 'surv-1',
+                kbDocumentClass: 'brand' as KbDocumentClass,
+                metadata: { body: 'Current truth' },
+            });
+            const loser = buildDocument({
+                id: 'lose-1',
+                kbDocumentClass: 'brand' as KbDocumentClass,
+                metadata: { body: 'Archived near-dup' },
+                consolidation: {
+                    state: 'superseded',
+                    supersededById: 'surv-1',
+                    reason: 'near-duplicate of Current truth',
+                    runAt: '2026-07-23T00:00:00.000Z',
+                },
+            });
+            docRepo.list.mockResolvedValue({ items: [survivor, loser], total: 2 });
+
+            const bundle = await service.resolveContext(WORK_ID);
+
+            expect(bundle.alwaysInjected.map((d) => d.id)).toEqual(['surv-1']);
+            expect(bundle.format()).not.toContain('Archived near-dup');
+        });
+
+        it('serves a promoted doc normally (only superseded is demoted)', async () => {
+            const promoted = buildDocument({
+                id: 'promo-1',
+                kbDocumentClass: 'brand' as KbDocumentClass,
+                metadata: { body: 'Promoted body' },
+                consolidation: {
+                    state: 'promoted',
+                    score: 42,
+                    reason: 'promotion score 42',
+                    runAt: '2026-07-23T00:00:00.000Z',
+                },
+            });
+            docRepo.list.mockResolvedValue({ items: [promoted], total: 1 });
+
+            const bundle = await service.resolveContext(WORK_ID);
+
+            expect(bundle.alwaysInjected.map((d) => d.id)).toEqual(['promo-1']);
+        });
+
+        it('substitutes the survivor when semantic retrieval hits a superseded doc', async () => {
+            const survivor = buildDocument({
+                id: 'surv-2',
+                kbDocumentClass: 'research' as KbDocumentClass,
+                path: 'research/current.md',
+                slug: 'current',
+                title: 'Current finding',
+                metadata: { body: 'Live finding' },
+            });
+            const loser = buildDocument({
+                id: 'lose-2',
+                kbDocumentClass: 'research' as KbDocumentClass,
+                metadata: { body: 'Stale finding' },
+                consolidation: {
+                    state: 'superseded',
+                    supersededById: 'surv-2',
+                    reason: 'near-duplicate',
+                    runAt: '2026-07-23T00:00:00.000Z',
+                },
+            });
+            // Chunk embeddings outlive consolidation: the hit lands on
+            // the LOSER. Also hit the survivor directly to prove the
+            // substitution dedupes to a single entry.
+            stubSemanticHit(['lose-2', 'surv-2']);
+            docRepo.list.mockResolvedValue({ items: [], total: 0 });
+            docRepo.findById.mockImplementation(async (_workId: string, docId: string) => {
+                if (docId === 'lose-2') return loser;
+                if (docId === 'surv-2') return survivor;
+                return null;
+            });
+
+            const bundle = await service.resolveContext(WORK_ID, { query: 'finding' });
+
+            expect(bundle.queryRetrieved.map((d) => d.id)).toEqual(['surv-2']);
+            const rendered = bundle.format();
+            expect(rendered).toContain('Live finding');
+            expect(rendered).not.toContain('Stale finding');
+        });
+
+        it('drops a superseded hit whose chain dead-ends or cycles (never serves the archive)', async () => {
+            const cycleA = buildDocument({
+                id: 'cyc-a',
+                kbDocumentClass: 'research' as KbDocumentClass,
+                metadata: { body: 'Cycle A' },
+                consolidation: {
+                    state: 'superseded',
+                    supersededById: 'cyc-b',
+                    reason: 'x',
+                    runAt: '2026-07-23T00:00:00.000Z',
+                },
+            });
+            const cycleB = buildDocument({
+                id: 'cyc-b',
+                kbDocumentClass: 'research' as KbDocumentClass,
+                metadata: { body: 'Cycle B' },
+                consolidation: {
+                    state: 'superseded',
+                    supersededById: 'cyc-a',
+                    reason: 'x',
+                    runAt: '2026-07-23T00:00:00.000Z',
+                },
+            });
+            const noSurvivor = buildDocument({
+                id: 'dead-1',
+                kbDocumentClass: 'research' as KbDocumentClass,
+                metadata: { body: 'Dead end' },
+                consolidation: {
+                    state: 'superseded',
+                    supersededById: 'gone-1',
+                    reason: 'x',
+                    runAt: '2026-07-23T00:00:00.000Z',
+                },
+            });
+            stubSemanticHit(['cyc-a', 'dead-1']);
+            docRepo.list.mockResolvedValue({ items: [], total: 0 });
+            docRepo.findById.mockImplementation(async (_workId: string, docId: string) => {
+                if (docId === 'cyc-a') return cycleA;
+                if (docId === 'cyc-b') return cycleB;
+                if (docId === 'dead-1') return noSurvivor;
+                return null;
+            });
+
+            const bundle = await service.resolveContext(WORK_ID, { query: 'anything' });
+
+            expect(bundle.queryRetrieved).toEqual([]);
+            const rendered = bundle.format();
+            expect(rendered).not.toContain('Cycle A');
+            expect(rendered).not.toContain('Dead end');
+        });
     });
 
     describe('getDocumentHistory', () => {
