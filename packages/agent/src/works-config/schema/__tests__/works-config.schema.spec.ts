@@ -153,6 +153,31 @@ describe('worksConfigSchema', () => {
         });
 
         /**
+         * Security regression — prototype-chain kinds. `KIND_SPEC_SCHEMAS`
+         * is an object literal, so a bare index with `kind: constructor` /
+         * `__proto__` / `toString` resolved to a truthy non-schema value and
+         * `.safeParse` THREW — breaking the never-throws contract with an
+         * attacker-suppliable input, and (on the write path) permanently
+         * locking a Work whose committed file carried such a kind, because
+         * the throw happens at read, before any rewrite can repair it.
+         */
+        it.each(['constructor', '__proto__', 'toString', 'valueOf', 'hasOwnProperty'])(
+            'treats the prototype-chain kind %s as unknown instead of throwing',
+            (kind) => {
+                let result: ReturnType<typeof validateWorksConfig> | undefined;
+                expect(() => {
+                    result = validateWorksConfig({ version: 2, kind, spec: { kind } });
+                }).not.toThrow();
+
+                expect(result?.errors).toEqual([]);
+                // Preserved as data, warned as unrecognised — same handling
+                // as any other unknown kind.
+                expect(result?.data?.spec).toMatchObject({ kind });
+                expect(result?.warnings.join(' ')).toMatch(/does not recognise/i);
+            },
+        );
+
+        /**
          * A newer server may ship a kind this build has never heard of. The
          * writer round-trips whatever it parsed, so rejecting here would
          * corrupt that user's file on the next write.

@@ -327,7 +327,18 @@ export function validateWorksConfig(raw: unknown): WorksConfigValidation {
     const spec = result.data.spec;
     if (spec) {
         const specKind = spec.kind ?? result.data.kind;
-        const kindSchema = specKind ? KIND_SPEC_SCHEMAS[specKind as KnownSpecKind] : undefined;
+        // Security: own-property lookup ONLY. `specKind` is attacker-supplied
+        // (a crafted repo's works.yml), and a bare index on an object literal
+        // resolves prototype-chain names — `kind: constructor` /
+        // `kind: __proto__` / `kind: toString` would return a truthy
+        // non-schema value whose `.safeParse` then THROWS, breaking this
+        // function's never-throws contract and (on the write path) locking
+        // the Work's config permanently: the throw happens at read, before
+        // any rewrite could repair the file.
+        const kindSchema =
+            specKind && Object.prototype.hasOwnProperty.call(KIND_SPEC_SCHEMAS, specKind)
+                ? KIND_SPEC_SCHEMAS[specKind as KnownSpecKind]
+                : undefined;
 
         if (kindSchema) {
             const specResult = kindSchema.safeParse({ ...spec, kind: specKind });

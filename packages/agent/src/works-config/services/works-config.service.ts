@@ -134,17 +134,35 @@ export class WorksConfigService {
         spec?: Record<string, unknown>;
         schemaWarnings?: string[];
     } {
-        const validation = validateWorksConfig(raw);
-        const messages = [...validation.warnings, ...validation.errors];
-
-        if (validation.errors.length > 0) {
-            this.logger.warn(
-                `.works/works.yml did not match the schema; continuing with best-effort parse. ${validation.errors.join('; ')}`,
-            );
-        }
-
         const out: { kind?: WorkKind; spec?: Record<string, unknown>; schemaWarnings?: string[] } =
             {};
+
+        // Defense-in-depth for the never-throws contract. `validateWorksConfig`
+        // is written not to throw, but this method sits on the read path of
+        // EVERY config load — generation, sync, import — over attacker-
+        // supplied file content, and an escaped exception here does not just
+        // 500 one request: it happens at the read step BEFORE any rewrite,
+        // so a poisoned file would never be repaired and the Work's config
+        // would be locked out permanently. A validator bug must degrade to
+        // "no advisory validation", never to that.
+        let messages: string[] = [];
+        try {
+            const validation = validateWorksConfig(raw);
+            messages = [...validation.warnings, ...validation.errors];
+
+            if (validation.errors.length > 0) {
+                this.logger.warn(
+                    `.works/works.yml did not match the schema; continuing with best-effort parse. ${validation.errors.join('; ')}`,
+                );
+            }
+        } catch (error) {
+            this.logger.warn(
+                `.works/works.yml schema validation itself failed; continuing without it. ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            messages = ['schema validation unavailable for this file'];
+        }
 
         const rawKind = raw.kind;
         if (typeof rawKind === 'string' && rawKind.trim()) {
