@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeAll, beforeEach } from 'vitest';
 import { TenantRuntimeBindingResolverService } from '../trigger/worker/services/tenant-runtime-binding-resolver.service';
 
 const {
@@ -92,12 +92,27 @@ describe('workGenerationTask', () => {
     let work: { id: string };
     let user: { id: string };
 
-    beforeEach(async () => {
-        vi.clearAllMocks();
+    /**
+     * Import the worker module ONCE — see the note in
+     * `agent-task-execute.task.spec.ts`. Cold-re-importing per test meant 25
+     * re-imports of the worker graph in this file alone, the largest single
+     * contributor to the `packages/tasks` suite runtime and to the 30s
+     * hook-timeout flake.
+     *
+     * `vi.resetModules()` is removed rather than moved: one test imports
+     * `trigger-generation.orchestrator` inside its body and compares the
+     * class BY REFERENCE against what `createTaskContext` received. That only
+     * holds while the worker and the test resolve the same module registry —
+     * which a per-test reset would break.
+     */
+    beforeAll(async () => {
+        await import('../tasks/trigger/work-generation.task');
+        const lastCall = taskMock.mock.calls[taskMock.mock.calls.length - 1];
+        registeredConfig = lastCall[0] as TaskConfig;
+    });
 
-        // taskMock captures whatever the source registered. We re-import via
-        // vi.resetModules so each test starts from a clean registration.
-        vi.resetModules();
+    beforeEach(() => {
+        vi.clearAllMocks();
 
         // Drive withWorkerContext to inline-call its body with the prepared
         // appContext, so the body's `appContext.get(...)` calls land on our
@@ -133,11 +148,6 @@ describe('workGenerationTask', () => {
             work,
             user,
         });
-
-        // Re-import the task module so taskMock receives the current config.
-        await import('../tasks/trigger/work-generation.task');
-        const lastCall = taskMock.mock.calls[taskMock.mock.calls.length - 1];
-        registeredConfig = lastCall[0] as TaskConfig;
     });
 
     describe('registration', () => {
