@@ -337,7 +337,15 @@ export function AgentSettingsClient({
                             // certainly invalid under the new one. Clearing
                             // falls back to the provider default rather than
                             // silently keeping an unroutable id.
-                            setModelId('');
+                            //
+                            // Only when the provider ACTUALLY changes: the
+                            // picker fires onChange even when the user
+                            // re-selects what was already chosen, and
+                            // clearing then would silently discard a
+                            // configured model on a no-op interaction.
+                            if (value !== aiProviderId) {
+                                setModelId('');
+                            }
                         }}
                         options={aiProviderOptions}
                         emptyOptionLabel="Account default"
