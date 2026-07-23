@@ -246,6 +246,39 @@ describe('DirectoryWebsiteClient', () => {
             expect(httpService.get).toHaveBeenCalledTimes(2);
         });
 
+        // A live site that just isn't wired for platform sync (revived / hand-
+        // deployed outside the deploy flow) returns 503 with this specific body.
+        // It must be the benign `not_provisioned` (permanent → no retry), NOT the
+        // alarming `upstream_5xx` that falsely reads as "site unreachable".
+        it('classifies the "platform sync not configured" 503 as not_provisioned (no retry)', async () => {
+            httpService.get.mockReturnValue(
+                throwError(() =>
+                    makeAxiosError({
+                        response: {
+                            status: 503,
+                            data: { error: 'platform sync not configured on this directory' },
+                        } as never,
+                        message: 'unavailable',
+                    }),
+                ),
+            );
+            const result = await client.fetchActivityFeed(makeWork() as never, {
+                limit: 50,
+                types: ['all'],
+            });
+            expect(result.ok).toBe(false);
+            if (!result.ok) {
+                const { degraded } = result as {
+                    ok: false;
+                    degraded: { reason: string; detail?: string };
+                };
+                expect(degraded.reason).toBe('not_provisioned');
+                expect(degraded.detail).toMatch(/activity sync is not configured/i);
+            }
+            // Permanent reason → the retry loop must not fire a second request.
+            expect(httpService.get).toHaveBeenCalledTimes(1);
+        });
+
         // Security (info leak): raw Axios network errors embed internal IPs /
         // hostnames (e.g. `connect ECONNREFUSED 10.96.0.1:443`) and
         // `degraded.detail` is serialised to the browser via FeedResponse, so
