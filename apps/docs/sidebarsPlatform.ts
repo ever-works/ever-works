@@ -278,6 +278,7 @@ const sidebars: SidebarsConfig = {
 			label: 'Agent Services',
 			items: [
 				'agent-services/work-lifecycle',
+				'agent-services/works-yml-schema',
 				'agent-services/work-generation',
 				'agent-services/work-scheduling',
 				'agent-services/repository-management',

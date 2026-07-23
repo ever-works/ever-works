@@ -2,7 +2,8 @@ import { Injectable, Logger } from '@nestjs/common';
 import { WorkScheduleCadence, type ProvidersDto } from '@ever-works/contracts/api';
 import * as yaml from 'yaml';
 import { GitFacadeService } from '@src/facades/git.facade';
-import type { RepositoryTarget } from '@src/entities/work.entity';
+import { normalizeWorkKind, type RepositoryTarget, type WorkKind } from '@src/entities/work.entity';
+import { validateWorksConfig } from '../schema/works-config.schema';
 
 const WORKS_CONFIG_FILEPATHS = ['.works/works.yml'] as const;
 
@@ -34,6 +35,26 @@ export interface WorksConfigSummary {
      * time. See ADR-004.
      */
     activitySyncMode?: 'pull' | 'push' | 'disabled';
+    /**
+     * Work kind declared by the repository (`kind:` in works.yml).
+     *
+     * Absent in every v1 file, which is why re-importing a blog's data repo
+     * used to produce a `default` Work that resolved to the directory
+     * template. Normalized through the shared vocabulary, so an unknown
+     * kind degrades to `default` rather than reaching the entity.
+     */
+    kind?: WorkKind;
+    /**
+     * Kind-specific configuration (`spec:` in works.yml). Carried verbatim —
+     * the platform preserves keys it does not understand so a file written
+     * by a newer build survives a round-trip through an older one.
+     */
+    spec?: Record<string, unknown>;
+    /**
+     * Non-blocking schema observations, e.g. a `version:` newer than this
+     * build understands. Surfaced for diagnostics; never fatal.
+     */
+    schemaWarnings?: string[];
 }
 
 export interface ParsedWorksConfig extends WorksConfigSummary {
@@ -94,7 +115,70 @@ export class WorksConfigService {
             ),
             deployProvider: this.readString(raw, ['deployProvider', 'deploy_provider']),
             activitySyncMode: this.readActivitySyncMode(raw),
+            ...this.readSchemaFields(raw),
         };
+    }
+
+    /**
+     * Read the v2 envelope additions (`kind`, `spec`) and collect any schema
+     * warnings.
+     *
+     * Validation is advisory here by design. `.works/works.yml` lives in the
+     * user's own repository, so a schema complaint must never be able to take
+     * their Work offline — the fields are read on a best-effort basis and
+     * problems are reported rather than thrown. `works validate` is the place
+     * to surface them loudly.
+     */
+    private readSchemaFields(raw: Record<string, unknown>): {
+        kind?: WorkKind;
+        spec?: Record<string, unknown>;
+        schemaWarnings?: string[];
+    } {
+        const out: { kind?: WorkKind; spec?: Record<string, unknown>; schemaWarnings?: string[] } =
+            {};
+
+        // Defense-in-depth for the never-throws contract. `validateWorksConfig`
+        // is written not to throw, but this method sits on the read path of
+        // EVERY config load — generation, sync, import — over attacker-
+        // supplied file content, and an escaped exception here does not just
+        // 500 one request: it happens at the read step BEFORE any rewrite,
+        // so a poisoned file would never be repaired and the Work's config
+        // would be locked out permanently. A validator bug must degrade to
+        // "no advisory validation", never to that.
+        let messages: string[] = [];
+        try {
+            const validation = validateWorksConfig(raw);
+            messages = [...validation.warnings, ...validation.errors];
+
+            if (validation.errors.length > 0) {
+                this.logger.warn(
+                    `.works/works.yml did not match the schema; continuing with best-effort parse. ${validation.errors.join('; ')}`,
+                );
+            }
+        } catch (error) {
+            this.logger.warn(
+                `.works/works.yml schema validation itself failed; continuing without it. ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            messages = ['schema validation unavailable for this file'];
+        }
+
+        const rawKind = raw.kind;
+        if (typeof rawKind === 'string' && rawKind.trim()) {
+            out.kind = normalizeWorkKind(rawKind);
+        }
+
+        const rawSpec = raw.spec;
+        if (rawSpec && typeof rawSpec === 'object' && !Array.isArray(rawSpec)) {
+            out.spec = rawSpec as Record<string, unknown>;
+        }
+
+        if (messages.length > 0) {
+            out.schemaWarnings = messages;
+        }
+
+        return out;
     }
 
     private readActivitySyncMode(

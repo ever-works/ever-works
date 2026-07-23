@@ -19,6 +19,7 @@ import { OnboardingTerminalService } from './onboarding-terminal.service';
 import { OnboardingAccountAdapter } from './onboarding-account.adapter';
 import { OnboardingWorkAdapter } from './onboarding-work.adapter';
 import { WellKnownController } from './well-known.controller';
+import { WorksSchemaController } from './works-schema.controller';
 import { OnboardingStateController } from './onboarding-state.controller';
 import { OnboardingStateService } from './onboarding-state.service';
 import { OnboardingCatalogController } from './onboarding-catalog.controller';
@@ -33,6 +34,7 @@ import { UsersModule } from '../users/users.module';
     controllers: [
         OnboardingController,
         WellKnownController,
+        WorksSchemaController,
         ClaimController,
         OnboardingStateController,
         OnboardingCatalogController,
