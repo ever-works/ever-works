@@ -79,8 +79,18 @@ describe('DeployController', () => {
         findByWork: jest.Mock;
     };
     let activityLogService: { log: jest.Mock };
-    let workRuntimeEnvService: { getDatabaseUrl: jest.Mock; setDatabaseUrl: jest.Mock };
+    let workRuntimeEnvService: {
+        getDatabaseUrl: jest.Mock;
+        setDatabaseUrl: jest.Mock;
+        getDatabaseMode: jest.Mock;
+        setDatabaseMode: jest.Mock;
+    };
     let managedSubdomainService: { getState: jest.Mock; update: jest.Mock };
+    let dbProvisionService: {
+        isReady: jest.Mock;
+        ensureDatabaseForWork: jest.Mock;
+        testConnection: jest.Mock;
+    };
     let userRepository: { findById: jest.Mock };
     let controller: DeployController;
 
@@ -131,11 +141,19 @@ describe('DeployController', () => {
         workRuntimeEnvService = {
             getDatabaseUrl: jest.fn().mockResolvedValue(null),
             setDatabaseUrl: jest.fn().mockResolvedValue(undefined),
+            getDatabaseMode: jest.fn().mockResolvedValue(null),
+            setDatabaseMode: jest.fn().mockResolvedValue(undefined),
         };
 
         managedSubdomainService = {
             getState: jest.fn(),
             update: jest.fn(),
+        };
+
+        dbProvisionService = {
+            isReady: jest.fn().mockReturnValue(false),
+            ensureDatabaseForWork: jest.fn().mockResolvedValue(null),
+            testConnection: jest.fn().mockResolvedValue({ ok: true }),
         };
 
         userRepository = {
@@ -152,6 +170,7 @@ describe('DeployController', () => {
             workRuntimeEnvService as never,
             managedSubdomainService as never,
             userRepository as never,
+            dbProvisionService as never,
         );
     });
 
