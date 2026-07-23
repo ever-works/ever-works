@@ -502,6 +502,16 @@ export class Work {
     @Column({ type: 'text', nullable: true })
     deployDatabaseUrlEncrypted?: string | null;
 
+    // Which database backs this Work's deployed site:
+    //   'shared' — a platform-managed database on the "Ever Works DB" cluster,
+    //              auto-provisioned by EverWorksDbProvisionService (the stored
+    //              `deployDatabaseUrlEncrypted` points at it).
+    //   'custom' — a bring-your-own connection string the user set explicitly.
+    // NULL for legacy rows: treated as 'custom' when a URL is set, otherwise
+    // 'shared' when the shared-DB feature is enabled (see WorkRuntimeEnvService).
+    @Column({ type: 'text', nullable: true })
+    deployDatabaseMode?: 'shared' | 'custom' | null;
+
     /**
      * EW-734 / EW-736 — globally-unique persisted managed subdomain claim.
      *

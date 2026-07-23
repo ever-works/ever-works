@@ -9,6 +9,7 @@ import {
     EverWorksDnsService,
     EverWorksK8sDeployProvider,
     SubdomainAllocator,
+    EverWorksDbProvisionService,
 } from '@ever-works/agent/ever-works-providers';
 import { DeployController } from './deploy.controller';
 import { DeployService } from './deploy.service';
@@ -36,6 +37,7 @@ import { ManagedSubdomainService } from './managed-subdomain.service';
         EverWorksK8sDeployProvider,
         SubdomainAllocator,
         ManagedSubdomainService,
+        EverWorksDbProvisionService,
     ],
     exports: [DeployService, DeploymentVerifierService, ManagedSubdomainService],
 })
