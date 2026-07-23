@@ -401,6 +401,52 @@ export const config = {
                 return Number.isFinite(raw) && raw > 0 ? raw : 3;
             },
         },
+
+        // "Ever Works DB" — a platform-managed SHARED Postgres so customer
+        // Works get a working database without bringing their own. Distinct
+        // from the platform's OWN database (`DATABASE_*`): today they point at
+        // the same server, but keeping them separate lets us move customer
+        // (tenant) DBs to a dedicated cluster later with only an env change.
+        //
+        // Two endpoints on purpose (mirrors Neon's pooled/unpooled split):
+        //  - `getAdminUrl()` — a least-privilege provisioner (CREATEDB +
+        //    CREATEROLE, NOT superuser) used ONLY for DDL (CREATE DATABASE /
+        //    ROLE). MUST be a DIRECT/session endpoint — a transaction-pooled
+        //    PgBouncer cannot run CREATE DATABASE.
+        //  - `getHost()/getPort()` — the endpoint used to compose the per-Work
+        //    `DATABASE_URL` injected into the deployed site. May be a PgBouncer
+        //    LB reachable from a separate customer cluster (cross-cluster).
+        sharedDb: {
+            isEnabled() {
+                return process.env.DB_EVER_WORKS_SHARED_ENABLED === 'true';
+            },
+            getAdminUrl() {
+                return process.env.DB_EVER_WORKS_SHARED_ADMIN_URL || '';
+            },
+            getHost() {
+                return process.env.DB_EVER_WORKS_SHARED_HOST || '';
+            },
+            getPort() {
+                const raw = parseInt(process.env.DB_EVER_WORKS_SHARED_PORT || '5432', 10);
+                return Number.isFinite(raw) && raw > 0 ? raw : 5432;
+            },
+            getSslMode() {
+                return process.env.DB_EVER_WORKS_SHARED_SSLMODE || 'require';
+            },
+            // Prefix for the deterministic per-Work database + role names
+            // (e.g. `ew_<workId>` / `ewr_<workId>`).
+            getNamePrefix() {
+                return (process.env.DB_EVER_WORKS_SHARED_NAME_PREFIX || 'ew').replace(
+                    /[^a-z0-9]/gi,
+                    '',
+                );
+            },
+            // The feature can be OFFERED to users (isEnabled) yet not actually
+            // provisionable until an operator wires the admin + host env.
+            isReady() {
+                return this.isEnabled() && Boolean(this.getAdminUrl()) && Boolean(this.getHost());
+            },
+        },
     },
 
     /**

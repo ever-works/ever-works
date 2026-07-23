@@ -28,6 +28,16 @@ import { ApiProperty } from '@nestjs/swagger';
  */
 export class SubdomainResponseDto {
     @ApiProperty({
+        description:
+            "Response envelope status. Always 'success' on a 200 — mirrors the `{status,...}` " +
+            'envelope every other deploy endpoint returns, so the web client (which gates on ' +
+            "`response.status === 'success'`) does not mis-report a healthy load as a failure.",
+        example: 'success',
+        enum: ['success', 'error', 'pending'],
+    })
+    status!: 'success' | 'error' | 'pending';
+
+    @ApiProperty({
         description: 'Leftmost label persisted on work.managedSubdomain',
         nullable: true,
         example: 'my-site',

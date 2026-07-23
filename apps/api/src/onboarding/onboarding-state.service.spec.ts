@@ -68,6 +68,7 @@ describe('OnboardingStateService', () => {
                     lastStep: 4,
                     ai: { choice: 'openrouter' },
                     storage: { choice: 'user-github' },
+                    db: { choice: 'ever-works-db' },
                     deploy: { choice: 'vercel' },
                     skippedSteps: ['ai-config'],
                     pluginsReviewed: true,
@@ -175,6 +176,7 @@ describe('OnboardingStateService', () => {
                 lastStep: -2,
                 ai: { choice: 'codex' },
                 storage: { choice: undefined as unknown as 'user-github' },
+                db: { choice: undefined as unknown as 'ever-works-db' },
                 deploy: { choice: undefined as unknown as 'vercel' },
                 skippedSteps: undefined as unknown as string[],
                 pluginsReviewed: undefined as unknown as boolean,
@@ -182,6 +184,7 @@ describe('OnboardingStateService', () => {
             expect(result.lastStep).toBe(0);
             expect(result.ai.choice).toBe('codex');
             expect(result.storage.choice).toBe(ONBOARDING_DEFAULT_STATE.storage.choice);
+            expect(result.db.choice).toBe(ONBOARDING_DEFAULT_STATE.db.choice);
             expect(result.deploy.choice).toBe(ONBOARDING_DEFAULT_STATE.deploy.choice);
             expect(result.skippedSteps).toEqual([]);
             expect(result.pluginsReviewed).toBe(false);
