@@ -78,6 +78,7 @@ export const ROUTES = {
     // (Missions → Ideas → Works), reading the same direction as the
     // dashboard tiles. Detail page wires in PR R.
     DASHBOARD_MISSIONS: '/missions',
+    DASHBOARD_MISSIONS_NEW: '/missions/new',
     DASHBOARD_MISSION: (id: string) => `/missions/${id}`,
     // Phase 5 PR N — dedicated Ideas catalog page (replaces the
     // dashboard-preview-only surface from Phase 2). Sidebar nav

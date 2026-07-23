@@ -639,6 +639,31 @@
                 "anyStatus": "Tout statut",
                 "apply": "Appliquer",
                 "reset": "Réinitialiser"
+            },
+            "newPage": {
+                "link": "Créer manuellement",
+                "or": "Ou",
+                "title": "Nouvelle mission",
+                "subtitle": "Décrivez un objectif continu. L’agent en génère des idées, une fois ou selon un calendrier.",
+                "nameLabel": "Titre",
+                "namePlaceholder": "Facultatif — laissez vide pour le déduire de la description",
+                "descriptionLabel": "Description",
+                "descriptionPlaceholder": "Décrivez ce sur quoi cette mission doit travailler, par ex. « Suivre les nouveaux frameworks d’agents IA open source et tenir notre annuaire à jour. »",
+                "descriptionHint": "Au moins 10 caractères.",
+                "typeLabel": "Type",
+                "typeOneShot": "Ponctuelle — exécuter une fois",
+                "typeScheduled": "Planifiée — exécuter régulièrement",
+                "scheduleLabel": "Planification",
+                "schedulePlaceholder": "0 9 * * *",
+                "scheduleHint": "Expression cron à cinq champs. Exemple : 0 9 * * * s’exécute chaque jour à 09h00.",
+                "scheduleRequired": "Une mission planifiée nécessite une expression cron.",
+                "cancel": "Annuler",
+                "create": "Créer la mission",
+                "creating": "Création…",
+                "created": "Mission créée",
+                "minLength": "La description doit comporter au moins 10 caractères.",
+                "error": "Impossible de créer la mission. Veuillez réessayer.",
+                "chatUnavailable": "Le chat est indisponible — utilisez « Créer manuellement »."
             }
         },
         "memoryPage": {

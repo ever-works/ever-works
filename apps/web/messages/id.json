@@ -592,6 +592,31 @@
                 "capUnlimited": "Unlimited",
                 "capPrefix": "Outstanding cap:",
                 "clonedFromPrefix": "Cloned from another Mission"
+            },
+            "newPage": {
+                "link": "Buat manual",
+                "or": "Atau",
+                "title": "Misi Baru",
+                "subtitle": "Jelaskan tujuan yang berkelanjutan. Agen akan menghasilkan Ide darinya — sekali, atau terjadwal.",
+                "nameLabel": "Judul",
+                "namePlaceholder": "Opsional — kosongkan untuk diturunkan dari deskripsi",
+                "descriptionLabel": "Deskripsi",
+                "descriptionPlaceholder": "Jelaskan apa yang harus terus dikerjakan misi ini — mis. \"Pantau framework agen AI open-source baru dan jaga direktori kami tetap mutakhir.\"",
+                "descriptionHint": "Minimal 10 karakter.",
+                "typeLabel": "Tipe",
+                "typeOneShot": "Sekali jalan — jalankan sekali",
+                "typeScheduled": "Terjadwal — jalankan berulang",
+                "scheduleLabel": "Jadwal",
+                "schedulePlaceholder": "0 9 * * *",
+                "scheduleHint": "Ekspresi cron lima bidang. Contoh: 0 9 * * * berjalan setiap hari pukul 09.00.",
+                "scheduleRequired": "Misi terjadwal memerlukan ekspresi cron.",
+                "cancel": "Batal",
+                "create": "Buat Misi",
+                "creating": "Membuat…",
+                "created": "Misi dibuat",
+                "minLength": "Deskripsi harus minimal 10 karakter.",
+                "error": "Tidak dapat membuat Misi. Silakan coba lagi.",
+                "chatUnavailable": "Chat sedang tidak tersedia — gunakan \"Buat manual\"."
             }
         },
         "memoryPage": {
