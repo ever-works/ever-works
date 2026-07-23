@@ -1945,8 +1945,12 @@
                     "activity": "활동 피드",
                     "kb": "지식 베이스",
                     "generator": "Work를 일회성 또는 예약된 일정으로 생성",
-                    "deploy": "Work 배포"
-                }
+                    "deploy": "Work 배포",
+                    "tasks": "이 워크의 작업"
+                },
+                "tasks": "작업",
+                "posts": "게시물",
+                "pages": "페이지"
             },
             "members": {
                 "title": "팀 멤버",
@@ -2160,7 +2164,25 @@
                 "categories": "카테고리",
                 "comparisons": "비교",
                 "generationStatus": "생성 상태",
-                "daysActive": "활성 일수"
+                "daysActive": "활성 일수",
+                "posts": "게시물",
+                "tags": "태그",
+                "deployStatus": "배포 상태",
+                "registeredUsers": "가입 사용자",
+                "teamMembers": "팀 구성원",
+                "agents": "에이전트",
+                "openTasks": "열린 작업",
+                "worksOwned": "워크",
+                "pageViews": "페이지뷰",
+                "sessions": "세션",
+                "conversions": "전환",
+                "states": {
+                    "live": "운영 중",
+                    "notConfigured": "분석을 연결하면 표시됩니다",
+                    "notDeployed": "배포하면 표시됩니다",
+                    "notGenerated": "생성하면 표시됩니다",
+                    "unavailable": "사용 불가"
+                }
             },
             "comparisons": {
                 "title": "비교",
@@ -2332,8 +2354,8 @@
                 "slug": "슬러그",
                 "repositories": "리포지토리",
                 "dataRepo": "데이터 리포지토리",
-                "websiteRepo": "웹사이트 리포지토리",
-                "mainRepo": "메인 리포지토리",
+                "websiteRepo": "워크 리포지토리",
+                "mainRepo": "{provider} 리포지토리",
                 "gitProvider": "Git 제공자",
                 "organization": "조직",
                 "created": "생성일",
@@ -2347,7 +2369,22 @@
                 "deployProvider": "배포 제공자",
                 "notConnected": "연결 안 됨",
                 "notConfigured": "설정 안 됨",
-                "viewSite": "사이트 보기"
+                "viewSite": "사이트 보기",
+                "repoHelp": {
+                    "data": {
+                        "title": "데이터 리포지토리",
+                        "body": "워크의 원본 데이터가 보관되는 곳입니다. 플랫폼이 대신 관리하는 메타데이터와 콘텐츠가 여기에 저장되며, 디렉터리라면 모든 항목과 카테고리, 태그가 이에 해당하고 다른 유형의 워크에서는 페이지 뒤에 있는 구조화된 콘텐츠가 됩니다. 에이전트는 언제나 이곳에 먼저 기록하고, 나머지는 모두 여기에서 생성됩니다. 자주 바뀌지 않으며 직접 편집해도 안전합니다."
+                    },
+                    "provider": {
+                        "title": "{provider} 리포지토리",
+                        "body": "데이터 리포지토리를 바탕으로 AI가 생성한, 읽고 둘러보기 좋은 형태의 워크입니다. {provider}에 게시되지만 어디에도 배포되지 않으며, 사람들은 {provider}에서 바로 읽게 됩니다. Awesome 리스트라면 잘 정리된 README가 되고, 다른 유형의 워크에서는 같은 콘텐츠를 Markdown으로 표현한 버전이 됩니다. 설정에서 생성 기능을 끌 수 있습니다."
+                    },
+                    "work": {
+                        "title": "워크 리포지토리",
+                        "body": "워크의 주요 결과물입니다. 플랫폼이 데이터 리포지토리에 선택한 워크 템플릿을 적용해 이 리포지토리를 만들어 냅니다. 대개는 배포 가능한 웹사이트나 웹 앱이지만, 템플릿에 따라 모바일 앱이나 문서 사이트 등 다른 종류의 프로젝트가 될 수도 있습니다. 실제로 배포되는 것은 바로 이 리포지토리입니다."
+                    },
+                    "ariaLabel": "이 리포지토리는 무엇인가요?"
+                }
             },
             "config": {
                 "title": "구성 세부 정보",
@@ -2365,7 +2402,7 @@
                 "pullRequestUpdate": "풀 리퀘스트 세부 정보",
                 "branch": "브랜치",
                 "prTitle": "PR 제목",
-                "mainRepository": "메인 리포지토리",
+                "mainRepository": "{provider} 리포지토리",
                 "dataRepository": "데이터 리포지토리"
             },
             "activity": {
@@ -2744,7 +2781,7 @@
                 "modelOverridePlaceholder": "예: openai/gpt-4.1 또는 openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "선택 사항입니다. 여기에 재정의하지 않으면 기본적으로 가져온 모델 또는 이전 모델을 사용합니다.",
                 "modelOverrideUnavailable": "사용 가능한 목록에서 모델을 선택하려면 먼저 구성된 AI 제공자를 선택하세요.",
-                "websiteTemplateHelperText": "웹사이트 저장소가 처음 생성될 때 사용될 웹사이트 템플릿을 선택하세요.",
+                "websiteTemplateHelperText": "워크 저장소가 처음 생성될 때 사용될 워크 템플릿을 선택하세요.",
                 "websiteTemplateLockedHelperText": "첫 번째 웹사이트 생성 후 템플릿 선택이 잠깁니다.",
                 "recommended": "권장",
                 "promptPlaceholder": "이 워크에 생성할 항목을 설명하세요...",
@@ -2789,7 +2826,7 @@
                 "enableBadgeEvaluationDescription": "항목에 품질 배지 평가 및 추가",
                 "captureScreenshots": "항목 스크린샷 캡처",
                 "captureScreenshotsDescription": "생성 중 각 항목에 대한 스크린샷 또는 제품 이미지 자동 캡처",
-                "websiteRepositoryCreationMethod": "웹사이트 리포지토리 생성 방법",
+                "websiteRepositoryCreationMethod": "워크 리포지토리 생성 방법",
                 "methodDuplicate": "복제",
                 "methodFork": "포크",
                 "workNamePlaceholder": "워크 이름 입력",
@@ -2815,7 +2852,7 @@
                 "targetKeywordsDescription": "AI 검색과 콘텐츠 생성을 안내하는 키워드. 더 구체적인 키워드가 더 나은 결과를 제공합니다.",
                 "sourceUrlsFieldDescription": "콘텐츠를 추출할 특정 URL. 비어 있으면 생성기가 웹을 자동 검색합니다.",
                 "generationMethodDescription": "기존 항목을 업데이트할지 모든 것을 처음부터 재생성할지 선택하세요.",
-                "websiteRepositoryCreationMethodDescription": "웹사이트 리포지토리가 생성되는 방법. 대부분의 경우 템플릿을 권장합니다.",
+                "websiteRepositoryCreationMethodDescription": "워크 리포지토리가 생성되는 방법. 대부분의 경우 템플릿을 권장합니다.",
                 "maxSearchQueriesDescription": "관련 콘텐츠를 찾기 위해 AI가 생성할 검색 쿼리 수 (1-50).",
                 "resultsPerQueryDescription": "검색 쿼리당 검색할 최대 결과 수 (1-20).",
                 "maxPagesToProcessDescription": "콘텐츠 추출을 위해 처리할 최대 웹페이지 수 (1-100).",
@@ -2974,7 +3011,7 @@
                         "model": "모델",
                         "schedule": "스케줄",
                         "providers": "제공자",
-                        "websiteRepo": "웹사이트 저장소"
+                        "websiteRepo": "워크 저장소"
                     },
                     "sourceTypes": {
                         "dataRepo": "데이터 저장소",
@@ -3009,8 +3046,8 @@
                 "deleteDataRepositoryDescription": "GitHub에서 JSON 데이터 저장소 제거",
                 "deleteMarkdownRepository": "마크다운 저장소 삭제",
                 "deleteMarkdownRepositoryDescription": "README가 포함된 마크다운 저장소 제거",
-                "deleteWebsiteRepository": "웹사이트 저장소 삭제",
-                "deleteWebsiteRepositoryDescription": "배포된 웹사이트 저장소 제거",
+                "deleteWebsiteRepository": "워크 저장소 삭제",
+                "deleteWebsiteRepositoryDescription": "배포된 워크 저장소 제거",
                 "deleteConfirm": "정말 확실한가요?",
                 "deleteConfirmDetail": "이 작업은 취소할 수 없습니다. 워크와 선택된 저장소가 영구적으로 삭제됩니다.",
                 "confirmWorkName": "확인을 위해 워크 이름 입력",
@@ -3028,7 +3065,7 @@
                 "updateFailed": "설정 업데이트 실패",
                 "deployProvider": {
                     "title": "배포 제공자",
-                    "description": "워크 웹사이트를 배포할 위치 선택",
+                    "description": "워크를 배포할 위치 선택",
                     "configure": "설정",
                     "ready": "배포 준비 완료",
                     "notConfigured": "설정되지 않음",
@@ -3268,7 +3305,7 @@
                 },
                 "noProviderAlert": {
                     "title": "배포 제공자 없음",
-                    "description": "워크 웹사이트를 배포하려면 배포 제공자를 선택하세요.",
+                    "description": "워크를 배포하려면 배포 제공자를 선택하세요.",
                     "selectButton": "선택 & 계속",
                     "noProviders": "사용 가능한 배포 제공자가 없습니다. 먼저 배포 플러그인을 설치하세요."
                 },
@@ -3292,8 +3329,8 @@
                 },
                 "form": {
                     "deployment": {
-                        "title": "웹사이트 배포",
-                        "description": "워크 웹사이트 저장소를 배포하세요.",
+                        "title": "워크 배포",
+                        "description": "워크 저장소를 배포하세요.",
                         "deployButton": "{provider}로 배포",
                         "deployingButton": "배포 중...",
                         "deployingStateButton": "배포 중 ({state})...",
@@ -3308,9 +3345,9 @@
                         }
                     },
                     "updateRepository": {
-                        "title": "웹사이트 저장소 업데이트",
+                        "title": "워크 저장소 업데이트",
                         "description": "템플릿의 최신 변경 사항을 다음에 동기화:",
-                        "websiteRepository": "웹사이트 저장소",
+                        "websiteRepository": "워크 저장소",
                         "updateButton": "저장소 업데이트",
                         "updatingButton": "업데이트 중..."
                     },
@@ -3327,20 +3364,20 @@
                     },
                     "info": {
                         "deployInfo": "배포는 일반적으로 1-3분이 걸립니다. 완료되면 URL을 받게 됩니다.",
-                        "updateInfo": "업데이트는 다음 배포를 위해 워크 콘텐츠를 웹사이트 저장소에 동기화합니다."
+                        "updateInfo": "업데이트는 다음 배포를 위해 워크 콘텐츠를 워크 저장소에 동기화합니다."
                     },
                     "websiteTemplate": {
                         "title": "자동 템플릿 업데이트",
-                        "description": "웹사이트를 최신 템플릿 변경 사항과 자동으로 동기화하세요.",
-                        "selectorLabel": "웹사이트 템플릿",
+                        "description": "워크를 최신 템플릿 변경 사항과 자동으로 동기화하세요.",
+                        "selectorLabel": "워크 템플릿",
                         "currentTemplateLabel": "현재 템플릿",
                         "unknownTemplate": "상속된 기본값",
-                        "currentHelperText": "선택된 템플릿은 웹사이트 저장소가 어떻게 초기화되고 업데이트되는지를 제어합니다.",
-                        "switchHelperText": "새 템플릿을 적용하면 기존 웹사이트 저장소가 이미 존재하는 경우 선택된 템플릿으로 재설정됩니다.",
-                        "switchAction": "웹사이트 저장소에 템플릿 적용",
+                        "currentHelperText": "선택된 템플릿은 워크 저장소가 어떻게 초기화되고 업데이트되는지를 제어합니다.",
+                        "switchHelperText": "새 템플릿을 적용하면 기존 워크 저장소가 이미 존재하는 경우 선택된 템플릿으로 재설정됩니다.",
+                        "switchAction": "워크 저장소에 템플릿 적용",
                         "switchActionIdle": "템플릿이 최신 상태입니다",
-                        "switchConfirmTitle": "웹사이트 템플릿을 전환하시겠습니까?",
-                        "switchConfirmDescription": "웹사이트 저장소가 이미 존재하는 경우, 선택된 템플릿의 내용으로 대체됩니다. 해당 저장소의 사용자 정의 코드는 손실됩니다.",
+                        "switchConfirmTitle": "워크 템플릿을 전환하시겠습니까?",
+                        "switchConfirmDescription": "워크 저장소가 이미 존재하는 경우, 선택된 템플릿의 내용으로 대체됩니다. 해당 저장소의 사용자 정의 코드는 손실됩니다.",
                         "switchConfirmButton": "템플릿 전환",
                         "switchCancel": "취소",
                         "autoUpdate": "자동 업데이트",
@@ -3715,7 +3752,7 @@
             },
             "deployProvider": {
                 "title": "배포 제공자",
-                "description": "워크 웹사이트를 배포할 위치를 선택하세요",
+                "description": "워크를 배포할 위치를 선택하세요",
                 "noProviders": "사용 가능한 배포 제공자가 없습니다",
                 "notConfigured": "설정되지 않음",
                 "configured": "배포 준비 완료",
@@ -3816,7 +3853,7 @@
                 "organizationHelp": "개인 계정 대신 조직 아래에 저장소 생성",
                 "organizationNameLabel": "조직 이름",
                 "organizationNamePlaceholder": "조직 이름 입력",
-                "websiteTemplateHelperText": "웹사이트 저장소가 처음 생성될 때 사용될 웹사이트 템플릿을 선택하세요."
+                "websiteTemplateHelperText": "워크 저장소가 처음 생성될 때 사용될 워크 템플릿을 선택하세요."
             },
             "manual": {
                 "title": "수동 생성",
@@ -3843,7 +3880,7 @@
                 "organizationHelp": "이 워크를 개인 계정 대신 GitHub 조직 아래에 생성",
                 "organizationNameLabel": "조직 이름",
                 "organizationNamePlaceholder": "my-organization",
-                "websiteTemplateHelperText": "웹사이트 저장소가 처음 생성될 때 사용될 웹사이트 템플릿을 선택하세요.",
+                "websiteTemplateHelperText": "워크 저장소가 처음 생성될 때 사용될 워크 템플릿을 선택하세요.",
                 "headerLabel": "사용자 지정 README 헤더",
                 "headerPlaceholder": "README 파일 상단에 사용자 지정 콘텐츠 추가",
                 "headerOverwrite": "기본 헤더 완전히 교체",
@@ -3949,15 +3986,15 @@
                     "importButton": "가져오기 & 연구 시작",
                     "importingButton": "연구 파이프라인 시작 중...",
                     "mainRepository": {
-                        "title": "Main repository",
+                        "title": "GitHub 저장소",
                         "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
                         "clone": {
                             "title": "Clone / recreate",
-                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                            "description": "이 워크를 위해 새로 생성되는 README 저장소를 만듭니다. 데이터 저장소와 워크 저장소는 그대로 생성됩니다."
                         },
                         "reuse": {
                             "title": "Reuse source README",
-                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                            "description": "생성되는 README 저장소를 만들지 않습니다. GitHub 저장소 링크는 원본 README 저장소를 가리킵니다."
                         }
                     }
                 },
@@ -4018,7 +4055,7 @@
                     "descriptionReady": "모든 저장소 발견됨. 연결 준비 완료.",
                     "dataRepo": "데이터 저장소",
                     "markdownRepo": "마크다운 저장소",
-                    "websiteRepo": "웹사이트 저장소",
+                    "websiteRepo": "워크 저장소",
                     "found": "발견됨",
                     "notFound": "미발견",
                     "cancel": "취소",
@@ -4629,7 +4666,7 @@
         },
         "templates": {
             "title": "템플릿",
-            "subtitle": "내장 웹사이트 템플릿을 찾아보고, 사용자 지정 카탈로그를 관리하며, 새로운 작업이 시작될 때 어떤 템플릿을 사용할지 제어하세요.",
+            "subtitle": "내장 워크 템플릿을 찾아보고, 사용자 지정 카탈로그를 관리하며, 새 워크가 어떤 템플릿에서 시작할지 제어하세요.",
             "kindSwitcher": {
                 "mission": "Mission Templates",
                 "work": "Work Templates",
@@ -5118,6 +5155,16 @@
                 "copyFailed": "클립보드에 복사할 수 없습니다"
             },
             "confirmDelete": "이 트리거를 삭제하시겠습니까? 웹훅 URL이 즉시 작동을 멈추며 되돌릴 수 없습니다."
+        },
+        "workKind": {
+            "label": "유형",
+            "website": "Website",
+            "landing-page": "Landing Page",
+            "blog": "Blog",
+            "directory": "Directory",
+            "awesome-repo": "Awesome Repo",
+            "company": "Company",
+            "default": "Work"
         }
     },
     "layout": {
@@ -5331,7 +5378,7 @@
         "deploy": {
             "deployFailed": "배포 실패",
             "updateRepositoryFailed": "리포지토리 업데이트 실패",
-            "updateSettingsFailed": "웹사이트 템플릿 설정 업데이트 실패"
+            "updateSettingsFailed": "워크 템플릿 설정 업데이트 실패"
         }
     },
     "validation": {

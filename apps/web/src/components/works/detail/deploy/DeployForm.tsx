@@ -538,7 +538,7 @@ function WebsiteTemplateSettings({
                             onChange={setSelectedTemplateId}
                             disabled={isPending}
                             label={t('form.websiteTemplate.selectorLabel', {
-                                defaultValue: 'Website template',
+                                defaultValue: 'Work template',
                             })}
                             helperText={
                                 hasTemplateChange

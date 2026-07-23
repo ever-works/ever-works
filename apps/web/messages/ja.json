@@ -1945,8 +1945,12 @@
                     "activity": "アクティビティフィード",
                     "kb": "ナレッジベース",
                     "generator": "Work を 1 回またはスケジュールで生成",
-                    "deploy": "Work をデプロイ"
-                }
+                    "deploy": "Work をデプロイ",
+                    "tasks": "このワークのタスク"
+                },
+                "tasks": "タスク",
+                "posts": "投稿",
+                "pages": "ページ"
             },
             "members": {
                 "title": "チームメンバー",
@@ -2160,7 +2164,25 @@
                 "categories": "カテゴリ",
                 "comparisons": "比較",
                 "generationStatus": "生成状態",
-                "daysActive": "アクティブ日数"
+                "daysActive": "アクティブ日数",
+                "posts": "投稿",
+                "tags": "タグ",
+                "deployStatus": "デプロイ状況",
+                "registeredUsers": "登録ユーザー",
+                "teamMembers": "チームメンバー",
+                "agents": "エージェント",
+                "openTasks": "未完了タスク",
+                "worksOwned": "ワーク",
+                "pageViews": "ページビュー",
+                "sessions": "セッション",
+                "conversions": "コンバージョン",
+                "states": {
+                    "live": "公開中",
+                    "notConfigured": "アナリティクスを接続すると表示されます",
+                    "notDeployed": "デプロイすると表示されます",
+                    "notGenerated": "生成すると表示されます",
+                    "unavailable": "利用不可"
+                }
             },
             "comparisons": {
                 "title": "比較",
@@ -2332,8 +2354,8 @@
                 "slug": "スラッグ",
                 "repositories": "リポジトリ",
                 "dataRepo": "データリポジトリ",
-                "websiteRepo": "ウェブサイトリポジトリ",
-                "mainRepo": "メインレポジトリ",
+                "websiteRepo": "ワークリポジトリ",
+                "mainRepo": "{provider} リポジトリ",
                 "gitProvider": "Gitプロバイダー",
                 "organization": "組織",
                 "created": "作成日",
@@ -2347,7 +2369,22 @@
                 "deployProvider": "デプロイプロバイダー",
                 "notConnected": "未接続",
                 "notConfigured": "未設定",
-                "viewSite": "サイトを表示"
+                "viewSite": "サイトを表示",
+                "repoHelp": {
+                    "data": {
+                        "title": "データリポジトリ",
+                        "body": "ワークの信頼できる唯一の情報源です。プラットフォームが管理するメタデータとコンテンツを保持します。ディレクトリの場合はすべてのアイテム、カテゴリ、タグが該当し、その他の種類のワークではページの背後にある構造化コンテンツが該当します。エージェントはまずここに書き込み、他のすべてはここから生成されます。変更されることはまれで、手作業で編集しても安全です。"
+                    },
+                    "provider": {
+                        "title": "{provider} リポジトリ",
+                        "body": "データリポジトリから AI が生成した、読みやすく閲覧しやすいバージョンのワークです。{provider} に公開されますが、どこにもデプロイされることはありません。閲覧者は {provider} 上で直接読みます。awesome リストの場合は厳選された README がこれにあたり、その他の種類のワークでは同じコンテンツを Markdown で表現したものになります。生成は設定でオフにできます。"
+                    },
+                    "work": {
+                        "title": "ワークリポジトリ",
+                        "body": "ワークの主要な成果物です。プラットフォームがデータリポジトリを取得し、選択したワークテンプレートを適用して、このリポジトリを生成します。通常はデプロイ可能なウェブサイトやウェブアプリですが、テンプレートによってはモバイルアプリ、ドキュメントサイト、その他のプロジェクトになることもあります。デプロイされるのはこのリポジトリです。"
+                    },
+                    "ariaLabel": "このリポジトリとは？"
+                }
             },
             "config": {
                 "title": "設定詳細",
@@ -2365,7 +2402,7 @@
                 "pullRequestUpdate": "プルリクエスト詳細",
                 "branch": "ブランチ",
                 "prTitle": "PRタイトル",
-                "mainRepository": "メインレポジトリ",
+                "mainRepository": "{provider} リポジトリ",
                 "dataRepository": "データリポジトリ"
             },
             "activity": {
@@ -2744,7 +2781,7 @@
                 "modelOverridePlaceholder": "例: openai/gpt-4.1 または openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "オプションです。デフォルトではインポートされたモデルまたは以前のモデルを使用しますが、ここで上書きできます。",
                 "modelOverrideUnavailable": "利用可能なリストからモデルを選択する前に、まず設定済みの AI プロバイダーを選択してください。",
-                "websiteTemplateHelperText": "ウェブサイトリポジトリが最初に作成されるときに使用されるウェブサイトテンプレートを選択してください。",
+                "websiteTemplateHelperText": "ワークリポジトリが最初に作成されるときに使用されるワークテンプレートを選択してください。",
                 "websiteTemplateLockedHelperText": "最初のウェブサイト生成後、テンプレートの選択はロックされます。",
                 "recommended": "おすすめ",
                 "promptPlaceholder": "このワークに生成するアイテムを記述してください...",
@@ -2789,7 +2826,7 @@
                 "enableBadgeEvaluationDescription": "アイテムに品質バッジを評価して追加",
                 "captureScreenshots": "アイテムのスクリーンショットをキャプチャ",
                 "captureScreenshotsDescription": "生成中に各アイテムのスクリーンショットまたは商品画像を自動的にキャプチャ",
-                "websiteRepositoryCreationMethod": "ウェブサイト リポジトリ作成方法",
+                "websiteRepositoryCreationMethod": "ワーク リポジトリ作成方法",
                 "methodDuplicate": "複製",
                 "methodFork": "フォーク",
                 "workNamePlaceholder": "ワーク名を入力",
@@ -2815,7 +2852,7 @@
                 "targetKeywordsDescription": "AI 検索とコンテンツ生成をガイドするキーワード。より具体的なキーワードでより良い結果が得られます。",
                 "sourceUrlsFieldDescription": "コンテンツを抽出する特定の URL。空の場合は、ジェネレーターが自動的にウェブを検索します。",
                 "generationMethodDescription": "既存のアイテムを更新するか、すべてをゼロから再作成するかを選択。",
-                "websiteRepositoryCreationMethodDescription": "ウェブサイト リポジトリの作成方法。ほとんどの場合でテンプレートをおすすめします。",
+                "websiteRepositoryCreationMethodDescription": "ワーク リポジトリの作成方法。ほとんどの場合でテンプレートをおすすめします。",
                 "maxSearchQueriesDescription": "AI が関連コンテンツを見つけるために生成する検索クエリ数（1-50）。",
                 "resultsPerQueryDescription": "検索クエリあたりの最大取得結果数（1-20）。",
                 "maxPagesToProcessDescription": "コンテンツ抽出のために処理する最大ウェブページ数（1-100）。",
@@ -2974,7 +3011,7 @@
                         "model": "モデル",
                         "schedule": "スケジュール",
                         "providers": "プロバイダー",
-                        "websiteRepo": "ウェブサイトリポジトリ"
+                        "websiteRepo": "ワークリポジトリ"
                     },
                     "sourceTypes": {
                         "dataRepo": "データリポジトリ",
@@ -3009,8 +3046,8 @@
                 "deleteDataRepositoryDescription": "GitHub から JSON データ リポジトリを削除",
                 "deleteMarkdownRepository": "Markdown リポジトリを削除",
                 "deleteMarkdownRepositoryDescription": "README を含む Markdown リポジトリを削除",
-                "deleteWebsiteRepository": "ウェブサイト リポジトリを削除",
-                "deleteWebsiteRepositoryDescription": "デプロイされたウェブサイト リポジトリを削除",
+                "deleteWebsiteRepository": "ワーク リポジトリを削除",
+                "deleteWebsiteRepositoryDescription": "デプロイされたワーク リポジトリを削除",
                 "deleteConfirm": "本当に削除しますか？",
                 "deleteConfirmDetail": "この操作は元に戻せません。ワークと選択したリポジトリが永久に削除されます。",
                 "confirmWorkName": "削除確認のためワーク名を入力",
@@ -3028,7 +3065,7 @@
                 "updateFailed": "設定の更新に失敗しました",
                 "deployProvider": {
                     "title": "デプロイ プロバイダー",
-                    "description": "ワーク ウェブサイトをデプロイする場所を選択",
+                    "description": "ワークをデプロイする場所を選択",
                     "configure": "設定",
                     "ready": "デプロイの準備完了",
                     "notConfigured": "未設定",
@@ -3268,7 +3305,7 @@
                 },
                 "noProviderAlert": {
                     "title": "デプロイプロバイダーがありません",
-                    "description": "ワークウェブサイトをデプロイするには、デプロイプロバイダーを選択してください。",
+                    "description": "ワークをデプロイするには、デプロイプロバイダーを選択してください。",
                     "selectButton": "選択して続行",
                     "noProviders": "利用可能なデプロイプロバイダーがありません。まずデプロイプラグインをインストールしてください。"
                 },
@@ -3292,8 +3329,8 @@
                 },
                 "form": {
                     "deployment": {
-                        "title": "ウェブサイトをデプロイ",
-                        "description": "ワークウェブサイトリポジトリをデプロイします。",
+                        "title": "ワークをデプロイ",
+                        "description": "ワークリポジトリをデプロイします。",
                         "deployButton": "{provider} にデプロイ",
                         "deployingButton": "デプロイ中...",
                         "deployingStateButton": "デプロイ中 ({state})...",
@@ -3308,9 +3345,9 @@
                         }
                     },
                     "updateRepository": {
-                        "title": "ウェブサイトリポジトリを更新",
+                        "title": "ワークリポジトリを更新",
                         "description": "テンプレートからの最新の変更を",
-                        "websiteRepository": "ウェブサイトリポジトリに同期",
+                        "websiteRepository": "ワークリポジトリに同期",
                         "updateButton": "リポジトリを更新",
                         "updatingButton": "更新中..."
                     },
@@ -3327,20 +3364,20 @@
                     },
                     "info": {
                         "deployInfo": "デプロイには通常1〜3分かかります。完了したらURLが通知されます。",
-                        "updateInfo": "更新により、ワークコンテンツが次のデプロイのためにウェブサイトリポジトリに同期されます。"
+                        "updateInfo": "更新により、ワークのコンテンツが次のデプロイのためにワークリポジトリに同期されます。"
                     },
                     "websiteTemplate": {
                         "title": "自動テンプレート更新",
-                        "description": "ウェブサイトを最新のテンプレート変更と自動的に同期します。",
-                        "selectorLabel": "ウェブサイトテンプレート",
+                        "description": "ワークを最新のテンプレート変更と自動的に同期します。",
+                        "selectorLabel": "ワークテンプレート",
                         "currentTemplateLabel": "現在のテンプレート",
                         "unknownTemplate": "継承されたデフォルト",
-                        "currentHelperText": "選択されたテンプレートは、ウェブサイトリポジトリの初期化と更新方法を制御します。",
-                        "switchHelperText": "新しいテンプレートを適用すると、既存のウェブサイトリポジトリが選択されたテンプレートからリセットされます（すでに存在する場合）。",
-                        "switchAction": "ウェブサイトリポジトリにテンプレートを適用",
+                        "currentHelperText": "選択されたテンプレートは、ワークリポジトリの初期化と更新方法を制御します。",
+                        "switchHelperText": "新しいテンプレートを適用すると、既存のワークリポジトリが選択されたテンプレートからリセットされます（すでに存在する場合）。",
+                        "switchAction": "ワークリポジトリにテンプレートを適用",
                         "switchActionIdle": "テンプレートは最新です",
-                        "switchConfirmTitle": "ウェブサイトテンプレートを切り替えますか？",
-                        "switchConfirmDescription": "ウェブサイトリポジトリが既に存在する場合、その内容は選択されたテンプレートから置き換えられます。そのリポジトリ内のカスタムコードはすべて失われます。",
+                        "switchConfirmTitle": "ワークテンプレートを切り替えますか？",
+                        "switchConfirmDescription": "ワークリポジトリが既に存在する場合、その内容は選択されたテンプレートから置き換えられます。そのリポジトリ内のカスタムコードはすべて失われます。",
                         "switchConfirmButton": "テンプレートを切り替える",
                         "switchCancel": "キャンセル",
                         "autoUpdate": "自動更新",
@@ -3715,7 +3752,7 @@
             },
             "deployProvider": {
                 "title": "デプロイ プロバイダー",
-                "description": "ワークウェブサイトをデプロイする場所を選択",
+                "description": "ワークをデプロイする場所を選択",
                 "noProviders": "利用可能なデプロイ プロバイダーがありません",
                 "notConfigured": "未設定",
                 "configured": "デプロイ準備完了",
@@ -3816,7 +3853,7 @@
                 "organizationHelp": "個人アカウントではなく組織の下にリポジトリを作成",
                 "organizationNameLabel": "組織名",
                 "organizationNamePlaceholder": "組織名を入力",
-                "websiteTemplateHelperText": "ウェブサイトリポジトリが最初に作成されるときに使用されるウェブサイトテンプレートを選択してください。"
+                "websiteTemplateHelperText": "ワークリポジトリが最初に作成されるときに使用されるワークテンプレートを選択してください。"
             },
             "manual": {
                 "title": "手動で作成",
@@ -3843,7 +3880,7 @@
                 "organizationHelp": "このワークを個人アカウントではなく GitHub 組織の下に作成",
                 "organizationNameLabel": "組織名",
                 "organizationNamePlaceholder": "my-organization",
-                "websiteTemplateHelperText": "ウェブサイトリポジトリが最初に作成されるときに使用されるウェブサイトテンプレートを選択してください。",
+                "websiteTemplateHelperText": "ワークリポジトリが最初に作成されるときに使用されるワークテンプレートを選択してください。",
                 "headerLabel": "カスタム README ヘッダー",
                 "headerPlaceholder": "README ファイルの上部にカスタムコンテンツを追加",
                 "headerOverwrite": "デフォルトヘッダーを完全に置き換え",
@@ -3949,15 +3986,15 @@
                     "importButton": "インポート＆リサーチを開始",
                     "importingButton": "リサーチパイプラインを開始中...",
                     "mainRepository": {
-                        "title": "Main repository",
+                        "title": "GitHub リポジトリ",
                         "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
                         "clone": {
                             "title": "Clone / recreate",
-                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                            "description": "このワーク用に、生成された新しい README リポジトリを作成します。データリポジトリとワークリポジトリは引き続き作成されます。"
                         },
                         "reuse": {
                             "title": "Reuse source README",
-                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                            "description": "生成された README リポジトリを作成しません。GitHub リポジトリのリンクは、ソースの README リポジトリを指します。"
                         }
                     }
                 },
@@ -4018,7 +4055,7 @@
                     "descriptionReady": "すべてのリポジトリが見つかりました。リンク準備完了。",
                     "dataRepo": "データ リポジトリ",
                     "markdownRepo": "Markdown リポジトリ",
-                    "websiteRepo": "ウェブサイト リポジトリ",
+                    "websiteRepo": "ワーク リポジトリ",
                     "found": "見つかりました",
                     "notFound": "見つかりませんでした",
                     "cancel": "キャンセル",
@@ -4629,7 +4666,7 @@
         },
         "templates": {
             "title": "テンプレート",
-            "subtitle": "組み込みのウェブサイトテンプレートを閲覧し、カスタムカタログを管理し、新しいワークがどのテンプレートから開始されるかを制御してください。",
+            "subtitle": "組み込みのワークテンプレートを閲覧し、カスタムカタログを管理し、新しいワークがどのテンプレートから開始されるかを制御してください。",
             "kindSwitcher": {
                 "mission": "Mission Templates",
                 "work": "Work Templates",
@@ -5118,6 +5155,16 @@
                 "copyFailed": "クリップボードにコピーできませんでした"
             },
             "confirmDelete": "このトリガーを削除しますか？ Webhook URL は直ちに使用できなくなり、元に戻せません。"
+        },
+        "workKind": {
+            "label": "タイプ",
+            "website": "Website",
+            "landing-page": "Landing Page",
+            "blog": "Blog",
+            "directory": "Directory",
+            "awesome-repo": "Awesome Repo",
+            "company": "Company",
+            "default": "Work"
         }
     },
     "layout": {
@@ -5331,7 +5378,7 @@
         "deploy": {
             "deployFailed": "デプロイに失敗しました",
             "updateRepositoryFailed": "リポジトリの更新に失敗しました",
-            "updateSettingsFailed": "ウェブサイトテンプレート設定の更新に失敗しました"
+            "updateSettingsFailed": "ワークテンプレート設定の更新に失敗しました"
         }
     },
     "validation": {

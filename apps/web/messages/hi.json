@@ -1937,8 +1937,12 @@
                     "activity": "गतिविधि फ़ीड",
                     "kb": "ज्ञान आधार",
                     "generator": "Work उत्पन्न करें, एक बार या निर्धारित समय पर",
-                    "deploy": "Work परिनियोजित करें"
-                }
+                    "deploy": "Work परिनियोजित करें",
+                    "tasks": "इस Work के कार्य"
+                },
+                "tasks": "कार्य",
+                "posts": "पोस्ट",
+                "pages": "पृष्ठ"
             },
             "members": {
                 "title": "टीम सदस्य",
@@ -2152,7 +2156,25 @@
                 "categories": "श्रेणियाँ",
                 "comparisons": "तुलनाएँ",
                 "generationStatus": "उत्पत्ति स्थिति",
-                "daysActive": "सक्रिय दिन"
+                "daysActive": "सक्रिय दिन",
+                "posts": "पोस्ट",
+                "tags": "टैग",
+                "deployStatus": "तैनाती स्थिति",
+                "registeredUsers": "पंजीकृत उपयोगकर्ता",
+                "teamMembers": "टीम सदस्य",
+                "agents": "एजेंट",
+                "openTasks": "खुले कार्य",
+                "worksOwned": "वर्क",
+                "pageViews": "पेज व्यू",
+                "sessions": "सत्र",
+                "conversions": "रूपांतरण",
+                "states": {
+                    "live": "लाइव",
+                    "notConfigured": "देखने के लिए एनालिटिक्स जोड़ें",
+                    "notDeployed": "देखने के लिए तैनात करें",
+                    "notGenerated": "देखने के लिए जनरेट करें",
+                    "unavailable": "अनुपलब्ध"
+                }
             },
             "comparisons": {
                 "title": "तुलनाएँ",
@@ -2324,8 +2346,23 @@
                 "slug": "स्लग",
                 "repositories": "रिपॉजिटरीज़",
                 "dataRepo": "डेटा रिपॉजिटरी",
-                "websiteRepo": "वेबसाइट रिपॉजिटरी",
-                "mainRepo": "मुख्य रिपॉजिटरी",
+                "websiteRepo": "कार्य रिपॉजिटरी",
+                "mainRepo": "{provider} रिपॉजिटरी",
+                "repoHelp": {
+                    "data": {
+                        "title": "डेटा रिपॉजिटरी",
+                        "body": "आपके कार्य के लिए सत्य का स्रोत। इसमें वह मेटाडेटा और सामग्री रहती है जिसे प्लेटफ़ॉर्म आपके लिए बनाए रखता है — किसी डायरेक्टरी के लिए यह हर आइटम, श्रेणी और टैग है; अन्य कार्य प्रकारों के लिए यह पेजों के पीछे की संरचित सामग्री है। एजेंट सबसे पहले यहीं लिखते हैं, और बाकी सब कुछ इसी से जनरेट होता है। यह कम ही बदलती है और इसे हाथ से संपादित करना सुरक्षित है।"
+                    },
+                    "provider": {
+                        "title": "{provider} रिपॉजिटरी",
+                        "body": "आपके कार्य का एक पठनीय, ब्राउज़ करने योग्य संस्करण, जिसे AI डेटा रिपॉजिटरी से जनरेट करता है। इसे {provider} पर प्रकाशित किया जाता है, लेकिन कहीं भी तैनात नहीं किया जाता — लोग इसे सीधे {provider} पर पढ़ते हैं। किसी अद्भुत सूची के लिए इसका अर्थ है एक क्यूरेट किया गया README; अन्य कार्य प्रकारों के लिए यह उसी सामग्री का समकक्ष Markdown दृश्य है। आप सेटिंग्स में इसका जनरेशन बंद कर सकते हैं।"
+                    },
+                    "work": {
+                        "title": "कार्य रिपॉजिटरी",
+                        "body": "आपके कार्य का मुख्य आउटपुट। प्लेटफ़ॉर्म डेटा रिपॉजिटरी लेता है, आपके चुने हुए कार्य टेम्प्लेट को लागू करता है, और यह रिपॉजिटरी तैयार करता है — आमतौर पर एक तैनात करने योग्य वेबसाइट या वेब ऐप, लेकिन टेम्प्लेट के आधार पर यह एक मोबाइल ऐप, डॉक्स साइट या कोई अन्य प्रोजेक्ट भी हो सकता है। यही वह रिपॉजिटरी है जिसे तैनात किया जाता है।"
+                    },
+                    "ariaLabel": "यह रिपॉजिटरी क्या है?"
+                },
                 "gitProvider": "गिट प्रदाता",
                 "organization": "संगठन",
                 "created": "बनाया गया",
@@ -2357,7 +2394,7 @@
                 "pullRequestUpdate": "पुल रिक्वेस्ट विवरण",
                 "branch": "शाखा",
                 "prTitle": "पीआर शीर्षक",
-                "mainRepository": "मुख्य रिपॉजिटरी",
+                "mainRepository": "{provider} रिपॉजिटरी",
                 "dataRepository": "डेटा रिपॉजिटरी"
             },
             "activity": {
@@ -2736,7 +2773,7 @@
                 "modelOverridePlaceholder": "जैसे openai/gpt-4.1 या openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "वैकल्पिक। डिफ़ॉल्ट रूप से आयातित या पिछला मॉडल उपयोग किया जाता है जब तक कि आप इसे यहाँ ओवरराइड न करें।",
                 "modelOverrideUnavailable": "सूची से मॉडल चुनने के लिए पहले एक कॉन्फ़िगर किए गए AI प्रदाता का चयन करें।",
-                "websiteTemplateHelperText": "वेबसाइट टेम्प्लेट चुनें जो वेबसाइट रिपॉज़िटरी पहली बार बनाए जाने पर उपयोग किया जाएगा।",
+                "websiteTemplateHelperText": "वह कार्य टेम्प्लेट चुनें जो कार्य रिपॉज़िटरी पहली बार बनाए जाने पर उपयोग किया जाएगा।",
                 "websiteTemplateLockedHelperText": "पहली वेबसाइट जेनरेशन के बाद टेम्प्लेट चयन लॉक हो जाता है।",
                 "recommended": "अनुशंसित",
                 "promptPlaceholder": "वर्णन करें कि इस कार्य के लिए कौन से आइटम उत्पन्न करने चाहिए...",
@@ -2781,7 +2818,7 @@
                 "enableBadgeEvaluationDescription": "आइटमों को गुणवत्ता बैज मूल्यांकन और जोड़ें",
                 "captureScreenshots": "आइटम स्क्रीनशॉट कैप्चर करें",
                 "captureScreenshotsDescription": "उत्पादन के दौरान प्रत्येक आइटम के लिए स्वचालित रूप से स्क्रीनशॉट या उत्पाद छवियाँ कैप्चर करें",
-                "websiteRepositoryCreationMethod": "वेबसाइट रीपॉजिटरी निर्माण विधि",
+                "websiteRepositoryCreationMethod": "कार्य रिपॉजिटरी निर्माण विधि",
                 "methodDuplicate": "डुप्लिकेट करें",
                 "methodFork": "फ़ोर्क करें",
                 "workNamePlaceholder": "कार्य का नाम दर्ज करें",
@@ -2807,7 +2844,7 @@
                 "targetKeywordsDescription": "AI खोज और कंटेंट उत्पादन को निर्देशित करने के लिए कीवर्ड। अधिक विशिष्ट कीवर्ड बेहतर परिणाम देते हैं।",
                 "sourceUrlsFieldDescription": "कंटेंट निकालने के लिए विशिष्ट URL। यदि खाली हो, तो जनरेटर स्वचालित रूप से वेब खोजेगा।",
                 "generationMethodDescription": "मौजूदा आइटम अपडेट करने या सब कुछ शून्य से पुनःबनाने का चयन करें।",
-                "websiteRepositoryCreationMethodDescription": "वेबसाइट रीपॉजिटरी कैसे बनाई जाती है। अधिकांश मामलों के लिए टेम्पलेट अनुशंसित है।",
+                "websiteRepositoryCreationMethodDescription": "कार्य रिपॉजिटरी कैसे बनाई जाती है। अधिकांश मामलों के लिए टेम्प्लेट अनुशंसित है।",
                 "maxSearchQueriesDescription": "प्रासंगिक कंटेंट खोजने के लिए AI द्वारा उत्पन्न खोज क्वेरी की संख्या (1-50)।",
                 "resultsPerQueryDescription": "प्रति खोज क्वेरी अधिकतम परिणाम प्राप्त करने के लिए (1-20)।",
                 "maxPagesToProcessDescription": "कंटेंट निकासी के लिए अधिकतम वेब पृष्ठ संसाधित करने के लिए (1-100)।",
@@ -2966,7 +3003,7 @@
                         "model": "मॉडल",
                         "schedule": "अनुसूची",
                         "providers": "प्रदाता",
-                        "websiteRepo": "वेबसाइट रिपॉजिटरी"
+                        "websiteRepo": "कार्य रिपो"
                     },
                     "sourceTypes": {
                         "dataRepo": "डेटा रिपॉजिटरी",
@@ -3001,8 +3038,8 @@
                 "deleteDataRepositoryDescription": "GitHub से JSON डेटा रिपॉजिटरी हटाएं",
                 "deleteMarkdownRepository": "मार्कडाउन रिपॉजिटरी हटाएं",
                 "deleteMarkdownRepositoryDescription": "README युक्त मार्कडाउन रिपॉजिटरी हटाएं",
-                "deleteWebsiteRepository": "वेबसाइट रिपॉजिटरी हटाएं",
-                "deleteWebsiteRepositoryDescription": "डिप्लॉय की गई वेबसाइट रिपॉजिटरी हटाएं",
+                "deleteWebsiteRepository": "कार्य रिपॉजिटरी हटाएं",
+                "deleteWebsiteRepositoryDescription": "डिप्लॉय की गई कार्य रिपॉजिटरी हटाएं",
                 "deleteConfirm": "क्या आप बिल्कुल सुनिश्चित हैं?",
                 "deleteConfirmDetail": "यह क्रिया पूर्ववत नहीं की जा सकती। कार्य और चयनित रिपॉजिटरी स्थायी रूप से हटा दी जाएंगी।",
                 "confirmWorkName": "पुष्टि के लिए कार्य का नाम टाइप करें",
@@ -3020,7 +3057,7 @@
                 "updateFailed": "सेटिंग्स अपडेट करने में विफल",
                 "deployProvider": {
                     "title": "डिप्लॉय प्रदाता",
-                    "description": "अपनी कार्य वेबसाइट को डिप्लॉय करने के लिए स्थान चुनें",
+                    "description": "अपना कार्य डिप्लॉय करने के लिए स्थान चुनें",
                     "configure": "कॉन्फ़िगर करें",
                     "ready": "डिप्लॉय करने के लिए तैयार",
                     "notConfigured": "कॉन्फ़िगर नहीं किया गया",
@@ -3260,7 +3297,7 @@
                 },
                 "noProviderAlert": {
                     "title": "कोई तैनाती प्रदाता नहीं",
-                    "description": "अपनी कार्य वेबसाइट तैनात करने के लिए एक तैनाती प्रदाता चुनें।",
+                    "description": "अपना कार्य तैनात करने के लिए एक तैनाती प्रदाता चुनें।",
                     "selectButton": "चुनें और जारी रखें",
                     "noProviders": "कोई तैनाती प्रदाता उपलब्ध नहीं। पहले एक तैनाती प्लगइन इंस्टॉल करें।"
                 },
@@ -3284,8 +3321,8 @@
                 },
                 "form": {
                     "deployment": {
-                        "title": "वेबसाइट तैनात करें",
-                        "description": "अपनी कार्य वेबसाइट रिपॉजिटरी तैनात करें।",
+                        "title": "कार्य तैनात करें",
+                        "description": "अपनी कार्य रिपॉजिटरी तैनात करें।",
                         "deployButton": "{provider} पर तैनात करें",
                         "deployingButton": "तैनात कर रहे हैं...",
                         "deployingStateButton": "तैनात कर रहे हैं ({state})...",
@@ -3300,9 +3337,9 @@
                         }
                     },
                     "updateRepository": {
-                        "title": "वेबसाइट रिपॉजिटरी अपडेट करें",
+                        "title": "कार्य रिपॉजिटरी अपडेट करें",
                         "description": "टेम्पलेट से नवीनतम परिवर्तनों को सिंक करें",
-                        "websiteRepository": "वेबसाइट रिपॉजिटरी",
+                        "websiteRepository": "कार्य रिपॉजिटरी",
                         "updateButton": "रिपॉजिटरी अपडेट करें",
                         "updatingButton": "अपडेट कर रहे हैं..."
                     },
@@ -3319,20 +3356,20 @@
                     },
                     "info": {
                         "deployInfo": "तैनाती आमतौर पर 1-3 मिनट लेती है। पूरा होने पर आपको URL प्राप्त होगा।",
-                        "updateInfo": "अपडेट आपकी कार्य सामग्री को अगली तैनाती के लिए वेबसाइट रिपॉजिटरी में सिंक करते हैं।"
+                        "updateInfo": "अपडेट आपके कार्य की सामग्री को अगली तैनाती के लिए कार्य रिपॉजिटरी में सिंक करते हैं।"
                     },
                     "websiteTemplate": {
                         "title": "स्वचालित टेम्पलेट अपडेट",
-                        "description": "अपनी वेबसाइट को नवीनतम टेम्पलेट परिवर्तनों के साथ स्वचालित रूप से सिंक रखें।",
-                        "selectorLabel": "वेबसाइट टेम्प्लेट",
+                        "description": "अपने कार्य को नवीनतम टेम्प्लेट परिवर्तनों के साथ स्वचालित रूप से सिंक रखें।",
+                        "selectorLabel": "कार्य टेम्प्लेट",
                         "currentTemplateLabel": "वर्तमान टेम्प्लेट",
                         "unknownTemplate": "वरासत में मिला डिफ़ॉल्ट",
-                        "currentHelperText": "चयनित टेम्प्लेट वेबसाइट रिपॉज़िटरी को कैसे प्रारंभ और अपडेट किया जाता है, इसका नियंत्रण करता है।",
-                        "switchHelperText": "यदि वेबसाइट रिपॉज़िटरी पहले से मौजूद है, तो नया टेम्प्लेट लागू करने से चयनित टेम्प्लेट से मौजूदा वेबसाइट रिपॉज़िटरी रीसेट हो जाएगी।",
-                        "switchAction": "वेबसाइट रिपॉज़िटरी पर टेम्प्लेट लागू करें",
+                        "currentHelperText": "चयनित टेम्प्लेट कार्य रिपॉज़िटरी को कैसे प्रारंभ और अपडेट किया जाता है, इसका नियंत्रण करता है।",
+                        "switchHelperText": "यदि कार्य रिपॉज़िटरी पहले से मौजूद है, तो नया टेम्प्लेट लागू करने से मौजूदा कार्य रिपॉज़िटरी चयनित टेम्प्लेट से रीसेट हो जाएगी।",
+                        "switchAction": "कार्य रिपॉज़िटरी पर टेम्प्लेट लागू करें",
                         "switchActionIdle": "टेम्प्लेट अप-टू-डेट है",
-                        "switchConfirmTitle": "वेबसाइट टेम्प्लेट बदलें?",
-                        "switchConfirmDescription": "यदि वेबसाइट रिपॉज़िटरी पहले से मौजूद है, तो इसकी सामग्री चयनित टेम्प्लेट से बदल दी जाएगी। उस रिपॉज़िटरी में कोई भी कस्टम कोड नष्ट हो जाएगा।",
+                        "switchConfirmTitle": "कार्य टेम्प्लेट बदलें?",
+                        "switchConfirmDescription": "यदि कार्य रिपॉज़िटरी पहले से मौजूद है, तो इसकी सामग्री चयनित टेम्प्लेट से बदल दी जाएगी। उस रिपॉज़िटरी में कोई भी कस्टम कोड नष्ट हो जाएगा।",
                         "switchConfirmButton": "टेम्प्लेट बदलें",
                         "switchCancel": "रद्द करें",
                         "autoUpdate": "स्वचालित रूप से अपडेट करें",
@@ -3707,7 +3744,7 @@
             },
             "deployProvider": {
                 "title": "डिप्लॉय प्रदाता",
-                "description": "अपनी कार्य वेबसाइट को डिप्लॉय करने के स्थान का चयन करें",
+                "description": "अपना कार्य डिप्लॉय करने के स्थान का चयन करें",
                 "noProviders": "कोई डिप्लॉय प्रदाता उपलब्ध नहीं",
                 "notConfigured": "कॉन्फ़िगर नहीं किया गया",
                 "configured": "डिप्लॉय करने के लिए तैयार",
@@ -3808,7 +3845,7 @@
                 "organizationHelp": "अपने व्यक्तिगत खाते के बजाय संगठन के अंतर्गत रिपॉजिटरी बनाएँ",
                 "organizationNameLabel": "संगठन का नाम",
                 "organizationNamePlaceholder": "संगठन का नाम दर्ज करें",
-                "websiteTemplateHelperText": "वेबसाइट टेम्प्लेट चुनें जो वेबसाइट रिपॉज़िटरी पहली बार बनाए जाने पर उपयोग किया जाएगा।"
+                "websiteTemplateHelperText": "वह कार्य टेम्प्लेट चुनें जो कार्य रिपॉज़िटरी पहली बार बनाए जाने पर उपयोग किया जाएगा।"
             },
             "manual": {
                 "title": "मैन्युअल रूप से बनाएँ",
@@ -3835,7 +3872,7 @@
                 "organizationHelp": "इस कार्य को GitHub संगठन के अंतर्गत बनाएँ न कि अपने व्यक्तिगत खाते के अंतर्गत",
                 "organizationNameLabel": "संगठन का नाम",
                 "organizationNamePlaceholder": "my-organization",
-                "websiteTemplateHelperText": "वेबसाइट टेम्प्लेट चुनें जो वेबसाइट रिपॉज़िटरी पहली बार बनाए जाने पर उपयोग किया जाएगा।",
+                "websiteTemplateHelperText": "वह कार्य टेम्प्लेट चुनें जो कार्य रिपॉज़िटरी पहली बार बनाए जाने पर उपयोग किया जाएगा।",
                 "headerLabel": "कस्टम README हेडर",
                 "headerPlaceholder": "अपने README फ़ाइल के शीर्ष पर कस्टम सामग्री जोड़ें",
                 "headerOverwrite": "पूर्वनिर्धारित हेडर को पूरी तरह बदलें",
@@ -3941,15 +3978,15 @@
                     "importButton": "आयात और अनुसंधान शुरू करें",
                     "importingButton": "अनुसंधान पाइपलाइन शुरू हो रही है...",
                     "mainRepository": {
-                        "title": "Main repository",
+                        "title": "GitHub रिपॉजिटरी",
                         "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
                         "clone": {
                             "title": "Clone / recreate",
-                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                            "description": "इस कार्य के लिए एक नई जनरेट की गई README रिपॉजिटरी बनाएँ। डेटा और कार्य रिपॉजिटरी फिर भी बनाई जाती हैं।"
                         },
                         "reuse": {
                             "title": "Reuse source README",
-                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                            "description": "जनरेट की गई README रिपॉजिटरी न बनाएँ। GitHub रिपॉजिटरी लिंक स्रोत README रिपॉजिटरी की ओर इंगित करेंगे।"
                         }
                     }
                 },
@@ -4010,7 +4047,7 @@
                     "descriptionReady": "सभी रिपॉजिटरीज़ मिल गईं। लिंक करने के लिए तैयार।",
                     "dataRepo": "डेटा रिपॉजिटरी",
                     "markdownRepo": "मार्कडाउन रिपॉजिटरी",
-                    "websiteRepo": "वेबसाइट रिपॉजिटरी",
+                    "websiteRepo": "कार्य रिपॉजिटरी",
                     "found": "मिली",
                     "notFound": "नहीं मिली",
                     "cancel": "रद्द करें",
@@ -4621,7 +4658,7 @@
         },
         "templates": {
             "title": "टेम्प्लेट",
-            "subtitle": "बिल्ट-इन वेबसाइट टेम्प्लेट्स ब्राउज़ करें, अपने कस्टम कैटलॉग को मैनेज करें, और नियंत्रित करें कि नए कार्य किस टेम्प्लेट से शुरू हों।",
+            "subtitle": "बिल्ट-इन कार्य टेम्प्लेट्स ब्राउज़ करें, अपने कस्टम कैटलॉग को मैनेज करें, और नियंत्रित करें कि नए कार्य किस टेम्प्लेट से शुरू हों।",
             "kindSwitcher": {
                 "mission": "Mission Templates",
                 "work": "Work Templates",
@@ -5110,6 +5147,16 @@
                 "copyFailed": "क्लिपबोर्ड पर कॉपी नहीं हो सका"
             },
             "confirmDelete": "इस ट्रिगर को हटाएं? इसका वेबहुक URL तुरंत काम करना बंद कर देगा और इसे पूर्ववत नहीं किया जा सकता।"
+        },
+        "workKind": {
+            "label": "प्रकार",
+            "website": "Website",
+            "landing-page": "Landing Page",
+            "blog": "Blog",
+            "directory": "Directory",
+            "awesome-repo": "Awesome Repo",
+            "company": "Company",
+            "default": "Work"
         }
     },
     "layout": {
@@ -5323,7 +5370,7 @@
         "deploy": {
             "deployFailed": "डिप्लॉय करने में विफल",
             "updateRepositoryFailed": "रिपॉजिटरी अपडेट करने में विफल",
-            "updateSettingsFailed": "वेबसाइट टेम्पलेट सेटिंग्स अपडेट करने में विफल"
+            "updateSettingsFailed": "कार्य टेम्प्लेट सेटिंग्स अपडेट करने में विफल"
         }
     },
     "validation": {

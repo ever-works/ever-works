@@ -2139,8 +2139,12 @@
                     "activity": "موجز النشاط",
                     "kb": "قاعدة المعرفة",
                     "generator": "توليد الـWork مرة واحدة أو وفق جدول",
-                    "deploy": "نشر الـWork"
-                }
+                    "deploy": "نشر الـWork",
+                    "tasks": "مهام هذا العمل"
+                },
+                "tasks": "المهام",
+                "posts": "المقالات",
+                "pages": "الصفحات"
             },
             "members": {
                 "title": "أعضاء الفريق",
@@ -2354,7 +2358,25 @@
                 "categories": "الفئات",
                 "comparisons": "المقارنات",
                 "generationStatus": "حالة التوليد",
-                "daysActive": "أيام النشاط"
+                "daysActive": "أيام النشاط",
+                "posts": "المقالات",
+                "tags": "الوسوم",
+                "deployStatus": "حالة النشر",
+                "registeredUsers": "المستخدمون المسجّلون",
+                "teamMembers": "أعضاء الفريق",
+                "agents": "الوكلاء",
+                "openTasks": "المهام المفتوحة",
+                "worksOwned": "الأعمال",
+                "pageViews": "مشاهدات الصفحة",
+                "sessions": "الجلسات",
+                "conversions": "التحويلات",
+                "states": {
+                    "live": "مباشر",
+                    "notConfigured": "اربط التحليلات لعرض هذا",
+                    "notDeployed": "انشر لعرض هذا",
+                    "notGenerated": "أنشئ المحتوى لعرض هذا",
+                    "unavailable": "غير متاح"
+                }
             },
             "comparisons": {
                 "title": "المقارنات",
@@ -2526,8 +2548,8 @@
                 "slug": "الاسم الفرعي",
                 "repositories": "المستودعات",
                 "dataRepo": "مستودع البيانات",
-                "websiteRepo": "مستودع الموقع",
-                "mainRepo": "المستودع الرئيسي",
+                "websiteRepo": "مستودع العمل",
+                "mainRepo": "مستودع {provider}",
                 "gitProvider": "مزود Git",
                 "organization": "المنظمة",
                 "created": "تم الإنشاء",
@@ -2541,7 +2563,22 @@
                 "deployProvider": "مزود النشر",
                 "notConnected": "غير متصل",
                 "notConfigured": "غير مُهيأ",
-                "viewSite": "عرض الموقع"
+                "viewSite": "عرض الموقع",
+                "repoHelp": {
+                    "data": {
+                        "title": "مستودع البيانات",
+                        "body": "مصدر الحقيقة لعملك. يحتوي على البيانات الوصفية والمحتوى الذي تتولى المنصة صيانته نيابةً عنك — ففي الدليل هو كل عنصر وفئة ووسم، وفي أنواع الأعمال الأخرى هو المحتوى المنظم الذي يقف خلف الصفحات. يكتب الوكلاء هنا أولًا، ثم يُولَّد كل شيء آخر انطلاقًا منه. نادرًا ما يتغير، ومن الآمن تعديله يدويًا."
+                    },
+                    "provider": {
+                        "title": "مستودع {provider}",
+                        "body": "نسخة من عملك قابلة للقراءة والتصفح، يولّدها الذكاء الاصطناعي من مستودع البيانات. يتم رفعها إلى {provider} لكن لا يتم نشرها على أي استضافة — يقرأها الناس مباشرةً على {provider}. في القوائم الرائعة (awesome lists) يعني ذلك ملف README منسّقًا بعناية، وفي أنواع الأعمال الأخرى هو عرض Markdown المكافئ للمحتوى نفسه. يمكنك إيقاف توليدها من الإعدادات."
+                    },
+                    "work": {
+                        "title": "مستودع العمل",
+                        "body": "المخرَج الرئيسي لعملك. تأخذ المنصة مستودع البيانات، وتطبّق عليه قالب العمل الذي اخترته، فتنتج هذا المستودع — وهو عادةً موقع أو تطبيق ويب قابل للنشر، لكنه قد يكون تطبيق هاتف محمول أو موقع توثيق أو أي مشروع آخر بحسب القالب. هذا هو المستودع الذي يتم نشره."
+                    },
+                    "ariaLabel": "ما هذا المستودع؟"
+                }
             },
             "config": {
                 "title": "تفاصيل التهيئة",
@@ -2559,7 +2596,7 @@
                 "pullRequestUpdate": "تفاصيل طلب السحب",
                 "branch": "الفرع",
                 "prTitle": "عنوان طلب السحب",
-                "mainRepository": "المستودع الرئيسي",
+                "mainRepository": "مستودع {provider}",
                 "dataRepository": "مستودع البيانات"
             },
             "activity": {
@@ -2938,7 +2975,7 @@
                 "modelOverridePlaceholder": "مثل openai/gpt-4.1 أو openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "اختياري. يستخدم النموذج المستورد أو السابق افتراضيًا إلا إذا قمت بتجاوزه هنا.",
                 "modelOverrideUnavailable": "اختر موفر AI مُكوّن أولاً لاختيار نموذج من القائمة المتاحة.",
-                "websiteTemplateHelperText": "اختر قالب الموقع الذي سيُستَخدم عند إنشاء مستودع الموقع لأول مرة.",
+                "websiteTemplateHelperText": "اختر قالب العمل الذي سيُستَخدم عند إنشاء مستودع العمل لأول مرة.",
                 "websiteTemplateLockedHelperText": "يصبح اختيار القالب مقفلًا بعد أول توليد لموقع الويب.",
                 "recommended": "مُوصى به",
                 "promptPlaceholder": "صف ما يجب توليده من عناصر لهذا المجلد...",
@@ -2983,7 +3020,7 @@
                 "enableBadgeEvaluationDescription": "تقييم وإضافة شارات الجودة إلى العناصر",
                 "captureScreenshots": "التقاط لقطات شاشة للعناصر",
                 "captureScreenshotsDescription": "التقاط تلقائي للقطات الشاشة أو صور المنتجات لكل عنصر أثناء التوليد",
-                "websiteRepositoryCreationMethod": "طريقة إنشاء مستودع الموقع",
+                "websiteRepositoryCreationMethod": "طريقة إنشاء مستودع العمل",
                 "methodDuplicate": "مكرر",
                 "methodFork": "فرع",
                 "workNamePlaceholder": "أدخل اسم المجلد",
@@ -3009,7 +3046,7 @@
                 "targetKeywordsDescription": "كلمات مفتاحية لتوجيه بحث الذكاء الاصطناعي وتوليد المحتوى. الكلمات الأكثر تحديدًا تعطي نتائج أفضل.",
                 "sourceUrlsFieldDescription": "روابط محددة لاستخراج المحتوى منها. إذا كانت فارغة، سيبحث المولد على الويب تلقائيًا.",
                 "generationMethodDescription": "اختر ما إذا كنت تريد تحديث العناصر الموجودة أو إعادة إنشاء كل شيء من جديد.",
-                "websiteRepositoryCreationMethodDescription": "كيفية إنشاء مستودع الموقع. القالب موصى به في معظم الحالات.",
+                "websiteRepositoryCreationMethodDescription": "كيفية إنشاء مستودع العمل. القالب موصى به في معظم الحالات.",
                 "maxSearchQueriesDescription": "عدد استعلامات البحث التي سينشئها الذكاء الاصطناعي للعثور على محتوى ذي صلة (1-50).",
                 "resultsPerQueryDescription": "الحد الأقصى للنتائج لكل استعلام بحث (1-20).",
                 "maxPagesToProcessDescription": "الحد الأقصى لصفحات الويب لمعالجة استخراج المحتوى (1-100).",
@@ -3168,7 +3205,7 @@
                         "model": "النموذج",
                         "schedule": "الجدولة",
                         "providers": "المزودون",
-                        "websiteRepo": "مستودع الموقع"
+                        "websiteRepo": "مستودع العمل"
                     },
                     "sourceTypes": {
                         "dataRepo": "مستودع البيانات",
@@ -3203,8 +3240,8 @@
                 "deleteDataRepositoryDescription": "إزالة مستودع بيانات JSON من GitHub",
                 "deleteMarkdownRepository": "حذف مستودع Markdown",
                 "deleteMarkdownRepositoryDescription": "إزالة مستودع Markdown الذي يحتوي على README",
-                "deleteWebsiteRepository": "حذف مستودع الموقع",
-                "deleteWebsiteRepositoryDescription": "إزالة مستودع موقع النشر",
+                "deleteWebsiteRepository": "حذف مستودع العمل",
+                "deleteWebsiteRepositoryDescription": "إزالة مستودع العمل المنشور",
                 "deleteConfirm": "هل أنت متأكد تمامًا؟",
                 "deleteConfirmDetail": "هذا الإجراء لا يمكن التراجع عنه. سيتم حذف العمل والمستودعات المحددة نهائيًا.",
                 "confirmWorkName": "اكتب اسم العمل للتأكيد",
@@ -3222,7 +3259,7 @@
                 "updateFailed": "فشل في تحديث الإعدادات",
                 "deployProvider": {
                     "title": "مزود النشر",
-                    "description": "حدد مكان نشر موقع عملك",
+                    "description": "حدد مكان نشر عملك",
                     "configure": "تكوين",
                     "ready": "جاهز للنشر",
                     "notConfigured": "غير مُكوّن",
@@ -3462,7 +3499,7 @@
                 },
                 "noProviderAlert": {
                     "title": "لا يوجد مزود نشر",
-                    "description": "حدد مزود نشر لنشر موقع عملك.",
+                    "description": "حدد مزود نشر لنشر عملك.",
                     "selectButton": "حدد وتابع",
                     "noProviders": "لا توجد مزودات نشر متاحة. قم بتثبيت إضافة نشر أولاً."
                 },
@@ -3486,8 +3523,8 @@
                 },
                 "form": {
                     "deployment": {
-                        "title": "نشر الموقع",
-                        "description": "نشر مستودع موقع عملك.",
+                        "title": "نشر العمل",
+                        "description": "انشر مستودع عملك.",
                         "deployButton": "نشر إلى {provider}",
                         "deployingButton": "جاري النشر...",
                         "deployingStateButton": "جاري النشر ({state})...",
@@ -3502,9 +3539,9 @@
                         }
                     },
                     "updateRepository": {
-                        "title": "تحديث مستودع الموقع",
+                        "title": "تحديث مستودع العمل",
                         "description": "مزامنة أحدث التغييرات من القالب إلى",
-                        "websiteRepository": "مستودع الموقع",
+                        "websiteRepository": "مستودع العمل",
                         "updateButton": "تحديث المستودع",
                         "updatingButton": "جاري التحديث..."
                     },
@@ -3521,20 +3558,20 @@
                     },
                     "info": {
                         "deployInfo": "يستغرق النشر عادةً 1-3 دقائق. ستتلقى رابطًا بمجرد الانتهاء.",
-                        "updateInfo": "تحديثات مزامنة محتوى عملك إلى مستودع الموقع للنشر التالي."
+                        "updateInfo": "تقوم التحديثات بمزامنة محتوى عملك إلى مستودع العمل استعدادًا للنشر التالي."
                     },
                     "websiteTemplate": {
                         "title": "تحديثات القالب التلقائية",
-                        "description": "حافظ على موقعك مزامنًا تلقائيًا مع أحدث تغييرات القالب.",
-                        "selectorLabel": "قالب الموقع",
+                        "description": "حافظ على مزامنة عملك تلقائيًا مع أحدث تغييرات القالب.",
+                        "selectorLabel": "قالب العمل",
                         "currentTemplateLabel": "القالب الحالي",
                         "unknownTemplate": "الافتراضي الموروث",
-                        "currentHelperText": "القالب المختار يتحكم في كيفية تهيئة مستودع الموقع وتحديثه.",
-                        "switchHelperText": "تطبيق قالب جديد سيُعيد ضبط مستودع الموقع الحالي من القالب المختار إذا كان موجودًا مسبقًا.",
-                        "switchAction": "تطبيق القالب على مستودع الموقع",
+                        "currentHelperText": "القالب المختار يتحكم في كيفية تهيئة مستودع العمل وتحديثه.",
+                        "switchHelperText": "تطبيق قالب جديد سيُعيد ضبط مستودع العمل الحالي من القالب المختار إذا كان موجودًا مسبقًا.",
+                        "switchAction": "تطبيق القالب على مستودع العمل",
                         "switchActionIdle": "القالب محدث",
-                        "switchConfirmTitle": "تبديل قالب الموقع؟",
-                        "switchConfirmDescription": "إذا كان مستودع الموقع موجودًا بالفعل، سيتم استبدال محتوياته من القالب المختار. سيُفقد أي كود مخصص في ذلك المستودع.",
+                        "switchConfirmTitle": "تبديل قالب العمل؟",
+                        "switchConfirmDescription": "إذا كان مستودع العمل موجودًا بالفعل، سيتم استبدال محتوياته من القالب المختار. سيُفقد أي كود مخصص في ذلك المستودع.",
                         "switchConfirmButton": "تبديل القالب",
                         "switchCancel": "إلغاء",
                         "autoUpdate": "تحديث تلقائيًا",
@@ -3937,7 +3974,7 @@
             },
             "deployProvider": {
                 "title": "مزود النشر",
-                "description": "حدد مكان نشر موقع عملك",
+                "description": "حدد مكان نشر عملك",
                 "noProviders": "لا توجد مزودات نشر متاحة",
                 "notConfigured": "غير مُهيأ",
                 "configured": "جاهز للنشر",
@@ -4041,7 +4078,7 @@
                 "organizationHelp": "إنشاء مستودعات تحت منظمة بدلاً من حسابك الشخصي",
                 "organizationNameLabel": "اسم المنظمة",
                 "organizationNamePlaceholder": "أدخل اسم المنظمة",
-                "websiteTemplateHelperText": "اختر قالب الموقع الذي سيُستَخدم عند إنشاء مستودع الموقع لأول مرة."
+                "websiteTemplateHelperText": "اختر قالب العمل الذي سيُستَخدم عند إنشاء مستودع العمل لأول مرة."
             },
             "manual": {
                 "title": "إنشاء يدويًا",
@@ -4068,7 +4105,7 @@
                 "organizationHelp": "إنشاء هذا العمل تحت منظمة GitHub بدلاً من حسابك الشخصي",
                 "organizationNameLabel": "اسم المنظمة",
                 "organizationNamePlaceholder": "my-organization",
-                "websiteTemplateHelperText": "اختر قالب الموقع الذي سيُستَخدم عند إنشاء مستودع الموقع لأول مرة.",
+                "websiteTemplateHelperText": "اختر قالب العمل الذي سيُستَخدم عند إنشاء مستودع العمل لأول مرة.",
                 "headerLabel": "رأس README مخصص",
                 "headerPlaceholder": "إضافة محتوى مخصص إلى أعلى ملف README الخاص بك",
                 "headerOverwrite": "استبدال الرأس الافتراضي بالكامل",
@@ -4174,15 +4211,15 @@
                     "importButton": "بدء الاستيراد والبحث",
                     "importingButton": "بدء خط أنابيب البحث...",
                     "mainRepository": {
-                        "title": "Main repository",
+                        "title": "مستودع GitHub",
                         "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
                         "clone": {
                             "title": "Clone / recreate",
-                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                            "description": "إنشاء مستودع README مولَّد جديد لهذا العمل. مع ذلك سيتم إنشاء مستودعي البيانات والعمل."
                         },
                         "reuse": {
                             "title": "Reuse source README",
-                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                            "description": "لا تُنشئ مستودع README مولَّدًا. ستشير روابط مستودع GitHub إلى مستودع README المصدر."
                         }
                     }
                 },
@@ -4243,7 +4280,7 @@
                     "descriptionReady": "تم العثور على جميع المستودعات. جاهز للربط.",
                     "dataRepo": "مستودع بيانات",
                     "markdownRepo": "مستودع Markdown",
-                    "websiteRepo": "مستودع الموقع",
+                    "websiteRepo": "مستودع العمل",
                     "found": "موجود",
                     "notFound": "غير موجود",
                     "cancel": "إلغاء",
@@ -4854,7 +4891,7 @@
         },
         "templates": {
             "title": "القوالب",
-            "subtitle": "استعرض القوالب الجاهزة للموقع، gérer كتالوجك المخصص، وتحكم في أي قالب سيبدأ به الأعمال الجديدة.",
+            "subtitle": "استعرض قوالب العمل المدمجة، وأدر كتالوجك المخصص، وتحكم في القالب الذي تبدأ منه الأعمال الجديدة.",
             "kindSwitcher": {
                 "mission": "Mission Templates",
                 "work": "Work Templates",
@@ -5306,6 +5343,16 @@
                 "copyFailed": "تعذّر النسخ إلى الحافظة"
             },
             "confirmDelete": "حذف هذا المشغّل؟ سيتوقف رابط خطّاف الويب الخاص به فورًا ولا يمكن التراجع عن ذلك."
+        },
+        "workKind": {
+            "label": "النوع",
+            "website": "Website",
+            "landing-page": "Landing Page",
+            "blog": "Blog",
+            "directory": "Directory",
+            "awesome-repo": "Awesome Repo",
+            "company": "Company",
+            "default": "Work"
         }
     },
     "layout": {
@@ -5519,7 +5566,7 @@
         "deploy": {
             "deployFailed": "فشل في النشر",
             "updateRepositoryFailed": "فشل في تحديث المستودع",
-            "updateSettingsFailed": "فشل في تحديث إعدادات قالب الموقع"
+            "updateSettingsFailed": "فشل في تحديث إعدادات قالب العمل"
         }
     },
     "validation": {
