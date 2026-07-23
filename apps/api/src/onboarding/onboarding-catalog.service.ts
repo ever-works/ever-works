@@ -139,15 +139,21 @@ export class OnboardingCatalogService {
                 default: true,
                 available: everWorksDbEnabled,
                 badges: everWorksDbEnabled ? ['default'] : ['default', 'planned'],
+                // The DB step is driven by the PostgreSQL DB plugin (its
+                // settingsSchema renders the Ever Works DB / Custom selector +
+                // connection string); the choice is persisted as the plugin's
+                // user-scoped `mode`, not the bespoke onboarding `db` bucket.
+                pluginId: 'postgres-db',
             },
             {
                 choice: 'custom',
                 title: 'Custom DB',
                 description:
-                    'Bring your own database — enter the connection details on the Deploy page after your Work is created.',
+                    'Bring your own database — enter the connection string during setup (used for all your Works; a database is created per Work).',
                 default: false,
                 available: true,
                 badges: ['byok'],
+                pluginId: 'postgres-db',
             },
         ];
 
@@ -186,6 +192,7 @@ export class OnboardingCatalogService {
             [
                 ...ai.map((c) => c.pluginId),
                 ...storage.map((c) => c.pluginId),
+                ...db.map((c) => c.pluginId),
                 ...deploy.map((c) => c.pluginId),
             ].filter((id): id is string => Boolean(id)),
         );
