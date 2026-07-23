@@ -20,6 +20,7 @@ Two owner-reported issues on Ever Works:
 ## 2. Current-state facts (verified: code + live, 2026-07-22)
 
 ### DB
+
 - A Work's site DB is a **single value**, `works.deployDatabaseUrlEncrypted` (AES-256-GCM,
   `PLATFORM_ENCRYPTION_KEY`, 64-hex present in prod). Read/written only by `WorkRuntimeEnvService`
   (`packages/agent/src/services/work-runtime-env.service.ts`).
@@ -37,6 +38,7 @@ Two owner-reported issues on Ever Works:
   template is **data-driven** — one image serves any directory; content lives in its DB.
 
 ### Subdomains — TWO independent problems
+
 1. **"Failed to load subdomain" is a frontend/backend contract bug (platform-wide, false alarm).**
    `GET/PUT /api/deploy/works/:id/subdomain` return a bare `SubdomainState` with **no `status` field**
    (`deploy.controller.ts:~798-850`, `managed-subdomain.service.ts`), but the web action gates success on
@@ -52,6 +54,7 @@ Two owner-reported issues on Ever Works:
    `_PATH` empty; no shared-kubeconfig key) → it has never actually deployed a tenant Work.
 
 ### The 7 legacy Works (all `deployProvider=k8s`, `managedSubdomain` set, DB-SET=Neon)
+
 `awesome-chairs`→chairs, `awesome`→dir, `awesome-mcp-servers`→mcpserver, `awesome-vector-databases`→vectordb,
 `awesome-time-tracking`→timetrack, `awesome-startup-books`→startup-books,
 `awesome-compliance-automation`→compliance-automation. Each has a per-work repo
@@ -68,19 +71,21 @@ Two owner-reported issues on Ever Works:
 5. **Two deploy targets, one shared DB (owner, 2026-07-22).** Works may run on **ever-k8s** (platform cluster,
    e.g. `demo`) OR on **`k8s-works-shared`** (the dedicated CUSTOMER cluster). Both use the shared "Ever Works
    DB" on the `pg` cluster:
-   - ever-k8s Works reach `pg` **in-cluster** (`pg-rw.databases.svc.cluster.local:5432`, `sslmode=require`).
-   - `k8s-works-shared` Works are on a **separate** cluster, so the shared DB is exposed to the LAN via a
-     **CNPG Pooler (PgBouncer) + MetalLB LoadBalancer**; those Works connect to that LB endpoint.
-   The DDL/provisioner path always goes **direct** to `pg-rw…svc` (transaction-pooled PgBouncer can't run
-   `CREATE DATABASE`); the injected per-Work app URL uses the **Pooler LB** endpoint so it works from either
-   cluster. `k8s-works-shared` must be **registered as a platform/ArgoCD deploy target** (its kubeconfig wired
-   into the managed deploy provider). **Proof-of-work this session: deploy one Work to `k8s-works-shared`
-   (not the old `k8s-works` .210) and verify it serves + reaches the shared DB cross-cluster.**
+    - ever-k8s Works reach `pg` **in-cluster** (`pg-rw.databases.svc.cluster.local:5432`, `sslmode=require`).
+    - `k8s-works-shared` Works are on a **separate** cluster, so the shared DB is exposed to the LAN via a
+      **CNPG Pooler (PgBouncer) + MetalLB LoadBalancer**; those Works connect to that LB endpoint.
+      The DDL/provisioner path always goes **direct** to `pg-rw…svc` (transaction-pooled PgBouncer can't run
+      `CREATE DATABASE`); the injected per-Work app URL uses the **Pooler LB** endpoint so it works from either
+      cluster. `k8s-works-shared` must be **registered as a platform/ArgoCD deploy target** (its kubeconfig wired
+      into the managed deploy provider). **Proof-of-work this session: deploy one Work to `k8s-works-shared`
+      (not the old `k8s-works` .210) and verify it serves + reaches the shared DB cross-cluster.**
 
 ## 4. Design
 
 ### 4.1 Config contract (new env vars)
+
 `DATABASE_*` (existing) stays = **Ever Works' own** platform DB. New group for the **shared customer DB**:
+
 - `DB_EVER_WORKS_SHARED_ENABLED` (bool) — feature flag; gates the "Ever Works DB" card (wizard + deploy) and
   makes it the default when true.
 - `DB_EVER_WORKS_SHARED_ADMIN_URL` (secret) — least-privilege provisioner (`CREATEDB`+`CREATEROLE`, **not**
@@ -91,6 +96,7 @@ Two owner-reported issues on Ever Works:
   change.) `_ADMIN_URL` stays direct to `pg-rw…svc` for DDL.
 
 Cross-cluster infra (this session):
+
 - **CNPG Pooler + MetalLB LoadBalancer** on the `pg` cluster, added to `ever-co/k8s-gitops` `apps/databases`
   and manually synced (per the DB-config-in-Git rule — never hand-edit the `pg` spec). Allocate a free MetalLB
   IP on ever-k8s.
@@ -103,6 +109,7 @@ surfaced to the frontend through the existing `OnboardingCatalogService` (`avail
 deploy-capabilities addition so the Deploy-page selector knows whether "shared" is offered.
 
 ### 4.2 Backend
+
 - **`EverWorksDbProvisionService`** (new, `packages/agent/src/ever-works-providers/`):
   `provisionForWork(work)` → connect with `DB_EVER_WORKS_SHARED_ADMIN_URL` (`pg` client), create role
   `ewr_<work>` (random password) + `CREATE DATABASE ew_<work> OWNER ewr_<work>`, **seed schema-only** from
@@ -125,6 +132,7 @@ deploy-capabilities addition so the Deploy-page selector knows whether "shared" 
   rotates).
 
 ### 4.3 Onboarding wizard (`apps/web` + `packages/contracts` + `apps/api/onboarding`)
+
 - Rename **"Your storage" → "Your Git Storage"** (title `EverWorksOnboardingWizard.tsx:~420` + label
   `labelForStep()` `~615`).
 - Insert **"Your DB Storage"** step immediately after the Git-storage step in `computeStepList`
@@ -138,14 +146,16 @@ deploy-capabilities addition so the Deploy-page selector knows whether "shared" 
   set path), mirroring how BYOK creds avoid the state blob.
 
 ### 4.4 Deploy page (`RuntimeEnvManagement.tsx`)
+
 - Add a **shared/custom selector** at the top of the "Database & environment" block. **Custom** = today's UI
   (masked current value + input + Save). **Shared** = read-only "Managed by Ever Works" note. `mode` threaded
   through the server action → runtime-env API. Selector only offered when `DB_EVER_WORKS_SHARED_ENABLED`.
 
 ### 4.5 Live ops — revive the 7 Works (this session, gated)
+
 Reliable, fleet-standard path = mirror `demo` (ArgoCD app on ever-k8s, in-cluster DB, data-driven generic
-image). **Pilot `chairs` end-to-end first, verify 200, then replicate to the other 6.**
-0. **Verify pg backups healthy** (Backups-first rule) before any DB work; record restore point.
+image). **Pilot `chairs` end-to-end first, verify 200, then replicate to the other 6.** 0. **Verify pg backups healthy** (Backups-first rule) before any DB work; record restore point.
+
 1. Provision `ew_<work>` DB + role on `pg` (in-cluster) and seed schema; import the Work's content from its
    `<slug>-website` repo seed.
 2. Deploy the Work on ever-k8s (ArgoCD app mirroring `ever-works-demo-prod`) with in-cluster `DATABASE_URL`,
@@ -158,6 +168,7 @@ Also: set each Work's `deployDatabaseUrlEncrypted` (encrypted) to the new in-clu
 Neon value so the Deploy page no longer shows Neon.
 
 ## 5. Sequencing (PRs)
+
 - **Code** = one feature branch → `develop` → cascade `stage` → `main` (no cherry-pick). Logical commits:
   (1) subdomain status fix + copy fix; (2) config contract + provision service + runtime-env mode +
   test-connection; (3) wizard step + rename; (4) deploy-page selector; (5) tests.
@@ -165,11 +176,13 @@ Neon value so the Deploy page no longer shows Neon.
   code to come up; the code automates this for future Works and fixes the banner.
 
 ## 6. Testing
+
 Unit: provision service (mocked `pg`), test-connection, wizard state machine + DTO allow-list, runtime-env
 `mode`, subdomain envelope. Update onboarding-wizard e2e specs that assert step order/titles. Manual: deploy-
 page selector both modes; one legacy site verified end-to-end before all 7.
 
 ## 7. Risks / rollback
+
 - Shared DB on the prod `pg` cluster shares blast radius with Gauzy prod → least-privilege provisioner role,
   per-Work DB isolation, `sslmode=require`, no LAN exposure. Backups cover new DBs (whole-cluster WAL).
 - DNS repoint is prod + outward-facing → confirm each; keep the old A-record value noted for rollback.

@@ -436,7 +436,10 @@ export const config = {
             // Prefix for the deterministic per-Work database + role names
             // (e.g. `ew_<workId>` / `ewr_<workId>`).
             getNamePrefix() {
-                return (process.env.DB_EVER_WORKS_SHARED_NAME_PREFIX || 'ew').replace(/[^a-z0-9]/gi, '');
+                return (process.env.DB_EVER_WORKS_SHARED_NAME_PREFIX || 'ew').replace(
+                    /[^a-z0-9]/gi,
+                    '',
+                );
             },
             // The feature can be OFFERED to users (isEnabled) yet not actually
             // provisionable until an operator wires the admin + host env.

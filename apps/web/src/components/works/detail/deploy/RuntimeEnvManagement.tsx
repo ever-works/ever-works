@@ -156,26 +156,20 @@ function RuntimeEnvContent({ work }: RuntimeEnvManagementProps) {
                     )}
 
                     {mode === 'shared' && sharedAvailable ? (
-                        <div>
-                            {databaseUrl?.configured ? (
-                                <>
-                                    <label className="mb-1 block text-xs font-medium text-muted-foreground">
-                                        Ever Works DB
-                                    </label>
-                                    <p className="break-all font-mono text-xs text-foreground">
-                                        {databaseUrl.masked}
-                                    </p>
-                                    <p className="mt-1 text-xs text-muted-foreground">
-                                        Managed by Ever Works — provisioned automatically for this
-                                        Work. No connection details needed.
-                                    </p>
-                                </>
-                            ) : (
-                                <>
-                                    <p className="text-xs text-muted-foreground">
-                                        A dedicated database is provisioned automatically on the Ever
-                                        Works DB cluster. No connection details needed.
-                                    </p>
+                        // Shared mode: never show a connection string — the platform
+                        // manages it. Just confirm the Work is on the Ever Works DB.
+                        <div className="flex items-start gap-2 rounded-md border border-border bg-muted/30 p-3">
+                            <Server className="mt-0.5 h-4 w-4 shrink-0 text-primary" />
+                            <div>
+                                <p className="text-sm font-medium text-foreground">
+                                    You are using the Ever Works DB
+                                </p>
+                                <p className="mt-0.5 text-xs text-muted-foreground">
+                                    A managed database is provisioned automatically for this Work —
+                                    no connection details needed. Switch to “Custom DB” above to use
+                                    your own.
+                                </p>
+                                {!databaseUrl?.configured && (
                                     <Button
                                         className="mt-2"
                                         size="sm"
@@ -189,8 +183,8 @@ function RuntimeEnvContent({ work }: RuntimeEnvManagementProps) {
                                         )}
                                         <span className="ml-1">Use Ever Works DB</span>
                                     </Button>
-                                </>
-                            )}
+                                )}
+                            </div>
                         </div>
                     ) : (
                         // Custom database — the pre-existing masked value + input + Save,

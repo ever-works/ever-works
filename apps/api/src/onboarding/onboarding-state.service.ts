@@ -159,7 +159,9 @@ function mergeState(
         lastStep: typeof patch.lastStep === 'number' ? patch.lastStep : current.lastStep,
         ai: { choice: patch.ai?.choice ?? current.ai.choice },
         storage: { choice: patch.storage?.choice ?? current.storage.choice },
-        db: { choice: patch.db?.choice ?? current.db?.choice ?? ONBOARDING_DEFAULT_STATE.db.choice },
+        db: {
+            choice: patch.db?.choice ?? current.db?.choice ?? ONBOARDING_DEFAULT_STATE.db.choice,
+        },
         deploy: { choice: patch.deploy?.choice ?? current.deploy.choice },
         skippedSteps: Array.isArray(patch.skippedSteps)
             ? [...patch.skippedSteps]

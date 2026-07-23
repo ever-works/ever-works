@@ -406,7 +406,8 @@ export class DeployController {
     @Post('/works/:id/db/test')
     @ApiOperation({
         summary: 'Test a custom database connection',
-        description: 'Attempts a short-timeout Postgres connection to validate a custom DATABASE_URL.',
+        description:
+            'Attempts a short-timeout Postgres connection to validate a custom DATABASE_URL.',
     })
     @ApiParam({ name: 'id', description: 'Work ID' })
     @ApiResponse({ status: 200, description: 'Connection test result' })

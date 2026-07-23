@@ -92,7 +92,10 @@ export class EverWorksDbProvisionService {
      */
     async testConnection(databaseUrl: string): Promise<{ ok: boolean; error?: string }> {
         if (!/^postgres(ql)?:\/\//i.test(databaseUrl)) {
-            return { ok: false, error: 'Connection string must start with postgres:// or postgresql://' };
+            return {
+                ok: false,
+                error: 'Connection string must start with postgres:// or postgresql://',
+            };
         }
         const client = new Client({
             connectionString: databaseUrl,
@@ -129,7 +132,9 @@ export class EverWorksDbProvisionService {
         });
         await client.connect();
         try {
-            const role = await client.query('SELECT 1 FROM pg_roles WHERE rolname = $1', [roleName]);
+            const role = await client.query('SELECT 1 FROM pg_roles WHERE rolname = $1', [
+                roleName,
+            ]);
             if (role.rowCount && role.rowCount > 0) {
                 await client.query(`ALTER ROLE "${roleName}" WITH LOGIN PASSWORD '${password}'`);
             } else {
