@@ -56,13 +56,39 @@ export type WorkMetricSource =
 /** How the raw number should be presented. */
 export type WorkMetricFormat = 'integer' | 'percent' | 'duration-days' | 'status';
 
+/**
+ * Message keys under `dashboard.workDetail.stats`.
+ *
+ * A literal union rather than `string`: the web app looks these up through
+ * next-intl, whose `useTranslations` type-checks keys against the message
+ * catalogue at compile time. Widening this to `string` would silently opt
+ * every tile label out of that check.
+ */
+export type WorkMetricLabelKey =
+	| 'totalItems'
+	| 'posts'
+	| 'categories'
+	| 'tags'
+	| 'comparisons'
+	| 'generationStatus'
+	| 'deployStatus'
+	| 'daysActive'
+	| 'registeredUsers'
+	| 'teamMembers'
+	| 'agents'
+	| 'openTasks'
+	| 'worksOwned'
+	| 'pageViews'
+	| 'sessions'
+	| 'conversions';
+
 export interface WorkMetricDefinition {
 	readonly id: WorkMetricId;
 	/**
 	 * Key under `dashboard.workDetail.stats` in the web app's messages.
 	 * Kept as a key rather than a label so contracts stays locale-free.
 	 */
-	readonly labelKey: string;
+	readonly labelKey: WorkMetricLabelKey;
 	readonly source: WorkMetricSource;
 	readonly format: WorkMetricFormat;
 }

@@ -15,6 +15,7 @@ import { Tooltip } from '../ui/tooltip';
 import { ShinyText } from '../ui/ShinyText';
 import { AnimatedClock } from '../ui/AnimatedClock';
 import { HoverPopup } from './detail/items/HoverPopup';
+import { WorkKindBadge } from './shared/WorkKindBadge';
 
 interface WorkCardProps {
     work: Work;
@@ -278,16 +279,19 @@ export function WorkCard({ work }: WorkCardProps) {
                 </div>
 
                 <div className="flex-1 mb-4">
-                    <div className="inline-flex items-center gap-1 mt-0.5 mb-3 bg-primary-400/10 dark:bg-white/10 self-start max-w-full px-1.5 py-0.5 rounded-full">
-                        <Github className="w-3 h-3 shrink-0 text-gray-600 dark:text-gray-200" />
-                        <span className="text-xs text-gray-600 dark:text-gray-200 truncate">
-                            {work.owner && (
-                                <span className="text-gray-400 dark:text-gray-400">
-                                    {work.owner}/
-                                </span>
-                            )}
-                            {work.slug}
-                        </span>
+                    <div className="flex flex-wrap items-center gap-1.5 mt-0.5 mb-3">
+                        <WorkKindBadge kind={work.kind} />
+                        <div className="inline-flex items-center gap-1 bg-primary-400/10 dark:bg-white/10 max-w-full px-1.5 py-0.5 rounded-full">
+                            <Github className="w-3 h-3 shrink-0 text-gray-600 dark:text-gray-200" />
+                            <span className="text-xs text-gray-600 dark:text-gray-200 truncate">
+                                {work.owner && (
+                                    <span className="text-gray-400 dark:text-gray-400">
+                                        {work.owner}/
+                                    </span>
+                                )}
+                                {work.slug}
+                            </span>
+                        </div>
                     </div>
 
                     <p className="text-xs leading-4.5 line-clamp-2 min-h-[2lh]">

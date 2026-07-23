@@ -1937,8 +1937,12 @@
                     "activity": "活动动态",
                     "kb": "知识库",
                     "generator": "生成 Work，一次性或按计划",
-                    "deploy": "部署 Work"
-                }
+                    "deploy": "部署 Work",
+                    "tasks": "此 Work 的任务"
+                },
+                "tasks": "任务",
+                "posts": "文章",
+                "pages": "页面"
             },
             "members": {
                 "title": "团队成员",
@@ -2152,7 +2156,25 @@
                 "categories": "类别",
                 "comparisons": "比较",
                 "generationStatus": "生成状态",
-                "daysActive": "活跃天数"
+                "daysActive": "活跃天数",
+                "posts": "文章",
+                "tags": "标签",
+                "deployStatus": "部署状态",
+                "registeredUsers": "注册用户",
+                "teamMembers": "团队成员",
+                "agents": "智能体",
+                "openTasks": "未完成任务",
+                "worksOwned": "作品",
+                "pageViews": "页面浏览量",
+                "sessions": "会话",
+                "conversions": "转化",
+                "states": {
+                    "live": "已上线",
+                    "notConfigured": "连接分析服务后可查看",
+                    "notDeployed": "部署后可查看",
+                    "notGenerated": "生成后可查看",
+                    "unavailable": "不可用"
+                }
             },
             "comparisons": {
                 "title": "比较",
@@ -2324,8 +2346,8 @@
                 "slug": "Slug",
                 "repositories": "仓库",
                 "dataRepo": "数据仓库",
-                "websiteRepo": "网站仓库",
-                "mainRepo": "主仓库",
+                "websiteRepo": "作品仓库",
+                "mainRepo": "{provider} 仓库",
                 "gitProvider": "Git 提供程序",
                 "organization": "组织",
                 "created": "创建时间",
@@ -2339,7 +2361,22 @@
                 "deployProvider": "部署提供程序",
                 "notConnected": "未连接",
                 "notConfigured": "未配置",
-                "viewSite": "查看站点"
+                "viewSite": "查看站点",
+                "repoHelp": {
+                    "data": {
+                        "title": "数据仓库",
+                        "body": "您作品的唯一可信来源。它保存着平台为您维护的元数据和内容——对于目录型作品，就是全部项目、类别和标签；对于其他类型的作品，则是页面背后的结构化内容。代理会先写入这里，其余的一切都由它生成。它很少变动，可以放心手动编辑。"
+                    },
+                    "provider": {
+                        "title": "{provider} 仓库",
+                        "body": "由 AI 基于数据仓库生成的、便于阅读和浏览的作品版本。它会发布到 {provider}，但不会部署到任何地方——人们直接在 {provider} 上阅读。对于 Awesome 列表，它就是一份精选的 README；对于其他类型的作品，则是同一内容对应的 Markdown 视图。您可以在设置中关闭它的生成。"
+                    },
+                    "work": {
+                        "title": "作品仓库",
+                        "body": "您作品的主要产出。平台会取用数据仓库，应用您选择的作品模板，生成这个仓库——通常是一个可部署的网站或 Web 应用，但视模板而定，也可以是移动应用、文档站点或任何其他项目。真正被部署的就是这个仓库。"
+                    },
+                    "ariaLabel": "这是什么仓库？"
+                }
             },
             "config": {
                 "title": "配置详情",
@@ -2357,7 +2394,7 @@
                 "pullRequestUpdate": "拉取请求详情",
                 "branch": "分支",
                 "prTitle": "PR 标题",
-                "mainRepository": "主仓库",
+                "mainRepository": "{provider} 仓库",
                 "dataRepository": "数据仓库"
             },
             "activity": {
@@ -2736,7 +2773,7 @@
                 "modelOverridePlaceholder": "例如 openai/gpt-4.1 或 openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "可选。默认使用导入或之前的模型，除非在此处覆盖。",
                 "modelOverrideUnavailable": "请先选择一个已配置的 AI 提供方，以便从可用列表中选择模型。",
-                "websiteTemplateHelperText": "选择网站在首次创建仓库时将使用的网站模板。",
+                "websiteTemplateHelperText": "选择首次创建作品仓库时将使用的作品模板。",
                 "websiteTemplateLockedHelperText": "模板选择在首次网站生成后被锁定。",
                 "recommended": "推荐",
                 "promptPlaceholder": "描述为此作品应生成哪些项目...",
@@ -2781,7 +2818,7 @@
                 "enableBadgeEvaluationDescription": "评估并为项目添加质量徽章",
                 "captureScreenshots": "捕获项目截图",
                 "captureScreenshotsDescription": "在生成过程中自动为每个项目捕获截图或产品图像",
-                "websiteRepositoryCreationMethod": "网站仓库创建方法",
+                "websiteRepositoryCreationMethod": "作品仓库创建方法",
                 "methodDuplicate": "复制",
                 "methodFork": "分叉",
                 "workNamePlaceholder": "输入作品名称",
@@ -2807,7 +2844,7 @@
                 "targetKeywordsDescription": "指导 AI 搜索和内容生成的关键词。更具体的关键词产生更好的结果。",
                 "sourceUrlsFieldDescription": "提取内容的特定 URL。如果为空，生成器将自动搜索网络。",
                 "generationMethodDescription": "选择是更新现有项目还是从头重新创建一切。",
-                "websiteRepositoryCreationMethodDescription": "网站仓库的创建方式。对于大多数情况，推荐使用模板。",
+                "websiteRepositoryCreationMethodDescription": "作品仓库的创建方式。对于大多数情况，推荐使用模板。",
                 "maxSearchQueriesDescription": "AI 生成的用于查找相关内容的搜索查询数（1-50）。",
                 "resultsPerQueryDescription": "每个搜索查询检索的最大结果数（1-20）。",
                 "maxPagesToProcessDescription": "用于内容提取的最大网页数（1-100）。",
@@ -2966,7 +3003,7 @@
                         "model": "模型",
                         "schedule": "调度",
                         "providers": "提供商",
-                        "websiteRepo": "网站仓库"
+                        "websiteRepo": "作品仓库"
                     },
                     "sourceTypes": {
                         "dataRepo": "数据仓库",
@@ -3001,8 +3038,8 @@
                 "deleteDataRepositoryDescription": "从 GitHub 删除 JSON 数据仓库",
                 "deleteMarkdownRepository": "删除 Markdown 仓库",
                 "deleteMarkdownRepositoryDescription": "删除包含 README 的 Markdown 仓库",
-                "deleteWebsiteRepository": "删除网站仓库",
-                "deleteWebsiteRepositoryDescription": "删除已部署的网站仓库",
+                "deleteWebsiteRepository": "删除作品仓库",
+                "deleteWebsiteRepositoryDescription": "移除已部署的作品仓库",
                 "deleteConfirm": "您确定吗？",
                 "deleteConfirmDetail": "此操作无法撤销。作品和选定的仓库将被永久删除。",
                 "confirmWorkName": "输入作品名称以确认",
@@ -3020,7 +3057,7 @@
                 "updateFailed": "更新设置失败",
                 "deployProvider": {
                     "title": "部署提供商",
-                    "description": "选择部署作品网站的位置",
+                    "description": "选择部署您作品的位置",
                     "configure": "配置",
                     "ready": "准备部署",
                     "notConfigured": "未配置",
@@ -3260,7 +3297,7 @@
                 },
                 "noProviderAlert": {
                     "title": "无部署提供商",
-                    "description": "选择部署提供商来部署您的作品网站。",
+                    "description": "选择部署提供商来部署您的作品。",
                     "selectButton": "选择并继续",
                     "noProviders": "没有可用的部署提供商。请先安装部署插件。"
                 },
@@ -3284,8 +3321,8 @@
                 },
                 "form": {
                     "deployment": {
-                        "title": "部署网站",
-                        "description": "部署您的作品网站仓库。",
+                        "title": "部署作品",
+                        "description": "部署您的作品仓库。",
                         "deployButton": "部署到 {provider}",
                         "deployingButton": "正在部署...",
                         "deployingStateButton": "正在部署 ({state})...",
@@ -3300,9 +3337,9 @@
                         }
                     },
                     "updateRepository": {
-                        "title": "更新网站仓库",
+                        "title": "更新作品仓库",
                         "description": "将模板的最新更改同步到",
-                        "websiteRepository": "网站仓库",
+                        "websiteRepository": "作品仓库",
                         "updateButton": "更新仓库",
                         "updatingButton": "正在更新..."
                     },
@@ -3319,20 +3356,20 @@
                     },
                     "info": {
                         "deployInfo": "部署通常需要 1-3 分钟。完成后您将收到 URL。",
-                        "updateInfo": "更新将您的作品内容同步到网站仓库，以供下次部署使用。"
+                        "updateInfo": "更新会将您的作品内容同步到作品仓库，以供下次部署使用。"
                     },
                     "websiteTemplate": {
                         "title": "自动模板更新",
-                        "description": "保持您的网站自动与最新模板更改同步。",
-                        "selectorLabel": "网站模板",
+                        "description": "让您的作品自动与最新的模板更改保持同步。",
+                        "selectorLabel": "作品模板",
                         "currentTemplateLabel": "当前模板",
                         "unknownTemplate": "继承的默认值",
-                        "currentHelperText": "所选模板控制网站仓库的初始化和更新方式。",
-                        "switchHelperText": "应用新模板将在网站仓库已存在时，从所选模板重置现有网站仓库。",
-                        "switchAction": "将模板应用到网站仓库",
+                        "currentHelperText": "所选模板控制作品仓库的初始化和更新方式。",
+                        "switchHelperText": "应用新模板会在作品仓库已存在时，用所选模板重置该仓库。",
+                        "switchAction": "将模板应用到作品仓库",
                         "switchActionIdle": "模板已是最新",
-                        "switchConfirmTitle": "切换网站模板？",
-                        "switchConfirmDescription": "如果网站仓库已存在，其内容将被所选模板替换。该仓库中的任何自定义代码将丢失。",
+                        "switchConfirmTitle": "切换作品模板？",
+                        "switchConfirmDescription": "如果作品仓库已存在，其内容将被所选模板替换。该仓库中的任何自定义代码都将丢失。",
                         "switchConfirmButton": "切换模板",
                         "switchCancel": "取消",
                         "autoUpdate": "自动更新",
@@ -3707,7 +3744,7 @@
             },
             "deployProvider": {
                 "title": "部署提供商",
-                "description": "选择部署作品网站的位置",
+                "description": "选择部署您作品的位置",
                 "noProviders": "没有可用的部署提供商",
                 "notConfigured": "未配置",
                 "configured": "准备部署",
@@ -3808,7 +3845,7 @@
                 "organizationHelp": "在组织下创建仓库，而不是个人账户",
                 "organizationNameLabel": "组织名称",
                 "organizationNamePlaceholder": "输入组织名称",
-                "websiteTemplateHelperText": "选择网站在首次创建仓库时将使用的网站模板。"
+                "websiteTemplateHelperText": "选择首次创建作品仓库时将使用的作品模板。"
             },
             "manual": {
                 "title": "手动创建",
@@ -3835,7 +3872,7 @@
                 "organizationHelp": "在 GitHub 组织下创建此作品，而不是个人账户",
                 "organizationNameLabel": "组织名称",
                 "organizationNamePlaceholder": "my-organization",
-                "websiteTemplateHelperText": "选择网站在首次创建仓库时将使用的网站模板。",
+                "websiteTemplateHelperText": "选择首次创建作品仓库时将使用的作品模板。",
                 "headerLabel": "自定义 README 标头",
                 "headerPlaceholder": "在 README 文件顶部添加自定义内容",
                 "headerOverwrite": "完全替换默认标头",
@@ -3941,15 +3978,15 @@
                     "importButton": "开始导入和研究",
                     "importingButton": "正在启动研究管道...",
                     "mainRepository": {
-                        "title": "Main repository",
+                        "title": "GitHub 仓库",
                         "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
                         "clone": {
                             "title": "Clone / recreate",
-                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                            "description": "为此作品创建一个新的生成 README 仓库。数据仓库和作品仓库仍会被创建。"
                         },
                         "reuse": {
                             "title": "Reuse source README",
-                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                            "description": "不创建生成的 README 仓库。GitHub 仓库链接将指向源 README 仓库。"
                         }
                     }
                 },
@@ -4010,7 +4047,7 @@
                     "descriptionReady": "所有仓库已找到。准备链接。",
                     "dataRepo": "数据仓库",
                     "markdownRepo": "Markdown 仓库",
-                    "websiteRepo": "网站仓库",
+                    "websiteRepo": "作品仓库",
                     "found": "已找到",
                     "notFound": "未找到",
                     "cancel": "取消",
@@ -4621,7 +4658,7 @@
         },
         "templates": {
             "title": "模板",
-            "subtitle": "浏览内置网站模板，管理您的自定义目录，并控制新工作从哪个模板开始。",
+            "subtitle": "浏览内置作品模板，管理您的自定义目录，并控制新作品从哪个模板开始。",
             "kindSwitcher": {
                 "mission": "Mission Templates",
                 "work": "Work Templates",
@@ -5110,6 +5147,16 @@
                 "copyFailed": "无法复制到剪贴板"
             },
             "confirmDelete": "删除此触发器？它的 Webhook URL 会立即失效，且此操作无法撤销。"
+        },
+        "workKind": {
+            "label": "类型",
+            "website": "Website",
+            "landing-page": "Landing Page",
+            "blog": "Blog",
+            "directory": "Directory",
+            "awesome-repo": "Awesome Repo",
+            "company": "Company",
+            "default": "Work"
         }
     },
     "layout": {
@@ -5323,7 +5370,7 @@
         "deploy": {
             "deployFailed": "部署失败",
             "updateRepositoryFailed": "更新仓库失败",
-            "updateSettingsFailed": "更新网站模板设置失败"
+            "updateSettingsFailed": "更新作品模板设置失败"
         }
     },
     "validation": {

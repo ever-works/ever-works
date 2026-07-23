@@ -1937,8 +1937,12 @@
                     "activity": "ฟีดกิจกรรม",
                     "kb": "ฐานความรู้",
                     "generator": "สร้าง Work ครั้งเดียวหรือตามตารางเวลา",
-                    "deploy": "ปรับใช้ Work"
-                }
+                    "deploy": "ปรับใช้ Work",
+                    "tasks": "งานสำหรับ Work นี้"
+                },
+                "tasks": "งาน",
+                "posts": "โพสต์",
+                "pages": "หน้า"
             },
             "members": {
                 "title": "สมาชิกทีม",
@@ -2152,7 +2156,25 @@
                 "categories": "หมวดหมู่",
                 "comparisons": "การเปรียบเทียบ",
                 "generationStatus": "สถานะการสร้าง",
-                "daysActive": "วันใช้งาน"
+                "daysActive": "วันใช้งาน",
+                "posts": "โพสต์",
+                "tags": "แท็ก",
+                "deployStatus": "สถานะการปรับใช้",
+                "registeredUsers": "ผู้ใช้ที่ลงทะเบียน",
+                "teamMembers": "สมาชิกทีม",
+                "agents": "เอเจนต์",
+                "openTasks": "งานที่ยังไม่เสร็จ",
+                "worksOwned": "งาน",
+                "pageViews": "การดูหน้า",
+                "sessions": "เซสชัน",
+                "conversions": "คอนเวอร์ชัน",
+                "states": {
+                    "live": "ออนไลน์",
+                    "notConfigured": "เชื่อมต่อการวิเคราะห์เพื่อดูข้อมูลนี้",
+                    "notDeployed": "ปรับใช้เพื่อดูข้อมูลนี้",
+                    "notGenerated": "สร้างเพื่อดูข้อมูลนี้",
+                    "unavailable": "ไม่พร้อมใช้งาน"
+                }
             },
             "comparisons": {
                 "title": "การเปรียบเทียบ",
@@ -2324,8 +2346,8 @@
                 "slug": "Slug",
                 "repositories": "คลังข้อมูล",
                 "dataRepo": "คลังข้อมูล",
-                "websiteRepo": "คลังเว็บไซต์",
-                "mainRepo": "คลังหลัก",
+                "websiteRepo": "คลังงาน",
+                "mainRepo": "คลัง {provider}",
                 "gitProvider": "ผู้ให้บริการ Git",
                 "organization": "องค์กร",
                 "created": "สร้าง",
@@ -2339,7 +2361,22 @@
                 "deployProvider": "ผู้ให้บริการ Deploy",
                 "notConnected": "ยังไม่ได้เชื่อมต่อ",
                 "notConfigured": "ยังไม่ได้ตั้งค่า",
-                "viewSite": "ดูเว็บไซต์"
+                "viewSite": "ดูเว็บไซต์",
+                "repoHelp": {
+                    "data": {
+                        "title": "คลังข้อมูล",
+                        "body": "แหล่งข้อมูลอ้างอิงหลักของงานของคุณ เก็บเมตาดาต้าและเนื้อหาที่แพลตฟอร์มดูแลให้คุณ — สำหรับไดเรกทอรีก็คือทุกไอเท็ม หมวดหมู่ และแท็ก ส่วนงานประเภทอื่นก็คือเนื้อหาแบบมีโครงสร้างที่อยู่เบื้องหลังหน้าเว็บ เอเจนต์จะเขียนลงที่นี่เป็นอันดับแรก และทุกอย่างที่เหลือถูกสร้างขึ้นจากคลังนี้ คลังนี้เปลี่ยนแปลงไม่บ่อยและปลอดภัยพอที่จะแก้ไขด้วยตนเอง"
+                    },
+                    "provider": {
+                        "title": "คลัง {provider}",
+                        "body": "เวอร์ชันของงานของคุณที่อ่านและเรียกดูได้ สร้างโดย AI จากคลังข้อมูล คลังนี้ถูกเผยแพร่ไปยัง {provider} แต่ไม่ถูกปรับใช้ที่ใดเลย — ผู้คนอ่านมันได้โดยตรงบน {provider} สำหรับ awesome list นั่นก็คือ README ที่คัดสรรมาแล้ว ส่วนงานประเภทอื่นก็คือมุมมอง Markdown ที่เทียบเท่าของเนื้อหาเดียวกัน คุณสามารถปิดการสร้างคลังนี้ได้ในการตั้งค่า"
+                    },
+                    "work": {
+                        "title": "คลังงาน",
+                        "body": "ผลลัพธ์หลักของงานของคุณ แพลตฟอร์มจะนำคลังข้อมูลมาใช้ร่วมกับเทมเพลตงานที่คุณเลือก แล้วสร้างคลังนี้ขึ้นมา — โดยทั่วไปคือเว็บไซต์หรือเว็บแอปที่ปรับใช้ได้ แต่ขึ้นอยู่กับเทมเพลต อาจเป็นแอปมือถือ เว็บไซต์เอกสาร หรือโปรเจกต์รูปแบบอื่นก็ได้ คลังนี้คือคลังที่จะถูกปรับใช้"
+                    },
+                    "ariaLabel": "คลังนี้คืออะไร?"
+                }
             },
             "config": {
                 "title": "รายละเอียดการตั้งค่า",
@@ -2357,7 +2394,7 @@
                 "pullRequestUpdate": "รายละเอียด Pull Request",
                 "branch": "Branch",
                 "prTitle": "ชื่อ PR",
-                "mainRepository": "คลังหลัก",
+                "mainRepository": "คลัง {provider}",
                 "dataRepository": "คลังข้อมูล"
             },
             "activity": {
@@ -2736,7 +2773,7 @@
                 "modelOverridePlaceholder": "เช่น openai/gpt-4.1 หรือ openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "ไม่บังคับ ใช้โมเดลที่นำเข้าหรือโมเดลก่อนหน้าเป็นค่าเริ่มต้น เว้นแต่จะแทนที่ที่นี่",
                 "modelOverrideUnavailable": "เลือกผู้ให้บริการ AI ที่ตั้งค่าไว้ก่อนเพื่อเลือกโมเดลจากรายการที่มี",
-                "websiteTemplateHelperText": "เลือกเทมเพลตเว็บไซต์ที่จะใช้เมื่อสร้างคลังข้อมูลเว็บไซต์ครั้งแรก",
+                "websiteTemplateHelperText": "เลือกเทมเพลตงานที่จะใช้เมื่อสร้างคลังงานครั้งแรก",
                 "websiteTemplateLockedHelperText": "การเลือกเทมเพลตจะถูกล็อกหลังจากการสร้างเว็บไซต์ครั้งแรก",
                 "recommended": "แนะนำ",
                 "promptPlaceholder": "อธิบายว่ารายการใดที่ควรสร้างสำหรับงานนี้...",
@@ -2781,7 +2818,7 @@
                 "enableBadgeEvaluationDescription": "ประเมินและเพิ่มเครื่องหมายคุณภาพให้รายการ",
                 "captureScreenshots": "บันทึกภาพหน้าจอรายการ",
                 "captureScreenshotsDescription": "บันทึกภาพหน้าจอหรือภาพสินค้าอัตโนมัติสำหรับแต่ละรายการระหว่างการสร้าง",
-                "websiteRepositoryCreationMethod": "วิธีการสร้างคลังเว็บไซต์",
+                "websiteRepositoryCreationMethod": "วิธีการสร้างคลังงาน",
                 "methodDuplicate": "คัดลอก",
                 "methodFork": "Fork",
                 "workNamePlaceholder": "ป้อนชื่องาน",
@@ -2807,7 +2844,7 @@
                 "targetKeywordsDescription": "คำหลักเพื่อนำทางการค้นหาและการสร้างเนื้อหาของ AI คำหลักที่เฉพาะเจาะจงมากขึ้นจะให้ผลลัพธ์ที่ดีกว่า",
                 "sourceUrlsFieldDescription": "URL เฉพาะเพื่อดึงเนื้อหา หากว่างเปล่า เครื่องมือสร้างจะค้นหาเว็บอัตโนมัติ",
                 "generationMethodDescription": "เลือกระหว่างการอัปเดตรายการที่มีอยู่หรือสร้างใหม่ทั้งหมด",
-                "websiteRepositoryCreationMethodDescription": "วิธีการสร้างคลังเว็บไซต์ แนะนำเทมเพลตสำหรับกรณีส่วนใหญ่",
+                "websiteRepositoryCreationMethodDescription": "วิธีการสร้างคลังงาน แนะนำเทมเพลตสำหรับกรณีส่วนใหญ่",
                 "maxSearchQueriesDescription": "จำนวนการค้นหาที่ AI จะสร้างเพื่อหาเนื้อหาที่เกี่ยวข้อง (1-50)",
                 "resultsPerQueryDescription": "จำนวนผลลัพธ์สูงสุดที่ดึงต่อการค้นหา (1-20)",
                 "maxPagesToProcessDescription": "จำนวนหน้าสูงสุดที่ประมวลผลเพื่อดึงเนื้อหา (1-100)",
@@ -2966,7 +3003,7 @@
                         "model": "โมเดล",
                         "schedule": "กำหนดการ",
                         "providers": "ผู้ให้บริการ",
-                        "websiteRepo": "คลังเว็บไซต์"
+                        "websiteRepo": "คลังงาน"
                     },
                     "sourceTypes": {
                         "dataRepo": "คลังข้อมูล",
@@ -3001,8 +3038,8 @@
                 "deleteDataRepositoryDescription": "ลบคลังข้อมูล JSON ออกจาก GitHub",
                 "deleteMarkdownRepository": "ลบคลัง Markdown",
                 "deleteMarkdownRepositoryDescription": "ลบคลัง Markdown ที่มี README",
-                "deleteWebsiteRepository": "ลบคลังเว็บไซต์",
-                "deleteWebsiteRepositoryDescription": "ลบคลังเว็บไซต์ที่ถูก deploy",
+                "deleteWebsiteRepository": "ลบคลังงาน",
+                "deleteWebsiteRepositoryDescription": "ลบคลังงานที่ถูก deploy",
                 "deleteConfirm": "คุณแน่ใจหรือไม่?",
                 "deleteConfirmDetail": "การดำเนินการนี้ไม่สามารถย้อนกลับได้ งานและคลังที่เลือกจะถูกลบอย่างถาวร",
                 "confirmWorkName": "พิมพ์ชื่องานเพื่อยืนยัน",
@@ -3020,7 +3057,7 @@
                 "updateFailed": "ไม่สามารถอัปเดตการตั้งค่าได้",
                 "deployProvider": {
                     "title": "ผู้ให้บริการ Deploy",
-                    "description": "เลือกตำแหน่งที่จะ deploy เว็บไซต์งานของคุณ",
+                    "description": "เลือกตำแหน่งที่จะ deploy งานของคุณ",
                     "configure": "ตั้งค่า",
                     "ready": "พร้อม deploy",
                     "notConfigured": "ยังไม่ได้ตั้งค่า",
@@ -3260,7 +3297,7 @@
                 },
                 "noProviderAlert": {
                     "title": "ไม่มีผู้ให้บริการการปรับใช้",
-                    "description": "เลือกผู้ให้บริการการปรับใช้เพื่อปรับใช้เว็บไซต์งานของคุณ",
+                    "description": "เลือกผู้ให้บริการการปรับใช้เพื่อปรับใช้งานของคุณ",
                     "selectButton": "เลือกและดำเนินการต่อ",
                     "noProviders": "ไม่มีผู้ให้บริการการปรับใช้ที่พร้อมใช้งาน โปรดติดตั้งปลั๊กอินการปรับใช้ก่อน"
                 },
@@ -3284,8 +3321,8 @@
                 },
                 "form": {
                     "deployment": {
-                        "title": "ปรับใช้เว็บไซต์",
-                        "description": "ปรับใช้คลังเว็บไซต์งานของคุณ",
+                        "title": "ปรับใช้งาน",
+                        "description": "ปรับใช้คลังงานของคุณ",
                         "deployButton": "ปรับใช้ไปยัง {provider}",
                         "deployingButton": "กำลังปรับใช้...",
                         "deployingStateButton": "กำลังปรับใช้ ({state})...",
@@ -3300,9 +3337,9 @@
                         }
                     },
                     "updateRepository": {
-                        "title": "อัปเดตคลังเว็บไซต์",
+                        "title": "อัปเดตคลังงาน",
                         "description": "ซิงค์การเปลี่ยนแปลงล่าสุดจากเทมเพลตไปยัง",
-                        "websiteRepository": "คลังเว็บไซต์",
+                        "websiteRepository": "คลังงาน",
                         "updateButton": "อัปเดตคลัง",
                         "updatingButton": "กำลังอัปเดต..."
                     },
@@ -3319,20 +3356,20 @@
                     },
                     "info": {
                         "deployInfo": "การปรับใช้โดยทั่วไปใช้เวลา 1-3 นาที คุณจะได้รับ URL เมื่อเสร็จสิ้น",
-                        "updateInfo": "การอัปเดตจะซิงค์เนื้อหางานของคุณไปยังคลังเว็บไซต์สำหรับการปรับใช้ครั้งถัดไป"
+                        "updateInfo": "การอัปเดตจะซิงค์เนื้อหางานของคุณไปยังคลังงานสำหรับการปรับใช้ครั้งถัดไป"
                     },
                     "websiteTemplate": {
                         "title": "อัปเดตเทมเพลตอัตโนมัติ",
-                        "description": "ทำให้เว็บไซต์ของคุณซิงค์อัตโนมัติกับการเปลี่ยนแปลงเทมเพลตล่าสุด",
-                        "selectorLabel": "เทมเพลตเว็บไซต์",
+                        "description": "ทำให้งานของคุณซิงค์อัตโนมัติกับการเปลี่ยนแปลงเทมเพลตล่าสุด",
+                        "selectorLabel": "เทมเพลตงาน",
                         "currentTemplateLabel": "เทมเพลตปัจจุบัน",
                         "unknownTemplate": "ค่าเริ่มต้นที่สืบทอด",
-                        "currentHelperText": "เทมเพลตที่เลือกควบคุมวิธีการเริ่มต้นและอัปเดตคลังข้อมูลเว็บไซต์",
-                        "switchHelperText": "การใช้เทมเพลตใหม่จะรีเซ็ตคลังข้อมูลเว็บไซต์ที่มีอยู่จากเทมเพลตที่เลือก หากมีอยู่แล้ว",
-                        "switchAction": "ใช้เทมเพลตกับคลังข้อมูลเว็บไซต์",
+                        "currentHelperText": "เทมเพลตที่เลือกควบคุมวิธีการเริ่มต้นและอัปเดตคลังงาน",
+                        "switchHelperText": "การใช้เทมเพลตใหม่จะรีเซ็ตคลังงานที่มีอยู่จากเทมเพลตที่เลือก หากมีอยู่แล้ว",
+                        "switchAction": "ใช้เทมเพลตกับคลังงาน",
                         "switchActionIdle": "เทมเพลตเป็นปัจจุบันแล้ว",
-                        "switchConfirmTitle": "เปลี่ยนเทมเพลตเว็บไซต์หรือไม่?",
-                        "switchConfirmDescription": "หากคลังข้อมูลเว็บไซต์มีอยู่แล้ว เนื้อหาจะถูกแทนที่ด้วยเทมเพลตที่เลือก โค้ดที่กำหนดเองในคลังข้อมูลนั้นจะสูญหาย",
+                        "switchConfirmTitle": "เปลี่ยนเทมเพลตงานหรือไม่?",
+                        "switchConfirmDescription": "หากคลังงานมีอยู่แล้ว เนื้อหาจะถูกแทนที่ด้วยเทมเพลตที่เลือก โค้ดที่กำหนดเองในคลังนั้นจะสูญหาย",
                         "switchConfirmButton": "เปลี่ยนเทมเพลต",
                         "switchCancel": "ยกเลิก",
                         "autoUpdate": "อัปเดตอัตโนมัติ",
@@ -3707,7 +3744,7 @@
             },
             "deployProvider": {
                 "title": "ผู้ให้บริการ Deploy",
-                "description": "เลือกตำแหน่งที่จะ deploy เว็บไซต์งานของคุณ",
+                "description": "เลือกตำแหน่งที่จะ deploy งานของคุณ",
                 "noProviders": "ไม่มีผู้ให้บริการ deploy ที่ใช้ได้",
                 "notConfigured": "ยังไม่ได้ตั้งค่า",
                 "configured": "พร้อม deploy",
@@ -3808,7 +3845,7 @@
                 "organizationHelp": "สร้าง repository ภายใต้องค์กรแทนบัญชีส่วนตัวของคุณ",
                 "organizationNameLabel": "ชื่อองค์กร",
                 "organizationNamePlaceholder": "ป้อนชื่อองค์กร",
-                "websiteTemplateHelperText": "เลือกเทมเพลตเว็บไซต์ที่จะใช้เมื่อสร้างคลังข้อมูลเว็บไซต์ครั้งแรก"
+                "websiteTemplateHelperText": "เลือกเทมเพลตงานที่จะใช้เมื่อสร้างคลังงานครั้งแรก"
             },
             "manual": {
                 "title": "สร้างด้วยตนเอง",
@@ -3835,7 +3872,7 @@
                 "organizationHelp": "สร้างงานนี้ภายใต้องค์กร GitHub แทนบัญชีส่วนตัวของคุณ",
                 "organizationNameLabel": "ชื่อองค์กร",
                 "organizationNamePlaceholder": "my-organization",
-                "websiteTemplateHelperText": "เลือกเทมเพลตเว็บไซต์ที่จะใช้เมื่อสร้างคลังข้อมูลเว็บไซต์ครั้งแรก",
+                "websiteTemplateHelperText": "เลือกเทมเพลตงานที่จะใช้เมื่อสร้างคลังงานครั้งแรก",
                 "headerLabel": "หัวข้อ README กำหนดเอง",
                 "headerPlaceholder": "เพิ่มเนื้อหากำหนดเองที่ด้านบนของไฟล์ README",
                 "headerOverwrite": "แทนที่หัวข้อเริ่มต้นทั้งหมด",
@@ -3941,15 +3978,15 @@
                     "importButton": "เริ่มนำเข้าและวิจัย",
                     "importingButton": "กำลังเริ่ม pipeline วิจัย...",
                     "mainRepository": {
-                        "title": "Main repository",
+                        "title": "คลัง GitHub",
                         "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
                         "clone": {
                             "title": "Clone / recreate",
-                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                            "description": "สร้างคลัง README ที่สร้างขึ้นใหม่สำหรับงานนี้ คลังข้อมูลและคลังงานจะยังคงถูกสร้างขึ้นเช่นเดิม"
                         },
                         "reuse": {
                             "title": "Reuse source README",
-                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                            "description": "ไม่ต้องสร้างคลัง README ที่สร้างขึ้น ลิงก์คลัง GitHub จะชี้ไปยังคลัง README ต้นทาง"
                         }
                     }
                 },
@@ -4010,7 +4047,7 @@
                     "descriptionReady": "พบ repository ทั้งหมด พร้อมลิงก์",
                     "dataRepo": "Data Repository",
                     "markdownRepo": "Markdown Repository",
-                    "websiteRepo": "Website Repository",
+                    "websiteRepo": "คลังงาน",
                     "found": "พบ",
                     "notFound": "ไม่พบ",
                     "cancel": "ยกเลิก",
@@ -4621,7 +4658,7 @@
         },
         "templates": {
             "title": "เทมเพลต",
-            "subtitle": "เรียกดูเทมเพลตเว็บไซต์ในตัว จัดการแคตตาล็อกแบบกำหนดเองของคุณ และควบคุมว่าเทมเพลตใดที่งานใหม่จะเริ่มต้นจาก",
+            "subtitle": "เรียกดูเทมเพลตงานในตัว จัดการแคตตาล็อกแบบกำหนดเองของคุณ และควบคุมว่างานใหม่จะเริ่มต้นจากเทมเพลตใด",
             "kindSwitcher": {
                 "mission": "Mission Templates",
                 "work": "Work Templates",
@@ -5110,6 +5147,16 @@
                 "copyFailed": "ไม่สามารถคัดลอกไปยังคลิปบอร์ด"
             },
             "confirmDelete": "ลบทริกเกอร์นี้หรือไม่? URL เว็บฮุกของมันจะหยุดทำงานทันทีและไม่สามารถเลิกทำได้"
+        },
+        "workKind": {
+            "label": "ประเภท",
+            "website": "Website",
+            "landing-page": "Landing Page",
+            "blog": "Blog",
+            "directory": "Directory",
+            "awesome-repo": "Awesome Repo",
+            "company": "Company",
+            "default": "Work"
         }
     },
     "layout": {
@@ -5323,7 +5370,7 @@
         "deploy": {
             "deployFailed": "เผยแพร่ล้มเหลว",
             "updateRepositoryFailed": "อัปเดตคลังล้มเหลว",
-            "updateSettingsFailed": "อัปเดตการตั้งค่าเทมเพลตเว็บไซต์ล้มเหลว"
+            "updateSettingsFailed": "อัปเดตการตั้งค่าเทมเพลตงานล้มเหลว"
         }
     },
     "validation": {

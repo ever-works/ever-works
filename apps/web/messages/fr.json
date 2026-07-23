@@ -2139,8 +2139,12 @@
                     "activity": "Fil d'activité",
                     "kb": "Base de connaissances",
                     "generator": "Générer le Work, ponctuellement ou planifié",
-                    "deploy": "Déployer le Work"
-                }
+                    "deploy": "Déployer le Work",
+                    "tasks": "Tâches de ce Work"
+                },
+                "tasks": "Tâches",
+                "posts": "Articles",
+                "pages": "Pages"
             },
             "members": {
                 "title": "Membres de l'équipe",
@@ -2354,7 +2358,25 @@
                 "categories": "Catégories",
                 "comparisons": "Comparaisons",
                 "generationStatus": "Statut de la génération",
-                "daysActive": "Jours actifs"
+                "daysActive": "Jours actifs",
+                "posts": "Articles",
+                "tags": "Étiquettes",
+                "deployStatus": "État du déploiement",
+                "registeredUsers": "Utilisateurs inscrits",
+                "teamMembers": "Membres de l'équipe",
+                "agents": "Agents",
+                "openTasks": "Tâches ouvertes",
+                "worksOwned": "Travaux",
+                "pageViews": "Pages vues",
+                "sessions": "Sessions",
+                "conversions": "Conversions",
+                "states": {
+                    "live": "En ligne",
+                    "notConfigured": "Connectez les analyses pour le voir",
+                    "notDeployed": "Déployez pour le voir",
+                    "notGenerated": "Générez pour le voir",
+                    "unavailable": "Indisponible"
+                }
             },
             "comparisons": {
                 "title": "Comparaisons",
@@ -2526,8 +2548,8 @@
                 "slug": "Slug",
                 "repositories": "Dépôts",
                 "dataRepo": "Dépôt de données",
-                "websiteRepo": "Dépôt du site web",
-                "mainRepo": "Dépôt principal",
+                "websiteRepo": "Dépôt du travail",
+                "mainRepo": "Dépôt {provider}",
                 "gitProvider": "Fournisseur Git",
                 "organization": "Organisation",
                 "created": "Créé",
@@ -2541,7 +2563,22 @@
                 "deployProvider": "Fournisseur de déploiement",
                 "notConnected": "Non connecté",
                 "notConfigured": "Non configuré",
-                "viewSite": "Voir le site"
+                "viewSite": "Voir le site",
+                "repoHelp": {
+                    "data": {
+                        "title": "Dépôt de données",
+                        "body": "La source de vérité de votre travail. Il contient les métadonnées et le contenu que la plateforme maintient pour vous : pour un annuaire, ce sont tous les éléments, catégories et tags ; pour les autres types de travaux, c'est le contenu structuré qui alimente les pages. Les agents y écrivent en premier, et tout le reste en est généré. Il change rarement et peut être modifié à la main sans risque."
+                    },
+                    "provider": {
+                        "title": "Dépôt {provider}",
+                        "body": "Une version lisible et navigable de votre travail, générée par l'IA à partir du dépôt de données. Elle est publiée sur {provider} mais n'est jamais déployée : on la consulte directement sur {provider}. Pour une liste Awesome, il s'agit d'un README organisé ; pour les autres types de travaux, de la vue Markdown équivalente du même contenu. Vous pouvez désactiver sa génération dans les Paramètres."
+                    },
+                    "work": {
+                        "title": "Dépôt du travail",
+                        "body": "Le résultat principal de votre travail. La plateforme part du dépôt de données, y applique le modèle de travail que vous avez choisi et produit ce dépôt : généralement un site web ou une application web déployable, mais selon le modèle, il peut aussi s'agir d'une application mobile, d'un site de documentation ou de tout autre type de projet. C'est ce dépôt qui est déployé."
+                    },
+                    "ariaLabel": "Qu'est-ce que ce dépôt ?"
+                }
             },
             "config": {
                 "title": "Détails de configuration",
@@ -2559,7 +2596,7 @@
                 "pullRequestUpdate": "Détails de la Pull Request",
                 "branch": "Branche",
                 "prTitle": "Titre de la PR",
-                "mainRepository": "Dépôt principal",
+                "mainRepository": "Dépôt {provider}",
                 "dataRepository": "Dépôt de données"
             },
             "activity": {
@@ -2938,7 +2975,7 @@
                 "modelOverridePlaceholder": "par ex. openai/gpt-4.1 ou openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Optionnel. Utilise par défaut le modèle importé ou précédent, sauf si vous le remplacez ici.",
                 "modelOverrideUnavailable": "Sélectionnez tout d'abord un fournisseur d'IA configuré pour choisir un modèle parmi la liste disponible.",
-                "websiteTemplateHelperText": "Choisissez le modèle de site web qui sera utilisé lors de la première création du dépôt du site web.",
+                "websiteTemplateHelperText": "Choisissez le modèle de travail qui sera utilisé lors de la première création du dépôt du travail.",
                 "websiteTemplateLockedHelperText": "La sélection du modèle est verrouillée après la première génération du site web.",
                 "recommended": "Recommandé",
                 "promptPlaceholder": "Décrivez les éléments qui doivent être générés pour ce travail...",
@@ -2983,7 +3020,7 @@
                 "enableBadgeEvaluationDescription": "Évaluer et ajouter des badges de qualité aux éléments",
                 "captureScreenshots": "Capturer des captures d'écran des éléments",
                 "captureScreenshotsDescription": "Capturer automatiquement des captures d'écran ou des images de produits pour chaque élément pendant la génération",
-                "websiteRepositoryCreationMethod": "Méthode de création du dépôt du site web",
+                "websiteRepositoryCreationMethod": "Méthode de création du dépôt du travail",
                 "methodDuplicate": "Dupliquer",
                 "methodFork": "Fork",
                 "workNamePlaceholder": "Saisir le nom du travail",
@@ -3009,7 +3046,7 @@
                 "targetKeywordsDescription": "Mots-clés pour guider la recherche IA et la génération de contenu. Des mots-clés plus spécifiques donnent de meilleurs résultats.",
                 "sourceUrlsFieldDescription": "URLs spécifiques pour extraire le contenu. Si vide, le générateur recherchera automatiquement sur le web.",
                 "generationMethodDescription": "Choisir si vous voulez mettre à jour les éléments existants ou recréer tout à partir de zéro.",
-                "websiteRepositoryCreationMethodDescription": "Comment le dépôt du site web est créé. Le modèle est recommandé dans la plupart des cas.",
+                "websiteRepositoryCreationMethodDescription": "Comment le dépôt du travail est créé. Le modèle est recommandé dans la plupart des cas.",
                 "maxSearchQueriesDescription": "Nombre de requêtes de recherche que l'IA générera pour trouver du contenu pertinent (1-50).",
                 "resultsPerQueryDescription": "Nombre maximum de résultats à récupérer par requête de recherche (1-20).",
                 "maxPagesToProcessDescription": "Nombre maximum de pages web à traiter pour l'extraction de contenu (1-100).",
@@ -3168,7 +3205,7 @@
                         "model": "Modèle",
                         "schedule": "Planification",
                         "providers": "Fournisseurs",
-                        "websiteRepo": "Dépôt du site web"
+                        "websiteRepo": "Dépôt du travail"
                     },
                     "sourceTypes": {
                         "dataRepo": "Dépôt de données",
@@ -3203,8 +3240,8 @@
                 "deleteDataRepositoryDescription": "Supprimer le dépôt de données JSON de GitHub",
                 "deleteMarkdownRepository": "Supprimer le dépôt markdown",
                 "deleteMarkdownRepositoryDescription": "Supprimer le dépôt markdown contenant le README",
-                "deleteWebsiteRepository": "Supprimer le dépôt du site web",
-                "deleteWebsiteRepositoryDescription": "Supprimer le dépôt du site web déployé",
+                "deleteWebsiteRepository": "Supprimer le dépôt du travail",
+                "deleteWebsiteRepositoryDescription": "Supprimer le dépôt du travail déployé",
                 "deleteConfirm": "Êtes-vous absolument sûr ?",
                 "deleteConfirmDetail": "Cette action ne peut pas être annulée. Le travail et les dépôts sélectionnés seront définitivement supprimés.",
                 "confirmWorkName": "Saisir le nom du travail pour confirmer",
@@ -3222,7 +3259,7 @@
                 "updateFailed": "Échec de la mise à jour des paramètres",
                 "deployProvider": {
                     "title": "Fournisseur de déploiement",
-                    "description": "Sélectionnez où déployer le site web de votre travail",
+                    "description": "Sélectionnez où déployer votre travail",
                     "configure": "Configurer",
                     "ready": "Prêt à déployer",
                     "notConfigured": "Non configuré",
@@ -3462,7 +3499,7 @@
                 },
                 "noProviderAlert": {
                     "title": "Aucun fournisseur de déploiement",
-                    "description": "Sélectionnez un fournisseur de déploiement pour déployer votre site web d'travail.",
+                    "description": "Sélectionnez un fournisseur de déploiement pour déployer votre travail.",
                     "selectButton": "Sélectionner & Continuer",
                     "noProviders": "Aucun fournisseur de déploiement disponible. Installez d'abord un plugin de déploiement."
                 },
@@ -3486,8 +3523,8 @@
                 },
                 "form": {
                     "deployment": {
-                        "title": "Déployer le site web",
-                        "description": "Déployez le dépôt de votre site web d'travail.",
+                        "title": "Déployer le travail",
+                        "description": "Déployez le dépôt de votre travail.",
                         "deployButton": "Déployer sur {provider}",
                         "deployingButton": "Déploiement en cours...",
                         "deployingStateButton": "Déploiement ({state}) en cours...",
@@ -3502,9 +3539,9 @@
                         }
                     },
                     "updateRepository": {
-                        "title": "Mettre à jour le dépôt du site web",
+                        "title": "Mettre à jour le dépôt du travail",
                         "description": "Synchroniser les dernières modifications du modèle vers le",
-                        "websiteRepository": "dépôt du site web",
+                        "websiteRepository": "dépôt du travail",
                         "updateButton": "Mettre à jour le dépôt",
                         "updatingButton": "Mise à jour en cours..."
                     },
@@ -3521,20 +3558,20 @@
                     },
                     "info": {
                         "deployInfo": "Le déploiement prend généralement 1 à 3 minutes. Vous recevrez une URL une fois terminé.",
-                        "updateInfo": "Les mises à jour synchronisent le contenu de votre travail vers le dépôt du site web pour le prochain déploiement."
+                        "updateInfo": "Les mises à jour synchronisent le contenu de votre travail vers le dépôt du travail pour le prochain déploiement."
                     },
                     "websiteTemplate": {
                         "title": "Mises à jour automatiques du modèle",
-                        "description": "Gardez votre site web automatiquement synchronisé avec les dernières modifications du modèle.",
-                        "selectorLabel": "Modèle de site web",
+                        "description": "Gardez votre travail automatiquement synchronisé avec les dernières modifications du modèle.",
+                        "selectorLabel": "Modèle de travail",
                         "currentTemplateLabel": "Modèle actuel",
                         "unknownTemplate": "Par défaut hérité",
-                        "currentHelperText": "Le modèle sélectionné contrôle la façon dont le dépôt du site web est initialisé et mis à jour.",
-                        "switchHelperText": "L'application d'un nouveau modèle réinitialisera le dépôt existant du site web à partir du modèle sélectionné s'il existe déjà.",
-                        "switchAction": "Appliquer le modèle au dépôt du site web",
+                        "currentHelperText": "Le modèle sélectionné contrôle la façon dont le dépôt du travail est initialisé et mis à jour.",
+                        "switchHelperText": "L'application d'un nouveau modèle réinitialisera le dépôt du travail existant à partir du modèle sélectionné s'il existe déjà.",
+                        "switchAction": "Appliquer le modèle au dépôt du travail",
                         "switchActionIdle": "Le modèle est à jour",
-                        "switchConfirmTitle": "Changer le modèle de site web ?",
-                        "switchConfirmDescription": "Si le dépôt du site web existe déjà, son contenu sera remplacé par celui du modèle sélectionné. Tout code personnalisé dans ce dépôt sera perdu.",
+                        "switchConfirmTitle": "Changer le modèle de travail ?",
+                        "switchConfirmDescription": "Si le dépôt du travail existe déjà, son contenu sera remplacé par celui du modèle sélectionné. Tout code personnalisé dans ce dépôt sera perdu.",
                         "switchConfirmButton": "Changer de modèle",
                         "switchCancel": "Annuler",
                         "autoUpdate": "Mettre à jour automatiquement",
@@ -3937,7 +3974,7 @@
             },
             "deployProvider": {
                 "title": "Fournisseur de déploiement",
-                "description": "Sélectionnez où déployer votre site web d'travail",
+                "description": "Sélectionnez où déployer votre travail",
                 "noProviders": "Aucun fournisseur de déploiement disponible",
                 "notConfigured": "Non configuré",
                 "configured": "Prêt à déployer",
@@ -4041,7 +4078,7 @@
                 "organizationHelp": "Créer des dépôts sous une organisation au lieu de votre compte personnel",
                 "organizationNameLabel": "Nom de l'organisation",
                 "organizationNamePlaceholder": "Saisir le nom de l'organisation",
-                "websiteTemplateHelperText": "Choisissez le modèle de site web qui sera utilisé lors de la première création du dépôt du site web."
+                "websiteTemplateHelperText": "Choisissez le modèle de travail qui sera utilisé lors de la première création du dépôt du travail."
             },
             "manual": {
                 "title": "Créer manuellement",
@@ -4068,7 +4105,7 @@
                 "organizationHelp": "Créer cet travail sous une organisation GitHub au lieu de votre compte personnel",
                 "organizationNameLabel": "Nom de l'organisation",
                 "organizationNamePlaceholder": "my-organization",
-                "websiteTemplateHelperText": "Choisissez le modèle de site web qui sera utilisé lors de la première création du dépôt du site web.",
+                "websiteTemplateHelperText": "Choisissez le modèle de travail qui sera utilisé lors de la première création du dépôt du travail.",
                 "headerLabel": "En-tête README personnalisé",
                 "headerPlaceholder": "Ajouter du contenu personnalisé en haut de votre fichier README",
                 "headerOverwrite": "Remplacer complètement l'en-tête par défaut",
@@ -4174,15 +4211,15 @@
                     "importButton": "Démarrer l'import & recherche",
                     "importingButton": "Démarrage du pipeline de recherche...",
                     "mainRepository": {
-                        "title": "Main repository",
+                        "title": "Dépôt GitHub",
                         "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
                         "clone": {
                             "title": "Clone / recreate",
-                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                            "description": "Créer un nouveau dépôt README généré pour ce travail. Les dépôts de données et du travail sont tout de même créés."
                         },
                         "reuse": {
                             "title": "Reuse source README",
-                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                            "description": "Ne pas créer de dépôt README généré. Les liens du dépôt GitHub pointeront vers le dépôt README source."
                         }
                     }
                 },
@@ -4243,7 +4280,7 @@
                     "descriptionReady": "Tous les dépôts trouvés. Prêt à lier.",
                     "dataRepo": "Dépôt de données",
                     "markdownRepo": "Dépôt Markdown",
-                    "websiteRepo": "Dépôt du site web",
+                    "websiteRepo": "Dépôt du travail",
                     "found": "Trouvé",
                     "notFound": "Non trouvé",
                     "cancel": "Annuler",
@@ -4854,7 +4891,7 @@
         },
         "templates": {
             "title": "Modèles",
-            "subtitle": "Parcourez les modèles de sites web intégrés, gérez votre catalogue personnalisé et déterminez quel modèle sera utilisé pour les nouveaux travaux.",
+            "subtitle": "Parcourez les modèles de travail intégrés, gérez votre catalogue personnalisé et déterminez quel modèle sera utilisé pour les nouveaux travaux.",
             "kindSwitcher": {
                 "mission": "Mission Templates",
                 "work": "Work Templates",
@@ -5306,6 +5343,16 @@
                 "copyFailed": "Impossible de copier dans le presse-papiers"
             },
             "confirmDelete": "Supprimer ce déclencheur ? Son URL de webhook cesse de fonctionner immédiatement et cette action est irréversible."
+        },
+        "workKind": {
+            "label": "Type",
+            "website": "Website",
+            "landing-page": "Landing Page",
+            "blog": "Blog",
+            "directory": "Directory",
+            "awesome-repo": "Awesome Repo",
+            "company": "Company",
+            "default": "Work"
         }
     },
     "layout": {
@@ -5519,7 +5566,7 @@
         "deploy": {
             "deployFailed": "Échec du déploiement",
             "updateRepositoryFailed": "Échec de la mise à jour du dépôt",
-            "updateSettingsFailed": "Échec de la mise à jour des paramètres du modèle de site web"
+            "updateSettingsFailed": "Échec de la mise à jour des paramètres du modèle de travail"
         }
     },
     "validation": {

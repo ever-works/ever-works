@@ -1945,8 +1945,12 @@
                     "activity": "Activiteitenfeed",
                     "kb": "Kennisbank",
                     "generator": "Work genereren — eenmalig of volgens planning",
-                    "deploy": "Work uitrollen"
-                }
+                    "deploy": "Work uitrollen",
+                    "tasks": "Taken voor deze Work"
+                },
+                "tasks": "Taken",
+                "posts": "Berichten",
+                "pages": "Pagina's"
             },
             "members": {
                 "title": "Teamleden",
@@ -2160,7 +2164,25 @@
                 "categories": "Categorieën",
                 "comparisons": "Vergelijkingen",
                 "generationStatus": "Generatiestatus",
-                "daysActive": "Actieve dagen"
+                "daysActive": "Actieve dagen",
+                "posts": "Berichten",
+                "tags": "Tags",
+                "deployStatus": "Deploystatus",
+                "registeredUsers": "Geregistreerde gebruikers",
+                "teamMembers": "Teamleden",
+                "agents": "Agents",
+                "openTasks": "Openstaande taken",
+                "worksOwned": "Works",
+                "pageViews": "Paginaweergaven",
+                "sessions": "Sessies",
+                "conversions": "Conversies",
+                "states": {
+                    "live": "Live",
+                    "notConfigured": "Koppel analytics om dit te zien",
+                    "notDeployed": "Rol uit om dit te zien",
+                    "notGenerated": "Genereer om dit te zien",
+                    "unavailable": "Niet beschikbaar"
+                }
             },
             "comparisons": {
                 "title": "Vergelijkingen",
@@ -2332,8 +2354,8 @@
                 "slug": "Slug",
                 "repositories": "Repositories",
                 "dataRepo": "Dat-repository",
-                "websiteRepo": "Website-repository",
-                "mainRepo": "Hoofdrepository",
+                "websiteRepo": "Work-repository",
+                "mainRepo": "{provider}-repository",
                 "gitProvider": "Git-aanbieder",
                 "organization": "Organisatie",
                 "created": "Aangemaakt",
@@ -2347,7 +2369,22 @@
                 "deployProvider": "Deploy-aanbieder",
                 "notConnected": "Niet verbonden",
                 "notConfigured": "Niet geconfigureerd",
-                "viewSite": "Site bekijken"
+                "viewSite": "Site bekijken",
+                "repoHelp": {
+                    "data": {
+                        "title": "Data-repository",
+                        "body": "De bron van waarheid voor uw Work. Hierin staan de metadata en content die het platform voor u bijhoudt — bij een Directory zijn dat alle items, categorieën en tags; bij andere Work-typen is het de gestructureerde content achter de pagina's. Agenten schrijven hier als eerste naartoe, en al het andere wordt hieruit gegenereerd. De inhoud verandert zelden en kan veilig met de hand worden bewerkt."
+                    },
+                    "provider": {
+                        "title": "{provider}-repository",
+                        "body": "Een leesbare, doorbladerbare versie van uw Work, door AI gegenereerd op basis van de Data-repository. Deze wordt gepubliceerd op {provider}, maar nergens uitgerold — mensen lezen hem rechtstreeks op {provider}. Bij een Awesome List is dat een samengestelde README; bij andere Work-typen is het de overeenkomstige Markdown-weergave van dezelfde content. U kunt het genereren ervan uitschakelen bij Instellingen."
+                    },
+                    "work": {
+                        "title": "Work-repository",
+                        "body": "De belangrijkste uitvoer van uw Work. Het platform neemt de Data-repository, past de door u gekozen Work-template toe en produceert deze repository — meestal een website of web-app die uitgerold kan worden, maar afhankelijk van de template kan het ook een mobiele app, een documentatiesite of een ander soort project zijn. Dit is de repository die wordt uitgerold."
+                    },
+                    "ariaLabel": "Wat is deze repository?"
+                }
             },
             "config": {
                 "title": "Configuratiedetails",
@@ -2365,7 +2402,7 @@
                 "pullRequestUpdate": "Pull request-details",
                 "branch": "Branch",
                 "prTitle": "PR-titel",
-                "mainRepository": "Hoofdrepository",
+                "mainRepository": "{provider}-repository",
                 "dataRepository": "Dat-repository"
             },
             "activity": {
@@ -2744,7 +2781,7 @@
                 "modelOverridePlaceholder": "bijv. openai/gpt-4.1 of openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Optioneel. Gebruikt standaard het geïmporteerde of vorige model, tenzij je het hier overschrijft.",
                 "modelOverrideUnavailable": "Selecteer eerst een geconfigureerde AI‑provider om een model te kiezen uit de beschikbare lijst.",
-                "websiteTemplateHelperText": "Kies de website‑template die wordt gebruikt wanneer de website‑repository voor het eerst wordt aangemaakt.",
+                "websiteTemplateHelperText": "Kies de Work-template die wordt gebruikt wanneer de Work-repository voor het eerst wordt aangemaakt.",
                 "websiteTemplateLockedHelperText": "De template‑selectie is vergrendeld na de eerste website‑generatie.",
                 "recommended": "Aanbevolen",
                 "promptPlaceholder": "Beschrijf welke items voor deze map moeten worden gegenereerd...",
@@ -2789,7 +2826,7 @@
                 "enableBadgeEvaluationDescription": "Evalueer en voeg kwaliteitsbadges toe aan items",
                 "captureScreenshots": "Item-screenshots vastleggen",
                 "captureScreenshotsDescription": "Leg automatisch screenshots of productafbeeldingen vast voor elk item tijdens generatie",
-                "websiteRepositoryCreationMethod": "Website-repository aanmaakmethode",
+                "websiteRepositoryCreationMethod": "Aanmaakmethode Work-repository",
                 "methodDuplicate": "Dupliceren",
                 "methodFork": "Fork",
                 "workNamePlaceholder": "Voer mapnaam in",
@@ -2815,7 +2852,7 @@
                 "targetKeywordsDescription": "Keywords om de AI-zoekopdracht en contentgeneratie te leiden. Specifiekere keywords geven betere resultaten.",
                 "sourceUrlsFieldDescription": "Specifieke URL's om content uit te extraheren. Als leeg, zoekt de generator automatisch op het web.",
                 "generationMethodDescription": "Kies of je bestaande items bijwerkt of alles vanaf nul opnieuw aanmaakt.",
-                "websiteRepositoryCreationMethodDescription": "Hoe de website-repository wordt aangemaakt. Sjabloon is aanbevolen voor de meeste gevallen.",
+                "websiteRepositoryCreationMethodDescription": "Hoe de Work-repository wordt aangemaakt. Sjabloon is aanbevolen voor de meeste gevallen.",
                 "maxSearchQueriesDescription": "Aantal zoekopdrachten dat de AI genereert om relevante content te vinden (1-50).",
                 "resultsPerQueryDescription": "Maximum resultaten per zoekopdracht (1-20).",
                 "maxPagesToProcessDescription": "Maximum webpagina's om te verwerken voor contentextractie (1-100).",
@@ -2974,7 +3011,7 @@
                         "model": "Model",
                         "schedule": "Schema",
                         "providers": "Providers",
-                        "websiteRepo": "Website-repository"
+                        "websiteRepo": "Work-repo"
                     },
                     "sourceTypes": {
                         "dataRepo": "Gegevensrepository",
@@ -3009,8 +3046,8 @@
                 "deleteDataRepositoryDescription": "Verwijder de JSON-data-repository van GitHub",
                 "deleteMarkdownRepository": "Markdown-repository verwijderen",
                 "deleteMarkdownRepositoryDescription": "Verwijder de markdown-repository met de README",
-                "deleteWebsiteRepository": "Website-repository verwijderen",
-                "deleteWebsiteRepositoryDescription": "Verwijder de gedeployde website-repository",
+                "deleteWebsiteRepository": "Work-repository verwijderen",
+                "deleteWebsiteRepositoryDescription": "Verwijder de gedeployde Work-repository",
                 "deleteConfirm": "Weet je het absoluut zeker?",
                 "deleteConfirmDetail": "Deze actie kan niet ongedaan worden gemaakt. De map en geselecteerde repositories worden permanent verwijderd.",
                 "confirmWorkName": "Typ mapnaam om te bevestigen",
@@ -3028,7 +3065,7 @@
                 "updateFailed": "Kon instellingen niet bijwerken",
                 "deployProvider": {
                     "title": "Deploy-provider",
-                    "description": "Selecteer waar je werk-website wordt gedeployed",
+                    "description": "Selecteer waar je Work wordt gedeployed",
                     "configure": "Configureren",
                     "ready": "Klaar om te deployen",
                     "notConfigured": "Niet geconfigureerd",
@@ -3268,7 +3305,7 @@
                 },
                 "noProviderAlert": {
                     "title": "Geen uitrolprovider",
-                    "description": "Selecteer een uitrolprovider om uw werk-website uit te rollen.",
+                    "description": "Selecteer een uitrolprovider om uw Work uit te rollen.",
                     "selectButton": "Selecteren & Doorgaan",
                     "noProviders": "Geen uitrolproviders beschikbaar. Installeer eerst een uitrolplug-in."
                 },
@@ -3292,8 +3329,8 @@
                 },
                 "form": {
                     "deployment": {
-                        "title": "Website uitrollen",
-                        "description": "Rol uw werk-website-repository uit.",
+                        "title": "Work uitrollen",
+                        "description": "Rol uw Work-repository uit.",
                         "deployButton": "Uitrollen naar {provider}",
                         "deployingButton": "Uitrollen...",
                         "deployingStateButton": "Uitrollen ({state})...",
@@ -3308,9 +3345,9 @@
                         }
                     },
                     "updateRepository": {
-                        "title": "Website-repository bijwerken",
+                        "title": "Work-repository bijwerken",
                         "description": "Synchroniseer de nieuwste wijzigingen van de sjabloon naar de",
-                        "websiteRepository": "website-repository",
+                        "websiteRepository": "Work-repository",
                         "updateButton": "Repository bijwerken",
                         "updatingButton": "Bezig met bijwerken..."
                     },
@@ -3327,20 +3364,20 @@
                     },
                     "info": {
                         "deployInfo": "Uitrol duurt doorgaans 1-3 minuten. U ontvangt een URL zodra het voltooid is.",
-                        "updateInfo": "Updates synchroniseren uw werk-inhoud met de website-repository voor de volgende uitrol."
+                        "updateInfo": "Updates synchroniseren de inhoud van uw Work naar de Work-repository voor de volgende uitrol."
                     },
                     "websiteTemplate": {
                         "title": "Automatische sjabloonupdates",
-                        "description": "Houd uw website automatisch gesynchroniseerd met de nieuwste sjabloonwijzigingen.",
-                        "selectorLabel": "Website‑template",
+                        "description": "Houd uw Work automatisch gesynchroniseerd met de nieuwste sjabloonwijzigingen.",
+                        "selectorLabel": "Work-template",
                         "currentTemplateLabel": "Huidige template",
                         "unknownTemplate": "Geërfde standaard",
-                        "currentHelperText": "De geselecteerde template bepaalt hoe de website‑repository wordt geïnitialiseerd en bijgewerkt.",
-                        "switchHelperText": "Het toepassen van een nieuwe template zet de bestaande website‑repository terug naar de geselecteerde template, als deze al bestaat.",
-                        "switchAction": "Pas template toe op website‑repository",
+                        "currentHelperText": "De geselecteerde template bepaalt hoe de Work-repository wordt geïnitialiseerd en bijgewerkt.",
+                        "switchHelperText": "Het toepassen van een nieuwe template zet de bestaande Work-repository terug naar de geselecteerde template, als deze al bestaat.",
+                        "switchAction": "Pas template toe op Work-repository",
                         "switchActionIdle": "Template is up‑to‑date",
-                        "switchConfirmTitle": "Website‑template overschakelen?",
-                        "switchConfirmDescription": "Als de website‑repository al bestaat, wordt de inhoud vervangen door de geselecteerde template. Eventuele aangepaste code in die repository gaat verloren.",
+                        "switchConfirmTitle": "Work-template overschakelen?",
+                        "switchConfirmDescription": "Als de Work-repository al bestaat, wordt de inhoud vervangen door de geselecteerde template. Eventuele aangepaste code in die repository gaat verloren.",
                         "switchConfirmButton": "Sjabloon overschakelen",
                         "switchCancel": "Annuleren",
                         "autoUpdate": "Automatisch bijwerken",
@@ -3715,7 +3752,7 @@
             },
             "deployProvider": {
                 "title": "Deploy-provider",
-                "description": "Selecteer waar je je werk-website wilt deployen",
+                "description": "Selecteer waar je je Work wilt deployen",
                 "noProviders": "Geen deploy-providers beschikbaar",
                 "notConfigured": "Niet geconfigureerd",
                 "configured": "Klaar om te deployen",
@@ -3816,7 +3853,7 @@
                 "organizationHelp": "Maak repositories aan onder een organisatie in plaats van je persoonlijke account",
                 "organizationNameLabel": "Organisatienaam",
                 "organizationNamePlaceholder": "Voer organisatienaam in",
-                "websiteTemplateHelperText": "Kies de website‑template die wordt gebruikt wanneer de website‑repository voor het eerst wordt aangemaakt."
+                "websiteTemplateHelperText": "Kies de Work-template die wordt gebruikt wanneer de Work-repository voor het eerst wordt aangemaakt."
             },
             "manual": {
                 "title": "Handmatig aanmaken",
@@ -3843,7 +3880,7 @@
                 "organizationHelp": "Maak deze werk aan onder een GitHub-organisatie in plaats van je persoonlijke account",
                 "organizationNameLabel": "Organisatienaam",
                 "organizationNamePlaceholder": "mijn-organisatie",
-                "websiteTemplateHelperText": "Kies de website‑template die wordt gebruikt wanneer de website‑repository voor het eerst wordt aangemaakt.",
+                "websiteTemplateHelperText": "Kies de Work-template die wordt gebruikt wanneer de Work-repository voor het eerst wordt aangemaakt.",
                 "headerLabel": "Aangepaste README-header",
                 "headerPlaceholder": "Voeg aangepaste content toe bovenaan je README-bestand",
                 "headerOverwrite": "Standaard header volledig vervangen",
@@ -3949,15 +3986,15 @@
                     "importButton": "Import en onderzoek starten",
                     "importingButton": "Onderzoeks-pipeline starten...",
                     "mainRepository": {
-                        "title": "Main repository",
+                        "title": "GitHub-repository",
                         "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
                         "clone": {
                             "title": "Clone / recreate",
-                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                            "description": "Maak een nieuwe gegenereerde README-repository aan voor deze Work. De Data- en Work-repository worden nog steeds aangemaakt."
                         },
                         "reuse": {
                             "title": "Reuse source README",
-                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                            "description": "Maak geen gegenereerde README-repository aan. Links naar de GitHub-repository verwijzen naar de oorspronkelijke README-repository."
                         }
                     }
                 },
@@ -4018,7 +4055,7 @@
                     "descriptionReady": "Alle repositories gevonden. Klaar om te koppelen.",
                     "dataRepo": "Data-repository",
                     "markdownRepo": "Markdown-repository",
-                    "websiteRepo": "Website-repository",
+                    "websiteRepo": "Work-repository",
                     "found": "Gevonden",
                     "notFound": "Niet gevonden",
                     "cancel": "Annuleren",
@@ -4629,7 +4666,7 @@
         },
         "templates": {
             "title": "Sjablonen",
-            "subtitle": "Blader door de ingebouwde website‑sjablonen, beheer je aangepaste catalogus, en bepaal welke sjabloon nieuwe werken gebruiken.",
+            "subtitle": "Blader door de ingebouwde Work-sjablonen, beheer je aangepaste catalogus, en bepaal welke sjabloon nieuwe Works gebruiken.",
             "kindSwitcher": {
                 "mission": "Mission Templates",
                 "work": "Work Templates",
@@ -5118,6 +5155,16 @@
                 "copyFailed": "Kon niet naar klembord kopiëren"
             },
             "confirmDelete": "Deze trigger verwijderen? De webhook-URL werkt onmiddellijk niet meer en dit kan niet ongedaan worden gemaakt."
+        },
+        "workKind": {
+            "label": "Type",
+            "website": "Website",
+            "landing-page": "Landing Page",
+            "blog": "Blog",
+            "directory": "Directory",
+            "awesome-repo": "Awesome Repo",
+            "company": "Company",
+            "default": "Work"
         }
     },
     "layout": {
@@ -5331,7 +5378,7 @@
         "deploy": {
             "deployFailed": "Deployen mislukt",
             "updateRepositoryFailed": "Repository bijwerken mislukt",
-            "updateSettingsFailed": "Website-sjablooninstellingen bijwerken mislukt"
+            "updateSettingsFailed": "Work-sjablooninstellingen bijwerken mislukt"
         }
     },
     "validation": {
