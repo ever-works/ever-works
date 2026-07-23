@@ -653,6 +653,102 @@ describe('KnowledgeBaseService', () => {
             expect(rendered).not.toContain('Stale finding');
         });
 
+        it('over-fetches chunk hits so converging chains do not under-fill the doc limit', async () => {
+            const survivor = buildDocument({
+                id: 'conv-surv',
+                kbDocumentClass: 'research' as KbDocumentClass,
+                metadata: { body: 'Converged survivor' },
+            });
+            const loserA = buildDocument({
+                id: 'conv-a',
+                kbDocumentClass: 'research' as KbDocumentClass,
+                consolidation: {
+                    state: 'superseded',
+                    supersededById: 'conv-surv',
+                    reason: 'x',
+                    runAt: '2026-07-23T00:00:00.000Z',
+                },
+            });
+            const loserB = buildDocument({
+                id: 'conv-b',
+                kbDocumentClass: 'research' as KbDocumentClass,
+                consolidation: {
+                    state: 'superseded',
+                    supersededById: 'conv-surv',
+                    reason: 'x',
+                    runAt: '2026-07-23T00:00:00.000Z',
+                },
+            });
+            const distinct = buildDocument({
+                id: 'conv-c',
+                kbDocumentClass: 'research' as KbDocumentClass,
+                metadata: { body: 'Distinct third doc' },
+            });
+            // limit=2, but the top-2 hits converge on ONE survivor. The 2×
+            // over-fetch surfaces the third hit so the limit is still met.
+            stubSemanticHit(['conv-a', 'conv-b', 'conv-c']);
+            docRepo.list.mockResolvedValue({ items: [], total: 0 });
+            docRepo.findById.mockImplementation(async (_workId: string, docId: string) => {
+                if (docId === 'conv-a') return loserA;
+                if (docId === 'conv-b') return loserB;
+                if (docId === 'conv-surv') return survivor;
+                if (docId === 'conv-c') return distinct;
+                return null;
+            });
+
+            const bundle = await service.resolveContext(WORK_ID, { query: 'q', limit: 2 });
+
+            expect(bundle.queryRetrieved.map((d) => d.id)).toEqual(['conv-surv', 'conv-c']);
+            // The widened chunk fetch is what makes the backfill possible.
+            const chunkRepo = (
+                service as unknown as {
+                    chunkRepository: { findNearestByEmbedding: jest.Mock };
+                }
+            ).chunkRepository;
+            expect(chunkRepo.findNearestByEmbedding).toHaveBeenCalledWith(
+                WORK_ID,
+                expect.anything(),
+                4,
+            );
+        });
+
+        it('caps the supersession walk (a pathological chain cannot stall resolution)', async () => {
+            // 20-link acyclic chain: doc-0 → doc-1 → … → doc-19 (live).
+            const chain = new Map<string, ReturnType<typeof buildDocument>>();
+            for (let i = 0; i < 20; i++) {
+                const id = `chain-${i}`;
+                chain.set(
+                    id,
+                    buildDocument({
+                        id,
+                        kbDocumentClass: 'research' as KbDocumentClass,
+                        metadata: { body: `link ${i}` },
+                        consolidation:
+                            i < 19
+                                ? {
+                                      state: 'superseded',
+                                      supersededById: `chain-${i + 1}`,
+                                      reason: 'x',
+                                      runAt: '2026-07-23T00:00:00.000Z',
+                                  }
+                                : null,
+                    }),
+                );
+            }
+            stubSemanticHit(['chain-0']);
+            docRepo.list.mockResolvedValue({ items: [], total: 0 });
+            docRepo.findById.mockImplementation(
+                async (_workId: string, docId: string) => chain.get(docId) ?? null,
+            );
+
+            const bundle = await service.resolveContext(WORK_ID, { query: 'q' });
+
+            // The walk gives up at the hop cap instead of serving the
+            // archive or walking all 20 links — bounded DB cost.
+            expect(bundle.queryRetrieved).toEqual([]);
+            expect(docRepo.findById.mock.calls.length).toBeLessThanOrEqual(8);
+        });
+
         it('drops a superseded hit whose chain dead-ends or cycles (never serves the archive)', async () => {
             const cycleA = buildDocument({
                 id: 'cyc-a',

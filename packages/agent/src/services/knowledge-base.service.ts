@@ -908,7 +908,12 @@ export class KnowledgeBaseService {
         query: string,
         limit: number,
     ): Promise<KbDocumentBodyDto[]> {
-        const chunks = await this.semanticSearch(workId, query, limit);
+        // Over-fetch chunk hits: supersession substitution below can
+        // CONVERGE several hits onto one survivor (and dead chains drop
+        // out entirely), which would under-fill the requested doc count
+        // if we only pulled `limit` chunks. 2× is a cheap single-query
+        // widening; the loop still cuts off at `limit` distinct docs.
+        const chunks = await this.semanticSearch(workId, query, limit * 2);
         if (chunks.length === 0) return [];
 
         const seen = new Set<string>();
@@ -922,6 +927,7 @@ export class KnowledgeBaseService {
         const results: KbDocumentBodyDto[] = [];
         const included = new Set<string>();
         for (const docId of orderedDocIds) {
+            if (results.length >= limit) break;
             const doc = await this.resolveCurrentDocument(workId, docId);
             if (doc && !included.has(doc.id)) {
                 included.add(doc.id);
@@ -949,9 +955,14 @@ export class KnowledgeBaseService {
         workId: string,
         docId: string,
     ): Promise<WorkKnowledgeDocument | null> {
+        // Hop cap on top of the cycle guard: each link costs a sequential
+        // findById, so a malformed or pathologically re-consolidated chain
+        // must not be able to stall prompt resolution. Real chains from
+        // repeated consolidation are survivor-of-survivor — a handful deep.
+        const MAX_SUPERSESSION_HOPS = 8;
         const visited = new Set<string>();
         let currentId = docId;
-        while (!visited.has(currentId)) {
+        while (!visited.has(currentId) && visited.size < MAX_SUPERSESSION_HOPS) {
             visited.add(currentId);
             const doc = await this.documentRepository.findById(workId, currentId);
             if (!doc) return null;
