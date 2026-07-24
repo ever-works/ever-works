@@ -5,6 +5,7 @@ import { MissionAttachment } from '../entities/mission-attachment.entity';
 import { MissionWork } from '../entities/mission-work.entity';
 import { Work } from '../entities/work.entity';
 import { MissionWorkRepository } from '../database/repositories/mission-work.repository';
+import { WorkRepository } from '../database/repositories/work.repository';
 import { WorkProposal } from '../entities/work-proposal.entity';
 import { UserUpload } from '../entities/user-upload.entity';
 import { MissionAttachmentRepository } from '../database/repositories/attachment.repositories';
@@ -55,6 +56,10 @@ import { MissionTickService } from './mission-tick.service';
         WorkAgentModule,
     ],
     providers: [
+        // MissionTickService hands the org's existing Works to idea
+        // generation so a Mission can propose improving one rather than
+        // always minting a new Work. `Work` is already in forFeature above.
+        WorkRepository,
         MissionsService,
         MissionWorkRepository,
         MissionTickService,
