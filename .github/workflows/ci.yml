@@ -371,7 +371,7 @@ jobs:
       - name: Start Inngest dev server
         run: |
           docker run -d --name inngest -p 8288:8288 \
-            inngest/inngest:v1.38.1 dev --no-discovery --host 0.0.0.0
+            inngest/inngest:v1.38.1 inngest dev --no-discovery --host 0.0.0.0
           echo "Waiting for Inngest on http://localhost:8288 ..."
           for i in $(seq 1 45); do
             if curl -sf -o /dev/null http://localhost:8288/; then
