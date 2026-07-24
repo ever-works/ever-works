@@ -82,6 +82,20 @@ test.describe('Organization lifecycle (deep)', () => {
         request,
         baseURL,
     }) => {
+        // Heaviest UI journey in the file: TWO full createOrganizationViaUI
+        // flows (each = switcher-open retry loop + modal + a guaranteed ~4s
+        // "Start empty" probe that must time out on the 2nd-org path + up to
+        // 30s waitForURL) plus THREE gotoDashboardWithSwitcher hits (each waits
+        // up to 30s for the switcher trigger). That cumulative budget is
+        // marginal against the 90s per-test default, so a single slow leg
+        // (cold prod route, or one switcher-open exhausting its retry loop)
+        // tips the whole test into a timeout. test.slow() triples the budget —
+        // pure headroom, no assertion is weakened. Every API shape/status this
+        // flow asserts (POST /api/organizations, /api/works 200, /api/tasks
+        // T-n, /api/me/missions active, list slug/tenantId) was verified
+        // against the live sqlite stack and already matches.
+        test.slow();
+
         const stamp = Date.now().toString(36);
         const orgA = `Deep Org A ${stamp}`;
         const orgB = `Deep Org B ${stamp}`;

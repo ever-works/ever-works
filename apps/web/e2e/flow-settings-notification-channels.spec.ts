@@ -594,50 +594,53 @@ test.describe('Notification channels — settings CRUD + lifecycle + UI', () => 
             // (the same component's other branch) so the test proves the page
             // round-trips the seeded user's channel settings either way.
             const nameHeader = page.getByRole('columnheader', { name: 'Name' });
-            const emptyState = page.getByText('No channels yet', { exact: false });
-            // Dev-next SSR for this nested route intermittently serves the channel
-            // list empty (the API fetch loses the race with the RSC stream), so the
-            // page can FLIP between the populated <table> and the dashed empty-state
-            // across renders — even between an isVisible() probe and the following
-            // assertion. Re-decide the branch on EVERY poll iteration and assert
-            // whichever surface is actually present, reloading when neither settled.
-            // Either surface proves the seeded user's channel settings round-tripped
-            // through the real server fetch (CI usually surfaces the populated table).
+            const row = page.getByRole('row', { name: new RegExp(channelName) });
+            const emptyState = page.getByText('start fanning notifications out beyond in-app', {
+                exact: false,
+            });
+            // Dev-next AND a cold PROD (`next start`) render can serve this nested
+            // route's SSR channel list empty on first paint (the API fetch loses the
+            // race with the RSC stream, or a warm-up render cached the pre-seed empty
+            // state), so the page shows EITHER the populated <table> (with the seeded
+            // row) OR the dashed empty-state card. Crucially the table can also render
+            // WITHOUT our row yet (the SSR set predates the just-created channel) — so
+            // we key the "populated" decision on the ACTUAL seeded ROW, not the static
+            // Name header, and RELOAD (forcing a fresh full-document SSR fetch)
+            // whenever neither the row nor the empty-state has settled. That covers
+            // the "table up but our row missing" render the old header-based check
+            // would spin on until the toPass budget expired. Either settled surface
+            // proves the seeded user's channel settings round-tripped through the real
+            // server fetch (CI usually surfaces the populated table).
             await expect(async () => {
-                const tableUp = await nameHeader.isVisible().catch(() => false);
+                const rowUp = await row.isVisible().catch(() => false);
                 const emptyUp = await emptyState.isVisible().catch(() => false);
-                if (!tableUp && !emptyUp) {
+                if (!rowUp && !emptyUp) {
                     await page.reload({ waitUntil: 'domcontentloaded' });
-                    throw new Error('neither table nor empty-state settled yet');
+                    throw new Error('neither seeded row nor empty-state settled yet');
                 }
-                if (tableUp) {
-                    // Populated render: nameHeader is up by construction; assert the
-                    // sibling headers + the seeded row + its per-row actions.
+                if (rowUp) {
+                    // Populated render: assert the table headers + the seeded row's
+                    // provider label + its per-row actions.
+                    await expect(nameHeader).toBeVisible({ timeout: 5_000 });
                     await expect(page.getByRole('columnheader', { name: 'Provider' })).toBeVisible({
-                        timeout: 2_000,
+                        timeout: 5_000,
                     });
                     await expect(page.getByRole('columnheader', { name: 'Verified' })).toBeVisible({
-                        timeout: 2_000,
+                        timeout: 5_000,
                     });
-                    const row = page.getByRole('row', { name: new RegExp(channelName) });
-                    await expect(row).toBeVisible({ timeout: 2_000 });
                     await expect(row.getByText('Slack', { exact: true })).toBeVisible({
-                        timeout: 2_000,
+                        timeout: 5_000,
                     });
                     await expect(row.getByRole('button', { name: 'Test' })).toBeVisible({
-                        timeout: 2_000,
+                        timeout: 5_000,
                     });
                     await expect(row.getByRole('button', { name: 'Remove' })).toBeVisible({
-                        timeout: 2_000,
+                        timeout: 5_000,
                     });
                 } else {
-                    // Empty-state branch (dev SSR served the list empty): assert the
-                    // dashed card's literal copy — the same component's other branch.
-                    await expect(
-                        page.getByText('start fanning notifications out beyond in-app', {
-                            exact: false,
-                        }),
-                    ).toBeVisible({ timeout: 2_000 });
+                    // Empty-state branch (SSR served the list empty): assert the dashed
+                    // card's literal copy — the same component's other branch.
+                    await expect(emptyState).toBeVisible({ timeout: 5_000 });
                 }
             }).toPass({ timeout: 60_000 });
         } finally {
@@ -661,9 +664,15 @@ test.describe('Notification channels — settings CRUD + lifecycle + UI', () => 
         const stillRow = page.getByRole('row', { name: new RegExp(channelName) });
         // Either the empty-state shows (channel gone) or — under a slow shared DB —
         // the row may briefly linger; branch tolerantly but require ONE of them.
+        // If neither has settled (a cold SSR render that hasn't reflected the delete
+        // yet), reload to force a fresh server fetch instead of spinning on a stale
+        // first paint until the budget expires.
         await expect(async () => {
             const empty = await emptyState.isVisible().catch(() => false);
             const hasRow = await stillRow.isVisible().catch(() => false);
+            if (!empty && !hasRow) {
+                await page.reload({ waitUntil: 'domcontentloaded' });
+            }
             expect(empty || hasRow).toBe(true);
         }).toPass({ timeout: 30_000 });
     });

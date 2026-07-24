@@ -638,6 +638,13 @@ test.describe('Flow: per-Work usage read-side — period windows, CSV export fil
         page,
         baseURL,
     }) => {
+        // The UI half polls up to 90s for a terminal surface (chrome / not-found /
+        // login) and, if none settles, falls through to a degraded API-contract
+        // assertion. That poll's 90s budget EQUALS the default test timeout, so the
+        // test would die exactly as the poll gives up — before the degraded branch
+        // can run. Give the whole test headroom for the poll + the fallthrough.
+        test.setTimeout(180_000);
+
         // Use the SEEDED storageState user for the UI half (its cookies drive the
         // dashboard); a FRESH user owns the work for the API half so nothing leaks.
         const { token, workId } = await freshUserWithWork(request, 'cap-usage-ui');

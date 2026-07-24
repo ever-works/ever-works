@@ -98,6 +98,20 @@ export interface ForkTemplateResult {
 export class TemplateCatalogService implements OnModuleInit {
     private readonly logger = new Logger(TemplateCatalogService.name);
     private readonly WEBSITE_DISCOVERY_SYNC_TTL_MS = 1000 * 60 * 60;
+    /**
+     * Cooldown between website-template DISCOVERY attempts, keyed by catalog org.
+     * Discovery hits the GitHub API for up to 50 pages on the request path, and
+     * its DB staleness gate only suppresses re-runs once discovery has PERSISTED
+     * rows — so a failed or empty discovery (GitHub throttling under load, no
+     * catalog access) would otherwise re-run the whole loop on EVERY request and
+     * stall it to the request timeout. This in-process cooldown suppresses
+     * re-attempts after ANY outcome; built-in templates are seeded at boot, so
+     * the catalog is fully usable in between.
+     */
+    private readonly discoveryAttemptAt = new Map<string, number>();
+    private readonly WEBSITE_DISCOVERY_ATTEMPT_COOLDOWN_MS = 1000 * 60 * 5;
+    /** Hard ceiling on how long one discovery attempt may hold up a request. */
+    private readonly WEBSITE_DISCOVERY_DEADLINE_MS = 8000;
 
     constructor(
         private readonly templateRepository: TemplateRepository,
@@ -614,8 +628,40 @@ export class TemplateCatalogService implements OnModuleInit {
                 updatedSince,
             );
 
-        if (!hasRecentDiscovery) {
-            await this.syncDiscoveredWebsiteTemplatesForUser(userId);
+        if (hasRecentDiscovery) {
+            return;
+        }
+
+        // Suppress re-attempts for a cooldown after ANY outcome (the DB gate above
+        // only suppresses AFTER a successful, row-persisting discovery). Without
+        // this, a discovery that fails or finds nothing re-runs the full 50-page
+        // GitHub fetch on every website-template request and stalls it.
+        const lastAttempt = this.discoveryAttemptAt.get(catalogOwner) ?? 0;
+        if (Date.now() - lastAttempt < this.WEBSITE_DISCOVERY_ATTEMPT_COOLDOWN_MS) {
+            return;
+        }
+        this.discoveryAttemptAt.set(catalogOwner, Date.now());
+
+        // Bound the attempt itself: a slow/throttled GitHub API must never hang the
+        // caller. On the deadline we serve the already-known catalog (built-ins +
+        // whatever was previously discovered) and re-attempt after the cooldown.
+        let timer: ReturnType<typeof setTimeout> | undefined;
+        const deadline = new Promise<void>((resolve) => {
+            timer = setTimeout(() => {
+                this.logger.warn(
+                    `Website template discovery for org ${catalogOwner} exceeded ` +
+                        `${this.WEBSITE_DISCOVERY_DEADLINE_MS}ms; serving the known catalog and ` +
+                        'retrying after the cooldown.',
+                );
+                resolve();
+            }, this.WEBSITE_DISCOVERY_DEADLINE_MS);
+        });
+        try {
+            await Promise.race([this.syncDiscoveredWebsiteTemplatesForUser(userId), deadline]);
+        } finally {
+            if (timer) {
+                clearTimeout(timer);
+            }
         }
     }
 

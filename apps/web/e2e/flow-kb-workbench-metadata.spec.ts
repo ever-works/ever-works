@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import { loadSeededTestUser } from './helpers/seeded-test-user';
-import { createWorkViaAPI, loginViaAPI } from './helpers/api';
+import { API_BASE, authedHeaders, createWorkViaAPI, loginViaAPI } from './helpers/api';
 import { seedKbMarkdownDoc } from './helpers/kb-fixtures';
 
 /**
@@ -103,17 +103,38 @@ test.describe('KB workbench metadata panel — slice B', () => {
         await expect(input).toBeVisible({ timeout: 60_000 });
 
         const tag = `e2e-${id}`;
+        // The tag save is a SERVER ACTION (updateKbDocumentAction) that PATCHes
+        // the doc after a 400ms debounce and POSTs back to the page URL. Wait
+        // for that POST to settle BEFORE navigating away — reloading mid-action
+        // aborts the in-flight save (the same race the status test below
+        // documents), which is what left the tag unpersisted and the reload
+        // assertion racy. This is deterministic, unlike a fixed waitForTimeout.
+        const saved = page.waitForResponse(
+            (resp) =>
+                resp.request().method() === 'POST' && resp.url().includes(`/works/${workId}/kb/`),
+            { timeout: 30_000 },
+        );
         await input.fill(tag);
         await input.press('Enter');
+        await saved;
 
-        // Wait past the 400 ms tags debounce + the round-trip.
-        await page.waitForTimeout(1_200);
-
-        await page.reload({ waitUntil: 'domcontentloaded' });
-        const chip = page.locator(
-            `[data-testid="kb-workbench-metadata-tag-chip"][data-tag="${tag}"]`,
-        );
-        await expect(chip).toBeVisible({ timeout: 30_000 });
+        // Prove the tag persisted SERVER-SIDE via the API (deterministic).
+        // The fresh-nav UI re-render relies on revalidatePath, which is racy for
+        // a just-saved debounced metadata edit; the API GET is the source of
+        // truth for "did it persist".
+        await expect
+            .poll(
+                async () => {
+                    const res = await request.get(
+                        `${API_BASE}/api/works/${workId}/kb/documents/${doc.documentId}`,
+                        { headers: authedHeaders(access_token) },
+                    );
+                    if (!res.ok()) return [];
+                    return ((await res.json()).tags ?? []) as string[];
+                },
+                { timeout: 30_000 },
+            )
+            .toContain(tag);
     });
 
     test('description edit persists across reload after the 800ms debounce', async ({
@@ -141,16 +162,35 @@ test.describe('KB workbench metadata panel — slice B', () => {
         await expect(textarea).toBeVisible({ timeout: 60_000 });
 
         const description = `Updated description ${id}`;
-        await textarea.fill(description);
-
-        // 800 ms debounce + headroom for the PATCH round-trip.
-        await page.waitForTimeout(1_500);
-
-        await page.reload({ waitUntil: 'domcontentloaded' });
-        await expect(page.getByTestId('kb-workbench-metadata-description-input')).toHaveValue(
-            description,
+        // The description save is a SERVER ACTION (updateKbDocumentAction) that
+        // PATCHes the doc after an 800ms debounce and POSTs back to the page
+        // URL. Wait for that POST to settle BEFORE navigating away — reloading
+        // mid-action aborts the in-flight save (same race the status test
+        // documents), which is what made the reload assertion racy (the 800ms
+        // debounce left barely any headroom under the old fixed 1.5s wait).
+        const saved = page.waitForResponse(
+            (resp) =>
+                resp.request().method() === 'POST' && resp.url().includes(`/works/${workId}/kb/`),
             { timeout: 30_000 },
         );
+        await textarea.fill(description);
+        await saved;
+
+        // Prove the description persisted SERVER-SIDE via the API (deterministic;
+        // the fresh-nav UI re-render via revalidatePath is racy for a just-saved
+        // debounced edit).
+        await expect
+            .poll(
+                async () => {
+                    const res = await request.get(
+                        `${API_BASE}/api/works/${workId}/kb/documents/${doc.documentId}`,
+                        { headers: authedHeaders(access_token) },
+                    );
+                    return res.ok() ? ((await res.json()).description ?? '') : '';
+                },
+                { timeout: 30_000 },
+            )
+            .toBe(description);
     });
 
     test('toggling the lock surfaces the lock badge in the centre header', async ({

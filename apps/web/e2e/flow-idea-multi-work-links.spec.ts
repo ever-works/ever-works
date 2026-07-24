@@ -155,6 +155,13 @@ test.describe('Idea → Work multi-link provenance (idea_works, 0..N)', () => {
 
         // ── (b) Work B, accept AGAIN — valid from ACCEPTED (0..N) ───────────
         const workB = await createWorkViaAPI(request, token, { name: `Multi Work B ${s}` });
+        // The e2e stack is sqlite, whose datetime column stores `idea_works.createdAt`
+        // at SECOND precision (prod Postgres is microsecond). The list is ordered
+        // `ORDER BY createdAt DESC` with no secondary key, so two accepts inside the
+        // same wall-clock second tie and come back in insertion order (A,B) — masking
+        // the real newest-first contract. Cross a full-second boundary before the
+        // second accept so the two rows get genuinely distinct timestamps.
+        await new Promise((resolve) => setTimeout(resolve, 1100));
         await acceptIdea(request, token, ideaId, workB.id);
 
         const afterSecond = await readIdea(request, token, ideaId);
