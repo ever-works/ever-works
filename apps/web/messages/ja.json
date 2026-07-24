@@ -600,6 +600,31 @@
                 "apply": "適用",
                 "reset": "リセット",
                 "status": "ステータス"
+            },
+            "newPage": {
+                "link": "手動で作成",
+                "or": "または",
+                "title": "新しいミッション",
+                "subtitle": "継続的な目標を記述します。エージェントがそこからアイデアを生成します（単発またはスケジュール実行）。",
+                "nameLabel": "タイトル",
+                "namePlaceholder": "任意 — 空欄にすると説明から自動生成されます",
+                "descriptionLabel": "説明",
+                "descriptionPlaceholder": "このミッションが取り組み続ける内容を記述します。例:「新しいオープンソース AI エージェントフレームワークを追跡し、ディレクトリを最新に保つ」",
+                "descriptionHint": "10 文字以上。",
+                "typeLabel": "タイプ",
+                "typeOneShot": "単発 — 1 回だけ実行",
+                "typeScheduled": "スケジュール — 繰り返し実行",
+                "scheduleLabel": "スケジュール",
+                "schedulePlaceholder": "0 9 * * *",
+                "scheduleHint": "5 フィールドの cron 式。例: 0 9 * * * は毎日 09:00 に実行されます。",
+                "scheduleRequired": "スケジュール実行のミッションには cron 式が必要です。",
+                "cancel": "キャンセル",
+                "create": "ミッションを作成",
+                "creating": "作成中…",
+                "created": "ミッションを作成しました",
+                "minLength": "説明は 10 文字以上で入力してください。",
+                "error": "ミッションを作成できませんでした。もう一度お試しください。",
+                "chatUnavailable": "チャットは現在利用できません。「手動で作成」をご利用ください。"
             }
         },
         "memoryPage": {

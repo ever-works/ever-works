@@ -592,6 +592,31 @@
                 "capUnlimited": "Unlimited",
                 "capPrefix": "Outstanding cap:",
                 "clonedFromPrefix": "Cloned from another Mission"
+            },
+            "newPage": {
+                "link": "Tạo thủ công",
+                "or": "Hoặc",
+                "title": "Nhiệm vụ mới",
+                "subtitle": "Mô tả một mục tiêu liên tục. Tác nhân sẽ tạo Ý tưởng từ đó — một lần hoặc theo lịch.",
+                "nameLabel": "Tiêu đề",
+                "namePlaceholder": "Tùy chọn — để trống để suy ra từ mô tả",
+                "descriptionLabel": "Mô tả",
+                "descriptionPlaceholder": "Mô tả điều nhiệm vụ này cần tiếp tục thực hiện — ví dụ \"Theo dõi các framework tác nhân AI nguồn mở mới và giữ danh bạ của chúng tôi luôn cập nhật.\"",
+                "descriptionHint": "Ít nhất 10 ký tự.",
+                "typeLabel": "Loại",
+                "typeOneShot": "Một lần — chạy một lần",
+                "typeScheduled": "Theo lịch — chạy lặp lại",
+                "scheduleLabel": "Lịch chạy",
+                "schedulePlaceholder": "0 9 * * *",
+                "scheduleHint": "Biểu thức cron năm trường. Ví dụ: 0 9 * * * chạy mỗi ngày lúc 09:00.",
+                "scheduleRequired": "Nhiệm vụ theo lịch cần một biểu thức cron.",
+                "cancel": "Hủy",
+                "create": "Tạo nhiệm vụ",
+                "creating": "Đang tạo…",
+                "created": "Đã tạo nhiệm vụ",
+                "minLength": "Mô tả phải có ít nhất 10 ký tự.",
+                "error": "Không thể tạo nhiệm vụ. Vui lòng thử lại.",
+                "chatUnavailable": "Trò chuyện hiện không khả dụng — hãy dùng \"Tạo thủ công\"."
             }
         },
         "memoryPage": {

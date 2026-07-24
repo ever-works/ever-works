@@ -600,6 +600,31 @@
                 "apply": "Toepassen",
                 "reset": "Resetten",
                 "status": "Status"
+            },
+            "newPage": {
+                "link": "Handmatig aanmaken",
+                "or": "Of",
+                "title": "Nieuwe missie",
+                "subtitle": "Beschrijf een doorlopend doel. De agent genereert er Ideeën uit — eenmalig of volgens schema.",
+                "nameLabel": "Titel",
+                "namePlaceholder": "Optioneel — laat leeg om hem uit de beschrijving af te leiden",
+                "descriptionLabel": "Beschrijving",
+                "descriptionPlaceholder": "Beschrijf waar deze missie aan moet blijven werken — bijv. \"Nieuwe open-source AI-agentframeworks volgen en onze directory actueel houden.\"",
+                "descriptionHint": "Minstens 10 tekens.",
+                "typeLabel": "Type",
+                "typeOneShot": "Eenmalig — één keer uitvoeren",
+                "typeScheduled": "Gepland — herhaaldelijk uitvoeren",
+                "scheduleLabel": "Schema",
+                "schedulePlaceholder": "0 9 * * *",
+                "scheduleHint": "Cron-expressie met vijf velden. Voorbeeld: 0 9 * * * draait elke dag om 09:00.",
+                "scheduleRequired": "Een geplande missie heeft een cron-expressie nodig.",
+                "cancel": "Annuleren",
+                "create": "Missie aanmaken",
+                "creating": "Aanmaken…",
+                "created": "Missie aangemaakt",
+                "minLength": "De beschrijving moet minstens 10 tekens bevatten.",
+                "error": "Kon de missie niet aanmaken. Probeer het opnieuw.",
+                "chatUnavailable": "Chat is momenteel niet beschikbaar — gebruik \"Handmatig aanmaken\"."
             }
         },
         "memoryPage": {

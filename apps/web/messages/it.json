@@ -592,6 +592,31 @@
                 "capUnlimited": "Unlimited",
                 "capPrefix": "Outstanding cap:",
                 "clonedFromPrefix": "Cloned from another Mission"
+            },
+            "newPage": {
+                "link": "Crea manualmente",
+                "or": "Oppure",
+                "title": "Nuova missione",
+                "subtitle": "Descrivi un obiettivo continuo. L’agente ne genera Idee, una volta sola o a intervalli programmati.",
+                "nameLabel": "Titolo",
+                "namePlaceholder": "Facoltativo — lascia vuoto per ricavarlo dalla descrizione",
+                "descriptionLabel": "Descrizione",
+                "descriptionPlaceholder": "Descrivi su cosa deve lavorare questa missione, ad es. \"Monitorare i nuovi framework open source per agenti IA e tenere aggiornata la nostra directory.\"",
+                "descriptionHint": "Almeno 10 caratteri.",
+                "typeLabel": "Tipo",
+                "typeOneShot": "Singola — esegui una volta",
+                "typeScheduled": "Programmata — esegui ripetutamente",
+                "scheduleLabel": "Programmazione",
+                "schedulePlaceholder": "0 9 * * *",
+                "scheduleHint": "Espressione cron a cinque campi. Esempio: 0 9 * * * viene eseguita ogni giorno alle 09:00.",
+                "scheduleRequired": "Una missione programmata richiede un’espressione cron.",
+                "cancel": "Annulla",
+                "create": "Crea missione",
+                "creating": "Creazione…",
+                "created": "Missione creata",
+                "minLength": "La descrizione deve contenere almeno 10 caratteri.",
+                "error": "Impossibile creare la missione. Riprova.",
+                "chatUnavailable": "La chat non è disponibile — usa «Crea manualmente»."
             }
         },
         "memoryPage": {

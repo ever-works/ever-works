@@ -691,6 +691,31 @@
                 "apply": "Apply",
                 "reset": "Reset",
                 "status": "Status"
+            },
+            "newPage": {
+                "link": "Create manually",
+                "or": "Or",
+                "title": "New Mission",
+                "subtitle": "Describe an ongoing goal. The agent generates Ideas from it — once, or on a schedule.",
+                "nameLabel": "Title",
+                "namePlaceholder": "Optional — leave blank to derive one from the description",
+                "descriptionLabel": "Description",
+                "descriptionPlaceholder": "Describe what this Mission should keep working on — e.g. \"Track new open-source AI agent frameworks and keep our directory current.\"",
+                "descriptionHint": "At least 10 characters.",
+                "typeLabel": "Type",
+                "typeOneShot": "One-shot — run once",
+                "typeScheduled": "Scheduled — run repeatedly",
+                "scheduleLabel": "Schedule",
+                "schedulePlaceholder": "0 9 * * *",
+                "scheduleHint": "Five-field cron expression. Example: 0 9 * * * runs every day at 09:00.",
+                "scheduleRequired": "A scheduled Mission needs a cron expression.",
+                "cancel": "Cancel",
+                "create": "Create Mission",
+                "creating": "Creating…",
+                "created": "Mission created",
+                "minLength": "Description must be at least 10 characters.",
+                "error": "Couldn't create the Mission. Please try again.",
+                "chatUnavailable": "Chat is unavailable right now — use \"Create manually\" instead."
             }
         },
         "memoryPage": {
