@@ -167,12 +167,47 @@ async function messageIdsFor(request: APIRequestContext, recipient: string): Pro
  * callers to disambiguate.) We therefore snapshot the box before sending and
  * wait for an id that was not already there.
  */
+/**
+ * Ask the oracle which of this user's delivered tokens is CURRENT.
+ *
+ * Correlating "the newest mail" with "the latest send" is unreliable: the box
+ * also holds the registration mail, and under CI SMTP lag an EARLIER send's
+ * message can land AFTER a later one — so both "first unseen message" and
+ * "newest message" can hand back a token that a subsequent send already rotated
+ * away. validate-email-token is the ground truth: exactly one token matches the
+ * stored hash at any moment, so we simply ask which one does.
+ */
+async function currentVerificationToken(
+    request: APIRequestContext,
+    email: string,
+): Promise<string | null> {
+    const lower = email.toLowerCase();
+    const messages = await listMessages(request).catch(() => []);
+    const mine = messages.filter((m) =>
+        m.To?.some((t) => `${t.Mailbox}@${t.Domain}`.toLowerCase() === lower),
+    );
+    for (const message of mine) {
+        const candidate = extractVerificationToken(message);
+        if (!candidate) continue;
+        const res = await request.get(
+            `${API_BASE}/api/auth/validate-email-token?token=${candidate}`,
+        );
+        if (res.ok() && (await res.json()).valid === true) return candidate;
+    }
+    return null;
+}
+
+/**
+ * Send a verification mail and return the token that is CURRENT afterwards,
+ * polling until it differs from `previous` (the send rotates the stored hash, so
+ * the current token necessarily changes once the new mail lands).
+ */
 async function sendAndReadToken(
     request: APIRequestContext,
     user: { email: string; token: string },
+    previous: string | null = null,
 ): Promise<string | null> {
     const mailUp = await isMailhogAvailable(request);
-    const before = mailUp ? await messageIdsFor(request, user.email) : new Set<string>();
 
     const send = await request.post(`${API_BASE}/api/auth/send-verification`, {
         headers: authedHeaders(user.token),
@@ -181,19 +216,11 @@ async function sendAndReadToken(
     expect((await send.json()).message).toBe(SEND_VERIFICATION_MSG);
     if (!mailUp) return null;
 
-    // Poll for a message that is genuinely NEW (CI SMTP delivery is slower than
-    // a dev box, so give it more headroom than a single fixed wait).
-    const deadline = Date.now() + 20_000;
-    const lower = user.email.toLowerCase();
+    const deadline = Date.now() + 25_000;
     while (Date.now() < deadline) {
-        const messages = await listMessages(request).catch(() => []);
-        const fresh = messages.find(
-            (m) =>
-                !before.has(m.ID) &&
-                m.To?.some((t) => `${t.Mailbox}@${t.Domain}`.toLowerCase() === lower),
-        );
-        if (fresh) return extractVerificationToken(fresh);
-        await new Promise((r) => setTimeout(r, 300));
+        const current = await currentVerificationToken(request, user.email);
+        if (current && current !== previous) return current;
+        await new Promise((r) => setTimeout(r, 400));
     }
     return null;
 }
@@ -229,8 +256,10 @@ test.describe('Flow: email-verification deep (oracle / send / web-route)', () =>
         const token1 = await sendAndReadToken(request, creds);
 
         // STEP 2 — a SECOND resend OVERWRITES the column with sha256(token2): the
-        // envelope is identical (idempotent to the caller) but the stored hash differs.
-        const token2 = await sendAndReadToken(request, creds);
+        // envelope is identical (idempotent to the caller) but the stored hash
+        // differs. Pass token1 so we wait for the CURRENT token to actually change
+        // rather than racing MailHog's delivery order.
+        const token2 = await sendAndReadToken(request, creds, token1);
 
         // STEP 3 — the REAL rotation proof, reachable only when mail delivered two
         // distinct tokens: the PRIOR token must no longer validate/verify (its hash
