@@ -218,6 +218,15 @@ describe('KbCitationHover', () => {
         });
         fireEvent.keyDown(document, { key: 'Escape' });
         await waitFor(() => {
+            // Re-dispatch on every retry: the component attaches its
+            // document keydown listener in an [open]-gated passive effect,
+            // so under a starved CI runner the first Escape can land in the
+            // window between the popover's DOM commit and that effect's
+            // flush — a keypress into a document with no listener, and the
+            // popover then stays open forever (observed as a rare
+            // load-flake on this exact assertion). Extra presses are
+            // idempotent once the listener exists.
+            fireEvent.keyDown(document, { key: 'Escape' });
             expect(screen.queryByTestId('kb-citation-popover')).toBeNull();
         });
     });
