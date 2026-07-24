@@ -48,6 +48,7 @@ import { AgentsModule } from './agents/agents.module';
 import { AgentApprovalsModule } from './agent-approvals/agent-approvals.module';
 import { SkillsModule } from './skills/skills.module';
 import { TasksModule } from './tasks/tasks.module';
+import { TerminalModule } from './terminal/terminal.module';
 import { TeamsModule } from './teams/teams.module';
 import { SchedulesModule } from './schedules/schedules.module';
 import { InboundTriggersModule } from './triggers/inbound-triggers.module';
@@ -173,6 +174,9 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // Phase 12 — Tasks API (CRUD + transitions + member CRUD).
         // Chat + attachments + per-task spend land in Phase 13.
         TasksModule,
+        // Streaming-terminal M3 — relay registry + WS gateway on this
+        // process's HTTP server + attach-token/internal-publish endpoints.
+        TerminalModule,
         // Teams & Prebuilt Companies — org-nested Teams CRUD + Org Chart
         // (docs/specs/features/teams-and-companies/spec.md §3).
         TeamsModule,
