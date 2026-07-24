@@ -356,7 +356,9 @@ jobs:
           registered=0
           for attempt in $(seq 1 40); do
             docker exec "$cid" temporal operator search-attribute create \
-              --namespace default --name tenantId --name concurrencyKey --type Keyword >/dev/null 2>&1 || true
+              --namespace default --name tenantId --type Keyword >/dev/null 2>&1 || true
+            docker exec "$cid" temporal operator search-attribute create \
+              --namespace default --name concurrencyKey --type Keyword >/dev/null 2>&1 || true
             docker exec "$cid" temporal operator search-attribute create \
               --namespace default --name tags --type KeywordList >/dev/null 2>&1 || true
             listing="$(docker exec "$cid" temporal operator search-attribute list --namespace default 2>/dev/null || true)"
