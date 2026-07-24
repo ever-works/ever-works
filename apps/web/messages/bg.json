@@ -3490,7 +3490,14 @@
                         "lastSuccess": "Last successful pull: {time}",
                         "lastError": "Last error: {error}"
                     }
-                }
+                },
+                "providerRepoTitle": "Репозиторий в {provider}",
+                "providerRepoEnableLabel": "Генериране на репозитория в {provider}",
+                "providerRepoEnableDescription": "Генерирана от ИИ версия на тази работа, публикувана в {provider}. Никога не се внедрява — хората я четат директно в {provider}.",
+                "providerRepoEnabled": "Генерирането на репозитория в {provider} е включено",
+                "providerRepoDisabled": "Генерирането на репозитория в {provider} е изключено",
+                "providerRepoUpdateFailed": "Настройката на репозитория не можа да бъде обновена",
+                "providerRepoDisabledNote": "Генерирането е изключено. Съществуващият репозиторий остава непроменен — просто спира да се обновява."
             },
             "deploy": {
                 "progress": {

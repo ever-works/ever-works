@@ -3720,7 +3720,14 @@
                         "lastSuccess": "Last successful pull: {time}",
                         "lastError": "Last error: {error}"
                     }
-                }
+                },
+                "providerRepoTitle": "{provider} Repository",
+                "providerRepoEnableLabel": "Generate the {provider} repository",
+                "providerRepoEnableDescription": "An AI-generated, browsable version of this Work published to {provider}. It is never deployed — people read it directly on {provider}.",
+                "providerRepoEnabled": "{provider} repository generation enabled",
+                "providerRepoDisabled": "{provider} repository generation disabled",
+                "providerRepoUpdateFailed": "Failed to update the repository setting",
+                "providerRepoDisabledNote": "Generation is off. The existing repository is left untouched — it simply stops being updated."
             },
             "deploy": {
                 "progress": {

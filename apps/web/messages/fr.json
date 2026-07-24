@@ -3490,7 +3490,14 @@
                         "lastSuccess": "Last successful pull: {time}",
                         "lastError": "Last error: {error}"
                     }
-                }
+                },
+                "providerRepoTitle": "Dépôt {provider}",
+                "providerRepoEnableLabel": "Générer le dépôt {provider}",
+                "providerRepoEnableDescription": "Une version consultable de ce travail, générée par IA et publiée sur {provider}. Elle n’est jamais déployée — on la lit directement sur {provider}.",
+                "providerRepoEnabled": "Génération du dépôt {provider} activée",
+                "providerRepoDisabled": "Génération du dépôt {provider} désactivée",
+                "providerRepoUpdateFailed": "Impossible de mettre à jour le paramètre du dépôt",
+                "providerRepoDisabledNote": "La génération est désactivée. Le dépôt existant reste intact — il cesse simplement d’être mis à jour."
             },
             "deploy": {
                 "progress": {

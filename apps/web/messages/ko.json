@@ -3296,7 +3296,14 @@
                         "lastSuccess": "Last successful pull: {time}",
                         "lastError": "Last error: {error}"
                     }
-                }
+                },
+                "providerRepoTitle": "{provider} 리포지토리",
+                "providerRepoEnableLabel": "{provider} 리포지토리 생성",
+                "providerRepoEnableDescription": "이 워크를 AI가 생성한 열람용 버전으로 {provider}에 게시됩니다. 배포되지 않으며 {provider}에서 바로 읽습니다.",
+                "providerRepoEnabled": "{provider} 리포지토리 생성을 켰습니다",
+                "providerRepoDisabled": "{provider} 리포지토리 생성을 껐습니다",
+                "providerRepoUpdateFailed": "리포지토리 설정을 업데이트하지 못했습니다",
+                "providerRepoDisabledNote": "생성이 꺼져 있습니다. 기존 리포지토리는 그대로 남고 업데이트만 중단됩니다."
             },
             "deploy": {
                 "progress": {

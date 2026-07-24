@@ -3288,7 +3288,14 @@
                         "lastSuccess": "Last successful pull: {time}",
                         "lastError": "Last error: {error}"
                     }
-                }
+                },
+                "providerRepoTitle": "Kho {provider}",
+                "providerRepoEnableLabel": "Tạo kho {provider}",
+                "providerRepoEnableDescription": "Phiên bản có thể đọc của Công việc này do AI tạo và xuất bản trên {provider}. Nó không bao giờ được triển khai — mọi người đọc trực tiếp trên {provider}.",
+                "providerRepoEnabled": "Đã bật tạo kho {provider}",
+                "providerRepoDisabled": "Đã tắt tạo kho {provider}",
+                "providerRepoUpdateFailed": "Không thể cập nhật cài đặt kho",
+                "providerRepoDisabledNote": "Việc tạo đang tắt. Kho hiện có được giữ nguyên — chỉ là không còn được cập nhật."
             },
             "deploy": {
                 "progress": {

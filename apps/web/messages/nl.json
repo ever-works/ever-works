@@ -3296,7 +3296,14 @@
                         "lastSuccess": "Last successful pull: {time}",
                         "lastError": "Last error: {error}"
                     }
-                }
+                },
+                "providerRepoTitle": "{provider}-repository",
+                "providerRepoEnableLabel": "De {provider}-repository genereren",
+                "providerRepoEnableDescription": "Een door AI gegenereerde, leesbare versie van deze Work, gepubliceerd op {provider}. Wordt nooit uitgerold — mensen lezen het direct op {provider}.",
+                "providerRepoEnabled": "Genereren van de {provider}-repository ingeschakeld",
+                "providerRepoDisabled": "Genereren van de {provider}-repository uitgeschakeld",
+                "providerRepoUpdateFailed": "Kan de repository-instelling niet bijwerken",
+                "providerRepoDisabledNote": "Genereren staat uit. De bestaande repository blijft ongemoeid — die wordt alleen niet meer bijgewerkt."
             },
             "deploy": {
                 "progress": {

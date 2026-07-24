@@ -3288,7 +3288,14 @@
                         "lastSuccess": "Last successful pull: {time}",
                         "lastError": "Last error: {error}"
                     }
-                }
+                },
+                "providerRepoTitle": "{provider} 仓库",
+                "providerRepoEnableLabel": "生成 {provider} 仓库",
+                "providerRepoEnableDescription": "由 AI 生成、可浏览的作品版本，发布到 {provider}。它不会被部署——人们直接在 {provider} 上阅读。",
+                "providerRepoEnabled": "已开启 {provider} 仓库生成",
+                "providerRepoDisabled": "已关闭 {provider} 仓库生成",
+                "providerRepoUpdateFailed": "更新仓库设置失败",
+                "providerRepoDisabledNote": "生成已关闭。现有仓库保持不变，只是不再更新。"
             },
             "deploy": {
                 "progress": {

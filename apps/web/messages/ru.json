@@ -3288,7 +3288,14 @@
                         "lastSuccess": "Last successful pull: {time}",
                         "lastError": "Last error: {error}"
                     }
-                }
+                },
+                "providerRepoTitle": "Репозиторий {provider}",
+                "providerRepoEnableLabel": "Создавать репозиторий {provider}",
+                "providerRepoEnableDescription": "Сгенерированная ИИ версия этой работы для чтения, публикуемая в {provider}. Она никогда не разворачивается — её читают прямо в {provider}.",
+                "providerRepoEnabled": "Создание репозитория {provider} включено",
+                "providerRepoDisabled": "Создание репозитория {provider} отключено",
+                "providerRepoUpdateFailed": "Не удалось обновить настройку репозитория",
+                "providerRepoDisabledNote": "Создание отключено. Существующий репозиторий остаётся нетронутым — он просто перестаёт обновляться."
             },
             "deploy": {
                 "progress": {

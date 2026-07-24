@@ -3490,7 +3490,14 @@
                         "lastSuccess": "Last successful pull: {time}",
                         "lastError": "Last error: {error}"
                     }
-                }
+                },
+                "providerRepoTitle": "مستودع {provider}",
+                "providerRepoEnableLabel": "إنشاء مستودع {provider}",
+                "providerRepoEnableDescription": "نسخة قابلة للتصفح من هذا العمل يولّدها الذكاء الاصطناعي وتُنشر على {provider}. لا تُنشر في أي بيئة — يقرأها الناس مباشرة على {provider}.",
+                "providerRepoEnabled": "تم تفعيل إنشاء مستودع {provider}",
+                "providerRepoDisabled": "تم إيقاف إنشاء مستودع {provider}",
+                "providerRepoUpdateFailed": "تعذّر تحديث إعداد المستودع",
+                "providerRepoDisabledNote": "الإنشاء متوقف. يبقى المستودع الحالي كما هو — يتوقف تحديثه فقط."
             },
             "deploy": {
                 "progress": {

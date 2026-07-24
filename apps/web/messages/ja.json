@@ -3296,7 +3296,14 @@
                         "lastSuccess": "Last successful pull: {time}",
                         "lastError": "Last error: {error}"
                     }
-                }
+                },
+                "providerRepoTitle": "{provider} リポジトリ",
+                "providerRepoEnableLabel": "{provider} リポジトリを生成する",
+                "providerRepoEnableDescription": "このワークを AI が生成した閲覧用のバージョンで、{provider} に公開されます。デプロイはされず、{provider} 上で直接読まれます。",
+                "providerRepoEnabled": "{provider} リポジトリの生成を有効にしました",
+                "providerRepoDisabled": "{provider} リポジトリの生成を無効にしました",
+                "providerRepoUpdateFailed": "リポジトリ設定を更新できませんでした",
+                "providerRepoDisabledNote": "生成はオフです。既存のリポジトリはそのまま残り、更新されなくなるだけです。"
             },
             "deploy": {
                 "progress": {
