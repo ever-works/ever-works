@@ -1937,8 +1937,12 @@
                     "activity": "Etkinlik Akışı",
                     "kb": "Bilgi Tabanı",
                     "generator": "Work'i tek seferlik veya zamanlanmış üret",
-                    "deploy": "Work'i dağıt"
-                }
+                    "deploy": "Work'i dağıt",
+                    "tasks": "Bu Work için görevler"
+                },
+                "tasks": "Görevler",
+                "posts": "Gönderiler",
+                "pages": "Sayfalar"
             },
             "members": {
                 "title": "Takım Üyeleri",
@@ -2152,7 +2156,25 @@
                 "categories": "Kategoriler",
                 "comparisons": "Karşılaştırmalar",
                 "generationStatus": "Oluşturma Durumu",
-                "daysActive": "Aktif Gün"
+                "daysActive": "Aktif Gün",
+                "posts": "Gönderiler",
+                "tags": "Etiketler",
+                "deployStatus": "Dağıtım Durumu",
+                "registeredUsers": "Kayıtlı Kullanıcılar",
+                "teamMembers": "Takım Üyeleri",
+                "agents": "Ajanlar",
+                "openTasks": "Açık Görevler",
+                "worksOwned": "İşler",
+                "pageViews": "Sayfa Görüntüleme",
+                "sessions": "Oturumlar",
+                "conversions": "Dönüşümler",
+                "states": {
+                    "live": "Yayında",
+                    "notConfigured": "Görmek için analitiği bağlayın",
+                    "notDeployed": "Görmek için dağıtın",
+                    "notGenerated": "Görmek için oluşturun",
+                    "unavailable": "Kullanılamıyor"
+                }
             },
             "comparisons": {
                 "title": "Karşılaştırmalar",
@@ -2324,8 +2346,23 @@
                 "slug": "Kısa Ad",
                 "repositories": "Depolar",
                 "dataRepo": "Veri Deposu",
-                "websiteRepo": "Web Sitesi Deposu",
-                "mainRepo": "Ana Depo",
+                "websiteRepo": "İş Deposu",
+                "mainRepo": "{provider} Deposu",
+                "repoHelp": {
+                    "data": {
+                        "title": "Veri Deposu",
+                        "body": "İşiniz için tek doğru bilgi kaynağı. Platformun sizin adınıza yönettiği meta verileri ve içeriği barındırır — bir dizin için bu, tüm öğeler, kategoriler ve etiketlerdir; diğer iş türlerinde ise sayfaların arkasındaki yapılandırılmış içeriktir. Ajanlar önce buraya yazar ve diğer her şey buradan üretilir. Nadiren değişir ve elle düzenlenmesi güvenlidir."
+                    },
+                    "provider": {
+                        "title": "{provider} Deposu",
+                        "body": "İşinizin, Veri Deposu'ndan AI tarafından üretilen okunabilir ve göz atılabilir sürümü. {provider} üzerinde yayımlanır ancak hiçbir yere dağıtılmaz — insanlar doğrudan {provider} üzerinde okur. Bir Harika Liste için bu, özenle hazırlanmış bir README demektir; diğer iş türlerinde ise aynı içeriğin Markdown karşılığıdır. Üretilmesini Ayarlar'dan kapatabilirsiniz."
+                    },
+                    "work": {
+                        "title": "İş Deposu",
+                        "body": "İşinizin ana çıktısı. Platform, Veri Deposu'nu alır, seçtiğiniz iş şablonunu uygular ve bu depoyu üretir — genellikle dağıtılabilir bir web sitesi veya web uygulaması, ancak şablona bağlı olarak bir mobil uygulama, bir dokümantasyon sitesi ya da başka herhangi bir proje de olabilir. Dağıtılan depo budur."
+                    },
+                    "ariaLabel": "Bu depo nedir?"
+                },
                 "gitProvider": "Git Sağlayıcısı",
                 "organization": "Kuruluş",
                 "created": "Oluşturulma",
@@ -2357,7 +2394,7 @@
                 "pullRequestUpdate": "Pull Request Detayları",
                 "branch": "Dal",
                 "prTitle": "PR Başlığı",
-                "mainRepository": "Ana Depo",
+                "mainRepository": "{provider} Deposu",
                 "dataRepository": "Veri Deposu"
             },
             "activity": {
@@ -2736,7 +2773,7 @@
                 "modelOverridePlaceholder": "ör. openai/gpt-4.1 veya openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "İsteğe bağlı. Burada geçersiz kılmadığınız sürece varsayılan olarak içe aktarılan veya önceki modeli kullanır.",
                 "modelOverrideUnavailable": "Kullanılabilir listeden bir model seçmek için önce yapılandırılmış bir AI sağlayıcısı seçin.",
-                "websiteTemplateHelperText": "Web sitesi deposu ilk oluşturulduğunda kullanılacak web sitesi şablonunu seçin.",
+                "websiteTemplateHelperText": "İş deposu ilk oluşturulduğunda kullanılacak iş şablonunu seçin.",
                 "websiteTemplateLockedHelperText": "Şablon seçimi, ilk web sitesi üretildikten sonra kilitlenir.",
                 "recommended": "Önerilen",
                 "promptPlaceholder": "Bu iş için oluşturulacak öğeleri açıklayın...",
@@ -2781,7 +2818,7 @@
                 "enableBadgeEvaluationDescription": "Öğelere kalite rozetleri değerlendir ve ekle",
                 "captureScreenshots": "Öğe Ekran Görüntülerini Yakala",
                 "captureScreenshotsDescription": "Oluşturma sırasında her öğe için ekran görüntülerini veya ürün görüntülerini otomatik yakala",
-                "websiteRepositoryCreationMethod": "Web Sitesi Depo Oluşturma Yöntemi",
+                "websiteRepositoryCreationMethod": "İş Deposu Oluşturma Yöntemi",
                 "methodDuplicate": "Çoğalt",
                 "methodFork": "Fork",
                 "workNamePlaceholder": "İş adını girin",
@@ -2807,7 +2844,7 @@
                 "targetKeywordsDescription": "AI aramasını ve içerik oluşturmayı yönlendirmek için anahtar kelimeler. Daha spesifik anahtar kelimeler daha iyi sonuçlar verir.",
                 "sourceUrlsFieldDescription": "İçerik çıkarmak için belirli URL'ler. Boşsa, oluşturucu web'i otomatik arar.",
                 "generationMethodDescription": "Mevcut öğeleri güncellemek mi yoksa her şeyi sıfırdan yeniden oluşturmak mı seçin.",
-                "websiteRepositoryCreationMethodDescription": "Web sitesi deposu nasıl oluşturulur. Çoğu durumda şablon önerilir.",
+                "websiteRepositoryCreationMethodDescription": "İş deposunun nasıl oluşturulacağı. Çoğu durumda şablon önerilir.",
                 "maxSearchQueriesDescription": "AI'nin alakalı içerik bulmak için oluşturacağı arama sorgusu sayısı (1-50).",
                 "resultsPerQueryDescription": "Arama sorgusu başına alınacak maksimum sonuç (1-20).",
                 "maxPagesToProcessDescription": "İçerik çıkarma için işlenecek maksimum web sayfası (1-100).",
@@ -2966,7 +3003,7 @@
                         "model": "Model",
                         "schedule": "Zamanlama",
                         "providers": "Sağlayıcılar",
-                        "websiteRepo": "Web Sitesi Deposu"
+                        "websiteRepo": "İş Deposu"
                     },
                     "sourceTypes": {
                         "dataRepo": "Veri Deposu",
@@ -3001,8 +3038,8 @@
                 "deleteDataRepositoryDescription": "GitHub'dan JSON veri deposunu kaldırın",
                 "deleteMarkdownRepository": "Markdown deposunu sil",
                 "deleteMarkdownRepositoryDescription": "README içeren markdown deposunu kaldırın",
-                "deleteWebsiteRepository": "Web sitesi deposunu sil",
-                "deleteWebsiteRepositoryDescription": "Dağıtılmış web sitesi deposunu kaldırın",
+                "deleteWebsiteRepository": "İş deposunu sil",
+                "deleteWebsiteRepositoryDescription": "Dağıtılmış iş deposunu kaldırın",
                 "deleteConfirm": "Tamamen emin misiniz?",
                 "deleteConfirmDetail": "Bu işlem geri alınamaz. İş ve seçilen depolar kalıcı olarak silinecek.",
                 "confirmWorkName": "Onaylamak için iş adını yazın",
@@ -3020,7 +3057,7 @@
                 "updateFailed": "Ayarlar güncellenemedi",
                 "deployProvider": {
                     "title": "Dağıtım Sağlayıcısı",
-                    "description": "İş web sitenizi nereye dağıtacağınızı seçin",
+                    "description": "İşinizi nereye dağıtacağınızı seçin",
                     "configure": "Yapılandır",
                     "ready": "Dağıtıma hazır",
                     "notConfigured": "Yapılandırılmamış",
@@ -3260,7 +3297,7 @@
                 },
                 "noProviderAlert": {
                     "title": "Dağıtım Sağlayıcısı Yok",
-                    "description": "İş web sitenizi dağıtmak için bir dağıtım sağlayıcısı seçin.",
+                    "description": "İşinizi dağıtmak için bir dağıtım sağlayıcısı seçin.",
                     "selectButton": "Seç & Devam Et",
                     "noProviders": "Kullanılabilir dağıtım sağlayıcısı yok. Önce bir dağıtım eklentisi yükleyin"
                 },
@@ -3284,8 +3321,8 @@
                 },
                 "form": {
                     "deployment": {
-                        "title": "Web Sitesi Dağıt",
-                        "description": "İş web sitesi deposunu dağıtın.",
+                        "title": "İşi Dağıt",
+                        "description": "İş deponuzu dağıtın.",
                         "deployButton": "{provider}'a Dağıt",
                         "deployingButton": "Dağıtılıyor...",
                         "deployingStateButton": "Dağıtılıyor ({state})...",
@@ -3300,9 +3337,9 @@
                         }
                     },
                     "updateRepository": {
-                        "title": "Web Sitesi Deposunu Güncelle",
+                        "title": "İş Deposunu Güncelle",
                         "description": "Şablondan en son değişiklikleri şu adrese senkronize edin:",
-                        "websiteRepository": "web sitesi deposu",
+                        "websiteRepository": "iş deposu",
                         "updateButton": "Depoyu Güncelle",
                         "updatingButton": "Güncelleniyor..."
                     },
@@ -3319,20 +3356,20 @@
                     },
                     "info": {
                         "deployInfo": "Dağıtım genellikle 1-3 dakika sürer. Tamamlandığında bir URL alacaksınız.",
-                        "updateInfo": "Güncellemeler, iş içeriğinizi bir sonraki dağıtım için web sitesi deposuna senkronize eder"
+                        "updateInfo": "Güncellemeler, işinizin içeriğini bir sonraki dağıtım için iş deposuna senkronize eder."
                     },
                     "websiteTemplate": {
                         "title": "Otomatik Şablon Güncellemeleri",
-                        "description": "Web sitenizi en son şablon değişiklikleriyle otomatik olarak senkronize tutun.",
-                        "selectorLabel": "Web sitesi şablonu",
+                        "description": "İşinizi en son şablon değişiklikleriyle otomatik olarak senkronize tutun.",
+                        "selectorLabel": "İş şablonu",
                         "currentTemplateLabel": "Geçerli şablon",
                         "unknownTemplate": "Devralınan varsayılan",
-                        "currentHelperText": "Seçilen şablon, web sitesi deposunun nasıl başlatılacağını ve güncelleneceğini kontrol eder.",
-                        "switchHelperText": "Yeni bir şablon uygulanırsa, mevcut web sitesi deposu seçilen şablondan sıfırlanır (zaten varsa).",
-                        "switchAction": "Şablonu web sitesi deposuna uygula",
+                        "currentHelperText": "Seçilen şablon, iş deposunun nasıl başlatılacağını ve güncelleneceğini kontrol eder.",
+                        "switchHelperText": "Yeni bir şablon uygulamak, mevcut iş deposunu (zaten varsa) seçilen şablondan sıfırlar.",
+                        "switchAction": "Şablonu iş deposuna uygula",
                         "switchActionIdle": "Şablon güncel",
-                        "switchConfirmTitle": "Web sitesi şablonunu değiştirmek istediğinizden emin misiniz?",
-                        "switchConfirmDescription": "Web sitesi deposu zaten varsa, içeriği seçilen şablondan değiştirilecektir. Depodaki herhangi bir özel kod kaybolacaktır.",
+                        "switchConfirmTitle": "İş şablonu değiştirilsin mi?",
+                        "switchConfirmDescription": "İş deposu zaten varsa, içeriği seçilen şablondan değiştirilecektir. O depodaki tüm özel kodlar kaybolacaktır.",
                         "switchConfirmButton": "Şablonu Değiştir",
                         "switchCancel": "İptal",
                         "autoUpdate": "Otomatik güncelle",
@@ -3707,7 +3744,7 @@
             },
             "deployProvider": {
                 "title": "Dağıtım Sağlayıcısı",
-                "description": "İş web sitenizi nereye dağıtacağınızı seçin",
+                "description": "İşinizi nereye dağıtacağınızı seçin",
                 "noProviders": "Kullanılabilir dağıtım sağlayıcısı yok",
                 "notConfigured": "Yapılandırılmamış",
                 "configured": "Dağıtıma hazır",
@@ -3808,7 +3845,7 @@
                 "organizationHelp": "Kişisel hesabınız yerine bir kuruluş altında depolar oluşturun",
                 "organizationNameLabel": "Kuruluş Adı",
                 "organizationNamePlaceholder": "Kuruluş adını girin",
-                "websiteTemplateHelperText": "Web sitesi deposu ilk oluşturulduğunda kullanılacak web sitesi şablonunu seçin."
+                "websiteTemplateHelperText": "İş deposu ilk oluşturulduğunda kullanılacak iş şablonunu seçin."
             },
             "manual": {
                 "title": "Manuel Oluştur",
@@ -3835,7 +3872,7 @@
                 "organizationHelp": "Bu işi kişisel hesabınız yerine bir GitHub kuruluşu altında oluşturun",
                 "organizationNameLabel": "Kuruluş Adı",
                 "organizationNamePlaceholder": "my-organization",
-                "websiteTemplateHelperText": "Web sitesi deposu ilk oluşturulduğunda kullanılacak web sitesi şablonunu seçin.",
+                "websiteTemplateHelperText": "İş deposu ilk oluşturulduğunda kullanılacak iş şablonunu seçin.",
                 "headerLabel": "Özel README Başlığı",
                 "headerPlaceholder": "README dosyanızın üstüne özel içerik ekleyin",
                 "headerOverwrite": "Varsayılan başlığı tamamen değiştir",
@@ -3941,15 +3978,15 @@
                     "importButton": "İçe Aktar & Araştırmayı Başlat",
                     "importingButton": "Araştırma hattı başlatılıyor...",
                     "mainRepository": {
-                        "title": "Main repository",
+                        "title": "GitHub deposu",
                         "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
                         "clone": {
                             "title": "Clone / recreate",
-                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                            "description": "Bu iş için yeni bir üretilmiş README deposu oluşturun. Veri ve iş depoları yine de oluşturulur."
                         },
                         "reuse": {
                             "title": "Reuse source README",
-                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                            "description": "Üretilmiş bir README deposu oluşturmayın. GitHub deposu bağlantıları kaynak README deposuna yönlendirir."
                         }
                     }
                 },
@@ -4010,7 +4047,7 @@
                     "descriptionReady": "Tüm depolar bulundu. Bağlamaya hazır.",
                     "dataRepo": "Veri Deposu",
                     "markdownRepo": "Markdown Deposu",
-                    "websiteRepo": "Web Sitesi Deposu",
+                    "websiteRepo": "İş Deposu",
                     "found": "Bulundu",
                     "notFound": "Bulunamadı",
                     "cancel": "İptal",
@@ -4621,7 +4658,7 @@
         },
         "templates": {
             "title": "Şablonlar",
-            "subtitle": "Yerleşik web sitesi şablonlarını gözatın, özel kataloğunuzu yönetin ve yeni işlerin hangi şablondan başlayacağını kontrol edin.",
+            "subtitle": "Yerleşik iş şablonlarına göz atın, özel kataloğunuzu yönetin ve yeni işlerin hangi şablondan başlayacağını kontrol edin.",
             "kindSwitcher": {
                 "mission": "Mission Templates",
                 "work": "Work Templates",
@@ -5110,6 +5147,16 @@
                 "copyFailed": "Panoya kopyalanamadı"
             },
             "confirmDelete": "Bu tetikleyici silinsin mi? Webhook URL’si hemen çalışmayı durdurur ve bu işlem geri alınamaz."
+        },
+        "workKind": {
+            "label": "Tür",
+            "website": "Website",
+            "landing-page": "Landing Page",
+            "blog": "Blog",
+            "directory": "Directory",
+            "awesome-repo": "Awesome Repo",
+            "company": "Company",
+            "default": "Work"
         }
     },
     "layout": {
@@ -5323,7 +5370,7 @@
         "deploy": {
             "deployFailed": "Dağıtım başarısız",
             "updateRepositoryFailed": "Depo güncellenemedi",
-            "updateSettingsFailed": "Web sitesi şablon ayarları güncellenemedi"
+            "updateSettingsFailed": "İş şablonu ayarları güncellenemedi"
         }
     },
     "validation": {

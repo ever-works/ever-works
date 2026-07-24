@@ -1937,8 +1937,12 @@
                     "activity": "Feed attività",
                     "kb": "Base di conoscenza",
                     "generator": "Genera Work, una tantum o pianificato",
-                    "deploy": "Distribuisci Work"
-                }
+                    "deploy": "Distribuisci Work",
+                    "tasks": "Attività di questo Work"
+                },
+                "tasks": "Attività",
+                "posts": "Articoli",
+                "pages": "Pagine"
             },
             "members": {
                 "title": "Membri del team",
@@ -2152,7 +2156,25 @@
                 "categories": "Categorie",
                 "comparisons": "Confronti",
                 "generationStatus": "Stato generazione",
-                "daysActive": "Giorni attivi"
+                "daysActive": "Giorni attivi",
+                "posts": "Articoli",
+                "tags": "Tag",
+                "deployStatus": "Stato distribuzione",
+                "registeredUsers": "Utenti registrati",
+                "teamMembers": "Membri del team",
+                "agents": "Agenti",
+                "openTasks": "Attività aperte",
+                "worksOwned": "Lavori",
+                "pageViews": "Visualizzazioni",
+                "sessions": "Sessioni",
+                "conversions": "Conversioni",
+                "states": {
+                    "live": "Online",
+                    "notConfigured": "Collega le analisi per vederlo",
+                    "notDeployed": "Distribuisci per vederlo",
+                    "notGenerated": "Genera per vederlo",
+                    "unavailable": "Non disponibile"
+                }
             },
             "comparisons": {
                 "title": "Confronti",
@@ -2324,8 +2346,8 @@
                 "slug": "Slug",
                 "repositories": "Repository",
                 "dataRepo": "Repository dati",
-                "websiteRepo": "Repository sito web",
-                "mainRepo": "Repository principale",
+                "websiteRepo": "Repository Lavori",
+                "mainRepo": "Repository {provider}",
                 "gitProvider": "Fornitore Git",
                 "organization": "Organizzazione",
                 "created": "Creato",
@@ -2339,7 +2361,22 @@
                 "deployProvider": "Fornitore distribuzione",
                 "notConnected": "Non connesso",
                 "notConfigured": "Non configurato",
-                "viewSite": "Visualizza sito"
+                "viewSite": "Visualizza sito",
+                "repoHelp": {
+                    "data": {
+                        "title": "Repository dati",
+                        "body": "La fonte di verità della tua lavori. Contiene i metadati e i contenuti che la piattaforma gestisce per te — per una directory sono tutti gli elementi, le categorie e i tag; per gli altri tipi di lavori è il contenuto strutturato dietro le pagine. Gli agenti scrivono prima qui, e tutto il resto viene generato da questo repository. Cambia raramente ed è sicuro modificarlo a mano."
+                    },
+                    "provider": {
+                        "title": "Repository {provider}",
+                        "body": "Una versione leggibile e navigabile della tua lavori, generata dall'AI a partire dal Repository dati. Viene pubblicata su {provider} ma non viene mai distribuita da nessuna parte: le persone la leggono direttamente su {provider}. Per una awesome list si tratta di un README curato; per gli altri tipi di lavori è la vista Markdown equivalente degli stessi contenuti. Puoi disattivarne la generazione in Impostazioni."
+                    },
+                    "work": {
+                        "title": "Repository Lavori",
+                        "body": "Il risultato principale della tua lavori. La piattaforma prende il Repository dati, applica il modello Lavori che hai scelto e produce questo repository — di solito un sito web o una web app distribuibile, ma a seconda del modello può essere un'app mobile, un sito di documentazione o qualsiasi altro progetto. È questo il repository che viene distribuito."
+                    },
+                    "ariaLabel": "Che cos'è questo repository?"
+                }
             },
             "config": {
                 "title": "Dettagli configurazione",
@@ -2357,7 +2394,7 @@
                 "pullRequestUpdate": "Dettagli Pull Request",
                 "branch": "Branch",
                 "prTitle": "Titolo PR",
-                "mainRepository": "Repository principale",
+                "mainRepository": "Repository {provider}",
                 "dataRepository": "Repository dati"
             },
             "activity": {
@@ -2736,7 +2773,7 @@
                 "modelOverridePlaceholder": "es. openai/gpt-4.1 o openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Opzionale. Usa il modello importato o precedente per impostazione predefinita a meno che non lo sovrascriva qui.",
                 "modelOverrideUnavailable": "Seleziona prima un provider AI configurato per scegliere un modello dall'elenco disponibile.",
-                "websiteTemplateHelperText": "Scegli il modello di sito web che verrà utilizzato quando il repository del sito web viene creato per la prima volta.",
+                "websiteTemplateHelperText": "Scegli il modello Lavori che verrà utilizzato quando il repository Lavori viene creato per la prima volta.",
                 "websiteTemplateLockedHelperText": "La selezione del modello è bloccata dopo la prima generazione del sito web.",
                 "recommended": "Consigliato",
                 "promptPlaceholder": "Descrivi quali elementi devono essere generati per questa lavori...",
@@ -2781,7 +2818,7 @@
                 "enableBadgeEvaluationDescription": "Valuta e aggiungi badge di qualità agli elementi",
                 "captureScreenshots": "Cattura Screenshot Elementi",
                 "captureScreenshotsDescription": "Cattura automaticamente screenshot o immagini prodotto per ogni elemento durante la generazione",
-                "websiteRepositoryCreationMethod": "Metodo Creazione Repository Sito Web",
+                "websiteRepositoryCreationMethod": "Metodo Creazione Repository Lavori",
                 "methodDuplicate": "Duplica",
                 "methodFork": "Fork",
                 "workNamePlaceholder": "Inserisci nome lavori",
@@ -2807,7 +2844,7 @@
                 "targetKeywordsDescription": "Parole chiave per guidare la ricerca AI e la generazione contenuti. Parole chiave più specifiche danno migliori risultati.",
                 "sourceUrlsFieldDescription": "URL specifici da cui estrarre contenuto. Se vuoti, il generatore cercherà sul web automaticamente.",
                 "generationMethodDescription": "Scegli se aggiornare gli elementi esistenti o ricreare tutto da zero.",
-                "websiteRepositoryCreationMethodDescription": "Come viene creato il repository del sito web. Template è raccomandato nella maggior parte dei casi.",
+                "websiteRepositoryCreationMethodDescription": "Come viene creato il repository Lavori. Template è raccomandato nella maggior parte dei casi.",
                 "maxSearchQueriesDescription": "Numero di query di ricerca che l'AI genererà per trovare contenuto rilevante (1-50).",
                 "resultsPerQueryDescription": "Numero massimo di risultati da recuperare per query di ricerca (1-20).",
                 "maxPagesToProcessDescription": "Numero massimo di pagine web da elaborare per estrazione contenuto (1-100).",
@@ -2966,7 +3003,7 @@
                         "model": "Modello",
                         "schedule": "Pianificazione",
                         "providers": "Fornitori",
-                        "websiteRepo": "Repo sito web"
+                        "websiteRepo": "Repo Lavori"
                     },
                     "sourceTypes": {
                         "dataRepo": "Repository dati",
@@ -3001,8 +3038,8 @@
                 "deleteDataRepositoryDescription": "Rimuovi il repository dati JSON da GitHub",
                 "deleteMarkdownRepository": "Elimina repository markdown",
                 "deleteMarkdownRepositoryDescription": "Rimuovi il repository markdown contenente il README",
-                "deleteWebsiteRepository": "Elimina repository sito web",
-                "deleteWebsiteRepositoryDescription": "Rimuovi il repository del sito web deployato",
+                "deleteWebsiteRepository": "Elimina repository Lavori",
+                "deleteWebsiteRepositoryDescription": "Rimuovi il repository Lavori distribuito",
                 "deleteConfirm": "Sei assolutamente sicuro?",
                 "deleteConfirmDetail": "Questa azione non può essere annullata. La lavori e i repository selezionati verranno eliminati permanentemente.",
                 "confirmWorkName": "Digita il nome della lavori per confermare",
@@ -3020,7 +3057,7 @@
                 "updateFailed": "Impossibile aggiornare le impostazioni",
                 "deployProvider": {
                     "title": "Fornitore di deploy",
-                    "description": "Seleziona dove deployare il sito web della tua lavori",
+                    "description": "Seleziona dove distribuire la tua lavori",
                     "configure": "Configura",
                     "ready": "Pronto per il deploy",
                     "notConfigured": "Non configurato",
@@ -3260,7 +3297,7 @@
                 },
                 "noProviderAlert": {
                     "title": "Nessun Provider di Distribuzione",
-                    "description": "Seleziona un provider di distribuzione per distribuire il tuo sito web lavori.",
+                    "description": "Seleziona un provider di distribuzione per distribuire la tua lavori.",
                     "selectButton": "Seleziona e Continua",
                     "noProviders": "Nessun provider di distribuzione disponibile. Installa prima un plugin di distribuzione"
                 },
@@ -3284,8 +3321,8 @@
                 },
                 "form": {
                     "deployment": {
-                        "title": "Distribuisci Sito Web",
-                        "description": "Distribuisci il repository del tuo sito web lavori.",
+                        "title": "Distribuisci Lavori",
+                        "description": "Distribuisci il tuo repository Lavori.",
                         "deployButton": "Distribuisci su {provider}",
                         "deployingButton": "Distribuzione in corso...",
                         "deployingStateButton": "Distribuzione ({state}) in corso...",
@@ -3300,9 +3337,9 @@
                         }
                     },
                     "updateRepository": {
-                        "title": "Aggiorna Repository Sito Web",
+                        "title": "Aggiorna Repository Lavori",
                         "description": "Sincronizza le ultime modifiche dal template al",
-                        "websiteRepository": "repository del sito web",
+                        "websiteRepository": "repository Lavori",
                         "updateButton": "Aggiorna Repository",
                         "updatingButton": "Aggiornamento in corso..."
                     },
@@ -3319,20 +3356,20 @@
                     },
                     "info": {
                         "deployInfo": "La distribuzione richiede tipicamente 1-3 minuti. Riceverai un URL una volta completata.",
-                        "updateInfo": "Gli aggiornamenti sincronizzano il contenuto della tua lavori con il repository del sito web per la prossima distribuzione"
+                        "updateInfo": "Gli aggiornamenti sincronizzano il contenuto della tua lavori con il repository Lavori per la prossima distribuzione."
                     },
                     "websiteTemplate": {
                         "title": "Aggiornamenti Automatici del Template",
-                        "description": "Mantieni il tuo sito web automaticamente sincronizzato con le ultime modifiche del template.",
-                        "selectorLabel": "Modello sito web",
+                        "description": "Mantieni la tua lavori automaticamente sincronizzata con le ultime modifiche del template.",
+                        "selectorLabel": "Modello Lavori",
                         "currentTemplateLabel": "Modello corrente",
                         "unknownTemplate": "Predefinito ereditato",
-                        "currentHelperText": "Il modello selezionato controlla come il repository del sito web viene inizializzato e aggiornato.",
-                        "switchHelperText": "L'applicazione di un nuovo modello reimposterà il repository esistente del sito web dal modello selezionato, se esiste già.",
-                        "switchAction": "Applica modello al repository del sito web",
+                        "currentHelperText": "Il modello selezionato controlla come il repository Lavori viene inizializzato e aggiornato.",
+                        "switchHelperText": "L'applicazione di un nuovo modello reimposterà il repository Lavori esistente dal modello selezionato, se esiste già.",
+                        "switchAction": "Applica modello al repository Lavori",
                         "switchActionIdle": "Il modello è aggiornato",
-                        "switchConfirmTitle": "Cambiare modello di sito web?",
-                        "switchConfirmDescription": "Se il repository del sito web esiste già, il suo contenuto verrà sostituito dal modello selezionato. Eventuale codice personalizzato in quel repository verrà perso.",
+                        "switchConfirmTitle": "Cambiare modello Lavori?",
+                        "switchConfirmDescription": "Se il repository Lavori esiste già, il suo contenuto verrà sostituito dal modello selezionato. Eventuale codice personalizzato in quel repository verrà perso.",
                         "switchConfirmButton": "Cambia modello",
                         "switchCancel": "Annulla",
                         "autoUpdate": "Aggiorna automaticamente",
@@ -3707,7 +3744,7 @@
             },
             "deployProvider": {
                 "title": "Fornitore di Deploy",
-                "description": "Seleziona dove distribuire il sito web della tua lavori",
+                "description": "Seleziona dove distribuire la tua lavori",
                 "noProviders": "Nessun fornitore di deploy disponibile",
                 "notConfigured": "Non configurato",
                 "configured": "Pronto per il deploy",
@@ -3808,7 +3845,7 @@
                 "organizationHelp": "Crea repository sotto un'organizzazione invece del tuo account personale",
                 "organizationNameLabel": "Nome Organizzazione",
                 "organizationNamePlaceholder": "Inserisci il nome dell'organizzazione",
-                "websiteTemplateHelperText": "Scegli il modello di sito web che verrà utilizzato quando il repository del sito web viene creato per la prima volta."
+                "websiteTemplateHelperText": "Scegli il modello Lavori che verrà utilizzato quando il repository Lavori viene creato per la prima volta."
             },
             "manual": {
                 "title": "Crea Manualmente",
@@ -3835,7 +3872,7 @@
                 "organizationHelp": "Crea questa lavori sotto un'organizzazione GitHub invece del tuo account personale",
                 "organizationNameLabel": "Nome Organizzazione",
                 "organizationNamePlaceholder": "my-organization",
-                "websiteTemplateHelperText": "Scegli il modello di sito web che verrà utilizzato quando il repository del sito web viene creato per la prima volta.",
+                "websiteTemplateHelperText": "Scegli il modello Lavori che verrà utilizzato quando il repository Lavori viene creato per la prima volta.",
                 "headerLabel": "Intestazione README Personalizzata",
                 "headerPlaceholder": "Aggiungi contenuto personalizzato in cima al file README",
                 "headerOverwrite": "Sostituisci completamente l'intestazione predefinita",
@@ -3941,15 +3978,15 @@
                     "importButton": "Avvia Importa e Ricerca",
                     "importingButton": "Avvio pipeline di ricerca...",
                     "mainRepository": {
-                        "title": "Main repository",
+                        "title": "Repository GitHub",
                         "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
                         "clone": {
                             "title": "Clone / recreate",
-                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                            "description": "Crea un nuovo repository README generato per questa lavori. I repository dati e Lavori vengono comunque creati."
                         },
                         "reuse": {
                             "title": "Reuse source README",
-                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                            "description": "Non creare un repository README generato. I link al repository GitHub punteranno al repository README di origine."
                         }
                     }
                 },
@@ -4010,7 +4047,7 @@
                     "descriptionReady": "Tutti i repository trovati. Pronto per il collegamento.",
                     "dataRepo": "Repository Dati",
                     "markdownRepo": "Repository Markdown",
-                    "websiteRepo": "Repository Sito Web",
+                    "websiteRepo": "Repository Lavori",
                     "found": "Trovato",
                     "notFound": "Non trovato",
                     "cancel": "Annulla",
@@ -4621,7 +4658,7 @@
         },
         "templates": {
             "title": "Modelli",
-            "subtitle": "Sfoglia i modelli di sito web predefiniti, gestisci il tuo catalogo personalizzato e controlla quale modello i nuovi lavori utilizzeranno inizialmente.",
+            "subtitle": "Sfoglia i modelli Lavori predefiniti, gestisci il tuo catalogo personalizzato e controlla quale modello i nuovi lavori utilizzeranno inizialmente.",
             "kindSwitcher": {
                 "mission": "Mission Templates",
                 "work": "Work Templates",
@@ -5110,6 +5147,16 @@
                 "copyFailed": "Impossibile copiare negli appunti"
             },
             "confirmDelete": "Eliminare questo trigger? Il suo URL webhook smette di funzionare immediatamente e l’operazione è irreversibile."
+        },
+        "workKind": {
+            "label": "Tipo",
+            "website": "Website",
+            "landing-page": "Landing Page",
+            "blog": "Blog",
+            "directory": "Directory",
+            "awesome-repo": "Awesome Repo",
+            "company": "Company",
+            "default": "Work"
         }
     },
     "layout": {
@@ -5323,7 +5370,7 @@
         "deploy": {
             "deployFailed": "Impossibile distribuire",
             "updateRepositoryFailed": "Impossibile aggiornare repository",
-            "updateSettingsFailed": "Impossibile aggiornare impostazioni template sito web"
+            "updateSettingsFailed": "Impossibile aggiornare impostazioni modello Lavori"
         }
     },
     "validation": {

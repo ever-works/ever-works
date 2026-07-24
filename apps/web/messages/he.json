@@ -2139,8 +2139,12 @@
                     "activity": "פיד פעילות",
                     "kb": "מאגר ידע",
                     "generator": "צור Work, חד-פעמי או על פי לוח זמנים",
-                    "deploy": "פרוס Work"
-                }
+                    "deploy": "פרוס Work",
+                    "tasks": "משימות עבור Work זה"
+                },
+                "tasks": "משימות",
+                "posts": "פוסטים",
+                "pages": "עמודים"
             },
             "members": {
                 "title": "חברי צוות",
@@ -2354,7 +2358,25 @@
                 "categories": "קטגוריות",
                 "comparisons": "השוואות",
                 "generationStatus": "סטטוס יצירה",
-                "daysActive": "ימים פעילים"
+                "daysActive": "ימים פעילים",
+                "posts": "פוסטים",
+                "tags": "תגיות",
+                "deployStatus": "מצב פריסה",
+                "registeredUsers": "משתמשים רשומים",
+                "teamMembers": "חברי צוות",
+                "agents": "סוכנים",
+                "openTasks": "משימות פתוחות",
+                "worksOwned": "עבודות",
+                "pageViews": "צפיות בעמוד",
+                "sessions": "הפעלות",
+                "conversions": "המרות",
+                "states": {
+                    "live": "פעיל",
+                    "notConfigured": "חברו אנליטיקה כדי לראות",
+                    "notDeployed": "פרסו כדי לראות",
+                    "notGenerated": "הפיקו כדי לראות",
+                    "unavailable": "לא זמין"
+                }
             },
             "comparisons": {
                 "title": "השוואות",
@@ -2526,8 +2548,8 @@
                 "slug": "Slug",
                 "repositories": "מאגרים",
                 "dataRepo": "מאגר נתונים",
-                "websiteRepo": "מאגר אתר",
-                "mainRepo": "מאגר ראשי",
+                "websiteRepo": "מאגר העבודה",
+                "mainRepo": "מאגר {provider}",
                 "gitProvider": "ספק Git",
                 "organization": "ארגון",
                 "created": "נוצר",
@@ -2541,7 +2563,22 @@
                 "deployProvider": "ספק פריסה",
                 "notConnected": "לא מחובר",
                 "notConfigured": "לא מוגדר",
-                "viewSite": "צפה באתר"
+                "viewSite": "צפה באתר",
+                "repoHelp": {
+                    "data": {
+                        "title": "מאגר נתונים",
+                        "body": "מקור האמת של העבודה שלך. כאן נשמרים המטא-נתונים והתוכן שהפלטפורמה מתחזקת עבורך — בספרייה אלה כל הפריטים, הקטגוריות והתגיות, ובסוגי עבודה אחרים זהו התוכן המובנה שמאחורי העמודים. הסוכנים כותבים לכאן קודם כול, וכל השאר נוצר מתוכו. הוא משתנה לעיתים רחוקות, וניתן לערוך אותו ידנית בבטחה."
+                    },
+                    "provider": {
+                        "title": "מאגר {provider}",
+                        "body": "גרסה קריאה ונוחה לעיון של העבודה שלך, שנוצרת על ידי AI מתוך מאגר הנתונים. היא מתפרסמת ב-{provider} אך אינה נפרסת בשום מקום — הקוראים מעיינים בה ישירות ב-{provider}. עבור רשימת Awesome מדובר ב-README אצור, ובסוגי עבודה אחרים זו תצוגת ה-Markdown המקבילה של אותו תוכן. אפשר לכבות את יצירתה בהגדרות."
+                    },
+                    "work": {
+                        "title": "מאגר העבודה",
+                        "body": "התוצר המרכזי של העבודה שלך. הפלטפורמה לוקחת את מאגר הנתונים, מחילה עליו את תבנית העבודה שבחרת, ומייצרת את המאגר הזה — לרוב אתר או אפליקציית ווב הניתנים לפריסה, אך בהתאם לתבנית זו יכולה להיות גם אפליקציה לנייד, אתר תיעוד או כל פרויקט אחר. זהו המאגר שנפרס בפועל."
+                    },
+                    "ariaLabel": "מהו המאגר הזה?"
+                }
             },
             "config": {
                 "title": "פרטי הגדרה",
@@ -2559,7 +2596,7 @@
                 "pullRequestUpdate": "פרטי בקשת משיכה",
                 "branch": "ענף",
                 "prTitle": "כותרת PR",
-                "mainRepository": "מאגר ראשי",
+                "mainRepository": "מאגר {provider}",
                 "dataRepository": "מאגר נתונים"
             },
             "activity": {
@@ -2938,7 +2975,7 @@
                 "modelOverridePlaceholder": "לדוגמה openai/gpt-4.1 או openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "אופציונלי. משתמש במודל המיובא או הקודם כברירת מחדל אלא אם תעקוף אותו כאן.",
                 "modelOverrideUnavailable": "ראשית בחר ספק AI מוגדר כדי לבחור מודל מהרשימה הזמינה。",
-                "websiteTemplateHelperText": "בחר את תבנית האתר שתועמד בעת יצירת מאגר האתר לראשונה。",
+                "websiteTemplateHelperText": "בחר את תבנית העבודה שתשמש ביצירה הראשונה של מאגר העבודה.",
                 "websiteTemplateLockedHelperText": "בחירת התבנית נעולה לאחר יצירת האתר הראשונה。",
                 "recommended": "מומלץ",
                 "promptPlaceholder": "תאר אילו פריטים יש לייצר עבור תיקייה זו...",
@@ -2983,7 +3020,7 @@
                 "enableBadgeEvaluationDescription": "הערך והוסף תגיות איכות לפריטים",
                 "captureScreenshots": "לכד צילומי מסך פריט",
                 "captureScreenshotsDescription": "לכד אוטומטית צילומי מסך או תמונות מוצר לכל פריט במהלך היצירה",
-                "websiteRepositoryCreationMethod": "שיטת יצירת מאגר אתר",
+                "websiteRepositoryCreationMethod": "שיטת יצירת מאגר העבודה",
                 "methodDuplicate": "שכפל",
                 "methodFork": "פיצול",
                 "workNamePlaceholder": "הזן שם תיקייה",
@@ -3009,7 +3046,7 @@
                 "targetKeywordsDescription": "מילות מפתח להנחיית חיפוש AI ויצירת תוכן. מילות מפתח ספציפיות יותר נותנות תוצאות טובות יותר.",
                 "sourceUrlsFieldDescription": "כתובות URL ספציפיות לחילוץ תוכן מהן. אם ריק, היוצר יחפש באינטרנט אוטומטית.",
                 "generationMethodDescription": "בחר אם לעדכן פריטים קיימים או ליצור הכל מאפס.",
-                "websiteRepositoryCreationMethodDescription": "איך מאגר האתר נוצר. תבנית מומלצת לרוב המקרים.",
+                "websiteRepositoryCreationMethodDescription": "כיצד נוצר מאגר העבודה. תבנית מומלצת לרוב המקרים.",
                 "maxSearchQueriesDescription": "מספר שאילתות החיפוש שה-AI ייצור כדי למצוא תוכן רלוונטי (1-50).",
                 "resultsPerQueryDescription": "מקסימום תוצאות להביא לשאילתת חיפוש (1-20).",
                 "maxPagesToProcessDescription": "מקסימום עמודי אינטרנט לעיבוד לחילוץ תוכן (1-100).",
@@ -3168,7 +3205,7 @@
                         "model": "מודל",
                         "schedule": "תזמון",
                         "providers": "ספקים",
-                        "websiteRepo": "מאגר אתר"
+                        "websiteRepo": "מאגר העבודה"
                     },
                     "sourceTypes": {
                         "dataRepo": "מאגר נתונים",
@@ -3203,8 +3240,8 @@
                 "deleteDataRepositoryDescription": "הסר את מאגר נתוני ה-JSON מ-GitHub",
                 "deleteMarkdownRepository": "מחק מאגר Markdown",
                 "deleteMarkdownRepositoryDescription": "הסר את מאגר ה-Markdown המכיל את ה-README",
-                "deleteWebsiteRepository": "מחק מאגר אתר",
-                "deleteWebsiteRepositoryDescription": "הסר את מאגר אתר הפריסה",
+                "deleteWebsiteRepository": "מחק את מאגר העבודה",
+                "deleteWebsiteRepositoryDescription": "הסר את מאגר העבודה שנפרס",
                 "deleteConfirm": "האם אתה בטוח לחלוטין?",
                 "deleteConfirmDetail": "פעולה זו אינה ניתנת לביטול. העבודה והמאגרים הנבחרים יימחקו לצמיתות.",
                 "confirmWorkName": "הקלד שם עבודה לאישור",
@@ -3222,7 +3259,7 @@
                 "updateFailed": "נכשל בעדכון הגדרות",
                 "deployProvider": {
                     "title": "ספק פריסה",
-                    "description": "בחר לאן לפרוס את אתר ספרייתך",
+                    "description": "בחר לאן לפרוס את העבודה שלך",
                     "configure": "הגדר",
                     "ready": "מוכן לפריסה",
                     "notConfigured": "לא מוגדר",
@@ -3462,7 +3499,7 @@
                 },
                 "noProviderAlert": {
                     "title": "אין ספק פריסה",
-                    "description": "בחר ספק פריסה כדי לפרוס את אתר העבודה שלך.",
+                    "description": "בחר ספק פריסה כדי לפרוס את העבודה שלך.",
                     "selectButton": "בחר והמשך",
                     "noProviders": "אין ספקי פריסה זמינים. התקן תוסף פריסה קודם."
                 },
@@ -3486,8 +3523,8 @@
                 },
                 "form": {
                     "deployment": {
-                        "title": "פרוס אתר",
-                        "description": "פרוס את מאגר אתר העבודה שלך.",
+                        "title": "פרוס עבודה",
+                        "description": "פרוס את מאגר העבודה שלך.",
                         "deployButton": "פרוס ל-{provider}",
                         "deployingButton": "מפריס...",
                         "deployingStateButton": "מפריס ({state})...",
@@ -3502,9 +3539,9 @@
                         }
                     },
                     "updateRepository": {
-                        "title": "עדכן מאגר אתר",
+                        "title": "עדכן את מאגר העבודה",
                         "description": "סנכרן את השינויים האחרונים מהתבנית אל",
-                        "websiteRepository": "מאגר האתר",
+                        "websiteRepository": "מאגר העבודה",
                         "updateButton": "עדכן מאגר",
                         "updatingButton": "מעדכן..."
                     },
@@ -3521,20 +3558,20 @@
                     },
                     "info": {
                         "deployInfo": "פריסה לוקחת בדרך כלל 1-3 דקות. תקבל קישור ברגע שהיא תסתיים.",
-                        "updateInfo": "עדכונים מסנכרנים את תוכן העבודה שלך למאגר האתר לפריסה הבאה."
+                        "updateInfo": "עדכונים מסנכרנים את תוכן העבודה שלך אל מאגר העבודה לקראת הפריסה הבאה."
                     },
                     "websiteTemplate": {
                         "title": "עדכוני תבנית אוטומטיים",
-                        "description": "שמור על אתרך מסונכרן אוטומטית עם השינויים האחרונים בתבנית.",
-                        "selectorLabel": "תבנית אתר",
+                        "description": "שמור על העבודה שלך מסונכרנת אוטומטית עם השינויים האחרונים בתבנית.",
+                        "selectorLabel": "תבנית עבודה",
                         "currentTemplateLabel": "תבנית נוכחית",
                         "unknownTemplate": "ברירת מחדל מורשת",
-                        "currentHelperText": "התבנית שנבחרה שולטת באופן אתחול ועדכון מאגר האתר。",
-                        "switchHelperText": "החלת תבנית חדשה תאפס את מאגר האתר הקיים מהתבנית שנבחרה אם הוא כבר קיים。",
-                        "switchAction": "החל תבנית על מאגר האתר",
+                        "currentHelperText": "התבנית שנבחרה קובעת כיצד מאגר העבודה מאותחל ומתעדכן.",
+                        "switchHelperText": "החלת תבנית חדשה תאפס את מאגר העבודה הקיים מהתבנית שנבחרה, אם הוא כבר קיים.",
+                        "switchAction": "החל תבנית על מאגר העבודה",
                         "switchActionIdle": "התבנית מעודכנת",
-                        "switchConfirmTitle": "להחליף תבנית אתר؟",
-                        "switchConfirmDescription": "אם מאגר האתר כבר קיים, תכניו יחלפו מהתבנית שנבחרה. כל קוד מותאם במאגר זה ייאבד。",
+                        "switchConfirmTitle": "להחליף את תבנית העבודה?",
+                        "switchConfirmDescription": "אם מאגר העבודה כבר קיים, תוכנו יוחלף מהתבנית שנבחרה. כל קוד מותאם אישית במאגר זה ייאבד.",
                         "switchConfirmButton": "החלף תבנית",
                         "switchCancel": "ביטול",
                         "autoUpdate": "עדכן אוטומטית",
@@ -3937,7 +3974,7 @@
             },
             "deployProvider": {
                 "title": "ספק פריסה",
-                "description": "בחר לאן לפרוס את אתר העבודה שלך",
+                "description": "בחר לאן לפרוס את העבודה שלך",
                 "noProviders": "אין ספקי פריסה זמינים",
                 "notConfigured": "לא מוגדר",
                 "configured": "מוכן לפריסה",
@@ -4041,7 +4078,7 @@
                 "organizationHelp": "צור מאגרים תחת ארגון במקום חשבון אישי",
                 "organizationNameLabel": "שם ארגון",
                 "organizationNamePlaceholder": "הזן שם ארגון",
-                "websiteTemplateHelperText": "בחר את תבנית האתר שתועמד בעת יצירת מאגר האתר לראשונה。"
+                "websiteTemplateHelperText": "בחר את תבנית העבודה שתשמש ביצירה הראשונה של מאגר העבודה."
             },
             "manual": {
                 "title": "צור ידנית",
@@ -4068,7 +4105,7 @@
                 "organizationHelp": "צור עבודה זו תחת ארגון GitHub במקום חשבון אישי",
                 "organizationNameLabel": "שם ארגון",
                 "organizationNamePlaceholder": "my-organization",
-                "websiteTemplateHelperText": "בחר את תבנית האתר שתועמד בעת יצירת מאגר האתר לראשונה。",
+                "websiteTemplateHelperText": "בחר את תבנית העבודה שתשמש ביצירה הראשונה של מאגר העבודה.",
                 "headerLabel": "כותרת README מותאמת",
                 "headerPlaceholder": "הוסף תוכן מותאם לחלק העליון של קובץ README שלך",
                 "headerOverwrite": "החלף את הכותרת המוגדרת מראש לחלוטין",
@@ -4174,15 +4211,15 @@
                     "importButton": "התחל ייבוא ומחקר",
                     "importingButton": "מתחיל צינור מחקר...",
                     "mainRepository": {
-                        "title": "Main repository",
+                        "title": "מאגר GitHub",
                         "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
                         "clone": {
                             "title": "Clone / recreate",
-                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                            "description": "צור מאגר README חדש שנוצר אוטומטית עבור עבודה זו. מאגר הנתונים ומאגר העבודה ייווצרו בכל מקרה."
                         },
                         "reuse": {
                             "title": "Reuse source README",
-                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                            "description": "אל תיצור מאגר README שנוצר אוטומטית. קישורי מאגר ה-GitHub יפנו אל מאגר ה-README המקורי."
                         }
                     }
                 },
@@ -4243,7 +4280,7 @@
                     "descriptionReady": "כל המאגרים נמצאו. מוכן לקישור.",
                     "dataRepo": "מאגר נתונים",
                     "markdownRepo": "מאגר Markdown",
-                    "websiteRepo": "מאגר אתר",
+                    "websiteRepo": "מאגר העבודה",
                     "found": "נמצא",
                     "notFound": "לא נמצא",
                     "cancel": "בטל",
@@ -4854,7 +4891,7 @@
         },
         "templates": {
             "title": "תבניות",
-            "subtitle": "עיין בתבניות אתרים מובנות, נהל את הקטלוג המותאם שלך, וקבע איזו תבנית יתחילו ממנה עבודות חדשות.",
+            "subtitle": "עיין בתבניות עבודה מובנות, נהל את הקטלוג המותאם שלך, וקבע מאיזו תבנית יתחילו עבודות חדשות.",
             "kindSwitcher": {
                 "mission": "Mission Templates",
                 "work": "Work Templates",
@@ -5306,6 +5343,16 @@
                 "copyFailed": "לא ניתן להעתיק ללוח"
             },
             "confirmDelete": "למחוק את הטריגר הזה? כתובת ה-webhook שלו תפסיק לפעול מיד ולא ניתן לבטל זאת."
+        },
+        "workKind": {
+            "label": "סוג",
+            "website": "Website",
+            "landing-page": "Landing Page",
+            "blog": "Blog",
+            "directory": "Directory",
+            "awesome-repo": "Awesome Repo",
+            "company": "Company",
+            "default": "Work"
         }
     },
     "layout": {
@@ -5519,7 +5566,7 @@
         "deploy": {
             "deployFailed": "נכשל בפריסה",
             "updateRepositoryFailed": "נכשל בעדכון מאגר",
-            "updateSettingsFailed": "נכשל בעדכון הגדרות תבנית אתר"
+            "updateSettingsFailed": "נכשל בעדכון הגדרות תבנית העבודה"
         }
     },
     "validation": {

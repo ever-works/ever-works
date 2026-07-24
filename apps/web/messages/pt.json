@@ -1937,8 +1937,12 @@
                     "activity": "Feed de atividade",
                     "kb": "Base de conhecimento",
                     "generator": "Gerar Work, uma vez ou em agenda",
-                    "deploy": "Implantar Work"
-                }
+                    "deploy": "Implantar Work",
+                    "tasks": "Tarefas deste Work"
+                },
+                "tasks": "Tarefas",
+                "posts": "Publicações",
+                "pages": "Páginas"
             },
             "members": {
                 "title": "Membros da Equipe",
@@ -2152,7 +2156,25 @@
                 "categories": "Categorias",
                 "comparisons": "Comparações",
                 "generationStatus": "Status da Geração",
-                "daysActive": "Dias Ativos"
+                "daysActive": "Dias Ativos",
+                "posts": "Publicações",
+                "tags": "Etiquetas",
+                "deployStatus": "Estado da implantação",
+                "registeredUsers": "Utilizadores registados",
+                "teamMembers": "Membros da equipa",
+                "agents": "Agentes",
+                "openTasks": "Tarefas abertas",
+                "worksOwned": "Trabalhos",
+                "pageViews": "Visualizações",
+                "sessions": "Sessões",
+                "conversions": "Conversões",
+                "states": {
+                    "live": "Ativo",
+                    "notConfigured": "Ligue as análises para ver isto",
+                    "notDeployed": "Implante para ver isto",
+                    "notGenerated": "Gere para ver isto",
+                    "unavailable": "Indisponível"
+                }
             },
             "comparisons": {
                 "title": "Comparações",
@@ -2324,8 +2346,8 @@
                 "slug": "Slug",
                 "repositories": "Repositórios",
                 "dataRepo": "Repositório de Dados",
-                "websiteRepo": "Repositório do Site",
-                "mainRepo": "Repositório Principal",
+                "websiteRepo": "Repositório do Trabalho",
+                "mainRepo": "Repositório {provider}",
                 "gitProvider": "Provedor Git",
                 "organization": "Organização",
                 "created": "Criado",
@@ -2339,7 +2361,22 @@
                 "deployProvider": "Provedor de Implantação",
                 "notConnected": "Não conectado",
                 "notConfigured": "Não configurado",
-                "viewSite": "Ver site"
+                "viewSite": "Ver site",
+                "repoHelp": {
+                    "data": {
+                        "title": "Repositório de Dados",
+                        "body": "A fonte da verdade do seu Trabalho. Contém os metadados e o conteúdo que a plataforma mantém para você — em um diretório, isso significa cada item, categoria e tag; em outros tipos de Trabalho, é o conteúdo estruturado por trás das páginas. Os Agentes escrevem aqui primeiro, e todo o restante é gerado a partir daí. Muda raramente e pode ser editado à mão com segurança."
+                    },
+                    "provider": {
+                        "title": "Repositório {provider}",
+                        "body": "Uma versão legível e navegável do seu Trabalho, gerada por IA a partir do Repositório de Dados. Ela é publicada no {provider}, mas nunca é implantada em lugar nenhum — as pessoas a leem diretamente no {provider}. Para uma Lista Awesome, isso significa um README curado; para outros tipos de Trabalho, é a visualização equivalente em Markdown do mesmo conteúdo. Você pode desativar a geração dela nas Configurações."
+                    },
+                    "work": {
+                        "title": "Repositório do Trabalho",
+                        "body": "O resultado principal do seu Trabalho. A plataforma pega o Repositório de Dados, aplica o modelo de Trabalho escolhido e produz este repositório — normalmente um site ou aplicativo web implantável, mas, dependendo do modelo, pode ser um aplicativo móvel, um site de documentação ou qualquer outro tipo de projeto. Este é o repositório que é implantado."
+                    },
+                    "ariaLabel": "O que é este repositório?"
+                }
             },
             "config": {
                 "title": "Detalhes de Configuração",
@@ -2357,7 +2394,7 @@
                 "pullRequestUpdate": "Detalhes de Pull Request",
                 "branch": "Branch",
                 "prTitle": "Título da PR",
-                "mainRepository": "Repositório Principal",
+                "mainRepository": "Repositório {provider}",
                 "dataRepository": "Repositório de Dados"
             },
             "activity": {
@@ -2736,7 +2773,7 @@
                 "modelOverridePlaceholder": "ex.: openai/gpt-4.1 ou openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Opcional. Usa o modelo importado ou anterior por padrão, a menos que você o substitua aqui.",
                 "modelOverrideUnavailable": "Selecione primeiro um provedor de IA configurado para escolher um modelo da lista disponível.",
-                "websiteTemplateHelperText": "Escolha o modelo de site que será usado quando o repositório do site for criado pela primeira vez.",
+                "websiteTemplateHelperText": "Escolha o modelo de Trabalho que será usado quando o repositório do Trabalho for criado pela primeira vez.",
                 "websiteTemplateLockedHelperText": "A seleção do modelo fica bloqueada após a primeira geração do site.",
                 "recommended": "Recomendado",
                 "promptPlaceholder": "Descreva quais itens devem ser gerados para este trabalho...",
@@ -2781,7 +2818,7 @@
                 "enableBadgeEvaluationDescription": "Avaliar e adicionar insígnias de qualidade aos itens",
                 "captureScreenshots": "Capturar Capturas de Tela dos Itens",
                 "captureScreenshotsDescription": "Capturar automaticamente capturas de tela ou imagens de produtos para cada item durante a geração",
-                "websiteRepositoryCreationMethod": "Método de Criação do Repositório do Site",
+                "websiteRepositoryCreationMethod": "Método de Criação do Repositório do Trabalho",
                 "methodDuplicate": "Duplicar",
                 "methodFork": "Fork",
                 "workNamePlaceholder": "Digite o nome do trabalho",
@@ -2807,7 +2844,7 @@
                 "targetKeywordsDescription": "Palavras-chave para guiar a pesquisa e geração de conteúdo da IA. Palavras-chave mais específicas geram melhores resultados.",
                 "sourceUrlsFieldDescription": "URLs específicas para extrair conteúdo. Se vazio, o gerador pesquisará a web automaticamente.",
                 "generationMethodDescription": "Escolha se atualizar itens existentes ou recriar tudo do zero.",
-                "websiteRepositoryCreationMethodDescription": "Como o repositório do site é criado. Modelo é recomendado na maioria dos casos.",
+                "websiteRepositoryCreationMethodDescription": "Como o repositório do Trabalho é criado. Modelo é recomendado na maioria dos casos.",
                 "maxSearchQueriesDescription": "Número de consultas de pesquisa que a IA gerará para encontrar conteúdo relevante (1-50).",
                 "resultsPerQueryDescription": "Máximo de resultados a recuperar por consulta de pesquisa (1-20).",
                 "maxPagesToProcessDescription": "Máximo de páginas da web para processar para extração de conteúdo (1-100).",
@@ -2966,7 +3003,7 @@
                         "model": "Modelo",
                         "schedule": "Agendamento",
                         "providers": "Provedores",
-                        "websiteRepo": "Repositório do Site"
+                        "websiteRepo": "Repo do Trabalho"
                     },
                     "sourceTypes": {
                         "dataRepo": "Repositório de Dados",
@@ -3001,8 +3038,8 @@
                 "deleteDataRepositoryDescription": "Remover o repositório de dados JSON do GitHub",
                 "deleteMarkdownRepository": "Excluir repositório markdown",
                 "deleteMarkdownRepositoryDescription": "Remover o repositório markdown contendo o README",
-                "deleteWebsiteRepository": "Excluir repositório do site",
-                "deleteWebsiteRepositoryDescription": "Remover o repositório do site implantado",
+                "deleteWebsiteRepository": "Excluir repositório do Trabalho",
+                "deleteWebsiteRepositoryDescription": "Remover o repositório do Trabalho implantado",
                 "deleteConfirm": "Você tem certeza absoluta?",
                 "deleteConfirmDetail": "Esta ação não pode ser desfeita. O trabalho e os repositórios selecionados serão permanentemente excluídos.",
                 "confirmWorkName": "Digite o nome do trabalho para confirmar",
@@ -3020,7 +3057,7 @@
                 "updateFailed": "Falha ao atualizar configurações",
                 "deployProvider": {
                     "title": "Provedor de Implantação",
-                    "description": "Selecione onde implantar o site do seu trabalho",
+                    "description": "Selecione onde implantar o seu Trabalho",
                     "configure": "Configurar",
                     "ready": "Pronto para implantar",
                     "notConfigured": "Não configurado",
@@ -3260,7 +3297,7 @@
                 },
                 "noProviderAlert": {
                     "title": "Nenhum Provedor de Implantação",
-                    "description": "Selecione um provedor de implantação para implantar seu site de trabalho.",
+                    "description": "Selecione um provedor de implantação para implantar o seu Trabalho.",
                     "selectButton": "Selecionar e Continuar",
                     "noProviders": "Nenhum provedor de implantação disponível. Instale um plugin de implantação primeiro."
                 },
@@ -3284,8 +3321,8 @@
                 },
                 "form": {
                     "deployment": {
-                        "title": "Implantar Site",
-                        "description": "Implantar o repositório do seu site de trabalho.",
+                        "title": "Implantar Trabalho",
+                        "description": "Implantar o repositório do seu Trabalho.",
                         "deployButton": "Implantar no {provider}",
                         "deployingButton": "Implantando...",
                         "deployingStateButton": "Implantando ({state})...",
@@ -3300,9 +3337,9 @@
                         }
                     },
                     "updateRepository": {
-                        "title": "Atualizar Repositório do Site",
+                        "title": "Atualizar Repositório do Trabalho",
                         "description": "Sincronizar as últimas alterações do template com o",
-                        "websiteRepository": "repositório do site",
+                        "websiteRepository": "repositório do Trabalho",
                         "updateButton": "Atualizar Repositório",
                         "updatingButton": "Atualizando..."
                     },
@@ -3319,20 +3356,20 @@
                     },
                     "info": {
                         "deployInfo": "A implantação geralmente leva de 1 a 3 minutos. Você receberá uma URL assim que estiver concluída.",
-                        "updateInfo": "As atualizações sincronizam o conteúdo do seu trabalho com o repositório do site para a próxima implantação."
+                        "updateInfo": "As atualizações sincronizam o conteúdo do seu Trabalho com o repositório do Trabalho para a próxima implantação."
                     },
                     "websiteTemplate": {
                         "title": "Atualizações Automáticas de Template",
-                        "description": "Mantenha seu site automaticamente sincronizado com as últimas alterações do template.",
-                        "selectorLabel": "Modelo de site",
+                        "description": "Mantenha seu Trabalho automaticamente sincronizado com as últimas alterações do template.",
+                        "selectorLabel": "Modelo de Trabalho",
                         "currentTemplateLabel": "Modelo atual",
                         "unknownTemplate": "Padrão herdado",
-                        "currentHelperText": "O modelo selecionado controla como o repositório do site é inicializado e atualizado.",
-                        "switchHelperText": "A aplicação de um novo modelo redefinirá o repositório existente do site a partir do modelo selecionado, se ele já existir.",
-                        "switchAction": "Aplicar modelo ao repositório do site",
+                        "currentHelperText": "O modelo selecionado controla como o repositório do Trabalho é inicializado e atualizado.",
+                        "switchHelperText": "A aplicação de um novo modelo redefinirá o repositório existente do Trabalho a partir do modelo selecionado, se ele já existir.",
+                        "switchAction": "Aplicar modelo ao repositório do Trabalho",
                         "switchActionIdle": "Modelo atualizado",
-                        "switchConfirmTitle": "Alternar modelo de site?",
-                        "switchConfirmDescription": "Se o repositório do site já existir, seu conteúdo será substituído pelo modelo selecionado. Qualquer código personalizado nesse repositório será perdido.",
+                        "switchConfirmTitle": "Alternar modelo de Trabalho?",
+                        "switchConfirmDescription": "Se o repositório do Trabalho já existir, seu conteúdo será substituído pelo modelo selecionado. Qualquer código personalizado nesse repositório será perdido.",
                         "switchConfirmButton": "Alternar modelo",
                         "switchCancel": "Cancelar",
                         "autoUpdate": "Atualizar automaticamente",
@@ -3707,7 +3744,7 @@
             },
             "deployProvider": {
                 "title": "Provedor de Implantação",
-                "description": "Selecione onde implantar o site do seu trabalho",
+                "description": "Selecione onde implantar o seu Trabalho",
                 "noProviders": "Nenhum provedor de implantação disponível",
                 "notConfigured": "Não configurado",
                 "configured": "Pronto para implantar",
@@ -3808,7 +3845,7 @@
                 "organizationHelp": "Criar repositórios sob uma organização em vez da sua conta pessoal",
                 "organizationNameLabel": "Nome da Organização",
                 "organizationNamePlaceholder": "Digite o nome da organização",
-                "websiteTemplateHelperText": "Escolha o modelo de site que será usado quando o repositório do site for criado pela primeira vez."
+                "websiteTemplateHelperText": "Escolha o modelo de Trabalho que será usado quando o repositório do Trabalho for criado pela primeira vez."
             },
             "manual": {
                 "title": "Criar Manualmente",
@@ -3835,7 +3872,7 @@
                 "organizationHelp": "Criar este trabalho sob uma organização GitHub em vez da sua conta pessoal",
                 "organizationNameLabel": "Nome da Organização",
                 "organizationNamePlaceholder": "my-organization",
-                "websiteTemplateHelperText": "Escolha o modelo de site que será usado quando o repositório do site for criado pela primeira vez.",
+                "websiteTemplateHelperText": "Escolha o modelo de Trabalho que será usado quando o repositório do Trabalho for criado pela primeira vez.",
                 "headerLabel": "Cabeçalho README Personalizado",
                 "headerPlaceholder": "Adicione conteúdo personalizado no topo do seu arquivo README",
                 "headerOverwrite": "Substituir cabeçalho padrão completamente",
@@ -3941,15 +3978,15 @@
                     "importButton": "Iniciar Importar & Pesquisar",
                     "importingButton": "Iniciando pipeline de pesquisa...",
                     "mainRepository": {
-                        "title": "Main repository",
+                        "title": "Repositório GitHub",
                         "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
                         "clone": {
                             "title": "Clone / recreate",
-                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                            "description": "Criar um novo repositório de README gerado para este Trabalho. Os repositórios de Dados e do Trabalho continuam sendo criados."
                         },
                         "reuse": {
                             "title": "Reuse source README",
-                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                            "description": "Não criar um repositório de README gerado. Os links do repositório GitHub apontarão para o repositório README de origem."
                         }
                     }
                 },
@@ -4010,7 +4047,7 @@
                     "descriptionReady": "Todos os repositórios encontrados. Pronto para vincular.",
                     "dataRepo": "Repositório de Dados",
                     "markdownRepo": "Repositório Markdown",
-                    "websiteRepo": "Repositório do Site",
+                    "websiteRepo": "Repositório do Trabalho",
                     "found": "Encontrado",
                     "notFound": "Não encontrado",
                     "cancel": "Cancelar",
@@ -4621,7 +4658,7 @@
         },
         "templates": {
             "title": "Modelos",
-            "subtitle": "Navegue pelos modelos de site integrados, gerencie seu catálogo personalizado e controle qual modelo os novos trabalhos usam como ponto de partida.",
+            "subtitle": "Navegue pelos modelos de Trabalho integrados, gerencie seu catálogo personalizado e controle qual modelo os novos Trabalhos usam como ponto de partida.",
             "kindSwitcher": {
                 "mission": "Mission Templates",
                 "work": "Work Templates",
@@ -5110,6 +5147,16 @@
                 "copyFailed": "Não foi possível copiar para a área de transferência"
             },
             "confirmDelete": "Excluir este gatilho? Sua URL de webhook para de funcionar imediatamente e isso não pode ser desfeito."
+        },
+        "workKind": {
+            "label": "Tipo",
+            "website": "Website",
+            "landing-page": "Landing Page",
+            "blog": "Blog",
+            "directory": "Directory",
+            "awesome-repo": "Awesome Repo",
+            "company": "Company",
+            "default": "Work"
         }
     },
     "layout": {
@@ -5323,7 +5370,7 @@
         "deploy": {
             "deployFailed": "Falha ao implantar",
             "updateRepositoryFailed": "Falha ao atualizar repositório",
-            "updateSettingsFailed": "Falha ao atualizar configurações do modelo do site"
+            "updateSettingsFailed": "Falha ao atualizar configurações do modelo de Trabalho"
         }
     },
     "validation": {

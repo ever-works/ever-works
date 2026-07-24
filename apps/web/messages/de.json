@@ -2139,8 +2139,12 @@
                     "activity": "Aktivitäts-Feed",
                     "kb": "Wissensdatenbank",
                     "generator": "Work generieren – einmalig oder nach Zeitplan",
-                    "deploy": "Work bereitstellen"
-                }
+                    "deploy": "Work bereitstellen",
+                    "tasks": "Aufgaben für diese Arbeit"
+                },
+                "tasks": "Aufgaben",
+                "posts": "Beiträge",
+                "pages": "Seiten"
             },
             "members": {
                 "title": "Teammitglieder",
@@ -2354,7 +2358,25 @@
                 "categories": "Kategorien",
                 "comparisons": "Vergleiche",
                 "generationStatus": "Generierungsstatus",
-                "daysActive": "Aktive Tage"
+                "daysActive": "Aktive Tage",
+                "posts": "Beiträge",
+                "tags": "Tags",
+                "deployStatus": "Bereitstellungsstatus",
+                "registeredUsers": "Registrierte Nutzer",
+                "teamMembers": "Teammitglieder",
+                "agents": "Agenten",
+                "openTasks": "Offene Aufgaben",
+                "worksOwned": "Werke",
+                "pageViews": "Seitenaufrufe",
+                "sessions": "Sitzungen",
+                "conversions": "Conversions",
+                "states": {
+                    "live": "Live",
+                    "notConfigured": "Analytics verbinden, um dies zu sehen",
+                    "notDeployed": "Bereitstellen, um dies zu sehen",
+                    "notGenerated": "Generieren, um dies zu sehen",
+                    "unavailable": "Nicht verfügbar"
+                }
             },
             "comparisons": {
                 "title": "Vergleiche",
@@ -2526,8 +2548,8 @@
                 "slug": "Slug",
                 "repositories": "Repositories",
                 "dataRepo": "Datenspeicher",
-                "websiteRepo": "Website-Repository",
-                "mainRepo": "Haupt-Repository",
+                "websiteRepo": "Werk-Repository",
+                "mainRepo": "{provider}-Repository",
                 "gitProvider": "Git-Anbieter",
                 "organization": "Organisation",
                 "created": "Erstellt",
@@ -2541,7 +2563,22 @@
                 "deployProvider": "Bereitstellungsanbieter",
                 "notConnected": "Nicht verbunden",
                 "notConfigured": "Nicht konfiguriert",
-                "viewSite": "Website anzeigen"
+                "viewSite": "Website anzeigen",
+                "repoHelp": {
+                    "data": {
+                        "title": "Datenspeicher",
+                        "body": "Die verbindliche Quelle für Ihr Werk. Hier liegen die Metadaten und Inhalte, die die Plattform für Sie pflegt – bei einem Verzeichnis sind das sämtliche Einträge, Kategorien und Tags, bei anderen Werktypen die strukturierten Inhalte hinter den Seiten. Agenten schreiben zuerst hierher, und alles Weitere wird daraus generiert. Der Datenspeicher ändert sich selten und kann gefahrlos von Hand bearbeitet werden."
+                    },
+                    "provider": {
+                        "title": "{provider}-Repository",
+                        "body": "Eine gut lesbare Fassung Ihres Werks zum Durchstöbern, die die KI aus dem Datenspeicher erzeugt. Sie wird auf {provider} veröffentlicht, aber nirgendwo bereitgestellt – man liest sie direkt auf {provider}. Bei einer Awesome List ist das ein kuratiertes README, bei anderen Werktypen die entsprechende Markdown-Ansicht derselben Inhalte. Die Generierung können Sie in den Einstellungen deaktivieren."
+                    },
+                    "work": {
+                        "title": "Werk-Repository",
+                        "body": "Das Hauptergebnis Ihres Werks. Die Plattform nimmt den Datenspeicher, wendet die von Ihnen gewählte Werk-Vorlage an und erzeugt daraus dieses Repository – meist eine bereitstellbare Website oder Web-App, je nach Vorlage aber auch eine mobile App, eine Dokumentationsseite oder ein beliebiges anderes Projekt. Dies ist das Repository, das bereitgestellt wird."
+                    },
+                    "ariaLabel": "Was ist dieses Repository?"
+                }
             },
             "config": {
                 "title": "Konfigurationsdetails",
@@ -2559,7 +2596,7 @@
                 "pullRequestUpdate": "Pull-Request-Details",
                 "branch": "Branch",
                 "prTitle": "PR-Titel",
-                "mainRepository": "Haupt-Repository",
+                "mainRepository": "{provider}-Repository",
                 "dataRepository": "Datenspeicher"
             },
             "activity": {
@@ -2938,7 +2975,7 @@
                 "modelOverridePlaceholder": "z. B. openai/gpt-4.1 oder openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Optional. Verwendet standardmäßig das importierte oder vorherige Modell, es sei denn, Sie überschreiben es hier.",
                 "modelOverrideUnavailable": "Wählen Sie zunächst einen konfigurierten KI-Anbieter aus, um ein Modell aus der verfügbaren Liste auszuwählen.",
-                "websiteTemplateHelperText": "Wählen Sie die Website-Vorlage aus, die beim ersten Erstellen des Website-Repositorys verwendet werden soll.",
+                "websiteTemplateHelperText": "Wählen Sie die Werk-Vorlage aus, die beim ersten Erstellen des Werk-Repositorys verwendet werden soll.",
                 "websiteTemplateLockedHelperText": "Die Vorlagenauswahl ist nach der ersten Website-Generierung gesperrt.",
                 "recommended": "Empfohlen",
                 "promptPlaceholder": "Beschreiben Sie, welche Elemente für diesen Ordner generiert werden sollen…",
@@ -2983,7 +3020,7 @@
                 "enableBadgeEvaluationDescription": "Bewerten und Qualitäts-Badges zu Elementen hinzufügen",
                 "captureScreenshots": "Element-Screenshots aufnehmen",
                 "captureScreenshotsDescription": "Automatisch Screenshots oder Produktbilder für jedes Element während der Generierung aufnehmen",
-                "websiteRepositoryCreationMethod": "Website-Repository-Erstellungsmethode",
+                "websiteRepositoryCreationMethod": "Werk-Repository-Erstellungsmethode",
                 "methodDuplicate": "Duplizieren",
                 "methodFork": "Fork",
                 "workNamePlaceholder": "Ordnername eingeben",
@@ -3009,7 +3046,7 @@
                 "targetKeywordsDescription": "Schlüsselwörter, die die AI-Suche und Inhaltsgenerierung leiten. Spezifischere Schlüsselwörter liefern bessere Ergebnisse.",
                 "sourceUrlsFieldDescription": "Spezifische URLs zum Extrahieren von Inhalt. Wenn leer, sucht der Generator automatisch im Web.",
                 "generationMethodDescription": "Wählen Sie, ob bestehende Elemente aktualisiert oder alles von Grund auf neu erstellt werden soll.",
-                "websiteRepositoryCreationMethodDescription": "Wie das Website-Repository erstellt wird. Vorlage ist für die meisten Fälle empfohlen.",
+                "websiteRepositoryCreationMethodDescription": "Wie das Werk-Repository erstellt wird. Vorlage ist für die meisten Fälle empfohlen.",
                 "maxSearchQueriesDescription": "Anzahl der Suchanfragen, die die AI generiert, um relevanten Inhalt zu finden (1-50).",
                 "resultsPerQueryDescription": "Maximale Ergebnisse pro Suchanfrage abrufen (1-20).",
                 "maxPagesToProcessDescription": "Maximale Webseiten zur Inhaltsgewinnung verarbeiten (1-100).",
@@ -3168,7 +3205,7 @@
                         "model": "Modell",
                         "schedule": "Zeitplan",
                         "providers": "Anbieter",
-                        "websiteRepo": "Website-Repo"
+                        "websiteRepo": "Werk-Repo"
                     },
                     "sourceTypes": {
                         "dataRepo": "Datenrepository",
@@ -3203,8 +3240,8 @@
                 "deleteDataRepositoryDescription": "Das JSON-Daten-Repository von GitHub entfernen",
                 "deleteMarkdownRepository": "Markdown-Repository löschen",
                 "deleteMarkdownRepositoryDescription": "Das Markdown-Repository, das die README enthält, entfernen",
-                "deleteWebsiteRepository": "Website-Repository löschen",
-                "deleteWebsiteRepositoryDescription": "Das bereitgestellte Website-Repository entfernen",
+                "deleteWebsiteRepository": "Werk-Repository löschen",
+                "deleteWebsiteRepositoryDescription": "Das bereitgestellte Werk-Repository entfernen",
                 "deleteConfirm": "Sind Sie absolut sicher?",
                 "deleteConfirmDetail": "Diese Aktion kann nicht rückgängig gemacht werden. Das Werk und die ausgewählten Repositories werden dauerhaft gelöscht.",
                 "confirmWorkName": "Werkname zur Bestätigung eingeben",
@@ -3222,7 +3259,7 @@
                 "updateFailed": "Fehler beim Aktualisieren der Einstellungen",
                 "deployProvider": {
                     "title": "Bereitsteller",
-                    "description": "Wählen Sie aus, wo Ihre Werk-Website bereitgestellt werden soll",
+                    "description": "Wählen Sie aus, wo Ihr Werk bereitgestellt werden soll",
                     "configure": "Konfigurieren",
                     "ready": "Bereit zur Bereitstellung",
                     "notConfigured": "Nicht konfiguriert",
@@ -3462,7 +3499,7 @@
                 },
                 "noProviderAlert": {
                     "title": "Kein Bereitstellungsanbieter",
-                    "description": "Wählen Sie einen Bereitstellungsanbieter aus, um Ihre Werk-Website bereitzustellen.",
+                    "description": "Wählen Sie einen Bereitstellungsanbieter aus, um Ihr Werk bereitzustellen.",
                     "selectButton": "Auswählen & Fortfahren",
                     "noProviders": "Keine Bereitstellungsanbieter verfügbar. Installieren Sie zuerst ein Bereitstellungs-Plugin."
                 },
@@ -3486,8 +3523,8 @@
                 },
                 "form": {
                     "deployment": {
-                        "title": "Website bereitstellen",
-                        "description": "Stellen Sie Ihr Werk-Website-Repository bereit.",
+                        "title": "Werk bereitstellen",
+                        "description": "Stellen Sie Ihr Werk-Repository bereit.",
                         "deployButton": "Zu {provider} bereitstellen",
                         "deployingButton": "Wird bereitgestellt…",
                         "deployingStateButton": "Wird bereitgestellt ({state})…",
@@ -3502,9 +3539,9 @@
                         }
                     },
                     "updateRepository": {
-                        "title": "Website-Repository aktualisieren",
+                        "title": "Werk-Repository aktualisieren",
                         "description": "Synchronisieren Sie die neuesten Änderungen aus dem Template mit dem",
-                        "websiteRepository": "Website-Repository",
+                        "websiteRepository": "Werk-Repository",
                         "updateButton": "Repository aktualisieren",
                         "updatingButton": "Wird aktualisiert…"
                     },
@@ -3521,20 +3558,20 @@
                     },
                     "info": {
                         "deployInfo": "Die Bereitstellung dauert in der Regel 1-3 Minuten. Sie erhalten eine URL, sobald sie abgeschlossen ist.",
-                        "updateInfo": "Updates synchronisieren den Inhalt Ihres Werks mit dem Website-Repository für die nächste Bereitstellung."
+                        "updateInfo": "Updates synchronisieren den Inhalt Ihres Werks mit dem Werk-Repository für die nächste Bereitstellung."
                     },
                     "websiteTemplate": {
                         "title": "Automatische Template-Updates",
-                        "description": "Halten Sie Ihre Website automatisch mit den neuesten Template-Änderungen synchron.",
-                        "selectorLabel": "Website-Vorlage",
+                        "description": "Halten Sie Ihr Werk automatisch mit den neuesten Vorlagenänderungen synchron.",
+                        "selectorLabel": "Werk-Vorlage",
                         "currentTemplateLabel": "Aktuelle Vorlage",
                         "unknownTemplate": "Geerbter Standard",
-                        "currentHelperText": "Die ausgewählte Vorlage steuert, wie das Website-Repository initialisiert und aktualisiert wird.",
-                        "switchHelperText": "Das Anwenden einer neuen Vorlage setzt das bestehende Website-Repository auf die ausgewählte Vorlage zurück, falls es bereits existiert.",
-                        "switchAction": "Vorlage auf Website-Repository anwenden",
+                        "currentHelperText": "Die ausgewählte Vorlage steuert, wie das Werk-Repository initialisiert und aktualisiert wird.",
+                        "switchHelperText": "Das Anwenden einer neuen Vorlage setzt das bestehende Werk-Repository auf die ausgewählte Vorlage zurück, falls es bereits existiert.",
+                        "switchAction": "Vorlage auf Werk-Repository anwenden",
                         "switchActionIdle": "Vorlage ist auf dem neuesten Stand",
-                        "switchConfirmTitle": "Website-Vorlage wechseln?",
-                        "switchConfirmDescription": "Falls das Website-Repository bereits existiert, wird sein Inhalt durch die ausgewählte Vorlage ersetzt. Jeglicher benutzerdefinierter Code in diesem Repository geht verloren.",
+                        "switchConfirmTitle": "Werk-Vorlage wechseln?",
+                        "switchConfirmDescription": "Falls das Werk-Repository bereits existiert, wird sein Inhalt durch die ausgewählte Vorlage ersetzt. Jeglicher benutzerdefinierter Code in diesem Repository geht verloren.",
                         "switchConfirmButton": "Vorlage wechseln",
                         "switchCancel": "Abbrechen",
                         "autoUpdate": "Automatisch aktualisieren",
@@ -3937,7 +3974,7 @@
             },
             "deployProvider": {
                 "title": "Deploy-Anbieter",
-                "description": "Wählen Sie aus, wo Ihre Werk-Website bereitgestellt werden soll",
+                "description": "Wählen Sie aus, wo Ihr Werk bereitgestellt werden soll",
                 "noProviders": "Keine Deploy-Anbieter verfügbar",
                 "notConfigured": "Nicht konfiguriert",
                 "configured": "Bereit zum Bereitstellen",
@@ -4041,7 +4078,7 @@
                 "organizationHelp": "Repositories unter einer Organisation statt Ihrem persönlichen Konto erstellen",
                 "organizationNameLabel": "Organisationsname",
                 "organizationNamePlaceholder": "Organisationsname eingeben",
-                "websiteTemplateHelperText": "Wählen Sie die Website-Vorlage aus, die beim ersten Erstellen des Website-Repositorys verwendet werden soll."
+                "websiteTemplateHelperText": "Wählen Sie die Werk-Vorlage aus, die beim ersten Erstellen des Werk-Repositorys verwendet werden soll."
             },
             "manual": {
                 "title": "Manuell erstellen",
@@ -4068,7 +4105,7 @@
                 "organizationHelp": "Dieses Werk unter einer GitHub-Organisation statt Ihrem persönlichen Konto erstellen",
                 "organizationNameLabel": "Organisationsname",
                 "organizationNamePlaceholder": "my-organization",
-                "websiteTemplateHelperText": "Wählen Sie die Website-Vorlage aus, die beim ersten Erstellen des Website-Repositorys verwendet werden soll.",
+                "websiteTemplateHelperText": "Wählen Sie die Werk-Vorlage aus, die beim ersten Erstellen des Werk-Repositorys verwendet werden soll.",
                 "headerLabel": "Benutzerdefinierter README-Header",
                 "headerPlaceholder": "Benutzerdefinierten Inhalt oben in Ihre README-Datei hinzufügen",
                 "headerOverwrite": "Standard-Header vollständig ersetzen",
@@ -4174,15 +4211,15 @@
                     "importButton": "Import & Research starten",
                     "importingButton": "Research-Pipeline wird gestartet…",
                     "mainRepository": {
-                        "title": "Main repository",
+                        "title": "GitHub-Repository",
                         "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
                         "clone": {
                             "title": "Clone / recreate",
-                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                            "description": "Ein neues generiertes README-Repository für dieses Werk erstellen. Das Data-Repository und das Werk-Repository werden weiterhin erstellt."
                         },
                         "reuse": {
                             "title": "Reuse source README",
-                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                            "description": "Kein generiertes README-Repository erstellen. Die GitHub-Repository-Links verweisen dann auf das Quell-README-Repository."
                         }
                     }
                 },
@@ -4243,7 +4280,7 @@
                     "descriptionReady": "Alle Repositories gefunden. Bereit zum Verknüpfen.",
                     "dataRepo": "Data-Repository",
                     "markdownRepo": "Markdown-Repository",
-                    "websiteRepo": "Website-Repository",
+                    "websiteRepo": "Werk-Repository",
                     "found": "Gefunden",
                     "notFound": "Nicht gefunden",
                     "cancel": "Abbrechen",
@@ -4854,7 +4891,7 @@
         },
         "templates": {
             "title": "Vorlagen",
-            "subtitle": "Durchsuchen Sie die integrierten Website-Vorlagen, verwalten Sie Ihren benutzerdefinierten Katalog und steuern Sie, welche Vorlage neue Arbeiten verwendet.",
+            "subtitle": "Durchsuchen Sie die integrierten Werk-Vorlagen, verwalten Sie Ihren benutzerdefinierten Katalog und steuern Sie, mit welcher Vorlage neue Werke starten.",
             "kindSwitcher": {
                 "mission": "Mission Templates",
                 "work": "Work Templates",
@@ -5306,6 +5343,16 @@
                 "copyFailed": "Kopieren in die Zwischenablage fehlgeschlagen"
             },
             "confirmDelete": "Diesen Trigger löschen? Seine Webhook-URL funktioniert sofort nicht mehr und dies kann nicht rückgängig gemacht werden."
+        },
+        "workKind": {
+            "label": "Typ",
+            "website": "Website",
+            "landing-page": "Landing Page",
+            "blog": "Blog",
+            "directory": "Directory",
+            "awesome-repo": "Awesome Repo",
+            "company": "Company",
+            "default": "Work"
         }
     },
     "layout": {
@@ -5519,7 +5566,7 @@
         "deploy": {
             "deployFailed": "Bereitstellung fehlgeschlagen",
             "updateRepositoryFailed": "Repository-Aktualisierung fehlgeschlagen",
-            "updateSettingsFailed": "Website-Vorlageneinstellungen konnten nicht aktualisiert werden"
+            "updateSettingsFailed": "Werk-Vorlageneinstellungen konnten nicht aktualisiert werden"
         }
     },
     "validation": {

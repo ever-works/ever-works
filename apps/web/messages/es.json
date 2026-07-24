@@ -2139,8 +2139,12 @@
                     "activity": "Feed de actividad",
                     "kb": "Base de conocimiento",
                     "generator": "Generar Work, una vez o según programación",
-                    "deploy": "Desplegar Work"
-                }
+                    "deploy": "Desplegar Work",
+                    "tasks": "Tareas de este Work"
+                },
+                "tasks": "Tareas",
+                "posts": "Publicaciones",
+                "pages": "Páginas"
             },
             "members": {
                 "title": "Miembros del equipo",
@@ -2354,7 +2358,25 @@
                 "categories": "Categorías",
                 "comparisons": "Comparaciones",
                 "generationStatus": "Estado de generación",
-                "daysActive": "Días activos"
+                "daysActive": "Días activos",
+                "posts": "Publicaciones",
+                "tags": "Etiquetas",
+                "deployStatus": "Estado del despliegue",
+                "registeredUsers": "Usuarios registrados",
+                "teamMembers": "Miembros del equipo",
+                "agents": "Agentes",
+                "openTasks": "Tareas abiertas",
+                "worksOwned": "Trabajos",
+                "pageViews": "Páginas vistas",
+                "sessions": "Sesiones",
+                "conversions": "Conversiones",
+                "states": {
+                    "live": "En vivo",
+                    "notConfigured": "Conecta analíticas para verlo",
+                    "notDeployed": "Despliega para verlo",
+                    "notGenerated": "Genera para verlo",
+                    "unavailable": "No disponible"
+                }
             },
             "comparisons": {
                 "title": "Comparaciones",
@@ -2526,8 +2548,8 @@
                 "slug": "Slug",
                 "repositories": "Repositorios",
                 "dataRepo": "Repositorio de datos",
-                "websiteRepo": "Repositorio del sitio web",
-                "mainRepo": "Repositorio principal",
+                "websiteRepo": "Repositorio del trabajo",
+                "mainRepo": "Repositorio de {provider}",
                 "gitProvider": "Proveedor de Git",
                 "organization": "Organización",
                 "created": "Creado",
@@ -2541,7 +2563,22 @@
                 "deployProvider": "Proveedor de implementación",
                 "notConnected": "No conectado",
                 "notConfigured": "No configurado",
-                "viewSite": "Ver sitio"
+                "viewSite": "Ver sitio",
+                "repoHelp": {
+                    "data": {
+                        "title": "Repositorio de datos",
+                        "body": "La fuente de verdad de tu trabajo. Contiene los metadatos y el contenido que la plataforma mantiene por ti: en un directorio son todos los elementos, categorías y etiquetas; en otros tipos de trabajo es el contenido estructurado que hay detrás de las páginas. Los agentes escriben aquí primero y todo lo demás se genera a partir de ello. Cambia pocas veces y puedes editarlo a mano sin problema."
+                    },
+                    "provider": {
+                        "title": "Repositorio de {provider}",
+                        "body": "Una versión legible y navegable de tu trabajo que la IA genera a partir del repositorio de datos. Se publica en {provider}, pero nunca se despliega en ninguna parte: la gente la lee directamente en {provider}. En una lista awesome eso significa un README curado; en otros tipos de trabajo es la vista equivalente en Markdown del mismo contenido. Puedes desactivar su generación en Configuración."
+                    },
+                    "work": {
+                        "title": "Repositorio del trabajo",
+                        "body": "El resultado principal de tu trabajo. La plataforma toma el repositorio de datos, aplica la plantilla de trabajo que hayas elegido y genera este repositorio: normalmente un sitio web o una aplicación web desplegable, aunque según la plantilla puede ser una aplicación móvil, un sitio de documentación o cualquier otro proyecto. Este es el repositorio que se despliega."
+                    },
+                    "ariaLabel": "¿Qué es este repositorio?"
+                }
             },
             "config": {
                 "title": "Detalles de configuración",
@@ -2559,7 +2596,7 @@
                 "pullRequestUpdate": "Detalles de solicitud de cambio",
                 "branch": "Sucursal",
                 "prTitle": "Título de PR",
-                "mainRepository": "Repositorio principal",
+                "mainRepository": "Repositorio de {provider}",
                 "dataRepository": "Repositorio de datos"
             },
             "activity": {
@@ -2938,7 +2975,7 @@
                 "modelOverridePlaceholder": "p. ej. openai/gpt-4.1 o openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Opcional. Utiliza el modelo importado o anterior por defecto a menos que lo sobrescribas aquí.",
                 "modelOverrideUnavailable": "Seleccione primero un proveedor de IA configurado para elegir un modelo de la lista disponible.",
-                "websiteTemplateHelperText": "Seleccione la plantilla de sitio web que se utilizará cuando se cree el repositorio del sitio web por primera vez.",
+                "websiteTemplateHelperText": "Seleccione la plantilla de trabajo que se utilizará cuando se cree el repositorio del trabajo por primera vez.",
                 "websiteTemplateLockedHelperText": "La selección de plantilla está bloqueada después de la primera generación del sitio web.",
                 "recommended": "Recomendado",
                 "promptPlaceholder": "Describe qué elementos deben generarse para este trabajo...",
@@ -2983,7 +3020,7 @@
                 "enableBadgeEvaluationDescription": "Evaluar y agregar insignias de calidad a los elementos",
                 "captureScreenshots": "Capturar capturas de pantalla de elementos",
                 "captureScreenshotsDescription": "Capturar automáticamente capturas de pantalla o imágenes de productos para cada elemento durante la generación",
-                "websiteRepositoryCreationMethod": "Método de creación del repositorio del sitio web",
+                "websiteRepositoryCreationMethod": "Método de creación del repositorio del trabajo",
                 "methodDuplicate": "Duplicar",
                 "methodFork": "Fork",
                 "workNamePlaceholder": "Ingresa el nombre del trabajo",
@@ -3009,7 +3046,7 @@
                 "targetKeywordsDescription": "Palabras clave para guiar la búsqueda y generación de contenido de la IA. Palabras clave más específicas producen mejores resultados.",
                 "sourceUrlsFieldDescription": "URLs específicas de las que extraer contenido. Si está vacío, el generador buscará en la web automáticamente.",
                 "generationMethodDescription": "Elige si actualizar elementos existentes o recrear todo desde cero.",
-                "websiteRepositoryCreationMethodDescription": "Cómo se crea el repositorio del sitio web. La plantilla se recomienda para la mayoría de los casos.",
+                "websiteRepositoryCreationMethodDescription": "Cómo se crea el repositorio del trabajo. La plantilla se recomienda para la mayoría de los casos.",
                 "maxSearchQueriesDescription": "Número de consultas de búsqueda que la IA generará para encontrar contenido relevante (1-50).",
                 "resultsPerQueryDescription": "Máximo de resultados a recuperar por consulta de búsqueda (1-20).",
                 "maxPagesToProcessDescription": "Máximo de páginas web a procesar para extracción de contenido (1-100).",
@@ -3168,7 +3205,7 @@
                         "model": "Modelo",
                         "schedule": "Programación",
                         "providers": "Proveedores",
-                        "websiteRepo": "Repositorio del sitio web"
+                        "websiteRepo": "Repo del trabajo"
                     },
                     "sourceTypes": {
                         "dataRepo": "Repositorio de datos",
@@ -3203,8 +3240,8 @@
                 "deleteDataRepositoryDescription": "Eliminar el repositorio de datos JSON de GitHub",
                 "deleteMarkdownRepository": "Eliminar repositorio de markdown",
                 "deleteMarkdownRepositoryDescription": "Eliminar el repositorio de markdown que contiene el README",
-                "deleteWebsiteRepository": "Eliminar repositorio del sitio web",
-                "deleteWebsiteRepositoryDescription": "Eliminar el repositorio del sitio web desplegado",
+                "deleteWebsiteRepository": "Eliminar repositorio del trabajo",
+                "deleteWebsiteRepositoryDescription": "Eliminar el repositorio del trabajo desplegado",
                 "deleteConfirm": "¿Estás absolutamente seguro?",
                 "deleteConfirmDetail": "Esta acción no se puede deshacer. El trabajo y los repositorios seleccionados se eliminarán permanentemente.",
                 "confirmWorkName": "Escribe el nombre del trabajo para confirmar",
@@ -3222,7 +3259,7 @@
                 "updateFailed": "Error al actualizar la configuración",
                 "deployProvider": {
                     "title": "Proveedor de despliegue",
-                    "description": "Selecciona dónde desplegar tu sitio web del trabajo",
+                    "description": "Selecciona dónde desplegar tu trabajo",
                     "configure": "Configurar",
                     "ready": "Listo para desplegar",
                     "notConfigured": "No configurado",
@@ -3462,7 +3499,7 @@
                 },
                 "noProviderAlert": {
                     "title": "Sin Proveedor de Despliegue",
-                    "description": "Selecciona un proveedor de despliegue para desplegar tu sitio web de trabajo.",
+                    "description": "Selecciona un proveedor de despliegue para desplegar tu trabajo.",
                     "selectButton": "Seleccionar y Continuar",
                     "noProviders": "No hay proveedores de despliegue disponibles. Instala primero un plugin de despliegue"
                 },
@@ -3486,8 +3523,8 @@
                 },
                 "form": {
                     "deployment": {
-                        "title": "Desplegar Sitio Web",
-                        "description": "Despliega el repositorio de tu sitio web de trabajo.",
+                        "title": "Desplegar Trabajo",
+                        "description": "Despliega el repositorio de tu trabajo.",
                         "deployButton": "Desplegar en {provider}",
                         "deployingButton": "Desplegando...",
                         "deployingStateButton": "Desplegando ({state})...",
@@ -3502,9 +3539,9 @@
                         }
                     },
                     "updateRepository": {
-                        "title": "Actualizar Repositorio del Sitio Web",
+                        "title": "Actualizar Repositorio del Trabajo",
                         "description": "Sincroniza los últimos cambios de la plantilla con el",
-                        "websiteRepository": "repositorio del sitio web",
+                        "websiteRepository": "repositorio del trabajo",
                         "updateButton": "Actualizar Repositorio",
                         "updatingButton": "Actualizando..."
                     },
@@ -3521,20 +3558,20 @@
                     },
                     "info": {
                         "deployInfo": "El despliegue suele tomar 1-3 minutos. Recibirás una URL una vez completado.",
-                        "updateInfo": "Las actualizaciones sincronizan el contenido de tu trabajo con el repositorio del sitio web para el próximo despliegue"
+                        "updateInfo": "Las actualizaciones sincronizan el contenido de tu trabajo con el repositorio del trabajo para el próximo despliegue."
                     },
                     "websiteTemplate": {
                         "title": "Actualizaciones Automáticas de Plantilla",
-                        "description": "Mantén tu sitio web sincronizado automáticamente con los últimos cambios de la plantilla.",
-                        "selectorLabel": "Plantilla de sitio web",
+                        "description": "Mantén tu trabajo sincronizado automáticamente con los últimos cambios de la plantilla.",
+                        "selectorLabel": "Plantilla de trabajo",
                         "currentTemplateLabel": "Plantilla actual",
                         "unknownTemplate": "Predeterminado heredado",
-                        "currentHelperText": "La plantilla seleccionada controla cómo se inicializa y actualiza el repositorio del sitio web.",
-                        "switchHelperText": "Aplicar una nueva plantilla restablecerá el repositorio existente del sitio web a partir de la plantilla seleccionada si ya existe.",
-                        "switchAction": "Aplicar plantilla al repositorio del sitio web",
+                        "currentHelperText": "La plantilla seleccionada controla cómo se inicializa y actualiza el repositorio del trabajo.",
+                        "switchHelperText": "Aplicar una nueva plantilla restablecerá el repositorio del trabajo existente a partir de la plantilla seleccionada si ya existe.",
+                        "switchAction": "Aplicar plantilla al repositorio del trabajo",
                         "switchActionIdle": "La plantilla está actualizada",
-                        "switchConfirmTitle": "¿Cambiar la plantilla del sitio web?",
-                        "switchConfirmDescription": "Si el repositorio del sitio web ya existe, su contenido será reemplazado por la plantilla seleccionada. Cualquier código personalizado en ese repositorio se perderá.",
+                        "switchConfirmTitle": "¿Cambiar la plantilla de trabajo?",
+                        "switchConfirmDescription": "Si el repositorio del trabajo ya existe, su contenido será reemplazado a partir de la plantilla seleccionada. Cualquier código personalizado en ese repositorio se perderá.",
                         "switchConfirmButton": "Cambiar plantilla",
                         "switchCancel": "Cancelar",
                         "autoUpdate": "Actualizar automáticamente",
@@ -3937,7 +3974,7 @@
             },
             "deployProvider": {
                 "title": "Proveedor de Despliegue",
-                "description": "Selecciona dónde desplegar tu sitio web del trabajo",
+                "description": "Selecciona dónde desplegar tu trabajo",
                 "noProviders": "No hay proveedores de despliegue disponibles",
                 "notConfigured": "No configurado",
                 "configured": "Listo para desplegar",
@@ -4041,7 +4078,7 @@
                 "organizationHelp": "Crear repositorios bajo una organización en lugar de tu cuenta personal",
                 "organizationNameLabel": "Nombre de la Organización",
                 "organizationNamePlaceholder": "Ingresa el nombre de la organización",
-                "websiteTemplateHelperText": "Seleccione la plantilla de sitio web que se utilizará cuando se cree el repositorio del sitio web por primera vez."
+                "websiteTemplateHelperText": "Seleccione la plantilla de trabajo que se utilizará cuando se cree el repositorio del trabajo por primera vez."
             },
             "manual": {
                 "title": "Crear Manualmente",
@@ -4068,7 +4105,7 @@
                 "organizationHelp": "Crear este trabajo bajo una organización de GitHub en lugar de tu cuenta personal",
                 "organizationNameLabel": "Nombre de la Organización",
                 "organizationNamePlaceholder": "my-organization",
-                "websiteTemplateHelperText": "Seleccione la plantilla de sitio web que se utilizará cuando se cree el repositorio del sitio web por primera vez.",
+                "websiteTemplateHelperText": "Seleccione la plantilla de trabajo que se utilizará cuando se cree el repositorio del trabajo por primera vez.",
                 "headerLabel": "Encabezado Personalizado de README",
                 "headerPlaceholder": "Agregar contenido personalizado al inicio de tu archivo README",
                 "headerOverwrite": "Reemplazar el encabezado predeterminado completamente",
@@ -4174,15 +4211,15 @@
                     "importButton": "Iniciar Importar & Investigación",
                     "importingButton": "Iniciando pipeline de investigación...",
                     "mainRepository": {
-                        "title": "Main repository",
+                        "title": "Repositorio de GitHub",
                         "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
                         "clone": {
                             "title": "Clone / recreate",
-                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                            "description": "Crear un nuevo repositorio con el README generado para este trabajo. Los repositorios de datos y del trabajo se crean igualmente."
                         },
                         "reuse": {
                             "title": "Reuse source README",
-                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                            "description": "No crear un repositorio con el README generado. Los enlaces al repositorio de GitHub apuntarán al repositorio README de origen."
                         }
                     }
                 },
@@ -4243,7 +4280,7 @@
                     "descriptionReady": "Todos los repositorios encontrados. Listo para vincular.",
                     "dataRepo": "Repositorio de Datos",
                     "markdownRepo": "Repositorio Markdown",
-                    "websiteRepo": "Repositorio del Sitio Web",
+                    "websiteRepo": "Repositorio del Trabajo",
                     "found": "Encontrado",
                     "notFound": "No encontrado",
                     "cancel": "Cancelar",
@@ -4854,7 +4891,7 @@
         },
         "templates": {
             "title": "Plantillas",
-            "subtitle": "Explore las plantillas de sitio web integradas, administre su catálogo personal y controle qué plantilla usan los nuevos trabajos al comenzar.",
+            "subtitle": "Explore las plantillas de trabajo integradas, administre su catálogo personalizado y controle con qué plantilla comienzan los nuevos trabajos.",
             "kindSwitcher": {
                 "mission": "Mission Templates",
                 "work": "Work Templates",
@@ -5306,6 +5343,16 @@
                 "copyFailed": "No se pudo copiar al portapapeles"
             },
             "confirmDelete": "¿Eliminar este disparador? Su URL de webhook dejará de funcionar de inmediato y esto no se puede deshacer."
+        },
+        "workKind": {
+            "label": "Tipo",
+            "website": "Website",
+            "landing-page": "Landing Page",
+            "blog": "Blog",
+            "directory": "Directory",
+            "awesome-repo": "Awesome Repo",
+            "company": "Company",
+            "default": "Work"
         }
     },
     "layout": {
@@ -5519,7 +5566,7 @@
         "deploy": {
             "deployFailed": "Fallo al implementar",
             "updateRepositoryFailed": "Fallo al actualizar repositorio",
-            "updateSettingsFailed": "Fallo al actualizar configuración de plantilla del sitio web"
+            "updateSettingsFailed": "Fallo al actualizar la configuración de la plantilla de trabajo"
         }
     },
     "validation": {

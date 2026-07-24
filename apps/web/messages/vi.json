@@ -1937,8 +1937,12 @@
                     "activity": "Bảng tin hoạt động",
                     "kb": "Cơ sở tri thức",
                     "generator": "Tạo Work một lần hoặc theo lịch",
-                    "deploy": "Triển khai Work"
-                }
+                    "deploy": "Triển khai Work",
+                    "tasks": "Nhiệm vụ cho Work này"
+                },
+                "tasks": "Nhiệm vụ",
+                "posts": "Bài viết",
+                "pages": "Trang"
             },
             "members": {
                 "title": "Thành viên đội ngũ",
@@ -2152,7 +2156,25 @@
                 "categories": "Danh mục",
                 "comparisons": "So sánh",
                 "generationStatus": "Trạng thái tạo",
-                "daysActive": "Ngày hoạt động"
+                "daysActive": "Ngày hoạt động",
+                "posts": "Bài viết",
+                "tags": "Thẻ",
+                "deployStatus": "Trạng thái triển khai",
+                "registeredUsers": "Người dùng đã đăng ký",
+                "teamMembers": "Thành viên nhóm",
+                "agents": "Tác nhân",
+                "openTasks": "Nhiệm vụ đang mở",
+                "worksOwned": "Công việc",
+                "pageViews": "Lượt xem trang",
+                "sessions": "Phiên",
+                "conversions": "Chuyển đổi",
+                "states": {
+                    "live": "Đang hoạt động",
+                    "notConfigured": "Kết nối phân tích để xem mục này",
+                    "notDeployed": "Triển khai để xem mục này",
+                    "notGenerated": "Tạo nội dung để xem mục này",
+                    "unavailable": "Không khả dụng"
+                }
             },
             "comparisons": {
                 "title": "So sánh",
@@ -2324,8 +2346,8 @@
                 "slug": "Slug",
                 "repositories": "Kho lưu trữ",
                 "dataRepo": "Kho dữ liệu",
-                "websiteRepo": "Kho trang web",
-                "mainRepo": "Kho chính",
+                "websiteRepo": "Kho Công việc",
+                "mainRepo": "Kho {provider}",
                 "gitProvider": "Nhà cung cấp Git",
                 "organization": "Tổ chức",
                 "created": "Đã tạo",
@@ -2339,7 +2361,22 @@
                 "deployProvider": "Nhà cung cấp triển khai",
                 "notConnected": "Chưa kết nối",
                 "notConfigured": "Chưa cấu hình",
-                "viewSite": "Xem trang"
+                "viewSite": "Xem trang",
+                "repoHelp": {
+                    "data": {
+                        "title": "Kho dữ liệu",
+                        "body": "Nguồn dữ liệu chuẩn cho Công việc của bạn. Kho này chứa siêu dữ liệu và nội dung mà nền tảng duy trì cho bạn — với một Directory thì đó là toàn bộ mục, danh mục và thẻ; với các loại Công việc khác thì đó là nội dung có cấu trúc nằm phía sau các trang. Agent ghi vào đây trước tiên, và mọi thứ còn lại đều được tạo ra từ đó. Kho này hiếm khi thay đổi và bạn có thể chỉnh sửa thủ công một cách an toàn."
+                    },
+                    "provider": {
+                        "title": "Kho {provider}",
+                        "body": "Phiên bản dễ đọc, dễ duyệt của Công việc của bạn, được AI tạo ra từ Kho dữ liệu. Kho này được xuất bản lên {provider} nhưng không bao giờ được triển khai ở đâu cả — mọi người đọc trực tiếp trên {provider}. Với một danh sách Awesome, đó là một README được biên tập; với các loại Công việc khác, đó là bản Markdown tương đương của cùng nội dung. Bạn có thể tắt việc tạo kho này trong Cài đặt."
+                    },
+                    "work": {
+                        "title": "Kho Công việc",
+                        "body": "Đầu ra chính của Công việc của bạn. Nền tảng lấy Kho dữ liệu, áp dụng mẫu Công việc bạn đã chọn và tạo ra kho lưu trữ này — thường là một trang web hoặc ứng dụng web có thể triển khai, nhưng tùy theo mẫu, nó cũng có thể là ứng dụng di động, trang tài liệu hoặc bất kỳ loại dự án nào khác. Đây chính là kho lưu trữ được đem đi triển khai."
+                    },
+                    "ariaLabel": "Kho lưu trữ này là gì?"
+                }
             },
             "config": {
                 "title": "Chi tiết cấu hình",
@@ -2357,7 +2394,7 @@
                 "pullRequestUpdate": "Chi tiết Pull Request",
                 "branch": "Nhánh",
                 "prTitle": "Tiêu đề PR",
-                "mainRepository": "Kho chính",
+                "mainRepository": "Kho {provider}",
                 "dataRepository": "Kho dữ liệu"
             },
             "activity": {
@@ -2736,7 +2773,7 @@
                 "modelOverridePlaceholder": "ví dụ: openai/gpt-4.1 hoặc openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Tùy chọn. Mặc định sử dụng mô hình đã nhập hoặc mô hình trước đó trừ khi bạn ghi đè ở đây.",
                 "modelOverrideUnavailable": "Hãy chọn một nhà cung cấp AI đã được cấu hình trước để chọn một model từ danh sách có sẵn.",
-                "websiteTemplateHelperText": "Chọn mẫu website sẽ được dùng khi repository website được tạo lần đầu.",
+                "websiteTemplateHelperText": "Chọn mẫu Công việc sẽ được dùng khi kho Công việc được tạo lần đầu.",
                 "websiteTemplateLockedHelperText": "Lựa chọn mẫu bị khóa sau khi tạo website lần đầu.",
                 "recommended": "Được khuyến nghị",
                 "promptPlaceholder": "Mô tả các mục nên được tạo cho công việc này...",
@@ -2781,7 +2818,7 @@
                 "enableBadgeEvaluationDescription": "Đánh giá và thêm huy hiệu chất lượng vào các mục",
                 "captureScreenshots": "Chụp Ảnh màn hình Mục",
                 "captureScreenshotsDescription": "Tự động chụp ảnh màn hình hoặc hình ảnh sản phẩm cho mỗi mục trong quá trình tạo",
-                "websiteRepositoryCreationMethod": "Phương thức Tạo Kho Trang web",
+                "websiteRepositoryCreationMethod": "Phương thức Tạo Kho Công việc",
                 "methodDuplicate": "Nhân bản",
                 "methodFork": "Fork",
                 "workNamePlaceholder": "Nhập tên công việc",
@@ -2807,7 +2844,7 @@
                 "targetKeywordsDescription": "Từ khóa hướng dẫn tìm kiếm AI và tạo nội dung. Từ khóa cụ thể hơn mang lại kết quả tốt hơn.",
                 "sourceUrlsFieldDescription": "URL cụ thể để trích xuất nội dung. Nếu trống, trình tạo sẽ tự động tìm kiếm web.",
                 "generationMethodDescription": "Chọn cập nhật các mục hiện có hoặc tái tạo mọi thứ từ đầu.",
-                "websiteRepositoryCreationMethodDescription": "Cách tạo kho trang web. Mẫu được khuyến nghị cho hầu hết các trường hợp.",
+                "websiteRepositoryCreationMethodDescription": "Cách tạo kho Công việc. Mẫu được khuyến nghị cho hầu hết các trường hợp.",
                 "maxSearchQueriesDescription": "Số truy vấn tìm kiếm AI tạo để tìm nội dung liên quan (1-50).",
                 "resultsPerQueryDescription": "Số kết quả tối đa lấy trên mỗi truy vấn tìm kiếm (1-20).",
                 "maxPagesToProcessDescription": "Số trang web tối đa xử lý để trích xuất nội dung (1-100).",
@@ -2966,7 +3003,7 @@
                         "model": "Mô hình",
                         "schedule": "Lịch trình",
                         "providers": "Nhà cung cấp",
-                        "websiteRepo": "Kho trang web"
+                        "websiteRepo": "Kho Công việc"
                     },
                     "sourceTypes": {
                         "dataRepo": "Kho dữ liệu",
@@ -3001,8 +3038,8 @@
                 "deleteDataRepositoryDescription": "Xóa kho lưu trữ dữ liệu JSON khỏi GitHub",
                 "deleteMarkdownRepository": "Xóa kho lưu trữ markdown",
                 "deleteMarkdownRepositoryDescription": "Xóa kho lưu trữ markdown chứa README",
-                "deleteWebsiteRepository": "Xóa kho lưu trữ trang web",
-                "deleteWebsiteRepositoryDescription": "Xóa kho lưu trữ trang web đã triển khai",
+                "deleteWebsiteRepository": "Xóa kho lưu trữ Công việc",
+                "deleteWebsiteRepositoryDescription": "Xóa kho lưu trữ Công việc đã triển khai",
                 "deleteConfirm": "Bạn có chắc chắn không?",
                 "deleteConfirmDetail": "Hành động này không thể hoàn tác. Công việc và các kho lưu trữ được chọn sẽ bị xóa vĩnh viễn.",
                 "confirmWorkName": "Nhập tên công việc để xác nhận",
@@ -3020,7 +3057,7 @@
                 "updateFailed": "Cập nhật cài đặt thất bại",
                 "deployProvider": {
                     "title": "Nhà cung cấp triển khai",
-                    "description": "Chọn nơi triển khai trang web công việc của bạn",
+                    "description": "Chọn nơi triển khai Công việc của bạn",
                     "configure": "Cấu hình",
                     "ready": "Sẵn sàng triển khai",
                     "notConfigured": "Chưa cấu hình",
@@ -3260,7 +3297,7 @@
                 },
                 "noProviderAlert": {
                     "title": "Không có Nhà cung cấp Triển khai",
-                    "description": "Chọn nhà cung cấp triển khai để triển khai trang web công việc của bạn.",
+                    "description": "Chọn nhà cung cấp triển khai để triển khai Công việc của bạn.",
                     "selectButton": "Chọn & Tiếp tục",
                     "noProviders": "Không có nhà cung cấp triển khai nào khả dụng. Cài đặt plugin triển khai trước."
                 },
@@ -3284,8 +3321,8 @@
                 },
                 "form": {
                     "deployment": {
-                        "title": "Triển khai Trang web",
-                        "description": "Triển khai kho lưu trữ trang web công việc của bạn.",
+                        "title": "Triển khai Công việc",
+                        "description": "Triển khai kho lưu trữ Công việc của bạn.",
                         "deployButton": "Triển khai đến {provider}",
                         "deployingButton": "Đang triển khai...",
                         "deployingStateButton": "Đang triển khai ({state})...",
@@ -3300,9 +3337,9 @@
                         }
                     },
                     "updateRepository": {
-                        "title": "Cập nhật Kho lưu trữ Trang web",
+                        "title": "Cập nhật Kho lưu trữ Công việc",
                         "description": "Đồng bộ các thay đổi mới nhất từ mẫu đến",
-                        "websiteRepository": "kho lưu trữ trang web",
+                        "websiteRepository": "kho lưu trữ Công việc",
                         "updateButton": "Cập nhật Kho lưu trữ",
                         "updatingButton": "Đang cập nhật..."
                     },
@@ -3319,20 +3356,20 @@
                     },
                     "info": {
                         "deployInfo": "Triển khai thường mất 1-3 phút. Bạn sẽ nhận được URL khi hoàn tất.",
-                        "updateInfo": "Cập nhật đồng bộ nội dung công việc của bạn đến kho lưu trữ trang web cho triển khai tiếp theo."
+                        "updateInfo": "Cập nhật sẽ đồng bộ nội dung Công việc của bạn sang kho lưu trữ Công việc cho lần triển khai tiếp theo."
                     },
                     "websiteTemplate": {
                         "title": "Cập nhật Tự động Mẫu",
-                        "description": "Giữ trang web của bạn tự động đồng bộ với các thay đổi mẫu mới nhất.",
-                        "selectorLabel": "Mẫu website",
+                        "description": "Giữ Công việc của bạn tự động đồng bộ với các thay đổi mẫu mới nhất.",
+                        "selectorLabel": "Mẫu Công việc",
                         "currentTemplateLabel": "Mẫu hiện tại",
                         "unknownTemplate": "Mặc định được thừa kế",
-                        "currentHelperText": "Mẫu đã chọn kiểm soát cách khởi tạo và cập nhật repository website.",
-                        "switchHelperText": "Áp dụng một mẫu mới sẽ đặt lại repository website hiện tại từ mẫu đã chọn nếu nó đã tồn tại.",
-                        "switchAction": "Áp dụng mẫu cho repository website",
+                        "currentHelperText": "Mẫu đã chọn kiểm soát cách khởi tạo và cập nhật kho Công việc.",
+                        "switchHelperText": "Áp dụng một mẫu mới sẽ đặt lại kho Công việc hiện có từ mẫu đã chọn nếu kho đó đã tồn tại.",
+                        "switchAction": "Áp dụng mẫu cho kho Công việc",
                         "switchActionIdle": "Mẫu đã được cập nhật",
-                        "switchConfirmTitle": "Chuyển đổi mẫu website?",
-                        "switchConfirmDescription": "Nếu repository website đã tồn tại, nội dung của nó sẽ được thay thế bằng mẫu đã chọn. Mã tùy chỉnh trong repository đó sẽ bị mất.",
+                        "switchConfirmTitle": "Chuyển đổi mẫu Công việc?",
+                        "switchConfirmDescription": "Nếu kho Công việc đã tồn tại, nội dung của nó sẽ được thay thế bằng mẫu đã chọn. Mã tùy chỉnh trong kho đó sẽ bị mất.",
                         "switchConfirmButton": "Chuyển đổi mẫu",
                         "switchCancel": "Hủy",
                         "autoUpdate": "Cập nhật tự động",
@@ -3707,7 +3744,7 @@
             },
             "deployProvider": {
                 "title": "Nhà Cung Cấp Triển Khai",
-                "description": "Chọn nơi triển khai trang web công việc của bạn",
+                "description": "Chọn nơi triển khai Công việc của bạn",
                 "noProviders": "Không có nhà cung cấp triển khai nào khả dụng",
                 "notConfigured": "Chưa cấu hình",
                 "configured": "Sẵn sàng triển khai",
@@ -3808,7 +3845,7 @@
                 "organizationHelp": "Tạo kho lưu trữ dưới tổ chức thay vì tài khoản cá nhân của bạn",
                 "organizationNameLabel": "Tên Tổ Chức",
                 "organizationNamePlaceholder": "Nhập tên tổ chức",
-                "websiteTemplateHelperText": "Chọn mẫu website sẽ được dùng khi repository website được tạo lần đầu."
+                "websiteTemplateHelperText": "Chọn mẫu Công việc sẽ được dùng khi kho Công việc được tạo lần đầu."
             },
             "manual": {
                 "title": "Tạo Thủ Công",
@@ -3835,7 +3872,7 @@
                 "organizationHelp": "Tạo công việc này dưới tổ chức GitHub thay vì tài khoản cá nhân của bạn",
                 "organizationNameLabel": "Tên Tổ Chức",
                 "organizationNamePlaceholder": "my-organization",
-                "websiteTemplateHelperText": "Chọn mẫu website sẽ được dùng khi repository website được tạo lần đầu.",
+                "websiteTemplateHelperText": "Chọn mẫu Công việc sẽ được dùng khi kho Công việc được tạo lần đầu.",
                 "headerLabel": "Tiêu Đề README Tùy Chỉnh",
                 "headerPlaceholder": "Thêm nội dung tùy chỉnh vào đầu file README của bạn",
                 "headerOverwrite": "Thay thế hoàn toàn tiêu đề mặc định",
@@ -3941,15 +3978,15 @@
                     "importButton": "Bắt Đầu Nhập & Nghiên Cứu",
                     "importingButton": "Đang bắt đầu đường ống nghiên cứu...",
                     "mainRepository": {
-                        "title": "Main repository",
+                        "title": "Kho lưu trữ GitHub",
                         "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
                         "clone": {
                             "title": "Clone / recreate",
-                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                            "description": "Tạo một kho lưu trữ README được tạo tự động mới cho Công việc này. Kho dữ liệu và kho Công việc vẫn được tạo."
                         },
                         "reuse": {
                             "title": "Reuse source README",
-                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                            "description": "Không tạo kho lưu trữ README được tạo tự động. Các liên kết kho lưu trữ GitHub sẽ trỏ đến kho lưu trữ README nguồn."
                         }
                     }
                 },
@@ -4010,7 +4047,7 @@
                     "descriptionReady": "Tất cả kho được tìm thấy. Sẵn sàng liên kết.",
                     "dataRepo": "Kho Dữ Liệu",
                     "markdownRepo": "Kho Markdown",
-                    "websiteRepo": "Kho Trang Web",
+                    "websiteRepo": "Kho Công việc",
                     "found": "Tìm thấy",
                     "notFound": "Không tìm thấy",
                     "cancel": "Hủy",
@@ -4621,7 +4658,7 @@
         },
         "templates": {
             "title": "Mẫu",
-            "subtitle": "Duyệt các mẫu website có sẵn, quản lý danh mục tùy chỉnh của bạn, và kiểm soát mẫu nào được dùng để bắt đầu công việc mới.",
+            "subtitle": "Duyệt các mẫu Công việc có sẵn, quản lý danh mục tùy chỉnh của bạn, và kiểm soát mẫu nào được dùng để bắt đầu công việc mới.",
             "kindSwitcher": {
                 "mission": "Mission Templates",
                 "work": "Work Templates",
@@ -5110,6 +5147,16 @@
                 "copyFailed": "Không thể sao chép vào bảng nhớ tạm"
             },
             "confirmDelete": "Xóa trình kích hoạt này? URL webhook của nó ngừng hoạt động ngay lập tức và không thể hoàn tác."
+        },
+        "workKind": {
+            "label": "Loại",
+            "website": "Website",
+            "landing-page": "Landing Page",
+            "blog": "Blog",
+            "directory": "Directory",
+            "awesome-repo": "Awesome Repo",
+            "company": "Company",
+            "default": "Work"
         }
     },
     "layout": {
@@ -5323,7 +5370,7 @@
         "deploy": {
             "deployFailed": "Triển khai thất bại",
             "updateRepositoryFailed": "Cập nhật kho lưu trữ thất bại",
-            "updateSettingsFailed": "Cập nhật cài đặt mẫu trang web thất bại"
+            "updateSettingsFailed": "Cập nhật cài đặt mẫu Công việc thất bại"
         }
     },
     "validation": {

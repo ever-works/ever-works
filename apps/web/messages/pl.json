@@ -1937,8 +1937,12 @@
                     "activity": "Kanał aktywności",
                     "kb": "Baza wiedzy",
                     "generator": "Wygeneruj Work — jednorazowo lub według harmonogramu",
-                    "deploy": "Wdróż Work"
-                }
+                    "deploy": "Wdróż Work",
+                    "tasks": "Zadania dla tego Work"
+                },
+                "tasks": "Zadania",
+                "posts": "Wpisy",
+                "pages": "Strony"
             },
             "members": {
                 "title": "Członkowie zespołu",
@@ -2152,7 +2156,25 @@
                 "categories": "Kategorie",
                 "comparisons": "Porównania",
                 "generationStatus": "Status generowania",
-                "daysActive": "Dni aktywne"
+                "daysActive": "Dni aktywne",
+                "posts": "Wpisy",
+                "tags": "Tagi",
+                "deployStatus": "Status wdrożenia",
+                "registeredUsers": "Zarejestrowani użytkownicy",
+                "teamMembers": "Członkowie zespołu",
+                "agents": "Agenci",
+                "openTasks": "Otwarte zadania",
+                "worksOwned": "Prace",
+                "pageViews": "Odsłony",
+                "sessions": "Sesje",
+                "conversions": "Konwersje",
+                "states": {
+                    "live": "Na żywo",
+                    "notConfigured": "Podłącz analitykę, aby to zobaczyć",
+                    "notDeployed": "Wdróż, aby to zobaczyć",
+                    "notGenerated": "Wygeneruj, aby to zobaczyć",
+                    "unavailable": "Niedostępne"
+                }
             },
             "comparisons": {
                 "title": "Porównania",
@@ -2324,8 +2346,8 @@
                 "slug": "Slug",
                 "repositories": "Repozytoria",
                 "dataRepo": "Repozytorium danych",
-                "websiteRepo": "Repozytorium strony",
-                "mainRepo": "Główne repozytorium",
+                "websiteRepo": "Repozytorium Pracy",
+                "mainRepo": "Repozytorium {provider}",
                 "gitProvider": "Dostawca Git",
                 "organization": "Organizacja",
                 "created": "Utworzono",
@@ -2339,7 +2361,22 @@
                 "deployProvider": "Dostawca wdrożenia",
                 "notConnected": "Niezpodłączony",
                 "notConfigured": "Nieskonfigurowany",
-                "viewSite": "Zobacz stronę"
+                "viewSite": "Zobacz stronę",
+                "repoHelp": {
+                    "data": {
+                        "title": "Repozytorium danych",
+                        "body": "Źródło prawdy dla Twojej Pracy. Przechowuje metadane i treści, którymi platforma zarządza w Twoim imieniu — w przypadku katalogu są to wszystkie elementy, kategorie i tagi, a w innych rodzajach Pracy uporządkowana treść stojąca za stronami. Agenci zapisują dane najpierw tutaj, a wszystko pozostałe jest z nich generowane. Zmienia się rzadko i można je bezpiecznie edytować ręcznie."
+                    },
+                    "provider": {
+                        "title": "Repozytorium {provider}",
+                        "body": "Czytelna wersja Twojej Pracy do przeglądania, generowana przez AI na podstawie repozytorium danych. Jest publikowana w serwisie {provider}, ale nigdy nigdzie nie jest wdrażana — czyta się ją bezpośrednio w serwisie {provider}. W przypadku listy „awesome” jest to starannie przygotowany README, a w innych rodzajach Pracy odpowiadający mu widok tej samej treści w formacie Markdown. Generowanie tego repozytorium możesz wyłączyć w Ustawieniach."
+                    },
+                    "work": {
+                        "title": "Repozytorium Pracy",
+                        "body": "Główny efekt Twojej Pracy. Platforma bierze repozytorium danych, stosuje wybrany przez Ciebie szablon Pracy i tworzy to repozytorium — zwykle jest to gotowa do wdrożenia strona lub aplikacja internetowa, ale w zależności od szablonu może to być również aplikacja mobilna, witryna z dokumentacją albo dowolny inny projekt. To właśnie to repozytorium jest wdrażane."
+                    },
+                    "ariaLabel": "Czym jest to repozytorium?"
+                }
             },
             "config": {
                 "title": "Szczegóły konfiguracji",
@@ -2357,7 +2394,7 @@
                 "pullRequestUpdate": "Szczegóły Pull Request",
                 "branch": "Gałąź",
                 "prTitle": "Tytuł PR",
-                "mainRepository": "Główne repozytorium",
+                "mainRepository": "Repozytorium {provider}",
                 "dataRepository": "Repozytorium danych"
             },
             "activity": {
@@ -2736,7 +2773,7 @@
                 "modelOverridePlaceholder": "np. openai/gpt-4.1 lub openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Opcjonalne. Domyślnie używa importowanego lub poprzedniego modelu, chyba że nadpiszesz go tutaj.",
                 "modelOverrideUnavailable": "Najpierw wybierz skonfigurowanego dostawcę AI, aby wybrać model z dostępnej listy.",
-                "websiteTemplateHelperText": "Wybierz szablon strony internetowej, który będzie używany przy pierwszym utworzeniu repozytorium strony.",
+                "websiteTemplateHelperText": "Wybierz szablon Pracy, który zostanie użyty przy pierwszym utworzeniu repozytorium Pracy.",
                 "websiteTemplateLockedHelperText": "Wybór szablonu jest zablokowany po pierwszym wygenerowaniu strony.",
                 "recommended": "Zalecane",
                 "promptPlaceholder": "Opisz, jakie elementy powinny być wygenerowane dla tego pracy...",
@@ -2781,7 +2818,7 @@
                 "enableBadgeEvaluationDescription": "Oceń i dodaj odznaki jakości do elementów",
                 "captureScreenshots": "Zrób zrzuty ekranu elementów",
                 "captureScreenshotsDescription": "Automatycznie zrób zrzuty ekranu lub obrazy produktów dla każdego elementu podczas generacji",
-                "websiteRepositoryCreationMethod": "Metoda tworzenia repozytorium witryny",
+                "websiteRepositoryCreationMethod": "Metoda tworzenia repozytorium Pracy",
                 "methodDuplicate": "Duplikuj",
                 "methodFork": "Fork",
                 "workNamePlaceholder": "Wprowadź nazwę pracy",
@@ -2807,7 +2844,7 @@
                 "targetKeywordsDescription": "Słowa kluczowe do kierowania wyszukiwania AI i generowania treści. Bardziej specyficzne słowa kluczowe dają lepsze wyniki.",
                 "sourceUrlsFieldDescription": "Konkretne adresy URL do wyodrębnienia treści. Jeśli puste, generator automatycznie przeszuka sieć.",
                 "generationMethodDescription": "Wybierz, czy zaktualizować istniejące elementy, czy odtworzyć wszystko od zera.",
-                "websiteRepositoryCreationMethodDescription": "Jak tworzony jest repozytorium witryny. Szablon zalecany w większości przypadków.",
+                "websiteRepositoryCreationMethodDescription": "Sposób tworzenia repozytorium Pracy. W większości przypadków zalecany jest szablon.",
                 "maxSearchQueriesDescription": "Liczba zapytań wyszukiwania, które AI wygeneruje do znalezienia istotnej treści (1-50).",
                 "resultsPerQueryDescription": "Maksymalna liczba wyników do pobrania na zapytanie wyszukiwania (1-20).",
                 "maxPagesToProcessDescription": "Maksymalna liczba stron internetowych do przetworzenia w celu wyodrębnienia treści (1-100).",
@@ -2966,7 +3003,7 @@
                         "model": "Model",
                         "schedule": "Harmonogram",
                         "providers": "Dostawcy",
-                        "websiteRepo": "Repozytorium witryny"
+                        "websiteRepo": "Repozytorium Pracy"
                     },
                     "sourceTypes": {
                         "dataRepo": "Repozytorium danych",
@@ -3001,8 +3038,8 @@
                 "deleteDataRepositoryDescription": "Usuń repozytorium danych JSON z GitHub",
                 "deleteMarkdownRepository": "Usuń repozytorium markdown",
                 "deleteMarkdownRepositoryDescription": "Usuń repozytorium markdown zawierające README",
-                "deleteWebsiteRepository": "Usuń repozytorium strony internetowej",
-                "deleteWebsiteRepositoryDescription": "Usuń wdrożone repozytorium strony internetowej",
+                "deleteWebsiteRepository": "Usuń repozytorium Pracy",
+                "deleteWebsiteRepositoryDescription": "Usuń wdrożone repozytorium Pracy",
                 "deleteConfirm": "Czy na pewno?",
                 "deleteConfirmDetail": "Ta akcja jest nieodwracalna. Praca i wybrane repozytoria zostaną trwale usunięte.",
                 "confirmWorkName": "Wpisz nazwę pracy, aby potwierdzić",
@@ -3020,7 +3057,7 @@
                 "updateFailed": "Nie udało się zaktualizować ustawień",
                 "deployProvider": {
                     "title": "Dostawca wdrożenia",
-                    "description": "Wybierz, gdzie wdrożyć stronę pracy",
+                    "description": "Wybierz, gdzie wdrożyć swoją Pracę",
                     "configure": "Konfiguruj",
                     "ready": "Gotowy do wdrożenia",
                     "notConfigured": "Nieskonfigurowany",
@@ -3260,7 +3297,7 @@
                 },
                 "noProviderAlert": {
                     "title": "Brak dostawcy wdrożenia",
-                    "description": "Wybierz dostawcę wdrożenia, aby wdrożyć swoją stronę pracy.",
+                    "description": "Wybierz dostawcę wdrożenia, aby wdrożyć swoją Pracę.",
                     "selectButton": "Wybierz i kontynuuj",
                     "noProviders": "Brak dostępnych dostawców wdrożenia. Najpierw zainstaluj wtyczkę wdrożenia"
                 },
@@ -3284,8 +3321,8 @@
                 },
                 "form": {
                     "deployment": {
-                        "title": "Wdróż stronę",
-                        "description": "Wdróż repozytorium strony pracy.",
+                        "title": "Wdróż Pracę",
+                        "description": "Wdróż repozytorium swojej Pracy.",
                         "deployButton": "Wdróż do {provider}",
                         "deployingButton": "Wdróż...",
                         "deployingStateButton": "Wdróż ({state})...",
@@ -3300,9 +3337,9 @@
                         }
                     },
                     "updateRepository": {
-                        "title": "Aktualizuj repozytorium strony",
+                        "title": "Aktualizuj repozytorium Pracy",
                         "description": "Synchronizuj najnowsze zmiany z szablonu do",
-                        "websiteRepository": "repozytorium strony",
+                        "websiteRepository": "repozytorium Pracy",
                         "updateButton": "Aktualizuj repozytorium",
                         "updatingButton": "Aktualizuję..."
                     },
@@ -3319,20 +3356,20 @@
                     },
                     "info": {
                         "deployInfo": "Wdrożenie zazwyczaj trwa 1-3 minuty. Otrzymasz URL po zakończeniu.",
-                        "updateInfo": "Aktualizacje synchronizują zawartość pracy z repozytorium strony na następne wdrożenie"
+                        "updateInfo": "Aktualizacje synchronizują treść Twojej Pracy z repozytorium Pracy na potrzeby następnego wdrożenia."
                     },
                     "websiteTemplate": {
                         "title": "Automatyczne aktualizacje szablonu",
-                        "description": "Utrzymuj stronę automatycznie zsynchronizowaną z najnowszymi zmianami szablonu.",
-                        "selectorLabel": "Szablon strony internetowej",
+                        "description": "Utrzymuj swoją Pracę automatycznie zsynchronizowaną z najnowszymi zmianami szablonu.",
+                        "selectorLabel": "Szablon Pracy",
                         "currentTemplateLabel": "Bieżący szablon",
                         "unknownTemplate": "Dziedziczony domyślny",
-                        "currentHelperText": "Wybrany szablon określa, jak inicjalizowane i aktualizowane jest repozytorium strony.",
-                        "switchHelperText": "Zastosowanie nowego szablonu zresetuje istniejące repozytorium strony do wybranego szablonu, jeśli już istnieje.",
-                        "switchAction": "Zastosuj szablon do repozytorium strony",
+                        "currentHelperText": "Wybrany szablon określa, jak inicjalizowane i aktualizowane jest repozytorium Pracy.",
+                        "switchHelperText": "Zastosowanie nowego szablonu zresetuje istniejące repozytorium Pracy na podstawie wybranego szablonu, jeśli już istnieje.",
+                        "switchAction": "Zastosuj szablon do repozytorium Pracy",
                         "switchActionIdle": "Szablon jest aktualny",
-                        "switchConfirmTitle": "Przełączyć szablon strony internetowej?",
-                        "switchConfirmDescription": "Jeśli repozytorium strony już istnieje, jego zawartość zostanie zastąpiona zawartością wybranego szablonu. Cały niestandardowy kod w tym repozytorium zostanie utracony.",
+                        "switchConfirmTitle": "Przełączyć szablon Pracy?",
+                        "switchConfirmDescription": "Jeśli repozytorium Pracy już istnieje, jego zawartość zostanie zastąpiona zawartością wybranego szablonu. Cały niestandardowy kod w tym repozytorium zostanie utracony.",
                         "switchConfirmButton": "Przełącz szablon",
                         "switchCancel": "Anuluj",
                         "autoUpdate": "Aktualizuj automatycznie",
@@ -3707,7 +3744,7 @@
             },
             "deployProvider": {
                 "title": "Dostawca wdrożenia",
-                "description": "Wybierz miejsce wdrożenia strony pracy",
+                "description": "Wybierz miejsce wdrożenia swojej Pracy",
                 "noProviders": "Brak dostępnych dostawców wdrożenia",
                 "notConfigured": "Nie skonfigurowany",
                 "configured": "Gotowy do wdrożenia",
@@ -3808,7 +3845,7 @@
                 "organizationHelp": "Twórz repozytoria w organizacji zamiast na koncie osobistym",
                 "organizationNameLabel": "Nazwa organizacji",
                 "organizationNamePlaceholder": "Wprowadź nazwę organizacji",
-                "websiteTemplateHelperText": "Wybierz szablon strony internetowej, który będzie używany przy pierwszym utworzeniu repozytorium strony."
+                "websiteTemplateHelperText": "Wybierz szablon Pracy, który zostanie użyty przy pierwszym utworzeniu repozytorium Pracy."
             },
             "manual": {
                 "title": "Utwórz ręcznie",
@@ -3835,7 +3872,7 @@
                 "organizationHelp": "Utwórz ten praca w organizacji GitHub zamiast na koncie osobistym",
                 "organizationNameLabel": "Nazwa organizacji",
                 "organizationNamePlaceholder": "my-organization",
-                "websiteTemplateHelperText": "Wybierz szablon strony internetowej, który będzie używany przy pierwszym utworzeniu repozytorium strony.",
+                "websiteTemplateHelperText": "Wybierz szablon Pracy, który zostanie użyty przy pierwszym utworzeniu repozytorium Pracy.",
                 "headerLabel": "Niestandardowy nagłówek README",
                 "headerPlaceholder": "Dodaj niestandardową zawartość na górę pliku README",
                 "headerOverwrite": "Całkowicie zastąp domyślny nagłówek",
@@ -3941,15 +3978,15 @@
                     "importButton": "Rozpocznij import i badania",
                     "importingButton": "Rozpoczynanie potoku badań...",
                     "mainRepository": {
-                        "title": "Main repository",
+                        "title": "Repozytorium GitHub",
                         "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
                         "clone": {
                             "title": "Clone / recreate",
-                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                            "description": "Utwórz dla tej Pracy nowe repozytorium z wygenerowanym plikiem README. Repozytorium danych i repozytorium Pracy nadal zostaną utworzone."
                         },
                         "reuse": {
                             "title": "Reuse source README",
-                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                            "description": "Nie twórz repozytorium z wygenerowanym plikiem README. Odnośniki do repozytorium GitHub będą wskazywać źródłowe repozytorium z plikiem README."
                         }
                     }
                 },
@@ -4010,7 +4047,7 @@
                     "descriptionReady": "Wszystkie repozytoria znalezione. Gotowe do połączenia.",
                     "dataRepo": "Repozytorium danych",
                     "markdownRepo": "Repozytorium Markdown",
-                    "websiteRepo": "Repozytorium strony",
+                    "websiteRepo": "Repozytorium Pracy",
                     "found": "Znaleziono",
                     "notFound": "Nie znaleziono",
                     "cancel": "Anuluj",
@@ -4621,7 +4658,7 @@
         },
         "templates": {
             "title": "Szablony",
-            "subtitle": "Przeglądaj wbudowane szablony stron internetowych, zarządzaj własnym katalogiem oraz kontroluj, którego szablonu używają nowe prace przy starcie.",
+            "subtitle": "Przeglądaj wbudowane szablony Pracy, zarządzaj własnym katalogiem oraz kontroluj, od którego szablonu startują nowe Prace.",
             "kindSwitcher": {
                 "mission": "Mission Templates",
                 "work": "Work Templates",
@@ -5110,6 +5147,16 @@
                 "copyFailed": "Nie udało się skopiować do schowka"
             },
             "confirmDelete": "Usunąć ten wyzwalacz? Jego adres webhooka natychmiast przestanie działać, a tej operacji nie można cofnąć."
+        },
+        "workKind": {
+            "label": "Typ",
+            "website": "Website",
+            "landing-page": "Landing Page",
+            "blog": "Blog",
+            "directory": "Directory",
+            "awesome-repo": "Awesome Repo",
+            "company": "Company",
+            "default": "Work"
         }
     },
     "layout": {
@@ -5323,7 +5370,7 @@
         "deploy": {
             "deployFailed": "Nie udało się wdrożyć",
             "updateRepositoryFailed": "Nie udało się zaktualizować repozytorium",
-            "updateSettingsFailed": "Nie udało się zaktualizować ustawień szablonu strony"
+            "updateSettingsFailed": "Nie udało się zaktualizować ustawień szablonu Pracy"
         }
     },
     "validation": {
