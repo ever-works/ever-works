@@ -119,6 +119,30 @@ export class CreateWorkProposalDto {
     @IsString()
     @MaxLength(120)
     title?: string;
+
+    @ApiProperty({
+        required: false,
+        description:
+            'When set, building this Idea RE-RUNS generation on this existing Work ' +
+            '(with the description + extraPrompt as the instruction) instead of ' +
+            'creating a new Work. Ownership is enforced at build time.',
+        format: 'uuid',
+    })
+    @IsOptional()
+    @IsUUID()
+    targetWorkId?: string;
+
+    @ApiProperty({
+        required: false,
+        description:
+            'Extra instruction appended to the description at build time — most ' +
+            'useful with targetWorkId ("re-run this Work and ALSO do X").',
+        maxLength: 5000,
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(5000)
+    extraPrompt?: string;
 }
 
 export class AddWorkProposalAttachmentDto {
@@ -215,6 +239,15 @@ export class WorkProposalResponseDto {
 
     @ApiProperty({ required: false, nullable: true })
     acceptedWorkId?: string | null;
+
+    /** Re-run target (Wave 0.3): building this Idea re-runs generation
+     *  on this existing Work instead of creating a new one. */
+    @ApiProperty({ required: false, nullable: true })
+    targetWorkId?: string | null;
+
+    /** Extra instruction appended to the description at build time. */
+    @ApiProperty({ required: false, nullable: true })
+    extraPrompt?: string | null;
 
     /**
      * FK to the spawning Mission (Phase 0 PR 0.1). NULL for Ideas

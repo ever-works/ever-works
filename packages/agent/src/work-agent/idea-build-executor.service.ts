@@ -1,12 +1,19 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import { config } from '../config';
 import { WorkBuildRequest, WorkBuildRequestStatus } from '../entities/work-build-request.entity';
 import { WorkAgentRun, WorkAgentRunStatus } from '../entities/work-agent-run.entity';
 import { WorkAgentRunLog, WorkAgentRunLogLevel } from '../entities/work-agent-run-log.entity';
+import type { User } from '../entities/user.entity';
+import type { WorkProposal } from '../entities/work-proposal.entity';
 import { WorkProposalRepository } from '../user-research/work-proposal.repository';
 import { WorkProposalService, type AutoRetryPolicy } from '../user-research/work-proposal.service';
+import { UserRepository } from '../database/repositories/user.repository';
+import { WorkRepository } from '../database/repositories/work.repository';
+import { WorkLifecycleService } from '../services/work-lifecycle.service';
+import { WorkGenerationService } from '../services/work-generation.service';
+import { slugifyText } from '../utils/text.utils';
 import { WorkAgentService } from './work-agent.service';
 
 /**
@@ -78,11 +85,13 @@ const ACTIVE_RUN_STATUSES = [
  *     and obviously traceable to the synthetic run — there is no
  *     DB-level FK on `work_proposals.acceptedWorkId`, only the
  *     entity-level `@ManyToOne`, so a synthetic value is safe).
- *   - Non-dry-run is a DOCUMENTED not-implemented stub. It performs the
- *     budget-guard precondition check and then returns a telemetry
- *     no-op WITHOUT mutating Goal/Idea state, so it can never strand an
- *     Idea in BUILDING. The real generation path is intentionally left
- *     as a wiring point (see `runRealGeneration`).
+ *   - Non-dry-run (Wave 0.3) REALLY builds: CREATE a Work from the
+ *     Idea, or RE-RUN generation on `idea.targetWorkId` with the
+ *     description (+ `extraPrompt`) as the prompt override. Every AI
+ *     call rides `AiFacadeService`, which enforces the EW-602 budget
+ *     guard per call; precondition failures skip without mutation, and
+ *     post-start failures flow through `handleGoalCompletion` — an
+ *     Idea can never be stranded in BUILDING (see `runRealGeneration`).
  *
  * APPROVAL GATE: `WorkAgentService.createGoal` seeds Idea-build Goals at
  * WAITING_FOR_APPROVAL. When the executor is enabled it auto-approves
@@ -104,6 +113,14 @@ export class IdeaBuildExecutorService {
         private readonly workAgent: WorkAgentService,
         private readonly workProposals: WorkProposalService,
         private readonly workProposalRepo: WorkProposalRepository,
+        // Real-generation dependencies (Wave 0.3). Optional so existing
+        // unit-test fixtures (and any context wiring only the dry-run
+        // path) keep constructing; the real path degrades to a failure
+        // outcome — never a crash — when they're absent.
+        @Optional() private readonly users?: UserRepository,
+        @Optional() private readonly workRepo?: WorkRepository,
+        @Optional() private readonly workLifecycle?: WorkLifecycleService,
+        @Optional() private readonly workGeneration?: WorkGenerationService,
     ) {}
 
     /**
@@ -177,25 +194,178 @@ export class IdeaBuildExecutorService {
             injectedOutcome ??
             this.computeSyntheticOutcome(config.ideaBuildExecutor.getDryRunOutcome(), goal.id);
 
+        const decision = await this.completeGoal(goal, ideaId, outcome);
+        return this.applyDecision(goal, ideaId, decision, true);
+    }
+
+    /**
+     * Non-dry-run REAL generation path (Wave 0.3 — replaces the
+     * documented not-implemented stub).
+     *
+     * Two shapes, selected by the Idea:
+     *   - `targetWorkId` set → RE-RUN: generation re-executes on that
+     *     existing Work with the Idea description (+ `extraPrompt`) as
+     *     the per-run prompt override. Ownership enforced by
+     *     `updateItemsGenerator`'s `ensureCanEdit`.
+     *   - otherwise → CREATE: a new Work is created from the Idea
+     *     (collision-safe slug) and initial generation runs with the
+     *     Idea description as the prompt.
+     *
+     * Spend safety: every AI call inside generation goes through
+     * `AiFacadeService`, which enforces the EW-602 budget guard
+     * (hard-stop + alerts) per call — a blocked budget surfaces here as
+     * a failure outcome and drives the SAME completion state machine.
+     * Precondition failures (missing deps, missing idea/user) return
+     * `skipped` WITHOUT mutating Goal/Idea state, preserving the
+     * original never-strand invariant; failures AFTER execution begins
+     * flow through `handleGoalCompletion`, which owns the retry/fail
+     * transitions — nothing is left in BUILDING.
+     */
+    private async runRealGeneration(
+        goal: WorkBuildRequest,
+        ideaId: string,
+    ): Promise<IdeaBuildExecuteResult> {
+        if (!this.users || !this.workLifecycle || !this.workGeneration) {
+            this.logger.warn(
+                `idea-build-executor: real generation dependencies are not wired in this ` +
+                    `context; goal=${goal.id} idea=${ideaId} left untouched.`,
+            );
+            return { status: 'skipped', reason: 'real-generation-dependencies-unwired' };
+        }
+        const idea = await this.workProposalRepo.findByIdForUser(ideaId, goal.userId);
+        if (!idea) {
+            return { status: 'skipped', reason: 'idea-not-found' };
+        }
+        const user = await this.users.findById(goal.userId);
+        if (!user) {
+            return { status: 'skipped', reason: 'user-not-found' };
+        }
+
+        // Begin execution — the same transitions the dry-run makes.
+        goal.status = WorkBuildRequestStatus.RUNNING;
+        await this.goals.save(goal);
+        await this.startActiveRun(goal, 'Build executor started (auto-approved).');
+        await this.workProposalRepo.markBuilding(ideaId, goal.userId);
+
+        let outcome: SyntheticBuildOutcome;
+        try {
+            const workId = await this.produceWork(idea, user);
+            outcome = { kind: 'success', workId };
+        } catch (error) {
+            this.logger.warn(
+                `idea-build-executor: real generation failed for goal=${goal.id} ` +
+                    `idea=${ideaId}: ${error instanceof Error ? error.message : String(error)}`,
+            );
+            outcome = { kind: 'failure', error };
+        }
+
+        const decision = await this.completeGoal(goal, ideaId, outcome);
+        return this.applyDecision(goal, ideaId, decision, false);
+    }
+
+    /**
+     * Produce (or re-generate) the Work for an Idea and return its id.
+     * Throws on any failure — the caller converts throws into a
+     * `failure` outcome for the completion state machine.
+     */
+    private async produceWork(idea: WorkProposal, user: User): Promise<string> {
+        const prompt = this.composeBuildPrompt(idea);
+
+        if (idea.targetWorkId) {
+            await this.workGeneration!.updateItemsGenerator({
+                workId: idea.targetWorkId,
+                updateDto: { prompt } as never,
+                user,
+                awaitCompletion: true,
+                context: { triggeredBy: 'api' },
+            });
+            return idea.targetWorkId;
+        }
+
+        const slug = await this.deriveAvailableSlug(idea);
+        const created = await this.workLifecycle!.createWork(
+            {
+                slug,
+                name: idea.title.slice(0, 120),
+                description: idea.description.slice(0, 500),
+            } as never,
+            user,
+        );
+        const workId = created?.work?.id;
+        if (!workId) {
+            throw new Error('createWork returned no work id');
+        }
+        await this.workGeneration!.generateItems(
+            workId,
+            { name: idea.title.slice(0, 120), prompt } as never,
+            user,
+            true,
+            { triggeredBy: 'api' },
+        );
+        return workId;
+    }
+
+    /** Idea description (+ optional extraPrompt) → the per-run prompt. */
+    private composeBuildPrompt(idea: WorkProposal): string {
+        const base = (idea.generatedPrompt?.trim() || idea.description.trim()).slice(0, 4000);
+        const extra = idea.extraPrompt?.trim();
+        return extra ? `${base}\n\nAdditional instruction:\n${extra.slice(0, 900)}` : base;
+    }
+
+    /**
+     * Collision-safe slug from the Idea's suggestion: try the suggestion
+     * verbatim, then suffix with the Idea id's first hex block. The
+     * suffix attempt is not re-checked — the uuid block makes a second
+     * collision for the same user practically impossible, and
+     * `createWork` still fails safely (→ failure outcome) if it happens.
+     */
+    private async deriveAvailableSlug(idea: WorkProposal): Promise<string> {
+        const base = (idea.slugSuggestion || slugifyText(idea.title) || 'idea-work').slice(0, 60);
+        const taken = this.workRepo
+            ? await this.workRepo.existsByUserAndSlug(idea.userId, base)
+            : false;
+        if (!taken) {
+            return base;
+        }
+        return `${base}-${idea.id.split('-')[0]}`;
+    }
+
+    /** Run the shared completion state machine for a build outcome. */
+    private async completeGoal(
+        goal: WorkBuildRequest,
+        ideaId: string,
+        outcome: SyntheticBuildOutcome,
+    ) {
         const attempts = await this.goals.count({ where: { ideaId, userId: goal.userId } });
         const policy = await this.resolveAutoRetryPolicy(goal.userId);
-
-        const decision = await this.workProposals.handleGoalCompletion({
+        return this.workProposals.handleGoalCompletion({
             userId: goal.userId,
             ideaId,
             outcome,
             attempts,
             policy,
         });
+    }
 
-        // 4. Reflect the decision on the Goal + Run so it's observable.
+    /**
+     * Reflect a completion decision on the Goal + Run (shared by the
+     * dry-run and real paths — the decisions and transitions are
+     * identical; only the log labels differ).
+     */
+    private async applyDecision(
+        goal: WorkBuildRequest,
+        ideaId: string,
+        decision: Awaited<ReturnType<WorkProposalService['handleGoalCompletion']>>,
+        dryRun: boolean,
+    ): Promise<IdeaBuildExecuteResult> {
+        const label = dryRun ? 'Dry-run' : 'Build';
         switch (decision.outcome) {
             case 'accepted':
             case 'rebuild-accepted': {
                 await this.finishGoal(goal, WorkBuildRequestStatus.COMPLETED, null);
                 await this.completeActiveRun(
                     goal,
-                    `Dry-run: Idea accepted (workId=${decision.workId}).`,
+                    `${label}: Idea accepted (workId=${decision.workId}).`,
                 );
                 return {
                     status: 'completed',
@@ -203,19 +373,19 @@ export class IdeaBuildExecutorService {
                     ideaId,
                     decision: decision.outcome,
                     workId: decision.workId,
-                    dryRun: true,
+                    dryRun,
                 };
             }
             case 'retry': {
-                // Dry-run does NOT loop — a real executor would enqueue a
-                // fresh Goal after `retryDelaySeconds`. We mark this Goal
-                // completed and record that a retry WOULD have been
-                // scheduled, so the decision is observable without a loop.
+                // Neither path loops in-process — a retry decision marks
+                // this Goal completed and records that a retry was decided
+                // (the retry Goal is enqueued by the completion handler's
+                // own machinery when wired; observable either way).
                 await this.finishGoal(goal, WorkBuildRequestStatus.COMPLETED, null);
                 await this.completeActiveRun(
                     goal,
-                    `Dry-run: retry decision (attempt ${decision.attempts}, ` +
-                        `delay ${decision.retryDelaySeconds}s) — not scheduled in dry-run.`,
+                    `${label}: retry decision (attempt ${decision.attempts}, ` +
+                        `delay ${decision.retryDelaySeconds}s).`,
                 );
                 return {
                     status: 'completed',
@@ -223,70 +393,40 @@ export class IdeaBuildExecutorService {
                     ideaId,
                     decision: 'retry',
                     workId: null,
-                    dryRun: true,
+                    dryRun,
                 };
             }
             case 'failed': {
                 await this.finishGoal(
                     goal,
                     WorkBuildRequestStatus.FAILED,
-                    `Dry-run build failed: ${decision.message}`,
+                    `${label} failed: ${decision.message}`,
                 );
-                await this.failActiveRun(goal, `Dry-run: Idea failed (${decision.kind}).`);
+                await this.failActiveRun(goal, `${label}: Idea failed (${decision.kind}).`);
                 return {
                     status: 'failed',
                     goalId: goal.id,
                     ideaId,
                     decision: 'failed',
-                    dryRun: true,
+                    dryRun,
                 };
             }
             case 'noop':
             default: {
                 await this.finishGoal(goal, WorkBuildRequestStatus.COMPLETED, null);
-                await this.completeActiveRun(goal, `Dry-run: no-op decision (${decision.reason}).`);
+                await this.completeActiveRun(
+                    goal,
+                    `${label}: no-op decision (${decision.reason}).`,
+                );
                 return {
                     status: 'failed',
                     goalId: goal.id,
                     ideaId,
                     decision: 'noop',
-                    dryRun: true,
+                    dryRun,
                 };
             }
         }
-    }
-
-    /**
-     * Non-dry-run REAL generation path — DOCUMENTED not-implemented
-     * stub. This is the single wiring point where the real
-     * work-generation pipeline (see `packages/tasks` work-generation
-     * task / `TriggerGenerationOrchestrator`) will be invoked to
-     * produce an actual Work, then hand the resulting workId to
-     * `handleGoalCompletion` as a `success` outcome.
-     *
-     * It is deliberately inert today:
-     *   - We CANNOT safely enable real spend from this PR, so the path
-     *     stays a stub gated behind `dryRun === false`.
-     *   - The budget guard MUST run before any real generation — that
-     *     precondition is enforced structurally here: no generation
-     *     happens, so no spend can occur without a guard. When the real
-     *     path lands, `BudgetGuardService.checkBudget(workId, userId,
-     *     'ai-generation', pluginId, { owner })` must gate it before the
-     *     first token is spent.
-     *   - Crucially it does NOT mutate Goal/Idea state, so flipping
-     *     dry-run off can never strand an Idea in BUILDING.
-     */
-    private async runRealGeneration(
-        goal: WorkBuildRequest,
-        ideaId: string,
-    ): Promise<IdeaBuildExecuteResult> {
-        this.logger.warn(
-            `idea-build-executor: real (non-dry-run) generation is not implemented; ` +
-                `no Work generated for goal=${goal.id} idea=${ideaId}. ` +
-                `Enable dry-run (EVER_WORKS_IDEA_BUILD_EXECUTOR_DRY_RUN=true) to exercise ` +
-                `the completion state machine without spend.`,
-        );
-        return { status: 'not-implemented', reason: 'real-generation-stub' };
     }
 
     // ─── helpers ────────────────────────────────────────────────────
