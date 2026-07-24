@@ -71,14 +71,34 @@ export class TerminalAttachController {
     }
 
     @Get()
-    @ApiOperation({ summary: 'Live terminal session status for this run (relay view).' })
+    @ApiOperation({
+        summary:
+            'Terminal session status for this run — live relay view merged with ' +
+            'the persisted AgentRun terminal columns (M4).',
+    })
     @HttpCode(HttpStatus.OK)
     async status(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) agentId: string,
         @Param('runId', ParseUUIDPipe) runId: string,
     ) {
-        await this.authorizeRun(auth.userId, agentId, runId);
-        return this.registry.getStatus(runId);
+        const run = await this.authorizeRun(auth.userId, agentId, runId);
+        return {
+            // Live relay view (empty/exists:false when no session is
+            // resident in this replica's registry).
+            ...this.registry.getStatus(runId),
+            // Persisted lifecycle (survives replica restarts; the source
+            // of truth for dead sessions and the Resume affordance).
+            run: {
+                persistent: run.persistent ?? false,
+                terminalState: run.terminalState ?? null,
+                terminalEndedReason: run.terminalEndedReason ?? null,
+                terminalProviderId: run.terminalProviderId ?? null,
+                // Presence only — the resume id itself stays server-side.
+                hasCliSession: Boolean(run.cliSessionId),
+                lastHeartbeatAt: run.lastHeartbeatAt?.toISOString() ?? null,
+                lastFrameSeq: run.lastFrameSeq ?? null,
+            },
+        };
     }
 }
