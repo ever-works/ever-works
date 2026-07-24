@@ -20,9 +20,9 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *
  *   POST /api/tasks { title, missionId?|ideaId?|workId? }            → 201
  *     - status:'backlog', priority:'p3', slug:'T-n' (per-user counter).
- *     - Scope columns are nullable + additive; service enforces "exactly
- *       zero or one of missionId/ideaId/workId" → popCount>1 is 400
- *       "...exactly zero or one of missionId / ideaId / workId.".
+ *     - Owner columns are nullable + additive AND non-exclusive: a Task may
+ *       carry any combination of missionId/ideaId/workId (and teamId/
+ *       agentId/goalId) at once, and every id round-trips.
  *     - The scope id is FK-enforced AND ownership-enforced at create time
  *       (`assertScopeReachable`): a workId/missionId/ideaId that does not
  *       exist — OR exists but is owned by another user — is a 400
@@ -35,13 +35,13 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *       Tasks. An orphan (unscoped) Task appears in NONE of the three.
  *       An unknown scope id → 200 with an empty page (never 4xx/5xx).
  *   PATCH /api/tasks/:id                                              → 200
- *       The UpdateTaskDto whitelists title/description/priority/labels/
- *       parentTaskId/requireAllApprovers ONLY, and the global ValidationPipe
- *       runs `forbidNonWhitelisted` — so a PATCH that even MENTIONS a scope
- *       key (missionId/ideaId/workId) is rejected 400 "property <key> should
- *       not exist". Scope is therefore IMMUTABLE post-create: a Task NEVER
- *       moves between scopes via PATCH (the request is refused outright; a
- *       title-only PATCH succeeds and leaves the scope untouched).
+ *       `UpdateTaskDto` whitelists the six owner keys alongside the mutable
+ *       fields, so owners are RE-FILEABLE: one PATCH may detach an owner
+ *       (`null`) and attach another. A Task raised against the wrong Work
+ *       has to be movable without recreating it and losing its history.
+ *       Re-filing is ownership-checked exactly as creation is — an owner the
+ *       caller cannot reach is a 400, so PATCH is not a way around the
+ *       guard. A title-only PATCH leaves every owner untouched.
  *   GET  /api/tasks/:id (cross-user)                                  → 404
  *       (no existence leak; never 403).
  *
@@ -251,9 +251,12 @@ test.describe('Task ↔ scope linkage (Mission / Idea / Work)', () => {
             slug: `excl-work-${s}`,
         });
 
-        // ALL THREE pairings violate "exactly zero or one" → 400 with the
-        // same server message. (The mission-idea spec only checked the
-        // mission+idea pairing; work+* is the new coverage.)
+        // Task ownership is NON-EXCLUSIVE. A Task raised by a Mission, filed
+        // against a Work, and derived from an Idea is one Task with three
+        // associations — the platform previously rejected that pairing with
+        // "exactly zero or one of missionId / ideaId / workId", which made
+        // the relationship impossible to express. Every pairing must now be
+        // accepted and every id persisted.
         const pairs: Array<[string, Record<string, string>]> = [
             ['mission+idea', { missionId, ideaId }],
             ['mission+work', { missionId, workId }],
@@ -262,18 +265,25 @@ test.describe('Task ↔ scope linkage (Mission / Idea / Work)', () => {
         for (const [label, scope] of pairs) {
             const res = await request.post(`${API_BASE}/api/tasks`, {
                 headers,
-                data: { title: `reject ${label} ${s}`, ...scope },
+                data: { title: `accept ${label} ${s}`, ...scope },
             });
-            expect(res.status(), `${label} should be 400`).toBe(400);
-            expect((await res.json()).message).toMatch(/exactly zero or one/i);
+            expect(res.status(), `${label} should be accepted`).toBe(201);
+            const created = await res.json();
+            for (const [key, value] of Object.entries(scope)) {
+                expect(created[key], `${label} should persist ${key}`).toBe(value);
+            }
         }
 
-        // All three scopes together is ALSO a 400 (popCount 3 > 1).
+        // All three at once is likewise accepted, and all three persist.
         const triple = await request.post(`${API_BASE}/api/tasks`, {
             headers,
-            data: { title: `reject triple ${s}`, missionId, ideaId, workId },
+            data: { title: `accept triple ${s}`, missionId, ideaId, workId },
         });
-        expect(triple.status()).toBe(400);
+        expect(triple.status()).toBe(201);
+        const tripleTask = await triple.json();
+        expect(tripleTask.missionId).toBe(missionId);
+        expect(tripleTask.ideaId).toBe(ideaId);
+        expect(tripleTask.workId).toBe(workId);
 
         // Linkage is FK + ownership enforced (`assertScopeReachable`): a Task
         // pinned to a never-created ghost workId is REJECTED at create time
@@ -301,7 +311,7 @@ test.describe('Task ↔ scope linkage (Mission / Idea / Work)', () => {
         expect(byGhost.ids).not.toContain(realTask.id);
     });
 
-    test('scope is immutable post-create: PATCH never moves a Task between scopes', async ({
+    test('owners are re-fileable via PATCH: detach + attach in one call, ownership-guarded, filters follow', async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
@@ -322,54 +332,59 @@ test.describe('Task ↔ scope linkage (Mission / Idea / Work)', () => {
         });
         expect(asScoped(task).workId).toBe(workId);
 
-        // A PATCH that even MENTIONS a scope key is REFUSED outright: the
-        // UpdateTaskDto whitelists only title/description/priority/labels/
-        // parentTaskId/requireAllApprovers, and the global ValidationPipe runs
-        // `forbidNonWhitelisted`, so {workId, missionId, …} → 400 "property
-        // <key> should not exist". Scope therefore can never move via PATCH.
-        const newTitle = `Renamed but pinned ${s}`;
-        const rejectRes = await request.patch(`${API_BASE}/api/tasks/${task.id}`, {
+        // Owners are RE-FILEABLE via PATCH. `UpdateTaskDto` whitelists the
+        // six owner keys, so a PATCH may detach one (`null`) and attach
+        // another in the same call — a Task raised against the wrong Work has
+        // to be movable without recreating it and losing its history.
+        const newTitle = `Renamed and re-filed ${s}`;
+        const refileRes = await request.patch(`${API_BASE}/api/tasks/${task.id}`, {
             headers,
             data: { workId: null, missionId, title: newTitle },
         });
-        expect(rejectRes.status(), `scope-key patch should be 400`).toBe(400);
-        expect((await rejectRes.json()).message).toEqual(
-            expect.arrayContaining([expect.stringMatching(/should not exist/i)]),
-        );
+        expect(refileRes.status(), `re-file patch body=${await refileRes.text()}`).toBe(200);
+        const refiled = await refileRes.json();
+        expect(refiled.title).toBe(newTitle);
+        expect(refiled.workId).toBeNull(); // detached
+        expect(refiled.missionId).toBe(missionId); // attached
 
-        // The rejected request changed NOTHING — the row is byte-for-byte its
-        // birth state (original title, work scope intact, mission still null).
-        const afterReject = await (
+        // GET-by-id confirms the persisted row agrees.
+        const afterRefile = await (
             await request.get(`${API_BASE}/api/tasks/${task.id}`, { headers })
         ).json();
-        expect(afterReject.title).toBe(`Immutable scope ${s}`); // not renamed
-        expect(afterReject.workId).toBe(workId);
-        expect(afterReject.missionId).toBeNull();
+        expect(afterRefile.workId).toBeNull();
+        expect(afterRefile.missionId).toBe(missionId);
 
-        // A title-only PATCH (whitelisted field) DOES succeed and leaves the
-        // scope untouched — mutable fields move, scope does not.
+        // An owner the caller cannot reach is still refused — re-filing is
+        // ownership-checked exactly as creation is, so PATCH is not a way
+        // around the guard.
+        const foreignRes = await request.patch(`${API_BASE}/api/tasks/${task.id}`, {
+            headers,
+            data: { workId: UNKNOWN_UUID },
+        });
+        expect(foreignRes.status(), `unreachable owner should be refused`).toBe(400);
+
+        // A title-only PATCH leaves every owner untouched.
         const patchRes = await request.patch(`${API_BASE}/api/tasks/${task.id}`, {
             headers,
-            data: { title: newTitle },
+            data: { title: `${newTitle} again` },
         });
         expect(patchRes.status(), `patch body=${await patchRes.text()}`).toBe(200);
         const patched = await patchRes.json();
-        expect(patched.title).toBe(newTitle); // mutable field moved
-        expect(patched.workId).toBe(workId); // scope unchanged
+        expect(patched.title).toBe(`${newTitle} again`);
+        expect(patched.missionId).toBe(missionId); // owners unchanged
 
-        // GET-by-id confirms the persisted row agrees (no eventual move).
         const after = await (
             await request.get(`${API_BASE}/api/tasks/${task.id}`, { headers })
         ).json();
-        expect(after.workId).toBe(workId);
-        expect(after.missionId).toBeNull();
+        expect(after.workId).toBeNull();
+        expect(after.missionId).toBe(missionId);
 
-        // The filters reflect the immutability: still in the work filter,
-        // still NOT in the mission filter after the failed move attempt.
+        // The list filters agree with the re-file: the task LEFT the work
+        // filter (workId is now null) and ENTERED the mission filter.
         const byWork = await listTaskIds(request, token, `workId=${workId}`);
-        expect(byWork.ids).toContain(task.id);
+        expect(byWork.ids).not.toContain(task.id);
         const byMission = await listTaskIds(request, token, `missionId=${missionId}`);
-        expect(byMission.ids).not.toContain(task.id);
+        expect(byMission.ids).toContain(task.id);
     });
 
     test('cross-user scope isolation: each user owns its own work scope, zero leakage; cross-read is 404', async ({

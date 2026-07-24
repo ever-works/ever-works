@@ -4,8 +4,15 @@ import { Work } from '@/lib/api/types-only';
 import { cn } from '@/lib/utils/cn';
 import { getGenerationStatusConfig } from '@/lib/utils/generation-status';
 import { useTranslations } from 'next-intl';
-import { Package, Tag, Clock, Scale } from 'lucide-react';
 import { useWorkDetail } from '../WorkDetailContext';
+import {
+    getWorkCapabilities,
+    WORK_METRIC_DEFINITIONS,
+    type WorkMetricId,
+    type WorkMetricState,
+} from '@ever-works/contracts';
+import { WORK_METRIC_PRESENTATION } from './work-metric-presentation';
+import { resolveWorkMetrics } from './resolve-work-metrics';
 
 interface WorkStatsProps {
     work: Work;
@@ -21,9 +28,13 @@ interface StatCardProps {
     icon: React.ReactNode;
     iconColor: string;
     className?: string;
+    /** Stable id for e2e selectors; also keys the React list. */
+    metricId?: WorkMetricId;
+    /** Shown under the value when the metric could not be resolved. */
+    hint?: string;
 }
 
-function StatCard({ title, value, icon, iconColor, className }: StatCardProps) {
+function StatCard({ title, value, icon, iconColor, className, metricId, hint }: StatCardProps) {
     return (
         <div
             className={cn(
@@ -33,6 +44,7 @@ function StatCard({ title, value, icon, iconColor, className }: StatCardProps) {
                 'w-full',
                 'min-w-0',
             )}
+            data-testid={metricId ? `work-stat-tile-${metricId}` : undefined}
         >
             <div
                 className={cn(
@@ -51,9 +63,15 @@ function StatCard({ title, value, icon, iconColor, className }: StatCardProps) {
                         'text-xl sm:text-2xl font-bold text-text dark:text-text-dark mt-2 break-words whitespace-normal',
                         className,
                     )}
+                    data-testid={metricId ? `work-stat-value-${metricId}` : undefined}
                 >
                     {value}
                 </p>
+                {hint && (
+                    <p className="mt-0.5 text-[11px] leading-tight text-text-muted dark:text-text-muted-dark">
+                        {hint}
+                    </p>
+                )}
 
                 <div className="absolute top-2 sm:top-3 right-2 sm:right-3">
                     <span className={cn(iconColor, 'block')}>{icon}</span>
@@ -81,54 +99,103 @@ function getGenerationStatusStat(
     };
 }
 
-export function WorkStats({ categoriesCount, itemsCount, comparisonsCount, work }: WorkStatsProps) {
+/**
+ * Which tiles a Work shows depends on what kind of Work it is.
+ *
+ * Every Work used to render the same five directory-shaped tiles, so a
+ * Landing Page reported "Total Items: 0 / Categories: 0 / Comparisons: 0"
+ * forever — three numbers that can never become anything else. The tile set
+ * now comes from the shared capability registry
+ * (`getWorkCapabilities(kind).metrics`).
+ *
+ * `default`-kind Works — which is effectively the entire installed base —
+ * keep exactly the previous five tiles, in the previous order.
+ */
+export function WorkStats({
+    categoriesCount,
+    itemsCount,
+    tagsCount,
+    comparisonsCount,
+    work,
+}: WorkStatsProps) {
     const t = useTranslations('dashboard.workDetail.stats');
     const tStatus = useTranslations('dashboard.workDetail.status');
     const { work: syncedWork } = useWorkDetail();
     const statusWork = syncedWork.id === work.id ? syncedWork : work;
 
-    const stats = [
-        {
-            title: t('totalItems'),
-            value: itemsCount,
-            icon: <Package className="w-3 h-3 sm:w-4 sm:h-4" />,
-            iconColor: 'text-blue-500',
-        },
-        {
-            title: t('categories'),
-            value: categoriesCount,
-            icon: <Tag className="w-3 h-3 sm:w-4 sm:h-4" />,
-            iconColor: 'text-violet-500',
-        },
-        {
-            title: t('comparisons'),
-            value: comparisonsCount,
-            icon: <Scale className="w-3 h-3 sm:w-4 sm:h-4" />,
-            iconColor: 'text-emerald-500',
-        },
-        getGenerationStatusStat(statusWork, t, tStatus),
-        {
-            title: t('daysActive'),
-            value: Math.floor(
-                (new Date().getTime() - new Date(work.createdAt).getTime()) / (1000 * 60 * 60 * 24),
-            ),
-            icon: <Clock className="w-3 h-3 sm:w-4 sm:h-4" />,
-            iconColor: 'text-orange-500',
-        },
-    ];
+    const metricIds = getWorkCapabilities(work.kind).metrics;
+    const generationStat = getGenerationStatusStat(statusWork, t, tStatus);
+
+    const values = resolveWorkMetrics(metricIds, {
+        itemsCount,
+        categoriesCount,
+        tagsCount,
+        comparisonsCount,
+        createdAt: work.createdAt,
+        hasDeployment: Boolean(work.website),
+        generationStatusLabel: String(generationStat.value),
+        deployStatusLabel: t('states.live'),
+    });
 
     return (
         <div className="grid grid-cols-[repeat(auto-fit,minmax(170px,1fr))] gap-4 w-full h-auto">
-            {stats.map((stat) => (
-                <StatCard
-                    key={stat.title}
-                    title={stat.title}
-                    value={stat.value}
-                    icon={stat.icon}
-                    iconColor={stat.iconColor}
-                    className={'className' in stat ? stat.className : undefined}
-                />
-            ))}
+            {values.map((metric) => {
+                const definition = WORK_METRIC_DEFINITIONS[metric.id];
+                const presentation = WORK_METRIC_PRESENTATION[metric.id];
+
+                // The generation-status tile keeps its bespoke status icon,
+                // colour and small-text treatment.
+                if (metric.id === 'generation-status') {
+                    return (
+                        <StatCard
+                            key={metric.id}
+                            metricId={metric.id}
+                            title={generationStat.title}
+                            value={generationStat.value}
+                            icon={generationStat.icon}
+                            iconColor={generationStat.iconColor}
+                            className={generationStat.className}
+                        />
+                    );
+                }
+
+                const Icon = presentation.icon;
+                const unavailable = metric.state !== 'ok';
+
+                return (
+                    <StatCard
+                        key={metric.id}
+                        metricId={metric.id}
+                        title={t(definition.labelKey)}
+                        // An unresolved metric shows an em-dash, never a
+                        // fabricated 0 — "no data yet" and "zero" are
+                        // different claims.
+                        value={unavailable ? '—' : (metric.value ?? '—')}
+                        hint={unavailable ? t(STATE_HINT_KEY[metric.state]) : undefined}
+                        icon={<Icon className="w-3 h-3 sm:w-4 sm:h-4" />}
+                        iconColor={unavailable ? 'text-text-muted' : presentation.iconColor}
+                        className={
+                            unavailable ? 'text-text-muted dark:text-text-muted-dark' : undefined
+                        }
+                    />
+                );
+            })}
         </div>
     );
 }
+
+/**
+ * Maps an unresolved metric state to its `stats.states.*` message key.
+ *
+ * The value type is a literal union, not `string`, so next-intl can still
+ * verify the composed key against the message catalogue.
+ */
+const STATE_HINT_KEY: Record<
+    Exclude<WorkMetricState, 'ok'>,
+    'states.notConfigured' | 'states.notDeployed' | 'states.notGenerated' | 'states.unavailable'
+> = {
+    not_configured: 'states.notConfigured',
+    not_deployed: 'states.notDeployed',
+    not_generated: 'states.notGenerated',
+    error: 'states.unavailable',
+};

@@ -10,10 +10,25 @@ export interface SwitchProps {
     label?: string;
     helperText?: string;
     className?: string;
+    /** Forwarded onto the inner `role="switch"` button so tests can target the
+     *  actual interactive control (the props interface is closed — without an
+     *  explicit passthrough a hyphenated attribute never reaches the DOM). */
+    'data-testid'?: string;
 }
 
 const Switch = React.forwardRef<HTMLDivElement, SwitchProps>(
-    ({ checked = false, onChange, disabled = false, label, helperText, className }, ref) => {
+    (
+        {
+            checked = false,
+            onChange,
+            disabled = false,
+            label,
+            helperText,
+            className,
+            'data-testid': dataTestId,
+        },
+        ref,
+    ) => {
         const handleClick = () => {
             if (!disabled && onChange) {
                 onChange(!checked);
@@ -32,6 +47,7 @@ const Switch = React.forwardRef<HTMLDivElement, SwitchProps>(
                 <button
                     type="button"
                     role="switch"
+                    data-testid={dataTestId}
                     aria-checked={checked}
                     disabled={disabled}
                     onClick={handleClick}

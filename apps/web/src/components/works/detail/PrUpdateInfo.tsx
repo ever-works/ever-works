@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useTranslations } from 'next-intl';
+import { formatGitProviderName } from '@/lib/utils/git-provider';
 
 /**
  * Security: PR URLs (`mainPR.url` / `dataPR.url`) come from the git-provider
@@ -29,12 +30,16 @@ export function PrUpdateInfo({
     mainPR,
     dataPR,
     className,
+    gitProvider,
 }: {
     mainPR: any;
     dataPR: any;
     className?: string;
+    /** Work's git provider — names the repo after the host it lives on. */
+    gitProvider?: string;
 }) {
     const tConf = useTranslations('dashboard.workDetail.config');
+    const providerName = formatGitProviderName(gitProvider);
 
     if (!mainPR?.url && !dataPR?.url) {
         return null;
@@ -52,7 +57,7 @@ export function PrUpdateInfo({
             <div className="bg-surface dark:bg-surface-dark rounded-md p-3 space-y-2">
                 <div className={cn(!mainPR?.branch && 'hidden')}>
                     <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                        {tConf('mainRepository')}
+                        {tConf('mainRepository', { provider: providerName })}
                     </p>
                     <Button
                         href={mainPrUrl || '#'}

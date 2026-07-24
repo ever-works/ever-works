@@ -7,3 +7,5 @@ export * from './services/works-config-projection.service';
 export * from './services/works-config-repository-sync.service';
 export * from './services/works-config-sync.listener';
 export * from './works-config-data';
+export * from './schema/works-config.schema';
+export * from './schema/emit-json-schema';

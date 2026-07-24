@@ -1,0 +1,865 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://api.ever.works/api/schema/works.yml.schema.json",
+    "title": "Ever Works — .works/works.yml",
+    "description": "Schema version 2. Every field is optional: works.yml is a partial override of platform defaults, never a complete description of a Work. Unknown keys are preserved on write.",
+    "type": "object",
+    "properties": {
+        "version": {
+            "type": "integer",
+            "exclusiveMinimum": 0,
+            "maximum": 9007199254740991
+        },
+        "kind": {
+            "type": "string",
+            "maxLength": 32
+        },
+        "name": {
+            "type": "string"
+        },
+        "title": {
+            "type": "string"
+        },
+        "initial_prompt": {
+            "type": "string",
+            "maxLength": 8000
+        },
+        "model": {
+            "type": "string"
+        },
+        "website_repo": {
+            "type": "string",
+            "maxLength": 400
+        },
+        "schedule_cadence": {
+            "type": "string",
+            "enum": [
+                "hourly",
+                "daily",
+                "weekly",
+                "monthly"
+            ]
+        },
+        "deploy_provider": {
+            "type": "string"
+        },
+        "deployProvider": {
+            "type": "string"
+        },
+        "activity_sync": {
+            "type": "object",
+            "properties": {
+                "mode": {
+                    "type": "string",
+                    "enum": [
+                        "pull",
+                        "push",
+                        "disabled"
+                    ]
+                }
+            },
+            "additionalProperties": {}
+        },
+        "providers": {
+            "type": "object",
+            "properties": {},
+            "additionalProperties": {}
+        },
+        "spec": {
+            "description": "Kind-specific configuration. The accepted shape depends on `kind`. A kind this schema does not list is still allowed — its spec is preserved as-is and not validated.",
+            "oneOf": [
+                {
+                    "title": "spec for kind: website",
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                        "kind": {
+                            "type": "string",
+                            "const": "website"
+                        },
+                        "template": {
+                            "type": "string",
+                            "minLength": 1
+                        },
+                        "pages": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "path": {
+                                        "type": "string",
+                                        "minLength": 1
+                                    },
+                                    "title": {
+                                        "type": "string"
+                                    },
+                                    "prompt": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "path"
+                                ],
+                                "additionalProperties": {}
+                            }
+                        },
+                        "nav": {
+                            "type": "object",
+                            "properties": {
+                                "header": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "label": {
+                                                "type": "string"
+                                            },
+                                            "href": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "required": [
+                                            "label",
+                                            "href"
+                                        ],
+                                        "additionalProperties": {}
+                                    }
+                                },
+                                "footer": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "object",
+                                        "properties": {
+                                            "label": {
+                                                "type": "string"
+                                            },
+                                            "href": {
+                                                "type": "string"
+                                            }
+                                        },
+                                        "required": [
+                                            "label",
+                                            "href"
+                                        ],
+                                        "additionalProperties": {}
+                                    }
+                                }
+                            },
+                            "additionalProperties": {}
+                        },
+                        "branding": {
+                            "type": "object",
+                            "properties": {
+                                "logo": {
+                                    "type": "string"
+                                },
+                                "favicon": {
+                                    "type": "string"
+                                },
+                                "theme": {
+                                    "type": "string"
+                                },
+                                "locale": {
+                                    "type": "string"
+                                }
+                            },
+                            "additionalProperties": {}
+                        },
+                        "seo": {
+                            "type": "object",
+                            "properties": {
+                                "title": {
+                                    "type": "string"
+                                },
+                                "description": {
+                                    "type": "string"
+                                },
+                                "keywords": {
+                                    "anyOf": [
+                                        {
+                                            "type": "string"
+                                        },
+                                        {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    ]
+                                },
+                                "author": {
+                                    "type": "string"
+                                },
+                                "image": {
+                                    "type": "string"
+                                },
+                                "twitter": {
+                                    "type": "string"
+                                },
+                                "url": {
+                                    "type": "string"
+                                }
+                            },
+                            "additionalProperties": {}
+                        },
+                        "analytics": {
+                            "type": "object",
+                            "properties": {
+                                "provider": {
+                                    "type": "string"
+                                }
+                            },
+                            "additionalProperties": {}
+                        }
+                    },
+                    "required": [
+                        "kind"
+                    ],
+                    "additionalProperties": {}
+                },
+                {
+                    "title": "spec for kind: landing-page",
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                        "kind": {
+                            "type": "string",
+                            "const": "landing-page"
+                        },
+                        "template": {
+                            "type": "string",
+                            "minLength": 1
+                        },
+                        "hero": {
+                            "type": "object",
+                            "properties": {
+                                "headline": {
+                                    "type": "string"
+                                },
+                                "subheadline": {
+                                    "type": "string"
+                                },
+                                "cta": {
+                                    "type": "object",
+                                    "properties": {
+                                        "label": {
+                                            "type": "string"
+                                        },
+                                        "href": {
+                                            "type": "string"
+                                        }
+                                    },
+                                    "required": [
+                                        "label",
+                                        "href"
+                                    ],
+                                    "additionalProperties": {}
+                                }
+                            },
+                            "additionalProperties": {}
+                        },
+                        "sections": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "type": {
+                                        "type": "string",
+                                        "minLength": 1
+                                    },
+                                    "title": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "type"
+                                ],
+                                "additionalProperties": {}
+                            }
+                        },
+                        "capture": {
+                            "type": "object",
+                            "properties": {
+                                "enabled": {
+                                    "type": "boolean"
+                                },
+                                "destination": {
+                                    "type": "string"
+                                }
+                            },
+                            "additionalProperties": {}
+                        },
+                        "branding": {
+                            "type": "object",
+                            "properties": {
+                                "logo": {
+                                    "type": "string"
+                                },
+                                "favicon": {
+                                    "type": "string"
+                                },
+                                "theme": {
+                                    "type": "string"
+                                },
+                                "locale": {
+                                    "type": "string"
+                                }
+                            },
+                            "additionalProperties": {}
+                        },
+                        "seo": {
+                            "type": "object",
+                            "properties": {
+                                "title": {
+                                    "type": "string"
+                                },
+                                "description": {
+                                    "type": "string"
+                                },
+                                "keywords": {
+                                    "anyOf": [
+                                        {
+                                            "type": "string"
+                                        },
+                                        {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    ]
+                                },
+                                "author": {
+                                    "type": "string"
+                                },
+                                "image": {
+                                    "type": "string"
+                                },
+                                "twitter": {
+                                    "type": "string"
+                                },
+                                "url": {
+                                    "type": "string"
+                                }
+                            },
+                            "additionalProperties": {}
+                        },
+                        "analytics": {
+                            "type": "object",
+                            "properties": {
+                                "provider": {
+                                    "type": "string"
+                                }
+                            },
+                            "additionalProperties": {}
+                        }
+                    },
+                    "required": [
+                        "kind"
+                    ],
+                    "additionalProperties": {}
+                },
+                {
+                    "title": "spec for kind: blog",
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                        "kind": {
+                            "type": "string",
+                            "const": "blog"
+                        },
+                        "template": {
+                            "type": "string",
+                            "minLength": 1
+                        },
+                        "content_dir": {
+                            "type": "string"
+                        },
+                        "authors": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "minLength": 1
+                                    },
+                                    "bio": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "name"
+                                ],
+                                "additionalProperties": {}
+                            }
+                        },
+                        "taxonomies": {
+                            "type": "object",
+                            "properties": {
+                                "categories": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                },
+                                "tags": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                }
+                            },
+                            "additionalProperties": {}
+                        },
+                        "feed": {
+                            "type": "object",
+                            "properties": {
+                                "enabled": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "additionalProperties": {}
+                        },
+                        "pagination": {
+                            "type": "object",
+                            "properties": {
+                                "per_page": {
+                                    "type": "integer",
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991
+                                }
+                            },
+                            "additionalProperties": {}
+                        },
+                        "generation": {
+                            "type": "object",
+                            "properties": {
+                                "cadence": {
+                                    "type": "string",
+                                    "enum": [
+                                        "hourly",
+                                        "daily",
+                                        "weekly",
+                                        "monthly"
+                                    ]
+                                },
+                                "topics_prompt": {
+                                    "type": "string",
+                                    "maxLength": 8000
+                                },
+                                "posts_per_run": {
+                                    "type": "integer",
+                                    "exclusiveMinimum": 0,
+                                    "maximum": 9007199254740991
+                                }
+                            },
+                            "additionalProperties": {}
+                        },
+                        "branding": {
+                            "type": "object",
+                            "properties": {
+                                "logo": {
+                                    "type": "string"
+                                },
+                                "favicon": {
+                                    "type": "string"
+                                },
+                                "theme": {
+                                    "type": "string"
+                                },
+                                "locale": {
+                                    "type": "string"
+                                }
+                            },
+                            "additionalProperties": {}
+                        },
+                        "seo": {
+                            "type": "object",
+                            "properties": {
+                                "title": {
+                                    "type": "string"
+                                },
+                                "description": {
+                                    "type": "string"
+                                },
+                                "keywords": {
+                                    "anyOf": [
+                                        {
+                                            "type": "string"
+                                        },
+                                        {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    ]
+                                },
+                                "author": {
+                                    "type": "string"
+                                },
+                                "image": {
+                                    "type": "string"
+                                },
+                                "twitter": {
+                                    "type": "string"
+                                },
+                                "url": {
+                                    "type": "string"
+                                }
+                            },
+                            "additionalProperties": {}
+                        }
+                    },
+                    "required": [
+                        "kind"
+                    ],
+                    "additionalProperties": {}
+                },
+                {
+                    "title": "spec for kind: directory",
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                        "kind": {
+                            "type": "string",
+                            "const": "directory"
+                        },
+                        "template": {
+                            "type": "string",
+                            "minLength": 1
+                        },
+                        "categories": {
+                            "type": "array",
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "name": {
+                                                "type": "string",
+                                                "minLength": 1
+                                            }
+                                        },
+                                        "required": [
+                                            "name"
+                                        ],
+                                        "additionalProperties": {}
+                                    }
+                                ]
+                            }
+                        },
+                        "tags": {
+                            "type": "array",
+                            "items": {
+                                "anyOf": [
+                                    {
+                                        "type": "string"
+                                    },
+                                    {
+                                        "type": "object",
+                                        "properties": {
+                                            "name": {
+                                                "type": "string",
+                                                "minLength": 1
+                                            }
+                                        },
+                                        "required": [
+                                            "name"
+                                        ],
+                                        "additionalProperties": {}
+                                    }
+                                ]
+                            }
+                        },
+                        "item_fields": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "minLength": 1
+                                    },
+                                    "type": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "name"
+                                ],
+                                "additionalProperties": {}
+                            }
+                        },
+                        "sources": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "url": {
+                                        "type": "string"
+                                    }
+                                },
+                                "additionalProperties": {}
+                            }
+                        },
+                        "submissions": {
+                            "type": "object",
+                            "properties": {
+                                "enabled": {
+                                    "type": "boolean"
+                                },
+                                "moderation": {
+                                    "type": "string",
+                                    "enum": [
+                                        "auto",
+                                        "manual"
+                                    ]
+                                }
+                            },
+                            "additionalProperties": {}
+                        },
+                        "comparisons": {
+                            "type": "object",
+                            "properties": {
+                                "enabled": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "additionalProperties": {}
+                        },
+                        "branding": {
+                            "type": "object",
+                            "properties": {
+                                "logo": {
+                                    "type": "string"
+                                },
+                                "favicon": {
+                                    "type": "string"
+                                },
+                                "theme": {
+                                    "type": "string"
+                                },
+                                "locale": {
+                                    "type": "string"
+                                }
+                            },
+                            "additionalProperties": {}
+                        },
+                        "seo": {
+                            "type": "object",
+                            "properties": {
+                                "title": {
+                                    "type": "string"
+                                },
+                                "description": {
+                                    "type": "string"
+                                },
+                                "keywords": {
+                                    "anyOf": [
+                                        {
+                                            "type": "string"
+                                        },
+                                        {
+                                            "type": "array",
+                                            "items": {
+                                                "type": "string"
+                                            }
+                                        }
+                                    ]
+                                },
+                                "author": {
+                                    "type": "string"
+                                },
+                                "image": {
+                                    "type": "string"
+                                },
+                                "twitter": {
+                                    "type": "string"
+                                },
+                                "url": {
+                                    "type": "string"
+                                }
+                            },
+                            "additionalProperties": {}
+                        }
+                    },
+                    "required": [
+                        "kind"
+                    ],
+                    "additionalProperties": {}
+                },
+                {
+                    "title": "spec for kind: awesome-repo",
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                        "kind": {
+                            "type": "string",
+                            "const": "awesome-repo"
+                        },
+                        "template": {
+                            "type": "string",
+                            "minLength": 1
+                        },
+                        "source": {
+                            "type": "object",
+                            "properties": {
+                                "repo": {
+                                    "type": "string",
+                                    "maxLength": 400
+                                },
+                                "branch": {
+                                    "type": "string"
+                                },
+                                "file": {
+                                    "type": "string"
+                                }
+                            },
+                            "additionalProperties": {}
+                        },
+                        "sync": {
+                            "type": "object",
+                            "properties": {
+                                "cadence": {
+                                    "type": "string",
+                                    "enum": [
+                                        "hourly",
+                                        "daily",
+                                        "weekly",
+                                        "monthly"
+                                    ]
+                                }
+                            },
+                            "additionalProperties": {}
+                        },
+                        "readme": {
+                            "type": "object",
+                            "properties": {
+                                "header": {
+                                    "type": "string"
+                                },
+                                "footer": {
+                                    "type": "string"
+                                },
+                                "overwriteDefaultHeader": {
+                                    "type": "boolean"
+                                },
+                                "overwriteDefaultFooter": {
+                                    "type": "boolean"
+                                },
+                                "toc": {
+                                    "type": "boolean"
+                                },
+                                "badges": {
+                                    "type": "array",
+                                    "items": {
+                                        "type": "string"
+                                    }
+                                }
+                            },
+                            "additionalProperties": {}
+                        },
+                        "enrich": {
+                            "type": "object",
+                            "properties": {
+                                "enabled": {
+                                    "type": "boolean"
+                                }
+                            },
+                            "additionalProperties": {}
+                        }
+                    },
+                    "required": [
+                        "kind"
+                    ],
+                    "additionalProperties": {}
+                },
+                {
+                    "title": "spec for kind: company",
+                    "$schema": "https://json-schema.org/draft/2020-12/schema",
+                    "type": "object",
+                    "properties": {
+                        "kind": {
+                            "type": "string",
+                            "const": "company"
+                        },
+                        "organization": {
+                            "type": "string"
+                        },
+                        "company_manifest": {
+                            "type": "string"
+                        },
+                        "departments": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "name": {
+                                        "type": "string",
+                                        "minLength": 1
+                                    }
+                                },
+                                "required": [
+                                    "name"
+                                ],
+                                "additionalProperties": {}
+                            }
+                        },
+                        "staffing": {
+                            "type": "array",
+                            "items": {
+                                "type": "object",
+                                "properties": {
+                                    "role": {
+                                        "type": "string",
+                                        "minLength": 1
+                                    },
+                                    "agent": {
+                                        "type": "string"
+                                    }
+                                },
+                                "required": [
+                                    "role"
+                                ],
+                                "additionalProperties": {}
+                            }
+                        },
+                        "branding": {
+                            "type": "object",
+                            "properties": {
+                                "logo": {
+                                    "type": "string"
+                                },
+                                "favicon": {
+                                    "type": "string"
+                                },
+                                "theme": {
+                                    "type": "string"
+                                },
+                                "locale": {
+                                    "type": "string"
+                                }
+                            },
+                            "additionalProperties": {}
+                        }
+                    },
+                    "required": [
+                        "kind"
+                    ],
+                    "additionalProperties": {}
+                },
+                {
+                    "title": "spec for an unrecognised kind",
+                    "type": "object",
+                    "additionalProperties": true
+                }
+            ]
+        }
+    },
+    "additionalProperties": {}
+}

@@ -579,6 +579,72 @@ describe('AccountImportService', () => {
             expect(result.worksCreated).toBe(1);
         });
 
+        it('round-trips kind and an explicit providerRepositoryEnabled:false on create', async () => {
+            const { service, mocks } = makeService();
+            mocks.userRepository.findById.mockResolvedValue({ id: 'user-1', username: 'octocat' });
+            mocks.workRepository.findByOwnerAndSlug.mockResolvedValue(null);
+            mocks.workRepository.create.mockResolvedValue({ id: 'w-new', slug: 'a' });
+
+            await service.applyImport(
+                'user-1',
+                makePayload([
+                    makeWork({ slug: 'a', kind: 'blog', providerRepositoryEnabled: false }),
+                ]),
+                [],
+            );
+
+            // A user who deliberately disabled provider-repo generation must
+            // not have it silently re-enabled by an account transfer.
+            expect(mocks.workRepository.create).toHaveBeenCalledWith(
+                expect.objectContaining({ kind: 'blog', providerRepositoryEnabled: false }),
+                expect.anything(),
+            );
+        });
+
+        it('overwrite applies kind + providerRepositoryEnabled, but omits both for pre-kind payloads', async () => {
+            const { service, mocks } = makeService();
+            mocks.userRepository.findById.mockResolvedValue({ id: 'user-1', username: 'octocat' });
+            const existing = { id: 'w-existing', slug: 'a', getRepoOwner: () => 'octocat' };
+            mocks.workRepository.findByOwnerAndSlug.mockResolvedValue(existing);
+
+            await service.applyImport(
+                'user-1',
+                makePayload([
+                    makeWork({ slug: 'a', kind: 'website', providerRepositoryEnabled: false }),
+                ]),
+                [{ slug: 'a', strategy: 'overwrite' }],
+            );
+            expect(mocks.workRepository.update).toHaveBeenCalledWith(
+                'w-existing',
+                expect.objectContaining({ kind: 'website', providerRepositoryEnabled: false }),
+            );
+
+            // Old export (no kind / no toggle) → existing settings untouched.
+            mocks.workRepository.update.mockClear();
+            await service.applyImport('user-1', makePayload([makeWork({ slug: 'a' })]), [
+                { slug: 'a', strategy: 'overwrite' },
+            ]);
+            const patch = mocks.workRepository.update.mock.calls[0][1];
+            expect('kind' in patch).toBe(false);
+            expect('providerRepositoryEnabled' in patch).toBe(false);
+        });
+
+        it('a bogus kind in a tampered payload is dropped, not written', async () => {
+            const { service, mocks } = makeService();
+            mocks.userRepository.findById.mockResolvedValue({ id: 'user-1', username: 'octocat' });
+            mocks.workRepository.findByOwnerAndSlug.mockResolvedValue(null);
+            mocks.workRepository.create.mockResolvedValue({ id: 'w-new', slug: 'a' });
+
+            await service.applyImport(
+                'user-1',
+                makePayload([makeWork({ slug: 'a', kind: 'constructor' })]),
+                [],
+            );
+
+            const [payload] = mocks.workRepository.create.mock.calls[0];
+            expect('kind' in payload).toBe(false);
+        });
+
         it('per-work failure inside the loop is caught and pushed to result.errors WITHOUT aborting other works', async () => {
             const { service, mocks } = makeService();
             mocks.userRepository.findById.mockResolvedValue({ id: 'user-1', username: 'octocat' });

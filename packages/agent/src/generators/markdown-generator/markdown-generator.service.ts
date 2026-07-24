@@ -2,7 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import * as fs from 'node:fs/promises';
 import { GitFacadeService } from '../../facades/git.facade';
 import type { Category, Identifiable, ItemData, Tag } from '@ever-works/contracts';
-import { Work } from '../../entities/work.entity';
+import { Work, shouldGenerateProviderRepository } from '../../entities/work.entity';
 import { User } from '../../entities/user.entity';
 import { DataRepository, PRUpdate } from '../data-generator/data-repository';
 import { ReadmeBuilder } from './readme-builder';
@@ -66,6 +66,18 @@ export class MarkdownGeneratorService {
         options: InitializeOptions = {},
     ): Promise<{ filesChanged: number }> {
         throwIfGenerationCancelled(options.signal);
+
+        // The single gate for the provider repository. `initialize` is called
+        // from eight places across generation and import; gating here rather
+        // than at each call site means a new caller cannot forget it — and
+        // means turning the setting off actually stops the repository being
+        // CREATED, not merely re-rendered.
+        if (!shouldGenerateProviderRepository(work)) {
+            this.logger.log(
+                `Skipping ${work.gitProvider} repository generation for work ${work.id} — disabled for this Work or not provisioned by kind "${work.kind}".`,
+            );
+            return { filesChanged: 0 };
+        }
 
         const workOwner = getWorkOwner(work);
         const committer = work.resolveCommitter(user);

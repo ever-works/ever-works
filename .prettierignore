@@ -22,3 +22,11 @@ apps/docs/build
 # but a local `pnpm format:check` would otherwise flag the generated JSON).
 apps/web/e2e/.auth
 apps/web/e2e/test-results
+
+# Generated from the zod schema in
+# `packages/agent/src/works-config/schema/works-config.schema.ts` and
+# committed so it can be served without a build step. Its formatting is
+# owned by `serializeWorksConfigJsonSchema()` — a drift test asserts the
+# file is byte-identical to a fresh generation, so letting Prettier
+# reformat it would fail that test on every run.
+packages/agent/src/works-config/schema/works.v2.schema.json
