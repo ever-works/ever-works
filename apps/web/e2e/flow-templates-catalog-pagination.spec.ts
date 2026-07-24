@@ -111,8 +111,13 @@ async function listTemplates(
     kind?: string,
 ): Promise<CatalogResponse> {
     const q = kind ? `?kind=${kind}` : '';
+    // /api/templates?kind=website can trigger an external raw.githubusercontent
+    // catalog read on a cold cache. Bound the request so a slow upstream fails
+    // THIS call fast instead of hanging until the whole-test budget expires and
+    // disposes the request context (observed in CI as "Request context disposed").
     const res = await request.get(`${API_BASE}/api/templates${q}`, {
         headers: authedHeaders(token),
+        timeout: 30_000,
     });
     expect(res.status(), `GET /api/templates${q}`).toBe(200);
     return res.json();
