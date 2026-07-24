@@ -163,9 +163,7 @@ async function expectServiceError(
 }
 
 /** Register a fresh user + a valid Work; returns the owner token + work id. */
-async function makeOwnedWork(
-    request: APIRequestContext,
-): Promise<{
+async function makeOwnedWork(request: APIRequestContext): Promise<{
     user: Awaited<ReturnType<typeof registerUserViaAPI>>;
     token: string;
     workId: string;
