@@ -36,30 +36,6 @@ import { WorkMember } from './work-member.entity';
 import type { WorkKbConfig } from './kb-types';
 
 /**
- * Work kinds a user can pick at creation time — the chip catalog on
- * `/new` and `/works/new`. Persisting the choice on `work.kind` is what
- * lets `WebsiteTemplateResolverService.resolveForWork` pick a
- * kind-appropriate default website template (general-purpose kinds →
- * the `web` template; directory-ish kinds stay on `classic`). See
- * `getWebsiteTemplateIdForWorkKind` in
- * `generators/website-generator/config/website-template.config.ts`.
- *
- * `company` is deliberately NOT in this list: Company Works are minted
- * only through the dedicated Register-Company flow
- * (`WorkLifecycleService.createCompanyWork`), never via the general
- * create path.
- */
-export const USER_SELECTABLE_WORK_KINDS = [
-    'website',
-    'landing-page',
-    'blog',
-    'directory',
-    'awesome-repo',
-] as const;
-
-export type UserSelectableWorkKind = (typeof USER_SELECTABLE_WORK_KINDS)[number];
-
-/**
  * EW-665 (Tenants & Organizations Phase 13) — Work "kind" discriminator.
  *
  *   - `'default'` — every Work that predates the kind-aware create path
@@ -73,13 +49,26 @@ export type UserSelectableWorkKind = (typeof USER_SELECTABLE_WORK_KINDS)[number]
  *     `Organization` via `OrganizationService.createOrganizationFromCompanyWork`.
  *   - the `USER_SELECTABLE_WORK_KINDS` members — the work-kind chip the
  *     user picked at creation, persisted so the website-template
- *     resolver can apply a kind-appropriate default.
+ *     resolver can apply a kind-appropriate default. See
+ *     `getWebsiteTemplateIdForWorkKind` in
+ *     `generators/website-generator/config/website-template.config.ts`.
  *
- * String union + `varchar(32)` mirrors the `TemplateKind` convention on
- * `template.entity.ts` — keeps the value space open without churning a
- * Postgres enum type on every new member.
+ * The vocabulary itself now lives in `@ever-works/contracts` — it is the
+ * only package both this one and `apps/web` import, so keeping one list
+ * there is what lets the web app reason about kinds (badges, capability
+ * gating, per-kind metrics) without depending on `@ever-works/agent`.
+ * Re-exported here so existing importers of the entity keep working.
  */
-export type WorkKind = 'default' | 'company' | UserSelectableWorkKind;
+import {
+    USER_SELECTABLE_WORK_KINDS,
+    getWorkCapabilities,
+    normalizeWorkKind,
+    type UserSelectableWorkKind,
+    type WorkKind,
+} from '@ever-works/contracts';
+
+export { USER_SELECTABLE_WORK_KINDS, normalizeWorkKind };
+export type { UserSelectableWorkKind, WorkKind };
 
 /**
  * Normalize a caller-supplied work-kind string for the general create
@@ -98,17 +87,18 @@ export function normalizeCreateWorkKind(value?: string | null): WorkKind | undef
     if (typeof value !== 'string') {
         return value === undefined || value === null ? undefined : 'default';
     }
-    const normalized = value.trim().toLowerCase();
-    if (!normalized) {
+    if (!value.trim()) {
         return undefined;
     }
-    const canonical = normalized === 'landing' ? 'landing-page' : normalized;
-    if (canonical === 'default') {
+    // `normalizeWorkKind` handles casing, the `landing` alias and the
+    // unknown-value fallback. The create path is stricter in exactly one
+    // respect: `company` is reserved for the Register-Company flow and must
+    // never be settable through the general create endpoint.
+    const canonical = normalizeWorkKind(value);
+    if (canonical === 'company') {
         return 'default';
     }
-    return (USER_SELECTABLE_WORK_KINDS as readonly string[]).includes(canonical)
-        ? (canonical as UserSelectableWorkKind)
-        : 'default';
+    return canonical;
 }
 
 /**
@@ -128,6 +118,38 @@ export function normalizeCreateWorkKind(value?: string | null): WorkKind | undef
  *   - `'archived'` — soft-retired; reserved for a future archive flow.
  */
 export type WorkStatus = 'draft' | 'active' | 'registered' | 'archived';
+
+/**
+ * Whether a Work should provision and maintain the browsable repository
+ * published to its git provider (the "{provider} Repository";
+ * `RepositoryRole` `work`).
+ *
+ * Two independent gates, both of which must allow it:
+ *   1. the Work's kind provisions that repository at all, and
+ *   2. the user has not turned it off.
+ *
+ * Kind wins: switching a Work to a kind that has no provider repository must
+ * stop generating one regardless of the stored flag, and switching back must
+ * not silently re-enable something the user disabled.
+ *
+ * Deliberately a free function taking a structural type rather than only an
+ * entity method. Works reach the generators as plain objects in several
+ * paths — `WorkQueryService` spreads the entity (`{...dir}`) and the
+ * generation pipeline passes those on — so an instance method alone would
+ * throw `is not a function` at runtime for exactly those callers. The entity
+ * keeps a thin method that delegates here.
+ */
+export function shouldGenerateProviderRepository(
+    work: Pick<Work, 'kind'> & { providerRepositoryEnabled?: boolean },
+): boolean {
+    if (!getWorkCapabilities(work.kind).repos.work) {
+        return false;
+    }
+    // `?? true` covers rows written before the column existed, which TypeORM
+    // surfaces as `undefined` on a partially-selected entity. Absent must
+    // read as enabled — the opposite would stop generation platform-wide.
+    return work.providerRepositoryEnabled ?? true;
+}
 
 @Entity({ name: 'works' })
 export class Work {
@@ -380,6 +402,25 @@ export class Work {
     @Column({ type: 'boolean', default: false })
     comparisonsEnabled: boolean;
 
+    /**
+     * Whether to generate the browsable repository published to the git
+     * provider — the one the UI calls the "{provider} Repository" and that
+     * `RepositoryRole` calls `work`.
+     *
+     * Defaults to `true` so every existing Work keeps its current behaviour.
+     * Turning it off is for Works whose output nobody reads on GitHub (an
+     * internal landing page, say) and who would rather not carry a
+     * repository that only ever holds a generated README.
+     *
+     * This is a user override layered ON TOP of the per-kind capability
+     * (`getWorkCapabilities(kind).repos.work`) — a kind that never
+     * provisions the repository ignores the flag entirely. Resolve the two
+     * together through `Work.shouldGenerateProviderRepository()` rather than
+     * reading this column directly.
+     */
+    @Column({ type: 'boolean', default: true })
+    providerRepositoryEnabled: boolean;
+
     @Column({ type: 'varchar', nullable: true, default: null })
     websiteTemplateId?: string | null;
 
@@ -589,6 +630,11 @@ export class Work {
 
     getMainRepo() {
         return this.getRelatedRepository('work').repo;
+    }
+
+    /** @see shouldGenerateProviderRepository — kept for entity-instance callers. */
+    shouldGenerateProviderRepository(): boolean {
+        return shouldGenerateProviderRepository(this);
     }
 
     getRepoOwner(type: RepositoryRole = 'data'): string {

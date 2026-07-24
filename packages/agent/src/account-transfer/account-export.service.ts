@@ -180,6 +180,11 @@ export class AccountExportService {
             slug: dir.slug,
             description: dir.description,
             owner: dir.owner || undefined,
+            kind: dir.kind || undefined,
+            providerRepositoryEnabled:
+                typeof dir.providerRepositoryEnabled === 'boolean'
+                    ? dir.providerRepositoryEnabled
+                    : undefined,
             gitProvider: dir.gitProvider,
             deployProvider: dir.deployProvider || undefined,
             readmeConfig: dir.readmeConfig || undefined,

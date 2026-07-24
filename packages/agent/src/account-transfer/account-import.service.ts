@@ -22,6 +22,8 @@ import type {
 } from './types';
 import { containsMaskedSecrets, MASKED_SECRET_PREFIX } from './types';
 import { sanitizePrompt } from '../utils/sanitize.util';
+import { normalizeCreateWorkKind, type Work, type WorkKind } from '../entities/work.entity';
+import { WORK_KINDS } from '@ever-works/contracts';
 
 /**
  * Canonical slug shape (matches the work/item DTO `@Matches` rule and
@@ -36,6 +38,22 @@ import { sanitizePrompt } from '../utils/sanitize.util';
  * filesystem while leaving every legitimate export unchanged.
  */
 const SLUG_PATTERN = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
+
+/**
+ * Import-specific kind normalization. `normalizeCreateWorkKind` maps
+ * UNKNOWN strings to `'default'` (right for the create endpoint), but on an
+ * import-overwrite that would let a tampered payload RESET an existing
+ * work's kind. Here an unrecognized value is treated as absent instead —
+ * only strings that name a real kind (or the `landing` alias) are applied.
+ */
+function normalizeImportedWorkKind(value: unknown): WorkKind | undefined {
+    if (typeof value !== 'string' || !value.trim()) {
+        return undefined;
+    }
+    const raw = value.trim().toLowerCase();
+    const recognized = raw === 'landing' || (WORK_KINDS as readonly string[]).includes(raw);
+    return recognized ? normalizeCreateWorkKind(value) : undefined;
+}
 
 /**
  * Max length applied to imported advanced-prompt fields. Mirrors
@@ -482,7 +500,7 @@ export class AccountImportService {
 
             if (resolution.strategy === 'overwrite') {
                 // Update existing work
-                await this.workRepository.update(existing.id, {
+                const updateData: Partial<Work> = {
                     name: dir.name,
                     description: dir.description,
                     gitProvider: dir.gitProvider,
@@ -495,7 +513,20 @@ export class AccountImportService {
                     communityPrEnabled: dir.communityPrEnabled,
                     communityPrAutoClose: dir.communityPrAutoClose,
                     comparisonsEnabled: dir.comparisonsEnabled,
-                });
+                };
+                // `kind` is user-supplied JSON — only apply a value that
+                // normalizes to a known kind; never let a bogus payload
+                // corrupt the column. Absent (pre-kind export) → keep as-is.
+                const importedKind = normalizeImportedWorkKind(dir.kind);
+                if (importedKind) {
+                    updateData.kind = importedKind;
+                }
+                // Preserve an explicit toggle (notably `false`); absent in
+                // old payloads → leave the existing work's setting alone.
+                if (typeof dir.providerRepositoryEnabled === 'boolean') {
+                    updateData.providerRepositoryEnabled = dir.providerRepositoryEnabled;
+                }
+                await this.workRepository.update(existing.id, updateData);
 
                 await this.importWorkRelations(existing.id, userId, dir, includesSecrets, result);
                 await this.importWorkRepoData(existing, dir, user, result);
@@ -505,26 +536,32 @@ export class AccountImportService {
         }
 
         // Create new work
-        const newDir = await this.workRepository.create(
-            {
-                name: dir.name,
-                slug,
-                description: dir.description,
-                owner: dir.owner || user.username,
-                userId,
-                gitProvider: dir.gitProvider,
-                deployProvider: dir.deployProvider,
-                readmeConfig: dir.readmeConfig,
-                domainType: dir.domainType,
-                repoVisibility: dir.repoVisibility,
-                scheduledUpdatesEnabled: dir.scheduledUpdatesEnabled,
-                scheduledCadence: dir.scheduledCadence as any,
-                communityPrEnabled: dir.communityPrEnabled,
-                communityPrAutoClose: dir.communityPrAutoClose,
-                comparisonsEnabled: dir.comparisonsEnabled,
-            },
-            user,
-        );
+        const createData: Partial<Work> = {
+            name: dir.name,
+            slug,
+            description: dir.description,
+            owner: dir.owner || user.username,
+            userId,
+            gitProvider: dir.gitProvider,
+            deployProvider: dir.deployProvider,
+            readmeConfig: dir.readmeConfig,
+            domainType: dir.domainType,
+            repoVisibility: dir.repoVisibility,
+            scheduledUpdatesEnabled: dir.scheduledUpdatesEnabled,
+            scheduledCadence: dir.scheduledCadence as any,
+            communityPrEnabled: dir.communityPrEnabled,
+            communityPrAutoClose: dir.communityPrAutoClose,
+            comparisonsEnabled: dir.comparisonsEnabled,
+        };
+        // Same normalization rules as the overwrite path above.
+        const importedKind = normalizeImportedWorkKind(dir.kind);
+        if (importedKind) {
+            createData.kind = importedKind;
+        }
+        if (typeof dir.providerRepositoryEnabled === 'boolean') {
+            createData.providerRepositoryEnabled = dir.providerRepositoryEnabled;
+        }
+        const newDir = await this.workRepository.create(createData, user);
 
         await this.importWorkRelations(newDir.id, userId, dir, includesSecrets, result);
         await this.importWorkRepoData(newDir, dir, user, result);

@@ -20,7 +20,11 @@ import {
     FolderGit2,
     Calendar,
     FileText,
+    Shapes,
 } from 'lucide-react';
+import { WorkKindBadge } from '../../shared/WorkKindBadge';
+import { InfoPopover } from '@/components/ui/InfoPopover';
+import { formatGitProviderName } from '@/lib/utils/git-provider';
 
 interface WorkInfoProps {
     work: Work;
@@ -49,14 +53,61 @@ function RepoVisibilityIcon({
     );
 }
 
+/**
+ * One row of the "Repositories" list: optional visibility icon, the link,
+ * and an ⓘ explaining what this particular repository is for. The three
+ * repositories confuse people constantly — the explainers are the point.
+ */
+function RepositoryRow({
+    label,
+    href,
+    isPrivate,
+    hasVisibility,
+    helpTitle,
+    helpBody,
+    helpAriaLabel,
+}: {
+    label: string;
+    href: string | null | undefined;
+    isPrivate: boolean | undefined;
+    hasVisibility: boolean;
+    helpTitle: string;
+    helpBody: string;
+    helpAriaLabel: string;
+}) {
+    return (
+        <li className="flex items-center gap-1">
+            {hasVisibility && <RepoVisibilityIcon isPrivate={isPrivate} label={label} />}
+            <Link
+                href={href || '#'}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-primary hover:text-primary-hover"
+            >
+                {label}
+            </Link>
+            <InfoPopover title={helpTitle} body={helpBody} ariaLabel={helpAriaLabel} />
+        </li>
+    );
+}
+
 export function WorkInfo({ work, config }: WorkInfoProps) {
     const t = useTranslations('dashboard.workDetail.info');
+    const tKind = useTranslations('dashboard.workKind');
     const { repoLinks, oauthConnection } = useWorkDetail();
+    const providerName = formatGitProviderName(work.gitProvider);
 
     const userRole = work.userRole;
     const isShared = userRole && userRole !== WorkMemberRole.OWNER;
 
     const infoItems = [
+        {
+            // Work type leads the block — it frames how every row below it
+            // (repositories, deploy provider, stats) should be read.
+            label: tKind('label'),
+            value: <WorkKindBadge kind={work.kind} />,
+            icon: <Shapes className="w-3.5 h-3.5" />,
+        },
         {
             label: t('yourRole'),
             value: (
@@ -129,56 +180,41 @@ export function WorkInfo({ work, config }: WorkInfoProps) {
             active: Boolean(repoLinks),
             value: (
                 <ul className="flex gap-2 flex-col list-inside">
-                    <li className="flex gap-1">
-                        {work.repoVisibility && (
-                            <RepoVisibilityIcon
-                                isPrivate={work.repoVisibility.data}
-                                label={t('dataRepo')}
-                            />
-                        )}
-                        <Link
-                            href={repoLinks?.dataRepo || '#'}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-primary hover:text-primary-hover"
-                        >
-                            {t('dataRepo')}
-                        </Link>
-                    </li>
+                    <RepositoryRow
+                        label={t('dataRepo')}
+                        href={repoLinks?.dataRepo}
+                        isPrivate={work.repoVisibility?.data}
+                        hasVisibility={Boolean(work.repoVisibility)}
+                        helpTitle={t('repoHelp.data.title')}
+                        helpBody={t('repoHelp.data.body')}
+                        helpAriaLabel={t('repoHelp.ariaLabel')}
+                    />
 
-                    <li className="flex gap-1">
-                        {work.repoVisibility && (
-                            <RepoVisibilityIcon
-                                isPrivate={work.repoVisibility.website}
-                                label={t('websiteRepo')}
-                            />
-                        )}
-                        <Link
-                            href={repoLinks?.websiteRepo || '#'}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-primary hover:text-primary-hover"
-                        >
-                            {t('websiteRepo')}
-                        </Link>
-                    </li>
+                    {/* `relatedRepositories.website` — the template output.
+                        Surfaced as the "Work Repository": it is the Work's
+                        main deliverable and is not necessarily a website. */}
+                    <RepositoryRow
+                        label={t('websiteRepo')}
+                        href={repoLinks?.websiteRepo}
+                        isPrivate={work.repoVisibility?.website}
+                        hasVisibility={Boolean(work.repoVisibility)}
+                        helpTitle={t('repoHelp.work.title')}
+                        helpBody={t('repoHelp.work.body')}
+                        helpAriaLabel={t('repoHelp.ariaLabel')}
+                    />
 
-                    <li className="flex gap-1">
-                        {work.repoVisibility && (
-                            <RepoVisibilityIcon
-                                isPrivate={work.repoVisibility.work}
-                                label={t('mainRepo')}
-                            />
-                        )}
-                        <Link
-                            href={repoLinks?.main || '#'}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            className="text-primary hover:text-primary-hover"
-                        >
-                            {t('mainRepo')}
-                        </Link>
-                    </li>
+                    {/* `relatedRepositories.work` — the AI-generated,
+                        read-on-the-host repo. Named after the git provider
+                        because that is where people actually browse it. */}
+                    <RepositoryRow
+                        label={t('mainRepo', { provider: providerName })}
+                        href={repoLinks?.main}
+                        isPrivate={work.repoVisibility?.work}
+                        hasVisibility={Boolean(work.repoVisibility)}
+                        helpTitle={t('repoHelp.provider.title', { provider: providerName })}
+                        helpBody={t('repoHelp.provider.body', { provider: providerName })}
+                        helpAriaLabel={t('repoHelp.ariaLabel')}
+                    />
                 </ul>
             ),
             icon: <FolderGit2 className="w-3.5 h-3.5" />,

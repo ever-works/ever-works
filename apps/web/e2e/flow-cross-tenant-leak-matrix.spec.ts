@@ -341,11 +341,11 @@ test.describe('Cross-tenant leak matrix (two tenants × every resource × every 
         const attacker = await buildTenant(request, 'RAttacker');
 
         // The victim owns a task explicitly linked to their OWN work, so the
-        // relation filters below have a real row to (fail to) surface. NOTE: the
-        // service enforces "exactly zero or one of missionId/ideaId/workId" — a
-        // task scoped to BOTH work + mission is a 400, so we pin only workId here
-        // (the positive control keys on workId; the missionId/parentTaskId probes
-        // still hunt victim.missionId / victim.taskId as their needles).
+        // relation filters below have a real row to (fail to) surface. Task
+        // ownership is non-exclusive, but this probe deliberately pins only
+        // workId: the positive control keys on workId, while the
+        // missionId/parentTaskId probes hunt victim.missionId / victim.taskId
+        // as their needles and must find nothing.
         const linkedTask = await createTaskViaAPI(request, victim.token, {
             title: `${victim.marker} LinkedTask`,
             workId: victim.workId,

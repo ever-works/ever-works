@@ -107,13 +107,17 @@ export function useStartFromPrompt(): StartFromPromptFn {
             // the message land — sending without opening would leave
             // a confusing "where did my prompt go?" beat.
             chatPanel?.setOpen?.(true);
-            if (chat) {
-                const base = opts?.intent
-                    ? `I want to create a ${opts.intent}. ${trimmed}`
-                    : trimmed;
-                const tail = opts?.attachments ? formatAttachmentsBlock(opts.attachments) : '';
-                chat.sendMessage(`${base}${tail}`);
+            // No chat context mounted means the prompt has nowhere to go.
+            // Returning false lets callers surface a real fallback (toast +
+            // manual-create link) instead of silently swallowing the prompt —
+            // previously this returned true regardless, which made every
+            // caller's `!handedOff` guard dead code.
+            if (!chat) {
+                return false;
             }
+            const base = opts?.intent ? `I want to create a ${opts.intent}. ${trimmed}` : trimmed;
+            const tail = opts?.attachments ? formatAttachmentsBlock(opts.attachments) : '';
+            chat.sendMessage(`${base}${tail}`);
             return true;
         },
         [chat, chatPanel],

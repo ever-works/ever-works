@@ -148,7 +148,12 @@ export function WorkConfig({ config }: WorkConfigProps) {
                     )}
                 </div>
 
-                <PrUpdateInfo mainPR={mainPR} dataPR={dataPR} className="px-5 py-3" />
+                <PrUpdateInfo
+                    mainPR={mainPR}
+                    dataPR={dataPR}
+                    gitProvider={work.gitProvider}
+                    className="px-5 py-3"
+                />
             </div>
         </div>
     );

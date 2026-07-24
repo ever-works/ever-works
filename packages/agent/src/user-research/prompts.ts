@@ -72,7 +72,42 @@ function neutralizePromptBlock(value: string): string {
 export interface MissionContext {
     description: string;
     kbExcerpts?: string[];
+    /**
+     * The Works that already exist in this Mission's organization.
+     *
+     * A Mission is an orchestrator over Works, not just a factory for new
+     * ones. Without this the generator only ever knows the Mission's own
+     * prose, so every Idea it produces is necessarily "build something
+     * new" — even when the right answer is "extend the landing page we
+     * already have". Passing the existing Works lets a proposal target one
+     * of them instead.
+     */
+    existingWorks?: MissionWorkContext[];
 }
+
+/**
+ * Compact view of one existing Work, for Mission idea generation.
+ *
+ * Deliberately small: a Mission's organization can hold dozens of Works
+ * and the whole set has to fit in the prompt alongside the Goal, the user
+ * profile and the existing-Ideas list.
+ */
+export interface MissionWorkContext {
+    name: string;
+    slug: string;
+    /** `website`, `directory`, `blog`, … — what shape of Work this is. */
+    kind?: string | null;
+    description?: string | null;
+    /**
+     * How this Work relates to the Mission, when the link is explicit
+     * (`created`, `improves`, `operates`, `markets`, `researches`,
+     * `retires`). Absent for Works that merely share the organization.
+     */
+    relation?: string | null;
+}
+
+/** Cap on how many Works are described, so the block cannot crowd out the Goal. */
+export const MAX_MISSION_WORKS_IN_PROMPT = 25;
 
 /**
  * Compact view of a single existing Idea — title + slug + short
@@ -289,6 +324,36 @@ export function buildProposalsPrompt(
             lines.push('### Background excerpts from the Mission KB');
             for (const excerpt of missionContext.kbExcerpts) {
                 lines.push(`- ${neutralizePromptBlock(excerpt.trim())}`);
+            }
+        }
+        // The organization's existing Works. Same untrusted framing as the
+        // Goal itself: names and descriptions are user-controlled free text
+        // that reaches the model verbatim, so every value goes through
+        // `neutralizePromptBlock` and the block is labelled as data.
+        const works = (missionContext.existingWorks ?? []).slice(0, MAX_MISSION_WORKS_IN_PROMPT);
+        if (works.length > 0) {
+            lines.push('');
+            lines.push('### Works that already exist in this organization');
+            lines.push(
+                'These are the Works this Mission can build on. Prefer proposing an improvement to an existing Work over creating a near-duplicate one; only propose a new Work when none of these fits.',
+            );
+            for (const work of works) {
+                const parts = [
+                    `- ${neutralizePromptBlock(work.name.trim())} (slug: ${neutralizePromptBlock(work.slug.trim())}`,
+                    work.kind ? `, type: ${neutralizePromptBlock(String(work.kind).trim())}` : '',
+                    work.relation
+                        ? `, relation: ${neutralizePromptBlock(String(work.relation).trim())}`
+                        : '',
+                    ')',
+                    work.description
+                        ? ` — ${neutralizePromptBlock(String(work.description).trim())}`
+                        : '',
+                ];
+                lines.push(parts.join(''));
+            }
+            const omitted = (missionContext.existingWorks?.length ?? 0) - works.length;
+            if (omitted > 0) {
+                lines.push(`- …and ${omitted} more Work(s) not listed here.`);
             }
         }
         lines.push('</untrusted_mission_context>');

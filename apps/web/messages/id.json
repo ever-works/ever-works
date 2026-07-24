@@ -592,6 +592,31 @@
                 "capUnlimited": "Unlimited",
                 "capPrefix": "Outstanding cap:",
                 "clonedFromPrefix": "Cloned from another Mission"
+            },
+            "newPage": {
+                "link": "Buat manual",
+                "or": "Atau",
+                "title": "Misi Baru",
+                "subtitle": "Jelaskan tujuan yang berkelanjutan. Agen akan menghasilkan Ide darinya — sekali, atau terjadwal.",
+                "nameLabel": "Judul",
+                "namePlaceholder": "Opsional — kosongkan untuk diturunkan dari deskripsi",
+                "descriptionLabel": "Deskripsi",
+                "descriptionPlaceholder": "Jelaskan apa yang harus terus dikerjakan misi ini — mis. \"Pantau framework agen AI open-source baru dan jaga direktori kami tetap mutakhir.\"",
+                "descriptionHint": "Minimal 10 karakter.",
+                "typeLabel": "Tipe",
+                "typeOneShot": "Sekali jalan — jalankan sekali",
+                "typeScheduled": "Terjadwal — jalankan berulang",
+                "scheduleLabel": "Jadwal",
+                "schedulePlaceholder": "0 9 * * *",
+                "scheduleHint": "Ekspresi cron lima bidang. Contoh: 0 9 * * * berjalan setiap hari pukul 09.00.",
+                "scheduleRequired": "Misi terjadwal memerlukan ekspresi cron.",
+                "cancel": "Batal",
+                "create": "Buat Misi",
+                "creating": "Membuat…",
+                "created": "Misi dibuat",
+                "minLength": "Deskripsi harus minimal 10 karakter.",
+                "error": "Tidak dapat membuat Misi. Silakan coba lagi.",
+                "chatUnavailable": "Chat sedang tidak tersedia — gunakan \"Buat manual\"."
             }
         },
         "memoryPage": {
@@ -1912,8 +1937,12 @@
                     "activity": "Umpan Aktivitas",
                     "kb": "Basis Pengetahuan",
                     "generator": "Buat Work, sekali atau terjadwal",
-                    "deploy": "Deploy Work"
-                }
+                    "deploy": "Deploy Work",
+                    "tasks": "Tugas untuk Work ini"
+                },
+                "tasks": "Tugas",
+                "posts": "Postingan",
+                "pages": "Halaman"
             },
             "members": {
                 "title": "Anggota Tim",
@@ -2127,7 +2156,25 @@
                 "categories": "Kategori",
                 "comparisons": "Perbandingan",
                 "generationStatus": "Status Generasi",
-                "daysActive": "Hari Aktif"
+                "daysActive": "Hari Aktif",
+                "posts": "Postingan",
+                "tags": "Tag",
+                "deployStatus": "Status Penyebaran",
+                "registeredUsers": "Pengguna Terdaftar",
+                "teamMembers": "Anggota Tim",
+                "agents": "Agen",
+                "openTasks": "Tugas Terbuka",
+                "worksOwned": "Karya",
+                "pageViews": "Tayangan Halaman",
+                "sessions": "Sesi",
+                "conversions": "Konversi",
+                "states": {
+                    "live": "Aktif",
+                    "notConfigured": "Hubungkan analitik untuk melihatnya",
+                    "notDeployed": "Sebarkan untuk melihatnya",
+                    "notGenerated": "Hasilkan untuk melihatnya",
+                    "unavailable": "Tidak tersedia"
+                }
             },
             "comparisons": {
                 "title": "Perbandingan",
@@ -2299,8 +2346,8 @@
                 "slug": "Slug",
                 "repositories": "Repositori",
                 "dataRepo": "Repositori Data",
-                "websiteRepo": "Repositori Situs Web",
-                "mainRepo": "Repositori Utama",
+                "websiteRepo": "Repositori Karya",
+                "mainRepo": "Repositori {provider}",
                 "gitProvider": "Penyedia Git",
                 "organization": "Organisasi",
                 "created": "Dibuat",
@@ -2314,7 +2361,22 @@
                 "deployProvider": "Penyedia Penerapan",
                 "notConnected": "Tidak terhubung",
                 "notConfigured": "Tidak dikonfigurasi",
-                "viewSite": "Lihat situs"
+                "viewSite": "Lihat situs",
+                "repoHelp": {
+                    "data": {
+                        "title": "Repositori Data",
+                        "body": "Sumber kebenaran untuk karya Anda. Repositori ini menyimpan metadata dan konten yang dikelola platform untuk Anda — untuk sebuah direktori, itu berarti setiap item, kategori, dan tag; untuk jenis karya lain, itu adalah konten terstruktur di balik halaman-halamannya. Agen menulis ke sini terlebih dahulu, dan semua hal lain dihasilkan darinya. Isinya jarang berubah dan aman untuk diedit secara manual."
+                    },
+                    "provider": {
+                        "title": "Repositori {provider}",
+                        "body": "Versi karya Anda yang mudah dibaca dan dijelajahi, dihasilkan oleh AI dari Repositori Data. Versi ini dipublikasikan ke {provider} tetapi tidak pernah disebarkan ke mana pun — orang membacanya langsung di {provider}. Untuk sebuah daftar hebat, itu berarti README yang terkurasi; untuk jenis karya lain, itu adalah tampilan Markdown yang setara dari konten yang sama. Anda dapat menonaktifkan pembuatannya di Pengaturan."
+                    },
+                    "work": {
+                        "title": "Repositori Karya",
+                        "body": "Keluaran utama dari karya Anda. Platform mengambil Repositori Data, menerapkan template Karya yang Anda pilih, lalu menghasilkan repositori ini — biasanya berupa situs web atau aplikasi web yang siap disebarkan, tetapi tergantung templatenya bisa juga berupa aplikasi seluler, situs dokumentasi, atau proyek jenis lain. Inilah repositori yang disebarkan."
+                    },
+                    "ariaLabel": "Apa itu repositori ini?"
+                }
             },
             "config": {
                 "title": "Detail Konfigurasi",
@@ -2332,7 +2394,7 @@
                 "pullRequestUpdate": "Detail Pull Request",
                 "branch": "Cabang",
                 "prTitle": "Judul PR",
-                "mainRepository": "Repositori Utama",
+                "mainRepository": "Repositori {provider}",
                 "dataRepository": "Repositori Data"
             },
             "activity": {
@@ -2711,7 +2773,7 @@
                 "modelOverridePlaceholder": "misalnya openai/gpt-4.1 atau openrouter/openai/gpt-4.1",
                 "modelOverrideHelperText": "Opsional. Secara default menggunakan model yang diimpor atau model sebelumnya kecuali Anda menimpa di sini.",
                 "modelOverrideUnavailable": "Pilih penyedia AI yang sudah dikonfigurasi terlebih dahulu untuk memilih model dari daftar yang tersedia.",
-                "websiteTemplateHelperText": "Pilih template situs web yang akan digunakan saat repositori situs web pertama kali dibuat.",
+                "websiteTemplateHelperText": "Pilih template Karya yang akan digunakan saat repositori Karya pertama kali dibuat.",
                 "websiteTemplateLockedHelperText": "Pemilihan template dikunci setelah pembuatan situs web pertama.",
                 "recommended": "Direkomendasikan",
                 "promptPlaceholder": "Jelaskan item apa yang harus dihasilkan untuk karya ini...",
@@ -2756,7 +2818,7 @@
                 "enableBadgeEvaluationDescription": "Evaluasi dan tambahkan lencana kualitas ke item",
                 "captureScreenshots": "Tangkap Tangkapan Layar Item",
                 "captureScreenshotsDescription": "Secara otomatis tangkap tangkapan layar atau gambar produk untuk setiap item selama generasi",
-                "websiteRepositoryCreationMethod": "Metode Pembuatan Repositori Situs Web",
+                "websiteRepositoryCreationMethod": "Metode Pembuatan Repositori Karya",
                 "methodDuplicate": "Duplikat",
                 "methodFork": "Fork",
                 "workNamePlaceholder": "Masukkan nama karya",
@@ -2782,7 +2844,7 @@
                 "targetKeywordsDescription": "Kata kunci untuk memandu pencarian AI dan generasi konten. Kata kunci yang lebih spesifik menghasilkan hasil yang lebih baik.",
                 "sourceUrlsFieldDescription": "URL spesifik untuk mengekstrak konten darinya. Jika kosong, generator akan mencari web secara otomatis.",
                 "generationMethodDescription": "Pilih apakah akan memperbarui item yang ada atau membuat ulang semuanya dari awal.",
-                "websiteRepositoryCreationMethodDescription": "Cara repositori situs web dibuat. Template direkomendasikan untuk sebagian besar kasus.",
+                "websiteRepositoryCreationMethodDescription": "Cara repositori Karya dibuat. Template direkomendasikan untuk sebagian besar kasus.",
                 "maxSearchQueriesDescription": "Jumlah kueri pencarian yang akan dihasilkan AI untuk menemukan konten relevan (1-50).",
                 "resultsPerQueryDescription": "Maksimum hasil yang diambil per kueri pencarian (1-20).",
                 "maxPagesToProcessDescription": "Maksimum halaman web yang diproses untuk ekstraksi konten (1-100).",
@@ -2941,7 +3003,7 @@
                         "model": "Model",
                         "schedule": "Jadwal",
                         "providers": "Penyedia",
-                        "websiteRepo": "Repositori Situs Web"
+                        "websiteRepo": "Repo Karya"
                     },
                     "sourceTypes": {
                         "dataRepo": "Repositori Data",
@@ -2976,8 +3038,8 @@
                 "deleteDataRepositoryDescription": "Hapus repositori data JSON dari GitHub",
                 "deleteMarkdownRepository": "Hapus repositori markdown",
                 "deleteMarkdownRepositoryDescription": "Hapus repositori markdown yang berisi README",
-                "deleteWebsiteRepository": "Hapus repositori situs web",
-                "deleteWebsiteRepositoryDescription": "Hapus repositori situs web yang dideploy",
+                "deleteWebsiteRepository": "Hapus repositori Karya",
+                "deleteWebsiteRepositoryDescription": "Hapus repositori Karya yang dideploy",
                 "deleteConfirm": "Apakah Anda benar-benar yakin?",
                 "deleteConfirmDetail": "Tindakan ini tidak dapat dibatalkan. Karya dan repositori yang dipilih akan dihapus secara permanen.",
                 "confirmWorkName": "Ketik nama karya untuk konfirmasi",
@@ -2995,7 +3057,7 @@
                 "updateFailed": "Gagal memperbarui pengaturan",
                 "deployProvider": {
                     "title": "Penyedia Deploy",
-                    "description": "Pilih tempat untuk deploy situs web karya Anda",
+                    "description": "Pilih tempat untuk deploy karya Anda",
                     "configure": "Konfigurasi",
                     "ready": "Siap untuk deploy",
                     "notConfigured": "Belum dikonfigurasi",
@@ -3226,7 +3288,14 @@
                         "lastSuccess": "Last successful pull: {time}",
                         "lastError": "Last error: {error}"
                     }
-                }
+                },
+                "providerRepoTitle": "Repositori {provider}",
+                "providerRepoEnableLabel": "Hasilkan repositori {provider}",
+                "providerRepoEnableDescription": "Versi Karya ini yang dihasilkan AI dan dapat dibaca, dipublikasikan di {provider}. Tidak pernah disebarkan — orang membacanya langsung di {provider}.",
+                "providerRepoEnabled": "Pembuatan repositori {provider} diaktifkan",
+                "providerRepoDisabled": "Pembuatan repositori {provider} dinonaktifkan",
+                "providerRepoUpdateFailed": "Gagal memperbarui pengaturan repositori",
+                "providerRepoDisabledNote": "Pembuatan dimatikan. Repositori yang ada dibiarkan apa adanya — hanya berhenti diperbarui."
             },
             "deploy": {
                 "progress": {
@@ -3235,7 +3304,7 @@
                 },
                 "noProviderAlert": {
                     "title": "Tidak Ada Penyedia Penyebaran",
-                    "description": "Pilih penyedia penyebaran untuk menyebarkan situs web karya Anda.",
+                    "description": "Pilih penyedia penyebaran untuk menyebarkan karya Anda.",
                     "selectButton": "Pilih & Lanjutkan",
                     "noProviders": "Tidak ada penyedia penyebaran yang tersedia. Pasang plugin penyebaran terlebih dahulu"
                 },
@@ -3259,8 +3328,8 @@
                 },
                 "form": {
                     "deployment": {
-                        "title": "Sebarkan Situs Web",
-                        "description": "Sebarkan repositori situs web karya Anda.",
+                        "title": "Sebarkan Karya",
+                        "description": "Sebarkan repositori Karya Anda.",
                         "deployButton": "Sebarkan ke {provider}",
                         "deployingButton": "Menyusun...",
                         "deployingStateButton": "Menyusun ({state})...",
@@ -3275,9 +3344,9 @@
                         }
                     },
                     "updateRepository": {
-                        "title": "Perbarui Repositori Situs Web",
+                        "title": "Perbarui Repositori Karya",
                         "description": "Sinkronkan perubahan terbaru dari template ke",
-                        "websiteRepository": "repositori situs web",
+                        "websiteRepository": "repositori Karya",
                         "updateButton": "Perbarui Repositori",
                         "updatingButton": "Memperbarui..."
                     },
@@ -3294,20 +3363,20 @@
                     },
                     "info": {
                         "deployInfo": "Penyebaran biasanya memakan waktu 1-3 menit. Anda akan menerima URL setelah selesai.",
-                        "updateInfo": "Pembaruan menyinkronkan konten karya Anda ke repositori situs web untuk penyebaran berikutnya"
+                        "updateInfo": "Pembaruan menyinkronkan konten karya Anda ke repositori Karya untuk penyebaran berikutnya."
                     },
                     "websiteTemplate": {
                         "title": "Pembaruan Template Otomatis",
-                        "description": "Jaga situs web Anda tetap sinkron secara otomatis dengan perubahan template terbaru.",
-                        "selectorLabel": "Template situs web",
+                        "description": "Jaga karya Anda tetap sinkron secara otomatis dengan perubahan template terbaru.",
+                        "selectorLabel": "Template Karya",
                         "currentTemplateLabel": "Template saat ini",
                         "unknownTemplate": "Default yang diwarisi",
-                        "currentHelperText": "Template yang dipilih mengontrol cara inisialisasi dan pembaruan repositori situs web.",
-                        "switchHelperText": "Menerapkan template baru akan mengatur ulang repositori situs web yang ada dari template yang dipilih jika sudah ada.",
-                        "switchAction": "Terapkan template ke repositori situs web",
+                        "currentHelperText": "Template yang dipilih mengontrol cara repositori Karya diinisialisasi dan diperbarui.",
+                        "switchHelperText": "Menerapkan template baru akan mengatur ulang repositori Karya yang ada dari template yang dipilih jika sudah ada.",
+                        "switchAction": "Terapkan template ke repositori Karya",
                         "switchActionIdle": "Template sudah aktual",
-                        "switchConfirmTitle": "Beralih ke template situs web?",
-                        "switchConfirmDescription": "Jika repositori situs web sudah ada, isi akan digantikan dengan template yang dipilih. Kode khusus di repositori tersebut akan hilang.",
+                        "switchConfirmTitle": "Beralih template Karya?",
+                        "switchConfirmDescription": "Jika repositori Karya sudah ada, isinya akan digantikan dengan template yang dipilih. Kode khusus apa pun di repositori tersebut akan hilang.",
                         "switchConfirmButton": "Beralih template",
                         "switchCancel": "Batal",
                         "autoUpdate": "Perbarui secara otomatis",
@@ -3682,7 +3751,7 @@
             },
             "deployProvider": {
                 "title": "Penyedia Deploy",
-                "description": "Pilih tempat untuk menyebarkan situs web karya Anda",
+                "description": "Pilih tempat untuk menyebarkan karya Anda",
                 "noProviders": "Tidak ada penyedia deploy yang tersedia",
                 "notConfigured": "Belum dikonfigurasi",
                 "configured": "Siap untuk deploy",
@@ -3783,7 +3852,7 @@
                 "organizationHelp": "Buat repositori di bawah organisasi bukan akun pribadi Anda",
                 "organizationNameLabel": "Nama Organisasi",
                 "organizationNamePlaceholder": "Masukkan nama organisasi",
-                "websiteTemplateHelperText": "Pilih template situs web yang akan digunakan saat repositori situs web pertama kali dibuat."
+                "websiteTemplateHelperText": "Pilih template Karya yang akan digunakan saat repositori Karya pertama kali dibuat."
             },
             "manual": {
                 "title": "Buat Secara Manual",
@@ -3810,7 +3879,7 @@
                 "organizationHelp": "Buat karya ini di bawah organisasi GitHub bukan akun pribadi Anda",
                 "organizationNameLabel": "Nama Organisasi",
                 "organizationNamePlaceholder": "my-organization",
-                "websiteTemplateHelperText": "Pilih template situs web yang akan digunakan saat repositori situs web pertama kali dibuat.",
+                "websiteTemplateHelperText": "Pilih template Karya yang akan digunakan saat repositori Karya pertama kali dibuat.",
                 "headerLabel": "Header README Khusus",
                 "headerPlaceholder": "Tambahkan konten khusus di atas file README Anda",
                 "headerOverwrite": "Ganti header default sepenuhnya",
@@ -3916,15 +3985,15 @@
                     "importButton": "Mulai Impor & Riset",
                     "importingButton": "Memulai pipeline riset...",
                     "mainRepository": {
-                        "title": "Main repository",
+                        "title": "Repositori GitHub",
                         "description": "Choose whether Ever Works should create a generated README repository or keep the source README repository as the main reference.",
                         "clone": {
                             "title": "Clone / recreate",
-                            "description": "Create a new generated README repository for this Work. Data and website repositories are still created."
+                            "description": "Buat repositori README hasil generasi yang baru untuk karya ini. Repositori Data dan Karya tetap dibuat."
                         },
                         "reuse": {
                             "title": "Reuse source README",
-                            "description": "Do not create a generated README repository. Main repository links will point to the source README repository."
+                            "description": "Jangan buat repositori README hasil generasi. Tautan repositori GitHub akan mengarah ke repositori README sumber."
                         }
                     }
                 },
@@ -3985,7 +4054,7 @@
                     "descriptionReady": "Semua repositori ditemukan. Siap dihubungkan.",
                     "dataRepo": "Repositori Data",
                     "markdownRepo": "Repositori Markdown",
-                    "websiteRepo": "Repositori Situs Web",
+                    "websiteRepo": "Repositori Karya",
                     "found": "Ditemukan",
                     "notFound": "Tidak ditemukan",
                     "cancel": "Batal",
@@ -4596,7 +4665,7 @@
         },
         "templates": {
             "title": "Template",
-            "subtitle": "Jelajahi template situs web bawaan, kelola katalog khusus Anda, dan kontrol template mana yang digunakan untuk memulai pekerjaan baru.",
+            "subtitle": "Jelajahi template Karya bawaan, kelola katalog khusus Anda, dan kontrol template mana yang digunakan untuk memulai karya baru.",
             "kindSwitcher": {
                 "mission": "Mission Templates",
                 "work": "Work Templates",
@@ -5085,6 +5154,16 @@
                 "copyFailed": "Tidak dapat menyalin ke papan klip"
             },
             "confirmDelete": "Hapus pemicu ini? URL webhook-nya langsung berhenti berfungsi dan ini tidak dapat dibatalkan."
+        },
+        "workKind": {
+            "label": "Tipe",
+            "website": "Website",
+            "landing-page": "Landing Page",
+            "blog": "Blog",
+            "directory": "Directory",
+            "awesome-repo": "Awesome Repo",
+            "company": "Company",
+            "default": "Work"
         }
     },
     "layout": {
@@ -5298,7 +5377,7 @@
         "deploy": {
             "deployFailed": "Gagal menerapkan",
             "updateRepositoryFailed": "Gagal memperbarui repositori",
-            "updateSettingsFailed": "Gagal memperbarui pengaturan template situs web"
+            "updateSettingsFailed": "Gagal memperbarui pengaturan template Karya"
         }
     },
     "validation": {

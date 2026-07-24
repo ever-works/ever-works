@@ -51,6 +51,7 @@ import {
 } from '@src/tasks';
 import { WorkScheduleBillingMode, GenerateStatusType } from '@src/entities/types';
 import { WorkOwnershipService } from './work-ownership.service';
+import { WorkMemoryService } from './work-memory.service';
 import { normalizeGeneratorError } from './utils/error.utils';
 import {
     classifyGenerationError,
@@ -160,6 +161,11 @@ export class WorkGenerationService {
         // shared pattern.
         @Optional()
         private readonly runtimeBindingStamper?: RuntimeBindingStamperService,
+        // Optional so the many isolated unit tests that construct this
+        // service positionally keep working; when absent, scheduled runs
+        // simply record no memory (the previous behaviour).
+        @Optional()
+        private readonly workMemory?: WorkMemoryService,
     ) {}
 
     async generateItems(
@@ -1152,6 +1158,69 @@ Only include image URLs that are absolute URLs (starting with http).`;
                 step: null,
             }),
         ]);
+
+        // Persist what this run learned into the shared Memory, so the next
+        // scheduled run starts from what this one found instead of
+        // re-deriving it. Deliberately AFTER the status writes and awaited
+        // separately: a memory provider being unreachable must never turn a
+        // succeeded run into a failed one.
+        await this.recordRunInMemory(workId, scheduleId, historyId);
+    }
+
+    /**
+     * Best-effort Memory write for a completed scheduled run.
+     *
+     * Never throws — `WorkMemoryService` already swallows provider errors,
+     * and the extra guard here covers the lookups this method does itself.
+     */
+    private async recordRunInMemory(
+        workId: string,
+        scheduleId: string,
+        historyId: string,
+    ): Promise<void> {
+        if (!this.workMemory) {
+            return;
+        }
+
+        try {
+            const [work, history] = await Promise.all([
+                this.workRepository.findById(workId),
+                this.generationHistoryRepository.findById(historyId),
+            ]);
+            if (!work) {
+                return;
+            }
+
+            const stats = {
+                newItems: history?.newItemsCount ?? 0,
+                updatedItems: history?.updatedItemsCount ?? 0,
+                totalItems: history?.totalItemsCount ?? 0,
+            };
+
+            const changelog = history?.changelog?.summary?.trim();
+            const summary = [
+                `Scheduled run of "${work.name}" completed.`,
+                `Items: ${stats.newItems} new, ${stats.updatedItems} updated, ${stats.totalItems} total.`,
+                changelog ? `Changes: ${changelog}` : null,
+            ]
+                .filter(Boolean)
+                .join(' ');
+
+            await this.workMemory.recordRun({
+                work,
+                userId: work.userId,
+                summary,
+                historyId,
+                scheduleId,
+                stats,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Failed to record scheduled-run memory for work ${workId}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
     }
 
     private async handleSyncFailure(
