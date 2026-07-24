@@ -346,17 +346,29 @@ jobs:
           if [ -z "$cid" ]; then echo "::error::temporal container not found"; exit 1; fi
           # The temporal-plugin maps three custom search attributes
           # (temporal-enqueue-options.ts): tenantId + concurrencyKey are single
-          # Keywords; tags is a list -> KeywordList. Register all three, or the
-          # test's StartWorkflow hits the same INVALID_ARGUMENT on the next one.
-          docker exec "$cid" temporal operator search-attribute create \
-            --namespace default --name tenantId --name concurrencyKey --type Keyword || true
-          docker exec "$cid" temporal operator search-attribute create \
-            --namespace default --name tags --type KeywordList || true
+          # Keywords; tags is a list -> KeywordList. auto-setup keeps migrating the
+          # visibility schema AFTER the frontend port opens (the healthcheck only
+          # proves the port listens), so creating a custom attribute too early
+          # silently no-ops and the test later fails with "no mapping defined for
+          # search attribute tags" (flaky: whoever wins the race). Register, then
+          # poll `list` until all three are actually present. Deterministic.
+          want="tenantId concurrencyKey tags"
+          registered=0
+          for attempt in $(seq 1 40); do
+            docker exec "$cid" temporal operator search-attribute create \
+              --namespace default --name tenantId --name concurrencyKey --type Keyword >/dev/null 2>&1 || true
+            docker exec "$cid" temporal operator search-attribute create \
+              --namespace default --name tags --type KeywordList >/dev/null 2>&1 || true
+            listing="$(docker exec "$cid" temporal operator search-attribute list --namespace default 2>/dev/null || true)"
+            missing=""
+            for a in $want; do echo "$listing" | grep -qw "$a" || missing="$missing $a"; done
+            if [ -z "$missing" ]; then registered=1; echo "All custom search attributes present after attempt $attempt:$want"; break; fi
+            echo "attempt $attempt/40: still missing:$missing - retrying in 3s"
+            sleep 3
+          done
           echo "Registered search attributes:"
           docker exec "$cid" temporal operator search-attribute list --namespace default || true
-          # Registration propagates to the matching/history services asynchronously;
-          # give it a moment so the first StartWorkflow in the test sees it.
-          sleep 5
+          if [ "$registered" != "1" ]; then echo "::error::custom search attributes never registered after 40 attempts"; exit 1; fi
 
       - name: Temporal real-infra
         env:
