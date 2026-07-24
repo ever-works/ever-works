@@ -1,4 +1,6 @@
 import { tasks } from '@trigger.dev/sdk';
+import { config } from '@ever-works/agent/config';
+import { JobRuntimeNotConfiguredError } from '@ever-works/agent/tasks-domain';
 import type {
     AgentHeartbeatTrigger,
     AgentRunCanceller,
@@ -14,6 +16,20 @@ import type {
 import type { AgentHeartbeatPayload } from '../tasks/trigger/agent-heartbeat.task';
 import type { AgentChatReplyPayload } from '../tasks/trigger/agent-chat-reply.task';
 import type { AgentTaskExecutePayload } from '../tasks/trigger/agent-task-execute.task';
+
+/**
+ * Loud-degradation gate (mirrors `TriggerService.ensureConfigured()`:
+ * `shouldUseTrigger()` + a present secret key). Without this, an
+ * unconfigured install's enqueue dies inside the SDK with an opaque
+ * network/auth error that the run record then carries verbatim — the
+ * user sees a failed run and no clue WHY. A typed, stably-named error
+ * lets the transition service record an actionable reason instead.
+ */
+function assertJobRuntimeConfigured(): void {
+    if (!config.trigger.shouldUseTrigger() || !config.trigger.getSecretKey()) {
+        throw new JobRuntimeNotConfiguredError();
+    }
+}
 
 /**
  * Tasks feature — Phase 15.3 + 15.4. Production dispatcher adapters
@@ -41,6 +57,7 @@ export const agentHeartbeatTriggerAdapter: AgentHeartbeatTrigger = {
 
 export const agentTaskExecuteTriggerAdapter: AgentTaskExecuteDispatcher = {
     async enqueue(payload: AgentTaskExecuteDispatchPayload) {
+        assertJobRuntimeConfigured();
         // Review-fix I10: pass `idempotencyKey` to Trigger.dev so a
         // double-fire for the same (taskId, agentId, generation) tuple
         // is deduped at the runner. Previously `dedupKey` rode only as
@@ -65,6 +82,7 @@ export const agentTaskExecuteTriggerAdapter: AgentTaskExecuteDispatcher = {
 
 export const agentChatReplyTriggerAdapter: AgentChatReplyDispatcher = {
     async enqueue(payload: AgentChatReplyDispatchPayload) {
+        assertJobRuntimeConfigured();
         // Review-fix I10 (mirror of agent-task-execute adapter above).
         const handle = await tasks.trigger<
             typeof import('../tasks/trigger/agent-chat-reply.task').agentChatReplyTask
