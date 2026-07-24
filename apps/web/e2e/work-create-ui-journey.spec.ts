@@ -126,8 +126,15 @@ test.describe('Work create — full UI wizard', () => {
         const workId = created.id;
 
         // --- Land on the freshly created work's detail page. ---
-        await page.goto(`/en/works/${workId}`, { waitUntil: 'domcontentloaded' });
-        await expect(page).toHaveURL(/\/works\/[A-Za-z0-9-]{6,}/, { timeout: 30_000 });
+        // A cold SSR nav under CI shard load can abort mid-flight
+        // (net::ERR_ABORTED / "frame was detached"); retry the navigation until
+        // the detail URL lands rather than failing on a single aborted goto.
+        await expect(async () => {
+            await page
+                .goto(`/en/works/${workId}`, { waitUntil: 'domcontentloaded', timeout: 30_000 })
+                .catch(() => undefined);
+            await expect(page).toHaveURL(new RegExp(`/works/${workId}`), { timeout: 5_000 });
+        }).toPass({ timeout: 90_000 });
 
         // The created work's id is carried in the resulting detail URL.
         const landedId = page.url().match(/\/works\/([A-Za-z0-9-]{6,})/)?.[1];
