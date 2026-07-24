@@ -164,11 +164,16 @@ realInfra('Inngest real-infra (EW-742 P6 T32/T37)', () => {
 		expect(first).toBeTruthy();
 		expect(second).toBeTruthy();
 
-		// Dev server normalises `event.id` → `<seed>-<hash>` server-side,
-		// so two sends with the same client-supplied `id` return the
-		// SAME canonical server id (dedup invariant). The exact suffix is
-		// dev-server internal — assert equality between the two responses.
-		expect(second).toBe(first);
+		// The plugin maps `idempotencyKey` -> the outbound event's `id`
+		// (Inngest's native dedup carrier). The dev server mints its own
+		// ULID receipt per send, so the two receipt ids differ and are NOT
+		// collapsed -- but it preserves the client-supplied `id` as the
+		// stored event's `id`. Verify the carrier survives the wire: fetch
+		// each event by its receipt id and assert the stored `id` is our key.
+		const firstEvent = await waitForEvent(baseUrl, first!);
+		const secondEvent = await waitForEvent(baseUrl, second!);
+		expect(firstEvent?.id).toBe(idemKey);
+		expect(secondEvent?.id).toBe(idemKey);
 	}, 30_000);
 
 	it('T31 carrier: enqueue stamps _ew.tenantId / _ew.tags into event.data', async () => {
