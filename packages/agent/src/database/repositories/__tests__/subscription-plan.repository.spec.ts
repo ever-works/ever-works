@@ -1,7 +1,7 @@
 import type { Repository } from 'typeorm';
 import { SubscriptionPlanRepository } from '../subscription-plan.repository';
-import { SubscriptionPlan, SubscriptionPlanCode } from '@src/entities';
-
+import { SubscriptionPlan } from '@src/entities/subscription-plan.entity';
+import { SubscriptionPlanCode } from '@src/entities/types';
 type Mocked = jest.Mocked<
     Pick<Repository<SubscriptionPlan>, 'find' | 'findOne' | 'update' | 'create' | 'save'>
 >;

@@ -195,6 +195,8 @@ export async function getWorkRuntimeEnv(workId: string) {
         const response = await deployAPI.getRuntimeEnv(workId);
         return {
             success: response.status === 'success',
+            mode: (response.mode ?? 'custom') as 'shared' | 'custom',
+            sharedAvailable: response.sharedAvailable ?? false,
             databaseUrl: response.databaseUrl ?? { configured: false, masked: null },
             managed: response.managed ?? [],
         };
@@ -202,6 +204,8 @@ export async function getWorkRuntimeEnv(workId: string) {
         console.error('Get runtime env error:', error);
         return {
             success: false,
+            mode: 'custom' as 'shared' | 'custom',
+            sharedAvailable: false,
             databaseUrl: { configured: false, masked: null as string | null },
             managed: [] as string[],
             error: error instanceof Error ? error.message : 'Failed to get runtime env',
@@ -209,26 +213,37 @@ export async function getWorkRuntimeEnv(workId: string) {
     }
 }
 
-export async function setWorkRuntimeEnv(workId: string, databaseUrl: string) {
+export async function setWorkRuntimeEnv(
+    workId: string,
+    input: { mode: 'shared' | 'custom'; databaseUrl?: string },
+) {
     const user = await getAuthFromCookie();
     if (!user) {
         redirect(ROUTES.AUTH_LOGIN);
     }
 
-    const trimmed = databaseUrl.trim();
-    if (!/^postgres(ql)?:\/\/.+/i.test(trimmed)) {
-        return {
-            success: false,
-            databaseUrl: { configured: false, masked: null as string | null },
-            error: 'DATABASE_URL must be a postgres:// or postgresql:// connection string',
-        };
+    let body: { mode: 'shared' | 'custom'; databaseUrl?: string };
+    if (input.mode === 'shared') {
+        body = { mode: 'shared' };
+    } else {
+        const trimmed = (input.databaseUrl ?? '').trim();
+        if (!/^postgres(ql)?:\/\/.+/i.test(trimmed)) {
+            return {
+                success: false,
+                databaseUrl: { configured: false, masked: null as string | null },
+                error: 'DATABASE_URL must be a postgres:// or postgresql:// connection string',
+            };
+        }
+        body = { mode: 'custom', databaseUrl: trimmed };
     }
 
     try {
-        const response = await deployAPI.setRuntimeEnv(workId, trimmed);
+        const response = await deployAPI.setRuntimeEnv(workId, body);
         revalidatePath(ROUTES.DASHBOARD_WORK_DEPLOY(workId));
         return {
             success: response.status === 'success',
+            mode: (response.mode ?? input.mode) as 'shared' | 'custom',
+            sharedAvailable: response.sharedAvailable ?? false,
             databaseUrl: response.databaseUrl ?? { configured: false, masked: null },
         };
     } catch (error) {
@@ -237,6 +252,40 @@ export async function setWorkRuntimeEnv(workId: string, databaseUrl: string) {
             success: false,
             databaseUrl: { configured: false, masked: null as string | null },
             error: error instanceof Error ? error.message : 'Failed to set runtime env',
+        };
+    }
+}
+
+/**
+ * Test a custom Postgres connection string before saving it. Returns
+ * `{ ok }` (reachable + `SELECT 1` succeeded) or `{ ok:false, error }`.
+ */
+export async function testWorkDbConnection(workId: string, databaseUrl: string) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+    const trimmed = databaseUrl.trim();
+    if (!/^postgres(ql)?:\/\/.+/i.test(trimmed)) {
+        return {
+            success: false,
+            ok: false,
+            error: 'DATABASE_URL must be a postgres:// or postgresql:// connection string',
+        };
+    }
+    try {
+        const response = await deployAPI.testDbConnection(workId, trimmed);
+        return {
+            success: response.status === 'success',
+            ok: response.ok ?? false,
+            error: response.error ?? null,
+        };
+    } catch (error) {
+        console.error('Test DB connection error:', error);
+        return {
+            success: false,
+            ok: false,
+            error: error instanceof Error ? error.message : 'Failed to test connection',
         };
     }
 }

@@ -12,6 +12,8 @@ import type {
     FormFieldGroup,
     ValidationResult,
     JsonSchema,
+    IFormSchemaProvider,
+    IPlugin,
 } from '@ever-works/plugin';
 import {
     isFormSchemaProvider,
@@ -190,12 +192,20 @@ export class GeneratorFormSchemaService {
         let config = { ...(rawConfig ?? {}) };
         const pluginConfig: Record<string, Record<string, unknown>> = {};
 
-        // Let the pipeline plugin transform first
+        // Let the pipeline plugin transform first. NOTE: the lazy plugin proxy
+        // returns a truthy function wrapper for EVERY property access (so
+        // `if (plugin.transformFormValues)` is always true) and wraps sync methods
+        // in a Promise. Invoking a method the plugin does NOT implement throws
+        // `Plugin "<id>" has no method "transformFormValues"` — which is exactly
+        // why Agent Pipeline generation failed ("fetch failed"), since
+        // agent-pipeline is a form-schema-provider but implements no transform.
+        // Materialize the real instance and reflect the OPTIONAL method on it
+        // (mirrors BaseFacade.materializeForUse).
         const pipelinePlugin = await this.resolvePipelinePlugin(pipelineId, options);
         if (pipelinePlugin && isFormSchemaProvider(pipelinePlugin.plugin)) {
-            const transform = pipelinePlugin.plugin.transformFormValues;
-            if (transform) {
-                config = transform.call(pipelinePlugin.plugin, config);
+            const real = (await this.materialize(pipelinePlugin.plugin)) as IFormSchemaProvider;
+            if (typeof real.transformFormValues === 'function') {
+                config = real.transformFormValues(config);
             }
         }
 
@@ -205,10 +215,14 @@ export class GeneratorFormSchemaService {
             if (!isFormSchemaProvider(registered.plugin)) continue;
 
             const pluginId = registered.plugin.id;
+            // Same proxy hazard as above: materialize + reflect the OPTIONAL
+            // transformFormValues on the real instance (also avoids the sync
+            // method being silently wrapped in a Promise by the proxy).
+            const real = (await this.materialize(registered.plugin)) as IFormSchemaProvider;
 
             // Call transformFormValues on full config — this produces the nested key
-            if (registered.plugin.transformFormValues) {
-                const transformed = registered.plugin.transformFormValues(config);
+            if (typeof real.transformFormValues === 'function') {
+                const transformed = real.transformFormValues(config);
                 const nested = transformed[pluginId];
 
                 if (nested && typeof nested === 'object' && !Array.isArray(nested)) {
@@ -227,6 +241,19 @@ export class GeneratorFormSchemaService {
         }
 
         return { config, pluginConfig };
+    }
+
+    /**
+     * Return the REAL materialized plugin instance, not the lazy proxy. The
+     * proxy's `get` trap returns a truthy function wrapper for EVERY property
+     * access (so `if (plugin.someOptionalMethod)` is always true) and wraps sync
+     * methods in a Promise — so reliably probing/calling an OPTIONAL plugin
+     * method (e.g. `transformFormValues`) requires the real instance. Mirrors
+     * `BaseFacade.materializeForUse`.
+     */
+    private async materialize(plugin: IPlugin): Promise<IPlugin> {
+        const stub = plugin as unknown as { __materialize?: () => Promise<IPlugin> };
+        return typeof stub.__materialize === 'function' ? await stub.__materialize() : plugin;
     }
 
     /**

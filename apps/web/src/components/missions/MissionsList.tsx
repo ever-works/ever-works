@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition, useEffect } from 'react';
-import { Target, Search } from 'lucide-react';
+import { Target, Search, PenLine } from 'lucide-react';
 import { Select } from '@/components/ui/select';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
@@ -104,10 +104,18 @@ export function MissionsList({
         // matches the pattern on /new — a single source of truth for
         // "I'm trying to create something" is the chat side panel.
         startSubmit(() => {
-            startFromPrompt(description, {
+            const handedOff = startFromPrompt(description, {
                 intent: 'Mission',
                 attachments: buildAttachmentRefs(attachments),
             });
+            // `startFromPrompt` returns false when the chat context isn't
+            // mounted — previously that silently swallowed the prompt and the
+            // user was left staring at an unchanged page. Keep their draft and
+            // point them at the deterministic create form instead.
+            if (!handedOff) {
+                toast.error(t('newPage.chatUnavailable'));
+                return;
+            }
             setDraft('');
         });
     };
@@ -140,6 +148,25 @@ export function MissionsList({
                     testId="missions-quick-add"
                     onAttachmentsChange={setAttachments}
                 />
+
+                {/* Deterministic, no-AI path. The composer above hands the
+                    prompt to the chat AI and only creates a Mission if the
+                    model calls the createMission tool; this bar links to the
+                    manual form at /missions/new, mirroring /ideas. */}
+                <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border/60 dark:border-border-dark/60 bg-surface/60 dark:bg-surface-dark/60 px-4 py-3">
+                    <p className="text-sm text-text-secondary dark:text-text-secondary-dark">
+                        {t('newPage.or')}
+                    </p>
+                    <Button
+                        href={ROUTES.DASHBOARD_MISSIONS_NEW}
+                        variant="secondary"
+                        size="sm"
+                        className="gap-1.5"
+                    >
+                        <PenLine className="w-3.5 h-3.5" />
+                        {t('newPage.link')}
+                    </Button>
+                </div>
             </div>
 
             <form className="mb-5 flex flex-col gap-2 @lg/main:flex-row @lg/main:items-end">

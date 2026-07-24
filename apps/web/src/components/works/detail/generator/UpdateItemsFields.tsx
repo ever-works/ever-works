@@ -80,6 +80,7 @@ export function UpdateItemsFields({
             <PrUpdateInfo
                 mainPR={mainPR}
                 dataPR={dataPR}
+                gitProvider={work.gitProvider}
                 className="pt-6 mt-6 border-t border-border dark:border-border-dark"
             />
         </div>

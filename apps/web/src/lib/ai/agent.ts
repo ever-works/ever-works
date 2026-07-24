@@ -158,17 +158,33 @@ export async function runAgent({
     });
 }
 
-/** Latest user message text — drives per-turn tool gating. */
+/** How many trailing user turns feed the tool-gating keyword match. */
+const TOOL_GATING_USER_TURNS = 3;
+
+/**
+ * Recent user message text — drives per-turn tool gating.
+ *
+ * Deliberately spans the last few user turns rather than only the latest.
+ * A create flow opens with a message that names the domain ("I want to
+ * create a Mission. …") and the assistant then asks a follow-up question;
+ * the user's reply is a bare answer ("AI Coding Tools Weekly") containing no
+ * domain keyword at all. Gating on that reply alone drops the whole domain —
+ * including the create tool the flow is about to call — so the conversation
+ * dead-ends on exactly the turn that was supposed to complete it.
+ */
 function lastUserText(messages: UIMessage[]): string {
-    for (let i = messages.length - 1; i >= 0; i--) {
+    const collected: string[] = [];
+    for (let i = messages.length - 1; i >= 0 && collected.length < TOOL_GATING_USER_TURNS; i--) {
         const message = messages[i];
         if (message.role !== 'user') continue;
-        return message.parts
-            .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
-            .map((part) => part.text)
-            .join(' ');
+        collected.push(
+            message.parts
+                .filter((part): part is { type: 'text'; text: string } => part.type === 'text')
+                .map((part) => part.text)
+                .join(' '),
+        );
     }
-    return '';
+    return collected.reverse().join(' ');
 }
 
 function isProviderErrorMessage(message: UIMessage): boolean {

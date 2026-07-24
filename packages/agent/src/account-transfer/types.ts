@@ -133,6 +133,14 @@ export interface ExportedWork {
     slug: string;
     description: string;
     owner?: string;
+    /** Work kind (directory/website/blog/…). Optional so pre-kind export
+     *  payloads keep importing; validated via `normalizeCreateWorkKind` on
+     *  import (payloads are user-supplied JSON). */
+    kind?: string;
+    /** The user's provider-repo toggle. A deliberate `false` must survive
+     *  an export/import round-trip — omitting it would silently re-enable
+     *  provider-repo generation on the imported work. */
+    providerRepositoryEnabled?: boolean;
     gitProvider: string;
     deployProvider?: string;
     readmeConfig?: any;

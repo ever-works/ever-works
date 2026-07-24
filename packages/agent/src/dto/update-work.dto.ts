@@ -69,6 +69,16 @@ export class UpdateWorkDto {
     @IsBoolean()
     websiteTemplateUseBeta?: boolean;
 
+    @ApiPropertyOptional({
+        description:
+            'Whether to generate the browsable repository published to the git provider ' +
+            '(the "{provider} Repository"). Defaults to true. A Work kind that never ' +
+            'provisions that repository ignores this flag.',
+    })
+    @IsOptional()
+    @IsBoolean()
+    providerRepositoryEnabled?: boolean;
+
     @ApiPropertyOptional({ description: 'Whether community PR processing is enabled' })
     @IsOptional()
     @IsBoolean()

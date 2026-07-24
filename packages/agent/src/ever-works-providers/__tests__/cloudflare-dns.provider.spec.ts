@@ -15,6 +15,7 @@ describe('CloudflareDnsProvider (EW-617 G5)', () => {
             deleteOk?: boolean;
             deleteStatus?: number;
             deleteBody?: any;
+            targetHostname?: string;
         } = {},
     ) {
         const calls: FetchCall[] = [];
@@ -77,7 +78,7 @@ describe('CloudflareDnsProvider (EW-617 G5)', () => {
                 apiToken: 'tk',
                 zoneId: 'zone1',
                 rootDomain: 'ever.works',
-                targetHostname: 'k8s.lb.example',
+                targetHostname: opts.targetHostname ?? 'k8s.lb.example',
             },
             fakeFetch,
         );
@@ -102,6 +103,44 @@ describe('CloudflareDnsProvider (EW-617 G5)', () => {
             content: 'k8s.lb.example',
             proxied: false,
             ttl: 1,
+        });
+    });
+
+    it('proxies the CNAME when the target is a Cloudflare Tunnel', async () => {
+        // `*.cfargotunnel.com` only resolves through Cloudflare's proxy — an
+        // unproxied CNAME there resolves to an unroutable placeholder and the
+        // tenant site is dead on the public internet.
+        const tunnel = '5a1c27a6-7d93-4f25-a329-3154995e16db.cfargotunnel.com';
+        const { provider, calls } = buildProvider({ listResult: [], targetHostname: tunnel });
+
+        await provider.ensureWorkSubdomain('ai-coding');
+
+        const body = JSON.parse(calls[1].init.body as string);
+        expect(body).toMatchObject({ content: tunnel, proxied: true });
+    });
+
+    it('proxies the CNAME when updating a drifted record onto a tunnel target', async () => {
+        const tunnel = '5a1c27a6-7d93-4f25-a329-3154995e16db.cfargotunnel.com';
+        const { provider, calls } = buildProvider({
+            targetHostname: tunnel,
+            listResult: [
+                {
+                    id: 'rec-drift',
+                    type: 'CNAME',
+                    name: 'ai-coding.ever.works',
+                    content: 'old.lb.example',
+                },
+            ],
+        });
+
+        await provider.ensureWorkSubdomain('ai-coding');
+
+        // `patchRecord` issues a PUT (full record replace), not a PATCH.
+        const update = calls.find((c) => (c.init.method ?? '').toUpperCase() === 'PUT');
+        expect(update).toBeDefined();
+        expect(JSON.parse(update!.init.body as string)).toMatchObject({
+            content: tunnel,
+            proxied: true,
         });
     });
 

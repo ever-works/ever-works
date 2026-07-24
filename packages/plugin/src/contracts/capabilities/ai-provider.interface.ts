@@ -140,6 +140,12 @@ export interface ChatCompletionOptions {
 	 * Plugins should use these settings instead of their stored defaults.
 	 */
 	readonly settings?: PluginSettings;
+
+	/**
+	 * Aborts the in-flight provider request. Optional and additive — the
+	 * provider plugins are pass-throughs, so no implementer changes.
+	 */
+	readonly signal?: AbortSignal;
 }
 
 /**

@@ -18,6 +18,7 @@ import { ROUTES } from '@/lib/constants';
 const FALLBACK_CATALOG: OnboardingCatalogResponse = {
     ai: [],
     storage: [],
+    db: [],
     deploy: [],
     plugins: [],
 };

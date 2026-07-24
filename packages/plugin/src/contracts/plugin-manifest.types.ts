@@ -18,6 +18,11 @@ export const PLUGIN_CATEGORIES = [
 	// EW-637 — pluggable object storage backends (local-fs, S3, MinIO, GitHub).
 	// See packages/plugin/src/contracts/capabilities/storage.interface.ts.
 	'storage',
+	// Pluggable relational database backend for deployed Works (the "PostgreSQL
+	// DB" plugin). Holds the tenant-level connection (Ever Works DB vs a custom
+	// server) and provisions/derives a per-Work database. Distinct from
+	// `storage` (object storage). See `capabilities/datastore.interface.ts`.
+	'database',
 	// Notifications v2 (EW-650 + EW-663) — email + chat-channel providers.
 	// See `capabilities/email-provider.interface.ts` and
 	// `capabilities/notification-channel.interface.ts`.

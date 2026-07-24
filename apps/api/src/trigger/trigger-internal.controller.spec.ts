@@ -19,6 +19,7 @@ jest.mock('@ever-works/agent/database', () => ({
 jest.mock('@ever-works/agent/agents', () => ({
     AgentScheduleDispatcherService: class AgentScheduleDispatcherService {},
     AgentRunService: class AgentRunService {},
+    AgentRunSweeperService: class AgentRunSweeperService {},
     AGENT_HEARTBEAT_TRIGGER: 'AGENT_HEARTBEAT_TRIGGER',
 }));
 jest.mock('@ever-works/agent/tasks-domain', () => ({

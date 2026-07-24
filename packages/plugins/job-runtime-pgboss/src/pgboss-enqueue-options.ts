@@ -38,10 +38,28 @@ export interface MappedPgBossEnqueue {
 	readonly metaForPayload: Readonly<Record<string, unknown>>;
 }
 
+/**
+ * Dedup horizon for a keyed (`idempotencyKey`) send — see mapEnqueueOptions.
+ * 6h. pg-boss rejects a `singletonSeconds` greater than the queue's archive
+ * interval (default 12h), so this stays comfortably under that ceiling while
+ * still covering the realistic duplicate window (retries, double-submits).
+ */
+export const IDEMPOTENCY_WINDOW_SECONDS = 21_600;
+
 export function mapEnqueueOptions(opts: JobEnqueueOptions): MappedPgBossEnqueue {
 	const sendOptions: Record<string, unknown> = {};
 	const meta: Record<string, unknown> = {};
-	if (opts.idempotencyKey !== undefined) sendOptions['singletonKey'] = opts.idempotencyKey;
+	if (opts.idempotencyKey !== undefined) {
+		sendOptions['singletonKey'] = opts.idempotencyKey;
+		// pg-boss v10 no longer dedups on `singletonKey` alone (v9 did). On a
+		// 'standard' queue, dedup requires pairing the key with `singletonSeconds`
+		// — "at most one job per key within this window". We default to 24h so a
+		// re-send of the same logical job (the point of an idempotencyKey) is
+		// suppressed for a generous horizon; distinct keys are unaffected. This is
+		// the multi-job-safe alternative to a keyed queue policy (which would cap
+		// the whole queue to one job).
+		sendOptions['singletonSeconds'] = IDEMPOTENCY_WINDOW_SECONDS;
+	}
 	if (opts.maxDurationSeconds !== undefined) sendOptions['expireInSeconds'] = opts.maxDurationSeconds;
 	if (opts.tenantId !== undefined) meta['tenantId'] = opts.tenantId;
 	if (opts.concurrencyKey !== undefined) meta['concurrencyKey'] = opts.concurrencyKey;

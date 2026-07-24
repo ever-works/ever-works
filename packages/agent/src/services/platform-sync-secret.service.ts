@@ -2,8 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
 import { config } from '../config';
 import { WorkRepository } from '../database/repositories/work.repository';
-import { Work } from '../entities';
-
+import { Work } from '../entities/work.entity';
 const ALGORITHM = 'aes-256-gcm';
 const KEY_LENGTH_BYTES = 32;
 const IV_LENGTH_BYTES = 12;

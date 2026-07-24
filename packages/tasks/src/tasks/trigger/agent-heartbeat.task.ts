@@ -76,7 +76,9 @@ export const agentHeartbeatTask = task<'agent-heartbeat', AgentHeartbeatPayload>
     },
     run: async (
         payload: AgentHeartbeatPayload,
-        { ctx }: { ctx?: { run?: { id?: string } } } = {},
+        // NOTE: this annotation replaces the SDK RunFnParams, so anything omitted
+        // here is silently invisible — which is exactly how `signal` went unused.
+        { ctx, signal }: { ctx?: { run?: { id?: string } }; signal?: AbortSignal } = {},
     ) => {
         // Security: validate payload IDs before any DB access (defense-in-depth, mirrors createTaskContext)
         assertUuid(payload.agentId, 'payload.agentId');
@@ -135,12 +137,22 @@ export const agentHeartbeatTask = task<'agent-heartbeat', AgentHeartbeatPayload>
                 });
             }
 
-            await runs.markStarted(run.id, ctx?.run?.id ?? null);
+            const claimed = await runs.markStarted(run.id, ctx?.run?.id ?? null);
+            // Honour the CAS: markStarted returns false when the row went terminal
+            // first — a user cancel, or the stuck-run sweeper reaping it. Executing
+            // anyway would burn the work and then lose it, because the terminal
+            // write at the end no-ops against the same guard. No behaviour change on
+            // the happy path: the CAS allows queued|running, so a legitimate retry
+            // re-claiming an already-running row still returns true.
+            if (!claimed) {
+                return { status: 'skipped', reason: 'run-already-terminal', runId: run.id };
+            }
             const result = await runner.execute({
                 runId: run.id,
                 agentId: agent.id,
                 userId: payload.userId,
                 kind: 'heartbeat',
+                signal,
             });
 
             if (result.status === 'assembled') {
@@ -152,7 +164,15 @@ export const agentHeartbeatTask = task<'agent-heartbeat', AgentHeartbeatPayload>
 
             const nextSlot = computeNextHeartbeat(agent.heartbeatCadence);
             const completed = result.status === 'assembled' || result.status === 'dispatched';
-            if (completed) {
+            const cancelled = result.status === 'cancelled';
+            if (cancelled) {
+                // A user cancel is not an agent failure. Without this arm the
+                // widened status union still compiles and silently falls into
+                // incrementErrorCount below, counting every cancel toward
+                // `pauseAfterFailures` until the agent auto-pauses. Mirrors the
+                // pre-execute cancelled path above.
+                await agents.releaseAfterRun(agent.id, nextSlot, 'cancelled');
+            } else if (completed) {
                 await agents.releaseAfterRun(agent.id, nextSlot, 'completed');
             } else {
                 await agents.incrementErrorCount(agent.id, nextSlot);

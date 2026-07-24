@@ -348,6 +348,22 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
             );
         });
 
+        it('queries for the run-lifecycle events this controller actually emits', async () => {
+            // run-now, cancel and assign-task all write activity rows via
+            // tryLog(), but were missing from AGENT_LIFECYCLE_EVENT_TYPES — so
+            // they were persisted and then never returned by this endpoint.
+            // Assert on the emitted set, not just the status-transition ones.
+            await controller.listEvents(auth, agentId, {});
+            const { actionTypes } = activityLog.findAgentEvents.mock.calls[0][0];
+            expect(actionTypes).toEqual(
+                expect.arrayContaining([
+                    'agent_run_triggered',
+                    'agent_run_cancelled',
+                    'agent_task_assigned',
+                ]),
+            );
+        });
+
         it('returns an empty page when ActivityLogService is unbound', async () => {
             controller = new AgentsController(
                 service,

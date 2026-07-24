@@ -60,6 +60,12 @@ export interface AgentAiDispatchInput {
     temperature?: number;
     /** Optional maxTokens cap. */
     maxTokens?: number;
+    /**
+     * Aborts the in-flight provider request when the run is cancelled. Without
+     * this, cancelling only takes effect between model round-trips, so a run
+     * already inside a long call keeps going until it returns.
+     */
+    abortSignal?: AbortSignal;
 }
 
 export interface AgentAiDispatchResult {

@@ -27,12 +27,21 @@ env:
   NODE_OPTIONS: --max-old-space-size=6144
 
 jobs:
-  lint-and-test:
+  # Relocated out of `lint-and-test` (body unchanged). It used to run BEFORE
+  # `Check formatting` / `Build all packages` / `run test on all packages`, so a
+  # dependency advisory failed the job and reported those three as `skipped`
+  # rather than run. A red `lint-and-test` then meant "nothing was built or
+  # tested" — indistinguishable at a glance from a real test failure, which is
+  # how a broken spec sat unnoticed on develop for two months.
+  #
+  # As its own job the gate is exactly as strict (still a hard fail on
+  # HIGH/CRITICAL) but it can no longer mask the build/test signal, and the two
+  # surface as separate checks so the cause is obvious from the checks list.
+  #
+  # No `pnpm install` here on purpose: `pnpm audit` resolves from
+  # `pnpm-lock.yaml` alone, so this job is checkout + pnpm + audit.
+  dependency-audit:
     runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
-
-    strategy:
-      matrix:
-        node-version: [22.x]
 
     steps:
       - name: Checkout repository
@@ -45,14 +54,10 @@ jobs:
         with:
           version: 10.33.3
 
-      - name: Setup Node.js ${{ matrix.node-version }}
+      - name: Setup Node.js 22.x
         uses: actions/setup-node@v7
         with:
-          node-version: ${{ matrix.node-version }}
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
+          node-version: 22.x
 
       # H-15: fail the build if any production transitive dep has a HIGH or
       # CRITICAL vulnerability. The existing `pnpm.overrides` block proves
@@ -92,6 +97,33 @@ jobs:
           fi
           echo "::error title=Dependency audit failed::pnpm audit reported HIGH/CRITICAL production vulnerabilities (or an unexpected error). See the output above."
           exit "$code"
+
+  lint-and-test:
+    runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
+
+    strategy:
+      matrix:
+        node-version: [22.x]
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271  # v3
+        with:
+          version: 10.33.3
+
+      - name: Setup Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
 
       - name: Check formatting
         run: pnpm format:check
@@ -235,21 +267,37 @@ jobs:
         ports: ['5432:5432']
         options: --health-cmd pg_isready --health-interval 10s --health-timeout 5s --health-retries 5
       temporal:
-        image: temporalio/auto-setup:latest
+        # Pinned (was `:latest`). A moving `:latest` is why this job flipped red:
+        # the tag advanced and the frontend now binds to the container's eth0 IP
+        # instead of the loopback the healthcheck probes. 1.29.3 == what `:latest`
+        # resolved to when this was fixed; bump deliberately, not by drift.
+        image: temporalio/auto-setup:1.29.3
         env:
           DB: postgres12
           DB_PORT: '5432'
           POSTGRES_USER: test
           POSTGRES_PWD: test
           POSTGRES_SEEDS: postgres
+          # THE fix: bind the frontend on all interfaces so the loopback
+          # healthcheck below can reach it. Without this, temporal binds only the
+          # container IP (e.g. 172.18.0.x:7233) and `nc -z localhost 7233` fails
+          # for the whole window -> the container is marked unhealthy and
+          # "Initialize containers" fails even though the server is up. Verified
+          # on a k8s repro: with BIND_ON_IP=0.0.0.0 the loopback probe passes ~80s
+          # in; without it, never.
+          BIND_ON_IP: '0.0.0.0'
         ports: ['7233:7233']
-        # auto-setup boots in 60-90s; generous start-period + retries
-        # absorb the warm-up without flaking the job.
-        options: --health-cmd "nc -z localhost 7233" --health-interval 10s --health-timeout 5s --health-retries 12 --health-start-period 30s
-      inngest:
-        image: inngest/inngest:latest
-        ports: ['8288:8288']
-        options: --health-cmd "wget -qO- http://localhost:8288/ || exit 1" --health-interval 5s --health-timeout 3s --health-retries 5
+        # Schema setup + boot measured ~80s on a ready DB; give it comfortable
+        # headroom (start-period 45s + 18x10s = 225s) so a slow warm-up or a
+        # postgres-not-yet-queryable retry can't tip it over.
+        options: --health-cmd "nc -z localhost 7233" --health-interval 10s --health-timeout 5s --health-retries 18 --health-start-period 45s
+      # NOTE: inngest is intentionally NOT a service container. The
+      # `inngest/inngest` image's default entrypoint is the CLI (it just prints
+      # help and exits) — the dev server only starts under the `dev` subcommand,
+      # and GitHub `services:` cannot override a container's command. So the
+      # container never listened on 8288 and the job failed at "Initialize
+      # containers". Started as a `docker run` step below instead (which CAN pass
+      # `dev`), reachable at localhost:8288 the same way the service containers are.
 
     steps:
       - name: Checkout repository
@@ -284,10 +332,70 @@ jobs:
           EW_TEST_REAL_PGBOSS_URL: postgres://test:test@localhost:5432/test
         run: pnpm --filter @ever-works/job-runtime-pgboss-plugin test
 
+      # The temporal-plugin real-infra suite tags workflows with a custom
+      # `tenantId` search attribute (multi-tenant routing). Temporal v10 rejects
+      # `StartWorkflow` with an unregistered search attribute
+      # ("Namespace default has no mapping defined for search attribute tenantId"),
+      # and auto-setup does not create custom attributes. Register it up front,
+      # inside the temporal service container (localhost:7233 = its own frontend)
+      # via the `temporal` CLI the image already ships. Idempotent enough for CI —
+      # `|| true` so a re-run where it already exists doesn't fail the job.
+      - name: Register Temporal search attributes
+        run: |
+          cid="$(docker ps -qf 'ancestor=temporalio/auto-setup:1.29.3' | head -n1)"
+          if [ -z "$cid" ]; then echo "::error::temporal container not found"; exit 1; fi
+          # The temporal-plugin maps three custom search attributes
+          # (temporal-enqueue-options.ts): tenantId + concurrencyKey are single
+          # Keywords; tags is a list -> KeywordList. auto-setup keeps migrating the
+          # visibility schema AFTER the frontend port opens (the healthcheck only
+          # proves the port listens), so creating a custom attribute too early
+          # silently no-ops and the test later fails with "no mapping defined for
+          # search attribute tags" (flaky: whoever wins the race). Register, then
+          # poll `list` until all three are actually present. Deterministic.
+          want="tenantId concurrencyKey tags"
+          registered=0
+          for attempt in $(seq 1 40); do
+            docker exec "$cid" temporal operator search-attribute create \
+              --namespace default --name tenantId --type Keyword >/dev/null 2>&1 || true
+            docker exec "$cid" temporal operator search-attribute create \
+              --namespace default --name concurrencyKey --type Keyword >/dev/null 2>&1 || true
+            docker exec "$cid" temporal operator search-attribute create \
+              --namespace default --name tags --type KeywordList >/dev/null 2>&1 || true
+            listing="$(docker exec "$cid" temporal operator search-attribute list --namespace default 2>/dev/null || true)"
+            missing=""
+            for a in $want; do echo "$listing" | grep -qw "$a" || missing="$missing $a"; done
+            if [ -z "$missing" ]; then registered=1; echo "All custom search attributes present after attempt $attempt:$want"; break; fi
+            echo "attempt $attempt/40: still missing:$missing - retrying in 3s"
+            sleep 3
+          done
+          echo "Registered search attributes:"
+          docker exec "$cid" temporal operator search-attribute list --namespace default || true
+          if [ "$registered" != "1" ]; then echo "::error::custom search attributes never registered after 40 attempts"; exit 1; fi
+
       - name: Temporal real-infra
         env:
           EW_TEST_REAL_TEMPORAL_ADDRESS: localhost:7233
         run: pnpm --filter @ever-works/job-runtime-temporal-plugin test
+
+      # Start the Inngest dev server via `docker run` (not a service container —
+      # see the note in `services:` above). `dev` is the subcommand that actually
+      # serves; `--host 0.0.0.0` binds all interfaces so the loopback probe and
+      # the test's http://localhost:8288 both reach it; `--no-discovery` skips the
+      # auto-scan for a local app (there is none here). Same pinned image tag.
+      - name: Start Inngest dev server
+        run: |
+          docker run -d --name inngest -p 8288:8288 \
+            inngest/inngest:v1.38.1 inngest dev --no-discovery --host 0.0.0.0
+          echo "Waiting for Inngest on http://localhost:8288 ..."
+          for i in $(seq 1 45); do
+            if curl -sf -o /dev/null http://localhost:8288/; then
+              echo "Inngest is ready."; exit 0
+            fi
+            sleep 2
+          done
+          echo "::error::Inngest dev server did not become ready in time"
+          docker logs inngest || true
+          exit 1
 
       - name: Inngest real-infra
         env:

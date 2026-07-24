@@ -14,6 +14,11 @@ describe('AgentRunRepository — terminal transitions', () => {
         where: jest.Mock;
         andWhere: jest.Mock;
         execute: jest.Mock;
+        // Sweep path: findStuckNonTerminal is a SELECT terminating in getMany.
+        select: jest.Mock;
+        orderBy: jest.Mock;
+        limit: jest.Mock;
+        getMany: jest.Mock;
     };
     let repository: {
         findOne: jest.Mock;
@@ -37,6 +42,10 @@ describe('AgentRunRepository — terminal transitions', () => {
             where: jest.fn().mockReturnThis(),
             andWhere: jest.fn().mockReturnThis(),
             execute: jest.fn().mockResolvedValue({ affected: 1 }),
+            select: jest.fn().mockReturnThis(),
+            orderBy: jest.fn().mockReturnThis(),
+            limit: jest.fn().mockReturnThis(),
+            getMany: jest.fn().mockResolvedValue([]),
         };
         repository = {
             // startedAt drives durationMs; null keeps the arithmetic out of the way.
@@ -213,6 +222,50 @@ describe('AgentRunRepository — terminal transitions', () => {
         it('reports found:false without a triggerRunId for an unknown run', async () => {
             repository.findOne.mockResolvedValue(null);
             await expect(runs.cancel('r1', 'u1')).resolves.toEqual({ found: false });
+        });
+    });
+
+    describe('stuck-run sweep', () => {
+        it('scans both non-terminal statuses on an age predicate that covers queued and running', async () => {
+            const cutoff = new Date('2026-01-01T00:00:00Z');
+            await runs.findStuckNonTerminal(cutoff, 200);
+            // This is a SELECT, so the status filter is the leading `where`,
+            // not an `andWhere` like the CAS updates — statusGuard() would miss it.
+            const whereCall = queryBuilder.where.mock.calls.find(([sql]) =>
+                String(sql).includes('status IN'),
+            );
+            expect(whereCall?.[1]?.statuses).toEqual(['queued', 'running']);
+            // COALESCE, because startedAt is NULL while queued — one predicate
+            // must cover both statuses or the queued half is never swept.
+            expect(
+                queryBuilder.andWhere.mock.calls.some(([sql]) => String(sql).includes('COALESCE')),
+            ).toBe(true);
+            expect(queryBuilder.limit).toHaveBeenCalledWith(200);
+        });
+
+        it('CAS-guards the bulk update so a run that finished first is never re-stamped', async () => {
+            queryBuilder.execute.mockResolvedValue({ affected: 2 });
+            await runs.markStuckFailed(['r1', 'r2'], 'stuck-timeout: x');
+            expect(statusGuard()).toEqual(['queued', 'running']);
+            expect(queryBuilder.set).toHaveBeenCalledWith(
+                expect.objectContaining({ status: 'failed', errorMessage: 'stuck-timeout: x' }),
+            );
+        });
+
+        it('returns rows actually affected, not the number of ids passed', async () => {
+            // A worker winning the race must not be counted as swept.
+            queryBuilder.execute.mockResolvedValue({ affected: 1 });
+            await expect(
+                runs.markStuckFailed(['r1', 'r2', 'r3'], 'stuck-timeout: x'),
+            ).resolves.toBe(1);
+        });
+
+        it('issues no query at all for an empty id list', async () => {
+            // TypeORM renders `IN (:...ids)` as invalid SQL for an empty array,
+            // so this is a runtime break, not a compile one.
+            repository.createQueryBuilder.mockClear();
+            await expect(runs.markStuckFailed([], 'stuck-timeout: x')).resolves.toBe(0);
+            expect(repository.createQueryBuilder).not.toHaveBeenCalled();
         });
     });
 

@@ -203,6 +203,26 @@ export class DirectoryWebsiteClient {
             return degraded('unauthorized');
         }
         if (status && status >= 500) {
+            // A directory site that is UP but whose platform-sync env
+            // (PLATFORM_SYNC_SECRET) was never injected — e.g. a Work revived /
+            // hand-deployed outside the platform deploy flow — answers this
+            // endpoint with 503 {"error":"platform sync not configured on this
+            // directory"}. That is NOT an outage: the site serves normally, only
+            // the activity-feed integration isn't wired yet. Classify it as the
+            // benign, already-translated `not_provisioned` state (UI: "events not
+            // yet available" + "redeploy the directory site") instead of falsely
+            // reporting the live site as unreachable ("Upstream 5xx"). Any other
+            // 5xx (a genuinely failing/overloaded site) stays `upstream_5xx`.
+            const bodyText =
+                typeof err.response?.data === 'string'
+                    ? err.response.data
+                    : JSON.stringify(err.response?.data ?? '');
+            if (status === 503 && /platform sync not configured/i.test(bodyText)) {
+                return degraded(
+                    'not_provisioned',
+                    'Deployed site is up; activity sync is not configured on it yet',
+                );
+            }
             return degraded('upstream_5xx', `Upstream ${status}`);
         }
         if (status && status >= 400) {

@@ -1,7 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { z } from 'zod';
 import { AiFacadeService } from '../facades/ai.facade';
-import { User } from '../entities';
+import { User } from '../entities/user.entity';
 import { WorkRepository } from '../database';
 import { slugifyText } from '../utils/text.utils';
 import { sanitizeDescription, sanitizeStringArray } from '../utils/sanitize.util';

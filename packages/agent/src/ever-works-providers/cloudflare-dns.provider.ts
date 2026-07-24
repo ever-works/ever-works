@@ -28,6 +28,26 @@ import type {
  * and stays small.
  */
 
+/**
+ * Cloudflare Tunnel targets (`<tunnel-uuid>.cfargotunnel.com`) are NOT
+ * real public DNS names — they only resolve through Cloudflare's proxy.
+ * An unproxied ("grey cloud") CNAME at one resolves to an unroutable
+ * placeholder address, so the hostname is dead on the public internet.
+ *
+ * Verified against the live `ever.works` zone: an unproxied CNAME to the
+ * tunnel resolved to `fd10:aec2:5dae::` and every request failed to
+ * connect; flipping the same record to proxied resolved to Cloudflare
+ * edge IPs and reached the origin. Every working tunnel-backed record in
+ * that zone is proxied.
+ *
+ * So proxying is derived from the target rather than configured: tunnel
+ * targets MUST be proxied, and anything else (a real LB hostname or A
+ * record) keeps the previous unproxied default.
+ */
+export function requiresProxy(targetHostname: string): boolean {
+    return /(^|\.)cfargotunnel\.com$/i.test((targetHostname ?? '').trim());
+}
+
 export interface CloudflareDnsConfig {
     apiToken: string;
     zoneId: string;
@@ -92,6 +112,7 @@ export class CloudflareDnsProvider implements IDnsOperations {
         this.assertSlug(slug);
         const fqdn = `${slug}.${this.config.rootDomain}`;
         const target = this.config.targetHostname;
+        const proxied = requiresProxy(target);
 
         const existing = await this.findRecord(fqdn);
         if (existing) {
@@ -104,7 +125,7 @@ export class CloudflareDnsProvider implements IDnsOperations {
                 type: 'CNAME',
                 name: fqdn,
                 content: target,
-                proxied: false,
+                proxied,
                 ttl: 1, // 1 == 'auto' per Cloudflare docs
             });
             this.logger.log(
@@ -117,7 +138,7 @@ export class CloudflareDnsProvider implements IDnsOperations {
             type: 'CNAME',
             name: fqdn,
             content: target,
-            proxied: false,
+            proxied,
             ttl: 1,
         });
         this.logger.log(`CloudflareDns CNAME created ${fqdn} -> ${target}`);

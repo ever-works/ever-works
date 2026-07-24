@@ -69,7 +69,9 @@ export const agentChatReplyTask = task<'agent-chat-reply', AgentChatReplyPayload
     },
     run: async (
         payload: AgentChatReplyPayload,
-        { ctx }: { ctx?: { run?: { id?: string } } } = {},
+        // NOTE: this annotation replaces the SDK RunFnParams, so anything omitted
+        // here is silently invisible — which is exactly how `signal` went unused.
+        { ctx, signal }: { ctx?: { run?: { id?: string } }; signal?: AbortSignal } = {},
     ) => {
         // Security: validate payload IDs before any DB access (defense-in-depth, mirrors agent-heartbeat).
         // triggeringMessageId is also asserted: it is a TaskChatMessage uuid PK and its raw value
@@ -141,7 +143,16 @@ export const agentChatReplyTask = task<'agent-chat-reply', AgentChatReplyPayload
                 });
             }
 
-            await runs.markStarted(run.id, ctx?.run?.id ?? null);
+            const claimed = await runs.markStarted(run.id, ctx?.run?.id ?? null);
+            // Honour the CAS: markStarted returns false when the row went terminal
+            // first — a user cancel, or the stuck-run sweeper reaping it. Executing
+            // anyway would burn the work and then lose it, because the terminal
+            // write at the end no-ops against the same guard. No behaviour change on
+            // the happy path: the CAS allows queued|running, so a legitimate retry
+            // re-claiming an already-running row still returns true.
+            if (!claimed) {
+                return { status: 'skipped', reason: 'run-already-terminal', runId: run.id };
+            }
 
             const [taskRow, messages] = await Promise.all([
                 tasks.getOne(payload.userId, payload.taskId).catch(() => null),
@@ -165,6 +176,7 @@ export const agentChatReplyTask = task<'agent-chat-reply', AgentChatReplyPayload
                 agentId: agent.id,
                 userId: payload.userId,
                 kind: 'chat',
+                signal,
                 taskId: payload.taskId,
                 chatMessageId: payload.triggeringMessageId,
                 immediateInput,

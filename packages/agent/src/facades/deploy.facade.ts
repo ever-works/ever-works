@@ -28,10 +28,12 @@ const EVER_WORKS_DEPLOY_PROVIDER_ID = 'ever-works';
 // Security: allow-list of plugin IDs whose secret settings the deploy
 // orchestrator is permitted to read via `getOtherPluginSettings`. The k8s
 // deploy only needs the GitHub plugin's `readPackagesPat*` to mint a GHCR
-// imagePullSecret. Restricting this prevents the open-ended "fetch any
+// imagePullSecret, plus the `postgres-db` plugin's resolved DB connection
+// (mode / custom / per-Work override) to compose the deployed site's
+// `DATABASE_URL`. Restricting this prevents the open-ended "fetch any
 // plugin's secrets" method from being repurposed to exfiltrate unrelated
 // credentials (e.g. an AI provider's API key) for the request's user.
-const CROSS_PLUGIN_SETTINGS_ALLOWLIST: ReadonlySet<string> = new Set(['github']);
+const CROSS_PLUGIN_SETTINGS_ALLOWLIST: ReadonlySet<string> = new Set(['github', 'postgres-db']);
 
 function resolvePluginProviderId(providerId: string): string {
     return providerId === EVER_WORKS_DEPLOY_PROVIDER_ID
@@ -422,6 +424,29 @@ export class DeployFacadeService implements IDeployFacade {
             userId: options.userId,
             workId: options.workId,
             includeSecrets: true,
+        });
+    }
+
+    /**
+     * Persist the PostgreSQL DB plugin's per-Work override connection string
+     * (its work-scoped `overrideConnectionString`). The Deploy page is the only
+     * UI that edits a Work's database, so it writes here to keep the plugin the
+     * source of truth for the override. Pass an empty string to clear it (the
+     * Work then inherits the account-level Ever Works DB / custom setting).
+     * Confined to `postgres-db` via the same allow-list as
+     * `getOtherPluginSettings`.
+     */
+    async setWorkDbOverride(workId: string, connectionString: string): Promise<void> {
+        const pluginId = 'postgres-db';
+        if (!CROSS_PLUGIN_SETTINGS_ALLOWLIST.has(pluginId)) {
+            throw new DeployFacadeError(
+                `Cross-plugin settings write is not permitted for plugin '${pluginId}'`,
+                'setWorkDbOverride',
+                pluginId,
+            );
+        }
+        await this.settingsService.updateWorkSettings(pluginId, workId, {
+            overrideConnectionString: connectionString ?? '',
         });
     }
 

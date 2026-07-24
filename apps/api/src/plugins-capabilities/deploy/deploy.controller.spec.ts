@@ -65,6 +65,7 @@ describe('DeployController', () => {
         addDomain: jest.Mock;
         removeDomain: jest.Mock;
         verifyDomain: jest.Mock;
+        setWorkDbOverride: jest.Mock;
     };
     let ownershipService: {
         ensureCanEdit: jest.Mock;
@@ -79,8 +80,18 @@ describe('DeployController', () => {
         findByWork: jest.Mock;
     };
     let activityLogService: { log: jest.Mock };
-    let workRuntimeEnvService: { getDatabaseUrl: jest.Mock; setDatabaseUrl: jest.Mock };
+    let workRuntimeEnvService: {
+        getDatabaseUrl: jest.Mock;
+        setDatabaseUrl: jest.Mock;
+        getDatabaseMode: jest.Mock;
+        setDatabaseMode: jest.Mock;
+    };
     let managedSubdomainService: { getState: jest.Mock; update: jest.Mock };
+    let dbProvisionService: {
+        isReady: jest.Mock;
+        ensureDatabaseForWork: jest.Mock;
+        testConnection: jest.Mock;
+    };
     let userRepository: { findById: jest.Mock };
     let controller: DeployController;
 
@@ -113,6 +124,9 @@ describe('DeployController', () => {
             addDomain: jest.fn(),
             removeDomain: jest.fn(),
             verifyDomain: jest.fn(),
+            // Mirrors the per-Work DB override into the PostgreSQL DB plugin;
+            // the controller calls this best-effort (.catch) on runtime-env save.
+            setWorkDbOverride: jest.fn().mockResolvedValue(undefined),
         };
         ownershipService = {
             ensureCanEdit: jest.fn(),
@@ -131,11 +145,19 @@ describe('DeployController', () => {
         workRuntimeEnvService = {
             getDatabaseUrl: jest.fn().mockResolvedValue(null),
             setDatabaseUrl: jest.fn().mockResolvedValue(undefined),
+            getDatabaseMode: jest.fn().mockResolvedValue(null),
+            setDatabaseMode: jest.fn().mockResolvedValue(undefined),
         };
 
         managedSubdomainService = {
             getState: jest.fn(),
             update: jest.fn(),
+        };
+
+        dbProvisionService = {
+            isReady: jest.fn().mockReturnValue(false),
+            ensureDatabaseForWork: jest.fn().mockResolvedValue(null),
+            testConnection: jest.fn().mockResolvedValue({ ok: true }),
         };
 
         userRepository = {
@@ -152,6 +174,7 @@ describe('DeployController', () => {
             workRuntimeEnvService as never,
             managedSubdomainService as never,
             userRepository as never,
+            dbProvisionService as never,
         );
     });
 
@@ -1393,7 +1416,7 @@ describe('DeployController', () => {
 
                 expect(ownershipService.ensureCanView).toHaveBeenCalledWith('work-1', 'caller-1');
                 expect(managedSubdomainService.getState).toHaveBeenCalledWith('work-1');
-                expect(result).toEqual(stateOk);
+                expect(result).toEqual({ status: 'success', ...stateOk });
             });
 
             it('propagates an ownership 404 verbatim without touching the service', async () => {
@@ -1423,6 +1446,7 @@ describe('DeployController', () => {
                 const result = await controller.getManagedSubdomain(auth, 'work-1');
 
                 expect(result).toEqual({
+                    status: 'success',
                     subdomain: null,
                     fqdn: null,
                     url: null,
@@ -1452,7 +1476,7 @@ describe('DeployController', () => {
                         details: { subdomain: 'my-site', fqdn: 'my-site.ever.works' },
                     }),
                 );
-                expect(result).toEqual(stateOk);
+                expect(result).toEqual({ status: 'success', ...stateOk });
             });
 
             it('does not call the service when ensureCanEdit rejects', async () => {
@@ -1515,7 +1539,7 @@ describe('DeployController', () => {
                     subdomain: 'my-site',
                 });
 
-                expect(result).toEqual(stateOk);
+                expect(result).toEqual({ status: 'success', ...stateOk });
             });
         });
     });

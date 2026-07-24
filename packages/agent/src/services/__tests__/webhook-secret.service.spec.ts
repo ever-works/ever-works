@@ -1,8 +1,7 @@
 import { randomBytes } from 'crypto';
 import { WebhookSecretService } from '../webhook-secret.service';
 import { WorkRepository } from '../../database/repositories/work.repository';
-import { Work } from '../../entities';
-
+import { Work } from '../../entities/work.entity';
 type RepoMock = jest.Mocked<Pick<WorkRepository, 'findById' | 'setWebhookSecretIfNull' | 'update'>>;
 
 const VALID_KEY_HEX = randomBytes(32).toString('hex');

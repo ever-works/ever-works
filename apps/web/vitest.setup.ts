@@ -1,5 +1,23 @@
 import { expect } from 'vitest';
 import * as matchers from '@testing-library/jest-dom/matchers';
+// Re-exported by @testing-library/react; `@testing-library/dom` is only a
+// transitive dependency here, so importing it directly does not resolve.
+import { configure } from '@testing-library/react';
+
+// CI-load resilience for async assertions.
+//
+// `waitFor` / `findBy*` poll with real `setTimeout` and give up after 1000ms
+// by default. Specs that drive a mocked fetch plus a state update — e.g.
+// `KbCitationHover.unit.spec.tsx` — comfortably clear that locally but blow
+// past it when the whole turbo test matrix runs concurrently, surfacing as a
+// flaky "Escape closes the popover"-style failure that never reproduces in
+// isolation.
+//
+// Raising the budget cannot mask a real bug: an assertion that is genuinely
+// false never becomes true, it just takes longer to be reported. This mirrors
+// the reasoning already applied to `testTimeout`/`hookTimeout` (30000ms) in
+// this config and in packages/tasks + apps/api.
+configure({ asyncUtilTimeout: 5000 });
 
 // Register jest-dom matchers (toBeInTheDocument, toBeDisabled, toHaveAttribute, …)
 // against vitest's `expect`. The `@testing-library/jest-dom/vitest` side-effect

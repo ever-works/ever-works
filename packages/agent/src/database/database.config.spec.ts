@@ -15,10 +15,19 @@
 // asserted by a dedicated drift-check in `database.module.spec.ts` (that
 // spec is allowed to load the real barrel, so the path-scurry constraint
 // doesn't apply there).
-jest.mock('../entities', () => {
+jest.mock('./_entities-inventory', () => {
     const { AGENT_ENTITY_NAMES } =
         jest.requireActual<typeof import('./_entity-names')>('./_entity-names');
-    return Object.fromEntries(AGENT_ENTITY_NAMES.map((name) => [name, class {}]));
+    // Synthesize a distinct NAMED CLASS per entity: the spec asserts every
+    // ENTITIES entry is `typeof === 'function'` and that all entries are unique,
+    // which mirrors the real entity classes without loading TypeORM.
+    return {
+        ENTITIES: AGENT_ENTITY_NAMES.map((name) => {
+            const cls = class {};
+            Object.defineProperty(cls, 'name', { value: name });
+            return cls;
+        }),
+    };
 });
 jest.mock('../entities/cache.entity', () => ({
     CacheEntry: class CacheEntry {},

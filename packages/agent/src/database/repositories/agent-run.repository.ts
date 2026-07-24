@@ -160,6 +160,73 @@ export class AgentRunRepository {
         return { found: true, previousStatus: run.status, triggerRunId: run.triggerRunId };
     }
 
+    /**
+     * Rows abandoned by a worker that died without reaching any checkpoint —
+     * OOM, node eviction, deploy, Trigger.dev teardown. Nothing else reaps
+     * them: `recoverStuckRunning()` operates exclusively on `agents` rows.
+     *
+     * Left alone they stay `queued`/`running` forever, and
+     * {@link findInFlightForTaskAgent} keeps treating them as in-flight — which
+     * permanently suppresses dispatch for that task-agent pair. That is the
+     * same user-visible bug as an orphaned queued run, reached by a different
+     * route.
+     *
+     * `COALESCE(startedAt, createdAt)` covers both statuses in one predicate:
+     * `startedAt` is NULL while queued, and {@link markStarted} is provably the
+     * only writer of `status='running'` and sets both in one atomic UPDATE, so
+     * `running` implies `startedAt IS NOT NULL` with no torn window. The
+     * COALESCE is also defence against a future second writer.
+     *
+     * Bounded by `limit` on purpose — see {@link markStuckFailed}.
+     */
+    async findStuckNonTerminal(
+        cutoff: Date,
+        limit: number,
+    ): Promise<
+        Pick<AgentRun, 'id' | 'agentId' | 'triggerKind' | 'status' | 'startedAt' | 'createdAt'>[]
+    > {
+        return this.repository
+            .createQueryBuilder('run')
+            .select([
+                'run.id',
+                'run.agentId',
+                'run.triggerKind',
+                'run.status',
+                'run.startedAt',
+                'run.createdAt',
+            ])
+            .where('run.status IN (:...statuses)', { statuses: NON_TERMINAL })
+            .andWhere('COALESCE(run.startedAt, run.createdAt) <= :cutoff', { cutoff })
+            .orderBy('COALESCE(run.startedAt, run.createdAt)', 'ASC')
+            .limit(limit)
+            .getMany();
+    }
+
+    /**
+     * Bulk-reap the ids returned by {@link findStuckNonTerminal}.
+     *
+     * One statement, CAS-guarded on `queued|running`, so a worker that finished
+     * in the gap between the select and this update keeps its result — the row
+     * simply is not counted. Returns `affected`, NOT `runIds.length`: reporting
+     * the input size would overstate the sweep every time that race is lost.
+     *
+     * `durationMs` is deliberately left NULL. It cannot be computed in a bulk
+     * statement, and NULL is the honest value for "we do not know when this
+     * died" — nothing branches on it.
+     */
+    async markStuckFailed(runIds: string[], errorMessage: string): Promise<number> {
+        // TypeORM renders `IN (:...ids)` as invalid SQL for an empty array.
+        if (runIds.length === 0) return 0;
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(AgentRun)
+            .set({ status: 'failed', finishedAt: new Date(), errorMessage })
+            .where('id IN (:...runIds)', { runIds })
+            .andWhere('status IN (:...statuses)', { statuses: NON_TERMINAL })
+            .execute();
+        return result.affected ?? 0;
+    }
+
     async createQueued(args: {
         agentId: string;
         userId: string;
@@ -207,9 +274,11 @@ export class AgentRunRepository {
      *
      * That mattered little while cancel was DB-only, but now that cancelling
      * actually kills the Trigger.dev run, losing this race would strand the
-     * row in `running` with no worker alive to finalize it — and there is no
-     * `agent_runs` sweeper to reap it. Returns whether the claim succeeded so
-     * the worker can bail instead of executing a cancelled run.
+     * row in `running` with no worker alive to finalize it. {@link findStuckNonTerminal}
+     * + {@link markStuckFailed} now reap such rows, but only after hours — the
+     * CAS is what keeps the row correct in the meantime. Returns whether the
+     * claim succeeded so the worker can bail instead of executing a run that
+     * was cancelled or swept.
      *
      * Allows `queued|running` (NOT queued-only): heartbeat re-resolves an
      * already-`running` row via `findInFlightForAgent` on retry, and a
@@ -250,9 +319,10 @@ export class AgentRunRepository {
      *    `failed` or `completed`, because cancelling does not stop the worker.
      *
      * Same CAS-style WHERE clause {@link cancel} already uses. Returns whether
-     * the row was actually transitioned so callers can report a no-op: there is
-     * NO `agent_runs` sweeper (`recoverStuckRunning()` only touches `agents`
-     * rows), so a silent miss would be both unrecoverable and invisible.
+     * the row was actually transitioned so callers can report a no-op. The
+     * `agent_runs` sweeper ({@link markStuckFailed}) only reaps rows that are
+     * hours old, so within a normal run a silent miss here is still effectively
+     * unrecoverable and invisible — keep reporting it.
      *
      * The `durationMs` read stays non-atomic on purpose (applies equally to
      * `markFailed` and `markCompleted`). `startedAt` is read before the CAS

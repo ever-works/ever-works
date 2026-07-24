@@ -1,13 +1,13 @@
 import { Injectable, Logger, BadRequestException, Optional } from '@nestjs/common';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 import { NotificationRepository } from '@src/database/repositories/notification.repository';
+import { Notification } from '@src/entities/notification.entity';
 import {
-    Notification,
     CreateNotificationDto,
     NotificationQueryOptions,
     NotificationType,
     NotificationCategory,
-} from '@src/entities';
+} from '@src/entities/notification.types';
 import { sanitizeName, sanitizeDescription } from '@src/utils/sanitize.util';
 import { redactSecrets } from '@src/utils/secret-scan';
 

@@ -1,4 +1,4 @@
-import { Work } from '@src/entities';
+import { Work } from '@src/entities/work.entity';
 import { BaseEvent } from './base';
 
 export class WorkGenerationCompletedEvent extends BaseEvent {

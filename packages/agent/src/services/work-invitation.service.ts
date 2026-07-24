@@ -14,9 +14,8 @@ import {
     InvitationRole,
     WorkInvitationStatus,
     WorkInvitationTransferState,
-    WorkInvitationMetadata,
-} from '../entities';
-
+} from '../entities/types';
+import { WorkInvitationMetadata } from '../entities/work-invitation.entity';
 export type IssuedInvitation = {
     invitation: WorkInvitation;
     /** Raw token, returned ONCE — only the hash is persisted. */

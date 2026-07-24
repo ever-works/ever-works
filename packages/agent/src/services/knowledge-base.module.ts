@@ -3,14 +3,12 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { DatabaseModule } from '../database/database.module';
 import { FacadesModule } from '../facades/facades.module';
-import {
-    WorkKnowledgeChunk,
-    WorkKnowledgeChunkCoordinate,
-    WorkKnowledgeCitation,
-    WorkKnowledgeDocument,
-    WorkKnowledgeTag,
-    WorkKnowledgeUpload,
-} from '../entities';
+import { WorkKnowledgeChunkCoordinate } from '../entities/work-knowledge-chunk-coordinate.entity';
+import { WorkKnowledgeChunk } from '../entities/work-knowledge-chunk.entity';
+import { WorkKnowledgeCitation } from '../entities/work-knowledge-citation.entity';
+import { WorkKnowledgeDocument } from '../entities/work-knowledge-document.entity';
+import { WorkKnowledgeTag } from '../entities/work-knowledge-tag.entity';
+import { WorkKnowledgeUpload } from '../entities/work-knowledge-upload.entity';
 import { WorkKnowledgeDocumentRepository } from '../database/repositories/work-knowledge-document.repository';
 import { WorkKnowledgeUploadRepository } from '../database/repositories/work-knowledge-upload.repository';
 import { WorkKnowledgeTagRepository } from '../database/repositories/work-knowledge-tag.repository';

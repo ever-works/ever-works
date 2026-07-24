@@ -76,6 +76,40 @@ export class WorkRuntimeEnvService {
     }
 
     /**
+     * Race-safe first-write of the per-Work `DATABASE_URL` (for the shared-DB
+     * auto-provision path). Persists `databaseUrl` only if none is set yet, and
+     * returns the URL that actually ended up stored (this one, or the winner of
+     * a concurrent provision). Mirrors the `getOrGenerate` secret pattern.
+     */
+    async setDatabaseUrlIfNull(workId: string, databaseUrl: string): Promise<string> {
+        const won = await this.workRepository.setDeployDatabaseUrlIfNull(
+            workId,
+            this.encrypt(databaseUrl),
+        );
+        if (won) {
+            return databaseUrl;
+        }
+        const existing = await this.getDatabaseUrl(workId);
+        if (!existing) {
+            throw new Error(
+                `DATABASE_URL bootstrap race lost but no value found for work ${workId}`,
+            );
+        }
+        return existing;
+    }
+
+    /** The Work's DB mode (`'shared'` | `'custom'`), or null if never set. */
+    async getDatabaseMode(workId: string): Promise<'shared' | 'custom' | null> {
+        const work = await this.workRepository.findById(workId);
+        return work?.deployDatabaseMode ?? null;
+    }
+
+    /** Set the Work's DB mode. */
+    async setDatabaseMode(workId: string, mode: 'shared' | 'custom'): Promise<void> {
+        await this.workRepository.setDeployDatabaseMode(workId, mode);
+    }
+
+    /**
      * Shared race-safe getOrGenerate for a base64 secret stored in an encrypted
      * Work column. First deploy generates + persists; concurrent deploys re-read.
      */

@@ -2,8 +2,7 @@ import { ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { randomUUID } from 'node:crypto';
 import { Not, Repository } from 'typeorm';
-import { AuthAccount } from '../../entities';
-
+import { AuthAccount } from '../../entities/auth-account.entity';
 /**
  * Namespace prefix for provider accounts created via the plugin-capability OAuth
  * integration flow (distinct from social sign-in accounts).

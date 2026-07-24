@@ -5,11 +5,14 @@ export default defineConfig({
         environment: 'node',
         globals: true,
         include: ['src/**/*.{test,spec}.ts'],
-        // Many task specs `vi.resetModules()` + `await import(...)` the worker
-        // graph in beforeEach; that cold re-import can exceed the default 10s
-        // hook timeout under CI load (flaky "Hook timed out in 10000ms"). Give
-        // hooks headroom so a slow re-import doesn't red the whole shard.
-        hookTimeout: 30000,
+        // Task specs cold-import the worker graph (@trigger.dev/sdk + the
+        // full task tree) in beforeAll/beforeEach; on saturated CI runners a
+        // single cold import has been measured past 30s (three consecutive
+        // "Hook timed out in 30000ms" reds on agent-task-execute even after
+        // the resetModules removal). The budget only matters under load —
+        // fast hooks still finish fast — so give hooks real headroom instead
+        // of chasing the runner-contention tail one bump at a time.
+        hookTimeout: 120000,
         testTimeout: 30000,
         coverage: {
             provider: 'v8',

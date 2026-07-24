@@ -401,6 +401,52 @@ export const config = {
                 return Number.isFinite(raw) && raw > 0 ? raw : 3;
             },
         },
+
+        // "Ever Works DB" — a platform-managed SHARED Postgres so customer
+        // Works get a working database without bringing their own. Distinct
+        // from the platform's OWN database (`DATABASE_*`): today they point at
+        // the same server, but keeping them separate lets us move customer
+        // (tenant) DBs to a dedicated cluster later with only an env change.
+        //
+        // Two endpoints on purpose (mirrors Neon's pooled/unpooled split):
+        //  - `getAdminUrl()` — a least-privilege provisioner (CREATEDB +
+        //    CREATEROLE, NOT superuser) used ONLY for DDL (CREATE DATABASE /
+        //    ROLE). MUST be a DIRECT/session endpoint — a transaction-pooled
+        //    PgBouncer cannot run CREATE DATABASE.
+        //  - `getHost()/getPort()` — the endpoint used to compose the per-Work
+        //    `DATABASE_URL` injected into the deployed site. May be a PgBouncer
+        //    LB reachable from a separate customer cluster (cross-cluster).
+        sharedDb: {
+            isEnabled() {
+                return process.env.DB_EVER_WORKS_SHARED_ENABLED === 'true';
+            },
+            getAdminUrl() {
+                return process.env.DB_EVER_WORKS_SHARED_ADMIN_URL || '';
+            },
+            getHost() {
+                return process.env.DB_EVER_WORKS_SHARED_HOST || '';
+            },
+            getPort() {
+                const raw = parseInt(process.env.DB_EVER_WORKS_SHARED_PORT || '5432', 10);
+                return Number.isFinite(raw) && raw > 0 ? raw : 5432;
+            },
+            getSslMode() {
+                return process.env.DB_EVER_WORKS_SHARED_SSLMODE || 'require';
+            },
+            // Prefix for the deterministic per-Work database + role names
+            // (e.g. `ew_<workId>` / `ewr_<workId>`).
+            getNamePrefix() {
+                return (process.env.DB_EVER_WORKS_SHARED_NAME_PREFIX || 'ew').replace(
+                    /[^a-z0-9]/gi,
+                    '',
+                );
+            },
+            // The feature can be OFFERED to users (isEnabled) yet not actually
+            // provisionable until an operator wires the admin + host env.
+            isReady() {
+                return this.isEnabled() && Boolean(this.getAdminUrl()) && Boolean(this.getHost());
+            },
+        },
     },
 
     /**
@@ -495,6 +541,49 @@ export const config = {
         getMaxRunDurationSeconds() {
             const raw = parseInt(process.env.AGENT_MAX_RUN_DURATION_SECONDS || '1800', 10);
             return Number.isFinite(raw) && raw > 0 ? raw : 1800;
+        },
+        /** Kill switch for the agent_runs stuck-run sweeper. Default on. */
+        getRunSweeperEnabled() {
+            return process.env.AGENT_RUN_SWEEPER_ENABLED !== 'false';
+        },
+        /**
+         * Age past which a `queued`/`running` AgentRun is considered abandoned.
+         *
+         * Deliberately generous, because the two error costs are wildly
+         * asymmetric. Sweeping too LATE means one task-agent pair cannot
+         * dispatch for a few extra hours — recoverable. Sweeping too EARLY
+         * destroys a live run's real result: the row reads `failed`, the
+         * worker's `markCompleted` then no-ops against the CAS, and the user
+         * sees the sweeper's message in the Activity tab where the summary
+         * should be. That is unrecoverable, and it manufactures exactly the
+         * class of corruption the terminal-transition CAS exists to prevent.
+         *
+         * Derived from the run-duration ceiling rather than hard-coded, so it
+         * self-corrects if that ceiling is raised. The ceiling is the largest
+         * `maxDuration` across the three agent tasks (agent-task-execute pins
+         * 3600s), not just this config's value.
+         *
+         * The floor clamp is the most important line here: a worker may burn
+         * up to 3 attempts, so anything below 3x the ceiling can reap a run
+         * that is legitimately still retrying. Without the clamp,
+         * `AGENT_RUN_STUCK_SWEEP_MINUTES=30` would silently reintroduce that.
+         */
+        getRunStuckSweepMinutes() {
+            const ceilingMinutes = Math.ceil(Math.max(3600, this.getMaxRunDurationSeconds()) / 60);
+            const floor = ceilingMinutes * 3;
+            const raw = parseInt(process.env.AGENT_RUN_STUCK_SWEEP_MINUTES || '', 10);
+            const configured = Number.isFinite(raw) && raw > 0 ? raw : ceilingMinutes * 6;
+            return Math.max(floor, configured);
+        },
+        /**
+         * Rows swept per tick. Bounded on purpose — `agent_runs` is the
+         * high-cardinality child table, and a post-outage backlog is precisely
+         * when this runs. Successive ticks drain; there is no pagination loop,
+         * so a runaway predicate cannot become an unbounded write storm.
+         */
+        getRunStuckSweepBatch() {
+            const raw = parseInt(process.env.AGENT_RUN_STUCK_SWEEP_BATCH || '200', 10);
+            return Number.isFinite(raw) && raw > 0 ? raw : 200;
         },
     },
 

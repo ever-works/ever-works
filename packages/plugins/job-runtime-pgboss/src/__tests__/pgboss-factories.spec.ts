@@ -43,7 +43,7 @@ class FakeBoss implements PgBossInstance {
 		return `sub${this.nextSubId++}`;
 	}
 
-	async cancel(id: string): Promise<void> {
+	async cancel(_name: string, id: string): Promise<void> {
 		this.cancelled.push(id);
 	}
 
@@ -99,15 +99,20 @@ describe('PgBossDispatcherFactory', () => {
 		await expect(factory.send('q1', {})).resolves.toBeNull();
 	});
 
-	it('cancel returns true on resolve, false on throw', async () => {
+	it('cancel resolves the queue from a prior send, then true on resolve / false on throw', async () => {
 		const boss = new FakeBoss();
 		const factory = new PgBossDispatcherFactory({ boss });
-		await expect(factory.cancel('j1')).resolves.toBe(true);
+		// v10 cancel needs the queue name; the dispatcher learns it from the send.
+		const id1 = await factory.send('q1', {}); // 'j1'
+		await expect(factory.cancel(id1!)).resolves.toBe(true);
 		expect(boss.cancelled).toEqual(['j1']);
+		const id2 = await factory.send('q1', {}); // 'j2'
 		boss.cancel = vi.fn(async () => {
 			throw new Error('boom');
 		});
-		await expect(factory.cancel('j2')).resolves.toBe(false);
+		await expect(factory.cancel(id2!)).resolves.toBe(false);
+		// A job this dispatcher never sent has no known queue -> false, no throw.
+		await expect(factory.cancel('never-sent')).resolves.toBe(false);
 	});
 
 	it('getJob returns null when boss.getJobById is absent or throws', async () => {

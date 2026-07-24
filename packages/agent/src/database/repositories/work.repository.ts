@@ -2,7 +2,9 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, IsNull, Brackets, Raw, LessThanOrEqual, In } from 'typeorm';
 import { Work } from '../../entities/work.entity';
-import { User, Mission, WorkProposal } from '../../entities';
+import { Mission } from '../../entities/mission.entity';
+import { User } from '../../entities/user.entity';
+import { WorkProposal } from '../../entities/work-proposal.entity';
 import { buildCaseInsensitiveLikeClause, prepareCaseInsensitiveContainsPattern } from '../utils';
 import { config } from '../../config';
 
@@ -424,6 +426,28 @@ export class WorkRepository {
             .andWhere('deployCookieSecretEncrypted IS NULL')
             .execute();
         return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Conditional UPDATE for the lazy bootstrap of the per-Work `DATABASE_URL`
+     * (`deployDatabaseUrlEncrypted`). Race-safe (see `setDeployAuthSecretIfNull`)
+     * so two concurrent deploys that both auto-provision a shared DB converge
+     * on the first provisioner's connection string instead of clobbering it.
+     */
+    async setDeployDatabaseUrlIfNull(workId: string, encrypted: string): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(Work)
+            .set({ deployDatabaseUrlEncrypted: encrypted })
+            .where('id = :id', { id: workId })
+            .andWhere('deployDatabaseUrlEncrypted IS NULL')
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /** Set the Work's DB mode (`'shared'` | `'custom'`). */
+    async setDeployDatabaseMode(workId: string, mode: 'shared' | 'custom'): Promise<void> {
+        await this.repository.update(workId, { deployDatabaseMode: mode });
     }
 
     /**

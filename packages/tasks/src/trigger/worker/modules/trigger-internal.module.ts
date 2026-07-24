@@ -9,7 +9,11 @@ import {
 import { MissionTickService } from '@ever-works/agent/missions';
 import { IdeaBuildExecutorService } from '@ever-works/agent/work-agent';
 import { GoalEvaluationService } from '@ever-works/agent/goals';
-import { AgentRunService, AgentScheduleDispatcherService } from '@ever-works/agent/agents';
+import {
+    AgentRunService,
+    AgentRunSweeperService,
+    AgentScheduleDispatcherService,
+} from '@ever-works/agent/agents';
 import {
     TaskChatService,
     TaskRecurrenceDispatcherService,
@@ -98,6 +102,13 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
                 createRemoteProxy(apiClient, 'AgentScheduleDispatcherService'),
             inject: [TriggerInternalApiClient],
         },
+        // Backs the `agent-run-sweeper` cron task.
+        {
+            provide: AgentRunSweeperService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'AgentRunSweeperService'),
+            inject: [TriggerInternalApiClient],
+        },
         {
             provide: AgentRunService,
             useFactory: (apiClient: TriggerInternalApiClient) =>
@@ -181,6 +192,7 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         IdeaBuildExecutorService,
         GoalEvaluationService,
         AgentScheduleDispatcherService,
+        AgentRunSweeperService,
         AgentRunService,
         AgentRepository,
         AgentRunRepository,

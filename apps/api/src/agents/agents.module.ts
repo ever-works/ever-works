@@ -315,6 +315,8 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                             tools,
                             temperature: input.temperature ?? 0.4,
                             maxTokens: input.maxTokens,
+                            // Aborts the in-flight provider request on cancel.
+                            signal: input.abortSignal,
                         },
                         {
                             userId: input.facadeOptions.userId,

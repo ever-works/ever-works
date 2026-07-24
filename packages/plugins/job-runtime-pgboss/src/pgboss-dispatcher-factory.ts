@@ -31,6 +31,52 @@ import { mapEnqueueOptions } from './pgboss-enqueue-options.js';
 export class PgBossDispatcherFactory {
 	constructor(private readonly opts: PgBossFactoryOptions) {}
 
+	/** Queues already created this process (createQueue is idempotent but hits the DB). */
+	private readonly ensuredQueues = new Set<string>();
+
+	/**
+	 * jobId -> queue name for jobs this dispatcher has sent, so `cancel(jobId)`
+	 * can call pg-boss v10's `cancel(name, id)` (v10 removed the by-id-only form).
+	 * Bounded (insertion-order eviction) so a long-lived dispatcher can't leak;
+	 * the realistic cancel pattern is "cancel a job I just scheduled", which is
+	 * always in the recent window.
+	 *
+	 * LIMITATION: only the instance that SENT the job knows its queue. A cancel
+	 * issued from a different process/instance won't find it here and returns
+	 * false. The fully general fix is to thread the queue name through the
+	 * platform's `cancel(runId)` contract (or persist a jobId->queue map);
+	 * tracked as a follow-up.
+	 */
+	private readonly sentJobQueue = new Map<string, string>();
+	private static readonly MAX_TRACKED = 50_000;
+
+	private rememberJobQueue(id: string | null, queue: string): void {
+		if (!id) return;
+		if (this.sentJobQueue.size >= PgBossDispatcherFactory.MAX_TRACKED) {
+			const oldest = this.sentJobQueue.keys().next().value;
+			if (oldest !== undefined) this.sentJobQueue.delete(oldest);
+		}
+		this.sentJobQueue.set(id, queue);
+	}
+
+	/**
+	 * pg-boss v10 no longer auto-creates a queue on first `send` — sending to a
+	 * queue that was never `createQueue`'d silently returns `null` and drops the
+	 * job. Ensure it exists before the first send (cached per process so the hot
+	 * path only pays the DB round-trip once per queue).
+	 */
+	private async ensureQueue(name: string): Promise<void> {
+		if (this.ensuredQueues.has(name) || !this.opts.boss.createQueue) return;
+		// Default ('standard') policy: a queue must hold many concurrent jobs
+		// (multi-tenant, batched). Idempotency is NOT a queue policy here — a
+		// keyed 'short'/'stately' policy would cap the queue to one job and break
+		// those. Instead `mapEnqueueOptions` pairs `singletonKey` with
+		// `singletonSeconds` per send, which dedups same-key jobs on a standard
+		// queue while leaving unkeyed/different-key jobs unaffected.
+		await this.opts.boss.createQueue(name);
+		this.ensuredQueues.add(name);
+	}
+
 	/** Underlying pg-boss instance — exposed for operator advanced lifecycle. */
 	get boss(): PgBossInstance {
 		return this.opts.boss;
@@ -44,7 +90,10 @@ export class PgBossDispatcherFactory {
 		const merged = this.opts.defaultSendOptions
 			? { ...this.opts.defaultSendOptions, ...(callOpts ?? {}) }
 			: callOpts;
-		return this.opts.boss.send(name, payload, merged);
+		await this.ensureQueue(name);
+		const id = await this.opts.boss.send(name, payload, merged);
+		this.rememberJobQueue(id, name);
+		return id;
 	}
 
 	/**
@@ -82,13 +131,25 @@ export class PgBossDispatcherFactory {
 			? { ...this.opts.defaultSendOptions, ...sendOptions }
 			: sendOptions;
 		const mergedOpts = extraOpts ? { ...baseOpts, ...extraOpts } : baseOpts;
-		return this.opts.boss.send(name, mergedPayload, mergedOpts);
+		await this.ensureQueue(name);
+		const id = await this.opts.boss.send(name, mergedPayload, mergedOpts);
+		this.rememberJobQueue(id, name);
+		return id;
 	}
 
-	/** Cancel an in-flight job by id. Returns true once the cancel call resolves. */
+	/**
+	 * Cancel an in-flight job by id. pg-boss v10 requires the queue name
+	 * (`cancel(name, id)` — the by-id-only form was removed), so this resolves
+	 * the queue from what this dispatcher sent. Returns false if the queue is
+	 * unknown here (e.g. the job was sent by a different instance — see
+	 * `sentJobQueue`) or the cancel call itself fails.
+	 */
 	async cancel(jobId: string): Promise<boolean> {
+		const queue = this.sentJobQueue.get(jobId);
+		if (!queue) return false;
 		try {
-			await this.opts.boss.cancel(jobId);
+			await this.opts.boss.cancel(queue, jobId);
+			this.sentJobQueue.delete(jobId);
 			return true;
 		} catch {
 			return false;

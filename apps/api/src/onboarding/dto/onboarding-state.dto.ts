@@ -14,6 +14,7 @@ import {
 } from 'class-validator';
 import type {
     OnboardingAiChoice,
+    OnboardingDbChoice,
     OnboardingDeployChoice,
     OnboardingStorageChoice,
     OnboardingWizardStateV2,
@@ -38,6 +39,8 @@ const STORAGE_CHOICES: readonly OnboardingStorageChoice[] = [
 
 const DEPLOY_CHOICES: readonly OnboardingDeployChoice[] = ['ever-works', 'vercel', 'k8s'];
 
+const DB_CHOICES: readonly OnboardingDbChoice[] = ['ever-works-db', 'custom'];
+
 class AiChoicePatchDto {
     @ApiProperty({ enum: AI_CHOICES })
     @IsIn(AI_CHOICES)
@@ -54,6 +57,12 @@ class DeployChoicePatchDto {
     @ApiProperty({ enum: DEPLOY_CHOICES })
     @IsIn(DEPLOY_CHOICES)
     choice!: OnboardingDeployChoice;
+}
+
+class DbChoicePatchDto {
+    @ApiProperty({ enum: DB_CHOICES })
+    @IsIn(DB_CHOICES)
+    choice!: OnboardingDbChoice;
 }
 
 // `OnboardingStatePatchInnerDto` MUST be declared BEFORE
@@ -80,6 +89,12 @@ export class OnboardingStatePatchInnerDto {
     @ValidateNested()
     @Type(() => StorageChoicePatchDto)
     storage?: StorageChoicePatchDto;
+
+    @ApiPropertyOptional({ type: DbChoicePatchDto })
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => DbChoicePatchDto)
+    db?: DbChoicePatchDto;
 
     @ApiPropertyOptional({ type: DeployChoicePatchDto })
     @IsOptional()
@@ -143,10 +158,13 @@ export class OnboardingCatalogResponseDto implements OnboardingCatalogResponse {
     storage!: OnboardingCatalogResponse['storage'];
 
     @ApiProperty()
+    db!: OnboardingCatalogResponse['db'];
+
+    @ApiProperty()
     deploy!: OnboardingCatalogResponse['deploy'];
 
     @ApiProperty()
     plugins!: OnboardingCatalogResponse['plugins'];
 }
 
-export { AI_CHOICES, STORAGE_CHOICES, DEPLOY_CHOICES };
+export { AI_CHOICES, STORAGE_CHOICES, DB_CHOICES, DEPLOY_CHOICES };

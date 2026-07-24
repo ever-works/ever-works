@@ -6,6 +6,7 @@ import type {
     OnboardingCard,
     OnboardingAiChoice,
     OnboardingStorageChoice,
+    OnboardingDbChoice,
     OnboardingDeployChoice,
     OnboardingPluginCard,
 } from '@ever-works/contracts/api';
@@ -31,6 +32,7 @@ export class OnboardingCatalogService {
     getCatalog(): OnboardingCatalogResponse {
         const everWorksGitEnabled = config.everWorks.git.isEnabled();
         const everWorksDeployEnabled = config.everWorks.deploy.isEnabled();
+        const everWorksDbEnabled = config.everWorks.sharedDb.isEnabled();
 
         const ai: ReadonlyArray<OnboardingCard<OnboardingAiChoice>> = [
             {
@@ -127,6 +129,34 @@ export class OnboardingCatalogService {
             },
         ];
 
+        const db: ReadonlyArray<OnboardingCard<OnboardingDbChoice>> = [
+            {
+                choice: 'ever-works-db',
+                title: 'Ever Works DB',
+                description: everWorksDbEnabled
+                    ? 'A managed database, provisioned automatically for your Work. No setup needed.'
+                    : 'Coming soon — a managed database, provisioned automatically for your Work.',
+                default: true,
+                available: everWorksDbEnabled,
+                badges: everWorksDbEnabled ? ['default'] : ['default', 'planned'],
+                // The DB step is driven by the PostgreSQL DB plugin (its
+                // settingsSchema renders the Ever Works DB / Custom selector +
+                // connection string); the choice is persisted as the plugin's
+                // user-scoped `mode`, not the bespoke onboarding `db` bucket.
+                pluginId: 'postgres-db',
+            },
+            {
+                choice: 'custom',
+                title: 'Custom DB',
+                description:
+                    'Bring your own database — enter the connection string during setup (used for all your Works; a database is created per Work).',
+                default: false,
+                available: true,
+                badges: ['byok'],
+                pluginId: 'postgres-db',
+            },
+        ];
+
         const deploy: ReadonlyArray<OnboardingCard<OnboardingDeployChoice>> = [
             {
                 choice: 'ever-works',
@@ -162,13 +192,14 @@ export class OnboardingCatalogService {
             [
                 ...ai.map((c) => c.pluginId),
                 ...storage.map((c) => c.pluginId),
+                ...db.map((c) => c.pluginId),
                 ...deploy.map((c) => c.pluginId),
             ].filter((id): id is string => Boolean(id)),
         );
 
         const plugins = this.collectPluginsStepCards(reservedPluginIds);
 
-        return { ai, storage, deploy, plugins };
+        return { ai, storage, db, deploy, plugins };
     }
 
     private collectPluginsStepCards(reservedPluginIds: Set<string>): OnboardingPluginCard[] {

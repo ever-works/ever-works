@@ -10,6 +10,14 @@ export type OnboardingAiChoice = 'ever-works' | 'openrouter' | 'claude-code' | '
 
 export type OnboardingStorageChoice = 'ever-works-git' | 'user-github' | 'user-gitlab' | 'user-git';
 
+/**
+ * Where a Work's database lives: the platform-managed "Ever Works DB" (shared,
+ * auto-provisioned) or a bring-your-own custom database (connection details are
+ * entered on the Deploy page after the Work is created — never stored in this
+ * onboarding-state blob).
+ */
+export type OnboardingDbChoice = 'ever-works-db' | 'custom';
+
 export type OnboardingDeployChoice = 'ever-works' | 'vercel' | 'k8s';
 
 export interface OnboardingWizardStateV2 {
@@ -17,6 +25,7 @@ export interface OnboardingWizardStateV2 {
 	readonly lastStep: number;
 	readonly ai: { readonly choice: OnboardingAiChoice };
 	readonly storage: { readonly choice: OnboardingStorageChoice };
+	readonly db: { readonly choice: OnboardingDbChoice };
 	readonly deploy: { readonly choice: OnboardingDeployChoice };
 	readonly skippedSteps: readonly string[];
 	readonly pluginsReviewed: boolean;
@@ -51,6 +60,7 @@ export interface OnboardingStatePatchRequest {
 		readonly lastStep: number;
 		readonly ai: Partial<{ choice: OnboardingAiChoice }>;
 		readonly storage: Partial<{ choice: OnboardingStorageChoice }>;
+		readonly db: Partial<{ choice: OnboardingDbChoice }>;
 		readonly deploy: Partial<{ choice: OnboardingDeployChoice }>;
 		readonly skippedSteps: readonly string[];
 		readonly pluginsReviewed: boolean;
@@ -63,6 +73,7 @@ export interface OnboardingStatePatchRequest {
 export interface OnboardingCatalogResponse {
 	readonly ai: ReadonlyArray<OnboardingCard<OnboardingAiChoice>>;
 	readonly storage: ReadonlyArray<OnboardingCard<OnboardingStorageChoice>>;
+	readonly db: ReadonlyArray<OnboardingCard<OnboardingDbChoice>>;
 	readonly deploy: ReadonlyArray<OnboardingCard<OnboardingDeployChoice>>;
 	/** Plugins to surface in the "Plugins & Integrations" wizard step. */
 	readonly plugins: ReadonlyArray<OnboardingPluginCard>;
@@ -94,6 +105,7 @@ export const ONBOARDING_DEFAULT_STATE: OnboardingWizardStateV2 = {
 	lastStep: 0,
 	ai: { choice: 'ever-works' },
 	storage: { choice: 'ever-works-git' },
+	db: { choice: 'ever-works-db' },
 	deploy: { choice: 'ever-works' },
 	skippedSteps: [],
 	pluginsReviewed: false

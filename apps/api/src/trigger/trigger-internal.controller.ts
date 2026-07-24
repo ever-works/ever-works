@@ -45,7 +45,11 @@ import {
 import { MissionTickService } from '@ever-works/agent/missions';
 import { IdeaBuildExecutorService } from '@ever-works/agent/work-agent';
 import { GoalEvaluationService } from '@ever-works/agent/goals';
-import { AgentRunService, AgentScheduleDispatcherService } from '@ever-works/agent/agents';
+import {
+    AgentRunService,
+    AgentRunSweeperService,
+    AgentScheduleDispatcherService,
+} from '@ever-works/agent/agents';
 import {
     TaskChatService,
     TaskRecurrenceDispatcherService,
@@ -255,6 +259,11 @@ export class TriggerInternalController implements OnModuleInit {
         @Optional()
         @Inject(forwardRef(() => WorkProposalsApiService))
         private readonly workProposalsApiService?: WorkProposalsApiService,
+        // Backs the `agent-run-sweeper` cron. Appended LAST and @Optional() so
+        // every positional `new TriggerInternalController(...)` in the specs
+        // keeps compiling — inserting mid-list silently shifts all later args.
+        @Optional()
+        private readonly agentRunSweeperService?: AgentRunSweeperService,
     ) {}
 
     onModuleInit() {
@@ -288,6 +297,7 @@ export class TriggerInternalController implements OnModuleInit {
             // Agents/Skills/Tasks PR #1017 — Phase 6. Exposed for the
             // agent-heartbeat dispatcher cron + agent-heartbeat one-shot.
             AgentScheduleDispatcherService: this.agentScheduleDispatcherService,
+            AgentRunSweeperService: this.agentRunSweeperService,
             AgentRunService: this.agentRunService,
             AgentRepository: this.agentRepositoryRef,
             AgentRunRepository: this.agentRunRepositoryRef,

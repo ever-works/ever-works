@@ -1,8 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { GitHubAppInstallationRepository as GitHubAppInstallationRepositoryEntity } from '../../entities';
-
+import { GitHubAppInstallationRepository as GitHubAppInstallationRepositoryEntity } from '../../entities/github-app-installation-repository.entity';
 export type GitHubAppRepositoryRecord = {
     githubRepoId: string;
     owner: string;

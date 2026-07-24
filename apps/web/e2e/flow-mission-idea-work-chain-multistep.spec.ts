@@ -43,7 +43,8 @@ import { listAgentRuns } from './helpers/agents-tasks';
  *    status:'accepted', acceptedWorkId=workId; work after → acceptedFromIdeaId=ideaId;
  *    GET :id/works → { links:[{ ideaId, workId, kind:'linked', … }] }.
  *  POST /api/tasks {title,(missionId|ideaId|workId)} → 201 slug 'T-n', status:'backlog',
- *    priority:'p3'; two scope ids → 400 "…exactly zero or one…"; unknown/foreign
+ *    priority:'p3'; several owner ids together → 201, all of them persist
+ *    (ownership is non-exclusive); unknown/foreign
  *    parent → 400 "<Kind> <id> not found." (BAD REQUEST, note the status).
  *  GET  /api/tasks?missionId|ideaId|workId → { data, meta }, EXACT partition;
  *    unknown scope → 200 empty; malformed → 400 (ParseUUIDPipe).
@@ -386,8 +387,13 @@ test.describe('Chain spine — Mission → Idea → Work linkage propagation', (
                 headers: authedHeaders(token),
                 data: { title: `both ${stamp()}`, ...combo },
             });
-            expect(res.status()).toBe(400);
-            expect(msgOf(await res.json())).toMatch(/exactly zero or one/i);
+            // Ownership is non-exclusive: a Task may belong to several
+            // owners at once, and each id must round-trip.
+            expect(res.status(), `body=${await res.text()}`).toBe(201);
+            const created = await res.json();
+            for (const [key, value] of Object.entries(combo)) {
+                expect(created[key]).toBe(value);
+            }
         }
     });
 });

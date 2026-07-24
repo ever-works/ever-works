@@ -86,6 +86,7 @@ export interface CreateWorkDto {
 }
 
 export interface UpdateWorkDto {
+    providerRepositoryEnabled?: boolean;
     name?: string;
     description?: string;
     owner?: string;
@@ -191,6 +192,25 @@ export interface Work {
      * resolve.
      */
     organizationId?: string | null;
+    /**
+     * Work "kind" discriminator — `default` | `company` | the chip the
+     * user picked at creation (`website`, `landing-page`, `blog`,
+     * `directory`, `awesome-repo`). Modelled server-side as an open
+     * string union on a `varchar(32)` (see `WorkKind` in
+     * `packages/agent/src/entities/work.entity.ts`) so new kinds can ship
+     * without a web deploy — hence `string`, not a closed union here.
+     * Read-only on this payload; it is set through `CreateWorkDto.kind`.
+     * Render it via `WorkKindBadge` / `normalizeWorkKind`, which degrade
+     * unknown values to the generic `default` presentation.
+     */
+    kind?: string;
+    /**
+     * Whether the "{provider} Repository" (the browsable AI-generated repo
+     * published to the git provider, never deployed) is generated for this
+     * Work. Absent on rows written before the column existed — absent means
+     * enabled. Resolve alongside `getWorkCapabilities(kind).repos.work`.
+     */
+    providerRepositoryEnabled?: boolean;
     gitProvider: string;
     deployProvider?: string;
     readmeConfig?: MarkdownReadmeConfig;

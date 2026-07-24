@@ -15,13 +15,14 @@ import { ConfigStep } from './steps/ConfigStep';
 import { PluginsCatalogStep } from './steps/PluginsCatalogStep';
 import { CreateWorkStep } from './steps/CreateWorkStep';
 import { useTurnstile } from './use-turnstile';
-import { AI_ICONS, DEPLOY_ICONS, STORAGE_ICONS } from './brand-icons';
+import { AI_ICONS, DB_ICONS, DEPLOY_ICONS, STORAGE_ICONS } from './brand-icons';
 import { trackOnboardingEvent } from '@/app/actions/onboarding/track';
 import { completeOnboarding, patchOnboardingState } from '@/app/actions/onboarding/state';
 import { getOnboardingPluginStatuses } from '@/app/actions/dashboard/onboarding';
 import type {
     OnboardingAiChoice,
     OnboardingCatalogResponse,
+    OnboardingDbChoice,
     OnboardingDeployChoice,
     OnboardingStateResponse,
     OnboardingStorageChoice,
@@ -417,7 +418,7 @@ function StepBody({
         case 'storage-choice':
             return (
                 <ChoiceStep
-                    title="Your storage"
+                    title="Your Git Storage"
                     description="Where do you want your Work repos to live?"
                     cards={catalog.storage}
                     selected={flow.state.storage.choice}
@@ -426,6 +427,36 @@ function StepBody({
                     onPlannedClick={(c) => flow.notePlannedClick('storage', c)}
                 />
             );
+        case 'db-choice': {
+            // Driven by the PostgreSQL DB plugin: its settingsSchema renders the
+            // Ever Works DB / Custom selector + (for custom) the connection
+            // string, saved as the plugin's user-scoped settings — replacing the
+            // bespoke `db` bucket. Falls back to the choice cards until the
+            // plugin is loaded in the running API image (graceful, additive).
+            const dbPlugin = pluginsById['postgres-db'] ?? null;
+            if (dbPlugin) {
+                return (
+                    <ConfigStep
+                        title="Your DB Storage"
+                        description="Choose where your Works store data — the managed Ever Works DB (a database is provisioned per Work) or your own Postgres server."
+                        plugin={dbPlugin}
+                        connection={connections['postgres-db'] ?? null}
+                        isStatusLoading={isStatusLoading}
+                    />
+                );
+            }
+            return (
+                <ChoiceStep
+                    title="Your DB Storage"
+                    description="Where should your Work's database live? Ever Works DB is fully managed; with Custom DB you enter connection details on the Deploy page after your Work is created."
+                    cards={catalog.db}
+                    selected={flow.state.db?.choice ?? 'ever-works-db'}
+                    icons={DB_ICONS}
+                    onSelect={(choice) => flow.setDbChoice(choice as OnboardingDbChoice)}
+                    onPlannedClick={(c) => flow.notePlannedClick('db', c)}
+                />
+            );
+        }
         case 'storage-config': {
             // Only `user-github` reaches here (others are auto-skipped).
             const plugin = pluginsById['github'] ?? null;
@@ -611,9 +642,11 @@ function labelForStep(step: WizardStep): string {
         case 'ai-config':
             return 'Configure AI';
         case 'storage-choice':
-            return 'Your storage';
+            return 'Your Git Storage';
         case 'storage-config':
             return 'Configure storage';
+        case 'db-choice':
+            return 'Your DB Storage';
         case 'deploy-choice':
             return 'Your deployment';
         case 'deploy-config':

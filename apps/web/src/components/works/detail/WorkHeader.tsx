@@ -12,6 +12,7 @@ import { Link, usePathname } from '@/i18n/navigation';
 import { ShinyText } from '@/components/ui/ShinyText';
 import { AnimatedClock } from '@/components/ui/AnimatedClock';
 import { WorkAgentsDropdown } from './WorkAgentsDropdown';
+import { WorkKindBadge } from '../shared/WorkKindBadge';
 import type { Agent } from '@/lib/api/agents';
 
 interface WorkHeaderProps {
@@ -107,6 +108,10 @@ export function WorkHeader({ work, agents = [], agentsTotal }: WorkHeaderProps) 
 
                         {/* Meta row */}
                         <div className="mt-4 flex flex-wrap items-center gap-3">
+                            {/* Work type — leads the row so the kind is the
+                                first thing read under the title. */}
+                            <WorkKindBadge kind={work.kind} variant="inline" />
+
                             {/* Slug */}
                             <div className="flex items-center gap-1 text-[11px] text-text-secondary dark:text-text-secondary-dark">
                                 <Cog className="w-3.5 h-3.5 opacity-60" />

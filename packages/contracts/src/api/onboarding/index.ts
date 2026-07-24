@@ -30,6 +30,7 @@ export type {
 export type {
 	OnboardingAiChoice,
 	OnboardingStorageChoice,
+	OnboardingDbChoice,
 	OnboardingDeployChoice,
 	OnboardingWizardStateV2,
 	OnboardingStateResponse,

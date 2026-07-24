@@ -1,8 +1,7 @@
 import { ConflictException, Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { GitHubAppUserLink } from '../../entities';
-
+import { GitHubAppUserLink } from '../../entities/github-app-user-link.entity';
 export type UpsertGitHubAppUserLinkData = {
     userId: string;
     githubUserId: string;

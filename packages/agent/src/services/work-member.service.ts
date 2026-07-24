@@ -10,8 +10,7 @@ import { WorkOwnershipService } from './work-ownership.service';
 import { WorkMember } from '@src/entities/work-member.entity';
 import { WorkMemberRole, ASSIGNABLE_MEMBER_ROLES } from '@src/entities/types';
 import { User } from '@src/entities/user.entity';
-import type { Work } from '@src/entities';
-
+import type { Work } from '@src/entities/work.entity';
 export interface WorkMemberDto {
     id: string;
     userId: string;

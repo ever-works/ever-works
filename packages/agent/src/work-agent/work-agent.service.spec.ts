@@ -1,5 +1,6 @@
 import { BadRequestException } from '@nestjs/common';
-import { WorkBuildRequestStatus, WorkAgentRunStatus } from '../entities';
+import { WorkAgentRunStatus } from '../entities/work-agent-run.entity';
+import { WorkBuildRequestStatus } from '../entities/work-build-request.entity';
 import { DEFAULT_WORK_AGENT_GUARDRAILS, WorkAgentService } from './work-agent.service';
 
 function makeRepo<T extends { id?: string }>() {

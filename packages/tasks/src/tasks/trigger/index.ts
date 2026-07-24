@@ -6,6 +6,7 @@ export * from './kb-embed-document.task';
 export * from './kb-mirror-document.task';
 export * from './kb-org-overlay-fanout.task';
 export * from './kb-reconcile.task';
+export * from './agent-run-sweeper.task';
 export * from './user-research-rerun-dispatcher.task';
 export * from './mission-tick.task';
 // PR-4 — Idea → Work build executor (flag-gated, dry-run by default).

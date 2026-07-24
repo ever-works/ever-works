@@ -1,8 +1,7 @@
 import { randomBytes } from 'crypto';
 import { PlatformSyncSecretService } from '../platform-sync-secret.service';
 import { WorkRepository } from '../../database/repositories/work.repository';
-import { Work } from '../../entities';
-
+import { Work } from '../../entities/work.entity';
 type RepoMock = jest.Mocked<
     Pick<
         WorkRepository,

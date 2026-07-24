@@ -13,6 +13,7 @@ export * from './form-schema-provider.interface.js';
 export * from './prompt-provider.interface.js';
 export * from './device-auth-provider.interface.js';
 export * from './storage.interface.js';
+export * from './datastore.interface.js';
 export * from './skills-provider.interface.js';
 export * from './task-tracker.interface.js';
 // Notifications v2 (EW-650 + siblings) — email + chat channel contracts.
