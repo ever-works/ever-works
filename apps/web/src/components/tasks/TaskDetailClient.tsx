@@ -14,9 +14,13 @@ import type {
     TaskPriority,
     TaskStatus,
 } from '@/lib/api/tasks';
+import type { AgentRunSession } from '@/lib/api/agents.shared';
 import { postTaskChatAction, transitionTaskAction, updateTaskAction } from '@/app/actions/tasks';
 import { TaskRecurringSection } from './TaskRecurringSection';
 import { TaskAttachmentsSection } from './TaskAttachmentsSection';
+import { TaskBranchSection } from './TaskBranchSection';
+import { TaskChecksSection } from './TaskChecksSection';
+import { TaskRunControls } from './TaskRunControls';
 
 // Status tones + dots mirror /tasks (TasksList) so colours stay
 // consistent across the list filter and the detail workflow buttons.
@@ -94,12 +98,21 @@ export function TaskDetailClient({
     initialAttachments = [],
     initialChatError = null,
     initialAttachmentsError = null,
+    initialGateRun = null,
 }: {
     task: Task;
     initialChat: TaskChatMessage[];
     initialAttachments?: TaskAttachmentRow[];
     initialChatError?: string | null;
     initialAttachmentsError?: string | null;
+    /**
+     * Latest run for this Task, server-fetched (`listSessions({ taskId,
+     * limit: 1 })`). Feeds BOTH the quality-gate Checks section (Wave 3 M6 —
+     * where the prop got its name) and the run controls (Wave 4 M5/M8): they
+     * read different columns of the same row, so re-fetching it twice would
+     * be pure waste.
+     */
+    initialGateRun?: AgentRunSession | null;
 }) {
     const t = useTranslations('dashboard.tasksPage.detail');
     const tStatus = useTranslations('dashboard.tasksPage.status');
@@ -324,6 +337,14 @@ export function TaskDetailClient({
                         )}
                     </section>
 
+                    {/* Run steering (Wave 4 M5) + attach action (M8) — steer /
+                        interrupt / resume the Task's latest run. Renders
+                        nothing when there is no actionable run. */}
+                    <TaskRunControls run={initialGateRun} />
+
+                    {/* Quality gates (Wave 3 M6) — Checks section */}
+                    <TaskChecksSection task={task} initialGateRun={initialGateRun} />
+
                     {/* FU-5 — Attachments */}
                     <TaskAttachmentsSection
                         taskId={task.id}
@@ -476,6 +497,9 @@ export function TaskDetailClient({
                             </DetailRow>
                         </dl>
                     </div>
+
+                    {/* Wave 2 M7 — isolated-branch cockpit / isolation override. */}
+                    <TaskBranchSection task={task} />
 
                     {/* Phase 17.8 UI — Recurring template controls. */}
                     <TaskRecurringSection task={task} />

@@ -1,4 +1,5 @@
 import 'server-only';
+import type { GateStatus, TaskAcceptanceCheck } from '@ever-works/contracts';
 import { ApiResponseError, serverFetch, serverMutation } from './server-api';
 
 export type TaskStatus =
@@ -12,6 +13,40 @@ export type TaskStatus =
 
 export type TaskPriority = 'p0' | 'p1' | 'p2' | 'p3' | 'p4';
 export type TaskActorType = 'user' | 'agent';
+
+/** Wave 2 M7 — per-Task isolation override ('on'/'off'; null = inherit
+ *  the Work-level `taskIsolation` setting). */
+export type TaskIsolationMode = 'on' | 'off';
+
+/** Wave 2 M7 — lifecycle of the Task's isolated branch. */
+export type TaskBranchState =
+    | 'created'
+    | 'pushed'
+    | 'pr-open'
+    | 'conflict'
+    | 'merged'
+    | 'discarded'
+    | 'cleaned';
+
+/** Kanban run cockpit (Wave 2) — AgentRun lifecycle mirrored on the board. */
+export type TaskRunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+
+/**
+ * Kanban run cockpit (Wave 2) — compact latest-run embed attached to
+ * list rows when `includeRun=true` is requested. `currentActivity` is
+ * plain text by contract — never render it as markup.
+ */
+export interface TaskRun {
+    id: string;
+    status: TaskRunStatus;
+    currentActivity: string | null;
+    totalTokens: number | null;
+    changedFilesCount: number | null;
+    startedAt: string | null;
+    /** Quality gates (Wave 3 M6) — latest-run gate verdict for the board
+     *  chip. `null`/absent = the run has no gate verdict. */
+    gateStatus?: GateStatus | null;
+}
 
 export interface Task {
     id: string;
@@ -40,6 +75,25 @@ export interface Task {
     recurrenceMaxOccurrences: number | null;
     recurrenceOccurredCount: number;
     parentRecurringTaskId: string | null;
+    // Wave 2 M7 — worktree-per-Task isolation surface. All null when the
+    // Task runs without an isolated branch.
+    isolationMode: TaskIsolationMode | null;
+    branchRef: string | null;
+    branchState: TaskBranchState | null;
+    baseSha: string | null;
+    prNumber: number | null;
+    prUrl: string | null;
+    conflictPaths: string[] | null;
+    // Kanban run cockpit (Wave 2) — latest-run denorm columns + the
+    // opt-in `run` embed (present only on `includeRun=true` responses).
+    latestRunId?: string | null;
+    latestRunStatus?: TaskRunStatus | null;
+    run?: TaskRun | null;
+    // Quality gates (Wave 3 M6) — acceptance checks declared on this Task.
+    // `null` = inherit the Work's `checkDefaults` untouched.
+    acceptanceChecks?: TaskAcceptanceCheck[] | null;
+    /** Gate-attempt budget; `null` = inherit the Work default. */
+    maxGateAttempts?: number | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -55,6 +109,8 @@ export interface ListTasksQuery {
     search?: string;
     limit?: number;
     offset?: number;
+    /** Kanban run cockpit (Wave 2) — embed each row's latest AgentRun. */
+    includeRun?: boolean;
 }
 
 function buildQuery(q: ListTasksQuery = {}): string {
@@ -70,6 +126,7 @@ function buildQuery(q: ListTasksQuery = {}): string {
     if (q.search) params.set('search', q.search);
     if (q.limit !== undefined) params.set('limit', String(q.limit));
     if (q.offset !== undefined) params.set('offset', String(q.offset));
+    if (q.includeRun) params.set('includeRun', 'true');
     const s = params.toString();
     return s ? `?${s}` : '';
 }
@@ -104,6 +161,9 @@ export const tasksAPI = {
         workId?: string | null;
         parentTaskId?: string | null;
         requireAllApprovers?: boolean;
+        isolationMode?: TaskIsolationMode | null;
+        acceptanceChecks?: TaskAcceptanceCheck[] | null;
+        maxGateAttempts?: number | null;
     }) {
         return serverMutation<Task>({
             endpoint: '/tasks',
@@ -124,6 +184,9 @@ export const tasksAPI = {
                 | 'labels'
                 | 'parentTaskId'
                 | 'requireAllApprovers'
+                | 'isolationMode'
+                | 'acceptanceChecks'
+                | 'maxGateAttempts'
             >
         >,
     ) {
@@ -140,6 +203,32 @@ export const tasksAPI = {
             endpoint: `/tasks/${id}`,
             data: {},
             method: 'DELETE',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * Wave 2 M7 — re-run the Task agent to resolve a workspace merge
+     * conflict. 409 when `branchState !== 'conflict'`.
+     */
+    async resolveConflicts(id: string) {
+        return serverMutation<Task>({
+            endpoint: `/tasks/${id}/resolve-conflicts`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * Wave 2 M7 — delete the Task branch and reset its workspace
+     * identity. Irreversible.
+     */
+    async discardBranch(id: string) {
+        return serverMutation<{ ok: true }>({
+            endpoint: `/tasks/${id}/discard-branch`,
+            data: {},
+            method: 'POST',
             wrapInData: false,
         });
     },

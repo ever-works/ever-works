@@ -20,6 +20,8 @@ export interface AgentSearchWebInput {
     agentId: string;
     workId?: string;
     taskId?: string;
+    /** Wave 9 M2 — per-run cost attribution (FacadeOptions.runId). */
+    runId?: string;
     query: string;
     maxResults?: number;
     includeDomains?: string[];
@@ -41,6 +43,8 @@ export interface AgentScreenshotInput {
     agentId: string;
     workId?: string;
     taskId?: string;
+    /** Wave 9 M2 — per-run cost attribution (FacadeOptions.runId). */
+    runId?: string;
     url: string;
     viewportWidth?: number;
     viewportHeight?: number;
@@ -58,6 +62,8 @@ export interface AgentExtractContentInput {
     agentId: string;
     workId?: string;
     taskId?: string;
+    /** Wave 9 M2 — per-run cost attribution (FacadeOptions.runId). */
+    runId?: string;
     url: string;
     /** Cap on raw content length returned to the model (defaults to 50 KB). */
     maxChars?: number;

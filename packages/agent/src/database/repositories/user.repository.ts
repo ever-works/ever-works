@@ -201,12 +201,41 @@ export class UserRepository {
      * Caller (Trigger.dev nightly task) is expected to delete them; ON DELETE
      * CASCADE on `work.userId` removes the orphan Works.
      */
+    /**
+     * Digest briefings (Wave 7) — users due a digest for one period.
+     * Only active, non-anonymous accounts; ordered oldest-first so a
+     * capped dispatch pass is stable across runs.
+     */
+    async findByDigestFrequency(frequency: 'daily' | 'weekly', limit = 200): Promise<User[]> {
+        return await this.repository.find({
+            where: { digestFrequency: frequency, isActive: true, isAnonymous: false },
+            order: { createdAt: 'ASC' },
+            take: limit,
+        });
+    }
+
     async findExpiredAnonymous(now: Date = new Date()): Promise<User[]> {
         return await this.repository.find({
             where: {
                 isAnonymous: true,
                 anonymousExpiresAt: LessThan(now),
             },
+        });
+    }
+
+    /**
+     * Credits ledger (pricing Wave 9 M1): stable-ordered page of active,
+     * non-anonymous users for the daily free-credit grant sweep. Loads
+     * the `defaultPlan` relation so the grant dispatcher can resolve the
+     * plan code without a per-user follow-up query.
+     */
+    async findActiveBatch(skip: number, take: number): Promise<User[]> {
+        return await this.repository.find({
+            where: { isActive: true, isAnonymous: false },
+            relations: { defaultPlan: true },
+            order: { createdAt: 'ASC', id: 'ASC' },
+            skip,
+            take,
         });
     }
 

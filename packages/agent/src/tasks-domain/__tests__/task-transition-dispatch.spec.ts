@@ -180,6 +180,31 @@ describe('TaskTransitionService — Phase 15.3 agent dispatch hook', () => {
         );
     });
 
+    it('classifies an unconfigured job runtime under its own stable reason marker', async () => {
+        const svc = makeSvc();
+        const notConfigured = new Error(
+            'Background job runtime is not configured on this install — agent runs cannot execute.',
+        );
+        notConfigured.name = 'JobRuntimeNotConfiguredError';
+        dispatcher.enqueue.mockRejectedValueOnce(notConfigured);
+        const task = makeTask({ status: TaskStatus.TODO });
+        tasks.findById.mockResolvedValueOnce({ ...task, status: TaskStatus.IN_PROGRESS });
+        assignees.findAgentAssignees.mockResolvedValueOnce([
+            { assigneeType: 'agent', assigneeId: 'agent-a' },
+        ]);
+
+        await svc.transition(task, TaskStatus.IN_PROGRESS);
+        await new Promise((r) => setImmediate(r));
+
+        // Loud degradation: an install-level misconfiguration must be
+        // distinguishable from a transient dispatch error — the run-detail
+        // UI and the health banner key on this marker.
+        expect(runs.markDispatchFailed).toHaveBeenCalledWith(
+            'r1',
+            expect.stringMatching(/^job-runtime-not-configured: /),
+        );
+    });
+
     it('skips reconciliation when the queued run was never created, and keeps fanning out', async () => {
         const svc = makeSvc();
         // createQueued fails for the FIRST assignee only — `run` stays null, so
@@ -204,6 +229,85 @@ describe('TaskTransitionService — Phase 15.3 agent dispatch hook', () => {
         expect(dispatcher.enqueue).toHaveBeenCalledWith(
             expect.objectContaining({ agentId: 'agent-b', runId: 'r1' }),
         );
+    });
+
+    describe('Wave 4 M2 — dispatch gate routing', () => {
+        const makeGatedSvc = (gate: any) =>
+            new TaskTransitionService(
+                tasks,
+                blocks,
+                approvers,
+                assignees,
+                runs,
+                dispatcher,
+                undefined, // notifications
+                undefined, // runDenorm
+                gate,
+            );
+
+        const toInProgress = async (svc: TaskTransitionService, taskOver: Partial<Task> = {}) => {
+            const task = makeTask({ status: TaskStatus.TODO, ...taskOver });
+            tasks.findById.mockResolvedValueOnce({ ...task, status: TaskStatus.IN_PROGRESS });
+            assignees.findAgentAssignees.mockResolvedValueOnce([
+                { assigneeType: 'agent', assigneeId: 'agent-a' },
+            ]);
+            await svc.transition(task, TaskStatus.IN_PROGRESS);
+            await new Promise((r) => setImmediate(r));
+        };
+
+        it('consults the gate with the Task scope (userId + workId + organizationId)', async () => {
+            const gate = { admit: jest.fn().mockResolvedValue({ admitted: true }) };
+            await toInProgress(makeGatedSvc(gate), {
+                workId: 'work-1',
+                organizationId: 'org-1',
+            } as Partial<Task>);
+            expect(gate.admit).toHaveBeenCalledWith({
+                userId: 'u1',
+                workId: 'work-1',
+                organizationId: 'org-1',
+            });
+            expect(dispatcher.enqueue).toHaveBeenCalledTimes(1);
+        });
+
+        it('denormalizes task.workId onto the queued run at creation', async () => {
+            const gate = { admit: jest.fn().mockResolvedValue({ admitted: true }) };
+            await toInProgress(makeGatedSvc(gate), { workId: 'work-1' });
+            expect(runs.createQueued).toHaveBeenCalledWith(
+                expect.objectContaining({ workId: 'work-1', queuedReason: null }),
+            );
+        });
+
+        it('over-limit: parks the run (queuedReason=concurrency-limit) and SKIPS the enqueue', async () => {
+            const gate = {
+                admit: jest
+                    .fn()
+                    .mockResolvedValue({ admitted: false, queuedReason: 'concurrency-limit' }),
+            };
+            await toInProgress(makeGatedSvc(gate), { workId: 'work-1' });
+            expect(runs.createQueued).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    workId: 'work-1',
+                    queuedReason: 'concurrency-limit',
+                }),
+            );
+            expect(dispatcher.enqueue).not.toHaveBeenCalled();
+            // A parked run is not a failed run.
+            expect(runs.markDispatchFailed).not.toHaveBeenCalled();
+        });
+
+        it('fails OPEN when the gate itself throws — a broken valve never stops dispatch', async () => {
+            const gate = { admit: jest.fn().mockRejectedValue(new Error('count query died')) };
+            await toInProgress(makeGatedSvc(gate), { workId: 'work-1' });
+            expect(dispatcher.enqueue).toHaveBeenCalledTimes(1);
+            expect(runs.createQueued).toHaveBeenCalledWith(
+                expect.objectContaining({ queuedReason: null }),
+            );
+        });
+
+        it('dispatches ungated when no gate is bound (fixtures + installs without the module)', async () => {
+            await toInProgress(makeSvc(), { workId: 'work-1' });
+            expect(dispatcher.enqueue).toHaveBeenCalledTimes(1);
+        });
     });
 
     it('catches dispatcher failures gracefully when runs repository is missing', async () => {

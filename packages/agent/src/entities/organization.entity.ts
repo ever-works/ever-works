@@ -6,6 +6,7 @@ import {
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from 'typeorm';
+import type { MergePolicyOverride } from '@ever-works/contracts';
 import { PortableDateColumn } from './_types';
 
 /**
@@ -161,6 +162,19 @@ export class Organization {
      */
     @Column({ type: 'uuid', nullable: true })
     linkedWorkId?: string | null;
+
+    /**
+     * Merge policy (Wave 3, founder decision D4) — organization-scoped
+     * slice of the matrix. NULL = inherit the Tenant's policy, then the
+     * platform default (`PLATFORM_DEFAULT_MERGE_POLICY`). Partial objects
+     * are normal: resolution is field-by-field, so an org can require
+     * human approval while inheriting everything else.
+     *
+     * Resolve through `MergePolicyService` (`@ever-works/agent/policy`) —
+     * never read this column directly to decide a merge.
+     */
+    @Column('simple-json', { nullable: true })
+    mergePolicy?: MergePolicyOverride | null;
 
     @CreateDateColumn()
     createdAt: Date;

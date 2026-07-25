@@ -14,6 +14,11 @@ import type {
     OrganizationRegistrationStatus,
 } from '@ever-works/agent/entities';
 import { UPGRADE_NOT_AVAILABLE_AFTER_MULTIPLE_ORGS } from '@ever-works/contracts/api';
+// Merge-policy matrix (Wave 3, D4). Imported from CONTRACTS, not from
+// `@ever-works/agent/policy`: the sanitizer is pure and the contracts
+// package is dependency-free, so this file does not drag the agent
+// package's entity graph into every consumer of the org service.
+import { sanitizeMergePolicyOverride, type MergePolicyOverride } from '@ever-works/contracts';
 import { UsernameAllocatorService } from '../users/services/username-allocator.service';
 import { TenantBootstrapService } from '../scope/tenant-bootstrap.service';
 
@@ -988,6 +993,11 @@ export class OrganizationService {
             legalName?: string;
             countryCode?: string;
             vision?: string | null;
+            /**
+             * Merge-policy matrix (Wave 3, D4) — organization-scoped slice.
+             * `null` clears the override (inherit Tenant / platform default).
+             */
+            mergePolicy?: MergePolicyOverride | null;
         },
     ): Promise<Organization> {
         const user = await this.userRepository.findById(userId);
@@ -998,11 +1008,23 @@ export class OrganizationService {
         if (!org || org.tenantId !== user.tenantId) {
             throw new NotFoundException(`Organization ${organizationId} not found`);
         }
-        const { vision, ...rest } = patch;
+        const { vision, mergePolicy, ...rest } = patch;
         let updatePayload: Partial<Organization> = { ...rest };
         if (vision !== undefined) {
             updatePayload.vision = this.normalizeVision(vision);
             updatePayload.visionUpdatedAt = new Date();
+        }
+        // Merge-policy matrix (Wave 3, D4). Sanitized defense-in-depth
+        // behind the DTO (drop-if-unrecognized, never coerce); an override
+        // that survives as `{}` is stored as NULL so "inherit" has exactly
+        // one representation at rest.
+        if (mergePolicy !== undefined) {
+            if (mergePolicy === null) {
+                updatePayload.mergePolicy = null;
+            } else {
+                const sanitized = sanitizeMergePolicyOverride(mergePolicy);
+                updatePayload.mergePolicy = Object.keys(sanitized).length > 0 ? sanitized : null;
+            }
         }
         await this.organizationRepository.update(organizationId, updatePayload);
         const updated = await this.organizationRepository.findById(organizationId);

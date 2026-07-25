@@ -105,6 +105,33 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         bodyHint: 'name, title, scope, scopeId, aiProvider, model, capabilities[].',
     },
     {
+        toolName: 'list_agent_templates',
+        method: 'GET',
+        path: '/api/agents/templates',
+        summary:
+            'List prebuilt agent templates (marketing/sales/ops presets with prompts, suggested skills, and a suggested pipeline).',
+        kind: 'read',
+    },
+    {
+        toolName: 'create_agent_from_template',
+        method: 'POST',
+        path: '/api/agents/from-template/{slug}',
+        summary:
+            'Create an agent for the current user from a prebuilt template (draft status, review-before-act guardrails).',
+        kind: 'create',
+        params: [
+            {
+                name: 'slug',
+                in: 'path',
+                required: true,
+                type: 'string',
+                description: 'Template slug from list_agent_templates (e.g. outreach-drafter)',
+            },
+        ],
+        body: true,
+        bodyHint: 'Optional placement overrides: name, scope, missionId, ideaId, workId.',
+    },
+    {
         toolName: 'update_agent',
         method: 'PATCH',
         path: '/api/agents/{id}',
@@ -183,6 +210,76 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         params: [id('Agent id')],
         body: true,
         bodyHint: 'taskId.',
+    },
+
+    // ── Meetings (Wave 8, feature a) ─────────────────────────────
+    {
+        toolName: 'list_meetings',
+        method: 'GET',
+        path: '/api/meetings',
+        summary:
+            'List the current user’s captured meetings (synced recordings, imported and manual), newest first — org-wide or filtered to one Work. Rows carry a sourceUrl recording link.',
+        kind: 'read',
+        params: [
+            {
+                name: 'workId',
+                in: 'query',
+                type: 'string',
+                description: 'Only meetings routed to this Work',
+            },
+            {
+                name: 'source',
+                in: 'query',
+                type: 'string',
+                description: 'Filter by source: zoom, google-meet, manual or import',
+            },
+            { name: 'limit', in: 'query', type: 'number', description: 'Max rows (default 20)' },
+        ],
+    },
+    {
+        toolName: 'get_meeting_summary',
+        method: 'GET',
+        path: '/api/meetings/{id}',
+        summary:
+            'Get one meeting’s AI summary, transcript and metadata (participants, timing, recording link). Use after list_meetings when asked what a meeting covered or decided.',
+        kind: 'read',
+        params: [id('Meeting id (from list_meetings)')],
+    },
+
+    // ── Fleet (Wave 12, slice 1) ─────────────────────────────────
+    {
+        toolName: 'list_fleet_nodes',
+        method: 'GET',
+        path: '/api/fleet/nodes',
+        summary:
+            'List the current user’s fleet — the machines enrolled to execute their work (desktop and headless nodes) plus live nodes of their own configured clusters. Each node carries kind, online/offline status, capability tags, platform and last-seen time.',
+        kind: 'read',
+        params: [],
+    },
+
+    // ── Merge policy (Wave 3, founder decision D4) ───────────────
+    {
+        toolName: 'resolve_merge_policy',
+        method: 'GET',
+        path: '/api/merge-policy/resolve',
+        summary:
+            'Resolve the effective merge policy for a Work and/or Agent — whether agents may merge their own pull requests, whether a green quality gate and/or a human approval is required, which merge methods are allowed and which branches are protected. Also reports which scope (tenant, organization, Work, Agent or the platform default) each setting came from. Use when the user asks who may merge, why a merge was refused, or what the current policy is.',
+        kind: 'read',
+        params: [
+            {
+                name: 'workId',
+                in: 'query',
+                type: 'string',
+                description: 'Resolve the policy as it applies to this Work.',
+            },
+            {
+                name: 'agentId',
+                in: 'query',
+                type: 'string',
+                description:
+                    'Resolve the policy as it applies to this Agent (most specific scope; its Work, organization and tenant are discovered automatically).',
+            },
+        ],
     },
 
     // ── Tasks ────────────────────────────────────────────────────

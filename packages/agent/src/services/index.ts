@@ -31,6 +31,7 @@ export * from './category-icon';
 export * from './knowledge-base.service';
 export * from './memory-consolidation';
 export * from './memory-consolidation.service';
+export * from './memory-recall';
 export * from './knowledge-base-git-mirror.service';
 export * from './knowledge-base-media-normalize.service';
 export * from './knowledge-base-transcribe.service';

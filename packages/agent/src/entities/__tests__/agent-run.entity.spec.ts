@@ -32,6 +32,16 @@ describe('AgentRun entity', () => {
         );
     });
 
+    it('declares the run-steering columns (Wave 4 M5)', () => {
+        // Pinned because the whole steering loop is invisible without them:
+        // the executing run reads `pendingInput` + `interruptRequested` on
+        // every tool-loop iteration, and a rename here degrades silently to
+        // "steering never arrives" rather than failing loudly.
+        expect(columnNames).toEqual(
+            expect.arrayContaining(['pendingInput', 'interruptRequested', 'awaitingInput']),
+        );
+    });
+
     it('declares timeline + status + task + chat indexes', () => {
         expect(indices.some((i) => i.name === 'idx_agent_runs_agent_started')).toBe(true);
         expect(indices.some((i) => i.name === 'idx_agent_runs_status')).toBe(true);

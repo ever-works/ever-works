@@ -588,7 +588,13 @@ describe('AccountImportService', () => {
             await service.applyImport(
                 'user-1',
                 makePayload([
-                    makeWork({ slug: 'a', kind: 'blog', providerRepositoryEnabled: false }),
+                    makeWork({
+                        slug: 'a',
+                        kind: 'blog',
+                        providerRepositoryEnabled: false,
+                        taskIsolation: 'worktree',
+                        taskBranchCleanup: 'manual',
+                    }),
                 ]),
                 [],
             );
@@ -596,7 +602,12 @@ describe('AccountImportService', () => {
             // A user who deliberately disabled provider-repo generation must
             // not have it silently re-enabled by an account transfer.
             expect(mocks.workRepository.create).toHaveBeenCalledWith(
-                expect.objectContaining({ kind: 'blog', providerRepositoryEnabled: false }),
+                expect.objectContaining({
+                    kind: 'blog',
+                    providerRepositoryEnabled: false,
+                    taskIsolation: 'worktree',
+                    taskBranchCleanup: 'manual',
+                }),
                 expect.anything(),
             );
         });
@@ -627,6 +638,98 @@ describe('AccountImportService', () => {
             const patch = mocks.workRepository.update.mock.calls[0][1];
             expect('kind' in patch).toBe(false);
             expect('providerRepositoryEnabled' in patch).toBe(false);
+        });
+
+        it('round-trips quality-gate fields (checkDefaults / checksPolicy / maxGateAttempts) on create', async () => {
+            const { service, mocks } = makeService();
+            mocks.userRepository.findById.mockResolvedValue({ id: 'user-1', username: 'octocat' });
+            mocks.workRepository.findByOwnerAndSlug.mockResolvedValue(null);
+            mocks.workRepository.create.mockResolvedValue({ id: 'w-new', slug: 'a' });
+
+            const checkDefaults = [
+                {
+                    id: 'build',
+                    name: 'Build',
+                    kind: 'build',
+                    command: 'pnpm build',
+                    required: true,
+                },
+            ];
+            await service.applyImport(
+                'user-1',
+                makePayload([
+                    makeWork({
+                        slug: 'a',
+                        checkDefaults,
+                        checksPolicy: 'required',
+                        maxGateAttempts: 4,
+                    } as any),
+                ]),
+                [],
+            );
+
+            // A Work that curated checks and opted into enforcement must not
+            // silently come back as policy 'off' with no defaults.
+            expect(mocks.workRepository.create).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    checkDefaults,
+                    checksPolicy: 'required',
+                    maxGateAttempts: 4,
+                }),
+                expect.anything(),
+            );
+        });
+
+        it('overwrite applies quality-gate fields; tampered values are dropped, not defaulted', async () => {
+            const { service, mocks } = makeService();
+            mocks.userRepository.findById.mockResolvedValue({ id: 'user-1', username: 'octocat' });
+            const existing = { id: 'w-existing', slug: 'a', getRepoOwner: () => 'octocat' };
+            mocks.workRepository.findByOwnerAndSlug.mockResolvedValue(existing);
+
+            const checkDefaults = [
+                { id: 'test', name: 'Test', kind: 'test', command: 'pnpm test', required: true },
+            ];
+            await service.applyImport(
+                'user-1',
+                makePayload([
+                    makeWork({
+                        slug: 'a',
+                        checkDefaults,
+                        checksPolicy: 'warn',
+                        maxGateAttempts: 3,
+                    } as any),
+                ]),
+                [{ slug: 'a', strategy: 'overwrite' }],
+            );
+            expect(mocks.workRepository.update).toHaveBeenCalledWith(
+                'w-existing',
+                expect.objectContaining({
+                    checkDefaults,
+                    checksPolicy: 'warn',
+                    maxGateAttempts: 3,
+                }),
+            );
+
+            // Tampered payload: unknown policy, non-array defaults and an
+            // out-of-range budget must ALL be dropped — never clamped or
+            // defaulted — leaving the existing Work's settings alone.
+            mocks.workRepository.update.mockClear();
+            await service.applyImport(
+                'user-1',
+                makePayload([
+                    makeWork({
+                        slug: 'a',
+                        checkDefaults: 'not-an-array',
+                        checksPolicy: 'block-everything',
+                        maxGateAttempts: 99,
+                    } as any),
+                ]),
+                [{ slug: 'a', strategy: 'overwrite' }],
+            );
+            const patch = mocks.workRepository.update.mock.calls[0][1];
+            expect('checkDefaults' in patch).toBe(false);
+            expect('checksPolicy' in patch).toBe(false);
+            expect('maxGateAttempts' in patch).toBe(false);
         });
 
         it('a bogus kind in a tampered payload is dropped, not written', async () => {

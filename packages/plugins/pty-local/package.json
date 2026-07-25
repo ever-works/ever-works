@@ -1,0 +1,60 @@
+{
+	"name": "@ever-works/pty-local-plugin",
+	"version": "1.0.0",
+	"description": "Streaming-terminal session host for Ever Works — spawns the agent CLI under a real PTY inside the executing job-runtime worker (node-pty prebuilt), degrading to a child_process pipe floor when the native addon is unavailable.",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run --passWithNoTests",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"optionalDependencies": {
+		"@homebridge/node-pty-prebuilt-multiarch": "^0.13.1"
+	},
+	"devDependencies": {
+		"@ever-works/contracts": "workspace:*",
+		"@ever-works/plugin": "workspace:*",
+		"@types/node": "^22.0.0",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.3",
+		"vitest": "^4.1.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "pty-local",
+			"name": "Local PTY Terminal Host",
+			"version": "1.0.0",
+			"category": "utility",
+			"capabilities": [
+				"terminal-stream"
+			],
+			"description": "Hosts live agent terminal sessions in the executing worker process: a real resizable PTY when the node-pty prebuild is present, an honest child_process pipe floor otherwise.",
+			"author": {
+				"name": "Ever Works Team"
+			}
+		}
+	}
+}

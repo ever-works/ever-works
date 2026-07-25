@@ -1,7 +1,7 @@
 {
 	"name": "@ever-works/slack-connector-plugin",
-	"version": "1.0.0",
-	"description": "Slack connector plugin for Ever Works platform (bidirectional; outbound chat.postMessage via @slack/web-api)",
+	"version": "1.1.0",
+	"description": "Slack connector plugin for Ever Works platform (bidirectional; outbound chat.postMessage, inbound Events API verification/parsing, and event-source pull via @slack/web-api)",
 	"author": {
 		"name": "Ever Co. LTD",
 		"email": "ever@ever.co",
@@ -32,6 +32,7 @@
 		"test:watch": "vitest"
 	},
 	"dependencies": {
+		"@ever-works/contracts": "workspace:*",
 		"@ever-works/plugin": "workspace:*",
 		"@slack/web-api": "^7.0.0"
 	},
@@ -45,13 +46,14 @@
 		"plugin": {
 			"id": "slack-connector",
 			"name": "Slack Connector",
-			"version": "1.0.0",
+			"version": "1.1.0",
 			"category": "connector",
 			"capabilities": [
 				"connector",
-				"connector-slack"
+				"connector-slack",
+				"event-source"
 			],
-			"description": "Bidirectional Slack connector. Outbound posts messages to a Slack channel with a bot token via chat.postMessage (Block Kit supported). Inbound Events API routing lands in a follow-up.",
+			"description": "Bidirectional Slack connector. Outbound posts messages to a Slack channel with a bot token via chat.postMessage (Block Kit supported, threaded replies). Inbound Events API deliveries are signature-verified and parsed; recent channel messages/mentions can be pulled into the platform event-ingest pipeline.",
 			"systemPlugin": false,
 			"builtIn": false,
 			"isDefault": false,
@@ -70,7 +72,7 @@
 					},
 					"signingSecret": {
 						"type": "string",
-						"title": "Signing secret (for inbound Events API — used in a follow-up)",
+						"title": "Signing secret (verifies inbound Events API deliveries)",
 						"x-secret": true,
 						"x-envVar": "SLACK_SIGNING_SECRET"
 					},
@@ -81,6 +83,10 @@
 					"defaultChannelId": {
 						"type": "string",
 						"title": "Default channel id (e.g. C0123456789)"
+					},
+					"eventChannelIds": {
+						"type": "string",
+						"title": "Channels to ingest events from (comma-separated ids; defaults to the default channel)"
 					}
 				}
 			},

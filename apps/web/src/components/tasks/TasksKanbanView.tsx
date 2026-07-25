@@ -1,11 +1,15 @@
 'use client';
 
-import { useEffect, useMemo, useState, useTransition } from 'react';
+import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import type { Task, TaskStatus, TaskPriority } from '@/lib/api/tasks';
 import { transitionTaskAction } from '@/app/actions/tasks';
+import { useTaskRunPolling } from '@/lib/hooks/use-task-run-polling';
+import { TaskBranchChip } from './TaskBranchChip';
+import { TaskRunChip } from './TaskRunChip';
+import { GateChip } from './GateChip';
 import {
     Inbox,
     Circle,
@@ -214,6 +218,17 @@ function TaskKanbanCard({
                 {task.title}
             </Link>
 
+            {/* Wave 2 M7 — isolated-branch chip · Wave 2 run cockpit — run
+                chip · Wave 3 M6 — gate chip when the latest run carries a
+                gate verdict. */}
+            {(task.branchRef || task.run) && (
+                <div className="flex flex-wrap gap-1">
+                    {task.branchRef && <TaskBranchChip task={task} />}
+                    {task.run && <TaskRunChip task={task} />}
+                    {task.run?.gateStatus && <GateChip status={task.run.gateStatus} />}
+                </div>
+            )}
+
             {/* Labels */}
             {(task.labels ?? []).length > 0 && (
                 <div className="flex flex-wrap gap-1">
@@ -409,6 +424,27 @@ export function TasksKanbanView({ tasks: initialTasks }: { tasks: Task[] }) {
     useEffect(() => {
         setTasks(initialTasks);
     }, [initialTasks]);
+
+    // Kanban run cockpit (Wave 2) — while any visible card carries a
+    // queued/running run, poll for fresh run telemetry every 10s and merge
+    // ONLY the run-related fields by task id (never status/title — those
+    // may hold un-flushed optimistic updates from a drag in progress).
+    const mergeRunData = useCallback((rows: Task[]) => {
+        const freshById = new Map(rows.map((row) => [row.id, row]));
+        setTasks((prev) =>
+            prev.map((task) => {
+                const fresh = freshById.get(task.id);
+                if (!fresh) return task;
+                return {
+                    ...task,
+                    run: fresh.run ?? null,
+                    latestRunId: fresh.latestRunId ?? task.latestRunId,
+                    latestRunStatus: fresh.latestRunStatus ?? task.latestRunStatus,
+                };
+            }),
+        );
+    }, []);
+    useTaskRunPolling(tasks, mergeRunData);
 
     const grouped = useMemo(() => {
         const map = new Map<TaskStatus, Task[]>(COLUMNS.map((c) => [c.key, []]));

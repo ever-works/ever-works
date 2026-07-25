@@ -28,8 +28,12 @@ export type UserSelectableWorkKind = (typeof USER_SELECTABLE_WORK_KINDS)[number]
  *     of existing rows. It must behave identically to `directory`; see
  *     `WORK_KIND_CAPABILITIES` for why that invariant is load-bearing.
  *   - `company` — see above.
+ *   - `campaign` — a go-to-market campaign Work: the artifact home for the
+ *     lead lists, drafts, and reports a go-to-market pipeline produces. Like
+ *     `company` it is minted by a dedicated flow (template activation), not
+ *     by the general create path, so it stays out of the chip catalog.
  */
-export const WORK_KINDS = [...USER_SELECTABLE_WORK_KINDS, 'company', 'default'] as const;
+export const WORK_KINDS = [...USER_SELECTABLE_WORK_KINDS, 'company', 'campaign', 'default'] as const;
 
 export type WorkKind = (typeof WORK_KINDS)[number];
 

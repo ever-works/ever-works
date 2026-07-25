@@ -62,13 +62,23 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'ComposioTriggerSubscription',
     'Conversation',
     'ConversationMessage',
+    // Credits ledger (pricing Wave 9 M1)
+    'CreditLedgerEntry',
     'EmailConversation',
     'EmailMessage',
+    // Fleet (Wave 12, slice 1) — enrolled execution nodes w/ heartbeat
+    'FleetNode',
     'GitHubAppInstallation',
     'GitHubAppInstallationRepository',
     'GitHubAppUserLink',
     // Inbound Triggers (Trigger Schedules) — signed webhook/API triggers
     'InboundTrigger',
+    // Event-ingest pull path (Wave 8) — per-(user, plugin) pull cursors
+    'IngestCursor',
+    // Event-ingest spine (Wave 6) — normalized external events
+    'IngestedEvent',
+    // Meetings v1 (Wave 8, feature a) — captured meetings w/ transcripts
+    'Meeting',
     'Mission',
     // Domain-model evolution PR-8 — Goals + measurement
     'Goal',
@@ -84,6 +94,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'OnboardingRequest',
     'Organization',
     'OrganizationNotificationDefault',
+    // Plan entitlements (pricing Wave 9 M1)
+    'PlanEntitlement',
     'PluginUsageEvent',
     'RefreshToken',
     // Skills family (PR #1019) ──

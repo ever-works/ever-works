@@ -16,6 +16,7 @@ import {
     GitProviderConnectionInfo,
 } from '@/lib/api';
 import type { Work } from '@/lib/api/types-only';
+import type { TaskAcceptanceCheck, WorkChecksPolicy } from '@ever-works/contracts';
 // Security: server actions are reachable as POST endpoints via the
 // `Next-Action` header, so every exported action must independently verify
 // authentication at the Next.js layer before proxying to backend
@@ -1371,6 +1372,121 @@ export async function rotateActivitySyncSecret(workId: string) {
         return {
             success: false,
             error: error instanceof Error ? error.message : 'Failed to rotate activity sync secret',
+        };
+    }
+}
+
+/**
+ * Wave 2 M7 — Work-level worktree-per-Task isolation settings. All four
+ * fields flow through the same `PATCH /works/:id` UpdateWorkDto path the
+ * sibling settings cards use.
+ */
+export async function updateTaskIsolationSettings(
+    workId: string,
+    settings: {
+        taskIsolation?: 'off' | 'worktree';
+        taskIsolationBaseBranch?: string | null;
+        taskIsolationTargetRepo?: 'work-output' | 'linked';
+        taskBranchCleanup?: 'on-merge' | 'manual';
+    },
+) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    const taskIsolationSchema = z.object({
+        taskIsolation: z.enum(['off', 'worktree']).optional(),
+        taskIsolationBaseBranch: z.string().max(255).nullable().optional(),
+        taskIsolationTargetRepo: z.enum(['work-output', 'linked']).optional(),
+        taskBranchCleanup: z.enum(['on-merge', 'manual']).optional(),
+    });
+
+    try {
+        const validation = taskIsolationSchema.safeParse(settings);
+        if (!validation.success) {
+            return {
+                success: false,
+                error: validation.error.errors[0].message,
+            };
+        }
+
+        const response = await workAPI.update(workId, validation.data);
+        revalidatePath(`/works/${workId}/settings`);
+
+        return {
+            success: response.status === 'success',
+        };
+    } catch (error) {
+        console.error('Failed to update task isolation settings:', error);
+        return {
+            success: false,
+            error:
+                error instanceof Error ? error.message : 'Failed to update task isolation settings',
+        };
+    }
+}
+
+/**
+ * Quality gates (Wave 3 M6) — Work-level default acceptance checks +
+ * enforcement policy + gate-attempt budget. Saves flow through the same
+ * `PATCH /works/:id` UpdateWorkDto path as the sibling settings cards
+ * (TaskIsolationSettings / CommitterSettings).
+ */
+export async function updateQualityGatesSettings(
+    workId: string,
+    settings: {
+        checkDefaults?: TaskAcceptanceCheck[] | null;
+        checksPolicy?: WorkChecksPolicy;
+        maxGateAttempts?: number;
+    },
+) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    const checkSchema = z.object({
+        id: z
+            .string()
+            .min(1)
+            .max(64)
+            .regex(/^[a-z0-9][a-z0-9-]*$/),
+        name: z.string().min(1).max(120),
+        kind: z.enum(['build', 'test', 'lint', 'typecheck', 'custom']),
+        command: z.string().min(1).max(500),
+        cwd: z.string().max(200).optional(),
+        timeoutSec: z.number().int().min(1).max(1800).optional(),
+        required: z.boolean(),
+        disabled: z.boolean().optional(),
+    });
+    const qualityGatesSchema = z.object({
+        checkDefaults: z.array(checkSchema).max(20).nullable().optional(),
+        checksPolicy: z.enum(['off', 'warn', 'required']).optional(),
+        maxGateAttempts: z.number().int().min(1).max(5).optional(),
+    });
+
+    try {
+        const validation = qualityGatesSchema.safeParse(settings);
+        if (!validation.success) {
+            return {
+                success: false,
+                error: validation.error.errors[0].message,
+            };
+        }
+
+        const response = await workAPI.update(workId, validation.data);
+        revalidatePath(`/works/${workId}/settings`);
+
+        return {
+            success: response.status === 'success',
+        };
+    } catch (error) {
+        console.error('Failed to update quality gates settings:', error);
+        return {
+            success: false,
+            error:
+                error instanceof Error ? error.message : 'Failed to update quality gates settings',
         };
     }
 }

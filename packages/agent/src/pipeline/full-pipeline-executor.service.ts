@@ -22,6 +22,8 @@ import { validatePipelineResult } from './validators';
 import { PluginContextFactoryService } from '../plugins/services/plugin-context-factory.service';
 import { KnowledgeBaseService } from '../services/knowledge-base.service';
 import { KbToolsFacadeAdapter } from '../services/kb-tools-facade.adapter';
+import { AgentMemoryFacadeService } from '../facades/agent-memory.facade';
+import { resolveMemoryRecall } from '../services/memory-recall';
 
 /**
  * Executor for self-managed pipeline plugins.
@@ -48,6 +50,13 @@ export class FullPipelineExecutorService {
         // plugins (agent-pipeline + family). Same optionality contract
         // as `knowledgeBaseService`.
         @Optional() private readonly kbToolsFacade?: KbToolsFacadeAdapter,
+        // Memory upgrades M3 — agent-memory recall at dispatch. The
+        // fenced recall block is resolved ONCE here (shared helper, not
+        // per-plugin work) and handed to self-managed pipeline plugins
+        // via `execContext.memoryRecall`. Optional so OSS images /
+        // isolated unit tests without the facades module still
+        // construct — recall simply stays off.
+        @Optional() private readonly agentMemoryFacade?: AgentMemoryFacadeService,
     ) {}
 
     /**
@@ -81,6 +90,75 @@ export class FullPipelineExecutorService {
     private resolveKbToolsFacadeSafe(work: WorkReference): IKbToolsFacade | undefined {
         if (!this.kbToolsFacade || !work.id) return undefined;
         return this.kbToolsFacade;
+    }
+
+    /**
+     * Memory upgrades M3 — resolve the fenced agent-memory recall block
+     * for a self-managed pipeline run, once, at dispatch.
+     *
+     * Shared-toggle contract: the Work's `memoryRecallEnabled` column
+     * (default TRUE — recall is on by default, configurable) rides in
+     * on `WorkReference.settings.memoryRecallEnabled`; only an explicit
+     * `false` disables the splice, so callers that don't populate
+     * settings keep the default-on behavior.
+     *
+     * Best-effort + loud-empty (same posture as the M2 agent-run
+     * injection, via the same shared helper): a provider failure logs a
+     * warning and the generation continues without recall; a configured
+     * provider with an empty store injects an explicit "no relevant
+     * memory found" note; no provider at all is a silent debug-level
+     * skip.
+     */
+    private async resolveMemoryRecallSafe(
+        work: WorkReference,
+        request: GenerationRequest,
+        options?: PipelineExecutionOptions,
+    ): Promise<string | undefined> {
+        if (!this.agentMemoryFacade || !work.id || !work.user?.id) return undefined;
+        if (work.settings?.memoryRecallEnabled === false) {
+            this.logger.debug(
+                `Memory recall disabled for work=${work.id} — skipping preamble splice.`,
+            );
+            return undefined;
+        }
+
+        const recall = await resolveMemoryRecall(
+            this.agentMemoryFacade,
+            {
+                query: request.prompt,
+                purpose: 'work-generation',
+                sessionId: options?.memorySessionId,
+                // Match the projectId convention of the memory pipeline
+                // modifier's digest writes (slug-first) so recall reads
+                // the same project partition those digests land in.
+                projectId: work.slug ?? work.id,
+            },
+            { userId: work.user.id, workId: work.id },
+        );
+
+        switch (recall.status) {
+            case 'injected':
+                this.logger.log(
+                    `Memory recall resolved for work=${work.id}: ${recall.contentChars} chars from provider "${recall.providerId}".`,
+                );
+                return recall.block;
+            case 'empty':
+                this.logger.log(
+                    `Memory recall for work=${work.id}: provider "${recall.providerId}" returned no relevant memory — explicit note injected.`,
+                );
+                return recall.block;
+            case 'no-provider':
+                this.logger.debug(
+                    `Memory recall skipped for work=${work.id} — no agent-memory provider configured.`,
+                );
+                return undefined;
+            case 'failed':
+            default:
+                this.logger.warn(
+                    `Memory recall failed for work=${work.id}: ${recall.reason}. Continuing without recall.`,
+                );
+                return undefined;
+        }
     }
 
     /**
@@ -126,9 +204,13 @@ export class FullPipelineExecutorService {
 
         // EW-641 Phase 2/b row 32c + 2/d row 36c — resolve KB bundle +
         // tools facade once before the plugin executes; both ride on
-        // the same execContext that facades use.
+        // the same execContext that facades use. Memory upgrades M3 —
+        // the fenced agent-memory recall block is resolved here too
+        // (deterministic order + shared budget: KB context first,
+        // agent-memory recall last, each independently capped).
         const kbContext = await this.resolveKbContextSafe(work, request);
         const kbTools = this.resolveKbToolsFacadeSafe(work);
+        const memoryRecall = await this.resolveMemoryRecallSafe(work, request, options);
 
         try {
             // Create execContext for the plugin to use facades
@@ -140,6 +222,7 @@ export class FullPipelineExecutorService {
                 kbContext,
                 kbTools,
                 options?.memorySessionId,
+                memoryRecall,
             );
 
             // Delegate to the plugin's execute method with execContext

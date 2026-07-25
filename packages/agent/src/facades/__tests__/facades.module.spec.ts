@@ -15,6 +15,8 @@ import { SkillsFacadeService } from '../skills.facade';
 import { TasksFacadeService } from '../tasks.facade';
 // EW-N (agentmemory plugin) — pluggable persistent memory facade.
 import { AgentMemoryFacadeService } from '../agent-memory.facade';
+import { WorkspaceFacadeService } from '../workspace.facade';
+import { TerminalStreamFacadeService } from '../terminal-stream.facade';
 // Notifications v2 (EW-650 + EW-663) — email + notification-channel facades.
 import { EmailFacadeService } from '../email.facade';
 import { NotificationChannelFacadeService } from '../notification-channel.facade';
@@ -49,6 +51,10 @@ describe('FacadesModule + barrel re-exports', () => {
         TasksFacadeService,
         // EW-N — Agent-Memory facade (default plugin: agentmemory REST :3111).
         AgentMemoryFacadeService,
+        // Wave 2 M2 — workspace capability (worktree-per-Task isolation).
+        WorkspaceFacadeService,
+        // Wave 1 M5 — streaming-terminal session hosts.
+        TerminalStreamFacadeService,
         // Notifications v2 (EW-650 + EW-663) — email + multi-channel notifications.
         EmailFacadeService,
         NotificationChannelFacadeService,
@@ -121,6 +127,8 @@ describe('FacadesModule + barrel re-exports', () => {
             expect(facadesBarrel.SkillsFacadeService).toBe(SkillsFacadeService);
             expect(facadesBarrel.TasksFacadeService).toBe(TasksFacadeService);
             expect(facadesBarrel.AgentMemoryFacadeService).toBe(AgentMemoryFacadeService);
+            expect(facadesBarrel.WorkspaceFacadeService).toBe(WorkspaceFacadeService);
+            expect(facadesBarrel.TerminalStreamFacadeService).toBe(TerminalStreamFacadeService);
             expect(facadesBarrel.EmailFacadeService).toBe(EmailFacadeService);
             expect(facadesBarrel.NotificationChannelFacadeService).toBe(
                 NotificationChannelFacadeService,
@@ -146,6 +154,8 @@ describe('FacadesModule + barrel re-exports', () => {
             expect(typeof facadesBarrel.NoGitProviderError).toBe('function');
             expect(typeof facadesBarrel.GitProviderNotFoundError).toBe('function');
             expect(typeof facadesBarrel.NoGitCredentialsError).toBe('function');
+            // Merge-policy matrix (Wave 3, D4) — agent merge refused by policy.
+            expect(typeof facadesBarrel.MergePolicyRefusedError).toBe('function');
             // oauth
             expect(typeof facadesBarrel.OAuthFacadeError).toBe('function');
             expect(typeof facadesBarrel.NoOAuthProviderError).toBe('function');
@@ -223,6 +233,10 @@ describe('FacadesModule + barrel re-exports', () => {
                     // Agent-Memory facade (default plugin: agentmemory REST :3111).
                     'AgentMemoryFacadeError',
                     'AgentMemoryFacadeService',
+                    'WorkspaceFacadeError',
+                    'WorkspaceFacadeService',
+                    'TerminalStreamFacadeError',
+                    'TerminalStreamFacadeService',
                     // Notifications v2 (EW-650 + EW-663) — email + notification channels.
                     'EmailFacadeError',
                     'EmailFacadeService',
@@ -237,6 +251,9 @@ describe('FacadesModule + barrel re-exports', () => {
                     // Goals feature PR-7 — metrics-provider capability facade.
                     'MetricsFacadeError',
                     'MetricsFacadeService',
+                    // Merge-policy matrix (Wave 3, D4). `AgentMergeActor` is
+                    // type-only and correctly absent from this runtime list.
+                    'MergePolicyRefusedError',
                 ].sort(),
             );
         });

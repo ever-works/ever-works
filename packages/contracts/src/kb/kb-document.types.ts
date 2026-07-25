@@ -1,4 +1,33 @@
-import type { KbDocumentClass, KbDocumentSource, KbDocumentStatus, KbLockMode } from './kb-document-class.js';
+import type {
+	KbDecisionStatus,
+	KbDocumentClass,
+	KbDocumentSource,
+	KbDocumentStatus,
+	KbLockMode,
+	KbReviewState
+} from './kb-document-class.js';
+
+/**
+ * Decision lifecycle state carried by a `decision`-class KB document
+ * (memory upgrades M4). Persisted as a `simple-json` column on the
+ * document row — `null` for every other class.
+ *
+ * `supersededByDocId` / `supersedesDocId` are the explicit chain links
+ * ("a reversed call is demoted, never dropped"); `supersededBySlug` is
+ * denormalized at transition time so retrieval can render the
+ * "historical — replaced by kb:decision/<slug>" label without a lookup.
+ */
+export interface KbDecisionState {
+	status: KbDecisionStatus;
+	/** The replacement decision this one was superseded by. */
+	supersededByDocId?: string | null;
+	/** Slug of the replacement (denormalized for the historical label). */
+	supersededBySlug?: string | null;
+	/** The older decision this one replaces. */
+	supersedesDocId?: string | null;
+	/** One-line rationale rendered alongside the decision in context. */
+	rationale?: string | null;
+}
 
 /**
  * Metadata-only DTO for a KB document.
@@ -34,6 +63,18 @@ export interface KbDocumentDto {
 	updatedAt: string;
 	lastCommitSha: string | null;
 	lastIndexedAt: string | null;
+	/**
+	 * Decision lifecycle state (memory upgrades M4). Non-null only for
+	 * `class === 'decision'` documents. Optional so pre-existing DTO
+	 * producers stay valid — absent means `null`.
+	 */
+	decision?: KbDecisionState | null;
+	/**
+	 * Review state (memory upgrades M7). `'proposed'` = agent-authored /
+	 * synthesized, awaiting human review — excluded from context
+	 * injection. Absent / `null` is treated as `'accepted'`.
+	 */
+	reviewState?: KbReviewState | null;
 }
 
 /**

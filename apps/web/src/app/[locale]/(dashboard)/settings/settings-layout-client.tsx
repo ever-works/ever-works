@@ -12,6 +12,9 @@ import {
     Bot,
     Cpu,
     Building2,
+    CreditCard,
+    BarChart3,
+    Server,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
@@ -77,11 +80,33 @@ export function SettingsLayoutClient({ children, settingsMenu }: SettingsLayoutC
                 icon: Bot,
                 href: `${baseSettingsPath}/work-agent`,
             },
+            // Fleet sits directly ABOVE Job Runtime by design: Fleet is
+            // WHERE work can run; Job Runtime stays HOW work is dispatched.
+            {
+                id: 'fleet',
+                label: t('tabs.fleet'),
+                icon: Server,
+                href: `${baseSettingsPath}/fleet`,
+            },
             {
                 id: 'job-runtime',
                 label: t('tabs.jobRuntime'),
                 icon: Cpu,
                 href: `${baseSettingsPath}/job-runtime`,
+            },
+            // Wave 13 — Billing + Usage & Credits (billing/usage PRD §2):
+            // also reachable from the settings shell like api-keys/security.
+            {
+                id: 'billing',
+                label: t('tabs.billing'),
+                icon: CreditCard,
+                href: `${baseSettingsPath}/billing`,
+            },
+            {
+                id: 'usage',
+                label: t('tabs.usageCredits'),
+                icon: BarChart3,
+                href: `${baseSettingsPath}/usage`,
             },
         ],
         [t],

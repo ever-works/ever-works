@@ -57,6 +57,12 @@ const protectedEndpoints = [
     '/api/activity-log/export',
     '/api/conversations',
     '/api/subscriptions/plan',
+    // Wave 13 (Billing/Usage UI) — new read-only surfaces are auth-gated
+    // like their siblings.
+    '/api/subscriptions/plans',
+    '/api/credits/balance',
+    '/api/credits/ledger',
+    '/api/credits/usage-summary',
     '/api/plugins',
 ];
 

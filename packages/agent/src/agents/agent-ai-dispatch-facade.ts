@@ -54,6 +54,8 @@ export interface AgentAiDispatchInput {
         workId?: string;
         agentId: string;
         taskId?: string;
+        /** Wave 9 M2 — per-run cost attribution (FacadeOptions.runId). */
+        runId?: string;
         providerOverride?: string;
     };
     /** Optional temperature override. Default 0.4 (agent runs prefer determinism). */

@@ -1,0 +1,45 @@
+# electron-builder configuration for the Ever Works Desktop Node app.
+#
+# Deliberately unsigned: no codeSign / notarize / certificate settings here.
+# Signing + auto-update channels are a follow-up hardening milestone (PRD M9);
+# CI packaging wires signing secrets outside the repo when that lands.
+appId: works.ever.desktop-node
+productName: Ever Works Desktop Node
+copyright: Copyright © 2026 Ever Co. LTD
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - dist/**
+  - package.json
+
+asar: true
+# The node core is plain TypeScript compiled to CommonJS — no native addons in
+# this app, so nothing needs a rebuild at package time. (A future `pty-local`
+# capability with a native addon would flip this.)
+npmRebuild: false
+
+win:
+  target:
+    - nsis
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+
+mac:
+  target:
+    - dmg
+    - zip
+  category: public.app-category.developer-tools
+
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Development
+  maintainer: Ever Co. LTD <ever@ever.co>
+
+publish: null

@@ -54,6 +54,7 @@ export const PLUGIN_CAPABILITIES = {
 	CONNECTOR_SLACK: 'connector-slack',
 	CONNECTOR_DISCORD: 'connector-discord',
 	CONNECTOR_WHATSAPP: 'connector-whatsapp',
+	CONNECTOR_LINEAR: 'connector-linear',
 	CONNECTOR_NOTION: 'connector-notion',
 	CONNECTOR_MICROSOFT_365: 'connector-microsoft-365',
 	// Pluggable persistent memory for AI coding / generation agents.
@@ -67,7 +68,18 @@ export const PLUGIN_CAPABILITIES = {
 	// providers: `custom-http` (GET-only, SSRF-guarded) and `stripe`
 	// (official SDK; balance + income windows). See
 	// `capabilities/metrics-provider.interface.ts` for the contract.
-	METRICS_PROVIDER: 'metrics-provider'
+	METRICS_PROVIDER: 'metrics-provider',
+	// Streaming-terminal session hosts (Wave 1 M5). First-party:
+	// pty-local (node-pty in the executing job-runtime worker, with a
+	// child_process pipe floor). Future: pty-ssh (user's own box),
+	// k8s-exec. See capabilities/terminal-stream.interface.ts.
+	TERMINAL_STREAM: 'terminal-stream',
+	// Isolated git working contexts for agent Tasks (Wave 2).
+	WORKSPACE: 'workspace',
+	// Event-ingest spine (Wave 6) — plugins that pull/push normalized
+	// external events into the platform ingest pipeline. See
+	// capabilities/event-source.interface.ts.
+	EVENT_SOURCE: 'event-source'
 } as const;
 
 export type PluginCapability = (typeof PLUGIN_CAPABILITIES)[keyof typeof PLUGIN_CAPABILITIES];

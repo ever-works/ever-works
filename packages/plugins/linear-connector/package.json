@@ -1,0 +1,96 @@
+{
+	"name": "@ever-works/linear-connector-plugin",
+	"version": "1.0.0",
+	"description": "Linear connector plugin for Ever Works platform (outbound issue comments via @linear/sdk and event-source pull of issues/comments into the event-ingest pipeline, with opt-in historical backfill)",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"private": false,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"clean": "rm -rf dist",
+		"type-check": "tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	},
+	"dependencies": {
+		"@ever-works/contracts": "workspace:*",
+		"@ever-works/plugin": "workspace:*",
+		"@linear/sdk": "^88.0.0"
+	},
+	"devDependencies": {
+		"@types/node": "^22.0.0",
+		"tsup": "^8.0.0",
+		"typescript": "^5.9.3",
+		"vitest": "^4.1.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "linear-connector",
+			"name": "Linear Connector",
+			"version": "1.0.0",
+			"category": "connector",
+			"capabilities": [
+				"connector",
+				"connector-linear",
+				"event-source"
+			],
+			"description": "Linear connector. Outbound posts comments on Linear issues via the official @linear/sdk. Event-source pull ingests issues (created/updated) and comments since the last watermark into the platform event-ingest pipeline, with opt-in historical backfill (backfillDays, max 90).",
+			"systemPlugin": false,
+			"builtIn": true,
+			"isDefault": false,
+			"autoEnable": false,
+			"settings": {
+				"type": "object",
+				"required": [
+					"apiKey"
+				],
+				"properties": {
+					"apiKey": {
+						"type": "string",
+						"title": "Linear API key (lin_api_…)",
+						"x-secret": true,
+						"x-envVar": "LINEAR_API_KEY"
+					},
+					"teamIds": {
+						"type": "string",
+						"title": "Team ids to ingest events from (comma-separated; all teams when empty)"
+					},
+					"backfillDays": {
+						"type": "number",
+						"title": "Historical backfill window in days on first pull (0 = off, max 90)",
+						"default": 0,
+						"minimum": 0,
+						"maximum": 90
+					},
+					"defaultIssueId": {
+						"type": "string",
+						"title": "Default issue id for outbound comments"
+					}
+				}
+			}
+		}
+	},
+	"publishConfig": {
+		"access": "restricted",
+		"registry": "https://registry.npmjs.org"
+	}
+}

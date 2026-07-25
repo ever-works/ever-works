@@ -279,7 +279,15 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 				(settings.baseUrl as string | undefined) || DEFAULT_BASE_URL
 			);
 			const model = (settings.model as string | undefined) || DEFAULT_MODEL;
-			const systemPrompt = buildSystemPrompt();
+			// Memory upgrades M3 — session preamble splice. The block
+			// arrives pre-fenced (`<agent_memory>…</agent_memory>`) +
+			// neutralized from the platform's shared recall helper; append
+			// verbatim. Absent = nothing to splice (provider off / toggle
+			// off / older orchestrator).
+			const baseSystemPrompt = buildSystemPrompt();
+			const systemPrompt = execContext.memoryRecall
+				? `${baseSystemPrompt}\n\n${execContext.memoryRecall}`
+				: baseSystemPrompt;
 			const workspaceSeedManifest = buildWorkspaceSeedManifest(DEFAULT_WORKSPACE_PATH, work, request, existing);
 			const uploadedSeedManifest = await client.uploadTextFile(
 				'ever-works-workspace-seed.json',

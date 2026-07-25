@@ -24,6 +24,23 @@ import type { KbDocumentBodyDto } from '@ever-works/contracts';
  *   {body}
  *   </kb>
  *
+ * **Decision rendering (memory upgrades M5).** `decision`-class docs
+ * get per-class treatment: a `# Decisions` section label line is
+ * emitted before the first decision doc (callers group decision docs
+ * contiguously — see `KbContextBundle.format`), each decision heading
+ * carries a status prefix, historical statuses (superseded / archived)
+ * are labelled `historical — replaced by kb:decision/<slug>` so the
+ * archive is never served back as current truth, and a one-line
+ * rationale (when present) leads the body:
+ *
+ *   # Decisions — settled calls; do not reverse without flagging
+ *   ## [decision: accepted] {title} (kb:decision/{slug})
+ *   Rationale: {rationale}
+ *   {body}
+ *   ---
+ *   ## [decision: superseded — historical; replaced by kb:decision/{slug}] {title} (kb:decision/{slug})
+ *   {body}
+ *
  * - Opening/closing `<kb>` tags on their own lines so prompts can use
  *   them as delimiters (LLM is told "the KB is between `<kb>` tags").
  * - `kb:{class}/{slug}` citation reference matches the `@kb:` mention
@@ -66,6 +83,15 @@ const TRUNCATION_MARKER = '\n[…truncated]';
 const OPEN_TAG = '<kb>';
 const CLOSE_TAG = '</kb>';
 const DOC_SEPARATOR = '\n---\n';
+
+/**
+ * Section label emitted once, before the first `decision`-class doc
+ * (memory upgrades M5). Level-1 heading so it can't be confused with
+ * the level-2 per-doc headings. Callers (`KbContextBundle.format`)
+ * group decision docs contiguously; if a caller interleaves them, the
+ * label still appears exactly once — before the first decision doc.
+ */
+const DECISION_SECTION_LABEL = '# Decisions — settled calls; do not reverse without flagging';
 
 /**
  * Security (prompt-injection hardening): KB document bodies/titles are
@@ -121,6 +147,7 @@ export function formatKbContext(
     // First-pass: build per-doc full entries. The slug + class come
     // straight from the DTO so the citation reference matches the row
     // 17 `@kb:` mention syntax.
+    let decisionLabelEmitted = false;
     const entries = docs.map((doc) => {
         // Security: neutralize the trusted-region delimiter (and chat-template
         // control markers) in every attacker-controlled field interpolated
@@ -128,8 +155,41 @@ export function formatKbContext(
         // slug) — so a poisoned doc cannot forge a `</kb>` boundary or spoof
         // a system turn. Benign Markdown is unaffected.
         const cite = `kb:${neutralizeKbField(doc.class)}/${neutralizeKbField(doc.slug)}`;
-        const heading = `## ${neutralizeKbField(doc.title)} (${cite})`;
-        const body = neutralizeKbField(doc.body ?? '');
+
+        let heading: string;
+        let body = neutralizeKbField(doc.body ?? '');
+
+        if (doc.class === 'decision') {
+            // M5 per-class rendering — status prefix; historical statuses
+            // (superseded / archived) are explicitly labelled so the
+            // archive is never served back as current truth, with the
+            // replacement promoted in the label when the chain link is
+            // known. Status values come from our enum (trusted); the
+            // denormalized replacement slug + rationale are doc-authored
+            // fields, so they are neutralized like every other field.
+            const status = doc.decision?.status ?? 'proposed';
+            const historical = status === 'superseded' || status === 'archived';
+            const replacedBy = doc.decision?.supersededBySlug
+                ? `; replaced by kb:decision/${neutralizeKbField(doc.decision.supersededBySlug)}`
+                : '';
+            const prefix = historical
+                ? `[decision: ${status} — historical${replacedBy}]`
+                : `[decision: ${status}]`;
+            heading = `## ${prefix} ${neutralizeKbField(doc.title)} (${cite})`;
+            if (!decisionLabelEmitted) {
+                // Section label rides on the first decision heading so the
+                // truncation pass (which never splits heading lines) keeps
+                // it intact whenever the section renders at all.
+                heading = `${DECISION_SECTION_LABEL}\n${heading}`;
+                decisionLabelEmitted = true;
+            }
+            if (doc.decision?.rationale) {
+                body = `Rationale: ${neutralizeKbField(doc.decision.rationale)}\n${body}`;
+            }
+        } else {
+            heading = `## ${neutralizeKbField(doc.title)} (${cite})`;
+        }
+
         return { heading, body, full: `${heading}\n${body}` };
     });
 
