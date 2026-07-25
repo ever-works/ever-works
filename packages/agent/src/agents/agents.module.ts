@@ -19,6 +19,7 @@ import { AgentBudgetRepository } from '../database/repositories/agent-budget.rep
 import { AgentMembershipRepository } from '../database/repositories/agent-membership.repository';
 import { AgentAttachmentRepository } from '../database/repositories/attachment.repositories';
 import { AgentsService } from './agents.service';
+import { AgentTemplatesService } from './agent-templates.service';
 import { AgentFileService } from './agent-file.service';
 import { AgentScheduleDispatcherService } from './agent-schedule-dispatcher.service';
 import { AgentRunSweeperService } from './agent-run-sweeper.service';
@@ -82,6 +83,9 @@ import { FacadesModule } from '../facades/facades.module';
         AgentMembershipRepository,
         AgentAttachmentRepository,
         AgentsService,
+        // Wave 10 — prebuilt agent-template activation (catalog data +
+        // ordinary Agent rows; no new persistence concepts).
+        AgentTemplatesService,
         AgentFileService,
         AgentScheduleDispatcherService,
         AgentRunSweeperService,
@@ -105,6 +109,7 @@ import { FacadesModule } from '../facades/facades.module';
         AgentMembershipRepository,
         AgentAttachmentRepository,
         AgentsService,
+        AgentTemplatesService,
         AgentFileService,
         AgentScheduleDispatcherService,
         AgentRunSweeperService,

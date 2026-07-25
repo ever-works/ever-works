@@ -2,6 +2,8 @@
 // — PR #1017 specs, Phase 3 + 4 + 6).
 export * from './agents.module';
 export * from './agents.service';
+export * from './agent-templates';
+export * from './agent-templates.service';
 export * from './agent-file.service';
 export * from './agent-schedule-dispatcher.service';
 export * from './agent-export.service';

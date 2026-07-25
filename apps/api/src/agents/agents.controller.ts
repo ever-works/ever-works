@@ -43,6 +43,8 @@ import {
     type AgentImportResult,
     type AgentScorecardMetric,
     type AgentTarget,
+    type AgentTemplate,
+    AgentTemplatesService,
     PluginUsageRepository,
 } from '@ever-works/agent/agents';
 import {
@@ -62,6 +64,7 @@ import {
     AddAgentAttachmentDto,
     AssignTaskToAgentDto,
     CreateAgentDto,
+    CreateAgentFromTemplateDto,
     ListAgentRunsQueryDto,
     ListAgentsQueryDto,
     ListRunSessionsQueryDto,
@@ -157,6 +160,10 @@ export class AgentsController {
         // + Optional for the same positional-spec reason as above.
         @Optional()
         private readonly dispatchGate?: RunDispatchGateService,
+        // Wave 10 — prebuilt agent-template activation. Trailing +
+        // Optional for the same positional-spec reason as above.
+        @Optional()
+        private readonly agentTemplates?: AgentTemplatesService,
     ) {}
 
     @Get()
@@ -317,6 +324,51 @@ export class AgentsController {
             })),
             meta: { total, limit, offset },
         };
+    }
+
+    /**
+     * Wave 10 — prebuilt agent-template catalog (in-code, fully
+     * specified presets with prompts + safe defaults). Complements the
+     * repo-backed `GET /api/agent-templates` metadata catalog. Declared
+     * BEFORE the `:id` routes so the literal `templates` segment never
+     * reaches ParseUUIDPipe.
+     */
+    @Get('templates')
+    @ApiOperation({ summary: 'List prebuilt agent templates (marketing/sales/ops presets)' })
+    @HttpCode(HttpStatus.OK)
+    async listTemplates(): Promise<{ data: AgentTemplate[] }> {
+        if (!this.agentTemplates) {
+            throw new InternalServerErrorException('Agent templates service is not available.');
+        }
+        return { data: [...this.agentTemplates.list()] };
+    }
+
+    /**
+     * Wave 10 — create MY Agent from a prebuilt template. Owner-scoped:
+     * the created Agent belongs to the caller, starts in DRAFT with the
+     * template's prompt (SOUL.md), conservative permissions, and
+     * review-before-act guardrails. Body fields are optional placement
+     * overrides only. Declared BEFORE the `:id` routes (literal segment).
+     */
+    @Post('from-template/:slug')
+    @ApiOperation({ summary: 'Create an Agent for the current user from a prebuilt template' })
+    @HttpCode(HttpStatus.CREATED)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async createFromTemplate(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('slug') slug: string,
+        @Body() body: CreateAgentFromTemplateDto,
+    ): Promise<AgentDto> {
+        if (!this.agentTemplates) {
+            throw new InternalServerErrorException('Agent templates service is not available.');
+        }
+        return this.agentTemplates.createFromTemplate(auth.userId, slug, {
+            name: body.name ?? null,
+            scope: body.scope,
+            missionId: body.missionId ?? null,
+            ideaId: body.ideaId ?? null,
+            workId: body.workId ?? null,
+        });
     }
 
     @Get(':id')
