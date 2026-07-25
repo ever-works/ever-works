@@ -9,6 +9,7 @@ import {
 import type { TaskIsolationMode } from './task-isolation';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
+import type { TaskAcceptanceCheck } from '@ever-works/contracts';
 import { Task, TaskPriority, TaskStatus, type TaskActorType } from '../entities/task.entity';
 import { Mission } from '../entities/mission.entity';
 import { Team } from '../entities/team.entity';
@@ -53,6 +54,10 @@ export interface CreateTaskInput {
     createdByType: TaskActorType;
     createdById: string;
     requireAllApprovers?: boolean;
+    /** Quality gates: `null` = inherit the Work's `checkDefaults` untouched. */
+    acceptanceChecks?: TaskAcceptanceCheck[] | null;
+    /** Quality gates: `null` = inherit the Work's budget (clamped 1..5 at resolve). */
+    maxGateAttempts?: number | null;
 }
 
 export interface UpdateTaskInput {
@@ -69,6 +74,10 @@ export interface UpdateTaskInput {
     goalId?: string | null;
     parentTaskId?: string | null;
     requireAllApprovers?: boolean;
+    /** Quality gates: `null` reverts to inheriting the Work's `checkDefaults`. */
+    acceptanceChecks?: TaskAcceptanceCheck[] | null;
+    /** Quality gates: `null` reverts to inheriting the Work's budget. */
+    maxGateAttempts?: number | null;
 }
 
 /**
@@ -319,6 +328,8 @@ export class TasksService {
             createdByType: input.createdByType,
             createdById: input.createdById,
             requireAllApprovers: input.requireAllApprovers ?? true,
+            acceptanceChecks: input.acceptanceChecks ?? null,
+            maxGateAttempts: input.maxGateAttempts ?? null,
         });
 
         await this.logActivity({
@@ -345,6 +356,8 @@ export class TasksService {
         if (input.priority !== undefined) patch.priority = input.priority;
         if (input.labels !== undefined) patch.labels = input.labels;
         if (input.isolationMode !== undefined) patch.isolationMode = input.isolationMode;
+        if (input.acceptanceChecks !== undefined) patch.acceptanceChecks = input.acceptanceChecks;
+        if (input.maxGateAttempts !== undefined) patch.maxGateAttempts = input.maxGateAttempts;
         if (input.requireAllApprovers !== undefined)
             patch.requireAllApprovers = input.requireAllApprovers;
 

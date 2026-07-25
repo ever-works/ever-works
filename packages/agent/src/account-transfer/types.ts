@@ -3,6 +3,7 @@
  * Supports versioned JSON export (v1) with full work data including
  * items, comparisons, site config, schedules, and advanced prompts.
  */
+import type { TaskAcceptanceCheck } from '@ever-works/contracts';
 
 // ─── Export Types ────────────────────────────────────────────────
 
@@ -157,6 +158,17 @@ export interface ExportedWork {
     communityPrEnabled: boolean;
     communityPrAutoClose: boolean;
     comparisonsEnabled: boolean;
+    /** Work-level default acceptance checks (quality gates). Payloads are
+     *  user-supplied JSON — import only applies this when it is actually
+     *  an array. */
+    checkDefaults?: TaskAcceptanceCheck[] | null;
+    /** Quality-gate enforcement policy. Import is drop-if-unrecognized —
+     *  never default-if-unrecognized — so a tampered value cannot reset an
+     *  existing Work's enforcement. */
+    checksPolicy?: string;
+    /** Gate-attempt budget (1..5). Out-of-range values are dropped on
+     *  import, not clamped. */
+    maxGateAttempts?: number;
     members: ExportedWorkMember[];
     customDomains: ExportedCustomDomain[];
     workPlugins: ExportedWorkPlugin[];

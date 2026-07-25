@@ -23,7 +23,7 @@ import type {
 import { containsMaskedSecrets, MASKED_SECRET_PREFIX } from './types';
 import { sanitizePrompt } from '../utils/sanitize.util';
 import { normalizeCreateWorkKind, type Work, type WorkKind } from '../entities/work.entity';
-import { WORK_KINDS } from '@ever-works/contracts';
+import { WORK_CHECKS_POLICIES, WORK_KINDS, type WorkChecksPolicy } from '@ever-works/contracts';
 
 /**
  * Canonical slug shape (matches the work/item DTO `@Matches` rule and
@@ -53,6 +53,27 @@ function normalizeImportedWorkKind(value: unknown): WorkKind | undefined {
     const raw = value.trim().toLowerCase();
     const recognized = raw === 'landing' || (WORK_KINDS as readonly string[]).includes(raw);
     return recognized ? normalizeCreateWorkKind(value) : undefined;
+}
+
+/**
+ * Quality-gate fields arrive from user-supplied JSON, so they follow the
+ * same posture as `normalizeImportedWorkKind`: drop-if-unrecognized, never
+ * default-if-unrecognized. A tampered `checksPolicy` must not be able to
+ * reset an existing Work's enforcement, and an out-of-range attempts
+ * budget is treated as absent rather than clamped — clamping would launder
+ * a bogus payload value into a legitimate-looking setting.
+ */
+function normalizeImportedChecksPolicy(value: unknown): WorkChecksPolicy | undefined {
+    return typeof value === 'string' && (WORK_CHECKS_POLICIES as readonly string[]).includes(value)
+        ? (value as WorkChecksPolicy)
+        : undefined;
+}
+
+/** Gate-attempt budget: integers within the resolve-time clamp range only. */
+function normalizeImportedMaxGateAttempts(value: unknown): number | undefined {
+    return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 5
+        ? value
+        : undefined;
 }
 
 /**
@@ -552,6 +573,23 @@ export class AccountImportService {
                     // null = 'use repo default' and must overwrite a custom base.
                     updateData.taskIsolationBaseBranch = dir.taskIsolationBaseBranch;
                 }
+                // Quality-gate fields: arrays only ever import as arrays;
+                // enum/int values are drop-if-unrecognized (see the
+                // normalizeImported* helpers above). Absent → existing
+                // Work's settings untouched.
+                if (Array.isArray(dir.checkDefaults)) {
+                    updateData.checkDefaults = dir.checkDefaults;
+                }
+                const importedChecksPolicy = normalizeImportedChecksPolicy(dir.checksPolicy);
+                if (importedChecksPolicy) {
+                    updateData.checksPolicy = importedChecksPolicy;
+                }
+                const importedMaxGateAttempts = normalizeImportedMaxGateAttempts(
+                    dir.maxGateAttempts,
+                );
+                if (importedMaxGateAttempts !== undefined) {
+                    updateData.maxGateAttempts = importedMaxGateAttempts;
+                }
                 await this.workRepository.update(existing.id, updateData);
 
                 await this.importWorkRelations(existing.id, userId, dir, includesSecrets, result);
@@ -610,6 +648,17 @@ export class AccountImportService {
             dir.taskIsolationBaseBranch.length <= 128
         ) {
             createData.taskIsolationBaseBranch = dir.taskIsolationBaseBranch;
+        }
+        if (Array.isArray(dir.checkDefaults)) {
+            createData.checkDefaults = dir.checkDefaults;
+        }
+        const importedChecksPolicy = normalizeImportedChecksPolicy(dir.checksPolicy);
+        if (importedChecksPolicy) {
+            createData.checksPolicy = importedChecksPolicy;
+        }
+        const importedMaxGateAttempts = normalizeImportedMaxGateAttempts(dir.maxGateAttempts);
+        if (importedMaxGateAttempts !== undefined) {
+            createData.maxGateAttempts = importedMaxGateAttempts;
         }
         const newDir = await this.workRepository.create(createData, user);
 

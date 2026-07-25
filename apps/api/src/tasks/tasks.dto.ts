@@ -1,5 +1,6 @@
 import { Type } from 'class-transformer';
 import {
+    ArrayMaxSize,
     IsArray,
     IsBoolean,
     IsDateString,
@@ -20,6 +21,7 @@ import {
     type TaskActorType,
     type TaskIsolationMode,
 } from '@ever-works/agent/tasks-domain';
+import { AcceptanceCheckDto } from '@ever-works/agent/dto';
 
 export class CreateTaskDto {
     @IsString()
@@ -86,6 +88,25 @@ export class CreateTaskDto {
     @IsOptional()
     @IsBoolean()
     requireAllApprovers?: boolean;
+
+    /**
+     * Acceptance checks for this Task (quality gates). Merge over the
+     * Work's `checkDefaults` by id: a same-id entry overrides the default,
+     * `disabled: true` suppresses it. `null` = inherit the defaults as-is.
+     */
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(20)
+    @ValidateNested({ each: true })
+    @Type(() => AcceptanceCheckDto)
+    acceptanceChecks?: AcceptanceCheckDto[] | null;
+
+    /** Gate-attempt budget (1..5). `null` = inherit the Work's value. */
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    @Max(5)
+    maxGateAttempts?: number | null;
 }
 
 export class UpdateTaskDto {
@@ -149,6 +170,25 @@ export class UpdateTaskDto {
     @IsOptional()
     @IsBoolean()
     requireAllApprovers?: boolean;
+
+    /**
+     * Replaces the Task's declared checks wholesale (same merge-over-Work
+     * semantics as on create). `null` reverts to inheriting the Work's
+     * `checkDefaults` untouched.
+     */
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(20)
+    @ValidateNested({ each: true })
+    @Type(() => AcceptanceCheckDto)
+    acceptanceChecks?: AcceptanceCheckDto[] | null;
+
+    /** Gate-attempt budget (1..5). `null` reverts to inheriting the Work. */
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    @Max(5)
+    maxGateAttempts?: number | null;
 }
 
 export class SetTaskRecurringDto {

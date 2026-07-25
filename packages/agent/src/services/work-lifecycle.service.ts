@@ -657,6 +657,20 @@ export class WorkLifecycleService {
                 updateData.taskBranchCleanup = updateDto.taskBranchCleanup;
             }
 
+            // Quality-gate settings. `checkDefaults: null` clears the
+            // Work-level defaults; checksPolicy / maxGateAttempts are
+            // NOT NULL columns, so only defined values flow through (the
+            // DTO already constrains them to the known set / 1..5).
+            if (updateDto.checkDefaults !== undefined) {
+                updateData.checkDefaults = updateDto.checkDefaults;
+            }
+            if (updateDto.checksPolicy !== undefined) {
+                updateData.checksPolicy = updateDto.checksPolicy;
+            }
+            if (updateDto.maxGateAttempts !== undefined) {
+                updateData.maxGateAttempts = updateDto.maxGateAttempts;
+            }
+
             // Handle community PR processing settings
             if (updateDto.communityPrEnabled !== undefined) {
                 updateData.communityPrEnabled = updateDto.communityPrEnabled;
