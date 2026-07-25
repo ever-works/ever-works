@@ -39,6 +39,7 @@ export interface CreateTaskInput {
     status?: TaskStatus;
     priority?: TaskPriority;
     labels?: string[] | null;
+    isolationMode?: string | null;
     missionId?: string | null;
     ideaId?: string | null;
     workId?: string | null;
@@ -56,6 +57,7 @@ export interface UpdateTaskInput {
     description?: string | null;
     priority?: TaskPriority;
     labels?: string[] | null;
+    isolationMode?: string | null;
     missionId?: string | null;
     ideaId?: string | null;
     workId?: string | null;
@@ -228,6 +230,7 @@ export class TasksService {
             status: input.status ?? TaskStatus.BACKLOG,
             priority: input.priority ?? TaskPriority.P3,
             labels: input.labels ?? null,
+            isolationMode: input.isolationMode ?? null,
             missionId: input.missionId ?? null,
             ideaId: input.ideaId ?? null,
             workId: input.workId ?? null,
@@ -263,6 +266,7 @@ export class TasksService {
         }
         if (input.priority !== undefined) patch.priority = input.priority;
         if (input.labels !== undefined) patch.labels = input.labels;
+        if (input.isolationMode !== undefined) patch.isolationMode = input.isolationMode;
         if (input.requireAllApprovers !== undefined)
             patch.requireAllApprovers = input.requireAllApprovers;
 

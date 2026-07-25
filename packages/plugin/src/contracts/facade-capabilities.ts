@@ -67,7 +67,9 @@ export const PLUGIN_CAPABILITIES = {
 	// providers: `custom-http` (GET-only, SSRF-guarded) and `stripe`
 	// (official SDK; balance + income windows). See
 	// `capabilities/metrics-provider.interface.ts` for the contract.
-	METRICS_PROVIDER: 'metrics-provider'
+	METRICS_PROVIDER: 'metrics-provider',
+	// Isolated git working contexts for agent Tasks (Wave 2).
+	WORKSPACE: 'workspace'
 } as const;
 
 export type PluginCapability = (typeof PLUGIN_CAPABILITIES)[keyof typeof PLUGIN_CAPABILITIES];

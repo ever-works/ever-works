@@ -185,6 +185,10 @@ export class AccountExportService {
                 typeof dir.providerRepositoryEnabled === 'boolean'
                     ? dir.providerRepositoryEnabled
                     : undefined,
+            taskIsolation: dir.taskIsolation || undefined,
+            taskIsolationBaseBranch: dir.taskIsolationBaseBranch ?? undefined,
+            taskIsolationTargetRepo: dir.taskIsolationTargetRepo || undefined,
+            taskBranchCleanup: dir.taskBranchCleanup || undefined,
             gitProvider: dir.gitProvider,
             deployProvider: dir.deployProvider || undefined,
             readmeConfig: dir.readmeConfig || undefined,

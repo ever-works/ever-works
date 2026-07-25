@@ -402,6 +402,28 @@ export class Work {
     @Column({ type: 'boolean', default: false })
     comparisonsEnabled: boolean;
 
+    // ── Task isolation (worktree-per-Task, Wave 2 M1) ────────────────
+    // Opt-in, per the founder: "not everyone needs it." A Task with
+    // isolation resolved off behaves exactly as today.
+
+    /** `'off' | 'worktree'` — default off; per-Task override on Task. */
+    @Column({ type: 'varchar', length: 16, default: 'off' })
+    taskIsolation: string;
+
+    /** Base branch Tasks branch FROM (ALWAYS fetched fresh — never a
+     *  cached HEAD). NULL = the repo's default branch. */
+    @Column({ type: 'varchar', length: 128, nullable: true })
+    taskIsolationBaseBranch?: string | null;
+
+    /** Which of the Work's repos the branch/PR flow targets:
+     *  `'work-output' | 'data' | 'provider'`. */
+    @Column({ type: 'varchar', length: 16, default: 'work-output' })
+    taskIsolationTargetRepo: string;
+
+    /** `'on-merge' | 'manual'` — when the Task branch is deleted. */
+    @Column({ type: 'varchar', length: 16, default: 'on-merge' })
+    taskBranchCleanup: string;
+
     /**
      * Whether to generate the browsable repository published to the git
      * provider — the one the UI calls the "{provider} Repository" and that

@@ -134,6 +134,25 @@ export class Task {
     @Column({ type: 'uuid', nullable: true })
     parentTaskId?: string | null;
 
+    // ── Task isolation (worktree-per-Task, Wave 2 M1) ────────────────
+
+    /** Per-Task override of the Work's `taskIsolation` setting:
+     *  NULL = inherit; `'on' | 'off'` force it. Resolution lives in
+     *  `tasks-domain/task-isolation.ts` (one function, unit-tested). */
+    @Column({ type: 'varchar', length: 8, nullable: true })
+    isolationMode?: string | null;
+
+    /** The Task's branch (e.g. `task/t-42-9f3c1a2b`). AUTHORITATIVE once
+     *  written — never recomputed, so a slug edit can't orphan it. The
+     *  branch is the durable workspace identity in cloud mode. */
+    @Column({ type: 'varchar', length: 200, nullable: true })
+    branchRef?: string | null;
+
+    /** Branch lifecycle: `none | created | pushed | pr-open | conflict |
+     *  merged | discarded`. NULL = isolation never engaged. */
+    @Column({ type: 'varchar', length: 16, nullable: true })
+    branchState?: string | null;
+
     @Column({ type: 'varchar', length: 16 })
     createdByType: TaskActorType;
 

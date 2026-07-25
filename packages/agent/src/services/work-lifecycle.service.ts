@@ -642,6 +642,21 @@ export class WorkLifecycleService {
                 updateData.providerRepositoryEnabled = updateDto.providerRepositoryEnabled;
             }
 
+            // Task isolation settings (worktree-per-Task, Wave 2 M1).
+            // DTO enum-validated; NULL baseBranch = repo default.
+            if (updateDto.taskIsolation !== undefined) {
+                updateData.taskIsolation = updateDto.taskIsolation;
+            }
+            if (updateDto.taskIsolationBaseBranch !== undefined) {
+                updateData.taskIsolationBaseBranch = updateDto.taskIsolationBaseBranch;
+            }
+            if (updateDto.taskIsolationTargetRepo !== undefined) {
+                updateData.taskIsolationTargetRepo = updateDto.taskIsolationTargetRepo;
+            }
+            if (updateDto.taskBranchCleanup !== undefined) {
+                updateData.taskBranchCleanup = updateDto.taskBranchCleanup;
+            }
+
             // Handle community PR processing settings
             if (updateDto.communityPrEnabled !== undefined) {
                 updateData.communityPrEnabled = updateDto.communityPrEnabled;

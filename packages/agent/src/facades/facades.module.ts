@@ -18,6 +18,7 @@ import { TasksFacadeService } from './tasks.facade';
 import { EmailFacadeService } from './email.facade';
 import { NotificationChannelFacadeService } from './notification-channel.facade';
 import { AgentMemoryFacadeService } from './agent-memory.facade';
+import { WorkspaceFacadeService } from './workspace.facade';
 import { VectorStoreFacadeService } from './vector-store.facade';
 import { MetricsFacadeService } from './metrics.facade';
 
@@ -38,6 +39,7 @@ const FACADES = [
     EmailFacadeService,
     NotificationChannelFacadeService,
     AgentMemoryFacadeService,
+    WorkspaceFacadeService,
     // EW-724 / EW-725 — vector-store facade (KB embeddings; consumed by
     // KnowledgeBaseReembedService via FacadesModule). Provided here like every
     // other barrel facade; deps are the global PluginRegistryService plus two

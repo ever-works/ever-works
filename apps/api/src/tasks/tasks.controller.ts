@@ -151,6 +151,7 @@ export class TasksController {
             status: body.status,
             priority: body.priority,
             labels: body.labels ?? null,
+            isolationMode: body.isolationMode ?? null,
             missionId: body.missionId ?? null,
             ideaId: body.ideaId ?? null,
             workId: body.workId ?? null,

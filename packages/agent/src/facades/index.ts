@@ -118,6 +118,7 @@ export {
 // (default plugin `@ever-works/agentmemory-plugin` talks to a local or
 // hosted `agentmemory` REST server on :3111)
 export { AgentMemoryFacadeService, AgentMemoryFacadeError } from './agent-memory.facade';
+export { WorkspaceFacadeService, WorkspaceFacadeError } from './workspace.facade';
 
 // Vector Store Facade — EW-642 RFC §6 selection chain + D4 embedding
 // mode resolver. Routes KB chunk upsert / query / delete through the

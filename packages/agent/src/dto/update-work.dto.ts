@@ -79,6 +79,24 @@ export class UpdateWorkDto {
     @IsBoolean()
     providerRepositoryEnabled?: boolean;
 
+    /** Task isolation (worktree-per-Task, Wave 2). 'off' | 'worktree'. */
+    @IsOptional()
+    @IsIn(['off', 'worktree'])
+    taskIsolation?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(128)
+    taskIsolationBaseBranch?: string | null;
+
+    @IsOptional()
+    @IsIn(['work-output', 'data', 'provider'])
+    taskIsolationTargetRepo?: string;
+
+    @IsOptional()
+    @IsIn(['on-merge', 'manual'])
+    taskBranchCleanup?: string;
+
     @ApiPropertyOptional({ description: 'Whether community PR processing is enabled' })
     @IsOptional()
     @IsBoolean()

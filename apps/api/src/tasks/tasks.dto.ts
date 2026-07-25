@@ -39,6 +39,12 @@ export class CreateTaskDto {
     @MaxLength(80, { each: true })
     labels?: string[] | null;
 
+    /** Task isolation override (worktree-per-Task, Wave 2): NULL
+     *  inherits the Work's taskIsolation setting. */
+    @IsOptional()
+    @IsIn(['on', 'off'])
+    isolationMode?: string | null;
+
     @IsOptional()
     @IsUUID()
     missionId?: string | null;
@@ -96,6 +102,12 @@ export class UpdateTaskDto {
     @IsString({ each: true })
     @MaxLength(80, { each: true })
     labels?: string[] | null;
+
+    /** Task isolation override (worktree-per-Task, Wave 2): NULL
+     *  inherits the Work's taskIsolation setting. */
+    @IsOptional()
+    @IsIn(['on', 'off'])
+    isolationMode?: string | null;
 
     /**
      * Re-filing a Task under a different owner. `null` detaches it from
