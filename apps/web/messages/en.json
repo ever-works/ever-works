@@ -1909,6 +1909,7 @@
                 "data": "Data",
                 "githubApp": "GitHub App",
                 "workAgent": "Work Agent",
+                "fleet": "Fleet",
                 "jobRuntime": "Job Runtime",
                 "gitProviders": "Git Providers",
                 "dangerZone": "Danger Zone",
@@ -2280,6 +2281,86 @@
                     "revokeSuccess": "API key revoked successfully",
                     "revokeError": "Failed to revoke API key",
                     "copyError": "Failed to copy to clipboard"
+                }
+            },
+            "fleet": {
+                "title": "Fleet",
+                "subtitle": "The machines that execute your work: enroll desktop or headless nodes with a one-time token, watch their health, and see the nodes of clusters you have configured yourself.",
+                "kinds": {
+                    "desktop-node": "Desktop node",
+                    "node": "Headless node",
+                    "k8s": "Cluster"
+                },
+                "statuses": {
+                    "enrolling": "Enrolling",
+                    "online": "Online",
+                    "offline": "Offline",
+                    "disabled": "Disabled"
+                },
+                "table": {
+                    "name": "Name",
+                    "kind": "Kind",
+                    "status": "Status",
+                    "platform": "Platform",
+                    "capabilities": "Capabilities",
+                    "lastSeen": "Last seen"
+                },
+                "empty": {
+                    "title": "No nodes enrolled yet",
+                    "description": "Add a node to lend one of your machines to the platform: a desktop node with a small status UI, or a headless node for servers and CI boxes. Issue a one-time enrollment token here and paste it into the node app during setup."
+                },
+                "cluster": {
+                    "title": "Your cluster nodes",
+                    "description": "Read-only, live node inventory of clusters you configured yourself in deployment settings. Platform-operated shared clusters are never listed here.",
+                    "empty": "No self-configured cluster is connected, or its nodes could not be read right now.",
+                    "roles": "Roles"
+                },
+                "add": {
+                    "button": "Add node",
+                    "title": "Add a node",
+                    "description": "Name the machine and pick its shape. You will get a one-time enrollment token to paste into the node during setup.",
+                    "nameLabel": "Node name",
+                    "namePlaceholder": "e.g. Office workstation",
+                    "nameRequired": "Please name the node first",
+                    "kindLabel": "Node kind",
+                    "kindHelper": {
+                        "desktop-node": "A desktop app that registers this machine and shows node status, logs and controls.",
+                        "node": "A command-line service for servers, CI boxes and scripted fleets — no UI."
+                    },
+                    "cancel": "Cancel",
+                    "submit": "Issue token",
+                    "issued": "Enrollment token issued",
+                    "tokenIntro": "Copy this one-time enrollment token. It expires in {minutes} minutes and can be used exactly once.",
+                    "copy": "Copy",
+                    "copied": "Copied",
+                    "copyError": "Failed to copy to clipboard",
+                    "instructionsTitle": "Install instructions",
+                    "instructionsBody": "Install the node app on the target machine, point it at this platform's API address, and paste the token when the setup asks for it. The node appears here as Online after its first heartbeat. (Node app downloads ship in an upcoming release.)",
+                    "tokenOnce": "For security, the token is shown only once — issue a new one if you lose it.",
+                    "done": "Done"
+                },
+                "actions": {
+                    "rename": "Rename",
+                    "disable": "Disable",
+                    "enable": "Enable",
+                    "remove": "Remove"
+                },
+                "rename": {
+                    "title": "Rename node",
+                    "cancel": "Cancel",
+                    "confirm": "Save"
+                },
+                "remove": {
+                    "title": "Remove node",
+                    "description": "Remove \"{name}\" from your fleet? Its credential stops working immediately and the machine will have to be enrolled again.",
+                    "cancel": "Cancel",
+                    "confirm": "Remove"
+                },
+                "messages": {
+                    "renamed": "Node renamed",
+                    "disabled": "Node disabled — it stops accepting work and heartbeats",
+                    "enabled": "Node enabled — it will come back online on its next heartbeat",
+                    "removed": "Node removed"
                 }
             },
             "jobRuntime": {

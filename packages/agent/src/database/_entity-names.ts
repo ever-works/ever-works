@@ -66,6 +66,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'CreditLedgerEntry',
     'EmailConversation',
     'EmailMessage',
+    // Fleet (Wave 12, slice 1) — enrolled execution nodes w/ heartbeat
+    'FleetNode',
     'GitHubAppInstallation',
     'GitHubAppInstallationRepository',
     'GitHubAppUserLink',

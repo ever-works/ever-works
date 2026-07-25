@@ -123,3 +123,5 @@ export * from './meeting.entity';
 // Credits ledger + plan entitlements (pricing Wave 9 M1)
 export * from './credit-ledger-entry.entity';
 export * from './plan-entitlement.entity';
+// Fleet (Wave 12, slice 1) — enrolled execution nodes with heartbeat
+export * from './fleet-node.entity';

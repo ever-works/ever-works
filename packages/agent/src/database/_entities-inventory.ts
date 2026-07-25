@@ -118,6 +118,7 @@ import { IngestCursor } from '../entities/ingest-cursor.entity';
 import { Meeting } from '../entities/meeting.entity';
 import { CreditLedgerEntry } from '../entities/credit-ledger-entry.entity';
 import { PlanEntitlement } from '../entities/plan-entitlement.entity';
+import { FleetNode } from '../entities/fleet-node.entity';
 import {
     PluginEntity,
     UserPluginEntity,
@@ -267,4 +268,7 @@ export const ENTITIES = [
     // are the usage currency layered on the costCents metering.
     CreditLedgerEntry,
     PlanEntitlement,
+    // Fleet (Wave 12, slice 1) — enrolled execution nodes (desktop /
+    // headless) with hashed credentials + heartbeat status.
+    FleetNode,
 ];

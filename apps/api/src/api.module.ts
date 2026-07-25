@@ -54,6 +54,7 @@ import { SchedulesModule } from './schedules/schedules.module';
 import { InboundTriggersModule } from './triggers/inbound-triggers.module';
 import { IngestModule } from './ingest/ingest.module';
 import { MeetingsApiModule } from './meetings/meetings.module';
+import { FleetApiModule } from './fleet/fleet.module';
 import { TelemetryModule } from './telemetry/telemetry.module';
 import { UsersModule } from './users/users.module';
 import { ScopeModule } from './scope/scope.module';
@@ -199,6 +200,10 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // boots the zoom.recording envelope→Meeting processor on the
         // ingest spine.
         MeetingsApiModule,
+        // Fleet (Wave 12, slice 1) — /api/fleet node registry (owner
+        // CRUD-lite + public token-authenticated enroll/heartbeat) over
+        // the agent-side FleetModule.
+        FleetApiModule,
         TelemetryModule,
         FunnelAnalyticsBindingModule,
         UploadsModule,
