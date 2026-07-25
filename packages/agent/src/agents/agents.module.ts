@@ -28,6 +28,7 @@ import { PromptAssemblerService } from './prompt-assembler.service';
 import { AgentRunService } from './agent-run.service';
 import { RunDispatchGateService } from './run-dispatch-gate.service';
 import { RunSteeringService } from './run-steering.service';
+import { TerminalSessionLauncher } from './terminal-session-launcher.service';
 import { AgentToolService } from './agent-tool.service';
 import { VisionContextService } from '../services/vision-context.service';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
@@ -103,6 +104,11 @@ import { FacadesModule } from '../facades/facades.module';
         // Wave 4 M5 — steer / interrupt / resume. Reuses the gate for resume
         // admission and the existing cancel path for stop.
         RunSteeringService,
+        // Streaming terminal — the single dispatch choke point for the
+        // `terminal-session` job. The TERMINAL_SESSION_DISPATCHER it
+        // enqueues through is @Optional() and bound by the api-side
+        // @Global() AgentsModule, exactly like RunDispatchGateService's.
+        TerminalSessionLauncher,
         AgentToolService,
     ],
     exports: [
@@ -122,6 +128,7 @@ import { FacadesModule } from '../facades/facades.module';
         AgentRunService,
         RunDispatchGateService,
         RunSteeringService,
+        TerminalSessionLauncher,
         AgentToolService,
     ],
 })

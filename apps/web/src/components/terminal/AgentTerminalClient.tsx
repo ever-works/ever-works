@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useCallback, useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { TerminalPane } from './TerminalPane';
 
@@ -33,6 +33,35 @@ export function AgentTerminalClient({
         return runs[0]?.id ?? null;
     }, [initialRunId, runs]);
     const [selected, setSelected] = useState<string | null>(defaultRun);
+    // `paneKey` remounts the pane after a successful start so the attach
+    // re-runs against the session that now exists (previously the pane could
+    // only ever attach to a channel nothing published to).
+    const [paneKey, setPaneKey] = useState(0);
+    const [starting, setStarting] = useState(false);
+    const [startError, setStartError] = useState<string | null>(null);
+
+    const startSession = useCallback(async () => {
+        if (!selected || starting) return;
+        setStarting(true);
+        setStartError(null);
+        try {
+            const res = await fetch(`/api/agents/${agentId}/runs/${selected}/terminal/start`, {
+                method: 'POST',
+            });
+            if (!res.ok) {
+                // The API's 409 messages ("already live", "run has finished")
+                // are the useful ones — surface them verbatim when present.
+                const body = (await res.json().catch(() => null)) as { message?: string } | null;
+                setStartError(body?.message ?? t('startFailed'));
+                return;
+            }
+            setPaneKey((k) => k + 1);
+        } catch {
+            setStartError(t('startFailed'));
+        } finally {
+            setStarting(false);
+        }
+    }, [agentId, selected, starting, t]);
 
     if (runs.length === 0) {
         return (
@@ -65,10 +94,32 @@ export function AgentTerminalClient({
                         </option>
                     ))}
                 </select>
+                <button
+                    type="button"
+                    onClick={() => void startSession()}
+                    disabled={!selected || starting}
+                    data-testid="terminal-start-session"
+                    className="ml-auto inline-flex items-center gap-1 rounded-md border border-border/60 dark:border-border-dark/60 px-2 h-8 text-xs text-text dark:text-text-dark hover:bg-card-hover dark:hover:bg-card-hover-dark disabled:opacity-50"
+                >
+                    {starting ? t('startingSession') : t('startSession')}
+                </button>
             </div>
+            {startError && (
+                <p
+                    role="alert"
+                    data-testid="terminal-start-error"
+                    className="text-xs text-red-600 dark:text-red-400"
+                >
+                    {startError}
+                </p>
+            )}
             {selected && (
                 <div className="flex-1 min-h-0">
-                    <TerminalPane key={selected} agentId={agentId} runId={selected} />
+                    <TerminalPane
+                        key={`${selected}:${paneKey}`}
+                        agentId={agentId}
+                        runId={selected}
+                    />
                 </div>
             )}
         </div>

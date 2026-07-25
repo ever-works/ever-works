@@ -20,7 +20,9 @@ import { AgentRunRepository } from '../database/repositories/agent-run.repositor
 import {
     AGENT_TASK_EXECUTE_DISPATCHER,
     JOB_RUNTIME_NOT_CONFIGURED_REASON,
+    TERMINAL_SESSION_STARTER,
     type AgentTaskExecuteDispatcher,
+    type TerminalSessionStarter,
 } from './task-dispatcher';
 import { TaskNotificationService } from './task-notification.service';
 import { TaskRunDenormService } from './task-run-denorm.service';
@@ -116,6 +118,13 @@ export class TaskTransitionService {
         // positional-constructor reasoning as above); Optional so fixtures
         // without it skip the rule entirely (fail toward the status quo).
         @Optional() private readonly works?: WorkRepository,
+        // Streaming terminal — starts the `terminal-session` job for a
+        // freshly-dispatched run that asked for one. Appended LAST (same
+        // positional-constructor reasoning as above); Optional so fixtures
+        // and installs without a job runtime simply never start a session.
+        @Optional()
+        @Inject(TERMINAL_SESSION_STARTER)
+        private readonly terminalSessions?: TerminalSessionStarter,
     ) {}
 
     /**
@@ -363,6 +372,39 @@ export class TaskTransitionService {
                     } catch (stampErr) {
                         this.logger.warn(
                             `Failed to stamp triggerRunId on AgentRun ${run.id}: ${stampErr}`,
+                        );
+                    }
+                }
+                // Streaming terminal — a run that asked for a long-lived
+                // interactive session gets one alongside its execution.
+                // `requirePersistent` means the starter refuses anything
+                // that did not ask, so the one-shot path is untouched.
+                //
+                // Its own try/catch, NOT the enqueue's: the dispatch has
+                // already succeeded here, and a terminal-session hiccup
+                // must never fall through to the rollback below and mark a
+                // live run dispatch-failed. Fire-and-forget for the same
+                // reason the fan-out itself is — the run does not wait on
+                // its terminal.
+                if (run && this.terminalSessions) {
+                    const terminalRunId = run.id;
+                    const terminalAgentId = assignee.assigneeId;
+                    try {
+                        void this.terminalSessions
+                            .startForRun({
+                                userId: task.userId,
+                                agentId: terminalAgentId,
+                                runId: terminalRunId,
+                                requirePersistent: true,
+                            })
+                            .catch((terminalErr) =>
+                                this.logger.warn(
+                                    `Terminal session start failed for AgentRun ${terminalRunId}: ${terminalErr}`,
+                                ),
+                            );
+                    } catch (terminalErr) {
+                        this.logger.warn(
+                            `Terminal session start threw for AgentRun ${terminalRunId}: ${terminalErr}`,
                         );
                     }
                 }

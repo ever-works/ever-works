@@ -6182,7 +6182,10 @@
             "reconnect": "Reconnect",
             "waitingForOutput": "Waiting for output…",
             "noRuns": "No runs yet — terminals attach to agent runs.",
-            "runPickerLabel": "Run"
+            "runPickerLabel": "Run",
+            "startSession": "Start session",
+            "startingSession": "Starting…",
+            "startFailed": "Could not start a terminal session for this run."
         },
         "jobRuntimeBanner": {
             "title": "Background job runtime is not configured.",
