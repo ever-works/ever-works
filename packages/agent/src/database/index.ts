@@ -16,6 +16,9 @@ export * from './repositories/user-subscription.repository';
 export * from './repositories/work-schedule.repository';
 export * from './repositories/usage-ledger.repository';
 export * from './repositories/plugin-usage.repository';
+// Credits ledger + plan entitlements (pricing Wave 9 M1)
+export * from './repositories/credit-ledger.repository';
+export * from './repositories/plan-entitlement.repository';
 export * from './repositories/work-budget.repository';
 export * from './repositories/work-budget-alert-state.repository';
 export * from './repositories/notification.repository';

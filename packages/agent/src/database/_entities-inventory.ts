@@ -114,6 +114,8 @@ import { TenantRuntimeProviderAllowlist } from '../entities/tenant-runtime-provi
 import { TenantCredentialSnapshot } from '../entities/tenant-credential-snapshot.entity';
 import { InboundTrigger } from '../entities/inbound-trigger.entity';
 import { IngestedEvent } from '../entities/ingested-event.entity';
+import { CreditLedgerEntry } from '../entities/credit-ledger-entry.entity';
+import { PlanEntitlement } from '../entities/plan-entitlement.entity';
 import {
     PluginEntity,
     UserPluginEntity,
@@ -253,4 +255,8 @@ export const ENTITIES = [
     // Event-ingest spine (Wave 6) — normalized external events awaiting
     // Activity/Memory fan-out.
     IngestedEvent,
+    // Credits ledger + plan entitlements (pricing Wave 9 M1) — credits
+    // are the usage currency layered on the costCents metering.
+    CreditLedgerEntry,
+    PlanEntitlement,
 ];

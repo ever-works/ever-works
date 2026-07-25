@@ -62,6 +62,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'ComposioTriggerSubscription',
     'Conversation',
     'ConversationMessage',
+    // Credits ledger (pricing Wave 9 M1)
+    'CreditLedgerEntry',
     'EmailConversation',
     'EmailMessage',
     'GitHubAppInstallation',
@@ -86,6 +88,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'OnboardingRequest',
     'Organization',
     'OrganizationNotificationDefault',
+    // Plan entitlements (pricing Wave 9 M1)
+    'PlanEntitlement',
     'PluginUsageEvent',
     'RefreshToken',
     // Skills family (PR #1019) ──

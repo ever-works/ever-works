@@ -88,6 +88,12 @@ jest.mock('@ever-works/agent/ingest', () => ({
 jest.mock('@ever-works/agent/digest', () => ({
     DigestService: class DigestService {},
     DigestModule: class DigestModule {},
+// Credits ledger (pricing Wave 9 M1) — the controller imports
+// CreditLedgerService from the subscriptions barrel; stub it so the real
+// barrel (repositories → TypeORM entity chain) is never loaded.
+jest.mock('@ever-works/agent/subscriptions', () => ({
+    SubscriptionsModule: class SubscriptionsModule {},
+    CreditLedgerService: class CreditLedgerService {},
 }));
 jest.mock('@ever-works/agent/activity-log', () => ({
     ActivityLogService: class ActivityLogService {},

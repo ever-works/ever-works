@@ -224,6 +224,22 @@ export class UserRepository {
     }
 
     /**
+     * Credits ledger (pricing Wave 9 M1): stable-ordered page of active,
+     * non-anonymous users for the daily free-credit grant sweep. Loads
+     * the `defaultPlan` relation so the grant dispatcher can resolve the
+     * plan code without a per-user follow-up query.
+     */
+    async findActiveBatch(skip: number, take: number): Promise<User[]> {
+        return await this.repository.find({
+            where: { isActive: true, isAnonymous: false },
+            relations: { defaultPlan: true },
+            order: { createdAt: 'ASC', id: 'ASC' },
+            skip,
+            take,
+        });
+    }
+
+    /**
      * EW-617 G2: hard-delete an anonymous user. Cascades to its Works via
      * `work.user` ON DELETE CASCADE. Safe to call only after the row has been
      * verified `isAnonymous=true` to avoid wiping a real account by mistake.

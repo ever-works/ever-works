@@ -72,6 +72,7 @@ import {
 } from '@ever-works/agent/plugins';
 import { EventIngestService } from '@ever-works/agent/ingest';
 import { DigestService } from '@ever-works/agent/digest';
+import { CreditLedgerService } from '@ever-works/agent/subscriptions';
 
 /**
  * C-05 RPC half — methods that must never be reachable via `POST
@@ -296,6 +297,12 @@ export class TriggerInternalController implements OnModuleInit {
         // RPC channel. Appended LAST + @Optional() per the arity rule above.
         @Optional()
         private readonly digestService?: DigestService,
+        // Credits ledger (pricing Wave 9 M1) — backs the
+        // `credits-daily-grant` cron: the worker proxy calls
+        // `dispatchDailyGrants()` over the internal RPC channel. Appended
+        // LAST + @Optional() per the arity rule above.
+        @Optional()
+        private readonly creditLedgerService?: CreditLedgerService,
     ) {}
 
     onModuleInit() {
@@ -371,6 +378,9 @@ export class TriggerInternalController implements OnModuleInit {
             // Digest briefings (Wave 7) — `digest-dispatcher` calls
             // `dispatchDue(period)` here (allow-list auto-derived).
             DigestService: this.digestService,
+            // Credits ledger (pricing Wave 9 M1) — `credits-daily-grant`
+            // calls `dispatchDailyGrants()` here (allow-list auto-derived).
+            CreditLedgerService: this.creditLedgerService,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),

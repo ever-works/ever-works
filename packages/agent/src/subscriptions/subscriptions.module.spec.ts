@@ -3,6 +3,8 @@ import { SubscriptionsModule } from './subscriptions.module';
 import { SubscriptionService } from './subscription.service';
 import { UsageLedgerService } from './usage-ledger.service';
 import { BillingProvider, ManualBillingProvider } from './billing/billing.provider';
+import { CreditLedgerService, InsufficientCreditsError } from './credits/credit-ledger.service';
+import { ENTITLEMENT_KEYS, EntitlementsService } from './credits/entitlements.service';
 
 /**
  * Pins the public `@ever-works/agent/subscriptions` barrel surface and the
@@ -33,6 +35,13 @@ describe('SubscriptionsModule + barrel re-exports', () => {
             expect(subscriptionsBarrel.ManualBillingProvider).toBe(ManualBillingProvider);
         });
 
+        it('re-exports the credits surface (pricing Wave 9 M1)', () => {
+            expect(subscriptionsBarrel.CreditLedgerService).toBe(CreditLedgerService);
+            expect(subscriptionsBarrel.EntitlementsService).toBe(EntitlementsService);
+            expect(subscriptionsBarrel.InsufficientCreditsError).toBe(InsufficientCreditsError);
+            expect(subscriptionsBarrel.ENTITLEMENT_KEYS).toBe(ENTITLEMENT_KEYS);
+        });
+
         it('exposes the documented runtime symbols only (no extras silently appearing)', () => {
             const runtimeKeys = Object.keys(subscriptionsBarrel).sort();
             expect(runtimeKeys).toEqual(
@@ -42,6 +51,11 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                     'UsageLedgerService',
                     'BillingProvider',
                     'ManualBillingProvider',
+                    // Credits ledger + plan entitlements (pricing Wave 9 M1)
+                    'CreditLedgerService',
+                    'InsufficientCreditsError',
+                    'EntitlementsService',
+                    'ENTITLEMENT_KEYS',
                 ].sort(),
             );
         });
@@ -61,6 +75,12 @@ describe('SubscriptionsModule + barrel re-exports', () => {
             expect(providers).toContain(UsageLedgerService);
         });
 
+        it('declares the credits services (Wave 9 M1) as providers', () => {
+            const providers = getMeta('providers');
+            expect(providers).toContain(CreditLedgerService);
+            expect(providers).toContain(EntitlementsService);
+        });
+
         it('binds the abstract BillingProvider token to ManualBillingProvider via useClass', () => {
             const providers = getMeta('providers');
             const billingBinding = providers.find(
@@ -75,6 +95,12 @@ describe('SubscriptionsModule + barrel re-exports', () => {
             expect(exports).toContain(SubscriptionService);
             expect(exports).toContain(UsageLedgerService);
             expect(exports).toContain(BillingProvider);
+        });
+
+        it('exports the credits services (consumed by apps/api + the worker RPC proxy)', () => {
+            const exports = getMeta('exports');
+            expect(exports).toContain(CreditLedgerService);
+            expect(exports).toContain(EntitlementsService);
         });
 
         it('does NOT export ManualBillingProvider directly — consumers use the abstract token', () => {
