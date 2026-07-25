@@ -39,6 +39,7 @@
 		"@ever-works/plugin": "workspace:*"
 	},
 	"devDependencies": {
+		"@ever-works/contracts": "workspace:*",
 		"@ever-works/plugin": "workspace:*",
 		"@types/node": "^22.0.0",
 		"tsup": "^8.0.0",

@@ -33,7 +33,14 @@ export interface AgentTemplate {
     readonly systemPrompt: string;
     /** Free-text capabilities summary — becomes the Agent's capabilities field. */
     readonly capabilities: string;
-    /** Skill slugs (skills catalog) that pair well with this template. */
+    /**
+     * Skill slugs (skills catalog) that pair well with this template.
+     *
+     * Every slug here MUST exist in the first-party go-to-market Skill
+     * catalog (`GTM_SKILLS` in `@ever-works/contracts`) — the integrity
+     * suite fails the build otherwise. That pin is what stops the list
+     * from decaying back into aspirational names with nothing behind them.
+     */
     readonly suggestedSkills: readonly string[];
     /** Pipeline plugin id this template is designed to drive. */
     readonly suggestedPipeline: string | null;
@@ -112,7 +119,7 @@ export const AGENT_TEMPLATES: readonly AgentTemplate[] = [
         capabilities:
             'Site structure and metadata review; content-gap analysis; internal-linking suggestions; ' +
             'prioritized fix lists; post-change re-audits.',
-        suggestedSkills: ['campaign-reporting', 'engagement-analysis'],
+        suggestedSkills: ['seo-audit', 'campaign-reporting', 'engagement-analysis'],
         suggestedPipeline: null,
         defaultPermissions: {},
         defaultGuardrails: REQUIRE_APPROVAL,
@@ -146,7 +153,7 @@ export const AGENT_TEMPLATES: readonly AgentTemplate[] = [
         capabilities:
             'Lead list building from seeds and public signals; explainable lead scoring; risk flagging; ' +
             'evidence-bound contact enrichment; list hygiene.',
-        suggestedSkills: ['contact-enrichment', 'lead-scoring', 'risk-filter'],
+        suggestedSkills: ['lead-research', 'contact-enrichment', 'lead-scoring', 'risk-filter'],
         suggestedPipeline: 'gtm-pipeline',
         defaultPermissions: {},
         defaultGuardrails: REQUIRE_APPROVAL,
@@ -214,7 +221,12 @@ export const AGENT_TEMPLATES: readonly AgentTemplate[] = [
         capabilities:
             'Social calendar planning; channel-fit post drafting; review-first staging; ' +
             'engagement-informed iteration.',
-        suggestedSkills: ['news-signal-detection', 'engagement-analysis', 'digest-compilation'],
+        suggestedSkills: [
+            'social-scheduling',
+            'news-signal-detection',
+            'engagement-analysis',
+            'digest-compilation',
+        ],
         suggestedPipeline: 'gtm-pipeline',
         defaultPermissions: {},
         defaultGuardrails: REQUIRE_APPROVAL,

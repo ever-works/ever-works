@@ -30,6 +30,7 @@
 		"test:coverage": "vitest run --coverage"
 	},
 	"dependencies": {
+		"@ever-works/contracts": "workspace:*",
 		"@ever-works/plugin": "workspace:*",
 		"gray-matter": "^4.0.3"
 	},

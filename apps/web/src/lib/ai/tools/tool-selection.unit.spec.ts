@@ -45,6 +45,28 @@ describe('selectActiveToolNames', () => {
         expect(selected).toContain('pause_agent');
     });
 
+    /**
+     * Wave 10 — the go-to-market surfaces (Agent templates + the first-party
+     * Skills catalog) are reached with campaign language that shares no stem
+     * with "agent" or "skill". Without these slots the very tools the user
+     * asked for are gated out of the turn.
+     */
+    it.each([
+        ['draft outreach for my top leads', 'pause_agent'],
+        ['plan the launch campaign', 'list_agents'],
+        ['audit the seo on my blog', 'list_agents'],
+        ['write this week newsletter digest', 'pause_agent'],
+        ['what changed at that competitor', 'list_agents'],
+    ])('pulls the go-to-market surfaces in for %j', (text, expected) => {
+        expect(selectActiveToolNames(NAMES, { text })).toContain(expected);
+    });
+
+    it('leaves unrelated domains out of a go-to-market turn', () => {
+        const selected = selectActiveToolNames(NAMES, { text: 'draft outreach for my top leads' });
+        expect(selected).not.toContain('list_webhooks');
+        expect(selected).not.toContain('list_notifications');
+    });
+
     it('never exceeds the cap', () => {
         const many = Array.from({ length: 300 }, (_, i) => `unknown_tool_${i}`);
         const selected = selectActiveToolNames(many, {
