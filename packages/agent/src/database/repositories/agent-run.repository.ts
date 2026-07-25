@@ -101,6 +101,38 @@ export class AgentRunRepository {
     }
 
     /**
+     * Run telemetry — ACCUMULATE token usage onto `agent_runs.totalTokens`.
+     *
+     * Separate from {@link updateTelemetry} (which sets an absolute value)
+     * because the caller — `AgentRunService.runToolLoop` — only ever knows
+     * ONE round-trip's usage, and the same run's loop can be re-entered
+     * (the Wave 3 M5 red-gate iterate loop calls `execute()` again on the
+     * same run). Folding the delta in here keeps the counter monotonic
+     * across attempts without the loop needing to read the row itself.
+     *
+     * Read-modify-write rather than a raw `SET col = col + :delta`: the
+     * three supported drivers (postgres / better-sqlite3 / mysql) do not
+     * share an identifier-quoting style, and a single run's tool loop is
+     * the only writer of this column. NULL (pre-column rows, runs that
+     * never reported) is treated as 0.
+     *
+     * Best-effort by contract: a missing row is a no-op and a non-positive
+     * / non-finite delta writes nothing. Callers additionally guard —
+     * telemetry must never fail a run.
+     */
+    async addTokens(runId: string, delta: number): Promise<void> {
+        if (!Number.isFinite(delta) || delta <= 0) return;
+        const row = await this.repository.findOne({
+            where: { id: runId },
+            select: { id: true, totalTokens: true },
+        });
+        if (!row) return;
+        await this.repository.update(runId, {
+            totalTokens: (row.totalTokens ?? 0) + Math.trunc(delta),
+        });
+    }
+
+    /**
      * @internal Background workers and internal services that have already
      * verified agent ownership through another path (e.g. agent-run.service
      * receives an `Agent` entity from an ownership-checked query) may use

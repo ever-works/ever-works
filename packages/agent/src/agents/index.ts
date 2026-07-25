@@ -23,6 +23,7 @@ export * from './agent-notify-channel-facade';
 export * from './agent-plugin-tools-facade';
 export * from './agent-tools-skill';
 export * from './agent-tool.service';
+export * from './agent-domain-tool-sources';
 export * from './budget-period';
 export * from './guardrails';
 export * from './heartbeat-cron';
