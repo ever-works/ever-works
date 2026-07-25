@@ -2,6 +2,7 @@ import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
+import type { GateStatus, TaskAcceptanceCheck, TaskCheckResult } from '@ever-works/contracts';
 import { AgentRun, AgentRunStatus, AgentRunTriggerKind } from '../../entities/agent-run.entity';
 
 /**
@@ -487,6 +488,36 @@ export class AgentRunRepository {
             .orderBy('run.createdAt', 'ASC')
             .take(limit)
             .getMany();
+    }
+
+    /**
+     * Quality gates (Wave 3 M2) — persist the gate columns for one run.
+     *
+     * Explicit field-by-field whitelist, mirroring
+     * {@link updateTerminalColumns}: the callers (the dispatch-freeze
+     * snapshot in `agent-task-execute` and `TaskGateRunnerService`) hand
+     * over worker-influenced payloads, and none of those may ever write
+     * status/summary/telemetry columns through this path. Deliberately no
+     * status CAS — the gate columns are additive facts about the run, not
+     * lifecycle transitions, and the runner reports them right before the
+     * terminal write.
+     */
+    async updateGateResults(
+        runId: string,
+        patch: {
+            resolvedChecks?: TaskAcceptanceCheck[] | null;
+            checkResults?: TaskCheckResult[] | null;
+            gateStatus?: GateStatus | null;
+            gateAttempts?: number;
+        },
+    ): Promise<void> {
+        const update: Record<string, unknown> = {};
+        if (patch.resolvedChecks !== undefined) update.resolvedChecks = patch.resolvedChecks;
+        if (patch.checkResults !== undefined) update.checkResults = patch.checkResults;
+        if (patch.gateStatus !== undefined) update.gateStatus = patch.gateStatus;
+        if (patch.gateAttempts !== undefined) update.gateAttempts = patch.gateAttempts;
+        if (Object.keys(update).length === 0) return;
+        await this.repository.update(runId, update);
     }
 
     /**

@@ -52,6 +52,7 @@ import {
 } from '@ever-works/agent/agents';
 import {
     TaskChatService,
+    TaskGateRunnerService,
     TaskRunDenormService,
     TaskWorkspaceService,
     TaskRecurrenceDispatcherService,
@@ -271,6 +272,12 @@ export class TriggerInternalController implements OnModuleInit {
         // keeps compiling — inserting mid-list silently shifts all later args.
         @Optional()
         private readonly agentRunSweeperService?: AgentRunSweeperService,
+        // Wave 3 M2 — acceptance-check runner (quality gates). The
+        // agent-task-execute worker calls `runChecks` over the internal RPC
+        // channel after the agent loop, before the finalize/PR step. Same
+        // appended-last @Optional() posture as the sweeper above.
+        @Optional()
+        private readonly taskGateRunnerService?: TaskGateRunnerService,
     ) {}
 
     onModuleInit() {
@@ -313,6 +320,9 @@ export class TriggerInternalController implements OnModuleInit {
             TasksService: this.tasksService,
             TaskChatService: this.taskChatService,
             TaskWorkspaceService: this.taskWorkspaceService,
+            // Wave 3 M2 — agent-task-execute calls `runChecks` here after the
+            // agent loop (quality gates; allow-list auto-derived).
+            TaskGateRunnerService: this.taskGateRunnerService,
             // Kanban run cockpit (Wave 2) — agent-task-execute calls
             // recordQueued/recordStarted/recordTerminal here.
             TaskRunDenormService: this.taskRunDenormService,

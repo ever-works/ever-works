@@ -183,6 +183,9 @@ describe('TriggerInternalController', () => {
             undefined, // anonymousUserCleanupService
             undefined, // knowledgeBaseReconcileService
             undefined, // workProposalsApiService (Optional trailing)
+            undefined, // agentRunSweeperService (Optional trailing)
+            // Wave 3 M2 — quality gates. Not exercised by these tests.
+            undefined, // taskGateRunnerService (Optional trailing)
         );
         c.onModuleInit();
         return c;

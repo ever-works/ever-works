@@ -36,6 +36,7 @@ import {
 import { TaskTransitionService } from './task-transition.service';
 import { TasksService } from './tasks.service';
 import { TaskChatService } from './task-chat.service';
+import { TaskGateRunnerService } from './task-gate-runner.service';
 import { TaskRecurrenceDispatcherService } from './task-recurrence-dispatcher.service';
 import { TaskNotificationService } from './task-notification.service';
 import { TaskRunDenormService } from './task-run-denorm.service';
@@ -113,6 +114,10 @@ import { NotificationsModule } from '../notifications/notifications.module';
         TaskNotificationService,
         TaskRunDenormService,
         TaskWorkspaceService,
+        // Wave 3 M2 — acceptance-check runner (quality gates). Needs only
+        // AgentRunRepository (exported by AgentsModule above) to persist
+        // per-run gate results.
+        TaskGateRunnerService,
     ],
     exports: [
         TaskRepository,
@@ -136,6 +141,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
         TaskNotificationService,
         TaskRunDenormService,
         TaskWorkspaceService,
+        TaskGateRunnerService,
     ],
 })
 export class TasksDomainModule {}

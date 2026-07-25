@@ -27,12 +27,24 @@ const {
     AgentRunRepositoryToken,
     AgentRunServiceToken,
     TasksServiceToken,
+    TaskChatServiceToken,
+    TaskGateRunnerServiceToken,
+    TaskRunDenormServiceToken,
+    TaskWorkspaceServiceToken,
+    WorkRepositoryToken,
+    resolveAcceptanceChecksMock,
+    resolveChecksPolicyMock,
 } = vi.hoisted(() => {
     class StubInternalModule {}
     class AgentRepositoryToken {}
     class AgentRunRepositoryToken {}
     class AgentRunServiceToken {}
     class TasksServiceToken {}
+    class TaskChatServiceToken {}
+    class TaskGateRunnerServiceToken {}
+    class TaskRunDenormServiceToken {}
+    class TaskWorkspaceServiceToken {}
+    class WorkRepositoryToken {}
     return {
         taskMock: vi.fn(),
         createApplicationContextMock: vi.fn(),
@@ -42,6 +54,16 @@ const {
         AgentRunRepositoryToken,
         AgentRunServiceToken,
         TasksServiceToken,
+        TaskChatServiceToken,
+        TaskGateRunnerServiceToken,
+        TaskRunDenormServiceToken,
+        TaskWorkspaceServiceToken,
+        WorkRepositoryToken,
+        // Quality gates (Wave 3): the pure resolution helpers are mocked as
+        // controllable fns — their merge/clamp logic is pinned by the agent
+        // package's own task-gates.spec; THIS suite tests the orchestration.
+        resolveAcceptanceChecksMock: vi.fn(),
+        resolveChecksPolicyMock: vi.fn(),
     };
 });
 
@@ -58,6 +80,7 @@ vi.mock('@nestjs/core', () => ({
 vi.mock('@ever-works/agent/database', () => ({
     AgentRepository: AgentRepositoryToken,
     AgentRunRepository: AgentRunRepositoryToken,
+    WorkRepository: WorkRepositoryToken,
 }));
 
 vi.mock('@ever-works/agent/agents', () => ({
@@ -66,6 +89,12 @@ vi.mock('@ever-works/agent/agents', () => ({
 
 vi.mock('@ever-works/agent/tasks-domain', () => ({
     TasksService: TasksServiceToken,
+    TaskChatService: TaskChatServiceToken,
+    TaskGateRunnerService: TaskGateRunnerServiceToken,
+    TaskRunDenormService: TaskRunDenormServiceToken,
+    TaskWorkspaceService: TaskWorkspaceServiceToken,
+    resolveAcceptanceChecks: resolveAcceptanceChecksMock,
+    resolveChecksPolicy: resolveChecksPolicyMock,
 }));
 
 vi.mock('../trigger/worker/modules/trigger-internal.module', () => ({
@@ -106,9 +135,23 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
         markStarted: ReturnType<typeof vi.fn>;
         markCompleted: ReturnType<typeof vi.fn>;
         markFailed: ReturnType<typeof vi.fn>;
+        updateTelemetry: ReturnType<typeof vi.fn>;
+        updateGateResults: ReturnType<typeof vi.fn>;
     };
     let runner: { execute: ReturnType<typeof vi.fn> };
     let tasks: { getOne: ReturnType<typeof vi.fn> };
+    let taskChat: { post: ReturnType<typeof vi.fn> };
+    let gateRunner: { runChecks: ReturnType<typeof vi.fn> };
+    let runDenorm: {
+        recordQueued: ReturnType<typeof vi.fn>;
+        recordStarted: ReturnType<typeof vi.fn>;
+        recordTerminal: ReturnType<typeof vi.fn>;
+    };
+    let taskWorkspace: {
+        provisionForRun: ReturnType<typeof vi.fn>;
+        finalizeRun: ReturnType<typeof vi.fn>;
+    };
+    let works: { findById: ReturnType<typeof vi.fn> };
     let registeredConfig: TaskConfig;
 
     /**
@@ -148,11 +191,30 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
             markStarted: vi.fn().mockResolvedValue(true),
             markCompleted: vi.fn().mockResolvedValue(undefined),
             markFailed: vi.fn().mockResolvedValue(undefined),
+            updateTelemetry: vi.fn().mockResolvedValue(undefined),
+            updateGateResults: vi.fn().mockResolvedValue(undefined),
         };
         runner = {
             execute: vi.fn().mockResolvedValue({ status: 'assembled' }),
         };
         tasks = { getOne: vi.fn() };
+        taskChat = { post: vi.fn().mockResolvedValue(undefined) };
+        gateRunner = { runChecks: vi.fn() };
+        runDenorm = {
+            recordQueued: vi.fn().mockResolvedValue(undefined),
+            recordStarted: vi.fn().mockResolvedValue(undefined),
+            recordTerminal: vi.fn().mockResolvedValue(undefined),
+        };
+        // Isolation off by default — the overwhelmingly common path.
+        taskWorkspace = {
+            provisionForRun: vi.fn().mockResolvedValue(null),
+            finalizeRun: vi.fn().mockResolvedValue({ outcome: 'no-changes' }),
+        };
+        works = { findById: vi.fn().mockResolvedValue(null) };
+        // Quality gates default OFF — pre-gate behavior everywhere unless a
+        // test opts in.
+        resolveAcceptanceChecksMock.mockReturnValue([]);
+        resolveChecksPolicyMock.mockReturnValue('off');
 
         // The owner owns AGENT_ID and OWNED_TASK_ID. A foreign taskId is
         // rejected by TasksService.getOne exactly like the real
@@ -185,6 +247,11 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
                 if (token === AgentRunRepositoryToken) return runs;
                 if (token === AgentRunServiceToken) return runner;
                 if (token === TasksServiceToken) return tasks;
+                if (token === TaskChatServiceToken) return taskChat;
+                if (token === TaskGateRunnerServiceToken) return gateRunner;
+                if (token === TaskRunDenormServiceToken) return runDenorm;
+                if (token === TaskWorkspaceServiceToken) return taskWorkspace;
+                if (token === WorkRepositoryToken) return works;
                 throw new Error(`Unexpected DI token: ${String(token)}`);
             }),
             close: vi.fn().mockResolvedValue(undefined),
@@ -394,6 +461,188 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
                 }),
             ).rejects.toThrow(/Invalid payload\.userId/);
             expect(createApplicationContextMock).not.toHaveBeenCalled();
+        });
+    });
+
+    describe('quality gates (Wave 3 M2+M3) — dispatch-freeze + PR gate', () => {
+        const WORK_ID = '88888888-8888-4888-8888-888888888888';
+        const WORKSPACE = {
+            cwd: '/workspaces/task-1',
+            branch: 'task/owned-task',
+            baseSha: 'a'.repeat(40),
+            reused: false,
+            provider: 'workspace',
+        };
+        const BUILD_CHECK = {
+            id: 'build',
+            name: 'build',
+            kind: 'build',
+            command: 'pnpm build',
+            required: true,
+        };
+
+        /** Point the owned task at a Work so the gate path can resolve it. */
+        const useWorkTask = () => {
+            tasks.getOne.mockImplementation(async (userId: string, taskId: string) => {
+                if (userId === OWNER && taskId === OWNED_TASK_ID) {
+                    return {
+                        id: OWNED_TASK_ID,
+                        slug: 'owned-task',
+                        title: 'Owned Task',
+                        description: null,
+                        status: 'in_progress',
+                        priority: 'medium',
+                        labels: [],
+                        missionId: null,
+                        ideaId: null,
+                        workId: WORK_ID,
+                    };
+                }
+                throw new Error(`Task ${taskId} not found.`);
+            });
+            works.findById.mockResolvedValue({ id: WORK_ID, checksPolicy: 'required' });
+        };
+
+        it('snapshots the resolved checks onto the run right after the claim (dispatch-freeze)', async () => {
+            useWorkTask();
+            resolveAcceptanceChecksMock.mockReturnValue([BUILD_CHECK]);
+            resolveChecksPolicyMock.mockReturnValue('off');
+
+            await registeredConfig.run(basePayload(OWNED_TASK_ID));
+
+            expect(works.findById).toHaveBeenCalledWith(WORK_ID);
+            expect(runs.updateGateResults).toHaveBeenCalledWith('run-1', {
+                resolvedChecks: [BUILD_CHECK],
+            });
+        });
+
+        it("policy 'off' never invokes the gate runner and finalizes exactly as before", async () => {
+            useWorkTask();
+            taskWorkspace.provisionForRun.mockResolvedValue(WORKSPACE);
+            taskWorkspace.finalizeRun.mockResolvedValue({ outcome: 'pr-opened', prNumber: 7 });
+            resolveChecksPolicyMock.mockReturnValue('off');
+
+            const result = await registeredConfig.run(basePayload(OWNED_TASK_ID));
+
+            expect(gateRunner.runChecks).not.toHaveBeenCalled();
+            expect(taskWorkspace.finalizeRun).toHaveBeenCalledTimes(1);
+            expect(result).toMatchObject({ status: 'completed', workspaceOutcome: 'pr-opened' });
+        });
+
+        it("red gate + policy 'required' → NO finalize/PR, run completes naming the failing check, task chat notified", async () => {
+            useWorkTask();
+            taskWorkspace.provisionForRun.mockResolvedValue(WORKSPACE);
+            resolveAcceptanceChecksMock.mockReturnValue([BUILD_CHECK]);
+            resolveChecksPolicyMock.mockReturnValue('required');
+            gateRunner.runChecks.mockResolvedValue({
+                gateStatus: 'red',
+                results: [{ id: 'build', status: 'red', exitCode: 1, durationMs: 12 }],
+            });
+
+            const result = await registeredConfig.run(basePayload(OWNED_TASK_ID));
+
+            // The single load-bearing assertion of the whole feature:
+            // a red check opens no PR.
+            expect(taskWorkspace.finalizeRun).not.toHaveBeenCalled();
+            expect(gateRunner.runChecks).toHaveBeenCalledWith({
+                checks: [BUILD_CHECK],
+                cwd: WORKSPACE.cwd,
+                runId: 'run-1',
+                policy: 'required',
+            });
+            expect(runs.markCompleted).toHaveBeenCalledTimes(1);
+            expect(runs.markCompleted.mock.calls[0][1]).toContain('build');
+            expect(runs.markCompleted.mock.calls[0][1]).toContain('PR withheld');
+            expect(taskChat.post).toHaveBeenCalledTimes(1);
+            const [chatUserId, chatInput] = taskChat.post.mock.calls[0];
+            expect(chatUserId).toBe(OWNER);
+            expect(chatInput).toMatchObject({
+                taskId: OWNED_TASK_ID,
+                authorType: 'agent',
+                authorId: AGENT_ID,
+            });
+            expect(chatInput.body).toContain('build');
+            expect(chatInput.body).toContain('no PR was opened');
+            expect(result).toMatchObject({
+                status: 'completed',
+                reason: 'gate-red',
+                gateStatus: 'red',
+            });
+        });
+
+        it("green gate → finalize proceeds carrying the 'all checks green' PR note", async () => {
+            useWorkTask();
+            taskWorkspace.provisionForRun.mockResolvedValue(WORKSPACE);
+            taskWorkspace.finalizeRun.mockResolvedValue({ outcome: 'pr-opened', prNumber: 9 });
+            resolveAcceptanceChecksMock.mockReturnValue([BUILD_CHECK]);
+            resolveChecksPolicyMock.mockReturnValue('required');
+            gateRunner.runChecks.mockResolvedValue({
+                gateStatus: 'green',
+                results: [{ id: 'build', status: 'green', exitCode: 0, durationMs: 12 }],
+            });
+
+            const result = await registeredConfig.run(basePayload(OWNED_TASK_ID));
+
+            expect(taskWorkspace.finalizeRun).toHaveBeenCalledTimes(1);
+            expect(taskWorkspace.finalizeRun.mock.calls[0][0]).toMatchObject({
+                gate: { checksPassed: 1 },
+            });
+            expect(result).toMatchObject({ status: 'completed', workspaceOutcome: 'pr-opened' });
+        });
+
+        it("policy 'required' with ZERO checks → gate skipped, PR withheld, 'no checks configured' in chat", async () => {
+            useWorkTask();
+            taskWorkspace.provisionForRun.mockResolvedValue(WORKSPACE);
+            resolveAcceptanceChecksMock.mockReturnValue([]);
+            resolveChecksPolicyMock.mockReturnValue('required');
+            gateRunner.runChecks.mockResolvedValue({ gateStatus: 'skipped', results: [] });
+
+            const result = await registeredConfig.run(basePayload(OWNED_TASK_ID));
+
+            expect(taskWorkspace.finalizeRun).not.toHaveBeenCalled();
+            expect(runs.markCompleted.mock.calls[0][1]).toContain('no checks configured');
+            expect(taskChat.post.mock.calls[0][1].body).toContain('no checks configured');
+            expect(result).toMatchObject({
+                status: 'completed',
+                reason: 'gate-red',
+                gateStatus: 'skipped',
+            });
+        });
+
+        it("red gate + policy 'warn' → reports but never blocks; finalize proceeds WITHOUT the green note", async () => {
+            useWorkTask();
+            taskWorkspace.provisionForRun.mockResolvedValue(WORKSPACE);
+            taskWorkspace.finalizeRun.mockResolvedValue({ outcome: 'pr-opened', prNumber: 11 });
+            resolveAcceptanceChecksMock.mockReturnValue([BUILD_CHECK]);
+            resolveChecksPolicyMock.mockReturnValue('warn');
+            gateRunner.runChecks.mockResolvedValue({
+                gateStatus: 'red',
+                results: [{ id: 'build', status: 'red', exitCode: 1, durationMs: 12 }],
+            });
+
+            const result = await registeredConfig.run(basePayload(OWNED_TASK_ID));
+
+            expect(taskWorkspace.finalizeRun).toHaveBeenCalledTimes(1);
+            expect(taskWorkspace.finalizeRun.mock.calls[0][0].gate).toBeUndefined();
+            expect(taskChat.post).not.toHaveBeenCalled();
+            expect(result).toMatchObject({ status: 'completed', workspaceOutcome: 'pr-opened' });
+        });
+
+        it('a crashed gate step marks the run FAILED — never green', async () => {
+            useWorkTask();
+            taskWorkspace.provisionForRun.mockResolvedValue(WORKSPACE);
+            resolveAcceptanceChecksMock.mockReturnValue([BUILD_CHECK]);
+            resolveChecksPolicyMock.mockReturnValue('required');
+            gateRunner.runChecks.mockRejectedValue(new Error('rpc down'));
+
+            const result = await registeredConfig.run(basePayload(OWNED_TASK_ID));
+
+            expect(taskWorkspace.finalizeRun).not.toHaveBeenCalled();
+            expect(runs.markFailed).toHaveBeenCalledWith(
+                'run-1',
+                expect.stringContaining('Quality gate execution failed'),
+            );
+            expect(result).toMatchObject({ status: 'failed', reason: 'gate-execution-failed' });
         });
     });
 });

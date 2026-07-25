@@ -180,6 +180,13 @@ export class TaskWorkspaceService {
         /** From `agent.permissions.canOpenPullRequests` (default true). */
         agentCanOpenPullRequests: boolean;
         workspace: ProvisionedTaskWorkspace;
+        /**
+         * Wave 3 M3 — optional note that a green quality gate preceded this
+         * finalize; surfaces on the PR body. The gate DECISION stays in the
+         * worker step (a red gate never reaches finalizeRun at all) — this
+         * is presentation only, which is why omitting it changes nothing.
+         */
+        gate?: { checksPassed: number };
     }): Promise<TaskWorkspaceFinalizeOutcome> {
         const { task, userId, workspace } = input;
         if (!this.workspaceFacade || !this.gitFacade) {
@@ -254,6 +261,9 @@ export class TaskWorkspaceService {
             return { outcome: 'pushed-no-pr' };
         }
 
+        const gateNote = input.gate
+            ? `\n\nQuality gate: all ${input.gate.checksPassed} acceptance checks green.`
+            : '';
         const pr = await this.gitFacade.createPullRequest(
             {
                 owner,
@@ -261,7 +271,7 @@ export class TaskWorkspaceService {
                 title: `Task ${task.slug}: ${task.title ?? 'agent run output'}`,
                 head: workspace.branch,
                 base: baseRef,
-                body: `Automated changes for Task \`${task.slug}\` (agent run). Review before merging — merge policy is governed by the Work's merge-policy settings.`,
+                body: `Automated changes for Task \`${task.slug}\` (agent run). Review before merging — merge policy is governed by the Work's merge-policy settings.${gateNote}`,
             },
             gitOptions,
         );
