@@ -14,7 +14,12 @@ import {
     Min,
     ValidateNested,
 } from 'class-validator';
-import { TaskPriority, TaskStatus, type TaskActorType } from '@ever-works/agent/tasks-domain';
+import {
+    TaskPriority,
+    TaskStatus,
+    type TaskActorType,
+    type TaskIsolationMode,
+} from '@ever-works/agent/tasks-domain';
 
 export class CreateTaskDto {
     @IsString()
@@ -38,6 +43,12 @@ export class CreateTaskDto {
     @IsString({ each: true })
     @MaxLength(80, { each: true })
     labels?: string[] | null;
+
+    /** Task isolation override (worktree-per-Task, Wave 2): NULL
+     *  inherits the Work's taskIsolation setting. */
+    @IsOptional()
+    @IsIn(['on', 'off'])
+    isolationMode?: TaskIsolationMode | null;
 
     @IsOptional()
     @IsUUID()
@@ -96,6 +107,12 @@ export class UpdateTaskDto {
     @IsString({ each: true })
     @MaxLength(80, { each: true })
     labels?: string[] | null;
+
+    /** Task isolation override (worktree-per-Task, Wave 2): NULL
+     *  inherits the Work's taskIsolation setting. */
+    @IsOptional()
+    @IsIn(['on', 'off'])
+    isolationMode?: TaskIsolationMode | null;
 
     /**
      * Re-filing a Task under a different owner. `null` detaches it from

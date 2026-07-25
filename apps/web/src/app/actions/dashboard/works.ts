@@ -1375,6 +1375,57 @@ export async function rotateActivitySyncSecret(workId: string) {
     }
 }
 
+/**
+ * Wave 2 M7 — Work-level worktree-per-Task isolation settings. All four
+ * fields flow through the same `PATCH /works/:id` UpdateWorkDto path the
+ * sibling settings cards use.
+ */
+export async function updateTaskIsolationSettings(
+    workId: string,
+    settings: {
+        taskIsolation?: 'off' | 'worktree';
+        taskIsolationBaseBranch?: string | null;
+        taskIsolationTargetRepo?: 'work-output' | 'linked';
+        taskBranchCleanup?: 'on-merge' | 'manual';
+    },
+) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    const taskIsolationSchema = z.object({
+        taskIsolation: z.enum(['off', 'worktree']).optional(),
+        taskIsolationBaseBranch: z.string().max(255).nullable().optional(),
+        taskIsolationTargetRepo: z.enum(['work-output', 'linked']).optional(),
+        taskBranchCleanup: z.enum(['on-merge', 'manual']).optional(),
+    });
+
+    try {
+        const validation = taskIsolationSchema.safeParse(settings);
+        if (!validation.success) {
+            return {
+                success: false,
+                error: validation.error.errors[0].message,
+            };
+        }
+
+        const response = await workAPI.update(workId, validation.data);
+        revalidatePath(`/works/${workId}/settings`);
+
+        return {
+            success: response.status === 'success',
+        };
+    } catch (error) {
+        console.error('Failed to update task isolation settings:', error);
+        return {
+            success: false,
+            error:
+                error instanceof Error ? error.message : 'Failed to update task isolation settings',
+        };
+    }
+}
+
 export async function updateCommitterSettings(
     workId: string,
     settings: {

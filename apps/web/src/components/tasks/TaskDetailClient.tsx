@@ -17,6 +17,7 @@ import type {
 import { postTaskChatAction, transitionTaskAction, updateTaskAction } from '@/app/actions/tasks';
 import { TaskRecurringSection } from './TaskRecurringSection';
 import { TaskAttachmentsSection } from './TaskAttachmentsSection';
+import { TaskBranchSection } from './TaskBranchSection';
 
 // Status tones + dots mirror /tasks (TasksList) so colours stay
 // consistent across the list filter and the detail workflow buttons.
@@ -476,6 +477,9 @@ export function TaskDetailClient({
                             </DetailRow>
                         </dl>
                     </div>
+
+                    {/* Wave 2 M7 — isolated-branch cockpit / isolation override. */}
+                    <TaskBranchSection task={task} />
 
                     {/* Phase 17.8 UI — Recurring template controls. */}
                     <TaskRecurringSection task={task} />

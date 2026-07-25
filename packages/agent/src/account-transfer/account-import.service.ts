@@ -526,6 +526,32 @@ export class AccountImportService {
                 if (typeof dir.providerRepositoryEnabled === 'boolean') {
                     updateData.providerRepositoryEnabled = dir.providerRepositoryEnabled;
                 }
+                if (
+                    typeof dir.taskIsolation === 'string' &&
+                    ['off', 'worktree'].includes(dir.taskIsolation)
+                ) {
+                    updateData.taskIsolation = dir.taskIsolation;
+                }
+                if (
+                    typeof dir.taskIsolationTargetRepo === 'string' &&
+                    ['work-output', 'data', 'provider'].includes(dir.taskIsolationTargetRepo)
+                ) {
+                    updateData.taskIsolationTargetRepo = dir.taskIsolationTargetRepo;
+                }
+                if (
+                    typeof dir.taskBranchCleanup === 'string' &&
+                    ['on-merge', 'manual'].includes(dir.taskBranchCleanup)
+                ) {
+                    updateData.taskBranchCleanup = dir.taskBranchCleanup;
+                }
+                if (
+                    dir.taskIsolationBaseBranch === null ||
+                    (typeof dir.taskIsolationBaseBranch === 'string' &&
+                        dir.taskIsolationBaseBranch.length <= 128)
+                ) {
+                    // null = 'use repo default' and must overwrite a custom base.
+                    updateData.taskIsolationBaseBranch = dir.taskIsolationBaseBranch;
+                }
                 await this.workRepository.update(existing.id, updateData);
 
                 await this.importWorkRelations(existing.id, userId, dir, includesSecrets, result);
@@ -560,6 +586,30 @@ export class AccountImportService {
         }
         if (typeof dir.providerRepositoryEnabled === 'boolean') {
             createData.providerRepositoryEnabled = dir.providerRepositoryEnabled;
+        }
+        if (
+            typeof dir.taskIsolation === 'string' &&
+            ['off', 'worktree'].includes(dir.taskIsolation)
+        ) {
+            createData.taskIsolation = dir.taskIsolation;
+        }
+        if (
+            typeof dir.taskIsolationTargetRepo === 'string' &&
+            ['work-output', 'data', 'provider'].includes(dir.taskIsolationTargetRepo)
+        ) {
+            createData.taskIsolationTargetRepo = dir.taskIsolationTargetRepo;
+        }
+        if (
+            typeof dir.taskBranchCleanup === 'string' &&
+            ['on-merge', 'manual'].includes(dir.taskBranchCleanup)
+        ) {
+            createData.taskBranchCleanup = dir.taskBranchCleanup;
+        }
+        if (
+            typeof dir.taskIsolationBaseBranch === 'string' &&
+            dir.taskIsolationBaseBranch.length <= 128
+        ) {
+            createData.taskIsolationBaseBranch = dir.taskIsolationBaseBranch;
         }
         const newDir = await this.workRepository.create(createData, user);
 

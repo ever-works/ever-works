@@ -141,6 +141,12 @@ export interface ExportedWork {
      *  an export/import round-trip — omitting it would silently re-enable
      *  provider-repo generation on the imported work. */
     providerRepositoryEnabled?: boolean;
+    /** Task-isolation settings (Wave 2) — user-visible Work settings
+     *  must round-trip; absent in old payloads = leave defaults. */
+    taskIsolation?: string;
+    taskIsolationBaseBranch?: string | null;
+    taskIsolationTargetRepo?: string;
+    taskBranchCleanup?: string;
     gitProvider: string;
     deployProvider?: string;
     readmeConfig?: any;

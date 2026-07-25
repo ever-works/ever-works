@@ -1,6 +1,6 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import { AgentRun, AgentRunStatus, AgentRunTriggerKind } from '../../entities/agent-run.entity';
 
@@ -30,6 +30,41 @@ export class AgentRunRepository {
 
     async findById(id: string): Promise<AgentRun | null> {
         return this.repository.findOne({ where: { id } });
+    }
+
+    /**
+     * Kanban run cockpit (Wave 2) — batch-load runs for the `includeRun`
+     * list embed. One IN query, no N+1.
+     *
+     * @internal Security: unscoped by design — callers MUST pass only ids
+     * derived server-side from rows the acting user already owns (the
+     * Tasks list hands over its own `latestRunId` pointers, never client
+     * input). HTTP handlers must not expose this with caller-supplied ids.
+     */
+    async findByIds(ids: string[]): Promise<AgentRun[]> {
+        // TypeORM renders `In([])` as invalid SQL on some drivers; and an
+        // empty batch has an obvious answer anyway.
+        if (ids.length === 0) return [];
+        return this.repository.find({ where: { id: In(ids) } });
+    }
+
+    /**
+     * Kanban run cockpit (Wave 2) — worker-side telemetry feed. A single
+     * `repository.update` so the worker can stream progress (current
+     * activity line, token counter, changed-files count) without touching
+     * status columns; the status lifecycle stays exclusively with the
+     * CAS-guarded transitions above. Best-effort — callers swallow
+     * failures, telemetry must never fail a run.
+     */
+    async updateTelemetry(
+        runId: string,
+        patch: {
+            currentActivity?: string | null;
+            totalTokens?: number | null;
+            changedFilesCount?: number | null;
+        },
+    ): Promise<void> {
+        await this.repository.update(runId, patch);
     }
 
     /**
@@ -452,6 +487,18 @@ export class AgentRunRepository {
             .orderBy('run.createdAt', 'ASC')
             .take(limit)
             .getMany();
+    }
+
+    /**
+     * Record the per-run workspace audit (worktree-per-Task isolation).
+     * The Task row keeps the durable branch identity; this is the
+     * run-scoped record for debugging and the run cockpit.
+     */
+    async setWorkspaceMeta(
+        runId: string,
+        workspaceMeta: NonNullable<AgentRun['workspaceMeta']>,
+    ): Promise<void> {
+        await this.repository.update(runId, { workspaceMeta });
     }
 
     /**

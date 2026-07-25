@@ -27,6 +27,7 @@ export * from './notification-channel.interface.js';
 export * from './connector.interface.js';
 export * from './agent-memory.interface.js';
 export * from './terminal-stream.interface.js';
+export * from './workspace.interface.js';
 // Org-wide Memory (Cortex P2) — pluggable ORG memory framework +
 // multi-doc-type RAG pipeline contracts. Additive, beside the existing
 // `agent-memory` / `vector-store` / `content-extractor` seams. See

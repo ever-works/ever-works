@@ -69,6 +69,14 @@ export interface AgentRunContext {
      * which case cooperative abort falls back to the throttled DB status read.
      */
     signal?: AbortSignal;
+    /**
+     * Working directory of the Task's provisioned isolated workspace
+     * (worktree-per-Task, Wave 2 M3). Set by `agent-task-execute` when
+     * the Task resolves isolation on; consumed by coding-session
+     * dispatch paths (pipeline plugins execute in a working directory).
+     * Absent for non-isolated runs.
+     */
+    workspaceCwd?: string | null;
 }
 
 export interface AgentRunBudgetCheck {

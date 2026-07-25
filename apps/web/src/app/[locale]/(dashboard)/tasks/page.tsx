@@ -78,6 +78,9 @@ export default async function TasksPage({ searchParams }: { searchParams: TasksS
         label: label || undefined,
         limit,
         offset,
+        // Kanban run cockpit (Wave 2) — embed each row's latest AgentRun so
+        // the board chips render on first paint (polling takes over after).
+        includeRun: true,
     };
     const result = await tasksAPI.list(query);
     const nextOffset = result.meta.offset + result.meta.limit;

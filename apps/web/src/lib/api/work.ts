@@ -102,7 +102,21 @@ export interface UpdateWorkDto {
     committerEmail?: string | null;
     /** EW-120 Activity Feed sync transport. */
     activitySyncMode?: 'pull' | 'push' | 'disabled';
+    /** Wave 2 M7 — worktree-per-Task isolation mode ('off' = agents work
+     *  directly against the Work's repos; 'worktree' = per-Task branches). */
+    taskIsolation?: TaskIsolationSetting;
+    /** Base branch Task branches fork from. `null` = repo default branch. */
+    taskIsolationBaseBranch?: string | null;
+    /** Where Task branches are pushed ('linked' is not yet available). */
+    taskIsolationTargetRepo?: TaskIsolationTargetRepo;
+    /** When Task branches are deleted after merge. */
+    taskBranchCleanup?: TaskBranchCleanup;
 }
+
+/** Wave 2 M7 — Work-level worktree-per-Task isolation settings. */
+export type TaskIsolationSetting = 'off' | 'worktree';
+export type TaskIsolationTargetRepo = 'work-output' | 'linked';
+export type TaskBranchCleanup = 'on-merge' | 'manual';
 
 export interface DeleteWorkDto {
     delete_data_repository?: boolean;
@@ -268,6 +282,12 @@ export interface Work {
     platformSyncLastSuccessAt?: string | null;
     platformSyncLastErrorAt?: string | null;
     platformSyncLastErrorMessage?: string | null;
+    // Wave 2 M7 — worktree-per-Task isolation settings. Absent on rows
+    // written before the columns existed — absent means 'off'.
+    taskIsolation?: TaskIsolationSetting;
+    taskIsolationBaseBranch?: string | null;
+    taskIsolationTargetRepo?: TaskIsolationTargetRepo;
+    taskBranchCleanup?: TaskBranchCleanup;
 }
 
 export interface WorksResponse {

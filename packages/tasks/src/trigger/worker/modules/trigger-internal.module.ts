@@ -17,7 +17,9 @@ import {
 import {
     TaskChatService,
     TaskRecurrenceDispatcherService,
+    TaskRunDenormService,
     TasksService,
+    TaskWorkspaceService,
 } from '@ever-works/agent/tasks-domain';
 import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
 import { NotificationChannelFacadeService } from '@ever-works/agent/facades';
@@ -141,6 +143,29 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
                 createRemoteProxy(apiClient, 'TasksService'),
             inject: [TriggerInternalApiClient],
         },
+        // Wave 2 M3/M6 — worktree-per-Task isolation. The real service
+        // (facades + repositories + the sandbox-workspace plugin) lives
+        // in the API; agent-task-execute and the task-branch-gc cron
+        // call provisionForRun/finalizeRun/sweepStaleBranches over the
+        // internal RPC channel. Execution is API-side today (the run
+        // itself is AgentRunService via this same proxy), so the
+        // checkout and the dispatch share one filesystem.
+        {
+            provide: TaskWorkspaceService,
+            useFactory: (apiClient) => createRemoteProxy(apiClient, 'TaskWorkspaceService'),
+            inject: [TriggerInternalApiClient],
+        },
+        // Kanban run cockpit (Wave 2) — latest-run denorm writes from the
+        // agent-task-execute worker (after claim + terminal transitions).
+        // The real service (TaskRepository graph) lives in the API; the
+        // worker only calls recordQueued/recordStarted/recordTerminal over
+        // the internal RPC channel, same shape as TaskWorkspaceService.
+        {
+            provide: TaskRunDenormService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'TaskRunDenormService'),
+            inject: [TriggerInternalApiClient],
+        },
         {
             provide: TaskChatService,
             useFactory: (apiClient: TriggerInternalApiClient) =>
@@ -199,6 +224,8 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         TaskRecurrenceDispatcherService,
         TasksService,
         TaskChatService,
+        TaskRunDenormService,
+        TaskWorkspaceService,
         NotificationChannelFacadeService,
         AnonymousUserCleanupService,
         KnowledgeBaseReconcileService,

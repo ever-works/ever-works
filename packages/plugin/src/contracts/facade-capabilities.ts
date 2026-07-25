@@ -72,7 +72,9 @@ export const PLUGIN_CAPABILITIES = {
 	// pty-local (node-pty in the executing job-runtime worker, with a
 	// child_process pipe floor). Future: pty-ssh (user's own box),
 	// k8s-exec. See capabilities/terminal-stream.interface.ts.
-	TERMINAL_STREAM: 'terminal-stream'
+	TERMINAL_STREAM: 'terminal-stream',
+	// Isolated git working contexts for agent Tasks (Wave 2).
+	WORKSPACE: 'workspace'
 } as const;
 
 export type PluginCapability = (typeof PLUGIN_CAPABILITIES)[keyof typeof PLUGIN_CAPABILITIES];

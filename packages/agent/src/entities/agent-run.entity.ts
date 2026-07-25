@@ -147,6 +147,38 @@ export class AgentRun {
     /** Highest published stdout seq (transcript/replay bookkeeping). */
     @Column({ type: 'int', nullable: true })
     lastFrameSeq?: number | null;
+    /** Per-run workspace audit (worktree-per-Task isolation):
+     *  `{ provider, path?, baseSha, branchRef, reused }`. The Task row
+     *  keeps the durable subset (branchRef/branchState/baseSha); this is
+     *  the run-scoped record for debugging and the run cockpit. */
+    @Column({ type: 'simple-json', nullable: true })
+    workspaceMeta?: {
+        provider: string;
+        path?: string;
+        baseSha: string;
+        branchRef: string;
+        reused: boolean;
+    } | null;
+
+    // ── Run cockpit telemetry (kanban run cockpit, Wave 2) ──────────
+    // Written by the worker via `AgentRunRepository.updateTelemetry` and
+    // surfaced on the board through the `includeRun` list embed. All
+    // nullable — runs that predate these columns (or workers that never
+    // report) simply show no telemetry. branchRef/prUrl/prNumber are NOT
+    // duplicated here: the Task row + `workspaceMeta` already carry them.
+
+    /** One-line "what the agent is doing right now" feed for the board
+     *  chip. Plain text only — the UI must never render it as markup. */
+    @Column({ type: 'varchar', length: 300, nullable: true })
+    currentActivity?: string | null;
+
+    /** Cumulative token usage reported by the worker for this run. */
+    @Column({ type: 'int', nullable: true })
+    totalTokens?: number | null;
+
+    /** Number of files the run has changed in its workspace so far. */
+    @Column({ type: 'int', nullable: true })
+    changedFilesCount?: number | null;
 
     @CreateDateColumn()
     createdAt: Date;

@@ -588,7 +588,13 @@ describe('AccountImportService', () => {
             await service.applyImport(
                 'user-1',
                 makePayload([
-                    makeWork({ slug: 'a', kind: 'blog', providerRepositoryEnabled: false }),
+                    makeWork({
+                        slug: 'a',
+                        kind: 'blog',
+                        providerRepositoryEnabled: false,
+                        taskIsolation: 'worktree',
+                        taskBranchCleanup: 'manual',
+                    }),
                 ]),
                 [],
             );
@@ -596,7 +602,12 @@ describe('AccountImportService', () => {
             // A user who deliberately disabled provider-repo generation must
             // not have it silently re-enabled by an account transfer.
             expect(mocks.workRepository.create).toHaveBeenCalledWith(
-                expect.objectContaining({ kind: 'blog', providerRepositoryEnabled: false }),
+                expect.objectContaining({
+                    kind: 'blog',
+                    providerRepositoryEnabled: false,
+                    taskIsolation: 'worktree',
+                    taskBranchCleanup: 'manual',
+                }),
                 expect.anything(),
             );
         });

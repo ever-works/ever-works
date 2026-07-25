@@ -21,6 +21,7 @@ import {
     type AgentTaskExecuteDispatcher,
 } from './task-dispatcher';
 import { TaskNotificationService } from './task-notification.service';
+import { TaskRunDenormService } from './task-run-denorm.service';
 
 /**
  * Tasks feature — Phase 12.1.
@@ -87,6 +88,9 @@ export class TaskTransitionService {
         // + blocked event. Optional so unit-test fixtures without the
         // Notifications graph still work.
         @Optional() private readonly notifications?: TaskNotificationService,
+        // Kanban run cockpit (Wave 2) — latest-run denorm on dispatch.
+        // Optional for the same unit-test-fixture reason as the rest.
+        @Optional() private readonly runDenorm?: TaskRunDenormService,
     ) {}
 
     /**
@@ -240,6 +244,13 @@ export class TaskTransitionService {
                           taskId: task.id,
                       })
                     : null;
+                // Kanban run cockpit — mirror the freshly-queued run onto the
+                // Task row so the board chip appears before the worker even
+                // claims it. The service is best-effort by contract (logs +
+                // never throws), so this cannot break the dispatch.
+                if (run) {
+                    await this.runDenorm?.recordQueued(task.id, run.id);
+                }
                 const handle = await this.dispatcher.enqueue({
                     agentId: assignee.assigneeId,
                     userId: task.userId,
@@ -287,6 +298,9 @@ export class TaskTransitionService {
                             `Failed to mark orphan AgentRun ${run.id} failed: ${failErr}`,
                         );
                     }
+                    // Kanban run cockpit — mirror the dispatch failure so the
+                    // board chip doesn't show a phantom queued run forever.
+                    await this.runDenorm?.recordTerminal(task.id, run.id, 'failed');
                 }
             }
         }

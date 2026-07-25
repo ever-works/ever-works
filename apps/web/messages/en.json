@@ -922,6 +922,14 @@
                 "title": "No Tasks yet.",
                 "subtitle": "Tasks ship in a later phase of the Agents/Skills/Tasks rollout. The page is reserved so the sidebar nav route resolves."
             },
+            "runChip": {
+                "queued": "Queued",
+                "running": "Running",
+                "completed": "Completed",
+                "failed": "Failed",
+                "cancelled": "Cancelled",
+                "tokens": "{count} tokens"
+            },
             "list": {
                 "newTask": "New Task",
                 "noDescription": "No description yet",
@@ -1015,6 +1023,29 @@
                 "dayOfMonth": "Day of month",
                 "timezone": "Timezone",
                 "save": "Save schedule"
+            },
+            "branch": {
+                "section": "Branch",
+                "branch": "Branch",
+                "copy": "Copy branch name",
+                "copied": "Copied",
+                "baseSha": "Base",
+                "state": "State",
+                "pullRequest": "Pull request",
+                "openPr": "Open PR",
+                "conflictTitle": "This branch has merge conflicts",
+                "resolve": "Resolve conflicts",
+                "resolving": "Resolving…",
+                "resolveError": "Failed to resolve conflicts",
+                "discard": "Discard branch",
+                "discardConfirm": "Discard this Task's branch? All unmerged changes on the branch will be permanently lost. This cannot be undone.",
+                "discardError": "Failed to discard branch",
+                "isolationLabel": "Task isolation",
+                "isolationDescription": "Override the Work-level isolation setting for this Task. When off, agents work directly against the Work's repositories.",
+                "isolationInherit": "Inherit from Work",
+                "isolationOn": "On — isolated branch",
+                "isolationOff": "Off — work directly",
+                "isolationSaveError": "Failed to update isolation override"
             },
             "status": {
                 "backlog": "Backlog",
@@ -3576,6 +3607,24 @@
                 "communityPrDisabled": "Community PR processing disabled",
                 "communityPrSettingsUpdated": "Community PR settings updated",
                 "communityPrUpdateFailed": "Failed to update community PR settings",
+                "taskIsolation": {
+                    "title": "Task isolation",
+                    "subtitle": "Run each isolated Task on its own branch instead of the Work's main line.",
+                    "enableLabel": "Isolate Tasks in worktree branches",
+                    "enableDescription": "When off, agents work directly against the Work's repositories. When on, each Task gets its own branch forked from the base branch.",
+                    "baseBranchLabel": "Base branch",
+                    "baseBranchDescription": "Branch Task branches fork from. Leave empty to use the repository's default branch.",
+                    "baseBranchPlaceholder": "Repository default branch",
+                    "baseBranchSave": "Save",
+                    "targetRepoLabel": "Target repository",
+                    "targetRepoWorkOutput": "Work output repository",
+                    "targetRepoLinked": "Linked repository (coming soon)",
+                    "cleanupLabel": "Branch cleanup",
+                    "cleanupOnMerge": "Delete branch when merged",
+                    "cleanupManual": "Keep branches (clean up manually)",
+                    "saved": "Task isolation settings updated",
+                    "saveFailed": "Failed to update task isolation settings"
+                },
                 "websiteConfig": {
                     "title": "Website Configuration",
                     "subtitle": "Customize how your Work's website looks and behaves",
