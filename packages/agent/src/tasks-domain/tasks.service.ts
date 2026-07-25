@@ -9,7 +9,7 @@ import {
 import type { TaskIsolationMode } from './task-isolation';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
-import type { TaskAcceptanceCheck } from '@ever-works/contracts';
+import type { GateStatus, TaskAcceptanceCheck } from '@ever-works/contracts';
 import { Task, TaskPriority, TaskStatus, type TaskActorType } from '../entities/task.entity';
 import { Mission } from '../entities/mission.entity';
 import { Team } from '../entities/team.entity';
@@ -112,6 +112,9 @@ export interface TaskRunEmbed {
     totalTokens: number | null;
     changedFilesCount: number | null;
     startedAt: Date | null;
+    /** Quality gates (Wave 3 M6) — latest-run gate verdict for the board
+     *  chip. `null` = the run never reached (or has no) gate step. */
+    gateStatus: GateStatus | null;
 }
 
 export type TaskWithRun = Task & { run?: TaskRunEmbed | null };
@@ -225,6 +228,7 @@ export class TasksService {
                         totalTokens: run.totalTokens ?? null,
                         changedFilesCount: run.changedFilesCount ?? null,
                         startedAt: run.startedAt ?? null,
+                        gateStatus: run.gateStatus ?? null,
                     },
                 ]),
             );

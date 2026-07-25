@@ -1,4 +1,5 @@
 import 'server-only';
+import type { GateStatus, TaskAcceptanceCheck } from '@ever-works/contracts';
 import { ApiResponseError, serverFetch, serverMutation } from './server-api';
 
 export type TaskStatus =
@@ -42,6 +43,9 @@ export interface TaskRun {
     totalTokens: number | null;
     changedFilesCount: number | null;
     startedAt: string | null;
+    /** Quality gates (Wave 3 M6) — latest-run gate verdict for the board
+     *  chip. `null`/absent = the run has no gate verdict. */
+    gateStatus?: GateStatus | null;
 }
 
 export interface Task {
@@ -85,6 +89,11 @@ export interface Task {
     latestRunId?: string | null;
     latestRunStatus?: TaskRunStatus | null;
     run?: TaskRun | null;
+    // Quality gates (Wave 3 M6) — acceptance checks declared on this Task.
+    // `null` = inherit the Work's `checkDefaults` untouched.
+    acceptanceChecks?: TaskAcceptanceCheck[] | null;
+    /** Gate-attempt budget; `null` = inherit the Work default. */
+    maxGateAttempts?: number | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -153,6 +162,8 @@ export const tasksAPI = {
         parentTaskId?: string | null;
         requireAllApprovers?: boolean;
         isolationMode?: TaskIsolationMode | null;
+        acceptanceChecks?: TaskAcceptanceCheck[] | null;
+        maxGateAttempts?: number | null;
     }) {
         return serverMutation<Task>({
             endpoint: '/tasks',
@@ -174,6 +185,8 @@ export const tasksAPI = {
                 | 'parentTaskId'
                 | 'requireAllApprovers'
                 | 'isolationMode'
+                | 'acceptanceChecks'
+                | 'maxGateAttempts'
             >
         >,
     ) {

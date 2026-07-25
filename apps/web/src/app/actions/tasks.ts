@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import type { TaskAcceptanceCheck } from '@ever-works/contracts';
 import {
     tasksAPI,
     type ListTasksQuery,
@@ -22,6 +23,9 @@ export async function createTaskAction(input: {
     ideaId?: string | null;
     workId?: string | null;
     parentTaskId?: string | null;
+    /** Quality gates (Wave 3 M6) — acceptance checks declared at create. */
+    acceptanceChecks?: TaskAcceptanceCheck[] | null;
+    maxGateAttempts?: number | null;
 }): Promise<Task> {
     // Security: verify session server-side before mutating data
     const user = await getAuthFromCookie();
@@ -44,6 +48,8 @@ export async function updateTaskAction(
             | 'parentTaskId'
             | 'requireAllApprovers'
             | 'isolationMode'
+            | 'acceptanceChecks'
+            | 'maxGateAttempts'
         >
     >,
 ): Promise<Task> {

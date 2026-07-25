@@ -55,6 +55,7 @@ import {
     ActivityActionType,
     ActivityStatus,
 } from '@ever-works/agent/activity-log';
+import type { TaskAcceptanceCheck, TaskCheckResult } from '@ever-works/contracts';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import {
@@ -253,6 +254,8 @@ export class AgentsController {
             costCents: number | null;
             gateStatus: string | null;
             gateAttempts: number;
+            resolvedChecks: TaskAcceptanceCheck[] | null;
+            checkResults: TaskCheckResult[] | null;
             persistent: boolean;
             terminalState: string | null;
             terminalEndedReason: string | null;
@@ -269,6 +272,7 @@ export class AgentsController {
                 status: query.status,
                 workId: query.workId,
                 agentId: query.agentId,
+                taskId: query.taskId,
                 triggerKind: query.kind,
             },
             limit,
@@ -297,9 +301,13 @@ export class AgentsController {
                 totalTokens: r.totalTokens ?? null,
                 changedFilesCount: r.changedFilesCount ?? null,
                 costCents: r.costCents ?? null,
-                // Quality-gate columns.
+                // Quality-gate columns. `resolvedChecks` is the dispatch-
+                // frozen definition set; `checkResults` carries per-check
+                // exit/duration/logTail for the Task-detail Checks section.
                 gateStatus: r.gateStatus ?? null,
                 gateAttempts: r.gateAttempts ?? 0,
+                resolvedChecks: r.resolvedChecks ?? null,
+                checkResults: r.checkResults ?? null,
                 // Streaming-terminal lifecycle columns.
                 persistent: r.persistent ?? false,
                 terminalState: r.terminalState ?? null,

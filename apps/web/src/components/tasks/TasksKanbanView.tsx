@@ -9,6 +9,7 @@ import { transitionTaskAction } from '@/app/actions/tasks';
 import { useTaskRunPolling } from '@/lib/hooks/use-task-run-polling';
 import { TaskBranchChip } from './TaskBranchChip';
 import { TaskRunChip } from './TaskRunChip';
+import { GateChip } from './GateChip';
 import {
     Inbox,
     Circle,
@@ -217,11 +218,14 @@ function TaskKanbanCard({
                 {task.title}
             </Link>
 
-            {/* Wave 2 M7 — isolated-branch chip · Wave 2 run cockpit — run chip */}
+            {/* Wave 2 M7 — isolated-branch chip · Wave 2 run cockpit — run
+                chip · Wave 3 M6 — gate chip when the latest run carries a
+                gate verdict. */}
             {(task.branchRef || task.run) && (
                 <div className="flex flex-wrap gap-1">
                     {task.branchRef && <TaskBranchChip task={task} />}
                     {task.run && <TaskRunChip task={task} />}
+                    {task.run?.gateStatus && <GateChip status={task.run.gateStatus} />}
                 </div>
             )}
 

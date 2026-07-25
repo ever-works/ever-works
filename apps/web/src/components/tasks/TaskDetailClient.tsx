@@ -14,10 +14,12 @@ import type {
     TaskPriority,
     TaskStatus,
 } from '@/lib/api/tasks';
+import type { AgentRunSession } from '@/lib/api/agents.shared';
 import { postTaskChatAction, transitionTaskAction, updateTaskAction } from '@/app/actions/tasks';
 import { TaskRecurringSection } from './TaskRecurringSection';
 import { TaskAttachmentsSection } from './TaskAttachmentsSection';
 import { TaskBranchSection } from './TaskBranchSection';
+import { TaskChecksSection } from './TaskChecksSection';
 
 // Status tones + dots mirror /tasks (TasksList) so colours stay
 // consistent across the list filter and the detail workflow buttons.
@@ -95,12 +97,15 @@ export function TaskDetailClient({
     initialAttachments = [],
     initialChatError = null,
     initialAttachmentsError = null,
+    initialGateRun = null,
 }: {
     task: Task;
     initialChat: TaskChatMessage[];
     initialAttachments?: TaskAttachmentRow[];
     initialChatError?: string | null;
     initialAttachmentsError?: string | null;
+    /** Quality gates (Wave 3 M6) — latest run w/ gate columns, server-fetched. */
+    initialGateRun?: AgentRunSession | null;
 }) {
     const t = useTranslations('dashboard.tasksPage.detail');
     const tStatus = useTranslations('dashboard.tasksPage.status');
@@ -324,6 +329,9 @@ export function TaskDetailClient({
                             <p className="text-sm text-text-muted italic">{t('noDescription')}</p>
                         )}
                     </section>
+
+                    {/* Quality gates (Wave 3 M6) — Checks section */}
+                    <TaskChecksSection task={task} initialGateRun={initialGateRun} />
 
                     {/* FU-5 — Attachments */}
                     <TaskAttachmentsSection

@@ -1,6 +1,7 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { tasksAPI, type TaskChatMessage } from '@/lib/api/tasks';
+import { agentsAPI } from '@/lib/api/agents';
 import { TaskDetailClient } from '@/components/tasks/TaskDetailClient';
 
 function errorMessage(err: unknown, fallback: string): string {
@@ -33,23 +34,31 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
     const task = await tasksAPI.get(id);
     if (!task) notFound();
 
-    const [chatResult, attachmentResult] = await Promise.allSettled([
+    const [chatResult, attachmentResult, gateRunResult] = await Promise.allSettled([
         tasksAPI.listChat(id, { limit: 50 }),
         // FU-5 — list initial attachments alongside the chat thread so
         // the detail page hydrates in one round-trip and the panel
         // renders without a client-side flash of "no attachments".
         tasksAPI.listAttachments(id),
+        // Quality gates (Wave 3 M6) — latest run for this Task with its
+        // gate columns (resolvedChecks / checkResults / gateStatus /
+        // gateAttempts) for the Checks section. Best-effort: a miss just
+        // renders the pre-dispatch declared checks.
+        agentsAPI.listSessions({ taskId: id, limit: 1 }),
     ]);
 
     const chat =
         chatResult.status === 'fulfilled' ? chatResult.value : { data: [] as TaskChatMessage[] };
     const attachments = attachmentResult.status === 'fulfilled' ? attachmentResult.value : [];
+    const gateRun =
+        gateRunResult.status === 'fulfilled' ? (gateRunResult.value.data[0] ?? null) : null;
 
     return (
         <TaskDetailClient
             task={task}
             initialChat={chat.data ?? []}
             initialAttachments={attachments}
+            initialGateRun={gateRun}
             initialChatError={
                 chatResult.status === 'rejected'
                     ? errorMessage(chatResult.reason, 'Failed to load conversation')

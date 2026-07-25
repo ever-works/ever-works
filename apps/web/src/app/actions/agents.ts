@@ -12,6 +12,7 @@ import {
     type CreateAgentInput,
     type UpdateAgentInput,
     type AgentFileName,
+    type ListRunSessionsQuery,
 } from '@/lib/api/agents';
 import { getAuthFromCookie } from '@/lib/auth';
 import { ROUTES } from '@/lib/constants';
@@ -215,4 +216,14 @@ export async function detachAgentAttachmentAction(agentId: string, attachmentId:
     const result = await agentsAPI.removeAttachment(agentId, attachmentId);
     revalidatePath(`/agents/${agentId}`);
     return result;
+}
+
+/**
+ * Run orchestration (Wave 4 M4) — read-only refresh used by the Sessions
+ * tab's polling hook. No revalidatePath on purpose — this is a poll, not
+ * a mutation (same posture as `listTasksWithRunsAction`).
+ */
+export async function listRunSessionsAction(query: ListRunSessionsQuery = {}) {
+    await ensureAuth();
+    return agentsAPI.listSessions(query);
 }

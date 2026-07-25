@@ -30,8 +30,12 @@ export {
     type AgentGuardrailActionType,
     type AgentGuardrailsMode,
     type AgentGuardrails,
+    type AgentRunSession,
+    type AgentRunSessionStatus,
+    type AgentRunTriggerKind,
+    type ListRunSessionsQuery,
 } from './agents.shared';
-import type { AgentGuardrails } from './agents.shared';
+import type { AgentGuardrails, AgentRunSession, ListRunSessionsQuery } from './agents.shared';
 
 export interface AgentPermissions {
     canCreateAgents: boolean;
@@ -378,6 +382,30 @@ export const agentsAPI = {
             method: 'POST',
             wrapInData: false,
         });
+    },
+
+    /**
+     * Run orchestration (Wave 4 M4) — the Sessions list: every AgentRun
+     * of the acting user across all Agents/Works, filterable + paginated
+     * (`GET /api/agents/runs`). Rows carry telemetry (currentActivity /
+     * totalTokens / costCents), quality-gate columns (gateStatus /
+     * resolvedChecks / checkResults) and terminal lifecycle columns for
+     * the attach link.
+     */
+    async listSessions(query: ListRunSessionsQuery = {}): Promise<{
+        data: AgentRunSession[];
+        meta: { total: number; limit: number; offset: number };
+    }> {
+        const params = new URLSearchParams();
+        if (query.status) params.set('status', query.status);
+        if (query.workId) params.set('workId', query.workId);
+        if (query.agentId) params.set('agentId', query.agentId);
+        if (query.taskId) params.set('taskId', query.taskId);
+        if (query.kind) params.set('kind', query.kind);
+        if (query.limit != null) params.set('limit', String(query.limit));
+        if (query.offset != null) params.set('offset', String(query.offset));
+        const qs = params.toString();
+        return serverFetch(`/agents/runs${qs ? `?${qs}` : ''}`, { method: 'GET' });
     },
 
     // FU-2 + FU-4 — runtime surfaces.
