@@ -2,13 +2,15 @@
 
 import { useEffect, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
-import { ListChecks } from 'lucide-react';
+import { ChevronDown, ChevronRight, ListChecks } from 'lucide-react';
 import { useSearchParams } from 'next/navigation';
+import type { TaskAcceptanceCheck } from '@ever-works/contracts';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import type { Task, TaskPriority } from '@/lib/api/tasks';
+import { ChecksEditor } from './ChecksEditor';
 // PASS-4 review fix (CRITICAL): templates dead end. Pre-fill from
 // ?from=<slug> when the user clicked "Use template" on /tasks/templates.
 import { listAstTemplates } from '@/lib/api/agent-templates';
@@ -24,6 +26,8 @@ type CreateTaskFn = (input: {
     missionId?: string | null;
     ideaId?: string | null;
     workId?: string | null;
+    acceptanceChecks?: TaskAcceptanceCheck[] | null;
+    maxGateAttempts?: number | null;
 }) => Promise<Task>;
 
 /**
@@ -61,6 +65,10 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
     // can show a visible notice to the user (guards against phishing deep-links
     // that silently inject content into the form before submission).
     const [preFillSource, setPreFillSource] = useState<'prompt' | 'template' | null>(null);
+    // Quality gates (Wave 3 M6) — optional acceptance-checks declaration.
+    const [checksOpen, setChecksOpen] = useState(false);
+    const [checks, setChecks] = useState<TaskAcceptanceCheck[]>([]);
+    const [maxGateAttempts, setMaxGateAttempts] = useState<string>('inherit');
     const [pending, startTransition] = useTransition();
     const [error, setError] = useState<string | null>(null);
 
@@ -169,6 +177,16 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
                         workId: scopeCount === 1 ? workId : null,
                         missionId: scopeCount === 1 ? missionId : null,
                         ideaId: scopeCount === 1 ? ideaId : null,
+                        // Quality gates — only declared rows with a command
+                        // count; empty declaration = inherit Work defaults.
+                        acceptanceChecks: (() => {
+                            const rows = checks.filter((c) => c.command.trim().length > 0);
+                            return rows.length > 0 ? rows : undefined;
+                        })(),
+                        maxGateAttempts:
+                            maxGateAttempts === 'inherit'
+                                ? undefined
+                                : parseInt(maxGateAttempts, 10),
                     });
                     router.push(ROUTES.DASHBOARD_TASK(task.id));
                 } catch (err) {
@@ -272,6 +290,60 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
                             className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark"
                         />
                     </div>
+                </div>
+                {/* Quality gates (Wave 3 M6) — collapsible acceptance-checks
+                    declaration. Left empty, the Task inherits the Work's
+                    checkDefaults untouched. */}
+                <div className="rounded-md border border-border/60 dark:border-border-dark/60">
+                    <button
+                        type="button"
+                        onClick={() => setChecksOpen((v) => !v)}
+                        aria-expanded={checksOpen}
+                        className="flex w-full items-center gap-1.5 px-3 py-2 text-xs font-medium text-text-secondary dark:text-text-secondary-dark hover:text-text dark:hover:text-text-dark"
+                        data-testid="new-task-checks-toggle"
+                    >
+                        {checksOpen ? (
+                            <ChevronDown className="w-3.5 h-3.5" />
+                        ) : (
+                            <ChevronRight className="w-3.5 h-3.5" />
+                        )}
+                        {t('acceptanceChecks')}
+                        {checks.length > 0 && (
+                            <span className="ml-1 text-[10px] font-mono text-text-muted">
+                                ({checks.length})
+                            </span>
+                        )}
+                    </button>
+                    {checksOpen && (
+                        <div className="px-3 pb-3 space-y-3">
+                            <p className="text-[11px] text-text-muted dark:text-text-muted-dark">
+                                {t('acceptanceChecksHint')}
+                            </p>
+                            <ChecksEditor
+                                value={checks}
+                                onChange={setChecks}
+                                disabled={pending}
+                                testIdPrefix="new-task-checks"
+                            />
+                            <label className="flex items-center gap-2 text-xs text-text-secondary dark:text-text-secondary-dark">
+                                {t('maxGateAttempts')}
+                                <Select
+                                    value={maxGateAttempts}
+                                    onValueChange={setMaxGateAttempts}
+                                    disabled={pending}
+                                    size="sm"
+                                    data-testid="new-task-max-gate-attempts"
+                                >
+                                    <option value="inherit">{t('maxGateAttemptsInherit')}</option>
+                                    {[1, 2, 3, 4, 5].map((n) => (
+                                        <option key={n} value={String(n)}>
+                                            {n}
+                                        </option>
+                                    ))}
+                                </Select>
+                            </label>
+                        </div>
+                    )}
                 </div>
                 {error && (
                     <p className="text-xs text-danger" role="alert">

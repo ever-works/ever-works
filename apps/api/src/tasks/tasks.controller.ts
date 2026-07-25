@@ -1,6 +1,7 @@
 import {
     BadRequestException,
     Body,
+    ConflictException,
     Controller,
     Delete,
     Get,
@@ -31,6 +32,7 @@ import { PluginUsageRepository } from '@ever-works/agent/database';
 // repository class lives under `@ever-works/agent/database` (the
 // agents barrel re-exports services + module only).
 import { AgentRepository } from '@ever-works/agent/database';
+import { TaskWorkspaceService } from '@ever-works/agent/tasks-domain';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import {
@@ -77,6 +79,8 @@ export class TasksController {
         private readonly pluginUsage: PluginUsageRepository,
         // Review-fix I5: AgentRepository for mention-lookup population.
         private readonly agents: AgentRepository,
+        // Wave 2 M5/M6 — workspace conflict-resolve + discard actions.
+        private readonly taskWorkspace: TaskWorkspaceService,
     ) {}
 
     /**
@@ -119,6 +123,10 @@ export class TasksController {
         @Query('search') search?: string,
         @Query('limit') limit?: string,
         @Query('offset') offset?: string,
+        // Kanban run cockpit (Wave 2 M2) — opt-in latest-run embed. The
+        // batch is keyed on the owner-scoped rows' `latestRunId` pointers
+        // server-side; this flag only toggles the embed, it carries no ids.
+        @Query('includeRun') includeRun?: string,
     ) {
         const filter: ListTasksFilter = {
             status: this.parseStatusList(status),
@@ -135,7 +143,9 @@ export class TasksController {
             limit: limit ? Math.min(200, Math.max(1, parseInt(limit, 10) || 50)) : 50,
             offset: offset ? Math.max(0, parseInt(offset, 10) || 0) : 0,
         };
-        const { rows, total } = await this.service.list(auth.userId, filter);
+        const { rows, total } = await this.service.list(auth.userId, filter, {
+            includeRun: includeRun === 'true',
+        });
         return { data: rows, meta: { total, limit: filter.limit, offset: filter.offset } };
     }
 
@@ -151,6 +161,7 @@ export class TasksController {
             status: body.status,
             priority: body.priority,
             labels: body.labels ?? null,
+            isolationMode: body.isolationMode ?? null,
             missionId: body.missionId ?? null,
             ideaId: body.ideaId ?? null,
             workId: body.workId ?? null,
@@ -161,6 +172,8 @@ export class TasksController {
             createdByType: 'user',
             createdById: auth.userId,
             requireAllApprovers: body.requireAllApprovers,
+            acceptanceChecks: body.acceptanceChecks ?? null,
+            maxGateAttempts: body.maxGateAttempts ?? null,
         });
     }
 
@@ -239,6 +252,46 @@ export class TasksController {
             throw new BadRequestException(`Invalid target status: ${body?.to}`);
         }
         return this.service.transition(auth.userId, id, body.to, { force: body.force === true });
+    }
+
+    @Post(':id/resolve-conflicts')
+    @ApiOperation({ summary: 'Re-run the Task agent to resolve a workspace merge conflict.' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 20, ttl: 60_000 } })
+    async resolveConflicts(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ) {
+        try {
+            return await this.taskWorkspace.resolveConflicts(auth.userId, id);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : '';
+            if (message === 'TASK_NOT_FOUND') throw new NotFoundException('Task not found');
+            if (message === 'TASK_NOT_IN_CONFLICT') {
+                throw new ConflictException('Task branch is not in a conflict state');
+            }
+            throw error;
+        }
+    }
+
+    @Post(':id/discard-branch')
+    @ApiOperation({
+        summary: 'Delete the Task branch and reset its workspace identity (irreversible).',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 20, ttl: 60_000 } })
+    async discardBranch(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ) {
+        try {
+            await this.taskWorkspace.discardBranch(auth.userId, id);
+            return { ok: true };
+        } catch (error) {
+            const message = error instanceof Error ? error.message : '';
+            if (message === 'TASK_NOT_FOUND') throw new NotFoundException('Task not found');
+            throw error;
+        }
     }
 
     @Post(':id/assignees')

@@ -111,6 +111,15 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 				description:
 					'GitHub login that owns the read-packages PAT. The Kubernetes deploy workflow uses this as REGISTRY_USERNAME when creating GHCR image pull secrets. Filled automatically by the read-packages OAuth flow; paste it manually when using a classic PAT.',
 				'x-scope': 'user'
+			},
+			webhookSecret: {
+				type: 'string',
+				title: 'Webhook secret',
+				description:
+					'Shared secret used to verify GitHub webhook deliveries sent to the platform ingest receiver (POST /api/ingest/github/events). Set the same value on the GitHub webhook configuration; deliveries with a missing or mismatched X-Hub-Signature-256 are rejected. Leave blank to keep the receiver disabled for your account.',
+				'x-secret': true,
+				'x-scope': 'user',
+				'x-widget': 'password'
 			}
 		}
 	};

@@ -38,6 +38,10 @@ export type {
 	OnboardingCatalogResponse,
 	OnboardingCard,
 	OnboardingCardBadge,
-	OnboardingPluginCard
+	OnboardingPluginCard,
+	OnboardingProfile,
+	OnboardingProfileOption,
+	OnboardingRoleId,
+	OnboardingTeamSizeId
 } from './wizard-state.js';
-export { ONBOARDING_DEFAULT_STATE } from './wizard-state.js';
+export { ONBOARDING_DEFAULT_STATE, ROLE_OPTIONS, TEAM_SIZE_OPTIONS } from './wizard-state.js';

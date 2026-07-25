@@ -20,12 +20,15 @@ jest.mock('@ever-works/agent/agents', () => ({
     AgentScheduleDispatcherService: class AgentScheduleDispatcherService {},
     AgentRunService: class AgentRunService {},
     AgentRunSweeperService: class AgentRunSweeperService {},
+    // Wave 4 M2 — drain-on-terminal RPC target (run orchestration).
+    RunDispatchGateService: class RunDispatchGateService {},
     AGENT_HEARTBEAT_TRIGGER: 'AGENT_HEARTBEAT_TRIGGER',
 }));
 jest.mock('@ever-works/agent/tasks-domain', () => ({
     TaskRecurrenceDispatcherService: class TaskRecurrenceDispatcherService {},
     TasksService: class TasksService {},
     TaskChatService: class TaskChatService {},
+    TaskRunDenormService: class TaskRunDenormService {},
 }));
 jest.mock('@ever-works/agent/entities', () => ({}));
 jest.mock('@ever-works/agent/cache', () => ({
@@ -72,6 +75,27 @@ jest.mock('@ever-works/agent/plugins', () => ({
     PluginRepository: class PluginRepository {},
     UserPluginRepository: class UserPluginRepository {},
     WorkPluginRepository: class WorkPluginRepository {},
+}));
+// Event-ingest spine (Wave 6) — the controller imports EventIngestService
+// from the ingest barrel; stub it so the real barrel (entity chain →
+// TypeORM under apps/api jest) is never loaded.
+jest.mock('@ever-works/agent/ingest', () => ({
+    EventIngestService: class EventIngestService {},
+    EventSourcePullService: class EventSourcePullService {},
+    EventIngestModule: class EventIngestModule {},
+}));
+// Digest briefings (Wave 7) — same rationale as the ingest stub above:
+// the controller imports DigestService from the digest barrel.
+jest.mock('@ever-works/agent/digest', () => ({
+    DigestService: class DigestService {},
+    DigestModule: class DigestModule {},
+}));
+// Credits ledger (pricing Wave 9 M1) — the controller imports
+// CreditLedgerService from the subscriptions barrel; stub it so the real
+// barrel (repositories → TypeORM entity chain) is never loaded.
+jest.mock('@ever-works/agent/subscriptions', () => ({
+    SubscriptionsModule: class SubscriptionsModule {},
+    CreditLedgerService: class CreditLedgerService {},
 }));
 jest.mock('@ever-works/agent/activity-log', () => ({
     ActivityLogService: class ActivityLogService {},
@@ -165,6 +189,8 @@ describe('TriggerInternalController', () => {
             undefined, // taskRecurrenceDispatcherService
             tasksService,
             taskChatService,
+            undefined, // taskWorkspaceService (Wave 2 — not exercised here)
+            undefined, // taskRunDenormService (kanban run cockpit — not exercised here)
             undefined, // notificationChannelFacade
             // EW-742 P3.2 T22 — three new constructor args added by PRs
             // bbc24309 / 5e4e2483 / 41906b71 to expose the worker-host
@@ -180,6 +206,9 @@ describe('TriggerInternalController', () => {
             undefined, // anonymousUserCleanupService
             undefined, // knowledgeBaseReconcileService
             undefined, // workProposalsApiService (Optional trailing)
+            undefined, // agentRunSweeperService (Optional trailing)
+            // Wave 3 M2 — quality gates. Not exercised by these tests.
+            undefined, // taskGateRunnerService (Optional trailing)
         );
         c.onModuleInit();
         return c;

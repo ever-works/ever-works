@@ -13,7 +13,14 @@ import { User } from './user.entity';
 import { Work } from './work.entity';
 import { WorkAgentRun } from './work-agent-run.entity';
 import { ClassToObject } from './types';
-import { KbDocumentClass, KbDocumentSource, KbDocumentStatus, KbLockMode } from './kb-types';
+import {
+    KbDecisionState,
+    KbDocumentClass,
+    KbDocumentSource,
+    KbDocumentStatus,
+    KbLockMode,
+    KbReviewState,
+} from './kb-types';
 import { WorkKnowledgeUpload } from './work-knowledge-upload.entity';
 import { TimestampColumn } from './_types';
 import type { KbConsolidationMarker } from '../services/memory-consolidation';
@@ -184,6 +191,26 @@ export class WorkKnowledgeDocument {
      */
     @Column({ type: 'simple-json', nullable: true })
     consolidation?: KbConsolidationMarker | null;
+
+    /**
+     * Decision lifecycle state (memory upgrades M4). Non-null only for
+     * `kbDocumentClass = 'decision'` rows. Status transitions are
+     * platform-side API calls validated against the status machine
+     * (`KB_DECISION_STATUS_TRANSITIONS`) — never an external event.
+     * Migration `1783700000000-AddKbDecisionReviewColumns` adds the
+     * column; `null` on every pre-existing row (fully additive).
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    decision?: KbDecisionState | null;
+
+    /**
+     * Review state (memory upgrades M7). `'proposed'` for agent-authored
+     * / consolidation-synthesized docs awaiting human review — such docs
+     * are excluded from context injection until accepted. `null` (all
+     * human-authored + pre-existing rows) is treated as `'accepted'`.
+     */
+    @Column({ type: 'varchar', nullable: true, name: 'review_state' })
+    reviewState?: KbReviewState | null;
 
     @CreateDateColumn()
     createdAt: Date;

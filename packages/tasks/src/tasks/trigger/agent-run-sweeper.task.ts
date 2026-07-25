@@ -46,6 +46,29 @@ export const agentRunSweeperTask = schedules.task({
                 const svc = appContext.get(AgentRunSweeperService);
                 const summary = await svc.sweepStuckRuns();
 
+                // Streaming-terminal M6: reap live-claiming sessions with a
+                // stale heartbeat, then best-effort publish the pinned exit
+                // frame so any attached browser learns the death instead of
+                // staring at a frozen pane. Frame publish is fully optional
+                // — the DB transition above is the source of truth.
+                const terminal = await svc.sweepStaleTerminalSessions();
+                if (terminal.swept.length > 0) {
+                    logger.warn('agent-run-sweeper reaped stale terminal sessions', {
+                        runIds: terminal.swept,
+                        cutoffMinutes: terminal.cutoffMinutes,
+                    });
+                    try {
+                        const { TerminalTransportClient } =
+                            await import('../../trigger/worker/services/terminal-transport.client.js');
+                        const client = new TerminalTransportClient();
+                        for (const runId of terminal.swept) {
+                            await client.publishExit(runId, -1, 'crashed').catch(() => undefined);
+                        }
+                    } catch {
+                        // No internal API config in this context — DB truth stands.
+                    }
+                }
+
                 if (summary.swept > 0) {
                     logger.warn('agent-run-sweeper reaped stuck runs', {
                         swept: summary.swept,

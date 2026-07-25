@@ -7,6 +7,7 @@ import {
     IsUrl,
     IsEmail,
     IsBoolean,
+    IsIn,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -59,4 +60,16 @@ export class UpdateProfileDto {
     @IsBoolean()
     @IsOptional()
     emailBudgetAlerts?: boolean;
+
+    @ApiPropertyOptional({
+        description:
+            "Digest briefing cadence: 'off' (default — no digests), 'daily' " +
+            "(every morning), or 'weekly' (Monday mornings). Digests are " +
+            'delivered as in-app notifications plus any configured ' +
+            'notification channels.',
+        enum: ['off', 'daily', 'weekly'],
+    })
+    @IsIn(['off', 'daily', 'weekly'])
+    @IsOptional()
+    digestFrequency?: 'off' | 'daily' | 'weekly';
 }

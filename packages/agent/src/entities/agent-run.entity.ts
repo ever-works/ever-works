@@ -1,5 +1,6 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 import { PortableDateColumn } from './_types';
+import type { GateStatus, TaskAcceptanceCheck, TaskCheckResult } from '@ever-works/contracts';
 
 /**
  * What kicked off this run.
@@ -37,6 +38,9 @@ export type AgentRunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'ca
 @Index('idx_agent_runs_status', ['status'])
 @Index('idx_agent_runs_task', ['taskId'])
 @Index('idx_agent_runs_chat_message', ['chatMessageId'])
+// Run orchestration (Wave 4 M1) — cheap per-Work concurrency counts +
+// Sessions-view grouping both scan (workId, status).
+@Index('idx_agent_runs_work_status', ['workId', 'status'])
 export class AgentRun {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -81,6 +85,39 @@ export class AgentRun {
     @Column('uuid', { nullable: true })
     chatMessageId?: string | null;
 
+    // ── Quality gates ──────────────────────────────────────────────
+    /**
+     * The acceptance checks this run is judged by, snapshotted at dispatch
+     * time via `resolveAcceptanceChecks(task, work)`. A snapshot, not a
+     * reference: editing the Task or the Work mid-run must not change what
+     * an in-flight run is graded against.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    resolvedChecks?: TaskAcceptanceCheck[] | null;
+
+    /**
+     * Per-check outcomes keyed by `TaskAcceptanceCheck.id`. `null` until
+     * the gate runner (a later milestone — this PR is schema only) reports.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    checkResults?: TaskCheckResult[] | null;
+
+    /**
+     * Aggregate gate outcome. `null` on runs that predate quality gates or
+     * that never reached the gate (crashed/cancelled before it). varchar(12)
+     * fits every `GateStatus` member.
+     */
+    @Column({ type: 'varchar', length: 12, nullable: true })
+    gateStatus?: GateStatus | null;
+
+    /**
+     * Gate attempts consumed by this run. NOT NULL default 0 so existing
+     * rows read as "never attempted" rather than unknown; bounded by
+     * `resolveMaxGateAttempts` (1..5) once the runner lands.
+     */
+    @Column({ type: 'int', default: 0 })
+    gateAttempts: number;
+
     // Tenant + Organization scope FKs (EW-657 Tier C denormalization).
     // No @ManyToOne — cycle-avoidance, see user.entity.ts EW-654 comment.
     @Column({ type: 'uuid', nullable: true })
@@ -110,6 +147,153 @@ export class AgentRun {
      */
     @Column({ type: 'varchar', length: 128, nullable: true })
     memorySessionId?: string | null;
+
+    // ── Streaming-terminal columns (M4). All nullable: NULL means "this
+    // run has no terminal" — every pre-existing and non-interactive run.
+    // INVARIANT (schema test): agent_runs gains no content/transcript
+    // bytes — terminal output lives in log chunks + the relay window.
+
+    /** Run intends a long-lived interactive session (park/resume-able). */
+    @Column({ type: 'boolean', default: false })
+    persistent: boolean;
+
+    /** `starting | attached | ended` — live terminal lifecycle. */
+    @Column({ type: 'varchar', length: 16, nullable: true })
+    terminalState?: string | null;
+
+    /** `completed | crashed | closed | parked` (+ provider hints). */
+    @Column({ type: 'varchar', length: 32, nullable: true })
+    terminalEndedReason?: string | null;
+
+    /** Which terminal-stream plugin hosted the session. */
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    terminalProviderId?: string | null;
+
+    /**
+     * The pipeline CLI's own resume id (conversation lifetime — sibling
+     * of `memorySessionId`). Park kills the process but keeps this, so
+     * Resume = new run + this id handed to the pipeline plugin.
+     */
+    @Column({ type: 'varchar', length: 128, nullable: true })
+    cliSessionId?: string | null;
+
+    /** Sweeper input: stale heartbeat + live terminalState ⇒ crashed. */
+    @Column({ type: 'timestamp', nullable: true })
+    lastHeartbeatAt?: Date | null;
+
+    /** Highest published stdout seq (transcript/replay bookkeeping). */
+    @Column({ type: 'int', nullable: true })
+    lastFrameSeq?: number | null;
+    /** Per-run workspace audit (worktree-per-Task isolation):
+     *  `{ provider, path?, baseSha, branchRef, reused }`. The Task row
+     *  keeps the durable subset (branchRef/branchState/baseSha); this is
+     *  the run-scoped record for debugging and the run cockpit. */
+    @Column({ type: 'simple-json', nullable: true })
+    workspaceMeta?: {
+        provider: string;
+        path?: string;
+        baseSha: string;
+        branchRef: string;
+        reused: boolean;
+    } | null;
+
+    // ── Run cockpit telemetry (kanban run cockpit, Wave 2) ──────────
+    // Written by the worker via `AgentRunRepository.updateTelemetry` and
+    // surfaced on the board through the `includeRun` list embed. All
+    // nullable — runs that predate these columns (or workers that never
+    // report) simply show no telemetry. branchRef/prUrl/prNumber are NOT
+    // duplicated here: the Task row + `workspaceMeta` already carry them.
+
+    /** One-line "what the agent is doing right now" feed for the board
+     *  chip. Plain text only — the UI must never render it as markup. */
+    @Column({ type: 'varchar', length: 300, nullable: true })
+    currentActivity?: string | null;
+
+    /** Cumulative token usage reported by the worker for this run. */
+    @Column({ type: 'int', nullable: true })
+    totalTokens?: number | null;
+
+    /** Number of files the run has changed in its workspace so far. */
+    @Column({ type: 'int', nullable: true })
+    changedFilesCount?: number | null;
+
+    // ── Run orchestration (Wave 4 M1). All additive; NULL/false on
+    // every pre-existing row. The dispatch gate + Sessions list are the
+    // consumers — nothing here changes the status state machine.
+
+    /**
+     * Denormalized Work scope, derived at creation from `task.workId`
+     * when the run is task-attached (NULL otherwise — heartbeat/manual
+     * runs have no Work). Powers per-Work concurrency counts and the
+     * Sessions view's group-by-Work without a join per row.
+     */
+    @Column({ type: 'uuid', nullable: true })
+    workId?: string | null;
+
+    /**
+     * The run is parked on a question/approval for a human. Set by
+     * lifecycle signals (never agent self-report prose); a run in this
+     * state must NEVER be reaped by TTL sweeps. Boolean (not a status
+     * member) so the existing status state machine and every CAS guard
+     * keep working unchanged.
+     */
+    @Column({ type: 'boolean', default: false })
+    awaitingInput: boolean;
+
+    /**
+     * Why a `queued` run has NOT been dispatched to the job runtime.
+     * `concurrency-limit` = parked by `RunDispatchGateService`; NULL =
+     * dispatched (or predates the gate). Cleared when a drain promotes
+     * the run. Short machine token, never free text.
+     */
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    queuedReason?: string | null;
+
+    /**
+     * Which pipeline plugin id executes this run (claude-code, codex,
+     * standard-pipeline, …) — the Sessions view's "runs on" chip. NULL
+     * for runs that predate the column or never reported.
+     */
+    @Column({ type: 'varchar', length: 32, nullable: true })
+    runnerKind?: string | null;
+
+    /**
+     * Cumulative cost estimate for this run in integer cents. Sibling
+     * of `totalTokens` (per-run rollup); the per-event source of truth
+     * stays `plugin_usage_events.costCents`.
+     */
+    @Column({ type: 'int', nullable: true })
+    costCents?: number | null;
+
+    // ── Run steering (Wave 4 M5). Both additive; NULL/false on every
+    // pre-existing row. The steering service writes them, the executing
+    // run's tool loop reads them between iterations.
+
+    /**
+     * FIFO queue of steering messages waiting to be injected into the
+     * LIVE run. `RunSteeringService.steer()` appends while the run is
+     * `queued`/`running`; the tool loop drains the queue between model
+     * round-trips and appends each entry as a `user` turn, then clears
+     * the column. NULL = nothing pending (the overwhelmingly common
+     * case), so the column costs one text read per iteration and no
+     * write at all on an unsteered run.
+     *
+     * Deliberately a queue, not a single slot: the UX contract is
+     * "messages sent during an active stream are queued, never dropped".
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    pendingInput?: string[] | null;
+
+    /**
+     * Cooperative stop request. Set by `RunSteeringService.interrupt()`;
+     * the tool loop checks it at the same checkpoint as the abort
+     * signal and stops BETWEEN iterations, so the run ends cleanly with
+     * a summary instead of being killed mid-round-trip. Distinct from
+     * cancel: cancel kills the process and skips every side effect,
+     * interrupt asks the agent to stop and completes the run honestly.
+     */
+    @Column({ type: 'boolean', default: false })
+    interruptRequested: boolean;
 
     @CreateDateColumn()
     createdAt: Date;

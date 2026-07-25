@@ -16,6 +16,8 @@ import { WebsiteConfigSettings } from './WebsiteConfigSettings';
 import { ItemImportExportSettings } from './ItemImportExportSettings';
 import { CommitterSettings } from './CommitterSettings';
 import { ActivitySyncSettings } from './ActivitySyncSettings';
+import { TaskIsolationSettings } from './TaskIsolationSettings';
+import { QualityGatesSettings } from './QualityGatesSettings';
 interface SettingsFormProps {
     work: Work;
     user: AuthUser;
@@ -43,6 +45,12 @@ export function SettingsForm({ work, user, initialRepositories }: SettingsFormPr
                 {/* Community PR Processing Settings */}
                 <ProviderRepositorySettings />
                 <CommunityPrSettings />
+
+                {/* Wave 2 M7 — worktree-per-Task isolation */}
+                <TaskIsolationSettings />
+
+                {/* Wave 3 M6 — quality gates (acceptance-check defaults) */}
+                <QualityGatesSettings />
 
                 {/* Advanced Prompts Settings */}
                 <AdvancedPromptsSettings workId={work.id} />

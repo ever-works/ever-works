@@ -114,3 +114,14 @@ export * from './team-member.entity';
 export * from './team-resource.entity';
 // Inbound Triggers (Trigger Schedules) — signed webhook/API triggers that spawn Tasks
 export * from './inbound-trigger.entity';
+// Event-ingest spine (Wave 6) — normalized external events awaiting fan-out
+export * from './ingested-event.entity';
+// Event-ingest pull path (Wave 8) — per-(user, plugin) pull watermarks/cursors
+export * from './ingest-cursor.entity';
+// Meetings v1 (Wave 8, feature a) — captured meetings with transcripts
+export * from './meeting.entity';
+// Credits ledger + plan entitlements (pricing Wave 9 M1)
+export * from './credit-ledger-entry.entity';
+export * from './plan-entitlement.entity';
+// Fleet (Wave 12, slice 1) — enrolled execution nodes with heartbeat
+export * from './fleet-node.entity';

@@ -1,15 +1,23 @@
 import { Type, Transform } from 'class-transformer';
 import {
+    ArrayMaxSize,
+    IsArray,
     IsOptional,
     IsString,
     IsBoolean,
     IsEmail,
     IsIn,
+    IsInt,
     IsUUID,
+    Max,
     ValidateNested,
     MaxLength,
+    Min,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { WORK_CHECKS_POLICIES, type WorkChecksPolicy } from '@ever-works/contracts';
+import { AcceptanceCheckDto } from './acceptance-check.dto';
+import { MergePolicyDto } from './merge-policy.dto';
 import { MarkdownReadmeConfigDto } from './create-work.dto';
 import { sanitizeName, sanitizeDescription } from '../utils/sanitize.util';
 
@@ -78,6 +86,80 @@ export class UpdateWorkDto {
     @IsOptional()
     @IsBoolean()
     providerRepositoryEnabled?: boolean;
+
+    /** Task isolation (worktree-per-Task, Wave 2). 'off' | 'worktree'. */
+    @IsOptional()
+    @IsIn(['off', 'worktree'])
+    taskIsolation?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(128)
+    taskIsolationBaseBranch?: string | null;
+
+    @IsOptional()
+    @IsIn(['work-output', 'data', 'provider'])
+    taskIsolationTargetRepo?: string;
+
+    @IsOptional()
+    @IsIn(['on-merge', 'manual'])
+    taskBranchCleanup?: string;
+
+    @ApiPropertyOptional({
+        description:
+            'Memory recall injection toggle (on by default). When false, self-managed pipeline runs for this Work skip the fenced agent-memory recall block in their session preamble.',
+    })
+    @IsOptional()
+    @IsBoolean()
+    memoryRecallEnabled?: boolean;
+    @ApiPropertyOptional({
+        description:
+            'Work-level default acceptance checks inherited by agent-executed Tasks under this Work. ' +
+            'Pass `null` to clear the defaults. Max 20 entries.',
+        type: AcceptanceCheckDto,
+        isArray: true,
+        nullable: true,
+    })
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(20)
+    @ValidateNested({ each: true })
+    @Type(() => AcceptanceCheckDto)
+    checkDefaults?: AcceptanceCheckDto[] | null;
+
+    @ApiPropertyOptional({
+        description:
+            "Enforcement policy for acceptance checks: 'off' (never run), 'warn' (run + report, red does not block) or 'required' (red blocks Task completion).",
+        enum: WORK_CHECKS_POLICIES,
+    })
+    @IsOptional()
+    @IsIn(WORK_CHECKS_POLICIES)
+    checksPolicy?: WorkChecksPolicy;
+
+    @ApiPropertyOptional({
+        description:
+            "Default gate-attempt budget for Tasks that don't set their own maxGateAttempts.",
+        minimum: 1,
+        maximum: 5,
+    })
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    @Max(5)
+    maxGateAttempts?: number;
+
+    @ApiPropertyOptional({
+        description:
+            'Work-scoped slice of the merge-policy matrix (Wave 3, D4). PARTIAL by design: every field ' +
+            'omitted inside the object inherits from the organization, then the tenant, then the platform ' +
+            'default. Pass `null` to clear the Work override entirely and inherit everything.',
+        type: MergePolicyDto,
+        nullable: true,
+    })
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => MergePolicyDto)
+    mergePolicy?: MergePolicyDto | null;
 
     @ApiPropertyOptional({ description: 'Whether community PR processing is enabled' })
     @IsOptional()

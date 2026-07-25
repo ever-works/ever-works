@@ -30,8 +30,22 @@ export {
     type AgentGuardrailActionType,
     type AgentGuardrailsMode,
     type AgentGuardrails,
+    type AgentRunSession,
+    type AgentRunSessionStatus,
+    type AgentRunTriggerKind,
+    type ListRunSessionsQuery,
+    type RunSteerResponse,
+    type RunInterruptResponse,
+    type RunResumeResponse,
 } from './agents.shared';
-import type { AgentGuardrails } from './agents.shared';
+import type {
+    AgentGuardrails,
+    AgentRunSession,
+    ListRunSessionsQuery,
+    RunSteerResponse,
+    RunInterruptResponse,
+    RunResumeResponse,
+} from './agents.shared';
 
 export interface AgentPermissions {
     canCreateAgents: boolean;
@@ -245,6 +259,24 @@ export interface AgentImportResult {
     finalSlug: string;
 }
 
+/**
+ * Wave 10 prebuilt agent-template catalog row as served by
+ * `GET /api/agents/templates` (in-code marketing/sales/ops presets).
+ * Wave 11 consumes `suggestedRoles` to surface 2-3 suggestions on the
+ * onboarding "What do you do" step.
+ */
+export interface AgentTemplateSummary {
+    slug: string;
+    name: string;
+    title: string;
+    category: string;
+    description: string;
+    capabilities: string;
+    suggestedSkills: string[];
+    suggestedPipeline: string | null;
+    suggestedRoles: string[];
+}
+
 function buildQuery(q: ListAgentsQuery = {}): string {
     const params = new URLSearchParams();
     if (q.scope) params.set('scope', q.scope);
@@ -270,6 +302,27 @@ export const agentsAPI = {
         } catch {
             return null;
         }
+    },
+
+    /** Wave 10 — list the prebuilt agent-template catalog. */
+    async listTemplates(): Promise<{ data: AgentTemplateSummary[] }> {
+        return serverFetch<{ data: AgentTemplateSummary[] }>('/agents/templates', {
+            method: 'GET',
+        });
+    },
+
+    /**
+     * Wave 10 — create MY Agent from a prebuilt template (DRAFT,
+     * review-before-act guardrails). Body fields are optional placement
+     * overrides; the onboarding suggestion flow passes none.
+     */
+    async createFromTemplate(slug: string): Promise<Agent> {
+        return serverMutation<Agent>({
+            endpoint: `/agents/from-template/${encodeURIComponent(slug)}`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
     },
 
     async create(input: CreateAgentInput): Promise<Agent> {
@@ -378,6 +431,30 @@ export const agentsAPI = {
             method: 'POST',
             wrapInData: false,
         });
+    },
+
+    /**
+     * Run orchestration (Wave 4 M4) — the Sessions list: every AgentRun
+     * of the acting user across all Agents/Works, filterable + paginated
+     * (`GET /api/agents/runs`). Rows carry telemetry (currentActivity /
+     * totalTokens / costCents), quality-gate columns (gateStatus /
+     * resolvedChecks / checkResults) and terminal lifecycle columns for
+     * the attach link.
+     */
+    async listSessions(query: ListRunSessionsQuery = {}): Promise<{
+        data: AgentRunSession[];
+        meta: { total: number; limit: number; offset: number };
+    }> {
+        const params = new URLSearchParams();
+        if (query.status) params.set('status', query.status);
+        if (query.workId) params.set('workId', query.workId);
+        if (query.agentId) params.set('agentId', query.agentId);
+        if (query.taskId) params.set('taskId', query.taskId);
+        if (query.kind) params.set('kind', query.kind);
+        if (query.limit != null) params.set('limit', String(query.limit));
+        if (query.offset != null) params.set('offset', String(query.offset));
+        const qs = params.toString();
+        return serverFetch(`/agents/runs${qs ? `?${qs}` : ''}`, { method: 'GET' });
     },
 
     // FU-2 + FU-4 — runtime surfaces.
@@ -494,6 +571,41 @@ export const agentsAPI = {
         return serverMutation({
             endpoint: `/agents/${id}/runs/${runId}/cancel`,
             data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    // ── Run controls (Wave 4 M5) ──
+    // steer / interrupt / resume. "Stop" is the existing `cancelRun` above —
+    // deliberately not duplicated here.
+
+    async steerRun(id: string, runId: string, message: string): Promise<RunSteerResponse> {
+        return serverMutation({
+            endpoint: `/agents/${id}/runs/${runId}/steer`,
+            data: { message },
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    async interruptRun(id: string, runId: string): Promise<RunInterruptResponse> {
+        return serverMutation({
+            endpoint: `/agents/${id}/runs/${runId}/interrupt`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    async resumeRun(
+        id: string,
+        runId: string,
+        message?: string | null,
+    ): Promise<RunResumeResponse> {
+        return serverMutation({
+            endpoint: `/agents/${id}/runs/${runId}/resume`,
+            data: message && message.trim().length > 0 ? { message: message.trim() } : {},
             method: 'POST',
             wrapInData: false,
         });

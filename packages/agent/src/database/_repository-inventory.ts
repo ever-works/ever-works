@@ -35,6 +35,7 @@ import { AgentEmailAssignmentRepository } from './repositories/agent-email-assig
 import { ApiKeyRepository } from './repositories/api-key.repository';
 import { AuthAccountRepository } from './repositories/auth-account.repository';
 import { ConversationRepository } from './repositories/conversation.repository';
+import { CreditLedgerRepository } from './repositories/credit-ledger.repository';
 import { EmailConversationRepository } from './repositories/email-conversation.repository';
 import { EmailMessageRepository } from './repositories/email-message.repository';
 import { GitHubAppInstallationRepoRepository } from './repositories/github-app-installation-repository.repository';
@@ -47,6 +48,7 @@ import { NotificationRepository } from './repositories/notification.repository';
 import { OnboardingRequestRepository } from './repositories/onboarding-request.repository';
 import { OrganizationNotificationDefaultRepository } from './repositories/organization-notification-default.repository';
 import { OrganizationRepository } from './repositories/organization.repository';
+import { PlanEntitlementRepository } from './repositories/plan-entitlement.repository';
 import { PluginUsageRepository } from './repositories/plugin-usage.repository';
 import { RefreshTokenRepository } from './repositories/refresh-token.repository';
 import { SubscriptionPlanRepository } from './repositories/subscription-plan.repository';
@@ -81,6 +83,7 @@ export const REPOSITORY_PROVIDERS: ReadonlyArray<Type<unknown>> = [
     ApiKeyRepository,
     AuthAccountRepository,
     ConversationRepository,
+    CreditLedgerRepository,
     EmailConversationRepository,
     EmailMessageRepository,
     GitHubAppInstallationRepoRepository,
@@ -93,6 +96,7 @@ export const REPOSITORY_PROVIDERS: ReadonlyArray<Type<unknown>> = [
     OnboardingRequestRepository,
     OrganizationNotificationDefaultRepository,
     OrganizationRepository,
+    PlanEntitlementRepository,
     PluginUsageRepository,
     RefreshTokenRepository,
     SubscriptionPlanRepository,

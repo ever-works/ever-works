@@ -209,9 +209,11 @@ export class AgentToolService {
         // token presence so when the platform hasn't wired the adapter
         // the model never sees the tools.
         if (agent.permissions?.canCallExternalTools && this.pluginTools) {
-            tools.push(this.buildSearchWebTool(agent));
-            tools.push(this.buildScreenshotTool(agent));
-            tools.push(this.buildExtractContentTool(agent));
+            // Wave 9 M2 — thread the run id so pass-through usage events
+            // carry per-run cost attribution (the accumulator sums them).
+            tools.push(this.buildSearchWebTool(agent, runContext));
+            tools.push(this.buildScreenshotTool(agent, runContext));
+            tools.push(this.buildExtractContentTool(agent, runContext));
         }
 
         // Notifications v2 (EW-670) — sendEmail. Same canCallExternalTools
@@ -511,7 +513,19 @@ export class AgentToolService {
         };
     }
 
-    private buildSearchWebTool(agent: Agent): AgentToolDescriptor<
+    /**
+     * Wave 9 M2 — the pass-through builders receive the run context so the
+     * resulting `PluginUsageEvent` rows carry per-run cost attribution.
+     * The `'no-run'` sentinel (default context) maps to `undefined`.
+     */
+    private runIdFor(runContext: { runId: string }): string | undefined {
+        return runContext.runId === 'no-run' ? undefined : runContext.runId;
+    }
+
+    private buildSearchWebTool(
+        agent: Agent,
+        runContext: { runId: string },
+    ): AgentToolDescriptor<
         {
             query: string;
             maxResults?: number;
@@ -558,6 +572,7 @@ export class AgentToolService {
                         userId: agent.userId,
                         agentId: agent.id,
                         workId: agent.workId ?? undefined,
+                        runId: this.runIdFor(runContext),
                         query: args.query,
                         maxResults: args.maxResults,
                         includeDomains: args.includeDomains,
@@ -779,6 +794,7 @@ export class AgentToolService {
 
     private buildScreenshotTool(
         agent: Agent,
+        runContext: { runId: string },
     ): AgentToolDescriptor<
         { url: string; viewportWidth?: number; viewportHeight?: number; fullPage?: boolean },
         AgentScreenshotResult
@@ -826,6 +842,7 @@ export class AgentToolService {
                         userId: agent.userId,
                         agentId: agent.id,
                         workId: agent.workId ?? undefined,
+                        runId: this.runIdFor(runContext),
                         url: args.url,
                         viewportWidth: args.viewportWidth,
                         viewportHeight: args.viewportHeight,
@@ -840,6 +857,7 @@ export class AgentToolService {
 
     private buildExtractContentTool(
         agent: Agent,
+        runContext: { runId: string },
     ): AgentToolDescriptor<{ url: string; maxChars?: number }, AgentExtractContentResult> {
         return {
             name: 'extractContent',
@@ -879,6 +897,7 @@ export class AgentToolService {
                         userId: agent.userId,
                         agentId: agent.id,
                         workId: agent.workId ?? undefined,
+                        runId: this.runIdFor(runContext),
                         url: args.url,
                         maxChars: args.maxChars,
                     });

@@ -25,6 +25,7 @@ import {
     type SourceRepository as ContractSourceRepository,
     type WorksConfigSnapshot as ContractWorksConfigSnapshot,
 } from '@ever-works/contracts/api';
+import type { TaskAcceptanceCheck, WorkChecksPolicy } from '@ever-works/contracts';
 import { APIResponse, ItemData, Category, Tag, Collection } from './types';
 import { CreateItemsGeneratorDto, ItemsGeneratorResponse } from './items-generator';
 
@@ -102,7 +103,29 @@ export interface UpdateWorkDto {
     committerEmail?: string | null;
     /** EW-120 Activity Feed sync transport. */
     activitySyncMode?: 'pull' | 'push' | 'disabled';
+    /** Wave 2 M7 — worktree-per-Task isolation mode ('off' = agents work
+     *  directly against the Work's repos; 'worktree' = per-Task branches). */
+    taskIsolation?: TaskIsolationSetting;
+    /** Base branch Task branches fork from. `null` = repo default branch. */
+    taskIsolationBaseBranch?: string | null;
+    /** Where Task branches are pushed ('linked' is not yet available). */
+    taskIsolationTargetRepo?: TaskIsolationTargetRepo;
+    /** When Task branches are deleted after merge. */
+    taskBranchCleanup?: TaskBranchCleanup;
+    // Quality gates (Wave 3 M6) — Work-level default acceptance checks
+    // inherited by agent-executed Tasks; `null` clears the defaults.
+    checkDefaults?: TaskAcceptanceCheck[] | null;
+    /** Enforcement policy: 'off' (never run) / 'warn' (report only) /
+     *  'required' (red blocks). */
+    checksPolicy?: WorkChecksPolicy;
+    /** Default gate-attempt budget (1..5) for Tasks without their own. */
+    maxGateAttempts?: number;
 }
+
+/** Wave 2 M7 — Work-level worktree-per-Task isolation settings. */
+export type TaskIsolationSetting = 'off' | 'worktree';
+export type TaskIsolationTargetRepo = 'work-output' | 'linked';
+export type TaskBranchCleanup = 'on-merge' | 'manual';
 
 export interface DeleteWorkDto {
     delete_data_repository?: boolean;
@@ -268,6 +291,26 @@ export interface Work {
     platformSyncLastSuccessAt?: string | null;
     platformSyncLastErrorAt?: string | null;
     platformSyncLastErrorMessage?: string | null;
+    // Wave 2 M7 — worktree-per-Task isolation settings. Absent on rows
+    // written before the columns existed — absent means 'off'.
+    taskIsolation?: TaskIsolationSetting;
+    taskIsolationBaseBranch?: string | null;
+    taskIsolationTargetRepo?: TaskIsolationTargetRepo;
+    taskBranchCleanup?: TaskBranchCleanup;
+    // Quality gates (Wave 3 M6). Absent on rows written before the
+    // columns existed — absent means no defaults / policy 'off' / 2.
+    checkDefaults?: TaskAcceptanceCheck[] | null;
+    checksPolicy?: WorkChecksPolicy;
+    maxGateAttempts?: number;
+}
+
+/** Wave 4 M3 — per-Work AgentRun summary counts
+ *  (`GET /api/works/:id/runs-summary`). */
+export interface WorkRunsSummary {
+    running: number;
+    queued: number;
+    awaiting: number;
+    failedLast24h: number;
 }
 
 export interface WorksResponse {
@@ -600,6 +643,11 @@ export const workAPI = {
     // Get aggregated stats for the current user's works
     getStats: async () => {
         return serverFetch<WorkStatsResponse>(`/works/stats`);
+    },
+
+    // Wave 4 M3 — per-Work AgentRun summary counts for the fleet chips.
+    getRunsSummary: async (id: string) => {
+        return serverFetch<WorkRunsSummary>(`/works/${id}/runs-summary`);
     },
 
     // Live slug-availability check for the create-Work form.

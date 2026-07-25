@@ -1,0 +1,40 @@
+{
+	"name": "ever-works-desktop-node",
+	"version": "0.1.0",
+	"description": "Ever Works Desktop Node - thin Electron shell that enrolls this machine as a platform execution node: setup wizard, status window and tray",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"private": true,
+	"main": "dist/main/main.js",
+	"scripts": {
+		"build": "tsc --noEmit && tsc -p tsconfig.main.json && vite build",
+		"dev": "vite",
+		"start": "electron .",
+		"dist": "electron-builder --config electron-builder.yml",
+		"dist:dir": "electron-builder --config electron-builder.yml --dir",
+		"type-check": "tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"clean": "rm -rf dist release"
+	},
+	"dependencies": {
+		"ever-works-node": "workspace:*"
+	},
+	"devDependencies": {
+		"@types/node": "^22.19.11",
+		"@types/react": "^19.2.7",
+		"@types/react-dom": "^19.2.3",
+		"@vitejs/plugin-react": "^6.0.1",
+		"electron": "^33.2.0",
+		"electron-builder": "^25.1.8",
+		"react": "19.2.5",
+		"react-dom": "19.2.5",
+		"typescript": "^5.9.3",
+		"vite": "^8.0.16",
+		"vitest": "^4.1.0"
+	}
+}

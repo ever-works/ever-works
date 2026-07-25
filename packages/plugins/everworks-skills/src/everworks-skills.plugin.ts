@@ -14,6 +14,8 @@ import type {
 
 import matter from 'gray-matter';
 
+import { mergeGtmCatalog } from './gtm-catalog.js';
+
 const RAW_CONTENT_BASE = 'https://raw.githubusercontent.com';
 const DEFAULT_CATALOG_REPO = 'ever-works/skills';
 const DEFAULT_CATALOG_BRANCH = 'main';
@@ -51,6 +53,14 @@ interface SkillsManifestRow {
  * malformed) the loader falls back to the small `BUILTIN_CATALOG`
  * below so the plugin always returns SOMETHING — the platform
  * self-recovers when the repo becomes reachable again.
+ *
+ * On TOP of either source, the first-party go-to-market Skill pack
+ * (`GTM_CATALOG_ENTRIES`, defined in `@ever-works/contracts`) is always
+ * merged in. Those Skills are the ones the prebuilt Agent templates name
+ * by slug, so they cannot be allowed to depend on a network fetch — an
+ * activated template whose suggested Skills resolve to nothing is a
+ * broken template. The merge keeps served entries on a slug collision,
+ * so the catalog repo can still revise a first-party Skill.
  */
 const BUILTIN_CATALOG: SkillCatalogEntry[] = [
 	{
@@ -193,8 +203,8 @@ export class EverWorksSkillsPlugin implements IPlugin, ISkillsProviderPlugin {
 			if (entries.length === 0) {
 				throw new Error('catalog manifest yielded no entries');
 			}
-			this.cache = { entries, fetchedAt: now };
-			return entries;
+			this.cache = { entries: mergeGtmCatalog(entries), fetchedAt: now };
+			return this.cache.entries;
 		} catch (err) {
 			// Fall back to the builtin catalog on ANY failure (network,
 			// non-200, malformed manifest/frontmatter) so the plugin
@@ -205,7 +215,7 @@ export class EverWorksSkillsPlugin implements IPlugin, ISkillsProviderPlugin {
 				`Ever Works Skills: catalog fetch from ${repo}@${branch} failed; using builtin fallback. ` +
 					`${err instanceof Error ? err.message : String(err)}`
 			);
-			this.cache = { entries: BUILTIN_CATALOG.slice(), fetchedAt: now };
+			this.cache = { entries: mergeGtmCatalog(BUILTIN_CATALOG.slice()), fetchedAt: now };
 			return this.cache.entries;
 		}
 	}

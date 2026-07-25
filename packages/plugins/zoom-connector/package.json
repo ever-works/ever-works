@@ -1,0 +1,99 @@
+{
+	"name": "@ever-works/zoom-connector-plugin",
+	"version": "1.0.0",
+	"description": "Zoom connector plugin for Ever Works platform (event-source pull of completed cloud recordings with transcripts into the event-ingest pipeline via the official @zoom/rivet SDK, Server-to-Server OAuth)",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"private": false,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"clean": "rm -rf dist",
+		"type-check": "tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	},
+	"dependencies": {
+		"@ever-works/contracts": "workspace:*",
+		"@ever-works/plugin": "workspace:*",
+		"@zoom/rivet": "^0.4.0"
+	},
+	"devDependencies": {
+		"@types/node": "^22.0.0",
+		"tsup": "^8.0.0",
+		"typescript": "^5.9.3",
+		"vitest": "^4.1.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "zoom-connector",
+			"name": "Zoom Connector",
+			"version": "1.0.0",
+			"category": "connector",
+			"capabilities": [
+				"connector",
+				"event-source"
+			],
+			"description": "Zoom connector. Event-source pull ingests completed cloud recordings (with transcripts when available) since the last watermark into the platform event-ingest pipeline via the official @zoom/rivet SDK (Server-to-Server OAuth), with opt-in historical backfill (backfillDays, max 90). Recording events become Meeting rows with transcript capture; live bot-join is a documented follow-up.",
+			"systemPlugin": false,
+			"builtIn": true,
+			"isDefault": false,
+			"autoEnable": false,
+			"settings": {
+				"type": "object",
+				"required": [
+					"accountId",
+					"clientId",
+					"clientSecret"
+				],
+				"properties": {
+					"accountId": {
+						"type": "string",
+						"title": "Zoom account id (Server-to-Server OAuth app)",
+						"x-envVar": "ZOOM_ACCOUNT_ID"
+					},
+					"clientId": {
+						"type": "string",
+						"title": "Zoom client id (Server-to-Server OAuth app)",
+						"x-envVar": "ZOOM_CLIENT_ID"
+					},
+					"clientSecret": {
+						"type": "string",
+						"title": "Zoom client secret (Server-to-Server OAuth app)",
+						"x-secret": true,
+						"x-envVar": "ZOOM_CLIENT_SECRET"
+					},
+					"backfillDays": {
+						"type": "number",
+						"title": "Historical backfill window in days on first pull (0 = off, max 90)",
+						"default": 0,
+						"minimum": 0,
+						"maximum": 90
+					}
+				}
+			}
+		}
+	},
+	"publishConfig": {
+		"access": "restricted",
+		"registry": "https://registry.npmjs.org"
+	}
+}

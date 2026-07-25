@@ -81,6 +81,8 @@ function toResponseDto(proposal: WorkProposal): WorkProposalResponseDto {
         source: proposal.source,
         status: proposal.status,
         acceptedWorkId: proposal.acceptedWorkId ?? null,
+        targetWorkId: proposal.targetWorkId ?? null,
+        extraPrompt: proposal.extraPrompt ?? null,
         missionId: proposal.missionId ?? null,
         failureMessage: proposal.failureMessage ?? null,
         failureKind: proposal.failureKind ?? null,
@@ -137,6 +139,8 @@ export class WorkProposalsController {
         const created = await this.service.createUserManual(auth.userId, {
             description: body.description,
             title: body.title,
+            targetWorkId: body.targetWorkId,
+            extraPrompt: body.extraPrompt,
         });
         return toResponseDto(created);
     }

@@ -129,6 +129,36 @@ export class AgentMemoryFacadeService extends BaseFacadeService implements IAgen
         }
     }
 
+    /**
+     * `buildContext` variant that also reports WHICH provider served
+     * the payload (memory upgrades M2/M3 — the AgentRunLog "recall
+     * size/provider" note and the pipeline dispatch log both need the
+     * resolved plugin id, which plain `buildContext` does not surface).
+     * Single resolution: the plugin is resolved once and used for both
+     * the id and the call. Same error posture as `buildContext` —
+     * `NoProviderError` propagates un-wrapped from resolution; backend
+     * failures are wrapped with the provider id attached.
+     */
+    async buildContextWithProvider(
+        input: {
+            query?: string;
+            purpose?: string;
+            sessionId?: string;
+            projectId?: string;
+            maxTokens?: number;
+        },
+        facadeOptions: FacadeOptions,
+    ): Promise<{ context: AgentMemoryContext; providerId: string }> {
+        const plugin = await this.resolveTypedPlugin(facadeOptions);
+        const settings = await this.getResolvedSettings(plugin.id, facadeOptions);
+        try {
+            const context = await plugin.buildContext({ ...input, settings });
+            return { context, providerId: plugin.id };
+        } catch (error) {
+            throw this.wrap(error, 'buildContext', plugin.id);
+        }
+    }
+
     async deleteEntry(id: string, facadeOptions: FacadeOptions): Promise<void> {
         const plugin = await this.resolveTypedPlugin(facadeOptions);
         if (typeof plugin.deleteEntry !== 'function') {

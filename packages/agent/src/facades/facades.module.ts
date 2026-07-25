@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../database/database.module';
 import { UsageModule } from '../usage/usage.module';
 import { BudgetsModule } from '../budgets/budgets.module';
+import { PolicyModule } from '../policy/policy.module';
 
 import { AiFacadeService } from './ai.facade';
 import { SearchFacadeService } from './search.facade';
@@ -18,6 +19,8 @@ import { TasksFacadeService } from './tasks.facade';
 import { EmailFacadeService } from './email.facade';
 import { NotificationChannelFacadeService } from './notification-channel.facade';
 import { AgentMemoryFacadeService } from './agent-memory.facade';
+import { TerminalStreamFacadeService } from './terminal-stream.facade';
+import { WorkspaceFacadeService } from './workspace.facade';
 import { VectorStoreFacadeService } from './vector-store.facade';
 import { MetricsFacadeService } from './metrics.facade';
 
@@ -38,6 +41,8 @@ const FACADES = [
     EmailFacadeService,
     NotificationChannelFacadeService,
     AgentMemoryFacadeService,
+    TerminalStreamFacadeService,
+    WorkspaceFacadeService,
     // EW-724 / EW-725 — vector-store facade (KB embeddings; consumed by
     // KnowledgeBaseReembedService via FacadesModule). Provided here like every
     // other barrel facade; deps are the global PluginRegistryService plus two
@@ -73,7 +78,11 @@ const FACADES = [
  * at the application root level. Do not import PluginsModule directly here.
  */
 @Module({
-    imports: [DatabaseModule, UsageModule, BudgetsModule],
+    // PolicyModule is a leaf (four scope entities, no facade imports), so
+    // importing it here cannot cycle. It binds MERGE_POLICY_ENFORCER,
+    // which GitFacadeService consumes @Optional() to enforce the
+    // merge-policy matrix on agent-driven merges (Wave 3, D4).
+    imports: [DatabaseModule, UsageModule, BudgetsModule, PolicyModule],
     providers: FACADES,
     exports: FACADES,
 })

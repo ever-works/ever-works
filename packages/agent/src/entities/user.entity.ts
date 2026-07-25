@@ -217,6 +217,15 @@ export class User {
     @Column({ default: true })
     emailBudgetAlerts: boolean;
 
+    /**
+     * Digest briefings (Wave 7) — per-user cadence for the scheduled
+     * activity digest. 'off' (default) | 'daily' | 'weekly'. Explicit
+     * `type: 'varchar'` so better-sqlite3 (e2e CI) doesn't choke on
+     * the inferred union type — see magicLinkToken note above.
+     */
+    @Column({ type: 'varchar', length: 8, default: 'off' })
+    digestFrequency: 'off' | 'daily' | 'weekly';
+
     // Timestamps
     @CreateDateColumn()
     createdAt: Date;

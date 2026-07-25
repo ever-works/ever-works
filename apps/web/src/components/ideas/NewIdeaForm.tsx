@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Lightbulb } from 'lucide-react';
 import { toast } from 'sonner';
@@ -28,36 +28,43 @@ export function NewIdeaForm({ createIdea }: { createIdea: CreateIdeaFn }) {
     const router = useRouter();
     const [title, setTitle] = useState('');
     const [description, setDescription] = useState('');
-    const [pending, startTransition] = useTransition();
+    // Explicit isSubmitting over useTransition.pending (house rule): the
+    // detached void-async inside startTransition resolved the transition
+    // immediately, so `pending` never actually disabled the button — a
+    // fast double-click/double-Enter created two Ideas. Same defect and
+    // same fix as NewMissionForm. Cleared only on error: on success the
+    // form stays locked through the navigation away.
+    const [isSubmitting, setIsSubmitting] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
     const trimmedDescription = description.trim();
-    const canSubmit = trimmedDescription.length >= MIN_DESCRIPTION_LENGTH && !pending;
+    const canSubmit = trimmedDescription.length >= MIN_DESCRIPTION_LENGTH && !isSubmitting;
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
+        if (isSubmitting) return;
         if (trimmedDescription.length < MIN_DESCRIPTION_LENGTH) {
             setError(t('minLength'));
             return;
         }
         setError(null);
+        setIsSubmitting(true);
         const trimmedTitle = title.trim();
-        startTransition(() => {
-            void (async () => {
-                try {
-                    await createIdea({
-                        description: trimmedDescription,
-                        title: trimmedTitle ? trimmedTitle : undefined,
-                    });
-                    toast.success(tToasts('ideaCreated'));
-                    router.push(ROUTES.DASHBOARD_IDEAS);
-                } catch {
-                    // Security: never surface raw API error text (may carry
-                    // internal details). Show a localized generic message.
-                    setError(t('error'));
-                }
-            })();
-        });
+        void (async () => {
+            try {
+                await createIdea({
+                    description: trimmedDescription,
+                    title: trimmedTitle ? trimmedTitle : undefined,
+                });
+                toast.success(tToasts('ideaCreated'));
+                router.push(ROUTES.DASHBOARD_IDEAS);
+            } catch {
+                // Security: never surface raw API error text (may carry
+                // internal details). Show a localized generic message.
+                setError(t('error'));
+                setIsSubmitting(false);
+            }
+        })();
     };
 
     return (
@@ -129,7 +136,7 @@ export function NewIdeaForm({ createIdea }: { createIdea: CreateIdeaFn }) {
                         {t('cancel')}
                     </Button>
                     <Button type="submit" size="sm" disabled={!canSubmit}>
-                        {pending ? t('creating') : t('create')}
+                        {isSubmitting ? t('creating') : t('create')}
                     </Button>
                 </div>
             </form>

@@ -63,6 +63,29 @@ jest.mock('@ever-works/agent/agents', () => ({
 jest.mock('@ever-works/agent/tasks-domain', () => ({
     TasksDomainModule: class TasksDomainModule {},
 }));
+// Event-ingest spine (Wave 6) — the module imports EventIngestModule
+// (and the controller it declares imports EventIngestService) from the
+// ingest barrel; stub both so the entity chain is never loaded.
+jest.mock('@ever-works/agent/ingest', () => ({
+    EventIngestModule: class EventIngestModule {},
+    EventIngestService: class EventIngestService {},
+    EventSourcePullService: class EventSourcePullService {},
+}));
+// Digest briefings (Wave 7) — the module imports DigestModule (and the
+// controller it declares imports DigestService) from the digest barrel;
+// stub both so the entity chain is never loaded.
+jest.mock('@ever-works/agent/digest', () => ({
+    DigestModule: class DigestModule {},
+    DigestService: class DigestService {},
+}));
+// Credits ledger (pricing Wave 9 M1) — the module imports the agent
+// SubscriptionsModule to expose CreditLedgerService through the
+// remote-proxy controller; stub the barrel so the repository → TypeORM
+// entity chain is never loaded under jest.
+jest.mock('@ever-works/agent/subscriptions', () => ({
+    SubscriptionsModule: class SubscriptionsModule {},
+    CreditLedgerService: class CreditLedgerService {},
+}));
 // EW-742 P3.2 T22 — trigger-internal.module imports TenantJobRuntimeModule
 // + OrganizationsModule (added by bbc24309 / 5e4e2483 / 41906b71). Loading
 // those modules pulls in real `@ever-works/agent/entities` + `@ever-works/agent/tasks`

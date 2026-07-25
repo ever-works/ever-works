@@ -185,6 +185,17 @@ export class AccountExportService {
                 typeof dir.providerRepositoryEnabled === 'boolean'
                     ? dir.providerRepositoryEnabled
                     : undefined,
+            taskIsolation: dir.taskIsolation || undefined,
+            // Serialize explicit null (= repo default branch) — omitting it
+            // would make an overwrite import silently RETAIN a custom base.
+            taskIsolationBaseBranch:
+                dir.taskIsolationBaseBranch === undefined ? undefined : dir.taskIsolationBaseBranch,
+            taskIsolationTargetRepo: dir.taskIsolationTargetRepo || undefined,
+            taskBranchCleanup: dir.taskBranchCleanup || undefined,
+            // Memory recall toggle — serialize the explicit boolean (a
+            // deliberate `false` must round-trip; see ExportedWork).
+            memoryRecallEnabled:
+                typeof dir.memoryRecallEnabled === 'boolean' ? dir.memoryRecallEnabled : undefined,
             gitProvider: dir.gitProvider,
             deployProvider: dir.deployProvider || undefined,
             readmeConfig: dir.readmeConfig || undefined,
@@ -195,6 +206,13 @@ export class AccountExportService {
             communityPrEnabled: dir.communityPrEnabled,
             communityPrAutoClose: dir.communityPrAutoClose,
             comparisonsEnabled: dir.comparisonsEnabled,
+            // Quality-gate settings must round-trip: a Work that opted into
+            // 'warn'/'required' or curated checkDefaults must not silently
+            // fall back to 'off'/none on the imported side.
+            checkDefaults: Array.isArray(dir.checkDefaults) ? dir.checkDefaults : undefined,
+            checksPolicy: dir.checksPolicy || undefined,
+            maxGateAttempts:
+                typeof dir.maxGateAttempts === 'number' ? dir.maxGateAttempts : undefined,
             members: members.map((m) => ({
                 userId: m.userId,
                 role: m.role,

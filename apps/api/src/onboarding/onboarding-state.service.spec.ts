@@ -139,6 +139,30 @@ describe('OnboardingStateService', () => {
             expect(second.state.prompt).toBe('build me a cafe directory');
             expect(second.state.lastStep).toBe(3);
         });
+
+        // Wave 11 — "What do you do" answers ride the same PATCH path.
+        it('persists profile roles + teamSize and preserves them across later patches', async () => {
+            const first = await svc.patchState('u1', {
+                state: { profile: { roles: ['marketing', 'founder-ceo'], teamSize: 'solo' } },
+            });
+            expect(first.state.profile).toEqual({
+                roles: ['marketing', 'founder-ceo'],
+                teamSize: 'solo',
+            });
+
+            // A later patch without `profile` keeps the persisted value.
+            const second = await svc.patchState('u1', { state: { lastStep: 5 } });
+            expect(second.state.profile).toEqual({
+                roles: ['marketing', 'founder-ceo'],
+                teamSize: 'solo',
+            });
+
+            // A roles-only patch keeps the persisted teamSize (field-level merge).
+            const third = await svc.patchState('u1', {
+                state: { profile: { roles: ['engineering'] } },
+            });
+            expect(third.state.profile).toEqual({ roles: ['engineering'], teamSize: 'solo' });
+        });
     });
 
     describe('markCompleted', () => {
@@ -196,6 +220,43 @@ describe('OnboardingStateService', () => {
             });
             expect(merged.ai.choice).toBe('grok');
             expect(merged.storage.choice).toBe(ONBOARDING_DEFAULT_STATE.storage.choice);
+        });
+
+        // Wave 11 — unknown profile values are DROPPED on read (never
+        // defaulted), matching the account-transfer enum rule.
+        it('normaliseState keeps known profile ids and drops unrecognised ones', () => {
+            const result = __test__.normaliseState({
+                ...ONBOARDING_DEFAULT_STATE,
+                profile: {
+                    roles: ['marketing', 'astronaut', 'sales'],
+                    teamSize: 'galactic',
+                },
+            });
+            expect(result.profile).toEqual({ roles: ['marketing', 'sales'] });
+
+            const empty = __test__.normaliseState({
+                ...ONBOARDING_DEFAULT_STATE,
+                profile: { roles: ['astronaut'], teamSize: 'galactic' },
+            });
+            expect(empty.profile).toBeUndefined();
+
+            const legacy = __test__.normaliseState({ ...ONBOARDING_DEFAULT_STATE });
+            expect(legacy.profile).toBeUndefined();
+        });
+
+        it('mergeState deep-merges profile per field and clears roles via an empty array', () => {
+            const current = __test__.mergeState(ONBOARDING_DEFAULT_STATE, {
+                profile: { roles: ['sales'], teamSize: 'small-2-10' },
+            });
+            expect(current.profile).toEqual({ roles: ['sales'], teamSize: 'small-2-10' });
+
+            const sizeOnly = __test__.mergeState(current, {
+                profile: { teamSize: 'mid-11-50' },
+            });
+            expect(sizeOnly.profile).toEqual({ roles: ['sales'], teamSize: 'mid-11-50' });
+
+            const cleared = __test__.mergeState(current, { profile: { roles: [] } });
+            expect(cleared.profile).toEqual({ teamSize: 'small-2-10' });
         });
 
         // EW-722 (idx 165): prompt round-trips through both helpers; legacy

@@ -23,4 +23,16 @@ export interface FacadeOptions {
 	 * Heartbeat runs leave this undefined.
 	 */
 	readonly taskId?: string;
+
+	/**
+	 * Pricing Wave 9 M2 — per-run cost attribution.
+	 *
+	 * Set on calls dispatched from inside an `AgentRun` (any trigger
+	 * kind). Rows tagged with the run id are what the run-cost
+	 * accumulator sums when the run reaches a terminal status, so the
+	 * resulting credits CONSUMPTION debit covers exactly this run's
+	 * metered spend. Undefined outside a run (the existing
+	 * agentId/taskId attribution is unaffected).
+	 */
+	readonly runId?: string;
 }

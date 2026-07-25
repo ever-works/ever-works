@@ -200,6 +200,14 @@ export enum ActivityActionType {
     //     `WorkProposalService.generate` for MISSION-sourced runs — the
     //     domain-model train added the same literal, so it is not redefined here.
     MISSION_TICK = 'mission_tick',
+
+    // Event-ingest spine (Wave 6) — one row per external event drained
+    // from `ingested_events` by `EventIngestService.processBatch()`.
+    // `metadata` carries the provenance block (source, kind,
+    // sourceEventId, sourceUrl, actor/subject) so the feed and the AI
+    // chat can link back to the original message / PR / page. Additive
+    // member — storage is a plain varchar.
+    EXTERNAL_EVENT_INGESTED = 'external_event_ingested',
 }
 
 export enum ActivityStatus {

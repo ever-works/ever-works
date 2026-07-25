@@ -25,4 +25,13 @@ import type { KbDocumentBodyDto } from './kb-document.types.js';
 export interface KbContextBundleData {
 	readonly alwaysInjected: ReadonlyArray<KbDocumentBodyDto>;
 	readonly queryRetrieved: ReadonlyArray<KbDocumentBodyDto>;
+	/**
+	 * Memory upgrades M5 — the Work's ACCEPTED `decision`-class docs,
+	 * rendered by `format()` in their own labelled section of the
+	 * `<kb>` block (status-prefixed). Superseded / archived / proposed
+	 * decisions never appear here; historical decisions can still ride
+	 * in via `queryRetrieved` (labelled historical) when the query hits
+	 * them directly. Optional so pre-existing producers stay valid.
+	 */
+	readonly decisions?: ReadonlyArray<KbDocumentBodyDto>;
 }

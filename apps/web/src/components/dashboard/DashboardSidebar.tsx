@@ -30,6 +30,8 @@ import {
     ListChecks,
     Sparkles,
     Users,
+    CreditCard,
+    BarChart3,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
@@ -463,6 +465,37 @@ export function DashboardSidebar({
                                             strokeWidth={1.3}
                                         />
                                         {t('profileMenu.keyboardShortcuts')}
+                                    </DropdownMenuItem>
+                                    {/* Wave 13 — Billing + Usage & Credits (billing/usage PRD §2):
+                                        a new section ABOVE the final separator + Sign Out. */}
+                                    <DropdownMenuSeparator />
+                                    <DropdownMenuItem
+                                        data-testid="profile-menu-billing"
+                                        onClick={() => {
+                                            onInteraction?.();
+                                            router.push(ROUTES.DASHBOARD_SETTINGS_BILLING);
+                                        }}
+                                        className="cursor-pointer px-3 rounded-md hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark"
+                                    >
+                                        <CreditCard
+                                            className="w-4 h-4 mr-2 shrink-0"
+                                            strokeWidth={1.5}
+                                        />
+                                        {t('profileMenu.billing')}
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        data-testid="profile-menu-usage-credits"
+                                        onClick={() => {
+                                            onInteraction?.();
+                                            router.push(ROUTES.DASHBOARD_USAGE);
+                                        }}
+                                        className="cursor-pointer px-3 rounded-md hover:bg-surface-tertiary/50 dark:hover:bg-card-primary-dark"
+                                    >
+                                        <BarChart3
+                                            className="w-4 h-4 mr-2 shrink-0"
+                                            strokeWidth={1.5}
+                                        />
+                                        {t('profileMenu.usageCredits')}
                                     </DropdownMenuItem>
                                     <DropdownMenuSeparator />
                                     <DropdownMenuItem

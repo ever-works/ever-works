@@ -24,6 +24,8 @@ export type WizardStepKind =
     | 'db-choice'
     | 'deploy-choice'
     | 'deploy-config'
+    | 'profile'
+    | 'communication'
     | 'plugins-catalog'
     | 'create-work';
 
@@ -56,6 +58,13 @@ export function computeStepList(state: OnboardingWizardStateV2): WizardStep[] {
     if (state.deploy.choice === 'vercel' || state.deploy.choice === 'k8s') {
         steps.push({ kind: 'deploy-config', id: `deploy-config:${state.deploy.choice}` });
     }
+    // Profile — Wave 11 "What do you do" (roles + team size). Slotted
+    // after the provider choices and before Communication; always
+    // shown, always skippable — selections are suggestion hints only.
+    steps.push({ kind: 'profile', id: 'profile' });
+    // Communication — connect the chat workspaces the org lives in
+    // (Slack now, Discord next). Always shown, always skippable.
+    steps.push({ kind: 'communication', id: 'communication' });
     steps.push({ kind: 'plugins-catalog', id: 'plugins-catalog' });
     steps.push({ kind: 'create-work', id: 'create-work' });
     return steps;
@@ -79,6 +88,8 @@ type FlowAction =
     | { type: 'setDbChoice'; value: OnboardingDbChoice }
     | { type: 'setDeployChoice'; value: OnboardingDeployChoice }
     | { type: 'setPrompt'; value: string }
+    | { type: 'toggleRole'; value: string }
+    | { type: 'setTeamSize'; value: string }
     | { type: 'recordSkip'; stepId: string }
     | { type: 'setPluginsReviewed'; value: boolean }
     | { type: 'mergeServerState'; value: OnboardingWizardStateV2 }
@@ -149,6 +160,31 @@ function reduce(state: FlowReducerState, action: FlowAction): FlowReducerState {
                     prompt: action.value.trim() || undefined,
                 },
             };
+        case 'toggleRole': {
+            // Wave 11 — multi-select role cards. Toggling an already-selected
+            // role removes it; anything else appends. Order = click order.
+            const current = state.state.profile?.roles ?? [];
+            const roles = current.includes(action.value)
+                ? current.filter((role) => role !== action.value)
+                : [...current, action.value];
+            return {
+                ...state,
+                state: {
+                    ...state.state,
+                    profile: { ...state.state.profile, roles },
+                },
+            };
+        }
+        case 'setTeamSize':
+            // Wave 11 — single-select team-size pills (no unselect: picking
+            // another pill replaces the previous one).
+            return {
+                ...state,
+                state: {
+                    ...state.state,
+                    profile: { ...state.state.profile, teamSize: action.value },
+                },
+            };
         case 'recordSkip': {
             if (state.state.skippedSteps.includes(action.stepId)) return state;
             return {
@@ -207,6 +243,8 @@ export interface UseOnboardingFlowResult {
     readonly setDeployChoice: (value: OnboardingDeployChoice) => void;
     readonly setPluginsReviewed: (value: boolean) => void;
     readonly setPrompt: (value: string) => void;
+    readonly toggleRole: (value: string) => void;
+    readonly setTeamSize: (value: string) => void;
     readonly goNext: () => void;
     readonly goBack: () => void;
     readonly skip: () => void;
@@ -333,6 +371,22 @@ export function useOnboardingFlow({
         [trackEvent],
     );
 
+    const toggleRole = useCallback(
+        (value: string) => {
+            trackEvent('onboarding_profile_role_toggled', { role: value });
+            dispatch({ type: 'toggleRole', value });
+        },
+        [trackEvent],
+    );
+
+    const setTeamSize = useCallback(
+        (value: string) => {
+            trackEvent('onboarding_profile_team_size_selected', { teamSize: value });
+            dispatch({ type: 'setTeamSize', value });
+        },
+        [trackEvent],
+    );
+
     const refresh = useCallback(() => {
         const stepKind = currentStep?.kind ?? 'welcome';
         trackEvent('onboarding_plugin_refresh_clicked', { stepKind });
@@ -384,6 +438,8 @@ export function useOnboardingFlow({
         setDeployChoice,
         setPluginsReviewed,
         setPrompt,
+        toggleRole,
+        setTeamSize,
         goNext,
         goBack,
         skip,
@@ -396,7 +452,8 @@ export function useOnboardingFlow({
 
 function stripVersion(state: OnboardingWizardStateV2) {
     // The patch endpoint deep-merges by field; `version` is server-managed.
-    const { lastStep, ai, storage, db, deploy, skippedSteps, pluginsReviewed, prompt } = state;
+    const { lastStep, ai, storage, db, deploy, skippedSteps, pluginsReviewed, prompt, profile } =
+        state;
     return {
         lastStep,
         ai: { choice: ai.choice },
@@ -406,6 +463,15 @@ function stripVersion(state: OnboardingWizardStateV2) {
         skippedSteps: [...skippedSteps],
         pluginsReviewed,
         ...(prompt ? { prompt } : {}),
+        // Wave 11 — profile rides the same save path as every other field.
+        ...(profile
+            ? {
+                  profile: {
+                      ...(profile.roles ? { roles: [...profile.roles] } : {}),
+                      ...(profile.teamSize ? { teamSize: profile.teamSize } : {}),
+                  },
+              }
+            : {}),
     };
 }
 
