@@ -184,6 +184,10 @@
         "./digest": {
             "types": "./dist/digest/index.d.ts",
             "default": "./dist/digest/index.js"
+        },
+        "./pr-review": {
+            "types": "./dist/pr-review/index.d.ts",
+            "default": "./dist/pr-review/index.js"
         }
     },
     "scripts": {

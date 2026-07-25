@@ -19,6 +19,7 @@ import { AgentsModule } from '@ever-works/agent/agents';
 // Controllers
 import { WorksController } from './works.controller';
 import { WorkRunsController } from './work-runs.controller';
+import { WorkPullRequestsController } from './work-pull-requests.controller';
 import { MembersController } from './members.controller';
 import { InvitationsController } from './invitations.controller';
 import { BulkItemsController } from './bulk-items.controller';
@@ -109,6 +110,8 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
         WorksController,
         // Wave 4 M3 — per-Work AgentRun summary counts.
         WorkRunsController,
+        // Wave 7 feature h (v1) — open PRs across the Work's repos.
+        WorkPullRequestsController,
         MembersController,
         InvitationsController,
         BulkItemsController,
