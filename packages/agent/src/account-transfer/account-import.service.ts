@@ -23,7 +23,14 @@ import type {
 import { containsMaskedSecrets, MASKED_SECRET_PREFIX } from './types';
 import { sanitizePrompt } from '../utils/sanitize.util';
 import { normalizeCreateWorkKind, type Work, type WorkKind } from '../entities/work.entity';
-import { WORK_CHECKS_POLICIES, WORK_KINDS, type WorkChecksPolicy } from '@ever-works/contracts';
+import {
+    WORK_CHECKS_POLICIES,
+    WORK_EXTERNAL_REF_KINDS,
+    WORK_EXTERNAL_REFS_MAX_PER_KIND,
+    WORK_KINDS,
+    type WorkChecksPolicy,
+    type WorkExternalRefs,
+} from '@ever-works/contracts';
 
 /**
  * Canonical slug shape (matches the work/item DTO `@Matches` rule and
@@ -74,6 +81,37 @@ function normalizeImportedMaxGateAttempts(value: unknown): number | undefined {
     return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 5
         ? value
         : undefined;
+}
+
+/**
+ * Ingest routing claims: keep only the KNOWN hint kinds, and under each
+ * only non-empty strings, deduped and capped. Same drop-if-unrecognized
+ * posture as the rest — an unknown key in a hand-edited payload must not
+ * survive into a column the resolver iterates. Returns undefined when
+ * nothing survives, so the caller leaves the existing value untouched.
+ */
+function normalizeImportedExternalRefs(value: unknown): WorkExternalRefs | undefined {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+    const source = value as Record<string, unknown>;
+    const out: WorkExternalRefs = {};
+    let kept = 0;
+    for (const kind of WORK_EXTERNAL_REF_KINDS) {
+        const raw = source[kind];
+        if (!Array.isArray(raw)) continue;
+        const ids = Array.from(
+            new Set(
+                raw
+                    .filter((entry): entry is string => typeof entry === 'string')
+                    .map((entry) => entry.trim())
+                    .filter((entry) => entry.length > 0 && entry.length <= 200),
+            ),
+        ).slice(0, WORK_EXTERNAL_REFS_MAX_PER_KIND);
+        if (ids.length > 0) {
+            out[kind] = ids;
+            kept += ids.length;
+        }
+    }
+    return kept > 0 ? out : undefined;
 }
 
 /**
@@ -579,6 +617,12 @@ export class AccountImportService {
                 if (typeof dir.memoryRecallEnabled === 'boolean') {
                     updateData.memoryRecallEnabled = dir.memoryRecallEnabled;
                 }
+                // Ingest routing claims — sanitized to known kinds only;
+                // absent/empty leaves the existing Work's claims alone.
+                const importedExternalRefs = normalizeImportedExternalRefs(dir.externalRefs);
+                if (importedExternalRefs) {
+                    updateData.externalRefs = importedExternalRefs;
+                }
                 // Quality-gate fields: arrays only ever import as arrays;
                 // enum/int values are drop-if-unrecognized (see the
                 // normalizeImported* helpers above). Absent → existing
@@ -651,6 +695,10 @@ export class AccountImportService {
         }
         if (typeof dir.memoryRecallEnabled === 'boolean') {
             createData.memoryRecallEnabled = dir.memoryRecallEnabled;
+        }
+        const importedExternalRefs = normalizeImportedExternalRefs(dir.externalRefs);
+        if (importedExternalRefs) {
+            createData.externalRefs = importedExternalRefs;
         }
         if (
             typeof dir.taskIsolationBaseBranch === 'string' &&

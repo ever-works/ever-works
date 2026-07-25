@@ -67,6 +67,7 @@ import {
     type TaskAcceptanceCheck,
     type UserSelectableWorkKind,
     type WorkChecksPolicy,
+    type WorkExternalRefs,
     type WorkKind,
 } from '@ever-works/contracts';
 
@@ -480,6 +481,28 @@ export class Work {
      */
     @Column('simple-json', { nullable: true })
     mergePolicy?: MergePolicyOverride | null;
+
+    // ── External routing refs (ingest workId routing) ────────────────
+
+    /**
+     * External containers whose events belong to this Work, keyed by
+     * {@link IngestedEventWorkHintKind}. NULL / absent key = this Work
+     * claims nothing of that kind.
+     *
+     * This is the storage behind `IngestedEventEnvelope.workHint`
+     * resolution for the kinds that have no other home: a Slack channel
+     * id, a tracker team key, a doc database id, a meeting id. The
+     * `repo` kind deliberately does NOT live here — a Work already
+     * declares its repositories (`getRepoOwner`/`getMainRepo`/…) and
+     * `matchWorkByRepo` is the single matcher for them, so duplicating
+     * repo identity into this map would create a second source of truth.
+     *
+     * Matching is case-insensitive + trimmed and always scoped to the
+     * owning user, so two users may claim the same external id without
+     * ever seeing each other's events.
+     */
+    @Column('simple-json', { nullable: true })
+    externalRefs?: WorkExternalRefs | null;
 
     /**
      * Whether to generate the browsable repository published to the git

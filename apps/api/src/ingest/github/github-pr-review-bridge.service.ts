@@ -194,6 +194,10 @@ export class GitHubPrReviewBridgeService {
                         externalId: `${fullName}#${prNumber}`,
                         ...(pr.title ? { title: pr.title } : {}),
                     },
+                    // Work routing: the repository is the container. The
+                    // spine resolves `owner/repo` against the ingesting
+                    // user's own Works via the shared repo matcher.
+                    workHint: { kind: 'repo', externalId: fullName },
                     ...(pr.html_url ? { sourceUrl: pr.html_url } : {}),
                     payload: {
                         action,
@@ -254,6 +258,7 @@ export class GitHubPrReviewBridgeService {
                         externalId: `${fullName}#${prNumber}`,
                         ...(title ? { title } : {}),
                     },
+                    workHint: { kind: 'repo', externalId: fullName },
                     ...(comment.html_url ? { sourceUrl: comment.html_url } : {}),
                     payload: {
                         repoFullName: fullName,

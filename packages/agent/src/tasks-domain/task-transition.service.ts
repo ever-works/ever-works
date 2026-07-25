@@ -285,7 +285,51 @@ export class TaskTransitionService {
         if (agentAssignees.length === 0) return;
         const generation = (task.recurrenceOccurredCount ?? 0) + 1;
         for (const assignee of agentAssignees) {
-            const dedupKey = `${task.id}:${assignee.assigneeId}:${generation}`;
+            await this.dispatchAgentRun(task, assignee.assigneeId, { generation });
+        }
+    }
+
+    /**
+     * THE dispatch path for one (Task, Agent) pair — gate admit →
+     * pre-created queued run → board denorm → job-runtime enqueue →
+     * triggerRunId stamp, with the loud-degradation error handling.
+     *
+     * Extracted from {@link fanOutAgentExecutions} (which is now a loop
+     * over it) so that board dispatch — "Run" on a kanban card — enters
+     * exactly the same path a drag-to-in-progress does. There is
+     * deliberately ONE implementation: a second one would be a second
+     * place for the concurrency valve, the credits precheck, the denorm
+     * mirror and the dispatch-failed bookkeeping to drift.
+     *
+     * Never throws: every failure is recorded on the run row and
+     * reported in the result, because the transition that hosts this
+     * call must not be rolled back by a dispatch hiccup.
+     *
+     * @param opts.generation dedup generation for the runtime key. The
+     *        transition path passes the recurrence generation so a rapid
+     *        status flip-flop cannot double-fire; explicit callers pass
+     *        their own discriminator.
+     */
+    async dispatchAgentRun(
+        task: Task,
+        agentId: string,
+        opts: { generation?: number; dedupKey?: string } = {},
+    ): Promise<{
+        runId: string | null;
+        /** True when the job runtime accepted the run this call. */
+        dispatched: boolean;
+        /** True when the run row exists but was parked by the gate. */
+        parked: boolean;
+        queuedReason?: string;
+        /** Set when the enqueue failed; the run is marked failed. */
+        error?: string;
+    }> {
+        if (!this.dispatcher) {
+            return { runId: null, dispatched: false, parked: false, error: 'no-dispatcher' };
+        }
+        const generation = opts.generation ?? (task.recurrenceOccurredCount ?? 0) + 1;
+        const dedupKey = opts.dedupKey ?? `${task.id}:${agentId}:${generation}`;
+        {
             let run: { id: string } | null = null;
             try {
                 // Run orchestration (Wave 4 M2) — consult the concurrency
@@ -315,7 +359,7 @@ export class TaskTransitionService {
                 // concurrency counts + the Sessions view need no join.
                 run = this.runs
                     ? await this.runs.createQueued({
-                          agentId: assignee.assigneeId,
+                          agentId,
                           userId: task.userId,
                           triggerKind: 'task',
                           taskId: task.id,
@@ -337,12 +381,17 @@ export class TaskTransitionService {
                 // terminal transitions promotes it when a slot frees.
                 if (!admission.admitted) {
                     this.logger.log(
-                        `Run for agent ${assignee.assigneeId} on task ${task.id} parked by dispatch gate (${admission.queuedReason}).`,
+                        `Run for agent ${agentId} on task ${task.id} parked by dispatch gate (${admission.queuedReason}).`,
                     );
-                    continue;
+                    return {
+                        runId: run?.id ?? null,
+                        dispatched: false,
+                        parked: true,
+                        queuedReason: admission.queuedReason ?? 'concurrency-limit',
+                    };
                 }
                 const handle = await this.dispatcher.enqueue({
-                    agentId: assignee.assigneeId,
+                    agentId,
                     userId: task.userId,
                     taskId: task.id,
                     dedupKey,
@@ -366,6 +415,7 @@ export class TaskTransitionService {
                         );
                     }
                 }
+                return { runId: run?.id ?? null, dispatched: true, parked: false };
             } catch (err) {
                 const message = err instanceof Error ? err.message : String(err);
                 // Loud degradation: an unconfigured job runtime is a distinct,
@@ -377,9 +427,7 @@ export class TaskTransitionService {
                 const reason = notConfigured
                     ? `${JOB_RUNTIME_NOT_CONFIGURED_REASON}: ${message}`
                     : `dispatch-failed: ${message}`;
-                this.logger.warn(
-                    `Failed to dispatch agent-task-execute for ${assignee.assigneeId}: ${reason}`,
-                );
+                this.logger.warn(`Failed to dispatch agent-task-execute for ${agentId}: ${reason}`);
                 if (run) {
                     try {
                         await this.runs?.markDispatchFailed(run.id, reason);
@@ -392,6 +440,12 @@ export class TaskTransitionService {
                     // board chip doesn't show a phantom queued run forever.
                     await this.runDenorm?.recordTerminal(task.id, run.id, 'failed');
                 }
+                return {
+                    runId: run?.id ?? null,
+                    dispatched: false,
+                    parked: false,
+                    error: reason,
+                };
             }
         }
     }

@@ -21,6 +21,7 @@ import { TaskAttachmentsSection } from './TaskAttachmentsSection';
 import { TaskBranchSection } from './TaskBranchSection';
 import { TaskChecksSection } from './TaskChecksSection';
 import { TaskRunControls } from './TaskRunControls';
+import { RunWithAgentMenu } from './RunWithAgentMenu';
 
 // Status tones + dots mirror /tasks (TasksList) so colours stay
 // consistent across the list filter and the detail workflow buttons.
@@ -212,9 +213,16 @@ export function TaskDetailClient({
                         <div className="text-[11px] font-mono text-text-muted mb-1.5">
                             {task.slug}
                         </div>
-                        <h1 className="text-2xl font-semibold leading-tight text-text dark:text-text-dark">
-                            {task.title}
-                        </h1>
+                        <div className="flex items-start justify-between gap-3">
+                            <h1 className="text-2xl font-semibold leading-tight text-text dark:text-text-dark">
+                                {task.title}
+                            </h1>
+                            {/* Board dispatch (kanban M3) — run this Task
+                                from its detail page, through the same
+                                gated path the board and a status
+                                transition use. */}
+                            <RunWithAgentMenu taskId={task.id} className="shrink-0" />
+                        </div>
                         {/* JIRA-style workflow buttons — mirrors the status
                             pills on /tasks. Current status shows active in its
                             own colour; allowed transitions are clickable; the

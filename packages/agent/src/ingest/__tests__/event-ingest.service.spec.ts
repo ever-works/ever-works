@@ -281,3 +281,91 @@ describe('EventIngestService', () => {
         });
     });
 });
+
+/**
+ * `workId` routing — the resolver seam. The spine's pre-routing
+ * behaviour (`envelope.workId ?? null`) is the contract when no resolver
+ * is bound; with one bound, a `workHint` becomes a real Work and a
+ * caller-supplied `workId` is verified against its owner.
+ */
+describe('EventIngestService — workId routing', () => {
+    let repository: { createIfNew: jest.Mock };
+    let activityLog: { log: jest.Mock };
+    let workHints: { resolve: jest.Mock; verifyOwnedWorkId: jest.Mock };
+
+    const build = (withResolver = true) =>
+        new EventIngestService(
+            repository as never,
+            activityLog as never,
+            undefined,
+            withResolver ? (workHints as never) : undefined,
+        );
+
+    beforeEach(() => {
+        repository = {
+            createIfNew: jest.fn(async () => ({ event: storedEvent(), created: true })),
+        };
+        activityLog = { log: jest.fn(async () => ({ id: 'activity-1' })) };
+        workHints = {
+            resolve: jest.fn(async () => 'work-resolved'),
+            verifyOwnedWorkId: jest.fn(async (_u: string, id: string) => id),
+        };
+    });
+
+    it('resolves a workHint into the stored workId', async () => {
+        await build().ingest('user-1', [
+            envelope({ workHint: { kind: 'chat-channel', externalId: 'C123' } }),
+        ]);
+        expect(workHints.resolve).toHaveBeenCalledWith('user-1', {
+            kind: 'chat-channel',
+            externalId: 'C123',
+        });
+        expect(repository.createIfNew).toHaveBeenCalledWith(
+            expect.objectContaining({ workId: 'work-resolved' }),
+        );
+    });
+
+    it('stores null when the hint resolves to nothing (routing is an upgrade, not a gate)', async () => {
+        workHints.resolve.mockResolvedValue(null);
+        await build().ingest('user-1', [
+            envelope({ workHint: { kind: 'meeting', externalId: 'nobody-claims-this' } }),
+        ]);
+        expect(repository.createIfNew).toHaveBeenCalledWith(
+            expect.objectContaining({ workId: null }),
+        );
+    });
+
+    it('prefers an explicit workId over the hint, after verifying ownership', async () => {
+        await build().ingest('user-1', [
+            envelope({
+                workId: 'work-explicit',
+                workHint: { kind: 'chat-channel', externalId: 'C123' },
+            }),
+        ]);
+        expect(workHints.verifyOwnedWorkId).toHaveBeenCalledWith('user-1', 'work-explicit');
+        expect(workHints.resolve).not.toHaveBeenCalled();
+        expect(repository.createIfNew).toHaveBeenCalledWith(
+            expect.objectContaining({ workId: 'work-explicit' }),
+        );
+    });
+
+    it('drops a workId the ingesting user does not own', async () => {
+        workHints.verifyOwnedWorkId.mockResolvedValue(null);
+        await build().ingest('user-1', [envelope({ workId: 'someone-elses-work' })]);
+        expect(repository.createIfNew).toHaveBeenCalledWith(
+            expect.objectContaining({ workId: null }),
+        );
+    });
+
+    it('keeps the pre-routing behaviour byte-for-byte when no resolver is bound', async () => {
+        await build(false).ingest('user-1', [
+            envelope({
+                workId: 'work-explicit',
+                workHint: { kind: 'chat-channel', externalId: 'C123' },
+            }),
+        ]);
+        expect(repository.createIfNew).toHaveBeenCalledWith(
+            expect.objectContaining({ workId: 'work-explicit' }),
+        );
+    });
+});

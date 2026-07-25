@@ -163,6 +163,10 @@ export class SlackChatBridgeService {
                 ...(event.user ? { externalId: event.user } : {}),
             },
             subject: { type: 'channel', externalId: channel },
+            // Work routing: the channel is the container. Resolved
+            // against the bound user's own Works only — a channel two
+            // users both connect routes independently for each of them.
+            workHint: { kind: 'chat-channel', externalId: channel },
             payload: {
                 channel,
                 ts,

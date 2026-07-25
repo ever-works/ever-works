@@ -3,7 +3,7 @@
  * Supports versioned JSON export (v1) with full work data including
  * items, comparisons, site config, schedules, and advanced prompts.
  */
-import type { TaskAcceptanceCheck } from '@ever-works/contracts';
+import type { TaskAcceptanceCheck, WorkExternalRefs } from '@ever-works/contracts';
 
 // ─── Export Types ────────────────────────────────────────────────
 
@@ -153,6 +153,13 @@ export interface ExportedWork {
      *  would silently re-enable recall on the imported work. Absent in
      *  old payloads = leave defaults. */
     memoryRecallEnabled?: boolean;
+    /** External containers this Work claims for ingested-event routing
+     *  (chat channels, tracker teams, doc databases, meetings). A
+     *  user-visible Work setting, so it must round-trip. Payloads are
+     *  user-supplied JSON — import sanitizes to string arrays under the
+     *  known kinds and drops everything else. Repo identity is NOT here:
+     *  repo routing resolves off the Work's own repositories. */
+    externalRefs?: WorkExternalRefs | null;
     gitProvider: string;
     deployProvider?: string;
     readmeConfig?: any;

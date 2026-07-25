@@ -196,6 +196,11 @@ export class AccountExportService {
             // deliberate `false` must round-trip; see ExportedWork).
             memoryRecallEnabled:
                 typeof dir.memoryRecallEnabled === 'boolean' ? dir.memoryRecallEnabled : undefined,
+            // Ingest routing claims (chat channels / teams / databases /
+            // meetings). Serialize the object as-is when present; an
+            // absent column exports as undefined so old importers and
+            // old payloads both stay happy.
+            externalRefs: dir.externalRefs ?? undefined,
             gitProvider: dir.gitProvider,
             deployProvider: dir.deployProvider || undefined,
             readmeConfig: dir.readmeConfig || undefined,

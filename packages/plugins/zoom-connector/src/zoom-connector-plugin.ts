@@ -513,6 +513,14 @@ export class ZoomConnectorPlugin implements IConnectorPlugin, IEventSourcePlugin
 				externalId,
 				...(meeting.topic ? { title: meeting.topic } : {})
 			},
+			// Work routing: the meeting is the container. A Work that
+			// claims this meeting id gets the recording on its feed;
+			// otherwise the event stays user-scoped.
+			workHint: {
+				kind: 'meeting',
+				externalId,
+				...(meeting.topic ? { label: meeting.topic } : {})
+			},
 			...(playUrl ? { sourceUrl: playUrl } : {}),
 			payload: {
 				meetingExternalId: externalId,

@@ -37,6 +37,15 @@ jest.mock('../ingest-cursor.repository', () => ({
 jest.mock('../event-source-pull.service', () => ({
     EventSourcePullService: class EventSourcePullService {},
 }));
+jest.mock('../../entities/work.entity', () => ({
+    Work: class Work {},
+}));
+jest.mock('../../database/repositories/work.repository', () => ({
+    WorkRepository: class WorkRepository {},
+}));
+jest.mock('../work-hint-resolver.service', () => ({
+    WorkHintResolverService: class WorkHintResolverService {},
+}));
 
 import 'reflect-metadata';
 import { EventIngestModule } from '../ingest.module';
@@ -44,27 +53,33 @@ import { IngestedEventRepository } from '../ingested-event.repository';
 import { EventIngestService } from '../event-ingest.service';
 import { IngestCursorRepository } from '../ingest-cursor.repository';
 import { EventSourcePullService } from '../event-source-pull.service';
+import { WorkRepository } from '../../database/repositories/work.repository';
+import { WorkHintResolverService } from '../work-hint-resolver.service';
 import { ActivityLogModule } from '../../activity-log/activity-log.module';
 import { FacadesModule } from '../../facades/facades.module';
 
 describe('EventIngestModule', () => {
     const meta = (key: string): unknown[] => Reflect.getMetadata(key, EventIngestModule) ?? [];
 
-    it('provides the repositories, the ingest service and the pull service', () => {
+    it('provides the repositories, the ingest service, the pull service and the workId router', () => {
         expect(meta('providers')).toEqual([
             IngestedEventRepository,
             EventIngestService,
             IngestCursorRepository,
             EventSourcePullService,
+            WorkRepository,
+            WorkHintResolverService,
         ]);
     });
 
-    it('exports all four for the API surface + trigger-internal RPC wiring', () => {
+    it('exports every provider for the API surface + trigger-internal RPC wiring', () => {
         expect(meta('exports')).toEqual([
             IngestedEventRepository,
             EventIngestService,
             IngestCursorRepository,
             EventSourcePullService,
+            WorkRepository,
+            WorkHintResolverService,
         ]);
     });
 
@@ -87,5 +102,6 @@ describe('ingest barrel', () => {
         expect(barrel.EventSourcePullService).toBe(EventSourcePullService);
         expect(barrel.IngestCursorRepository).toBe(IngestCursorRepository);
         expect(typeof barrel.buildIngestEventTools).toBe('function');
+        expect(barrel.WorkHintResolverService).toBe(WorkHintResolverService);
     });
 });

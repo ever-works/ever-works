@@ -21,6 +21,7 @@ import {
     TaskChatService,
     TaskStatus,
     TaskPriority,
+    RUN_BATCH_MAX_TASKS,
     type TaskActorType,
     type ListTasksFilter,
 } from '@ever-works/agent/tasks-domain';
@@ -44,6 +45,8 @@ import {
     AddReviewerDto,
     CreateTaskDto,
     PostTaskChatDto,
+    RunTaskDto,
+    RunTasksBatchDto,
     SetTaskRecurringDto,
     TransitionTaskDto,
     UpdateTaskDto,
@@ -177,6 +180,24 @@ export class TasksController {
         });
     }
 
+    // Declared BEFORE every `:id` route: `run-batch` is a single path
+    // segment, so a future `@Post(':id')` would otherwise shadow it.
+    @Post('run-batch')
+    @ApiOperation({
+        summary: `Run up to ${RUN_BATCH_MAX_TASKS} Tasks in one call. Per-item results — one Task failing (no agent, run already in flight) never fails the others.`,
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 20, ttl: 60_000 } })
+    async runBatch(@CurrentUser() auth: AuthenticatedUser, @Body() body: RunTasksBatchDto) {
+        if (!Array.isArray(body?.items)) {
+            throw new BadRequestException('items must be an array.');
+        }
+        return this.service.runTasksBatch(
+            auth.userId,
+            body.items.map((item) => ({ taskId: item.taskId, agentId: item.agentId ?? null })),
+        );
+    }
+
     @Get(':id')
     @ApiOperation({ summary: 'Get one Task.' })
     @HttpCode(HttpStatus.OK)
@@ -252,6 +273,36 @@ export class TasksController {
             throw new BadRequestException(`Invalid target status: ${body?.to}`);
         }
         return this.service.transition(auth.userId, id, body.to, { force: body.force === true });
+    }
+
+    // ── Board dispatch (kanban M3 / M4) ───────────────────────────
+
+    @Get(':id/run-candidates')
+    @ApiOperation({
+        summary:
+            'Agents that can run this Task (assignees, then its own agent, then the Work default) — the board agent picker.',
+    })
+    @HttpCode(HttpStatus.OK)
+    async runCandidates(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ) {
+        return { data: await this.service.listRunCandidates(auth.userId, id) };
+    }
+
+    @Post(':id/run')
+    @ApiOperation({
+        summary:
+            'Run this Task now. Resolves the Agent (explicit agentId → assigned Agent → the Work default), then dispatches through the same gated path a status transition uses. 409 RUN_ALREADY_IN_FLIGHT when a run for that (task, agent) is still queued/running.',
+    })
+    @HttpCode(HttpStatus.ACCEPTED)
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
+    async run(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: RunTaskDto,
+    ) {
+        return this.service.runTask(auth.userId, id, { agentId: body?.agentId ?? null });
     }
 
     @Post(':id/resolve-conflicts')
