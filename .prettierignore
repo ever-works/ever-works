@@ -30,3 +30,6 @@ apps/web/e2e/test-results
 # file is byte-identical to a fresh generation, so letting Prettier
 # reformat it would fail that test on every run.
 packages/agent/src/works-config/schema/works.v2.schema.json
+
+# Generated OpenAPI artifact (pnpm generate:openapi)
+apps/api/openapi.json

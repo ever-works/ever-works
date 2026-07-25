@@ -67,7 +67,12 @@ export const PLUGIN_CAPABILITIES = {
 	// providers: `custom-http` (GET-only, SSRF-guarded) and `stripe`
 	// (official SDK; balance + income windows). See
 	// `capabilities/metrics-provider.interface.ts` for the contract.
-	METRICS_PROVIDER: 'metrics-provider'
+	METRICS_PROVIDER: 'metrics-provider',
+	// Streaming-terminal session hosts (Wave 1 M5). First-party:
+	// pty-local (node-pty in the executing job-runtime worker, with a
+	// child_process pipe floor). Future: pty-ssh (user's own box),
+	// k8s-exec. See capabilities/terminal-stream.interface.ts.
+	TERMINAL_STREAM: 'terminal-stream'
 } as const;
 
 export type PluginCapability = (typeof PLUGIN_CAPABILITIES)[keyof typeof PLUGIN_CAPABILITIES];

@@ -126,4 +126,35 @@ export class AgentRunSweeperService {
             byKind,
         };
     }
+
+    /**
+     * Streaming-terminal M6 — reap sessions whose terminal claims to be
+     * live but whose heartbeat went stale (crashed worker, killed pod).
+     * Marks them `ended/crashed` and returns the run ids so the CALLER
+     * (the worker-side sweeper task) can best-effort publish a pinned
+     * `exit` frame through the relay — no viewer stares at a frozen
+     * pane. Zero-arg like `sweepStuckRuns` (superjson RPC proxy).
+     */
+    async sweepStaleTerminalSessions(): Promise<{ swept: string[]; cutoffMinutes: number }> {
+        const cutoffMinutes = 5;
+        const cutoff = new Date(Date.now() - cutoffMinutes * 60_000);
+        const stale = await this.runs.findStaleTerminalRuns(cutoff);
+        const swept: string[] = [];
+        for (const run of stale) {
+            try {
+                await this.runs.updateTerminalColumns(run.id, {
+                    terminalState: 'ended',
+                    terminalEndedReason: 'crashed',
+                });
+                swept.push(run.id);
+            } catch (error) {
+                this.logger.warn(
+                    `terminal sweep failed for run ${run.id}: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+            }
+        }
+        return { swept, cutoffMinutes };
+    }
 }

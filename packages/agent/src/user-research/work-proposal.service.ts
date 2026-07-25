@@ -719,7 +719,12 @@ export class WorkProposalService {
      */
     async createUserManual(
         userId: string,
-        input: { description: string; title?: string },
+        input: {
+            description: string;
+            title?: string;
+            targetWorkId?: string | null;
+            extraPrompt?: string | null;
+        },
     ): Promise<WorkProposal> {
         const description = input.description.trim();
         const callerTitle = input.title?.trim();
@@ -735,6 +740,11 @@ export class WorkProposalService {
             title,
             description,
             slugSuggestion,
+            // Re-run-existing-Work fields (Wave 0.3). Ownership of the
+            // target Work is enforced at BUILD time (ensureCanEdit in the
+            // executor) — a stale/foreign id degrades to a failed build.
+            targetWorkId: input.targetWorkId ?? null,
+            extraPrompt: input.extraPrompt ?? null,
         });
     }
 

@@ -38,3 +38,30 @@ export interface AgentChatReplyDispatcher {
 
 export const AGENT_TASK_EXECUTE_DISPATCHER = 'AGENT_TASK_EXECUTE_DISPATCHER' as const;
 export const AGENT_CHAT_REPLY_DISPATCHER = 'AGENT_CHAT_REPLY_DISPATCHER' as const;
+
+/**
+ * Stable, user-readable marker the run-failure UI keys on. Kept as an
+ * exported constant so the producer (dispatcher adapters), the consumer
+ * (TaskTransitionService's failure classification), and any UI matcher
+ * share one literal instead of three drifting copies.
+ */
+export const JOB_RUNTIME_NOT_CONFIGURED_REASON = 'job-runtime-not-configured' as const;
+
+/**
+ * Thrown by dispatcher adapters when no background job runtime is
+ * usable (e.g. a local install without Trigger.dev credentials). Callers
+ * match on `.name` — the FacadeError house pattern — so the check works
+ * across package boundaries without instanceof identity issues. The
+ * point is LOUD degradation: a run must fail with a reason a human can
+ * act on, never vanish into a generic SDK stack trace.
+ */
+export class JobRuntimeNotConfiguredError extends Error {
+    constructor(message?: string) {
+        super(
+            message ??
+                'Background job runtime is not configured on this install — agent runs cannot execute. ' +
+                    'Configure a job runtime (e.g. Trigger.dev credentials) to enable agent execution.',
+        );
+        this.name = 'JobRuntimeNotConfiguredError';
+    }
+}

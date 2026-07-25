@@ -151,7 +151,12 @@ export class WorkProposalsApiService {
      */
     async createUserManual(
         userId: string,
-        input: { description: string; title?: string },
+        input: {
+            description: string;
+            title?: string;
+            targetWorkId?: string;
+            extraPrompt?: string;
+        },
     ): Promise<WorkProposal> {
         const description = input.description?.trim() ?? '';
         if (description.length < 10) {
@@ -160,6 +165,8 @@ export class WorkProposalsApiService {
         return this.proposals.createUserManual(userId, {
             description,
             title: input.title,
+            targetWorkId: input.targetWorkId,
+            extraPrompt: input.extraPrompt,
         });
     }
 
