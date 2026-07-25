@@ -149,6 +149,30 @@ export class WorkProposal {
     @JoinColumn({ name: 'acceptedWorkId' })
     acceptedWork?: Work | null;
 
+    /**
+     * When set, building this Idea does NOT create a new Work — it
+     * RE-RUNS generation on this existing Work with the Idea's
+     * description (+ `extraPrompt`) as the instruction. NULL = the
+     * classic Idea→new-Work path. Ownership of the target Work is
+     * enforced at execution time (`ensureCanEdit`), not at write time —
+     * a stale id degrades to a failed build, never a cross-user write.
+     */
+    @Column('uuid', { nullable: true })
+    targetWorkId?: string | null;
+
+    @ManyToOne(() => Work, { nullable: true, onDelete: 'SET NULL' })
+    @JoinColumn({ name: 'targetWorkId' })
+    targetWork?: Work | null;
+
+    /**
+     * Extra instruction appended to the Idea description when the build
+     * executes (most useful with `targetWorkId`: "re-run this Work and
+     * ALSO do X"). Capped at the DTO layer; nullable for every
+     * pre-existing Idea.
+     */
+    @Column({ type: 'text', nullable: true })
+    extraPrompt?: string | null;
+
     @Column({ type: 'varchar', nullable: true })
     generationRunId?: string | null;
 

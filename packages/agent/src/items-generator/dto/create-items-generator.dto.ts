@@ -128,6 +128,18 @@ export class CreateItemsGeneratorDto implements ICreateItemsGeneratorDto {
 
 export class UpdateItemsGeneratorDto implements IUpdateItemsGeneratorDto {
     @ApiPropertyOptional({
+        description:
+            'Optional prompt override for THIS run — replaces the stored last-run ' +
+            'prompt in the merged payload (updateDto spreads last). Used by Idea ' +
+            're-runs to inject the Idea description + extra instructions.',
+        maxLength: 5000,
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(5000)
+    prompt?: string;
+
+    @ApiPropertyOptional({
         description: 'Optional AI model override used for generation',
         maxLength: 200,
     })

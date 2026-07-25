@@ -180,6 +180,31 @@ describe('TaskTransitionService — Phase 15.3 agent dispatch hook', () => {
         );
     });
 
+    it('classifies an unconfigured job runtime under its own stable reason marker', async () => {
+        const svc = makeSvc();
+        const notConfigured = new Error(
+            'Background job runtime is not configured on this install — agent runs cannot execute.',
+        );
+        notConfigured.name = 'JobRuntimeNotConfiguredError';
+        dispatcher.enqueue.mockRejectedValueOnce(notConfigured);
+        const task = makeTask({ status: TaskStatus.TODO });
+        tasks.findById.mockResolvedValueOnce({ ...task, status: TaskStatus.IN_PROGRESS });
+        assignees.findAgentAssignees.mockResolvedValueOnce([
+            { assigneeType: 'agent', assigneeId: 'agent-a' },
+        ]);
+
+        await svc.transition(task, TaskStatus.IN_PROGRESS);
+        await new Promise((r) => setImmediate(r));
+
+        // Loud degradation: an install-level misconfiguration must be
+        // distinguishable from a transient dispatch error — the run-detail
+        // UI and the health banner key on this marker.
+        expect(runs.markDispatchFailed).toHaveBeenCalledWith(
+            'r1',
+            expect.stringMatching(/^job-runtime-not-configured: /),
+        );
+    });
+
     it('skips reconciliation when the queued run was never created, and keeps fanning out', async () => {
         const svc = makeSvc();
         // createQueued fails for the FIRST assignee only — `run` stays null, so
