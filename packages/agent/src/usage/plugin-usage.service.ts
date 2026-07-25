@@ -22,6 +22,12 @@ export type RecordPluginUsageInput = {
      */
     agentId?: string | null;
     taskId?: string | null;
+    /**
+     * Pricing Wave 9 M2 — per-run attribution. Set when the call was
+     * made inside an `AgentRun`; the run-cost accumulator sums tagged
+     * rows at run-terminal time for the credits debit.
+     */
+    runId?: string | null;
 };
 
 /**
@@ -66,6 +72,8 @@ export class PluginUsageService {
                 // Phase 15.6 — propagate Agent/Task attribution when set.
                 agentId: input.agentId ?? null,
                 taskId: input.taskId ?? null,
+                // Wave 9 M2 — propagate per-run attribution when set.
+                runId: input.runId ?? null,
             });
         } catch (error) {
             this.logger.warn(

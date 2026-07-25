@@ -1,6 +1,8 @@
 export * from './database-config.factory';
 export * from './database.config';
 export * from './database.module';
+// Pricing Wave 9 M2 — run-cost settlement seam (token + contract).
+export * from './run-cost-settler';
 export * from './repositories/api-key.repository';
 export * from './repositories/work.repository';
 export * from './repositories/work-deployment.repository';

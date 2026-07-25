@@ -196,6 +196,8 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
             // Phase 15.6 — Agent/Task attribution propagation.
             agentId: facadeOptions.agentId,
             taskId: facadeOptions.taskId,
+            // Wave 9 M2 — per-run cost attribution.
+            runId: facadeOptions.runId,
             pluginId: plugin.id,
             capability: PluginUsageCapability.AI,
             units: response.usage?.totalTokens ?? 1,
@@ -379,6 +381,8 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
             // Phase 15.6 — Agent/Task attribution propagation.
             agentId: facadeOptions.agentId,
             taskId: facadeOptions.taskId,
+            // Wave 9 M2 — per-run cost attribution.
+            runId: facadeOptions.runId,
             pluginId: plugin.id,
             capability: PluginUsageCapability.AI,
             units: response.usage?.totalTokens ?? 1,
@@ -453,6 +457,8 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
                         // Phase 15.6 — Agent/Task attribution propagation.
                         agentId: facadeOptions.agentId,
                         taskId: facadeOptions.taskId,
+                        // Wave 9 M2 — per-run cost attribution.
+                        runId: facadeOptions.runId,
                         pluginId: plugin.id,
                         capability: PluginUsageCapability.AI,
                         units: chunkCount,
@@ -531,6 +537,8 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
                 // Phase 15.6 — Agent/Task attribution propagation.
                 agentId: facadeOptions.agentId,
                 taskId: facadeOptions.taskId,
+                // Wave 9 M2 — per-run cost attribution.
+                runId: facadeOptions.runId,
                 pluginId: plugin.id,
                 capability: PluginUsageCapability.AI,
                 units,
@@ -604,6 +612,8 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
                 userId: facadeOptions.userId,
                 agentId: facadeOptions.agentId,
                 taskId: facadeOptions.taskId,
+                // Wave 9 M2 — per-run cost attribution.
+                runId: facadeOptions.runId,
                 pluginId: plugin.id,
                 capability: PluginUsageCapability.AI,
                 units: minutes,

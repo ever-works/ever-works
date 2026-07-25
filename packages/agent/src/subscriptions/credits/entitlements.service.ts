@@ -7,6 +7,15 @@ export const ENTITLEMENT_KEYS = {
     DAILY_FREE_CREDITS: 'daily-free-credits',
     MAX_CONCURRENT_RUNS: 'max-concurrent-runs',
     WORKS_LIMIT: 'works-limit',
+    /**
+     * Pricing Wave 9 M2 — whether the plan's runs are billed against the
+     * credits balance (1 = credit-limited, 0/absent = not). Consumed by
+     * the dispatch gate's soft-enforcement precheck: only a
+     * credit-limited plan with balance ≤ 0 parks new runs (and only when
+     * `CREDITS_ENFORCEMENT=on`). No row seeded yet — every plan resolves
+     * to the fallback 0, keeping enforcement doubly dark.
+     */
+    CREDIT_LIMITED: 'credit-limited',
 } as const;
 
 type CacheSlot = {

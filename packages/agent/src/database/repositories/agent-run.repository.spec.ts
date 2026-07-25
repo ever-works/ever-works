@@ -319,4 +319,58 @@ describe('AgentRunRepository — terminal transitions', () => {
             expect(update).not.toHaveBeenCalled();
         });
     });
+
+    // ── Wave 9 M2 — run-cost settlement hook ─────────────────────────
+    // Terminal writes are the ONE choke point every run lifecycle path
+    // shares, so the metering → credits debit hangs off them here.
+    describe('run-cost settlement hook (RUN_COST_SETTLER)', () => {
+        let settler: { settleRun: jest.Mock };
+        let hookedRuns: AgentRunRepository;
+
+        beforeEach(() => {
+            settler = { settleRun: jest.fn().mockResolvedValue({ status: 'settled' }) };
+            hookedRuns = new AgentRunRepository(repository as never, settler as never);
+            jest.spyOn(
+                (hookedRuns as never as { logger: { warn: () => void } }).logger,
+                'warn',
+            ).mockImplementation(() => undefined);
+        });
+
+        it('settles after a WINNING markCompleted', async () => {
+            await hookedRuns.markCompleted('r1', 'done');
+            expect(settler.settleRun).toHaveBeenCalledWith('r1');
+        });
+
+        it('settles after a WINNING markFailed — failed runs still consumed spend', async () => {
+            await hookedRuns.markFailed('r1', 'boom');
+            expect(settler.settleRun).toHaveBeenCalledWith('r1');
+        });
+
+        it('does NOT settle when the terminal CAS lost (the winner already settled)', async () => {
+            queryBuilder.execute.mockResolvedValue({ affected: 0 });
+            repository.findOne.mockResolvedValue({ id: 'r1', status: 'cancelled' });
+            await hookedRuns.markCompleted('r1', 'done');
+            expect(settler.settleRun).not.toHaveBeenCalled();
+        });
+
+        it('a throwing settler never fails the terminal write (defence-in-depth)', async () => {
+            settler.settleRun.mockRejectedValue(new Error('credits stack down'));
+            await expect(hookedRuns.markCompleted('r1', 'done')).resolves.toBeUndefined();
+            await expect(hookedRuns.markFailed('r1', 'boom')).resolves.toBeUndefined();
+        });
+
+        it('no settler bound (unit tests / credit-less installs) ⇒ terminal writes unchanged', async () => {
+            await expect(runs.markCompleted('r1', 'done')).resolves.toBeUndefined();
+            expect(queryBuilder.set).toHaveBeenCalledWith(
+                expect.objectContaining({ status: 'completed' }),
+            );
+        });
+
+        it('markStuckFailed settles every reaped id (idempotent per contract)', async () => {
+            await hookedRuns.markStuckFailed(['r1', 'r2'], 'stuck');
+            expect(settler.settleRun).toHaveBeenCalledTimes(2);
+            expect(settler.settleRun).toHaveBeenCalledWith('r1');
+            expect(settler.settleRun).toHaveBeenCalledWith('r2');
+        });
+    });
 });

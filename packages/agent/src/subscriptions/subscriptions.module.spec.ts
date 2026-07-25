@@ -5,6 +5,7 @@ import { UsageLedgerService } from './usage-ledger.service';
 import { BillingProvider, ManualBillingProvider } from './billing/billing.provider';
 import { CreditLedgerService, InsufficientCreditsError } from './credits/credit-ledger.service';
 import { ENTITLEMENT_KEYS, EntitlementsService } from './credits/entitlements.service';
+import { RunCostSettlementService } from './credits/run-cost-settlement.service';
 
 /**
  * Pins the public `@ever-works/agent/subscriptions` barrel surface and the
@@ -42,6 +43,13 @@ describe('SubscriptionsModule + barrel re-exports', () => {
             expect(subscriptionsBarrel.ENTITLEMENT_KEYS).toBe(ENTITLEMENT_KEYS);
         });
 
+        it('re-exports the run-cost settlement surface (pricing Wave 9 M2)', () => {
+            // The RUN_CREDITS_PRECHECK / RUN_COST_SETTLER tokens live in
+            // the agents / database barrels respectively (leaf files
+            // beside their consumers) — only the implementation is here.
+            expect(subscriptionsBarrel.RunCostSettlementService).toBe(RunCostSettlementService);
+        });
+
         it('exposes the documented runtime symbols only (no extras silently appearing)', () => {
             const runtimeKeys = Object.keys(subscriptionsBarrel).sort();
             expect(runtimeKeys).toEqual(
@@ -56,6 +64,8 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                     'InsufficientCreditsError',
                     'EntitlementsService',
                     'ENTITLEMENT_KEYS',
+                    // Run-cost settlement (pricing Wave 9 M2)
+                    'RunCostSettlementService',
                 ].sort(),
             );
         });
@@ -79,6 +89,11 @@ describe('SubscriptionsModule + barrel re-exports', () => {
             const providers = getMeta('providers');
             expect(providers).toContain(CreditLedgerService);
             expect(providers).toContain(EntitlementsService);
+        });
+
+        it('declares + exports RunCostSettlementService (Wave 9 M2)', () => {
+            expect(getMeta('providers')).toContain(RunCostSettlementService);
+            expect(getMeta('exports')).toContain(RunCostSettlementService);
         });
 
         it('binds the abstract BillingProvider token to ManualBillingProvider via useClass', () => {
@@ -110,10 +125,15 @@ describe('SubscriptionsModule + barrel re-exports', () => {
 
         it('imports DatabaseModule (where the repositories are bound)', () => {
             const imports = getMeta('imports');
-            // DatabaseModule is the first (and only) import — pin its presence
-            // by name to avoid coupling this test to its constructor identity.
+            // Pin presence by name to avoid coupling this test to the
+            // modules' constructor identities.
             const importNames = imports.map((m: any) => m?.name ?? String(m));
             expect(importNames).toContain('DatabaseModule');
+        });
+
+        it('imports NotificationsModule (Wave 9 M2 — exhaustion notifications)', () => {
+            const importNames = getMeta('imports').map((m: any) => m?.name ?? String(m));
+            expect(importNames).toContain('NotificationsModule');
         });
     });
 });

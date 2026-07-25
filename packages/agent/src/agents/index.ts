@@ -10,6 +10,7 @@ export * from './agent-export.service';
 export * from './prompt-assembler.service';
 export * from './agent-run.service';
 export * from './run-dispatch-gate.service';
+export * from './run-credits-precheck';
 export * from './agent-run-canceller';
 export * from './agent-run-abort';
 export * from './agent-run-sweeper.service';

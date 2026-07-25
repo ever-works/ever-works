@@ -1,9 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { In, Repository } from 'typeorm';
 import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
 import type { GateStatus, TaskAcceptanceCheck, TaskCheckResult } from '@ever-works/contracts';
 import { AgentRun, AgentRunStatus, AgentRunTriggerKind } from '../../entities/agent-run.entity';
+import { RUN_COST_SETTLER, type RunCostSettler } from '../run-cost-settler';
 
 /**
  * Statuses a run may be transitioned OUT OF by a normal terminal write.
@@ -27,7 +28,38 @@ export class AgentRunRepository {
     constructor(
         @InjectRepository(AgentRun)
         private readonly repository: Repository<AgentRun>,
+        // Pricing Wave 9 M2 — run-cost settlement seam. Terminal writes
+        // are the ONE choke point every run lifecycle path shares (the
+        // worker's RPC proxy included), so the metering→credits debit
+        // hangs off them here. @Optional(): bound by the api-side
+        // @Global() SubscriptionsModule; absent in unit tests and
+        // installs without the credits stack — every hook site no-ops.
+        @Optional()
+        @Inject(RUN_COST_SETTLER)
+        private readonly runCostSettler?: RunCostSettler,
     ) {}
+
+    /**
+     * Fire the run-cost settlement for a run that just went terminal.
+     * Best-effort BY CONTRACT — a settlement failure must never fail (or
+     * bubble into) the terminal write that hosted it; the settler itself
+     * also never rejects, this guard is defence-in-depth. Awaited (not
+     * fire-and-forget) so callers that need read-your-write semantics on
+     * `agent_runs.costCents` — and the tests — observe a completed
+     * settlement when the terminal write resolves.
+     */
+    private async settleRunCost(runId: string): Promise<void> {
+        if (!this.runCostSettler) return;
+        try {
+            await this.runCostSettler.settleRun(runId);
+        } catch (err) {
+            this.logger.warn(
+                `AgentRun ${runId}: run-cost settlement failed (ignored): ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+        }
+    }
 
     async findById(id: string): Promise<AgentRun | null> {
         return this.repository.findOne({ where: { id } });
@@ -205,6 +237,9 @@ export class AgentRunRepository {
                 workId: run.workId ?? null,
             };
         }
+        // Wave 9 M2 — a user-cancelled run consumed provider spend up to
+        // the moment it was cancelled; settle what was actually metered.
+        await this.settleRunCost(runId);
         return {
             found: true,
             previousStatus: run.status,
@@ -283,6 +318,13 @@ export class AgentRunRepository {
             .where('id IN (:...runIds)', { runIds })
             .andWhere('status IN (:...statuses)', { statuses: NON_TERMINAL })
             .execute();
+        // Wave 9 M2 — every input id is terminal after this statement
+        // (either this bulk CAS won or a worker's own terminal write did,
+        // which already settled). Settling all ids is safe: settlement is
+        // idempotent (`run:{runId}` ledger key) and zero-event runs skip.
+        for (const runId of runIds) {
+            await this.settleRunCost(runId);
+        }
         return result.affected ?? 0;
     }
 
@@ -446,11 +488,18 @@ export class AgentRunRepository {
     async markCompleted(runId: string, summary: string | null): Promise<void> {
         const ok = await this.casTerminal(runId, NON_TERMINAL, { status: 'completed', summary });
         if (!ok) await this.warnTerminalNoOp(runId, 'markCompleted');
+        // Wave 9 M2 — settle metered cost → credits debit on the winning
+        // terminal write only; a CAS loser's re-settle would be a
+        // harmless idempotent no-op but is skipped to avoid double work.
+        if (ok) await this.settleRunCost(runId);
     }
 
     async markFailed(runId: string, errorMessage: string): Promise<void> {
         const ok = await this.casTerminal(runId, NON_TERMINAL, { status: 'failed', errorMessage });
         if (!ok) await this.warnTerminalNoOp(runId, 'markFailed');
+        // Wave 9 M2 — failed runs still consumed provider spend; the
+        // accumulator sums whatever the run actually metered (often 0).
+        if (ok) await this.settleRunCost(runId);
     }
 
     /**
@@ -465,6 +514,10 @@ export class AgentRunRepository {
     async markDispatchFailed(runId: string, errorMessage: string): Promise<void> {
         const ok = await this.casTerminal(runId, QUEUED_ONLY, { status: 'failed', errorMessage });
         if (!ok) await this.warnTerminalNoOp(runId, 'markDispatchFailed');
+        // Wave 9 M2 — a dispatch-failed run normally metered nothing (the
+        // settler skips runs with zero tagged events); kept for the ONE
+        // terminal choke-point invariant.
+        if (ok) await this.settleRunCost(runId);
     }
 
     /**
@@ -474,6 +527,19 @@ export class AgentRunRepository {
      */
     async setMemorySessionId(runId: string, memorySessionId: string): Promise<void> {
         await this.repository.update(runId, { memorySessionId });
+    }
+
+    /**
+     * Pricing Wave 9 M2 — stamp the run's cumulative metered cost
+     * (sum of its tagged `plugin_usage_events.costCents`) onto the
+     * Wave-4 `costCents` rollup column. Written by the run-cost
+     * settlement on terminal transitions; deliberately NOT part of
+     * {@link updateTelemetry}'s worker-facing whitelist — workers
+     * self-report tokens/activity, but cost comes from the metering
+     * pipeline only.
+     */
+    async stampCostCents(runId: string, costCents: number): Promise<void> {
+        await this.repository.update(runId, { costCents });
     }
 
     /**

@@ -214,6 +214,7 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                     workId,
                     agentId,
                     taskId,
+                    runId,
                     query,
                     maxResults,
                     includeDomains,
@@ -222,7 +223,8 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                     const results = await search.search(
                         query,
                         { maxResults, includeDomains, excludeDomains },
-                        { userId, workId, agentId, taskId },
+                        // Wave 9 M2 — runId feeds per-run cost attribution.
+                        { userId, workId, agentId, taskId, runId },
                     );
                     return {
                         results: results.map((r) => ({
@@ -239,6 +241,7 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                     workId,
                     agentId,
                     taskId,
+                    runId,
                     url,
                     viewportWidth,
                     viewportHeight,
@@ -246,7 +249,8 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                 }) {
                     const result = await screenshot.capture(
                         { url, viewportWidth, viewportHeight, fullPage } as any,
-                        { userId, workId, agentId, taskId },
+                        // Wave 9 M2 — runId feeds per-run cost attribution.
+                        { userId, workId, agentId, taskId, runId },
                     );
                     return {
                         success: result.success,
@@ -254,12 +258,14 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                         cacheUrl: result.cacheUrl ?? null,
                     };
                 },
-                async extractContent({ userId, workId, agentId, taskId, url, maxChars }) {
+                async extractContent({ userId, workId, agentId, taskId, runId, url, maxChars }) {
                     const result = await extractor.extractContent(url, undefined, {
                         userId,
                         workId,
                         agentId,
                         taskId,
+                        // Wave 9 M2 — runId feeds per-run cost attribution.
+                        runId,
                     });
                     const raw = result?.rawContent ?? '';
                     const cap = maxChars && maxChars > 0 ? Math.min(maxChars, 200_000) : 50_000;
@@ -329,6 +335,8 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                             workId: input.facadeOptions.workId,
                             agentId: input.facadeOptions.agentId,
                             taskId: input.facadeOptions.taskId,
+                            // Wave 9 M2 — per-run cost attribution.
+                            runId: input.facadeOptions.runId,
                             providerOverride: input.facadeOptions.providerOverride,
                         },
                     );

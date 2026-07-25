@@ -366,6 +366,20 @@ export const config = {
                 const parsed = parseInt(process.env.CREDITS_DAILY_GRANT_BATCH || '500');
                 return Number.isFinite(parsed) && parsed > 0 ? parsed : 500;
             },
+            /**
+             * Soft credits enforcement kill-switch (pricing Wave 9 M2 —
+             * ship dark). Default OFF: the dispatch gate's credits
+             * precheck only runs when `CREDITS_ENFORCEMENT=on` (or
+             * `true`). Debits/metering are unaffected by this flag —
+             * it gates ONLY whether a credit-limited plan with an
+             * exhausted balance parks new runs
+             * (`queuedReason='insufficient-credits'`) instead of
+             * dispatching them.
+             */
+            isEnforcementEnabled() {
+                const raw = (process.env.CREDITS_ENFORCEMENT || '').toLowerCase();
+                return raw === 'on' || raw === 'true' || raw === '1';
+            },
         },
     },
 
