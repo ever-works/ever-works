@@ -14,9 +14,11 @@ import {
     Min,
 } from 'class-validator';
 import {
+    KB_DECISION_STATUSES,
     KB_DOCUMENT_CLASSES,
     KB_DOCUMENT_STATUSES,
     KB_LOCK_MODES,
+    KbDecisionStatus,
     KbDocumentClass,
     KbDocumentStatus,
     KbLockMode,
@@ -245,4 +247,25 @@ export class CreateKbUploadDto {
 export class OrgKbDocumentScopeDto {
     @IsUUID()
     organizationId: string;
+}
+
+/**
+ * Body for `POST /api/works/:id/kb/documents/:docId/decision-status`
+ * (memory upgrades M4) — the platform-side decision status transition.
+ * The service validates the transition against the status machine and
+ * 409s on an illegal move; `supersededByDocId` records the replacement
+ * chain when transitioning to `superseded`.
+ */
+export class TransitionKbDecisionStatusDto {
+    @IsIn(KB_DECISION_STATUSES as unknown as readonly string[])
+    status: KbDecisionStatus;
+
+    @IsOptional()
+    @IsUUID()
+    supersededByDocId?: string;
+
+    @IsOptional()
+    @IsString()
+    @MaxLength(KB_DESCRIPTION_MAX)
+    rationale?: string;
 }
