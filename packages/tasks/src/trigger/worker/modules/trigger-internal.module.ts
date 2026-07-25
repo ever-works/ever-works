@@ -262,6 +262,8 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
             provide: DigestService,
             useFactory: (apiClient: TriggerInternalApiClient) =>
                 createRemoteProxy(apiClient, 'DigestService'),
+            inject: [TriggerInternalApiClient],
+        },
         // Credits ledger (pricing Wave 9 M1) — the credits-daily-grant
         // cron task calls `dispatchDailyGrants()` on this proxy, which
         // RPCs to the live API where the ledger/entitlement repositories

@@ -76,6 +76,7 @@ jest.mock('@ever-works/agent/ingest', () => ({
 jest.mock('@ever-works/agent/digest', () => ({
     DigestModule: class DigestModule {},
     DigestService: class DigestService {},
+}));
 // Credits ledger (pricing Wave 9 M1) — the module imports the agent
 // SubscriptionsModule to expose CreditLedgerService through the
 // remote-proxy controller; stub the barrel so the repository → TypeORM
