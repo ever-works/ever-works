@@ -88,7 +88,7 @@ export class TerminalAttachService {
             ) {
                 return null;
             }
-            if (Date.now() > claims.exp) return null;
+            if (Date.now() >= claims.exp) return null;
             return claims;
         } catch {
             return null;

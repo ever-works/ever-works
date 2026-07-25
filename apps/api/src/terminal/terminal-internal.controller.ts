@@ -2,6 +2,7 @@ import {
     Body,
     Controller,
     ForbiddenException,
+    PayloadTooLargeException,
     Headers,
     HttpCode,
     HttpStatus,
@@ -82,9 +83,14 @@ export class TerminalInternalController {
             throw new ForbiddenException('Invalid run id');
         }
         const items = Array.isArray(body) ? body : [body];
+        if (items.length > 2048) {
+            // The worker transport splits batches on 413 — never silently
+            // discard the tail of an oversized batch.
+            throw new PayloadTooLargeException('Frame batch exceeds 2048 items');
+        }
         let accepted = 0;
         let dropped = 0;
-        for (const item of items.slice(0, 2048)) {
+        for (const item of items) {
             const frame = normalizeTerminalFrame(item);
             if (frame && this.registry.publish(runId, frame)) {
                 accepted++;

@@ -99,8 +99,15 @@ export class TerminalWsService implements OnApplicationBootstrap, OnApplicationS
     }
 
     private handleUpgrade(req: IncomingMessage, socket: Duplex, head: Buffer): void {
-        const url = (req.url ?? '').split('?')[0];
-        const match = WS_PATH_PATTERN.exec(url);
+        const rawUrl = req.url ?? '';
+        if (rawUrl.includes('?')) {
+            // Attach tokens ride the FIRST FRAME, never the URL — a query
+            // string on a terminal upgrade is always a mistake or an
+            // exfiltration attempt; refuse instead of ignoring it.
+            socket.destroy();
+            return;
+        }
+        const match = WS_PATH_PATTERN.exec(rawUrl);
         if (!match || !this.wss) {
             // Not ours — other upgrade listeners (none today) could still
             // claim it; destroy only if nobody else is listening.
@@ -136,8 +143,17 @@ export class TerminalWsService implements OnApplicationBootstrap, OnApplicationS
             state.alive = true;
         });
 
-        ws.on('message', (data: Buffer | string) => {
-            const raw = typeof data === 'string' ? data : new Uint8Array(data);
+        ws.on('message', (data: Buffer | ArrayBuffer | Buffer[] | string) => {
+            // ws.RawData is Buffer | ArrayBuffer | Buffer[] — normalize
+            // every form before decoding.
+            const raw =
+                typeof data === 'string'
+                    ? data
+                    : Array.isArray(data)
+                      ? new Uint8Array(Buffer.concat(data))
+                      : data instanceof ArrayBuffer
+                        ? new Uint8Array(data)
+                        : new Uint8Array(data);
             const frame = decodeTerminalFrame(raw);
             if (!frame) {
                 // Garbage is dropped silently — never throw, never echo.
@@ -199,6 +215,7 @@ export class TerminalWsService implements OnApplicationBootstrap, OnApplicationS
         });
 
         ws.on('close', () => {
+            clearTimeout(authTimer);
             if (state.authenticated) {
                 this.registry.detach(state.runId, state.clientId);
             }
