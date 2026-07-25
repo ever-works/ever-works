@@ -33,6 +33,9 @@ import { PluginUsageRepository } from '@ever-works/agent/database';
 // agents barrel re-exports services + module only).
 import { AgentRepository } from '@ever-works/agent/database';
 import { TaskWorkspaceService } from '@ever-works/agent/tasks-domain';
+// Re-litigation guard (memory upgrades M6) — provided + exported by
+// `KnowledgeBaseModule`, which the api-side TasksModule imports.
+import { DecisionConflictService } from '@ever-works/agent/services';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import {
@@ -81,6 +84,8 @@ export class TasksController {
         private readonly agents: AgentRepository,
         // Wave 2 M5/M6 — workspace conflict-resolve + discard actions.
         private readonly taskWorkspace: TaskWorkspaceService,
+        // Memory upgrades M6 — deterministic re-litigation guard.
+        private readonly decisionConflicts: DecisionConflictService,
     ) {}
 
     /**
@@ -182,6 +187,29 @@ export class TasksController {
     @HttpCode(HttpStatus.OK)
     async getOne(@CurrentUser() auth: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
         return this.service.getOne(auth.userId, id);
+    }
+
+    @Get(':id/decision-conflicts')
+    @ApiOperation({
+        summary:
+            'Re-litigation guard — settled decisions this Task appears to re-open (advisory, never blocking).',
+        description:
+            "Deterministic term-overlap check (`term-overlap/v1`, no LLM) of the Task's title + description against the `class=decision, status=accepted` documents in the Task's Work Knowledge Base. Owner-scoped: a Task the caller does not own 404s, and every candidate read goes through the KB service's own view gate. Returns `{ conflicts, scanned, heuristic }`; an empty `conflicts` array is the normal case.",
+    })
+    @HttpCode(HttpStatus.OK)
+    async decisionConflictsForTask(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ) {
+        // Owner scope + existence: `getOne` throws NotFound for a Task
+        // the caller doesn't own (no 403 existence leak).
+        const task = await this.service.getOne(auth.userId, id);
+        return this.decisionConflicts.checkIntent({
+            workId: task.workId ?? null,
+            userId: auth.userId,
+            title: task.title,
+            description: task.description ?? null,
+        });
     }
 
     @Patch(':id')
