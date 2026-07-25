@@ -14,7 +14,7 @@ export const metadata: Metadata = { title: 'Tasks' };
  */
 export default async function MissionTasksTabPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
-    const result = await tasksAPI.list({ missionId: id, limit: 100 });
+    const result = await tasksAPI.list({ missionId: id, limit: 100, includeRun: true });
     return (
         <div className="p-6 max-w-screen-2xl mx-auto">
             <TasksScopedSection tasks={result.data} scopeLabel="Mission" scopeId={id} />

@@ -44,6 +44,10 @@ export enum PluginUsageCapability {
 // `AddTaskIdToPluginUsageEvents1779978014000` adds the column + index.
 // No FK to `tasks` — task delete must NOT cascade-drop audit rows.
 @Index('idx_plugin_usage_events_task_occurred', ['taskId', 'occurredAt'])
+// Pricing Wave 9 M2 — per-run cost accumulation filter. Migration
+// `AddRunIdToPluginUsageEvents1783600000000` adds the column + index.
+// No FK to `agent_runs` — run deletion must NOT cascade-drop audit rows.
+@Index('idx_plugin_usage_events_run_occurred', ['runId', 'occurredAt'])
 @Entity({ name: 'plugin_usage_events' })
 export class PluginUsageEvent {
     @PrimaryGeneratedColumn('uuid')
@@ -104,6 +108,18 @@ export class PluginUsageEvent {
      */
     @Column({ type: 'uuid', nullable: true })
     taskId?: string | null;
+
+    /**
+     * Per-run attribution (pricing Wave 9 M2). Populated when the call
+     * was made inside an `AgentRun` (threaded through
+     * `FacadeOptions.runId` by the run's AI-dispatch + tool
+     * pass-through adapters). The run-cost accumulator sums
+     * `costCents` over rows tagged with this id at run-terminal time
+     * to stamp `agent_runs.costCents` and emit the credits debit. Null
+     * for calls made outside a run. No FK — audit rows outlive runs.
+     */
+    @Column({ type: 'uuid', nullable: true })
+    runId?: string | null;
 
     /**
      * Polymorphic-owner discriminator (Missions/Ideas/Works spec §8.2).

@@ -5,6 +5,7 @@ import {
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from 'typeorm';
+import type { MergePolicyOverride } from '@ever-works/contracts';
 
 /**
  * EW-653 (Tenants & Organizations Phase 1) — internal-only scope
@@ -71,6 +72,21 @@ export class Tenant {
      */
     @Column({ type: 'varchar', length: 200 })
     displayName: string;
+
+    /**
+     * Merge policy (Wave 3, founder decision D4) — the LEAST specific
+     * scope of the matrix, one step above the platform default. NULL =
+     * inherit `PLATFORM_DEFAULT_MERGE_POLICY`. Partial objects are
+     * normal: resolution is field-by-field.
+     *
+     * The Tenant is internal-only (never rendered in the UI), so this
+     * column has no self-service HTTP write surface yet — it is read on
+     * every resolution and is the natural home for an operator-level
+     * ceiling. Resolve through `MergePolicyService`
+     * (`@ever-works/agent/policy`), never read it directly.
+     */
+    @Column('simple-json', { nullable: true })
+    mergePolicy?: MergePolicyOverride | null;
 
     @CreateDateColumn()
     createdAt: Date;

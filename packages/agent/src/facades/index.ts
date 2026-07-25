@@ -51,6 +51,11 @@ export {
     NoGitProviderError,
     GitProviderNotFoundError,
     NoGitCredentialsError,
+    // Merge-policy matrix (Wave 3, D4) — refusal error + the actor shape
+    // that marks a merge agent-driven. Both cross package boundaries
+    // (apps/api maps the error to 403), so both must be barrel-exported.
+    MergePolicyRefusedError,
+    type AgentMergeActor,
     type GitFacadeOptions,
     type GitProviderInfo,
     type FacadeCloneOptions,
@@ -119,6 +124,7 @@ export {
 // hosted `agentmemory` REST server on :3111)
 export { AgentMemoryFacadeService, AgentMemoryFacadeError } from './agent-memory.facade';
 export { TerminalStreamFacadeService, TerminalStreamFacadeError } from './terminal-stream.facade';
+export { WorkspaceFacadeService, WorkspaceFacadeError } from './workspace.facade';
 
 // Vector Store Facade — EW-642 RFC §6 selection chain + D4 embedding
 // mode resolver. Routes KB chunk upsert / query / delete through the

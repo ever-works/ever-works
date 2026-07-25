@@ -71,6 +71,13 @@ const FACADE_ERROR_STATUS: Readonly<Record<string, HttpStatus>> = {
     NoDeployCredentialsError: HttpStatus.CONFLICT,
     // "the resolved plugin does not implement this operation".
     OAuthNotSupportedError: HttpStatus.BAD_REQUEST,
+    // Merge-policy matrix (Wave 3, D4) — an agent-driven merge the
+    // effective policy refuses. Not a fault: the caller resolves it by
+    // changing the policy at the tenant / org / Work / Agent scope, or by
+    // satisfying the condition (green gate, human approval, allowed
+    // method, non-protected branch). The refusal reason is safe to
+    // surface — it names the offending value on purpose.
+    MergePolicyRefusedError: HttpStatus.FORBIDDEN,
 };
 
 @Catch(FacadeError)

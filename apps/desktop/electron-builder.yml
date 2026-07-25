@@ -1,0 +1,44 @@
+# electron-builder configuration for the Ever Works Desktop App.
+#
+# Deliberately unsigned: no codeSign / notarize / certificate settings here.
+# Signing + auto-update channels are a follow-up hardening milestone (PRD M9);
+# CI packaging wires signing secrets outside the repo when that lands.
+appId: works.ever.desktop
+productName: Ever Works Desktop
+copyright: Copyright © 2026 Ever Co. LTD
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - dist/**
+  - package.json
+
+asar: true
+# The desktop app spawns the platform's own workspace processes; nothing in
+# this package needs a native rebuild at package time.
+npmRebuild: false
+
+win:
+  target:
+    - nsis
+
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+
+mac:
+  target:
+    - dmg
+    - zip
+  category: public.app-category.developer-tools
+
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Development
+  maintainer: Ever Co. LTD <ever@ever.co>
+
+publish: null

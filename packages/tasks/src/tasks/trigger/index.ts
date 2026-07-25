@@ -8,6 +8,7 @@ export * from './kb-org-overlay-fanout.task';
 export * from './kb-reconcile.task';
 export * from './agent-run-sweeper.task';
 export * from './terminal-session.task';
+export * from './task-branch-gc.task';
 export * from './user-research-rerun-dispatcher.task';
 export * from './mission-tick.task';
 // PR-4 — Idea → Work build executor (flag-gated, dry-run by default).
@@ -27,3 +28,5 @@ export * from './work-schedule-dispatcher.task';
 export * from './webhook-delivery.task';
 // EW-693 — long-running plugin execution (Phase 7 / T27).
 export * from './run-plugin-operation.task';
+// Pricing Wave 9 M1 — daily free-credit grant (idempotent per user/day).
+export * from './credits-daily-grant.task';

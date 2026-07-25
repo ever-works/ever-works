@@ -1,8 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialEntity';
+import type { GateStatus, TaskAcceptanceCheck, TaskCheckResult } from '@ever-works/contracts';
 import { AgentRun, AgentRunStatus, AgentRunTriggerKind } from '../../entities/agent-run.entity';
+import { RUN_COST_SETTLER, type RunCostSettler } from '../run-cost-settler';
 
 /**
  * Statuses a run may be transitioned OUT OF by a normal terminal write.
@@ -26,10 +28,76 @@ export class AgentRunRepository {
     constructor(
         @InjectRepository(AgentRun)
         private readonly repository: Repository<AgentRun>,
+        // Pricing Wave 9 M2 — run-cost settlement seam. Terminal writes
+        // are the ONE choke point every run lifecycle path shares (the
+        // worker's RPC proxy included), so the metering→credits debit
+        // hangs off them here. @Optional(): bound by the api-side
+        // @Global() SubscriptionsModule; absent in unit tests and
+        // installs without the credits stack — every hook site no-ops.
+        @Optional()
+        @Inject(RUN_COST_SETTLER)
+        private readonly runCostSettler?: RunCostSettler,
     ) {}
+
+    /**
+     * Fire the run-cost settlement for a run that just went terminal.
+     * Best-effort BY CONTRACT — a settlement failure must never fail (or
+     * bubble into) the terminal write that hosted it; the settler itself
+     * also never rejects, this guard is defence-in-depth. Awaited (not
+     * fire-and-forget) so callers that need read-your-write semantics on
+     * `agent_runs.costCents` — and the tests — observe a completed
+     * settlement when the terminal write resolves.
+     */
+    private async settleRunCost(runId: string): Promise<void> {
+        if (!this.runCostSettler) return;
+        try {
+            await this.runCostSettler.settleRun(runId);
+        } catch (err) {
+            this.logger.warn(
+                `AgentRun ${runId}: run-cost settlement failed (ignored): ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+        }
+    }
 
     async findById(id: string): Promise<AgentRun | null> {
         return this.repository.findOne({ where: { id } });
+    }
+
+    /**
+     * Kanban run cockpit (Wave 2) — batch-load runs for the `includeRun`
+     * list embed. One IN query, no N+1.
+     *
+     * @internal Security: unscoped by design — callers MUST pass only ids
+     * derived server-side from rows the acting user already owns (the
+     * Tasks list hands over its own `latestRunId` pointers, never client
+     * input). HTTP handlers must not expose this with caller-supplied ids.
+     */
+    async findByIds(ids: string[]): Promise<AgentRun[]> {
+        // TypeORM renders `In([])` as invalid SQL on some drivers; and an
+        // empty batch has an obvious answer anyway.
+        if (ids.length === 0) return [];
+        return this.repository.find({ where: { id: In(ids) } });
+    }
+
+    /**
+     * Kanban run cockpit (Wave 2) — worker-side telemetry feed. A single
+     * `repository.update` so the worker can stream progress (current
+     * activity line, token counter, changed-files count) without touching
+     * status columns; the status lifecycle stays exclusively with the
+     * CAS-guarded transitions above. Best-effort — callers swallow
+     * failures, telemetry must never fail a run.
+     */
+    async updateTelemetry(
+        runId: string,
+        patch: {
+            currentActivity?: string | null;
+            totalTokens?: number | null;
+            changedFilesCount?: number | null;
+        },
+    ): Promise<void> {
+        await this.repository.update(runId, patch);
     }
 
     /**
@@ -121,14 +189,25 @@ export class AgentRunRepository {
          * worker had not yet reached `markStarted`.
          */
         triggerRunId?: string | null;
+        /**
+         * Wave 4 M2 — denormalized Work scope of the cancelled row, so the
+         * caller can drain the concurrency queue for that Work after a
+         * successful cancel. Null for Work-less runs.
+         */
+        workId?: string | null;
     }> {
         const run = await this.repository.findOne({
             where: { id: runId, userId },
-            select: ['id', 'status', 'triggerRunId'],
+            select: ['id', 'status', 'triggerRunId', 'workId'],
         });
         if (!run) return { found: false };
         if (run.status !== 'queued' && run.status !== 'running') {
-            return { found: true, previousStatus: run.status, triggerRunId: run.triggerRunId };
+            return {
+                found: true,
+                previousStatus: run.status,
+                triggerRunId: run.triggerRunId,
+                workId: run.workId ?? null,
+            };
         }
         const result = await this.repository
             .createQueryBuilder()
@@ -155,9 +234,18 @@ export class AgentRunRepository {
                 // Re-read: the worker may have stamped `triggerRunId` via
                 // markStarted between our first read and this CAS.
                 triggerRunId: fresh?.triggerRunId ?? run.triggerRunId,
+                workId: run.workId ?? null,
             };
         }
-        return { found: true, previousStatus: run.status, triggerRunId: run.triggerRunId };
+        // Wave 9 M2 — a user-cancelled run consumed provider spend up to
+        // the moment it was cancelled; settle what was actually metered.
+        await this.settleRunCost(runId);
+        return {
+            found: true,
+            previousStatus: run.status,
+            triggerRunId: run.triggerRunId,
+            workId: run.workId ?? null,
+        };
     }
 
     /**
@@ -183,23 +271,49 @@ export class AgentRunRepository {
         cutoff: Date,
         limit: number,
     ): Promise<
-        Pick<AgentRun, 'id' | 'agentId' | 'triggerKind' | 'status' | 'startedAt' | 'createdAt'>[]
+        Pick<
+            AgentRun,
+            | 'id'
+            | 'agentId'
+            | 'triggerKind'
+            | 'status'
+            | 'startedAt'
+            | 'createdAt'
+            | 'workId'
+            | 'awaitingInput'
+        >[]
     > {
-        return this.repository
-            .createQueryBuilder('run')
-            .select([
-                'run.id',
-                'run.agentId',
-                'run.triggerKind',
-                'run.status',
-                'run.startedAt',
-                'run.createdAt',
-            ])
-            .where('run.status IN (:...statuses)', { statuses: NON_TERMINAL })
-            .andWhere('COALESCE(run.startedAt, run.createdAt) <= :cutoff', { cutoff })
-            .orderBy('COALESCE(run.startedAt, run.createdAt)', 'ASC')
-            .limit(limit)
-            .getMany();
+        return (
+            this.repository
+                .createQueryBuilder('run')
+                .select([
+                    'run.id',
+                    'run.agentId',
+                    'run.triggerKind',
+                    'run.status',
+                    'run.startedAt',
+                    'run.createdAt',
+                    // Wave 4 M2 — the sweeper drains the concurrency queue for
+                    // every Work whose stuck run it just reaped.
+                    'run.workId',
+                    // Wave 4 M5 — selected so the sweeper can re-assert the
+                    // never-reap-awaiting_input rule in the service layer too.
+                    'run.awaitingInput',
+                ])
+                .where('run.status IN (:...statuses)', { statuses: NON_TERMINAL })
+                // Wave 4 M5 — a run parked on a human question is NOT stuck; it is
+                // waiting, possibly for days. Reaping it is the production bug this
+                // predicate exists to prevent, so the exemption lives in the SQL
+                // (and again in `AgentRunSweeperService`, belt-and-braces). The
+                // NULL arm covers rows written before the column existed.
+                .andWhere('(run.awaitingInput IS NULL OR run.awaitingInput = :notAwaiting)', {
+                    notAwaiting: false,
+                })
+                .andWhere('COALESCE(run.startedAt, run.createdAt) <= :cutoff', { cutoff })
+                .orderBy('COALESCE(run.startedAt, run.createdAt)', 'ASC')
+                .limit(limit)
+                .getMany()
+        );
     }
 
     /**
@@ -224,6 +338,13 @@ export class AgentRunRepository {
             .where('id IN (:...runIds)', { runIds })
             .andWhere('status IN (:...statuses)', { statuses: NON_TERMINAL })
             .execute();
+        // Wave 9 M2 — every input id is terminal after this statement
+        // (either this bulk CAS won or a worker's own terminal write did,
+        // which already settled). Settling all ids is safe: settlement is
+        // idempotent (`run:{runId}` ledger key) and zero-event runs skip.
+        for (const runId of runIds) {
+            await this.settleRunCost(runId);
+        }
         return result.affected ?? 0;
     }
 
@@ -233,6 +354,13 @@ export class AgentRunRepository {
         triggerKind: AgentRunTriggerKind;
         taskId?: string | null;
         chatMessageId?: string | null;
+        /** Wave 4 M1 — denormalized from `task.workId` at creation when present. */
+        workId?: string | null;
+        /** Wave 4 M2 — set to `concurrency-limit` when the dispatch gate parks the run. */
+        queuedReason?: string | null;
+        /** Wave 4 M1 — pipeline plugin id when known at creation. */
+        runnerKind?: string | null;
+        organizationId?: string | null;
     }): Promise<AgentRun> {
         const run = this.repository.create({
             agentId: args.agentId,
@@ -241,6 +369,12 @@ export class AgentRunRepository {
             status: 'queued',
             taskId: args.taskId ?? null,
             chatMessageId: args.chatMessageId ?? null,
+            workId: args.workId ?? null,
+            queuedReason: args.queuedReason ?? null,
+            runnerKind: args.runnerKind ?? null,
+            // Only stamp when explicitly provided — the ambient scope
+            // subscriber (EW-657) remains the default writer.
+            ...(args.organizationId !== undefined ? { organizationId: args.organizationId } : {}),
         });
         return this.repository.save(run);
     }
@@ -374,11 +508,18 @@ export class AgentRunRepository {
     async markCompleted(runId: string, summary: string | null): Promise<void> {
         const ok = await this.casTerminal(runId, NON_TERMINAL, { status: 'completed', summary });
         if (!ok) await this.warnTerminalNoOp(runId, 'markCompleted');
+        // Wave 9 M2 — settle metered cost → credits debit on the winning
+        // terminal write only; a CAS loser's re-settle would be a
+        // harmless idempotent no-op but is skipped to avoid double work.
+        if (ok) await this.settleRunCost(runId);
     }
 
     async markFailed(runId: string, errorMessage: string): Promise<void> {
         const ok = await this.casTerminal(runId, NON_TERMINAL, { status: 'failed', errorMessage });
         if (!ok) await this.warnTerminalNoOp(runId, 'markFailed');
+        // Wave 9 M2 — failed runs still consumed provider spend; the
+        // accumulator sums whatever the run actually metered (often 0).
+        if (ok) await this.settleRunCost(runId);
     }
 
     /**
@@ -393,6 +534,10 @@ export class AgentRunRepository {
     async markDispatchFailed(runId: string, errorMessage: string): Promise<void> {
         const ok = await this.casTerminal(runId, QUEUED_ONLY, { status: 'failed', errorMessage });
         if (!ok) await this.warnTerminalNoOp(runId, 'markDispatchFailed');
+        // Wave 9 M2 — a dispatch-failed run normally metered nothing (the
+        // settler skips runs with zero tagged events); kept for the ONE
+        // terminal choke-point invariant.
+        if (ok) await this.settleRunCost(runId);
     }
 
     /**
@@ -402,6 +547,19 @@ export class AgentRunRepository {
      */
     async setMemorySessionId(runId: string, memorySessionId: string): Promise<void> {
         await this.repository.update(runId, { memorySessionId });
+    }
+
+    /**
+     * Pricing Wave 9 M2 — stamp the run's cumulative metered cost
+     * (sum of its tagged `plugin_usage_events.costCents`) onto the
+     * Wave-4 `costCents` rollup column. Written by the run-cost
+     * settlement on terminal transitions; deliberately NOT part of
+     * {@link updateTelemetry}'s worker-facing whitelist — workers
+     * self-report tokens/activity, but cost comes from the metering
+     * pipeline only.
+     */
+    async stampCostCents(runId: string, costCents: number): Promise<void> {
+        await this.repository.update(runId, { costCents });
     }
 
     /**
@@ -455,6 +613,48 @@ export class AgentRunRepository {
     }
 
     /**
+     * Quality gates (Wave 3 M2) — persist the gate columns for one run.
+     *
+     * Explicit field-by-field whitelist, mirroring
+     * {@link updateTerminalColumns}: the callers (the dispatch-freeze
+     * snapshot in `agent-task-execute` and `TaskGateRunnerService`) hand
+     * over worker-influenced payloads, and none of those may ever write
+     * status/summary/telemetry columns through this path. Deliberately no
+     * status CAS — the gate columns are additive facts about the run, not
+     * lifecycle transitions, and the runner reports them right before the
+     * terminal write.
+     */
+    async updateGateResults(
+        runId: string,
+        patch: {
+            resolvedChecks?: TaskAcceptanceCheck[] | null;
+            checkResults?: TaskCheckResult[] | null;
+            gateStatus?: GateStatus | null;
+            gateAttempts?: number;
+        },
+    ): Promise<void> {
+        const update: Record<string, unknown> = {};
+        if (patch.resolvedChecks !== undefined) update.resolvedChecks = patch.resolvedChecks;
+        if (patch.checkResults !== undefined) update.checkResults = patch.checkResults;
+        if (patch.gateStatus !== undefined) update.gateStatus = patch.gateStatus;
+        if (patch.gateAttempts !== undefined) update.gateAttempts = patch.gateAttempts;
+        if (Object.keys(update).length === 0) return;
+        await this.repository.update(runId, update);
+    }
+
+    /**
+     * Record the per-run workspace audit (worktree-per-Task isolation).
+     * The Task row keeps the durable branch identity; this is the
+     * run-scoped record for debugging and the run cockpit.
+     */
+    async setWorkspaceMeta(
+        runId: string,
+        workspaceMeta: NonNullable<AgentRun['workspaceMeta']>,
+    ): Promise<void> {
+        await this.repository.update(runId, { workspaceMeta });
+    }
+
+    /**
      * Find an in-flight run for the (taskId, agentId) pair — used by
      * the agent-chat-reply dedup guard (architecture/security §8 — T6
      * mitigation): if a chat-triggered run is already running for the
@@ -474,6 +674,26 @@ export class AgentRunRepository {
     }
 
     /**
+     * Most-recent run dispatched for a Task, any agent, any status —
+     * the "latest run" the quality-gate transition rule (Wave 3 M8)
+     * reads `gateStatus` from. Authoritative (queries the runs table
+     * directly) rather than following the best-effort `tasks.latestRunId`
+     * denorm pointer, because a policy gate must not depend on
+     * board-decoration telemetry.
+     *
+     * @internal Security: unscoped — callers must have verified Task
+     * ownership through another path (TaskTransitionService receives an
+     * owner-scoped Task row).
+     */
+    async findLatestForTask(taskId: string): Promise<AgentRun | null> {
+        return this.repository
+            .createQueryBuilder('run')
+            .where('run.taskId = :taskId', { taskId })
+            .orderBy('run.createdAt', 'DESC')
+            .getOne();
+    }
+
+    /**
      * Most-recent queued / running run for an Agent regardless of trigger
      * kind. Kept as a legacy fallback for Trigger payloads created before
      * workers started carrying explicit AgentRun ids.
@@ -487,5 +707,280 @@ export class AgentRunRepository {
             })
             .orderBy('run.createdAt', 'DESC')
             .getOne();
+    }
+
+    // ── Run orchestration (Wave 4 M2/M3) ───────────────────────────
+
+    /**
+     * In-flight = `running`, plus `queued` rows that were actually handed
+     * to the job runtime (`queuedReason IS NULL`). Rows parked by the
+     * dispatch gate (`queuedReason = 'concurrency-limit'`) are WAITING for
+     * capacity, not consuming it — counting them would deadlock the drain:
+     * the parked run itself would keep the count at the limit forever.
+     */
+    private inFlightQb(alias = 'run') {
+        return this.repository
+            .createQueryBuilder(alias)
+            .where(`${alias}.status IN (:...statuses)`, {
+                statuses: ['queued', 'running'] satisfies AgentRunStatus[],
+            })
+            .andWhere(`${alias}.queuedReason IS NULL`);
+    }
+
+    /** Per-Work in-flight count for the dispatch gate. */
+    async countInFlightForWork(workId: string): Promise<number> {
+        return this.inFlightQb().andWhere('run.workId = :workId', { workId }).getCount();
+    }
+
+    /** Per-user in-flight count (the org valve for org-less personal runs). */
+    async countInFlightForUser(userId: string): Promise<number> {
+        return this.inFlightQb().andWhere('run.userId = :userId', { userId }).getCount();
+    }
+
+    /** Per-organization in-flight count for the dispatch gate. */
+    async countInFlightForOrganization(organizationId: string): Promise<number> {
+        return this.inFlightQb()
+            .andWhere('run.organizationId = :organizationId', { organizationId })
+            .getCount();
+    }
+
+    /**
+     * Oldest run parked by the dispatch gate for this Work — FIFO drain
+     * order (priority-aware ordering is a documented later milestone).
+     */
+    async findOldestQueuedForConcurrency(
+        workId: string,
+        queuedReason: string,
+    ): Promise<AgentRun | null> {
+        return this.repository
+            .createQueryBuilder('run')
+            .where('run.workId = :workId', { workId })
+            .andWhere('run.status = :status', { status: 'queued' satisfies AgentRunStatus })
+            .andWhere('run.queuedReason = :queuedReason', { queuedReason })
+            .orderBy('run.createdAt', 'ASC')
+            .getOne();
+    }
+
+    /**
+     * CAS-claim a parked run for dispatch: clears `queuedReason` only
+     * while the row is still `queued` AND still parked, so two drains
+     * racing for the same run resolve to exactly one dispatcher. Returns
+     * whether THIS caller won the claim.
+     */
+    async claimQueuedForDispatch(runId: string, queuedReason: string): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(AgentRun)
+            .set({ queuedReason: null })
+            .where('id = :id', { id: runId })
+            .andWhere('status = :status', { status: 'queued' satisfies AgentRunStatus })
+            .andWhere('queuedReason = :queuedReason', { queuedReason })
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Roll a drain-claimed run back to parked after its dispatch could
+     * not be attempted (no dispatcher bound). No-clobber: only a still-
+     * `queued` row with a cleared reason is restored.
+     */
+    async restoreQueuedReason(runId: string, queuedReason: string): Promise<void> {
+        await this.repository
+            .createQueryBuilder()
+            .update(AgentRun)
+            .set({ queuedReason })
+            .where('id = :id', { id: runId })
+            .andWhere('status = :status', { status: 'queued' satisfies AgentRunStatus })
+            .andWhere('queuedReason IS NULL')
+            .execute();
+    }
+
+    // ── Run steering (Wave 4 M5) ───────────────────────────────────
+
+    /**
+     * Append one steering message to a LIVE run's pending-input queue.
+     *
+     * Read-modify-write rather than a SQL array append: `pendingInput` is a
+     * `simple-json` (text) column, and the two supported drivers (Postgres in
+     * prod, sqlite in e2e) have no portable JSON-append. The status re-check
+     * inside the UPDATE's WHERE is what makes it safe: a run that went terminal
+     * between the read and the write takes no message, and the caller is told
+     * so (`false`) and starts a new run instead. Two concurrent steers on the
+     * same live run can drop one message under a lost update — acceptable for a
+     * human-paced control channel, and strictly better than a terminal run
+     * silently swallowing input.
+     *
+     * `awaitingInput` is cleared in the SAME statement: an answered question is
+     * no longer a question, and doing it here means no window where the run is
+     * both parked and holding fresh input.
+     */
+    async appendPendingInput(runId: string, message: string): Promise<boolean> {
+        const run = await this.repository.findOne({
+            where: { id: runId },
+            select: ['id', 'status', 'pendingInput'],
+        });
+        if (!run) return false;
+        if (!NON_TERMINAL.includes(run.status)) return false;
+        const queue = Array.isArray(run.pendingInput) ? [...run.pendingInput] : [];
+        queue.push(message);
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(AgentRun)
+            .set({ pendingInput: queue, awaitingInput: false })
+            .where('id = :id', { id: runId })
+            .andWhere('status IN (:...statuses)', { statuses: NON_TERMINAL })
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Drain the steering signals for the executing run: the queued input
+     * messages (cleared as they are handed over, so the same message is never
+     * injected twice) plus the cooperative interrupt flag.
+     *
+     * Called once per model round-trip by `AgentRunService.runToolLoop`, i.e.
+     * at most `TOOL_LOOP_MAX_ITERATIONS` times per run, and it only writes when
+     * there was actually something queued.
+     */
+    async takeSteeringSignals(runId: string): Promise<{
+        pendingInput: string[];
+        interruptRequested: boolean;
+    }> {
+        const run = await this.repository.findOne({
+            where: { id: runId },
+            select: ['id', 'pendingInput', 'interruptRequested'],
+        });
+        if (!run) return { pendingInput: [], interruptRequested: false };
+        const pendingInput = Array.isArray(run.pendingInput) ? run.pendingInput : [];
+        if (pendingInput.length > 0) {
+            await this.repository.update(runId, { pendingInput: null });
+        }
+        return { pendingInput, interruptRequested: run.interruptRequested === true };
+    }
+
+    /**
+     * Request a cooperative stop. CAS-guarded on `queued|running` so an
+     * interrupt racing a terminal write cannot resurrect a finished run's
+     * flag. Returns whether the request was recorded.
+     */
+    async requestInterrupt(runId: string): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(AgentRun)
+            .set({ interruptRequested: true })
+            .where('id = :id', { id: runId })
+            .andWhere('status IN (:...statuses)', { statuses: NON_TERMINAL })
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Lifecycle signal: the run is (or is no longer) parked on a human.
+     *
+     * Deliberately NOT status-guarded — a run parks itself as its LAST act
+     * before finishing, so the write frequently lands on a row that is already
+     * terminal, and that is the correct state to record (the Sessions view
+     * shows "awaiting input" on a finished-but-parked run, and Resume is
+     * offered from exactly there).
+     */
+    async setAwaitingInput(runId: string, awaitingInput: boolean): Promise<void> {
+        await this.repository.update(runId, { awaitingInput });
+    }
+
+    /**
+     * Seed a freshly-created run with the conversation identity + first
+     * message it should resume from. Field-by-field whitelist, mirroring
+     * {@link updateTerminalColumns}.
+     */
+    async seedResumeContext(
+        runId: string,
+        patch: { cliSessionId?: string | null; pendingInput?: string[] | null },
+    ): Promise<void> {
+        const update: Record<string, unknown> = {};
+        if (patch.cliSessionId !== undefined) update.cliSessionId = patch.cliSessionId;
+        if (patch.pendingInput !== undefined) update.pendingInput = patch.pendingInput;
+        if (Object.keys(update).length === 0) return;
+        await this.repository.update(runId, update);
+    }
+
+    /**
+     * Sessions list (Wave 4 M3) — owner-scoped, filterable, paginated.
+     * `userId` is mandatory and always applied at the repository layer:
+     * this is the HTTP-facing method, so cross-user rows must be
+     * unreachable even if a future controller forgets its own guard.
+     */
+    async listSessionsForUser(
+        userId: string,
+        filters: {
+            status?: AgentRunStatus;
+            workId?: string;
+            agentId?: string;
+            taskId?: string;
+            triggerKind?: AgentRunTriggerKind;
+        },
+        limit = 25,
+        offset = 0,
+    ): Promise<[AgentRun[], number]> {
+        const qb = this.repository
+            .createQueryBuilder('run')
+            .where('run.userId = :userId', { userId });
+        if (filters.status) {
+            qb.andWhere('run.status = :status', { status: filters.status });
+        }
+        if (filters.workId) {
+            qb.andWhere('run.workId = :workId', { workId: filters.workId });
+        }
+        if (filters.agentId) {
+            qb.andWhere('run.agentId = :agentId', { agentId: filters.agentId });
+        }
+        if (filters.taskId) {
+            qb.andWhere('run.taskId = :taskId', { taskId: filters.taskId });
+        }
+        if (filters.triggerKind) {
+            qb.andWhere('run.triggerKind = :triggerKind', { triggerKind: filters.triggerKind });
+        }
+        return qb.orderBy('run.createdAt', 'DESC').take(limit).skip(offset).getManyAndCount();
+    }
+
+    /**
+     * Per-Work session summary (Wave 4 M3) — one grouped scan over
+     * `(workId, status)` instead of four counts. CASE/SUM is portable
+     * across Postgres and sqlite (the e2e suite runs on sqlite);
+     * `awaitingInput = :true` binds a real boolean so both drivers
+     * compare their native representation.
+     */
+    async summarizeForWork(workId: string): Promise<{
+        running: number;
+        queued: number;
+        awaiting: number;
+        failedLast24h: number;
+    }> {
+        const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const raw = await this.repository
+            .createQueryBuilder('run')
+            .select(`SUM(CASE WHEN run.status = 'running' THEN 1 ELSE 0 END)`, 'running')
+            .addSelect(`SUM(CASE WHEN run.status = 'queued' THEN 1 ELSE 0 END)`, 'queued')
+            .addSelect(
+                `SUM(CASE WHEN run.awaitingInput = :isAwaiting AND run.status IN ('queued', 'running') THEN 1 ELSE 0 END)`,
+                'awaiting',
+            )
+            .addSelect(
+                `SUM(CASE WHEN run.status = 'failed' AND run.finishedAt >= :cutoff THEN 1 ELSE 0 END)`,
+                'failedLast24h',
+            )
+            .where('run.workId = :workId', { workId })
+            .setParameters({ isAwaiting: true, cutoff })
+            .getRawOne<{
+                running: string | number | null;
+                queued: string | number | null;
+                awaiting: string | number | null;
+                failedLast24h: string | number | null;
+            }>();
+        return {
+            running: Number(raw?.running ?? 0),
+            queued: Number(raw?.queued ?? 0),
+            awaiting: Number(raw?.awaiting ?? 0),
+            failedLast24h: Number(raw?.failedLast24h ?? 0),
+        };
     }
 }

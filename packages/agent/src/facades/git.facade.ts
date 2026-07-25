@@ -1,4 +1,10 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import type {
+    GateStatus,
+    MergeDecision,
+    MergeRefusalCode,
+    MergePolicySource,
+} from '@ever-works/contracts';
 import type {
     IGitProviderPlugin,
     GitRepository,
@@ -33,6 +39,7 @@ import {
 } from '../database/repositories/auth-account.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { GitHubAppInstallationRepository } from '../database/repositories/github-app-installation.repository';
+import { MERGE_POLICY_ENFORCER, type MergePolicyEnforcer } from '../policy/merge-policy.enforcer';
 import type { AuthAccount } from '../entities/auth-account.entity';
 import { FacadeError } from './base.facade';
 import { config } from '@src/config';
@@ -74,6 +81,32 @@ export class GitProviderNotFoundError extends GitFacadeError {
     }
 }
 
+/**
+ * Merge-policy matrix (Wave 3, founder decision D4) — an agent-driven
+ * merge that the EFFECTIVE policy refuses. Carries the machine-readable
+ * refusal `code`, the scope the policy came from, and a human `reason`
+ * that names the offending value.
+ *
+ * Mapped to HTTP 403 by `FacadeExceptionFilter` (by this exact `name`):
+ * it is not a fault, it is a policy the caller can change at the tenant,
+ * organization, Work or Agent scope.
+ */
+export class MergePolicyRefusedError extends GitFacadeError {
+    readonly code?: MergeRefusalCode;
+    readonly policySource?: MergePolicySource;
+
+    constructor(decision: MergeDecision, providerId?: string) {
+        super(
+            decision.reason ?? 'Merge refused by the effective merge policy.',
+            'mergePullRequest',
+            providerId,
+        );
+        this.name = 'MergePolicyRefusedError';
+        this.code = decision.code;
+        this.policySource = decision.source;
+    }
+}
+
 export class NoGitCredentialsError extends GitFacadeError {
     constructor(providerId: string, userId: string) {
         super(
@@ -105,6 +138,37 @@ export interface GitFacadeUserAuth extends GitFacadeBaseOptions {
 
 /** Git facade options: must provide at least token OR userId */
 export type GitFacadeOptions = GitFacadeTokenAuth | GitFacadeUserAuth;
+
+/**
+ * Merge-policy matrix (Wave 3, founder decision D4) — the "who is asking"
+ * for {@link GitFacadeService.mergePullRequest}.
+ *
+ * PRESENT  ⇒ the merge is AGENT-DRIVEN and is routed through the single
+ *            decision point (`MergePolicyService.canAgentMerge`) before
+ *            the provider is called at all.
+ * ABSENT   ⇒ the merge is human-driven; behaviour is exactly as it was
+ *            before this feature landed. Human merges are governed by the
+ *            git provider's own branch protection, not by this matrix.
+ */
+export interface AgentMergeActor {
+    /** The Agent asking to merge. Required — it is what makes this agent-driven. */
+    agentId: string;
+    /** Narrows the policy chain when the Agent is not itself Work-scoped. */
+    workId?: string | null;
+    organizationId?: string | null;
+    tenantId?: string | null;
+    /** Latest quality-gate verdict for the run behind this pull request. */
+    gateStatus?: GateStatus | null;
+    /** Whether a human approval is on record for this merge. */
+    humanApproved?: boolean;
+    /**
+     * Base branch of the pull request. Optional: when omitted the facade
+     * looks it up through the provider. If it still cannot be determined
+     * and the policy protects any branch, the merge is REFUSED rather than
+     * performed blind.
+     */
+    targetBranch?: string | null;
+}
 
 export type { GitProviderInfo };
 
@@ -159,6 +223,15 @@ export class GitFacadeService implements IGitFacade {
         private readonly settingsService: PluginSettingsService,
         private readonly workRepository: WorkRepository,
         private readonly gitHubAppInstallationRepository: GitHubAppInstallationRepository,
+        // Merge-policy matrix (Wave 3, D4) — bound to MergePolicyService by
+        // the agent-side PolicyModule (imported by FacadesModule). Appended
+        // LAST + @Optional() per the positional-spec arity rule; consumed
+        // via the token so the facade never imports the concrete service.
+        // Unbound, an AGENT-DRIVEN merge fails CLOSED (see mergePullRequest);
+        // human-driven merges are untouched.
+        @Optional()
+        @Inject(MERGE_POLICY_ENFORCER)
+        private readonly mergePolicy?: MergePolicyEnforcer,
     ) {}
 
     private getRequiredOAuthScopes(providerId: string): readonly string[] {
@@ -670,15 +743,118 @@ export class GitFacadeService implements IGitFacade {
         return null;
     }
 
+    /**
+     * Land a pull request.
+     *
+     * Merge-policy matrix (Wave 3, founder decision D4): when `agentActor`
+     * is supplied the merge is AGENT-DRIVEN and is routed through the
+     * single decision point before the provider is touched. A refusal
+     * throws {@link MergePolicyRefusedError} carrying the reason — the
+     * provider call never happens, so a policy violation cannot land even
+     * partially. Without `agentActor` (human-driven merges) nothing
+     * changes.
+     */
     async mergePullRequest(
         owner: string,
         repo: string,
         prNumber: number,
         mergeOptions: MergeOptions | undefined,
         options: GitFacadeOptions,
+        agentActor?: AgentMergeActor,
     ): Promise<MergeResult> {
+        if (agentActor?.agentId) {
+            await this.assertAgentMayMerge(
+                owner,
+                repo,
+                prNumber,
+                mergeOptions,
+                options,
+                agentActor,
+            );
+        }
         const { plugin, token } = await this.resolvePluginAndToken(options);
         return plugin.mergePullRequest(owner, repo, prNumber, mergeOptions, token);
+    }
+
+    /**
+     * The enforcement half of the merge-policy matrix. Throws
+     * {@link MergePolicyRefusedError} when the effective policy refuses.
+     *
+     * Fail-CLOSED by design (the opposite posture from the concurrency
+     * valve in `RunDispatchGateService`, and deliberately so): a merge is
+     * irreversible, so an unavailable enforcer or an undeterminable target
+     * branch refuses instead of proceeding. The only bypass is the
+     * operator kill-switch `AGENT_MERGE_POLICY_ENFORCEMENT=off`, which
+     * restores the pre-feature behaviour wholesale.
+     */
+    private async assertAgentMayMerge(
+        owner: string,
+        repo: string,
+        prNumber: number,
+        mergeOptions: MergeOptions | undefined,
+        options: GitFacadeOptions,
+        agentActor: AgentMergeActor,
+    ): Promise<void> {
+        if (!config.agents.isMergePolicyEnforcementEnabled()) {
+            this.logger.warn(
+                `Merge-policy enforcement is DISABLED (AGENT_MERGE_POLICY_ENFORCEMENT=off) — ` +
+                    `agent ${agentActor.agentId} merging ${owner}/${repo}#${prNumber} unchecked.`,
+            );
+            return;
+        }
+
+        if (!this.mergePolicy) {
+            throw new MergePolicyRefusedError(
+                {
+                    allowed: false,
+                    code: 'agent-merge-disabled',
+                    reason:
+                        'Agent-driven merges are unavailable in this runtime: the merge-policy ' +
+                        'enforcer is not bound, and an unevaluated policy is never a satisfied policy.',
+                },
+                options.providerId,
+            );
+        }
+
+        // Resolve the base branch when the caller did not supply it — the
+        // protected-branch rule is worthless without it, and the decision
+        // point refuses on an unknown target rather than guessing.
+        let targetBranch = agentActor.targetBranch ?? null;
+        if (!targetBranch) {
+            try {
+                const pr = await this.getPullRequest(owner, repo, prNumber, options);
+                targetBranch = pr?.base ?? null;
+            } catch (error) {
+                this.logger.warn(
+                    `Merge policy: could not read ${owner}/${repo}#${prNumber} to determine its ` +
+                        `base branch: ${error instanceof Error ? error.message : String(error)}`,
+                );
+            }
+        }
+
+        const decision = await this.mergePolicy.canAgentMerge({
+            agentId: agentActor.agentId,
+            workId: agentActor.workId ?? options.workId ?? null,
+            organizationId: agentActor.organizationId ?? null,
+            tenantId: agentActor.tenantId ?? null,
+            gateStatus: agentActor.gateStatus ?? null,
+            humanApproved: agentActor.humanApproved ?? false,
+            targetBranch,
+            mergeMethod: mergeOptions?.mergeMethod ?? null,
+        });
+
+        if (!decision.allowed) {
+            this.logger.log(
+                `Merge policy REFUSED agent ${agentActor.agentId} on ${owner}/${repo}#${prNumber} ` +
+                    `(${decision.code ?? 'refused'}, policy source: ${decision.source ?? 'default'}).`,
+            );
+            throw new MergePolicyRefusedError(decision, options.providerId);
+        }
+
+        this.logger.log(
+            `Merge policy ALLOWED agent ${agentActor.agentId} on ${owner}/${repo}#${prNumber} ` +
+                `(policy source: ${decision.source ?? 'default'}).`,
+        );
     }
 
     async listPullRequests(

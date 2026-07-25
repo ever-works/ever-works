@@ -1,6 +1,8 @@
 export * from './database-config.factory';
 export * from './database.config';
 export * from './database.module';
+// Pricing Wave 9 M2 — run-cost settlement seam (token + contract).
+export * from './run-cost-settler';
 export * from './repositories/api-key.repository';
 export * from './repositories/work.repository';
 export * from './repositories/work-deployment.repository';
@@ -16,6 +18,9 @@ export * from './repositories/user-subscription.repository';
 export * from './repositories/work-schedule.repository';
 export * from './repositories/usage-ledger.repository';
 export * from './repositories/plugin-usage.repository';
+// Credits ledger + plan entitlements (pricing Wave 9 M1)
+export * from './repositories/credit-ledger.repository';
+export * from './repositories/plan-entitlement.repository';
 export * from './repositories/work-budget.repository';
 export * from './repositories/work-budget-alert-state.repository';
 export * from './repositories/notification.repository';

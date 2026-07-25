@@ -14,6 +14,8 @@ export enum NotificationCategory {
     // Agents/Skills/Tasks PR #1017 — Phase 18.3.
     AGENT = 'agent',
     TASK = 'task',
+    // Digest briefings (Wave 7) — scheduled daily/weekly activity digests.
+    DIGEST = 'digest',
 }
 
 export interface CreateNotificationDto {

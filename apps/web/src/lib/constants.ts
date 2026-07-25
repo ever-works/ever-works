@@ -119,6 +119,7 @@ export const ROUTES = {
     DASHBOARD_TEMPLATES: '/templates',
     // Agents (Agents/Skills/Tasks PR #1017 — Phase 5)
     DASHBOARD_AGENTS: '/agents',
+    DASHBOARD_AGENT_SESSIONS: '/agents/sessions',
     DASHBOARD_AGENT_NEW: '/agents/new',
     DASHBOARD_AGENT: (id: string) => `/agents/${id}`,
     DASHBOARD_AGENT_DASHBOARD: (id: string) => `/agents/${id}`,
@@ -158,6 +159,9 @@ export const ROUTES = {
     DASHBOARD_SETTINGS_GITHUB_APP: '/settings/github-app',
     DASHBOARD_SETTINGS_WORK_AGENT: '/settings/work-agent',
     DASHBOARD_SETTINGS_JOB_RUNTIME: '/settings/job-runtime',
+    // Wave 13 — Billing + Usage & Credits pages (billing/usage PRD §2).
+    DASHBOARD_SETTINGS_BILLING: '/settings/billing',
+    DASHBOARD_USAGE: '/settings/usage',
     // Dynamic plugin settings routes
     DASHBOARD_SETTINGS_PLUGIN_CATEGORY: (category: string) => `/settings/plugins/${category}`,
     // Profile (alias of settings — `/profile` redirects to `/settings`)

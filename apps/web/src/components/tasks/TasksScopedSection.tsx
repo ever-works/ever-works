@@ -2,6 +2,8 @@ import { ListChecks, Plus } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import type { Task } from '@/lib/api/tasks';
+import type { WorkRunsSummary } from '@/lib/api/types-only';
+import { WorkRunsSummaryBadges } from '@/components/works/detail/WorkRunsSummaryBadges';
 import { TasksList } from './TasksList';
 
 /**
@@ -17,10 +19,13 @@ export function TasksScopedSection({
     tasks,
     scopeLabel,
     scopeId,
+    runsSummary = null,
 }: {
     tasks: Task[];
     scopeLabel: 'Work' | 'Mission' | 'Idea';
     scopeId: string;
+    /** Wave 4 M4 — per-Work AgentRun summary counts (Work scope only). */
+    runsSummary?: WorkRunsSummary | null;
 }) {
     const doneCount = tasks.filter((t) => t.status === 'done').length;
     const openCount = tasks.filter((t) => !['done', 'cancelled'].includes(t.status)).length;
@@ -50,6 +55,8 @@ export function TasksScopedSection({
                                     <span>done</span>
                                 </span>
                             )}
+                            {/* Wave 4 M4 — per-Work fleet summary chips. */}
+                            {runsSummary && <WorkRunsSummaryBadges summary={runsSummary} />}
                         </div>
                         <p className="text-xs text-text-secondary dark:text-text-secondary-dark mt-0.5">
                             {openCount > 0

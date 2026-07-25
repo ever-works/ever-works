@@ -266,6 +266,102 @@
             "loadingStatus": "Loading connection status...",
             "setupGuide": "Setup guide"
         },
+        "communicationStep": {
+            "title": "Communication",
+            "description": "Connect the chat workspaces your team lives in. Mention the Ever Works bot to chat, build, and follow your Works without leaving the conversation.",
+            "slack": {
+                "name": "Slack",
+                "description": "Install the Ever Works app for Slack: mention the bot to chat with the platform, ingest channel activity into Memory and Activities, and get replies in-thread.",
+                "action": "Connect Slack"
+            },
+            "discord": {
+                "name": "Discord",
+                "description": "The Ever Works app for Discord is on the way.",
+                "comingSoon": "Coming soon"
+            },
+            "skipHint": "You can connect these anytime from Settings → Plugins."
+        },
+        "profileStep": {
+            "title": "What do you do",
+            "description": "Tell us about your role and team so we can suggest better starting points — pick as many roles as apply. Nothing is hidden based on your answers.",
+            "rolesLabel": "Your roles",
+            "teamSizeLabel": "Team size",
+            "roles": {
+                "founder-ceo": {
+                    "label": "Founder / CEO",
+                    "description": "I run the company and wear many hats"
+                },
+                "engineering": {
+                    "label": "Engineering",
+                    "description": "I build and ship software"
+                },
+                "product": {
+                    "label": "Product",
+                    "description": "I define what we build and why"
+                },
+                "marketing": {
+                    "label": "Marketing",
+                    "description": "I grow awareness, content, and campaigns"
+                },
+                "sales": {
+                    "label": "Sales",
+                    "description": "I find, pitch, and close customers"
+                },
+                "consultant": {
+                    "label": "Consultant",
+                    "description": "I deliver projects and advice for clients"
+                },
+                "research": {
+                    "label": "Research",
+                    "description": "I investigate, analyze, and synthesize"
+                },
+                "operations": {
+                    "label": "Operations",
+                    "description": "I keep the business running smoothly"
+                },
+                "support": {
+                    "label": "Support",
+                    "description": "I help customers succeed and resolve issues"
+                },
+                "finance": {
+                    "label": "Finance",
+                    "description": "I manage budgets, billing, and reporting"
+                },
+                "hr": {
+                    "label": "HR",
+                    "description": "I hire, onboard, and support our people"
+                },
+                "legal": {
+                    "label": "Legal",
+                    "description": "I handle contracts, compliance, and policy"
+                },
+                "education": {
+                    "label": "Education",
+                    "description": "I teach, train, or create learning content"
+                },
+                "other": {
+                    "label": "Other",
+                    "description": "Something else — tell us more later"
+                }
+            },
+            "teamSizes": {
+                "solo": "Solo",
+                "small-2-10": "Small (2–10)",
+                "mid-11-50": "Mid (11–50)",
+                "large-51-200": "Large (51–200)",
+                "enterprise-200-plus": "Enterprise (200+)"
+            },
+            "suggestions": {
+                "title": "Suggested agents for you",
+                "description": "Based on your roles — create one now, customize it later from Agents.",
+                "create": "Create agent",
+                "creating": "Creating…",
+                "created": "Created",
+                "createdToast": "Agent created — find it under Agents.",
+                "createFailed": "Failed to create the agent. Try again."
+            },
+            "skipHint": "Optional — skip if you'd rather not say. Your answers only improve suggestions and can be changed later."
+        },
         "plugins": {
             "byokDescription": "Connect your own key to unlock the full configuration.",
             "byokDefaultButton": "Bring your own key",
@@ -913,6 +1009,32 @@
                 "saveSuccess": "Guardrails saved",
                 "saveError": "Could not save guardrails",
                 "resetSuccess": "Guardrails reset to default"
+            },
+            "pageTabs": {
+                "agents": "Agents",
+                "sessions": "Sessions"
+            },
+            "sessions": {
+                "title": "Sessions",
+                "subtitle": "Every agent run across your Agents and Works — live activity, tokens, cost and quality gates in one place.",
+                "status": {
+                    "queued": "Queued",
+                    "running": "Running",
+                    "completed": "Completed",
+                    "failed": "Failed",
+                    "cancelled": "Cancelled"
+                },
+                "awaitingInput": "Awaiting input",
+                "queuedConcurrency": "Waiting for a concurrency slot",
+                "tokens": "{count} tokens",
+                "attach": "Attach",
+                "notStarted": "Not started",
+                "filterStatusAll": "All statuses",
+                "filterWorkAll": "All Works",
+                "groupByWork": "Group by Work",
+                "noWork": "No Work",
+                "emptyTitle": "No sessions yet",
+                "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
             }
         },
         "tasksPage": {
@@ -921,6 +1043,14 @@
             "empty": {
                 "title": "No Tasks yet.",
                 "subtitle": "Tasks ship in a later phase of the Agents/Skills/Tasks rollout. The page is reserved so the sidebar nav route resolves."
+            },
+            "runChip": {
+                "queued": "Queued",
+                "running": "Running",
+                "completed": "Completed",
+                "failed": "Failed",
+                "cancelled": "Cancelled",
+                "tokens": "{count} tokens"
             },
             "list": {
                 "newTask": "New Task",
@@ -967,7 +1097,11 @@
                 "priorityP4": "P4 — low",
                 "createError": "Failed to create Task",
                 "cancel": "Cancel",
-                "create": "Create"
+                "create": "Create",
+                "acceptanceChecks": "Acceptance checks",
+                "acceptanceChecksHint": "Commands that must exit 0 before this Task's agent work can open a pull request. Leave empty to inherit the Work's default checks.",
+                "maxGateAttempts": "Max gate attempts",
+                "maxGateAttemptsInherit": "Inherit from Work"
             },
             "detail": {
                 "moveTo": "Move to",
@@ -1000,7 +1134,27 @@
                 "updated": "Updated",
                 "scopeWork": "Work",
                 "scopeMission": "Mission",
-                "scopeIdea": "Idea"
+                "scopeIdea": "Idea",
+                "runControls": {
+                    "title": "Run controls",
+                    "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",
+                    "parkedHint": "This run is parked. Resume it to continue the same session, optionally with a new instruction.",
+                    "steerPlaceholder": "Message the running agent…",
+                    "resumePlaceholder": "Optional instruction to resume with…",
+                    "steer": "Steer",
+                    "interrupt": "Interrupt",
+                    "resume": "Resume",
+                    "attach": "Attach",
+                    "attachHint": "Open this run's live terminal session",
+                    "awaitingInput": "Awaiting input",
+                    "confirmInterrupt": "Ask this agent to stop after its current step? It will finish with a summary of the work done so far.",
+                    "steerInjected": "Message delivered to the running agent.",
+                    "steerNeedsNewRun": "That run already finished, so the message was not delivered. Mention the agent in the conversation to start a new run.",
+                    "interruptRequested": "Interrupt requested — the agent will stop after its current step.",
+                    "resumeDispatched": "Resumed — a new run is picking up the same session.",
+                    "resumeQueued": "Resume queued — it starts as soon as a concurrency slot frees up.",
+                    "genericError": "That run control could not be applied."
+                }
             },
             "recurring": {
                 "section": "Recurring schedule",
@@ -1015,6 +1169,29 @@
                 "dayOfMonth": "Day of month",
                 "timezone": "Timezone",
                 "save": "Save schedule"
+            },
+            "branch": {
+                "section": "Branch",
+                "branch": "Branch",
+                "copy": "Copy branch name",
+                "copied": "Copied",
+                "baseSha": "Base",
+                "state": "State",
+                "pullRequest": "Pull request",
+                "openPr": "Open PR",
+                "conflictTitle": "This branch has merge conflicts",
+                "resolve": "Resolve conflicts",
+                "resolving": "Resolving…",
+                "resolveError": "Failed to resolve conflicts",
+                "discard": "Discard branch",
+                "discardConfirm": "Discard this Task's branch? All unmerged changes on the branch will be permanently lost. This cannot be undone.",
+                "discardError": "Failed to discard branch",
+                "isolationLabel": "Task isolation",
+                "isolationDescription": "Override the Work-level isolation setting for this Task. When off, agents work directly against the Work's repositories.",
+                "isolationInherit": "Inherit from Work",
+                "isolationOn": "On — isolated branch",
+                "isolationOff": "Off — work directly",
+                "isolationSaveError": "Failed to update isolation override"
             },
             "status": {
                 "backlog": "Backlog",
@@ -1031,6 +1208,53 @@
                 "p2": "Medium",
                 "p3": "Normal",
                 "p4": "Low"
+            },
+            "gateChip": {
+                "green": "Gate passed",
+                "red": "Gate failed",
+                "skipped": "Gate skipped",
+                "none": "No checks"
+            },
+            "checks": {
+                "title": "Checks",
+                "edit": "Edit",
+                "cancel": "Cancel",
+                "save": "Save",
+                "saveError": "Failed to save checks",
+                "empty": "No acceptance checks declared. This Task inherits the Work's default checks, if any.",
+                "optional": "optional",
+                "notRun": "not run yet",
+                "exit": "exit {code}",
+                "attempts": "Attempt {count}",
+                "attemptsOf": "Attempt {count} of {max}",
+                "maxAttempts": "Max gate attempts",
+                "maxAttemptsInherit": "Inherit from Work",
+                "result": {
+                    "green": "Passed",
+                    "red": "Failed",
+                    "timeout": "Timeout",
+                    "error": "Error"
+                }
+            },
+            "checksEditor": {
+                "empty": "No checks yet. Add a command whose exit code decides green or red.",
+                "name": "Name",
+                "namePlaceholder": "e.g. Build",
+                "id": "Id",
+                "kind": "Kind",
+                "command": "Command",
+                "commandPlaceholder": "e.g. pnpm build",
+                "timeout": "Timeout (s)",
+                "required": "Required",
+                "remove": "Remove",
+                "addCheck": "Add check",
+                "kinds": {
+                    "build": "Build",
+                    "test": "Test",
+                    "lint": "Lint",
+                    "typecheck": "Type check",
+                    "custom": "Custom"
+                }
             }
         },
         "skillsPage": {
@@ -1705,9 +1929,12 @@
                 "data": "Data",
                 "githubApp": "GitHub App",
                 "workAgent": "Work Agent",
+                "fleet": "Fleet",
                 "jobRuntime": "Job Runtime",
                 "gitProviders": "Git Providers",
-                "dangerZone": "Danger Zone"
+                "dangerZone": "Danger Zone",
+                "billing": "Billing",
+                "usageCredits": "Usage & Credits"
             },
             "githubApp": {
                 "title": "GitHub App Installations",
@@ -2076,6 +2303,86 @@
                     "copyError": "Failed to copy to clipboard"
                 }
             },
+            "fleet": {
+                "title": "Fleet",
+                "subtitle": "The machines that execute your work: enroll desktop or headless nodes with a one-time token, watch their health, and see the nodes of clusters you have configured yourself.",
+                "kinds": {
+                    "desktop-node": "Desktop node",
+                    "node": "Headless node",
+                    "k8s": "Cluster"
+                },
+                "statuses": {
+                    "enrolling": "Enrolling",
+                    "online": "Online",
+                    "offline": "Offline",
+                    "disabled": "Disabled"
+                },
+                "table": {
+                    "name": "Name",
+                    "kind": "Kind",
+                    "status": "Status",
+                    "platform": "Platform",
+                    "capabilities": "Capabilities",
+                    "lastSeen": "Last seen"
+                },
+                "empty": {
+                    "title": "No nodes enrolled yet",
+                    "description": "Add a node to lend one of your machines to the platform: a desktop node with a small status UI, or a headless node for servers and CI boxes. Issue a one-time enrollment token here and paste it into the node app during setup."
+                },
+                "cluster": {
+                    "title": "Your cluster nodes",
+                    "description": "Read-only, live node inventory of clusters you configured yourself in deployment settings. Platform-operated shared clusters are never listed here.",
+                    "empty": "No self-configured cluster is connected, or its nodes could not be read right now.",
+                    "roles": "Roles"
+                },
+                "add": {
+                    "button": "Add node",
+                    "title": "Add a node",
+                    "description": "Name the machine and pick its shape. You will get a one-time enrollment token to paste into the node during setup.",
+                    "nameLabel": "Node name",
+                    "namePlaceholder": "e.g. Office workstation",
+                    "nameRequired": "Please name the node first",
+                    "kindLabel": "Node kind",
+                    "kindHelper": {
+                        "desktop-node": "A desktop app that registers this machine and shows node status, logs and controls.",
+                        "node": "A command-line service for servers, CI boxes and scripted fleets — no UI."
+                    },
+                    "cancel": "Cancel",
+                    "submit": "Issue token",
+                    "issued": "Enrollment token issued",
+                    "tokenIntro": "Copy this one-time enrollment token. It expires in {minutes} minutes and can be used exactly once.",
+                    "copy": "Copy",
+                    "copied": "Copied",
+                    "copyError": "Failed to copy to clipboard",
+                    "instructionsTitle": "Install instructions",
+                    "instructionsBody": "Install the node app on the target machine, point it at this platform's API address, and paste the token when the setup asks for it. The node appears here as Online after its first heartbeat. (Node app downloads ship in an upcoming release.)",
+                    "tokenOnce": "For security, the token is shown only once — issue a new one if you lose it.",
+                    "done": "Done"
+                },
+                "actions": {
+                    "rename": "Rename",
+                    "disable": "Disable",
+                    "enable": "Enable",
+                    "remove": "Remove"
+                },
+                "rename": {
+                    "title": "Rename node",
+                    "cancel": "Cancel",
+                    "confirm": "Save"
+                },
+                "remove": {
+                    "title": "Remove node",
+                    "description": "Remove \"{name}\" from your fleet? Its credential stops working immediately and the machine will have to be enrolled again.",
+                    "cancel": "Cancel",
+                    "confirm": "Remove"
+                },
+                "messages": {
+                    "renamed": "Node renamed",
+                    "disabled": "Node disabled — it stops accepting work and heartbeats",
+                    "enabled": "Node enabled — it will come back online on its next heartbeat",
+                    "removed": "Node removed"
+                }
+            },
             "jobRuntime": {
                 "title": "Job Runtime",
                 "subtitle": "Override the platform-default job-runtime provider with your own credentials. Inherit falls back to the platform default; BYO keeps the same provider with tenant credentials; Override switches both provider and credentials.",
@@ -2167,6 +2474,108 @@
                     "requiredFieldsMissing": "Required credential fields are empty: {fields}",
                     "providerNoLongerAllowed": "Provider {provider} is no longer enabled by the operator. Revert to inherit or pick an allowed provider before saving.",
                     "noProvidersAvailable": "The operator has not enabled any job-runtime providers for tenant overlays. Switch to inherit mode or contact your operator."
+                }
+            },
+            "billing": {
+                "title": "Billing",
+                "subtitle": "Manage your plan, credits, payment method, and invoices.",
+                "disabledNotice": "Billing is not enabled on this deployment. Plans are shown for reference; every account runs on the Free tier.",
+                "loadError": "Some billing data could not be loaded. Refresh the page to try again.",
+                "currentPlan": {
+                    "title": "Current plan",
+                    "statusActive": "Active"
+                },
+                "plans": {
+                    "title": "Plans",
+                    "subtitle": "Plans gate features and limits; usage is billed from your credits balance.",
+                    "empty": "No plans available.",
+                    "perMonth": "/mo",
+                    "free": "Free",
+                    "maxWorks": "Up to {count} Works",
+                    "cadences": "{count} schedule cadences",
+                    "dailyFreeCredits": "{amount} daily free credits",
+                    "payAsYouGo": "Pay-as-you-go from your credits balance",
+                    "current": "Current plan",
+                    "switchFree": "Switch to {name}",
+                    "upgrade": "Upgrade",
+                    "upgradeHint": "Paid plans are activated through billing once payments launch.",
+                    "changeSuccess": "Plan updated to {name}",
+                    "changeError": "Failed to change plan"
+                },
+                "credits": {
+                    "title": "Credits",
+                    "balanceLabel": "current balance",
+                    "buy": "Buy credits",
+                    "buySubtitle": "Top up your usage balance. 1 credit = 1¢ of platform-billed usage.",
+                    "presetCredits": "You will receive {credits} credits",
+                    "customAmount": "Custom $",
+                    "comingSoon": "Payments are coming soon",
+                    "comingSoonBody": "Card top-ups are not yet available on this deployment. Your balance still tracks grants and usage."
+                },
+                "paymentMethod": {
+                    "title": "Payment method",
+                    "comingSoon": "Payment method management arrives with the payments launch.",
+                    "empty": "No payment method on file."
+                },
+                "autoRecharge": {
+                    "title": "Auto-recharge",
+                    "comingSoon": "Automatic top-ups arrive with the payments launch.",
+                    "description": "Automatically top up your balance when it falls below a threshold."
+                },
+                "invoices": {
+                    "title": "Invoice history",
+                    "empty": "No invoices yet. Invoices appear here once billing is live."
+                },
+                "ledger": {
+                    "title": "Credits ledger",
+                    "subtitle": "Every credit added or consumed, in dollars.",
+                    "empty": "No credit activity yet.",
+                    "loading": "Loading…",
+                    "loadError": "Failed to load the ledger.",
+                    "filterAll": "All types",
+                    "kinds": {
+                        "purchase": "Purchase",
+                        "grant": "Grant",
+                        "daily-free": "Daily free",
+                        "consumption": "Consumption",
+                        "adjustment": "Adjustment",
+                        "expiry": "Expiry"
+                    },
+                    "colDate": "Date",
+                    "colType": "Type",
+                    "colDescription": "Description",
+                    "colAmount": "Amount",
+                    "colBalance": "Balance",
+                    "pagePrev": "Previous",
+                    "pageNext": "Next",
+                    "pageInfo": "Page {page} of {pages}"
+                }
+            },
+            "usage": {
+                "title": "Usage & Credits",
+                "subtitle": "Where your credits and spend went — by day, model, agent, and Work.",
+                "loadError": "Some usage data could not be loaded. Refresh the page to try again.",
+                "tiles": {
+                    "balance": "Credits balance",
+                    "consumed": "Credits used",
+                    "added": "Credits added",
+                    "spend": "Month spend",
+                    "tasksCompleted": "Tasks completed",
+                    "worksActive": "Works active",
+                    "agentRuns": "Agent runs",
+                    "periodNote": "Showing period {period}"
+                },
+                "charts": {
+                    "byDay": "Usage per day",
+                    "byModel": "Usage by model",
+                    "byAgent": "Usage by agent",
+                    "byWork": "Usage by Work",
+                    "range7d": "7d",
+                    "range30d": "30d",
+                    "empty": "No usage in this period.",
+                    "loading": "Loading…",
+                    "error": "Failed to load chart data.",
+                    "unattributed": "Unattributed"
                 }
             }
         },
@@ -3576,6 +3985,24 @@
                 "communityPrDisabled": "Community PR processing disabled",
                 "communityPrSettingsUpdated": "Community PR settings updated",
                 "communityPrUpdateFailed": "Failed to update community PR settings",
+                "taskIsolation": {
+                    "title": "Task isolation",
+                    "subtitle": "Run each isolated Task on its own branch instead of the Work's main line.",
+                    "enableLabel": "Isolate Tasks in worktree branches",
+                    "enableDescription": "When off, agents work directly against the Work's repositories. When on, each Task gets its own branch forked from the base branch.",
+                    "baseBranchLabel": "Base branch",
+                    "baseBranchDescription": "Branch Task branches fork from. Leave empty to use the repository's default branch.",
+                    "baseBranchPlaceholder": "Repository default branch",
+                    "baseBranchSave": "Save",
+                    "targetRepoLabel": "Target repository",
+                    "targetRepoWorkOutput": "Work output repository",
+                    "targetRepoLinked": "Linked repository (coming soon)",
+                    "cleanupLabel": "Branch cleanup",
+                    "cleanupOnMerge": "Delete branch when merged",
+                    "cleanupManual": "Keep branches (clean up manually)",
+                    "saved": "Task isolation settings updated",
+                    "saveFailed": "Failed to update task isolation settings"
+                },
                 "websiteConfig": {
                     "title": "Website Configuration",
                     "subtitle": "Customize how your Work's website looks and behaves",
@@ -3728,7 +4155,27 @@
                 "providerRepoEnabled": "{provider} repository generation enabled",
                 "providerRepoDisabled": "{provider} repository generation disabled",
                 "providerRepoUpdateFailed": "Failed to update the repository setting",
-                "providerRepoDisabledNote": "Generation is off. The existing repository is left untouched — it simply stops being updated."
+                "providerRepoDisabledNote": "Generation is off. The existing repository is left untouched — it simply stops being updated.",
+                "qualityGates": {
+                    "title": "Quality gates",
+                    "subtitle": "Default acceptance checks agent-executed Tasks under this Work must pass before opening a pull request.",
+                    "saved": "Quality gates settings saved",
+                    "saveFailed": "Failed to save quality gates settings",
+                    "policyLabel": "Checks policy",
+                    "policyHint": {
+                        "off": "Checks never run. Existing behavior — the gate is disabled for this Work.",
+                        "warn": "Checks run and report, but a red gate does not block the Task.",
+                        "required": "A red or skipped gate blocks the Task from opening a pull request."
+                    },
+                    "policyOff": "Off — never run checks",
+                    "policyWarn": "Warn — run and report only",
+                    "policyRequired": "Required — red blocks",
+                    "maxAttemptsLabel": "Max gate attempts",
+                    "maxAttemptsDescription": "How many times a run may retry after a red gate before it gives up and asks for help (1–5).",
+                    "defaultsLabel": "Default checks",
+                    "defaultsDescription": "Inherited by every Task under this Work. A Task check with the same id overrides its default.",
+                    "defaultsSave": "Save default checks"
+                }
             },
             "deploy": {
                 "progress": {
@@ -3921,6 +4368,7 @@
                     }
                 },
                 "classes": {
+                    "decision": "Decision",
                     "brand": "Brand",
                     "legal": "Legal",
                     "seo": "SEO",
@@ -4271,6 +4719,12 @@
                         "close": "Close"
                     }
                 }
+            },
+            "runsSummary": {
+                "running": "running",
+                "queued": "queued",
+                "awaiting": "awaiting input",
+                "failedLast24h": "failed (24h)"
             }
         },
         "newPage": {
@@ -5044,7 +5498,9 @@
                 "accountSettings": "Account Settings",
                 "helpDocs": "Help & Docs",
                 "support": "Support",
-                "keyboardShortcuts": "Keyboard Shortcuts"
+                "keyboardShortcuts": "Keyboard Shortcuts",
+                "billing": "Billing",
+                "usageCredits": "Usage & Credits"
             },
             "signOut": "Sign Out",
             "signingOut": "Signing out..."
@@ -5713,6 +6169,7 @@
             "directory": "Directory",
             "awesome-repo": "Awesome Repo",
             "company": "Company",
+            "campaign": "Campaign",
             "default": "Work"
         },
         "terminal": {
@@ -5820,7 +6277,9 @@
             "jobRuntime": "Job Runtime",
             "dangerZone": "Danger Zone",
             "pluginSettings": "Plugin Settings",
-            "discover": "Discover"
+            "discover": "Discover",
+            "billing": "Billing",
+            "usage": "Usage & Credits"
         }
     },
     "api": {

@@ -51,6 +51,7 @@ export type {
     RepositoryStatus,
     RepositoryType,
     SourceValidationSettingsDto,
+    WorkRunsSummary,
     // GenerateStatus now has dynamic step support
 } from './work';
 

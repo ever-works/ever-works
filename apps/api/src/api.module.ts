@@ -52,6 +52,10 @@ import { TerminalModule } from './terminal/terminal.module';
 import { TeamsModule } from './teams/teams.module';
 import { SchedulesModule } from './schedules/schedules.module';
 import { InboundTriggersModule } from './triggers/inbound-triggers.module';
+import { IngestModule } from './ingest/ingest.module';
+import { MeetingsApiModule } from './meetings/meetings.module';
+import { FleetApiModule } from './fleet/fleet.module';
+import { MergePolicyApiModule } from './merge-policy/merge-policy.module';
 import { TelemetryModule } from './telemetry/telemetry.module';
 import { UsersModule } from './users/users.module';
 import { ScopeModule } from './scope/scope.module';
@@ -188,6 +192,24 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // triggers that spawn Tasks on verified HMAC deliveries.
         // Management CRUD + the public /:id/fire endpoint.
         InboundTriggersModule,
+        // Event-ingest spine (Wave 6) — POST /api/ingest/events push
+        // surface over the agent-side EventIngestModule (dedupe-insert +
+        // Activity/Memory fan-out; pull rides the event-ingest-tick cron).
+        IngestModule,
+        // Meetings v1 (Wave 8, feature a) — /api/meetings CRUD +
+        // transcript capture over the agent-side MeetingsModule; also
+        // boots the zoom.recording envelope→Meeting processor on the
+        // ingest spine.
+        MeetingsApiModule,
+        // Fleet (Wave 12, slice 1) — /api/fleet node registry (owner
+        // CRUD-lite + public token-authenticated enroll/heartbeat) over
+        // the agent-side FleetModule.
+        FleetApiModule,
+        // Merge-policy matrix (Wave 3, founder decision D4) —
+        // GET /api/merge-policy/resolve owner-scoped preview over the
+        // agent-side PolicyModule. Writes ride the existing Work / Agent /
+        // organization PATCH endpoints.
+        MergePolicyApiModule,
         TelemetryModule,
         FunnelAnalyticsBindingModule,
         UploadsModule,

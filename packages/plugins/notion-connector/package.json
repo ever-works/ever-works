@@ -1,0 +1,96 @@
+{
+	"name": "@ever-works/notion-connector-plugin",
+	"version": "1.0.0",
+	"description": "Notion connector plugin for Ever Works platform (outbound page comments via @notionhq/client and event-source pull of created/edited pages into the event-ingest pipeline, with opt-in historical backfill)",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"private": false,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"clean": "rm -rf dist",
+		"type-check": "tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	},
+	"dependencies": {
+		"@ever-works/contracts": "workspace:*",
+		"@ever-works/plugin": "workspace:*",
+		"@notionhq/client": "^2.3.0"
+	},
+	"devDependencies": {
+		"@types/node": "^22.0.0",
+		"tsup": "^8.0.0",
+		"typescript": "^5.9.3",
+		"vitest": "^4.1.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "notion-connector",
+			"name": "Notion Connector",
+			"version": "1.0.0",
+			"category": "connector",
+			"capabilities": [
+				"connector",
+				"connector-notion",
+				"event-source"
+			],
+			"description": "Notion connector. Outbound appends comments on Notion pages via the official @notionhq/client. Event-source pull ingests pages created/edited since the last watermark (workspace search or configured databases) into the platform event-ingest pipeline, with opt-in historical backfill (backfillDays, max 90).",
+			"systemPlugin": false,
+			"builtIn": true,
+			"isDefault": false,
+			"autoEnable": false,
+			"settings": {
+				"type": "object",
+				"required": [
+					"apiKey"
+				],
+				"properties": {
+					"apiKey": {
+						"type": "string",
+						"title": "Notion integration token (ntn_… / secret_…)",
+						"x-secret": true,
+						"x-envVar": "NOTION_API_KEY"
+					},
+					"databaseIds": {
+						"type": "string",
+						"title": "Database ids to ingest pages from (comma-separated; workspace-wide search when empty)"
+					},
+					"backfillDays": {
+						"type": "number",
+						"title": "Historical backfill window in days on first pull (0 = off, max 90)",
+						"default": 0,
+						"minimum": 0,
+						"maximum": 90
+					},
+					"defaultPageId": {
+						"type": "string",
+						"title": "Default page id for outbound comments"
+					}
+				}
+			}
+		}
+	},
+	"publishConfig": {
+		"access": "restricted",
+		"registry": "https://registry.npmjs.org"
+	}
+}

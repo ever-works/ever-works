@@ -83,6 +83,8 @@ export class ScreenshotFacadeService extends BaseFacadeService implements IScree
                 // Phase 15.6 — Agent/Task attribution propagation.
                 agentId: facadeOptions.agentId,
                 taskId: facadeOptions.taskId,
+                // Wave 9 M2 — per-run cost attribution.
+                runId: facadeOptions.runId,
                 pluginId: plugin.id,
                 capability: PluginUsageCapability.SCREENSHOT,
                 units: 1,

@@ -15,5 +15,8 @@ import { ConversationTitleService } from './conversation-title.service';
     imports: [FacadesModule, DatabaseModule, KnowledgeBaseModule],
     controllers: [OpenAiCompatController, ConversationController],
     providers: [OpenAiCompatService, ConversationTitleService],
+    // Exported for the Slack chat bridge (IngestModule) — Slack mentions
+    // route through the SAME chat surface the web app uses.
+    exports: [OpenAiCompatService],
 })
 export class AiConversationModule {}

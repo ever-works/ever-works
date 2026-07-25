@@ -11,6 +11,7 @@ import {
     AGENT_GIT_FACADE,
     AGENT_EMAIL_FACADE,
     AGENT_NOTIFY_CHANNEL_FACADE,
+    RunSteeringService,
     type AgentRunChatBackPoster,
     type AgentRunTaskFinisher,
     type AgentPluginToolsFacade,
@@ -52,6 +53,7 @@ import {
     TaskChatService,
     TasksService,
     TaskStatus,
+    RUN_STEERING_PORT,
 } from '@ever-works/agent/tasks-domain';
 import {
     FacadesModule,
@@ -161,11 +163,25 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                 async finishTask({ userId, taskId, to, force }) {
                     const row = await tasks.transition(userId, taskId, to as TaskStatus, {
                         force: force ?? false,
+                        // Quality gates (Wave 3 M8): the run finalizer flips
+                        // status on the Agent's behalf, so its → in_review is
+                        // refused while the latest run's gate is red/skipped
+                        // under a 'required' checks policy. Human transitions
+                        // (API/UI) never pass actorType and are unaffected.
+                        actorType: 'agent',
                     });
                     return { status: row.status };
                 },
             }),
         },
+        // Run steering (Wave 4 M5) — bind the port `TaskChatService` reaches
+        // for when a chat message mentions an agent that already has a LIVE
+        // run on the Task. Same @Global() token posture as the post-processor
+        // bindings above: the implementation lives in the agent-side
+        // AgentsModule (imported here), the consumer lives in
+        // TasksDomainModule, and neither package gains a runtime import of
+        // the other.
+        { provide: RUN_STEERING_PORT, useExisting: RunSteeringService },
         // Notifications v2 (EW-670) — INBOUND_EMAIL_TASK_SPAWNER binding.
         // The inbound-email dispatcher's `task-spawn` mode delegates here:
         // create a Task from the inbound email (scoped to the address
@@ -208,6 +224,7 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                     workId,
                     agentId,
                     taskId,
+                    runId,
                     query,
                     maxResults,
                     includeDomains,
@@ -216,7 +233,8 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                     const results = await search.search(
                         query,
                         { maxResults, includeDomains, excludeDomains },
-                        { userId, workId, agentId, taskId },
+                        // Wave 9 M2 — runId feeds per-run cost attribution.
+                        { userId, workId, agentId, taskId, runId },
                     );
                     return {
                         results: results.map((r) => ({
@@ -233,6 +251,7 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                     workId,
                     agentId,
                     taskId,
+                    runId,
                     url,
                     viewportWidth,
                     viewportHeight,
@@ -240,7 +259,8 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                 }) {
                     const result = await screenshot.capture(
                         { url, viewportWidth, viewportHeight, fullPage } as any,
-                        { userId, workId, agentId, taskId },
+                        // Wave 9 M2 — runId feeds per-run cost attribution.
+                        { userId, workId, agentId, taskId, runId },
                     );
                     return {
                         success: result.success,
@@ -248,12 +268,14 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                         cacheUrl: result.cacheUrl ?? null,
                     };
                 },
-                async extractContent({ userId, workId, agentId, taskId, url, maxChars }) {
+                async extractContent({ userId, workId, agentId, taskId, runId, url, maxChars }) {
                     const result = await extractor.extractContent(url, undefined, {
                         userId,
                         workId,
                         agentId,
                         taskId,
+                        // Wave 9 M2 — runId feeds per-run cost attribution.
+                        runId,
                     });
                     const raw = result?.rawContent ?? '';
                     const cap = maxChars && maxChars > 0 ? Math.min(maxChars, 200_000) : 50_000;
@@ -323,6 +345,8 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                             workId: input.facadeOptions.workId,
                             agentId: input.facadeOptions.agentId,
                             taskId: input.facadeOptions.taskId,
+                            // Wave 9 M2 — per-run cost attribution.
+                            runId: input.facadeOptions.runId,
                             providerOverride: input.facadeOptions.providerOverride,
                         },
                     );
@@ -619,6 +643,7 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
         AGENT_EMAIL_FACADE,
         AGENT_NOTIFY_CHANNEL_FACADE,
         INBOUND_EMAIL_TASK_SPAWNER,
+        RUN_STEERING_PORT,
     ],
 })
 export class AgentsModule {}

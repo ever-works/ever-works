@@ -2,11 +2,16 @@
 // — PR #1017 specs, Phase 3 + 4 + 6).
 export * from './agents.module';
 export * from './agents.service';
+export * from './agent-templates';
+export * from './agent-templates.service';
 export * from './agent-file.service';
 export * from './agent-schedule-dispatcher.service';
 export * from './agent-export.service';
 export * from './prompt-assembler.service';
 export * from './agent-run.service';
+export * from './run-dispatch-gate.service';
+export * from './run-steering.service';
+export * from './run-credits-precheck';
 export * from './agent-run-canceller';
 export * from './agent-run-abort';
 export * from './agent-run-sweeper.service';

@@ -27,6 +27,11 @@ export * from './notification-channel.interface.js';
 export * from './connector.interface.js';
 export * from './agent-memory.interface.js';
 export * from './terminal-stream.interface.js';
+export * from './workspace.interface.js';
+// Event-ingest spine (Wave 6) — pull-model event sources feeding the
+// normalized `IngestedEventEnvelope` pipeline (webhook push lands with
+// each concrete connector). See `event-source.interface.ts`.
+export * from './event-source.interface.js';
 // Org-wide Memory (Cortex P2) — pluggable ORG memory framework +
 // multi-doc-type RAG pipeline contracts. Additive, beside the existing
 // `agent-memory` / `vector-store` / `content-extractor` seams. See
