@@ -928,6 +928,32 @@
                 "saveSuccess": "Guardrails saved",
                 "saveError": "Could not save guardrails",
                 "resetSuccess": "Guardrails reset to default"
+            },
+            "pageTabs": {
+                "agents": "Agents",
+                "sessions": "Sessions"
+            },
+            "sessions": {
+                "title": "Sessions",
+                "subtitle": "Every agent run across your Agents and Works — live activity, tokens, cost and quality gates in one place.",
+                "status": {
+                    "queued": "Queued",
+                    "running": "Running",
+                    "completed": "Completed",
+                    "failed": "Failed",
+                    "cancelled": "Cancelled"
+                },
+                "awaitingInput": "Awaiting input",
+                "queuedConcurrency": "Waiting for a concurrency slot",
+                "tokens": "{count} tokens",
+                "attach": "Attach",
+                "notStarted": "Not started",
+                "filterStatusAll": "All statuses",
+                "filterWorkAll": "All Works",
+                "groupByWork": "Group by Work",
+                "noWork": "No Work",
+                "emptyTitle": "No sessions yet",
+                "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
             }
         },
         "tasksPage": {
@@ -990,7 +1016,11 @@
                 "priorityP4": "P4 — low",
                 "createError": "Failed to create Task",
                 "cancel": "Cancel",
-                "create": "Create"
+                "create": "Create",
+                "acceptanceChecks": "Acceptance checks",
+                "acceptanceChecksHint": "Commands that must exit 0 before this Task's agent work can open a pull request. Leave empty to inherit the Work's default checks.",
+                "maxGateAttempts": "Max gate attempts",
+                "maxGateAttemptsInherit": "Inherit from Work"
             },
             "detail": {
                 "moveTo": "Move to",
@@ -1077,6 +1107,53 @@
                 "p2": "Medium",
                 "p3": "Normal",
                 "p4": "Low"
+            },
+            "gateChip": {
+                "green": "Gate passed",
+                "red": "Gate failed",
+                "skipped": "Gate skipped",
+                "none": "No checks"
+            },
+            "checks": {
+                "title": "Checks",
+                "edit": "Edit",
+                "cancel": "Cancel",
+                "save": "Save",
+                "saveError": "Failed to save checks",
+                "empty": "No acceptance checks declared. This Task inherits the Work's default checks, if any.",
+                "optional": "optional",
+                "notRun": "not run yet",
+                "exit": "exit {code}",
+                "attempts": "Attempt {count}",
+                "attemptsOf": "Attempt {count} of {max}",
+                "maxAttempts": "Max gate attempts",
+                "maxAttemptsInherit": "Inherit from Work",
+                "result": {
+                    "green": "Passed",
+                    "red": "Failed",
+                    "timeout": "Timeout",
+                    "error": "Error"
+                }
+            },
+            "checksEditor": {
+                "empty": "No checks yet. Add a command whose exit code decides green or red.",
+                "name": "Name",
+                "namePlaceholder": "e.g. Build",
+                "id": "Id",
+                "kind": "Kind",
+                "command": "Command",
+                "commandPlaceholder": "e.g. pnpm build",
+                "timeout": "Timeout (s)",
+                "required": "Required",
+                "remove": "Remove",
+                "addCheck": "Add check",
+                "kinds": {
+                    "build": "Build",
+                    "test": "Test",
+                    "lint": "Lint",
+                    "typecheck": "Type check",
+                    "custom": "Custom"
+                }
             }
         },
         "skillsPage": {
@@ -3792,7 +3869,27 @@
                 "providerRepoEnabled": "{provider} repository generation enabled",
                 "providerRepoDisabled": "{provider} repository generation disabled",
                 "providerRepoUpdateFailed": "Failed to update the repository setting",
-                "providerRepoDisabledNote": "Generation is off. The existing repository is left untouched — it simply stops being updated."
+                "providerRepoDisabledNote": "Generation is off. The existing repository is left untouched — it simply stops being updated.",
+                "qualityGates": {
+                    "title": "Quality gates",
+                    "subtitle": "Default acceptance checks agent-executed Tasks under this Work must pass before opening a pull request.",
+                    "saved": "Quality gates settings saved",
+                    "saveFailed": "Failed to save quality gates settings",
+                    "policyLabel": "Checks policy",
+                    "policyHint": {
+                        "off": "Checks never run. Existing behavior — the gate is disabled for this Work.",
+                        "warn": "Checks run and report, but a red gate does not block the Task.",
+                        "required": "A red or skipped gate blocks the Task from opening a pull request."
+                    },
+                    "policyOff": "Off — never run checks",
+                    "policyWarn": "Warn — run and report only",
+                    "policyRequired": "Required — red blocks",
+                    "maxAttemptsLabel": "Max gate attempts",
+                    "maxAttemptsDescription": "How many times a run may retry after a red gate before it gives up and asks for help (1–5).",
+                    "defaultsLabel": "Default checks",
+                    "defaultsDescription": "Inherited by every Task under this Work. A Task check with the same id overrides its default.",
+                    "defaultsSave": "Save default checks"
+                }
             },
             "deploy": {
                 "progress": {
@@ -4335,6 +4432,12 @@
                         "close": "Close"
                     }
                 }
+            },
+            "runsSummary": {
+                "running": "running",
+                "queued": "queued",
+                "awaiting": "awaiting input",
+                "failedLast24h": "failed (24h)"
             }
         },
         "newPage": {

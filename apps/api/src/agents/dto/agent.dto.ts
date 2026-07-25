@@ -479,6 +479,13 @@ export class ListRunSessionsQueryDto {
     @IsUUID()
     agentId?: string;
 
+    /** Quality gates (Wave 3 M6) — the Task detail Checks section fetches
+     *  the latest run for one Task (`taskId` + `limit=1`). */
+    @ApiProperty({ required: false, format: 'uuid' })
+    @IsOptional()
+    @IsUUID()
+    taskId?: string;
+
     /** Trigger kind — named `kind` on the wire for the Sessions view. */
     @ApiProperty({ required: false, enum: ['heartbeat', 'manual', 'task', 'chat', 'event'] })
     @IsOptional()

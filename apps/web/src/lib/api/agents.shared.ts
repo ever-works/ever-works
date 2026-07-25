@@ -12,6 +12,8 @@
  * one canonical definition.
  */
 
+import type { GateStatus, TaskAcceptanceCheck, TaskCheckResult } from '@ever-works/contracts';
+
 // ── Agent Dispatch Guardrails ──
 // Mirrors `AgentGuardrails` (packages/agent/src/agents/guardrails.ts)
 // and the proposal action types
@@ -40,4 +42,55 @@ export interface AgentGuardrails {
     autoApproveActionTypes?: AgentGuardrailActionType[];
     /** Action types the Agent may never take (auto-rejected with an audit row). */
     blockedActionTypes?: AgentGuardrailActionType[];
+}
+
+// ── Sessions view (Wave 4 M4) ──
+// Client-safe mirror of the `GET /api/agents/runs` row shape
+// (AgentsController.listRunSessions). Lives here so the `'use client'`
+// Sessions tab can type its rows without pulling the `server-only`
+// `agents.ts` module into the bundle.
+
+export type AgentRunSessionStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+
+export type AgentRunTriggerKind = 'heartbeat' | 'manual' | 'task' | 'chat' | 'event';
+
+export interface AgentRunSession {
+    id: string;
+    agentId: string;
+    status: AgentRunSessionStatus;
+    triggerKind: AgentRunTriggerKind;
+    taskId: string | null;
+    workId: string | null;
+    awaitingInput: boolean;
+    queuedReason: string | null;
+    runnerKind: string | null;
+    startedAt: string | null;
+    finishedAt: string | null;
+    durationMs: number | null;
+    summary: string | null;
+    errorMessage: string | null;
+    /** Plain text BY CONTRACT — never render as markup. */
+    currentActivity: string | null;
+    totalTokens: number | null;
+    changedFilesCount: number | null;
+    costCents: number | null;
+    gateStatus: GateStatus | null;
+    gateAttempts: number;
+    resolvedChecks: TaskAcceptanceCheck[] | null;
+    checkResults: TaskCheckResult[] | null;
+    persistent: boolean;
+    terminalState: string | null;
+    terminalEndedReason: string | null;
+    terminalProviderId: string | null;
+    createdAt: string;
+}
+
+export interface ListRunSessionsQuery {
+    status?: AgentRunSessionStatus;
+    workId?: string;
+    agentId?: string;
+    taskId?: string;
+    kind?: AgentRunTriggerKind;
+    limit?: number;
+    offset?: number;
 }

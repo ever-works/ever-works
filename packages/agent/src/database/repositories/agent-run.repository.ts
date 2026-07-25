@@ -721,6 +721,7 @@ export class AgentRunRepository {
             status?: AgentRunStatus;
             workId?: string;
             agentId?: string;
+            taskId?: string;
             triggerKind?: AgentRunTriggerKind;
         },
         limit = 25,
@@ -737,6 +738,9 @@ export class AgentRunRepository {
         }
         if (filters.agentId) {
             qb.andWhere('run.agentId = :agentId', { agentId: filters.agentId });
+        }
+        if (filters.taskId) {
+            qb.andWhere('run.taskId = :taskId', { taskId: filters.taskId });
         }
         if (filters.triggerKind) {
             qb.andWhere('run.triggerKind = :triggerKind', { triggerKind: filters.triggerKind });

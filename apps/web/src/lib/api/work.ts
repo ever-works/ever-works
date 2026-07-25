@@ -25,6 +25,7 @@ import {
     type SourceRepository as ContractSourceRepository,
     type WorksConfigSnapshot as ContractWorksConfigSnapshot,
 } from '@ever-works/contracts/api';
+import type { TaskAcceptanceCheck, WorkChecksPolicy } from '@ever-works/contracts';
 import { APIResponse, ItemData, Category, Tag, Collection } from './types';
 import { CreateItemsGeneratorDto, ItemsGeneratorResponse } from './items-generator';
 
@@ -111,6 +112,14 @@ export interface UpdateWorkDto {
     taskIsolationTargetRepo?: TaskIsolationTargetRepo;
     /** When Task branches are deleted after merge. */
     taskBranchCleanup?: TaskBranchCleanup;
+    // Quality gates (Wave 3 M6) — Work-level default acceptance checks
+    // inherited by agent-executed Tasks; `null` clears the defaults.
+    checkDefaults?: TaskAcceptanceCheck[] | null;
+    /** Enforcement policy: 'off' (never run) / 'warn' (report only) /
+     *  'required' (red blocks). */
+    checksPolicy?: WorkChecksPolicy;
+    /** Default gate-attempt budget (1..5) for Tasks without their own. */
+    maxGateAttempts?: number;
 }
 
 /** Wave 2 M7 — Work-level worktree-per-Task isolation settings. */
@@ -288,6 +297,20 @@ export interface Work {
     taskIsolationBaseBranch?: string | null;
     taskIsolationTargetRepo?: TaskIsolationTargetRepo;
     taskBranchCleanup?: TaskBranchCleanup;
+    // Quality gates (Wave 3 M6). Absent on rows written before the
+    // columns existed — absent means no defaults / policy 'off' / 2.
+    checkDefaults?: TaskAcceptanceCheck[] | null;
+    checksPolicy?: WorkChecksPolicy;
+    maxGateAttempts?: number;
+}
+
+/** Wave 4 M3 — per-Work AgentRun summary counts
+ *  (`GET /api/works/:id/runs-summary`). */
+export interface WorkRunsSummary {
+    running: number;
+    queued: number;
+    awaiting: number;
+    failedLast24h: number;
 }
 
 export interface WorksResponse {
@@ -620,6 +643,11 @@ export const workAPI = {
     // Get aggregated stats for the current user's works
     getStats: async () => {
         return serverFetch<WorkStatsResponse>(`/works/stats`);
+    },
+
+    // Wave 4 M3 — per-Work AgentRun summary counts for the fleet chips.
+    getRunsSummary: async (id: string) => {
+        return serverFetch<WorkRunsSummary>(`/works/${id}/runs-summary`);
     },
 
     // Live slug-availability check for the create-Work form.
