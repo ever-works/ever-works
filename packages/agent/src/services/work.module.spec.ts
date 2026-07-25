@@ -47,6 +47,7 @@ jest.mock('./work-ownership.service', () => ({ WorkOwnershipService: class {} })
 jest.mock('./work-query.service', () => ({ WorkQueryService: class {} }));
 jest.mock('./work-lifecycle.service', () => ({ WorkLifecycleService: class {} }));
 jest.mock('./work-generation.service', () => ({ WorkGenerationService: class {} }));
+jest.mock('./work-memory.service', () => ({ WorkMemoryService: class {} }));
 jest.mock('./work-schedule.service', () => ({ WorkScheduleService: class {} }));
 jest.mock('./work-schedule-dispatcher.service', () => ({
     WorkScheduleDispatcherService: class {},
@@ -125,6 +126,7 @@ import { WorkOwnershipService } from './work-ownership.service';
 import { WorkQueryService } from './work-query.service';
 import { WorkLifecycleService } from './work-lifecycle.service';
 import { WorkGenerationService } from './work-generation.service';
+import { WorkMemoryService } from './work-memory.service';
 import { WorkScheduleService } from './work-schedule.service';
 import { WorkScheduleDispatcherService } from './work-schedule-dispatcher.service';
 import { AnonymousUserCleanupService } from './anonymous-user-cleanup.service';
@@ -204,6 +206,7 @@ describe('WorkModule', () => {
             WorkQueryService,
             WorkLifecycleService,
             WorkGenerationService,
+            WorkMemoryService,
             WorkDetailService,
             WorkScheduleService,
             WorkScheduleDispatcherService,
@@ -327,7 +330,9 @@ describe('WorkModule', () => {
             // WEBHOOK_SECRET (mirrors PlatformSyncSecretService pattern).
             // Bumped to 33 with WorkRuntimeEnvService for the per-Work runtime
             // DATABASE_URL surface (#1315).
-            expect(meta('exports')).toHaveLength(33);
+            // Bumped to 34 with WorkMemoryService — scheduled Work runs write
+            // what they learned into shared Memory (develop eb3a317a).
+            expect(meta('exports')).toHaveLength(34);
         });
 
         it('does NOT re-export DatabaseModule (callers must import it explicitly when they need entities/repositories)', () => {
