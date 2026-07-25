@@ -573,6 +573,12 @@ export class AccountImportService {
                     // null = 'use repo default' and must overwrite a custom base.
                     updateData.taskIsolationBaseBranch = dir.taskIsolationBaseBranch;
                 }
+                // Memory recall toggle — preserve an explicit boolean
+                // (notably `false`); absent in old payloads → keep the
+                // existing work's setting.
+                if (typeof dir.memoryRecallEnabled === 'boolean') {
+                    updateData.memoryRecallEnabled = dir.memoryRecallEnabled;
+                }
                 // Quality-gate fields: arrays only ever import as arrays;
                 // enum/int values are drop-if-unrecognized (see the
                 // normalizeImported* helpers above). Absent → existing
@@ -642,6 +648,9 @@ export class AccountImportService {
             ['on-merge', 'manual'].includes(dir.taskBranchCleanup)
         ) {
             createData.taskBranchCleanup = dir.taskBranchCleanup;
+        }
+        if (typeof dir.memoryRecallEnabled === 'boolean') {
+            createData.memoryRecallEnabled = dir.memoryRecallEnabled;
         }
         if (
             typeof dir.taskIsolationBaseBranch === 'string' &&

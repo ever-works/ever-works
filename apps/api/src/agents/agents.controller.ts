@@ -337,6 +337,7 @@ export class AgentsController {
             aiProviderId: body.aiProviderId,
             modelId: body.modelId,
             maxSkillContextTokens: body.maxSkillContextTokens,
+            memoryRecallEnabled: body.memoryRecallEnabled,
             heartbeatCadence: body.heartbeatCadence,
             idleBehavior: body.idleBehavior,
             pauseAfterFailures: body.pauseAfterFailures,

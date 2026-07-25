@@ -170,6 +170,36 @@ describe('AgentMemoryFacadeService', () => {
             expect(result.content).toBe('hello');
         });
 
+        it('buildContextWithProvider returns the context AND the resolved provider id (M2/M3 recall log)', async () => {
+            const plugin = wireSinglePlugin();
+            (plugin.buildContext as jest.Mock).mockResolvedValueOnce({
+                content: 'recalled',
+                approxTokens: 7,
+            });
+            const result = await service.buildContextWithProvider({ query: 'q' }, opts);
+            expect(result.context.content).toBe('recalled');
+            expect(result.context.approxTokens).toBe(7);
+            expect(result.providerId).toBe('agentmemory');
+            expect(plugin.buildContext).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    query: 'q',
+                    settings: { baseUrl: 'http://localhost:3111' },
+                }),
+            );
+        });
+
+        it('buildContextWithProvider wraps backend failures with the provider id attached', async () => {
+            const plugin = wireSinglePlugin();
+            (plugin.buildContext as jest.Mock).mockRejectedValueOnce(new Error('backend down'));
+            await expect(
+                service.buildContextWithProvider({ query: 'q' }, opts),
+            ).rejects.toMatchObject({
+                name: 'AgentMemoryFacadeError',
+                operation: 'buildContext',
+                provider: 'agentmemory',
+            });
+        });
+
         it('listSessions calls the plugin and returns its list', async () => {
             const plugin = wireSinglePlugin();
             (plugin.listSessions as jest.Mock).mockResolvedValueOnce([

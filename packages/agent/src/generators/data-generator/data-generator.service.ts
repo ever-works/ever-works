@@ -1313,6 +1313,12 @@ export class DataGeneratorService {
             slug: work.slug,
             description: work.description,
             user: { id: user.id }, // User context for multi-tenant plugin resolution
+            // Memory upgrades M3 — the per-Work recall toggle rides the
+            // WorkReference settings carrier to the pipeline dispatch
+            // (`FullPipelineExecutorService.resolveMemoryRecallSafe`).
+            // `?? true`: recall is on by default; only an explicit
+            // `false` on the Work disables the preamble splice.
+            settings: { memoryRecallEnabled: work.memoryRecallEnabled ?? true },
         };
 
         const request: GenerationRequest = {

@@ -278,6 +278,17 @@ export class Agent {
     @Column({ type: 'int', default: 4000 })
     maxSkillContextTokens: number;
 
+    /**
+     * Memory recall injection toggle (memory upgrades M2). When true
+     * (the default — recall is on by default, configurable), task-kind
+     * runs of this Agent splice a fenced recall block built from the
+     * agent-memory provider's `buildContext` into the assembled
+     * prompt. `false` switches recall injection off for this Agent
+     * without touching the session open/close write path.
+     */
+    @Column({ type: 'boolean', default: true })
+    memoryRecallEnabled: boolean;
+
     // ── Lifecycle ──
 
     @Column({ type: 'varchar', length: 16, default: AgentStatus.DRAFT })

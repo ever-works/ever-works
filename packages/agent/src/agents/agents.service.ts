@@ -99,6 +99,11 @@ export interface UpdateAgentInput {
     aiProviderId?: string | null;
     modelId?: string | null;
     maxSkillContextTokens?: number;
+    /**
+     * Memory recall injection toggle (memory upgrades M2). Recall is
+     * on by default; `false` disables the prompt splice for this Agent.
+     */
+    memoryRecallEnabled?: boolean;
     heartbeatCadence?: string | null;
     idleBehavior?: AgentIdleBehavior;
     pauseAfterFailures?: number;
@@ -348,6 +353,8 @@ export class AgentsService {
         if (input.modelId !== undefined) patch.modelId = input.modelId;
         if (input.maxSkillContextTokens !== undefined)
             patch.maxSkillContextTokens = input.maxSkillContextTokens;
+        if (input.memoryRecallEnabled !== undefined)
+            patch.memoryRecallEnabled = input.memoryRecallEnabled;
         if (input.heartbeatCadence !== undefined) {
             this.validateHeartbeatCadence(input.heartbeatCadence);
             patch.heartbeatCadence = input.heartbeatCadence;

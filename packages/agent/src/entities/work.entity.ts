@@ -425,6 +425,19 @@ export class Work {
     /** `'on-merge' | 'manual'` — when the Task branch is deleted. */
     @Column({ type: 'varchar', length: 16, default: 'on-merge' })
     taskBranchCleanup: string;
+
+    // ── Memory recall (memory upgrades M3) ───────────────────────────
+
+    /**
+     * Shared per-Work toggle for memory recall injection at pipeline
+     * dispatch. When true (the default — recall is on by default,
+     * configurable), self-managed pipeline runs for this Work receive
+     * a fenced recall block from the agent-memory provider in their
+     * session preamble (`execContext.memoryRecall`). `false` disables
+     * the splice; the memory write path is untouched.
+     */
+    @Column({ type: 'boolean', default: true })
+    memoryRecallEnabled: boolean;
     // Quality Gates FIELDS
     /**
      * Work-level default acceptance checks inherited by every agent-executed
