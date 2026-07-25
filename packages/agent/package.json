@@ -180,6 +180,10 @@
         "./ingest": {
             "types": "./dist/ingest/index.d.ts",
             "default": "./dist/ingest/index.js"
+        },
+        "./digest": {
+            "types": "./dist/digest/index.d.ts",
+            "default": "./dist/digest/index.js"
         }
     },
     "scripts": {
