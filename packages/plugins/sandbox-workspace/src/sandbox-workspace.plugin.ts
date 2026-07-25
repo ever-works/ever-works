@@ -163,15 +163,8 @@ export class SandboxWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 			)
 		).stdout.trim();
 
-		const startPoint = reused
-			? `refs/remotes/origin/${spec.branch}`
-			: `refs/remotes/origin/${spec.baseRef}`;
-		await this.gitOrThrow(
-			['checkout', '-B', spec.branch, startPoint],
-			dir,
-			spec.auth,
-			'branch checkout failed'
-		);
+		const startPoint = reused ? `refs/remotes/origin/${spec.branch}` : `refs/remotes/origin/${spec.baseRef}`;
+		await this.gitOrThrow(['checkout', '-B', spec.branch, startPoint], dir, spec.auth, 'branch checkout failed');
 
 		await this.writeStamp(dir, { bindingKey: spec.bindingKey, branch: spec.branch });
 
@@ -186,12 +179,7 @@ export class SandboxWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		const dir = handle.path;
 		await this.gitOrThrow(['add', '-A'], dir, opts.auth, 'git add failed');
 
-		const status = await this.gitOrThrow(
-			['status', '--porcelain'],
-			dir,
-			opts.auth,
-			'git status failed'
-		);
+		const status = await this.gitOrThrow(['status', '--porcelain'], dir, opts.auth, 'git status failed');
 		const dirty = status.stdout.trim().length > 0;
 		if (dirty) {
 			await this.gitOrThrow(
@@ -222,12 +210,7 @@ export class SandboxWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		let pushed = false;
 		if (opts.push) {
 			const repoUrl = (
-				await this.gitOrThrow(
-					['remote', 'get-url', 'origin'],
-					dir,
-					opts.auth,
-					'origin remote missing'
-				)
+				await this.gitOrThrow(['remote', 'get-url', 'origin'], dir, opts.auth, 'origin remote missing')
 			).stdout.trim();
 			await this.gitOrThrow(
 				['push', this.authedUrl(repoUrl, opts.auth), `HEAD:refs/heads/${handle.branch}`],
@@ -324,9 +307,7 @@ export class SandboxWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 	// ── internals ────────────────────────────────────────────────────
 
 	private baseDir(settings: WorkspaceProvisionSpec['settings']): string {
-		const configured =
-			(typeof settings?.baseDir === 'string' && settings.baseDir) ||
-			process.env.EW_WORKSPACES_DIR;
+		const configured = (typeof settings?.baseDir === 'string' && settings.baseDir) || process.env.EW_WORKSPACES_DIR;
 		return configured || join(tmpdir(), 'ew-workspaces');
 	}
 
@@ -364,11 +345,7 @@ export class SandboxWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		return out;
 	}
 
-	private git(
-		args: string[],
-		cwd: string | undefined,
-		auth: WorkspaceProvisionSpec['auth']
-	): Promise<GitResult> {
+	private git(args: string[], cwd: string | undefined, auth: WorkspaceProvisionSpec['auth']): Promise<GitResult> {
 		return new Promise((resolve) => {
 			execFile(
 				'git',
