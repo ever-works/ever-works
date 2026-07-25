@@ -151,4 +151,122 @@ describe('TaskWorkspaceService', () => {
         const result = await build().provisionForRun(input());
         expect(result).not.toBeNull();
     });
+
+    describe('finalizeRun (M4)', () => {
+        let transitions: { transition: jest.Mock };
+        let taskChat: { post: jest.Mock };
+        let facadeExt: {
+            provision: jest.Mock;
+            finalize: jest.Mock;
+            simulateMerge: jest.Mock;
+        };
+
+        const buildFull = () =>
+            new TaskWorkspaceService(
+                works as any,
+                { ...tasks, findById: jest.fn().mockResolvedValue(makeTask()) } as any,
+                runs as any,
+                facadeExt as any,
+                {
+                    ...gitFacade,
+                    createPullRequest: jest.fn().mockResolvedValue({
+                        number: 7,
+                        url: 'https://github.com/acme/site-data/pull/7',
+                    }),
+                } as any,
+                transitions as any,
+                taskChat as any,
+            );
+
+        const workspace = {
+            cwd: '/ws/task',
+            branch: 'task/t-42-123e4567',
+            baseSha: 'abc123def456',
+            reused: false,
+            provider: 'workspace',
+        };
+
+        const finalizeInput = () => ({
+            task: makeTask(),
+            userId: 'user-1',
+            agentId: 'agent-1',
+            agentCanOpenPullRequests: true,
+            workspace,
+        });
+
+        beforeEach(() => {
+            transitions = { transition: jest.fn().mockResolvedValue(undefined) };
+            taskChat = { post: jest.fn().mockResolvedValue(undefined) };
+            facadeExt = {
+                provision: jest.fn(),
+                finalize: jest
+                    .fn()
+                    .mockResolvedValue({ pushed: true, headSha: 'cafe42', empty: false }),
+                simulateMerge: jest.fn().mockResolvedValue({ clean: true, conflictPaths: [] }),
+            };
+        });
+
+        it('empty run → no-changes, no push state, no PR', async () => {
+            facadeExt.finalize.mockResolvedValue({ pushed: false, headSha: null, empty: true });
+            const result = await buildFull().finalizeRun(finalizeInput());
+            expect(result.outcome).toBe('no-changes');
+            expect(tasks.updateById).not.toHaveBeenCalled();
+            expect(facadeExt.simulateMerge).not.toHaveBeenCalled();
+        });
+
+        it('clean merge → opens PR, persists pr-open, moves Task to in_review', async () => {
+            const svc = buildFull();
+            const result = await svc.finalizeRun(finalizeInput());
+            expect(result).toEqual(expect.objectContaining({ outcome: 'pr-opened', prNumber: 7 }));
+            expect(tasks.updateById).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.objectContaining({ branchState: 'pushed' }),
+            );
+            expect(tasks.updateById).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.objectContaining({
+                    branchState: 'pr-open',
+                    prNumber: 7,
+                    prUrl: 'https://github.com/acme/site-data/pull/7',
+                }),
+            );
+            expect(transitions.transition).toHaveBeenCalledWith(expect.anything(), 'in_review');
+        });
+
+        it('conflict → NAMES paths, posts chat message, moves Task to blocked, NO PR', async () => {
+            facadeExt.simulateMerge.mockResolvedValue({
+                clean: false,
+                conflictPaths: ['src/app.ts', 'README.md'],
+            });
+            const svc = buildFull();
+            const result = await svc.finalizeRun(finalizeInput());
+            expect(result.outcome).toBe('conflict');
+            expect(result.conflictPaths).toEqual(['src/app.ts', 'README.md']);
+            expect(tasks.updateById).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.objectContaining({
+                    branchState: 'conflict',
+                    conflictPaths: ['src/app.ts', 'README.md'],
+                }),
+            );
+            expect(taskChat.post).toHaveBeenCalledWith(
+                'user-1',
+                expect.objectContaining({
+                    authorType: 'agent',
+                    body: expect.stringContaining('src/app.ts'),
+                }),
+            );
+            expect(transitions.transition).toHaveBeenCalledWith(expect.anything(), 'blocked');
+        });
+
+        it('no PR permission → pushed-no-pr, branch stays pushed', async () => {
+            const svc = buildFull();
+            const result = await svc.finalizeRun({
+                ...finalizeInput(),
+                agentCanOpenPullRequests: false,
+            });
+            expect(result.outcome).toBe('pushed-no-pr');
+            expect(transitions.transition).not.toHaveBeenCalled();
+        });
+    });
 });

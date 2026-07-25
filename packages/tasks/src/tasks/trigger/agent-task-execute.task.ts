@@ -195,9 +195,10 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
             // LOUDLY — the user opted into isolation; silently degrading to
             // a shared checkout would betray that setting.
             let workspaceCwd: string | null = null;
+            const taskWorkspace = appContext.get(TaskWorkspaceService);
+            let provisioned: Awaited<ReturnType<TaskWorkspaceService['provisionForRun']>> = null;
             try {
-                const taskWorkspace = appContext.get(TaskWorkspaceService);
-                const provisioned = await taskWorkspace.provisionForRun({
+                provisioned = await taskWorkspace.provisionForRun({
                     task: taskRow,
                     userId: payload.userId,
                     runId: run.id,
@@ -251,6 +252,45 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                 await runs.markCompleted(run.id, `Prompt assembled for task ${payload.taskId}`);
             } else if (result.status === 'agent-not-found') {
                 await runs.markFailed(run.id, 'Agent not found');
+            }
+
+            // Wave 2 M4 — green-path finalize of the isolated workspace:
+            // commit + push the run's output, simulate the merge against
+            // a FRESH base, then open the PR (→ in_review) or refuse it
+            // with NAMED conflict paths (→ blocked). Only runs when a
+            // workspace was provisioned and the run itself succeeded.
+            const runSucceeded = result.status === 'assembled' || result.status === 'dispatched';
+            if (provisioned && runSucceeded) {
+                try {
+                    const finalize = await taskWorkspace.finalizeRun({
+                        task: taskRow,
+                        userId: payload.userId,
+                        agentId: agent.id,
+                        agentCanOpenPullRequests:
+                            (agent as { permissions?: { canOpenPullRequests?: boolean } })
+                                .permissions?.canOpenPullRequests !== false,
+                        workspace: provisioned,
+                    });
+                    return {
+                        status: 'completed',
+                        agentId: agent.id,
+                        taskId: payload.taskId,
+                        runId: run.id,
+                        dedupKey: payload.dedupKey,
+                        workspaceOutcome: finalize.outcome,
+                    };
+                } catch (error) {
+                    // The run executed but its output never landed on the
+                    // branch — that IS a failure of the Task's promise.
+                    const message = error instanceof Error ? error.message : String(error);
+                    await runs.markFailed(run.id, `Workspace finalize failed: ${message}`);
+                    return {
+                        status: 'failed',
+                        reason: 'workspace-finalize-failed',
+                        runId: run.id,
+                        taskId: payload.taskId,
+                    };
+                }
             }
 
             return {

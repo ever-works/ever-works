@@ -1,10 +1,12 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
-import type { Task } from '../entities/task.entity';
+import { forwardRef, Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import { TaskStatus, type Task } from '../entities/task.entity';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
 import { WorkspaceFacadeService } from '../facades/workspace.facade';
 import { GitFacadeService } from '../facades/git.facade';
+import { TaskTransitionService } from './task-transition.service';
+import { TaskChatService } from './task-chat.service';
 import { resolveTaskIsolation, taskBranchName } from './task-isolation';
 
 export interface ProvisionedTaskWorkspace {
@@ -14,6 +16,13 @@ export interface ProvisionedTaskWorkspace {
     baseSha: string;
     reused: boolean;
     provider: string;
+}
+
+export interface TaskWorkspaceFinalizeOutcome {
+    outcome: 'no-changes' | 'pr-opened' | 'pushed-no-pr' | 'conflict';
+    prNumber?: number;
+    prUrl?: string;
+    conflictPaths?: string[];
 }
 
 /**
@@ -40,6 +49,15 @@ export class TaskWorkspaceService {
         // when absent and isolation is on, we fail loudly below.
         @Optional() private readonly workspaceFacade?: WorkspaceFacadeService,
         @Optional() private readonly gitFacade?: GitFacadeService,
+        // M4 — finalize path collaborators. Same module; forwardRef
+        // because TaskTransitionService/TaskChatService are declared
+        // after this provider in some graphs.
+        @Optional()
+        @Inject(forwardRef(() => TaskTransitionService))
+        private readonly transitions?: TaskTransitionService,
+        @Optional()
+        @Inject(forwardRef(() => TaskChatService))
+        private readonly taskChat?: TaskChatService,
     ) {}
 
     /**
@@ -140,5 +158,157 @@ export class TaskWorkspaceService {
             reused: handle.reused,
             provider: 'workspace',
         };
+    }
+
+    /**
+     * M4 — green-path finalize after a successful isolated run:
+     * commit + push whatever the run left in the workspace, simulate
+     * the merge against a FRESH base, then either open the PR
+     * (community-PR posture: agents open PRs, the merge-policy matrix
+     * decides who merges) or refuse it and NAME the conflicting paths.
+     *
+     * State machine written here:
+     *   empty run          → (no change)          outcome 'no-changes'
+     *   pushed + clean     → 'pr-open' + in_review outcome 'pr-opened'
+     *   pushed, no PR perm → 'pushed'             outcome 'pushed-no-pr'
+     *   pushed + conflict  → 'conflict' + blocked outcome 'conflict'
+     */
+    async finalizeRun(input: {
+        task: Task;
+        userId: string;
+        agentId: string;
+        /** From `agent.permissions.canOpenPullRequests` (default true). */
+        agentCanOpenPullRequests: boolean;
+        workspace: ProvisionedTaskWorkspace;
+    }): Promise<TaskWorkspaceFinalizeOutcome> {
+        const { task, userId, workspace } = input;
+        if (!this.workspaceFacade || !this.gitFacade) {
+            throw new Error(
+                `Task ${task.id} workspace finalize requires the workspace/git facades.`,
+            );
+        }
+        if (!task.workId) {
+            throw new Error(`Task ${task.id} lost its Work before finalize.`);
+        }
+        const work = await this.works.findById(task.workId);
+        if (!work) {
+            throw new Error(`Task ${task.id} lost its Work before finalize.`);
+        }
+
+        const owner = work.getRepoOwner();
+        const repo = work.getDataRepo();
+        const gitOptions = { userId, providerId: work.gitProvider, workId: work.id };
+        const repository = await this.gitFacade.getRepository(owner, repo, gitOptions);
+        const baseRef =
+            (work.taskIsolationBaseBranch && work.taskIsolationBaseBranch.trim()) ||
+            repository.defaultBranch;
+
+        const handle = {
+            path: workspace.cwd,
+            baseSha: workspace.baseSha,
+            reused: workspace.reused,
+            branch: workspace.branch,
+            bindingKey: task.id,
+        };
+        const facadeOptions = { userId, workId: work.id };
+
+        const finalize = await this.workspaceFacade.finalize(
+            handle,
+            { commitMessage: `feat(task): ${task.slug} agent run output`, push: true },
+            facadeOptions,
+        );
+        if (finalize.empty) {
+            this.logger.log(`Task ${task.id} run produced no changes — nothing to push.`);
+            return { outcome: 'no-changes' };
+        }
+        await this.tasks.updateById(task.id, { branchState: 'pushed' });
+
+        const simulation = await this.workspaceFacade.simulateMerge(handle, baseRef, facadeOptions);
+
+        if (!simulation.clean) {
+            // Refuse the PR and NAME the paths — the single
+            // highest-value UX detail of the whole feature.
+            await this.tasks.updateById(task.id, {
+                branchState: 'conflict',
+                conflictPaths: simulation.conflictPaths,
+            });
+            await this.postSystemMessage(
+                input,
+                [
+                    `Merge conflict against \`${baseRef}\` — the push was completed but no PR was opened.`,
+                    '',
+                    'Conflicting paths:',
+                    ...simulation.conflictPaths.map((p) => `- \`${p}\``),
+                    '',
+                    'Send a message here (or use Resolve conflicts) to re-run with a rebase onto the fresh base.',
+                ].join('\n'),
+            );
+            await this.transitionTask(task, TaskStatus.BLOCKED);
+            return { outcome: 'conflict', conflictPaths: simulation.conflictPaths };
+        }
+
+        if (!input.agentCanOpenPullRequests) {
+            this.logger.log(
+                `Task ${task.id} branch ${workspace.branch} pushed; agent lacks canOpenPullRequests — leaving PR to a human.`,
+            );
+            return { outcome: 'pushed-no-pr' };
+        }
+
+        const pr = await this.gitFacade.createPullRequest(
+            {
+                owner,
+                repo,
+                title: `Task ${task.slug}: ${task.title ?? 'agent run output'}`,
+                head: workspace.branch,
+                base: baseRef,
+                body: `Automated changes for Task \`${task.slug}\` (agent run). Review before merging — merge policy is governed by the Work's merge-policy settings.`,
+            },
+            gitOptions,
+        );
+        await this.tasks.updateById(task.id, {
+            branchState: 'pr-open',
+            prNumber: pr.number,
+            prUrl: pr.url,
+        });
+        await this.transitionTask(task, TaskStatus.IN_REVIEW);
+        this.logger.log(`Task ${task.id} opened PR #${pr.number} (${pr.url}).`);
+        return { outcome: 'pr-opened', prNumber: pr.number, prUrl: pr.url };
+    }
+
+    private async transitionTask(task: Task, to: TaskStatus): Promise<void> {
+        if (!this.transitions) return;
+        try {
+            const fresh = await this.tasks.findById(task.id);
+            if (fresh && fresh.status !== to) {
+                await this.transitions.transition(fresh, to);
+            }
+        } catch (error) {
+            this.logger.warn(
+                `Task ${task.id} status transition to ${to} failed: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+    }
+
+    private async postSystemMessage(
+        input: { task: Task; userId: string; agentId: string },
+        body: string,
+    ): Promise<void> {
+        if (!this.taskChat) return;
+        try {
+            await this.taskChat.post(input.userId, {
+                taskId: input.task.id,
+                authorType: 'agent',
+                authorId: input.agentId,
+                body,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Task ${input.task.id} conflict chat message failed: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
     }
 }
