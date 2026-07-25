@@ -19,3 +19,11 @@ export {
 	type SlackSignatureInput,
 	type SlackSignatureResult
 } from './slack-signature.js';
+
+// The plugin loader resolves `module.default` first. Without a default
+// export, `import()` of the CJS build hands back the whole namespace
+// object (no __esModule marker), which fails the plugin-class check at
+// materialization time — the plugin registers from its manifest and then
+// dies on first use. Every loadable first-party plugin re-exports its
+// class as default; keep this in sync with the class above.
+export { SlackConnectorPlugin as default } from './slack-connector-plugin.js';
