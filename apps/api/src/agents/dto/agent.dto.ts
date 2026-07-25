@@ -262,6 +262,15 @@ export class UpdateAgentDto {
     @Max(20000)
     maxSkillContextTokens?: number;
 
+    @ApiProperty({
+        required: false,
+        description:
+            'Memory recall injection toggle (on by default). When false, task-kind runs of this Agent skip the fenced agent-memory recall block.',
+    })
+    @IsOptional()
+    @IsBoolean()
+    memoryRecallEnabled?: boolean;
+
     @ApiProperty({ required: false, maxLength: 64 })
     @IsOptional()
     @IsString()

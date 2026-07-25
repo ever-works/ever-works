@@ -657,6 +657,13 @@ export class WorkLifecycleService {
                 updateData.taskBranchCleanup = updateDto.taskBranchCleanup;
             }
 
+            // Memory recall injection toggle (memory upgrades M3) —
+            // boolean, on by default; false disables the pipeline
+            // preamble splice for this Work.
+            if (updateDto.memoryRecallEnabled !== undefined) {
+                updateData.memoryRecallEnabled = updateDto.memoryRecallEnabled;
+            }
+
             // Quality-gate settings. `checkDefaults: null` clears the
             // Work-level defaults; checksPolicy / maxGateAttempts are
             // NOT NULL columns, so only defined values flow through (the

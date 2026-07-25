@@ -192,6 +192,10 @@ export class AccountExportService {
                 dir.taskIsolationBaseBranch === undefined ? undefined : dir.taskIsolationBaseBranch,
             taskIsolationTargetRepo: dir.taskIsolationTargetRepo || undefined,
             taskBranchCleanup: dir.taskBranchCleanup || undefined,
+            // Memory recall toggle — serialize the explicit boolean (a
+            // deliberate `false` must round-trip; see ExportedWork).
+            memoryRecallEnabled:
+                typeof dir.memoryRecallEnabled === 'boolean' ? dir.memoryRecallEnabled : undefined,
             gitProvider: dir.gitProvider,
             deployProvider: dir.deployProvider || undefined,
             readmeConfig: dir.readmeConfig || undefined,

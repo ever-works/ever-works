@@ -32,6 +32,7 @@ import {
     type AgentAiToolCall,
 } from './agent-ai-dispatch-facade';
 import { AgentMemoryFacadeService } from '../facades/agent-memory.facade';
+import { resolveMemoryRecall } from '../services/memory-recall';
 import { VisionContextService } from '../services/vision-context.service';
 import { createAgentRunAbortSource } from './agent-run-abort';
 import { isGenerationCancelledError } from '../utils/generation-cancellation.utils';
@@ -300,6 +301,81 @@ export class AgentRunService {
             ].join('\n');
             prompt.systemMessage = `${prompt.systemMessage}\n\n${visionBlock}`;
             prompt.totalSystemTokens = estimateTokens(prompt.systemMessage);
+        }
+
+        // 3b. Memory recall injection (memory upgrades M2) — task-kind
+        // runs splice a fenced, neutralized recall block built from the
+        // agent-memory provider's `buildContext` into the assembled
+        // system message. Appended AFTER assembly for the same two
+        // reasons as the vision block above (11-segment recipe stays
+        // untouched; tail-first truncation keeps appended segments
+        // stable). Best-effort by contract: the helper never throws,
+        // a provider failure degrades to a WARN row, and "provider off"
+        // vs "recall empty" vs "recall disabled" are all distinguishable
+        // in the AgentRunLog (loud-empty rule).
+        if (context.kind === 'task' && this.agentMemory) {
+            if (agent.memoryRecallEnabled === false) {
+                await this.runLogs
+                    .append({
+                        runId: context.runId,
+                        level: 'INFO',
+                        step: 'memory-recall',
+                        message: 'Memory recall is disabled for this Agent — skipping injection.',
+                        metadata: { status: 'disabled' },
+                    })
+                    .catch(() => undefined);
+            } else {
+                const recall = await resolveMemoryRecall(
+                    this.agentMemory,
+                    {
+                        query: context.immediateInput ?? undefined,
+                        purpose: context.kind,
+                        sessionId: memorySessionId ?? undefined,
+                        projectId: agent.workId ?? undefined,
+                    },
+                    {
+                        userId: context.userId,
+                        ...(agent.workId ? { workId: agent.workId } : {}),
+                    },
+                );
+                if (recall.status === 'injected' || recall.status === 'empty') {
+                    prompt.systemMessage = `${prompt.systemMessage}\n\n${recall.block}`;
+                    prompt.totalSystemTokens = estimateTokens(prompt.systemMessage);
+                }
+                const level = recall.status === 'failed' ? 'WARN' : 'INFO';
+                const message =
+                    recall.status === 'injected'
+                        ? `Memory recall injected: ${recall.contentChars} chars${
+                              recall.approxTokens ? ` (~${recall.approxTokens} tokens)` : ''
+                          } from provider "${recall.providerId}".`
+                        : recall.status === 'empty'
+                          ? `Memory recall: provider "${recall.providerId}" returned no relevant memory — explicit "no relevant memory found" note injected.`
+                          : recall.status === 'no-provider'
+                            ? 'Memory recall skipped — no agent-memory provider configured for this scope.'
+                            : `Memory recall failed (run continues): ${recall.reason}`;
+                if (recall.status === 'failed') {
+                    this.logger.warn(
+                        `AgentRunService: memory recall failed for run ${context.runId}: ${recall.reason}`,
+                    );
+                }
+                await this.runLogs
+                    .append({
+                        runId: context.runId,
+                        level,
+                        step: 'memory-recall',
+                        message,
+                        metadata: {
+                            status: recall.status,
+                            contentChars: recall.contentChars,
+                            ...(recall.approxTokens !== undefined
+                                ? { approxTokens: recall.approxTokens }
+                                : {}),
+                            ...(recall.providerId ? { provider: recall.providerId } : {}),
+                            ...(recall.reason ? { reason: recall.reason } : {}),
+                        },
+                    })
+                    .catch(() => undefined);
+            }
         }
 
         // 3a. SKILL_INVOKED activity — one row per Skill that made it

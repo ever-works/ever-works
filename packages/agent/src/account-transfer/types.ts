@@ -148,6 +148,11 @@ export interface ExportedWork {
     taskIsolationBaseBranch?: string | null;
     taskIsolationTargetRepo?: string;
     taskBranchCleanup?: string;
+    /** Memory recall injection toggle (memory upgrades M3). A deliberate
+     *  `false` must survive an export/import round-trip — omitting it
+     *  would silently re-enable recall on the imported work. Absent in
+     *  old payloads = leave defaults. */
+    memoryRecallEnabled?: boolean;
     gitProvider: string;
     deployProvider?: string;
     readmeConfig?: any;

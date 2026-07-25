@@ -103,6 +103,14 @@ export class UpdateWorkDto {
     @IsOptional()
     @IsIn(['on-merge', 'manual'])
     taskBranchCleanup?: string;
+
+    @ApiPropertyOptional({
+        description:
+            'Memory recall injection toggle (on by default). When false, self-managed pipeline runs for this Work skip the fenced agent-memory recall block in their session preamble.',
+    })
+    @IsOptional()
+    @IsBoolean()
+    memoryRecallEnabled?: boolean;
     @ApiPropertyOptional({
         description:
             'Work-level default acceptance checks inherited by agent-executed Tasks under this Work. ' +
