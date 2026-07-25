@@ -600,6 +600,10 @@ export class AgentRunService {
                         workId: agent.workId ?? undefined,
                         agentId: agent.id,
                         taskId: context.taskId ?? undefined,
+                        // Wave 9 M2 — tag every usage event this round
+                        // records with the run id so the run-cost
+                        // accumulator can sum exactly this run's spend.
+                        runId: context.runId,
                         providerOverride: agent.aiProviderId ?? undefined,
                     },
                 });

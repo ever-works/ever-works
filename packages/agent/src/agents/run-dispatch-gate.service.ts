@@ -6,6 +6,7 @@ import {
     JOB_RUNTIME_NOT_CONFIGURED_REASON,
     type AgentTaskExecuteDispatcher,
 } from '../tasks-domain/task-dispatcher';
+import { RUN_CREDITS_PRECHECK, type RunCreditsPrecheck } from './run-credits-precheck';
 
 /**
  * Stable machine token stamped into `agent_runs.queuedReason` when the
@@ -13,6 +14,17 @@ import {
  * this exact literal — one shared constant, never three drifting copies.
  */
 export const QUEUED_REASON_CONCURRENCY = 'concurrency-limit' as const;
+
+/**
+ * Pricing Wave 9 M2 — stamped when the soft credits precheck parks a run
+ * (credit-limited plan + exhausted balance, `CREDITS_ENFORCEMENT=on`).
+ * Deliberately NOT drained by {@link RunDispatchGateService.drainForWork}
+ * (that promotes concurrency-parked rows only): a credits-parked run
+ * waits for a top-up, not for capacity. Promotion-on-top-up is a
+ * documented Wave 9 follow-up; until then the run stays visibly queued
+ * with this reason in the Sessions view.
+ */
+export const QUEUED_REASON_INSUFFICIENT_CREDITS = 'insufficient-credits' as const;
 
 export interface RunDispatchAdmitInput {
     userId: string;
@@ -69,6 +81,14 @@ export class RunDispatchGateService {
         @Optional()
         @Inject(AGENT_TASK_EXECUTE_DISPATCHER)
         private readonly dispatcher?: AgentTaskExecuteDispatcher,
+        // Pricing Wave 9 M2 — soft credits precheck. Bound (to
+        // RunCostSettlementService) by the api-side @Global()
+        // SubscriptionsModule; absent in unit tests and credit-less
+        // installs. Appended LAST + @Optional() per the positional-spec
+        // arity rule.
+        @Optional()
+        @Inject(RUN_CREDITS_PRECHECK)
+        private readonly creditsPrecheck?: RunCreditsPrecheck,
     ) {}
 
     /** Env default today; per-Work override column when it lands. */
@@ -111,6 +131,31 @@ export class RunDispatchGateService {
                     } at ${inFlight}/${orgLimit} in-flight runs — queueing.`,
                 );
                 return { admitted: false, queuedReason: QUEUED_REASON_CONCURRENCY };
+            }
+        }
+
+        // Pricing Wave 9 M2 — soft credits enforcement (ship-dark). Runs
+        // ONLY when the CREDITS_ENFORCEMENT kill-switch is on AND the
+        // precheck token is bound. Fail-open on any error: a broken
+        // billing check must never stop work (same posture as a broken
+        // concurrency valve).
+        if (this.creditsPrecheck && config.billing.credits.isEnforcementEnabled()) {
+            try {
+                if (await this.creditsPrecheck.shouldQueueForCredits(input.userId)) {
+                    this.logger.log(
+                        `Dispatch gate: user ${input.userId} is credit-limited with an ` +
+                            `exhausted balance — queueing.`,
+                    );
+                    return {
+                        admitted: false,
+                        queuedReason: QUEUED_REASON_INSUFFICIENT_CREDITS,
+                    };
+                }
+            } catch (err) {
+                this.logger.warn(
+                    `Dispatch gate: credits precheck failed for user ${input.userId} ` +
+                        `(fail-open): ${err}`,
+                );
             }
         }
 

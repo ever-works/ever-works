@@ -22,6 +22,12 @@ export type CrossUserSpendRow = {
     costCents: number;
 };
 
+/** Pricing Wave 9 M2 — one run's metered spend, grouped per plugin. */
+export type RunPluginSpend = {
+    pluginId: string;
+    costCents: number;
+};
+
 @Injectable()
 export class PluginUsageRepository {
     constructor(
@@ -160,6 +166,30 @@ export class PluginUsageRepository {
         }
         const row = await qb.getRawOne<{ total: string }>();
         return Number(row?.total ?? 0);
+    }
+
+    /**
+     * Pricing Wave 9 M2 — the run-cost accumulator's input: this run's
+     * metered spend summed per plugin. Grouped by plugin (rather than a
+     * single SUM) so the settlement can exclude plugins whose calls ran
+     * on user-supplied keys (BYOK — free per founder decision P2/P3)
+     * without a second query. Uses the `(runId, occurredAt)` index from
+     * the 1783600000000 migration. Rows recorded before per-run tagging
+     * existed have `runId = NULL` and are honestly not attributable.
+     */
+    async getRunCostByPlugin(runId: string): Promise<RunPluginSpend[]> {
+        const rows = await this.repository
+            .createQueryBuilder('e')
+            .select('e.pluginId', 'pluginId')
+            .addSelect('COALESCE(SUM(e.costCents), 0)', 'costCents')
+            .where('e.runId = :runId', { runId })
+            .groupBy('e.pluginId')
+            .getRawMany<{ pluginId: string; costCents: string }>();
+
+        return rows.map((r) => ({
+            pluginId: r.pluginId,
+            costCents: Number(r.costCents ?? 0),
+        }));
     }
 
     async getSpendByPlugin(

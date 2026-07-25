@@ -1,4 +1,8 @@
-import { QUEUED_REASON_CONCURRENCY, RunDispatchGateService } from '../run-dispatch-gate.service';
+import {
+    QUEUED_REASON_CONCURRENCY,
+    QUEUED_REASON_INSUFFICIENT_CREDITS,
+    RunDispatchGateService,
+} from '../run-dispatch-gate.service';
 
 /**
  * Run orchestration (Wave 4 M2) — dispatch-gate contract:
@@ -10,6 +14,8 @@ describe('RunDispatchGateService', () => {
     const ENV_KEYS = [
         'AGENT_MAX_CONCURRENT_RUNS_PER_WORK',
         'AGENT_MAX_CONCURRENT_RUNS_PER_ORG',
+        // Wave 9 M2 — soft credits-enforcement kill-switch (default OFF).
+        'CREDITS_ENFORCEMENT',
     ] as const;
     const savedEnv: Record<string, string | undefined> = {};
 
@@ -43,6 +49,10 @@ describe('RunDispatchGateService', () => {
 
     const makeGate = (withDispatcher = true) =>
         new RunDispatchGateService(runs, withDispatcher ? dispatcher : undefined);
+
+    // Wave 9 M2 — gate with the credits precheck token bound.
+    const makeGateWithCredits = (precheck: { shouldQueueForCredits: jest.Mock }) =>
+        new RunDispatchGateService(runs, dispatcher, precheck as never);
 
     const parkedRun = (over: Record<string, unknown> = {}) => ({
         id: 'run-parked',
@@ -127,6 +137,69 @@ describe('RunDispatchGateService', () => {
             expect(result.admitted).toBe(true);
             expect(runs.countInFlightForWork).not.toHaveBeenCalled();
             expect(runs.countInFlightForUser).toHaveBeenCalledWith('user-1');
+        });
+    });
+
+    describe('admit — soft credits precheck (Wave 9 M2, ship-dark)', () => {
+        it('is DARK by default: precheck bound but CREDITS_ENFORCEMENT unset ⇒ never consulted', async () => {
+            const precheck = { shouldQueueForCredits: jest.fn().mockResolvedValue(true) };
+            const result = await makeGateWithCredits(precheck).admit({
+                userId: 'user-1',
+                workId: 'work-1',
+            });
+            expect(result).toEqual({ admitted: true });
+            expect(precheck.shouldQueueForCredits).not.toHaveBeenCalled();
+        });
+
+        it('queues with insufficient-credits when enabled AND the user is broke', async () => {
+            process.env.CREDITS_ENFORCEMENT = 'on';
+            const precheck = { shouldQueueForCredits: jest.fn().mockResolvedValue(true) };
+            const result = await makeGateWithCredits(precheck).admit({
+                userId: 'user-1',
+                workId: 'work-1',
+            });
+            expect(result).toEqual({
+                admitted: false,
+                queuedReason: QUEUED_REASON_INSUFFICIENT_CREDITS,
+            });
+            expect(precheck.shouldQueueForCredits).toHaveBeenCalledWith('user-1');
+        });
+
+        it('admits normally when enabled but the user has balance', async () => {
+            process.env.CREDITS_ENFORCEMENT = 'on';
+            const precheck = { shouldQueueForCredits: jest.fn().mockResolvedValue(false) };
+            const result = await makeGateWithCredits(precheck).admit({
+                userId: 'user-1',
+                workId: 'work-1',
+            });
+            expect(result).toEqual({ admitted: true });
+        });
+
+        it('fails OPEN when the precheck throws — a broken billing check never stops work', async () => {
+            process.env.CREDITS_ENFORCEMENT = 'on';
+            const precheck = {
+                shouldQueueForCredits: jest.fn().mockRejectedValue(new Error('credits DB down')),
+            };
+            const result = await makeGateWithCredits(precheck).admit({
+                userId: 'user-1',
+                workId: 'work-1',
+            });
+            expect(result).toEqual({ admitted: true });
+        });
+
+        it('the concurrency valve wins over the credits precheck (checked first)', async () => {
+            process.env.CREDITS_ENFORCEMENT = 'on';
+            runs.countInFlightForWork.mockResolvedValueOnce(10);
+            const precheck = { shouldQueueForCredits: jest.fn().mockResolvedValue(true) };
+            const result = await makeGateWithCredits(precheck).admit({
+                userId: 'user-1',
+                workId: 'work-1',
+            });
+            expect(result).toEqual({
+                admitted: false,
+                queuedReason: QUEUED_REASON_CONCURRENCY,
+            });
+            expect(precheck.shouldQueueForCredits).not.toHaveBeenCalled();
         });
     });
 
