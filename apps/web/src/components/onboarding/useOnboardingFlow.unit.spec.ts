@@ -27,6 +27,7 @@ describe('computeStepList', () => {
             'storage-choice',
             'db-choice',
             'deploy-choice',
+            'communication',
             'plugins-catalog',
             'create-work',
         ]);
@@ -61,7 +62,7 @@ describe('computeStepList', () => {
         );
     });
 
-    it('builds the full 10-step list when every BYOK is chosen', () => {
+    it('builds the full 11-step list when every BYOK is chosen', () => {
         const list = computeStepList(
             defaultsWith({
                 ai: { choice: 'claude-code' },
@@ -69,7 +70,7 @@ describe('computeStepList', () => {
                 deploy: { choice: 'vercel' },
             }),
         );
-        expect(list).toHaveLength(10);
+        expect(list).toHaveLength(11);
         expect(list.map((s) => s.kind)).toEqual([
             'welcome',
             'ai-choice',
@@ -79,9 +80,16 @@ describe('computeStepList', () => {
             'db-choice',
             'deploy-choice',
             'deploy-config',
+            'communication',
             'plugins-catalog',
             'create-work',
         ]);
+    });
+
+    it('always inserts the Communication step between deployment and the plugins catalog', () => {
+        const kinds = computeStepList(ONBOARDING_DEFAULT_STATE).map((s) => s.kind);
+        expect(kinds.indexOf('communication')).toBeGreaterThan(kinds.indexOf('deploy-choice'));
+        expect(kinds.indexOf('communication')).toBe(kinds.indexOf('plugins-catalog') - 1);
     });
 
     it('encodes the chosen vendor into the step id so React keys stay stable across rechooses', () => {

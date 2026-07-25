@@ -24,6 +24,7 @@ export type WizardStepKind =
     | 'db-choice'
     | 'deploy-choice'
     | 'deploy-config'
+    | 'communication'
     | 'plugins-catalog'
     | 'create-work';
 
@@ -56,6 +57,9 @@ export function computeStepList(state: OnboardingWizardStateV2): WizardStep[] {
     if (state.deploy.choice === 'vercel' || state.deploy.choice === 'k8s') {
         steps.push({ kind: 'deploy-config', id: `deploy-config:${state.deploy.choice}` });
     }
+    // Communication — connect the chat workspaces the org lives in
+    // (Slack now, Discord next). Always shown, always skippable.
+    steps.push({ kind: 'communication', id: 'communication' });
     steps.push({ kind: 'plugins-catalog', id: 'plugins-catalog' });
     steps.push({ kind: 'create-work', id: 'create-work' });
     return steps;
