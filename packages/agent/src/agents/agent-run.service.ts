@@ -98,7 +98,16 @@ export interface AgentRunExecuteResult {
         | 'dispatched'
         | 'dispatch-failed'
         /** Cancelled mid-flight; the row is already 'cancelled' and no status was written. */
-        | 'cancelled';
+        | 'cancelled'
+        /**
+         * Run steering (Wave 4 M5) — a cooperative interrupt stopped the tool
+         * loop between iterations. Distinct from `cancelled` (the process was
+         * killed and every side effect skipped) and from `dispatched` (the
+         * agent finished its own work): the row IS marked `completed` with an
+         * honest summary, but downstream steps that grade completed work — the
+         * quality gate, the PR step — must not treat it as success.
+         */
+        | 'interrupted';
     prompt?: AssembledPrompt;
     budgetCheck?: AgentRunBudgetCheck;
     /** Set when the LLM-dispatch path ran end-to-end. */
@@ -441,6 +450,32 @@ export class AgentRunService {
         }
 
         const dispatchResult = await this.runToolLoop(context, agent, prompt);
+        if (dispatchResult.interrupted) {
+            // Run steering (Wave 4 M5) — a human asked the agent to stop. The
+            // run is COMPLETED (it did real work up to here and its workspace
+            // state is meaningful), with a summary that says why it ended.
+            // No replyBody / taskFinishStatus, so finalize applies no
+            // externally-visible side effect: an interrupted run must not
+            // silently flip the Task to done.
+            const summary =
+                dispatchResult.outcome.summary ??
+                `Interrupted by the user after ${dispatchResult.iterations} model round-trip(s).`;
+            const finalizeResult = await this.finalize(
+                context,
+                { errored: false, summary },
+                memorySessionId,
+                agent,
+            );
+            return {
+                runId: context.runId,
+                status: 'interrupted',
+                prompt,
+                budgetCheck,
+                outcome: { ...dispatchResult.outcome, summary },
+                finalizeResult,
+                toolLoopIterations: dispatchResult.iterations,
+            };
+        }
         if (dispatchResult.cancelled) {
             const finalizeResult = await this.finalize(
                 context,
@@ -526,6 +561,12 @@ export class AgentRunService {
          * every externally-visible side effect.
          */
         cancelled?: boolean;
+        /**
+         * Run steering (Wave 4 M5) — a cooperative interrupt stopped the loop
+         * between iterations. The row is still open, so the caller finalizes
+         * it `completed` with a summary.
+         */
+        interrupted?: boolean;
         errorMessage?: string;
         outcome: AgentRunOutcome;
         iterations: number;
@@ -583,6 +624,9 @@ export class AgentRunService {
         // partial outcome. Using the toolCalls.length signal directly is
         // provider-agnostic.
         let lastRoundHadToolCalls = false;
+        // Run steering (Wave 4 M5) — set when a cooperative interrupt landed
+        // between iterations; the caller finalizes the run `completed`.
+        let interrupted = false;
 
         try {
             while (iterations < TOOL_LOOP_MAX_ITERATIONS) {
@@ -590,6 +634,49 @@ export class AgentRunService {
                 // One checkpoint per model round-trip. Bounded at 10 by the cap
                 // above, and the DB is only read when the signal did not fire.
                 await abort.checkpoint();
+
+                // Run steering (Wave 4 M5) — the SAME checkpoint reads the two
+                // cooperative control signals: an interrupt request (stop
+                // between iterations, keeping the work done so far) and any
+                // steering messages a human queued while the agent was
+                // streaming. Deliberately adjacent to `abort.checkpoint()`:
+                // one place in the loop owns "should I keep going, and has
+                // anyone said anything?".
+                const steering = await this.takeSteeringSignals(context.runId);
+                if (steering.interruptRequested) {
+                    interrupted = true;
+                    await this.runLogs
+                        .append({
+                            runId: context.runId,
+                            level: 'WARN',
+                            step: 'steering',
+                            message: 'Interrupt requested — stopping between iterations.',
+                            metadata: { iteration: iterations, reason: 'interrupt' },
+                        })
+                        .catch(() => undefined);
+                    // Iterations counts round-trips PERFORMED; this one never
+                    // reached the model.
+                    iterations -= 1;
+                    break;
+                }
+                for (const injected of steering.pendingInput) {
+                    // Security (prompt-injection): a steering message is
+                    // authenticated human input from the run's owner, but it
+                    // still enters the same message list as untrusted tool
+                    // output, so it is framed explicitly as a user turn rather
+                    // than spliced into the system prompt.
+                    messages.push({ role: 'user', content: injected });
+                    await this.runLogs
+                        .append({
+                            runId: context.runId,
+                            level: 'INFO',
+                            step: 'steering',
+                            message: 'Injected a queued steering message into the live run.',
+                            metadata: { iteration: iterations, bytes: injected.length },
+                        })
+                        .catch(() => undefined);
+                }
+
                 const round = await this.aiDispatch!.dispatch({
                     abortSignal: abort.signal,
                     messages,
@@ -715,6 +802,22 @@ export class AgentRunService {
             };
         }
 
+        if (interrupted) {
+            // Honest summary: what the agent DID before it was told to stop.
+            // No `taskFinishStatus` / `replyBody` — an interrupted run must
+            // apply no externally-visible side effect.
+            const summary =
+                iterations > 0
+                    ? `Interrupted by the user after ${iterations} model round-trip(s).`
+                    : 'Interrupted by the user before the first model round-trip.';
+            return {
+                errored: false,
+                interrupted: true,
+                outcome: { errored: false, summary },
+                iterations,
+            };
+        }
+
         if (
             iterations >= TOOL_LOOP_MAX_ITERATIONS &&
             (lastFinishReason === 'tool_calls' || lastRoundHadToolCalls)
@@ -744,6 +847,69 @@ export class AgentRunService {
             capturedForce,
         );
         return { errored: false, outcome, iterations };
+    }
+
+    /**
+     * Run steering (Wave 4 M5) — read (and consume) this run's cooperative
+     * control signals.
+     *
+     * Feature-detected rather than called unconditionally: `this.runs` is
+     * stubbed with a partial mock in a large number of existing unit specs
+     * (and by the worker's RPC proxy shape when an older API replica is still
+     * rolling), and a missing method must degrade to "no steering" — never
+     * throw inside the tool loop and get misreported as a dispatch failure.
+     * Any read failure degrades the same way for the same reason: steering is
+     * an enhancement, the run is the product.
+     */
+    private async takeSteeringSignals(
+        runId: string,
+    ): Promise<{ pendingInput: string[]; interruptRequested: boolean }> {
+        const none = { pendingInput: [] as string[], interruptRequested: false };
+        const take = (this.runs as Partial<AgentRunRepository>).takeSteeringSignals;
+        if (typeof take !== 'function') return none;
+        try {
+            const signals = await take.call(this.runs, runId);
+            return {
+                pendingInput: Array.isArray(signals?.pendingInput) ? signals.pendingInput : [],
+                interruptRequested: signals?.interruptRequested === true,
+            };
+        } catch (err) {
+            this.logger.warn(`Run ${runId}: steering read failed (ignored): ${err}`);
+            return none;
+        }
+    }
+
+    /**
+     * Run steering (Wave 4 M5) — the awaiting-input lifecycle signal, exposed
+     * as a first-class method so the executor AND pipeline plugins (over the
+     * worker's existing RPC proxy of this service — no new transport) can park
+     * a run on a human without reaching into the repository.
+     *
+     * `awaitingInput` is a LIFECYCLE SIGNAL, never agent self-report prose:
+     * callers report a structured "I asked a question / I need an approval"
+     * event, nothing is parsed out of the assistant's text. A parked run is
+     * exempt from every TTL sweep (`AgentRunSweeperService`), so setting it
+     * from prose would let a chatty agent make itself immortal.
+     */
+    async markAwaitingInput(runId: string, awaitingInput = true): Promise<void> {
+        const set = (this.runs as Partial<AgentRunRepository>).setAwaitingInput;
+        if (typeof set !== 'function') return;
+        try {
+            await set.call(this.runs, runId, awaitingInput);
+            await this.runLogs
+                .append({
+                    runId,
+                    level: 'INFO',
+                    step: 'steering',
+                    message: awaitingInput
+                        ? 'Run parked awaiting human input.'
+                        : 'Run no longer awaiting human input.',
+                    metadata: { awaitingInput },
+                })
+                .catch(() => undefined);
+        } catch (err) {
+            this.logger.warn(`Run ${runId}: failed to set awaitingInput=${awaitingInput}: ${err}`);
+        }
     }
 
     /**
@@ -974,6 +1140,15 @@ export class AgentRunService {
         }
 
         await this.runs.markCompleted(context.runId, summary ?? undefined).catch(() => undefined);
+        // Run steering (Wave 4 M5) — a run that finished WITHOUT a definitive
+        // outcome because it needs a human is parked here, at the one place
+        // every completion path funnels through. Signal-driven only: the
+        // executor / pipeline plugin sets `outcome.awaitingInput`; nothing is
+        // inferred from the assistant's prose. The Sessions view badges it and
+        // the stale-run sweeper is forbidden to reap it.
+        if (outcome.awaitingInput === true) {
+            await this.markAwaitingInput(context.runId, true);
+        }
         await this.tryCloseMemorySession(memorySessionId, context, agent ?? null);
 
         // Schedules P2 — completed-heartbeat activity coverage (see the

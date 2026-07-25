@@ -11,6 +11,7 @@ import {
     AGENT_GIT_FACADE,
     AGENT_EMAIL_FACADE,
     AGENT_NOTIFY_CHANNEL_FACADE,
+    RunSteeringService,
     type AgentRunChatBackPoster,
     type AgentRunTaskFinisher,
     type AgentPluginToolsFacade,
@@ -52,6 +53,7 @@ import {
     TaskChatService,
     TasksService,
     TaskStatus,
+    RUN_STEERING_PORT,
 } from '@ever-works/agent/tasks-domain';
 import {
     FacadesModule,
@@ -172,6 +174,14 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                 },
             }),
         },
+        // Run steering (Wave 4 M5) — bind the port `TaskChatService` reaches
+        // for when a chat message mentions an agent that already has a LIVE
+        // run on the Task. Same @Global() token posture as the post-processor
+        // bindings above: the implementation lives in the agent-side
+        // AgentsModule (imported here), the consumer lives in
+        // TasksDomainModule, and neither package gains a runtime import of
+        // the other.
+        { provide: RUN_STEERING_PORT, useExisting: RunSteeringService },
         // Notifications v2 (EW-670) — INBOUND_EMAIL_TASK_SPAWNER binding.
         // The inbound-email dispatcher's `task-spawn` mode delegates here:
         // create a Task from the inbound email (scoped to the address
@@ -633,6 +643,7 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
         AGENT_EMAIL_FACADE,
         AGENT_NOTIFY_CHANNEL_FACADE,
         INBOUND_EMAIL_TASK_SPAWNER,
+        RUN_STEERING_PORT,
     ],
 })
 export class AgentsModule {}

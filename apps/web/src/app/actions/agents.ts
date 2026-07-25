@@ -200,6 +200,35 @@ export async function cancelAgentRunAction(id: string, runId: string) {
     return res;
 }
 
+/**
+ * Run steering (Wave 4 M5) — the three run controls behind the Task-detail
+ * buttons. "Stop" stays `cancelAgentRunAction` above.
+ *
+ * Errors are deliberately NOT swallowed: the API answers 409 when the control
+ * does not apply to the run's state ("already finished", "not resumable"), and
+ * that is exactly what the caller must show the user.
+ */
+export async function steerAgentRunAction(id: string, runId: string, message: string) {
+    await ensureAuth();
+    const res = await agentsAPI.steerRun(id, runId, message);
+    revalidatePath(`/agents/${id}/activity`);
+    return res;
+}
+
+export async function interruptAgentRunAction(id: string, runId: string) {
+    await ensureAuth();
+    const res = await agentsAPI.interruptRun(id, runId);
+    revalidatePath(`/agents/${id}/activity`);
+    return res;
+}
+
+export async function resumeAgentRunAction(id: string, runId: string, message?: string | null) {
+    await ensureAuth();
+    const res = await agentsAPI.resumeRun(id, runId, message ?? null);
+    revalidatePath(`/agents/${id}/activity`);
+    return res;
+}
+
 // Attachment actions — used by the PromptComposer-driven flow on
 // /new (Agent chip). Lets the caller wire uploads to an Agent once
 // we have its id.

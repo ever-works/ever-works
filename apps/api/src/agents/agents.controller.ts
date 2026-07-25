@@ -34,6 +34,7 @@ import {
     AGENT_RUN_CANCELLER,
     type AgentRunCanceller,
     RunDispatchGateService,
+    RunSteeringService,
     SkillBindingRepository,
     type AgentDto,
     type AgentExportEnvelope,
@@ -68,6 +69,8 @@ import {
     ListAgentRunsQueryDto,
     ListAgentsQueryDto,
     ListRunSessionsQueryDto,
+    ResumeRunDto,
+    SteerRunDto,
     UpdateAgentDto,
     UpdateAgentGuardrailsDto,
 } from './dto/agent.dto';
@@ -120,6 +123,29 @@ const AGENT_LIFECYCLE_EVENT_TYPES: ActivityActionType[] = [
     ActivityActionType.AGENT_TASK_ASSIGNED,
 ];
 
+/**
+ * Attach-session action (Wave 4 M8) — is this run's terminal actually
+ * attachable RIGHT NOW?
+ *
+ * Two conditions, both required:
+ *  - the terminal lifecycle says a session exists or is coming up
+ *    (`starting` | `attached`) — `ended` sessions have no PTY to join; and
+ *  - the run itself is still open (`queued` | `running`) — a terminal run's
+ *    columns can legitimately still read `attached` (the last write the
+ *    worker managed before it died, which the terminal sweeper only corrects
+ *    minutes later), and offering Attach there is a guaranteed dead end.
+ *
+ * Computed server-side and shipped as one boolean so the Sessions list, the
+ * Task detail controls and any future surface can never drift on the rule.
+ */
+export function isSessionAttachable(run: {
+    status: string;
+    terminalState?: string | null;
+}): boolean {
+    const live = run.status === 'queued' || run.status === 'running';
+    return live && (run.terminalState === 'attached' || run.terminalState === 'starting');
+}
+
 @ApiTags('agents')
 @Controller('api/agents')
 export class AgentsController {
@@ -164,6 +190,12 @@ export class AgentsController {
         // Optional for the same positional-spec reason as above.
         @Optional()
         private readonly agentTemplates?: AgentTemplatesService,
+        // Run steering (Wave 4 M5) — steer / interrupt / resume. Trailing +
+        // Optional for the same positional-spec reason as above; when unbound
+        // the three endpoints report 500 "not available" rather than
+        // pretending the control landed.
+        @Optional()
+        private readonly steering?: RunSteeringService,
     ) {}
 
     @Get()
@@ -267,6 +299,7 @@ export class AgentsController {
             terminalState: string | null;
             terminalEndedReason: string | null;
             terminalProviderId: string | null;
+            sessionAttachable: boolean;
             createdAt: string;
         }>;
         meta: { total: number; limit: number; offset: number };
@@ -320,6 +353,10 @@ export class AgentsController {
                 terminalState: r.terminalState ?? null,
                 terminalEndedReason: r.terminalEndedReason ?? null,
                 terminalProviderId: r.terminalProviderId ?? null,
+                // Attach-session action (Wave 4 M8) — the UI gates its
+                // terminal-icon deep link on this, never on `terminalState`
+                // alone (see isSessionAttachable above).
+                sessionAttachable: isSessionAttachable(r),
                 createdAt: r.createdAt.toISOString(),
             })),
             meta: { total, limit, offset },
@@ -845,6 +882,130 @@ export class AgentsController {
             }
         }
         return { cancelled: wasOpen, previousStatus: result.previousStatus };
+    }
+
+    /**
+     * Run steering (Wave 4 M5) — send a message to a run.
+     *
+     * LIVE run ⇒ the message is queued for the executing tool loop, which
+     * injects it between model round-trips (`dispatched: 'injected'`).
+     * TERMINAL run ⇒ `dispatched: 'new-run'`, telling the caller to start a
+     * fresh run instead. Deliberately NOT a 409: "the run finished while you
+     * were typing" is a normal race, not a client error, and the caller has a
+     * defined next step.
+     *
+     * Ownership is enforced twice — `getOne` 404s a cross-user Agent, and
+     * `RunSteeringService` loads the run through `findByIdAndUser`, so a run
+     * id belonging to someone else is indistinguishable from a missing one.
+     */
+    @Post(':id/runs/:runId/steer')
+    @ApiOperation({
+        summary:
+            'Send a steering message to a run: injected into the live session, or ' +
+            'answered with new-run when the run already finished.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async steerRun(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('runId', ParseUUIDPipe) runId: string,
+        @Body() body: SteerRunDto,
+    ): Promise<{ dispatched: 'injected' | 'new-run'; runId: string; queuedCount?: number }> {
+        await this.service.getOne(auth.userId, id);
+        const steering = this.requireSteering();
+        return steering.steer({ runId, userId: auth.userId, message: body.message });
+    }
+
+    /**
+     * Run steering (Wave 4 M5) — cooperative stop request.
+     *
+     * The run's tool loop honours it at its next per-iteration checkpoint, so
+     * the run stops BETWEEN iterations and finishes `completed` with a summary
+     * instead of being killed mid-round-trip. 409 when the run is already
+     * terminal — unlike steer, there is no meaningful fallback action.
+     *
+     * "Stop" (kill the process now) stays the existing
+     * `POST :id/runs/:runId/cancel` endpoint; it is not duplicated here.
+     */
+    @Post(':id/runs/:runId/interrupt')
+    @ApiOperation({
+        summary:
+            'Request a cooperative stop: the run halts between tool-loop iterations ' +
+            'and completes with a summary. 409 when the run is already terminal.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async interruptRun(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('runId', ParseUUIDPipe) runId: string,
+    ): Promise<{ interrupted: boolean; runId: string }> {
+        await this.service.getOne(auth.userId, id);
+        const steering = this.requireSteering();
+        const outcome = await steering.interrupt(runId, auth.userId);
+        void this.tryLog({
+            userId: auth.userId,
+            agentId: id,
+            actionType: ActivityActionType.AGENT_RUN_CANCELLED,
+            details: { runId, control: 'interrupt' },
+        });
+        return outcome;
+    }
+
+    /**
+     * Run steering (Wave 4 M5) — resume a parked / awaiting-input run.
+     *
+     * Dispatches a NEW run carrying the source run's `cliSessionId` (the
+     * pipeline plugin's own conversation id) and, optionally, a first message.
+     * Runs are immutable: the source row stays terminal. 409 when the run is
+     * not resumable (still live, or ended for a non-parked reason).
+     */
+    @Post(':id/runs/:runId/resume')
+    @ApiOperation({
+        summary:
+            'Resume a parked / awaiting-input run as a NEW run carrying the same ' +
+            'pipeline session. 409 when the run is not resumable.',
+    })
+    @HttpCode(HttpStatus.ACCEPTED)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async resumeRun(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('runId', ParseUUIDPipe) runId: string,
+        @Body() body: ResumeRunDto,
+    ): Promise<{
+        dispatched: 'new-run';
+        runId: string;
+        resumedFromRunId: string;
+        carriedCliSession: boolean;
+        queued: boolean;
+    }> {
+        await this.service.getOne(auth.userId, id);
+        const steering = this.requireSteering();
+        const outcome = await steering.resume(runId, auth.userId, body.message ?? null);
+        void this.tryLog({
+            userId: auth.userId,
+            agentId: id,
+            actionType: ActivityActionType.AGENT_RUN_TRIGGERED,
+            details: { runId: outcome.runId, source: 'resume', resumedFromRunId: runId },
+        });
+        return outcome;
+    }
+
+    /**
+     * The steering service is @Optional() so every positional spec
+     * constructor keeps compiling. An unbound service means the deployment is
+     * misconfigured — say so loudly rather than answering 200 for a control
+     * that never reached anything.
+     */
+    private requireSteering(): RunSteeringService {
+        if (!this.steering) {
+            throw new InternalServerErrorException(
+                'RunSteeringService is not available on this deployment.',
+            );
+        }
+        return this.steering;
     }
 
     @Get(':id/skills')

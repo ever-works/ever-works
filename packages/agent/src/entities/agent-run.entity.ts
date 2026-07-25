@@ -265,6 +265,36 @@ export class AgentRun {
     @Column({ type: 'int', nullable: true })
     costCents?: number | null;
 
+    // ── Run steering (Wave 4 M5). Both additive; NULL/false on every
+    // pre-existing row. The steering service writes them, the executing
+    // run's tool loop reads them between iterations.
+
+    /**
+     * FIFO queue of steering messages waiting to be injected into the
+     * LIVE run. `RunSteeringService.steer()` appends while the run is
+     * `queued`/`running`; the tool loop drains the queue between model
+     * round-trips and appends each entry as a `user` turn, then clears
+     * the column. NULL = nothing pending (the overwhelmingly common
+     * case), so the column costs one text read per iteration and no
+     * write at all on an unsteered run.
+     *
+     * Deliberately a queue, not a single slot: the UX contract is
+     * "messages sent during an active stream are queued, never dropped".
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    pendingInput?: string[] | null;
+
+    /**
+     * Cooperative stop request. Set by `RunSteeringService.interrupt()`;
+     * the tool loop checks it at the same checkpoint as the abort
+     * signal and stops BETWEEN iterations, so the run ends cleanly with
+     * a summary instead of being killed mid-round-trip. Distinct from
+     * cancel: cancel kills the process and skips every side effect,
+     * interrupt asks the agent to stop and completes the run honestly.
+     */
+    @Column({ type: 'boolean', default: false })
+    interruptRequested: boolean;
+
     @CreateDateColumn()
     createdAt: Date;
 }

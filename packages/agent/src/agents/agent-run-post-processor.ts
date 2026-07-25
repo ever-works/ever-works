@@ -53,6 +53,13 @@ export const AGENT_RUN_TASK_FINISHER = 'AGENT_RUN_TASK_FINISHER' as const;
  * `force` — passed through to the transition call. Approver gate only.
  * `errored` — when true, the AgentRun row is marked failed instead of
  * completed and side-effects are skipped.
+ * `awaitingInput` — run steering (Wave 4 M5) lifecycle signal: the run
+ * ended without a definitive outcome because it needs a human (a
+ * question, an approval, an exhausted budget). `finalize()` stamps
+ * `agent_runs.awaitingInput`, which the Sessions view badges and the
+ * stale-run sweeper is forbidden to reap. A LIFECYCLE SIGNAL, never
+ * agent self-report prose — only the executor / pipeline plugin sets it,
+ * and it is not parsed out of the assistant's text.
  */
 export interface AgentRunOutcome {
     summary?: string | null;
@@ -61,4 +68,5 @@ export interface AgentRunOutcome {
     force?: boolean;
     errored?: boolean;
     errorMessage?: string;
+    awaitingInput?: boolean;
 }

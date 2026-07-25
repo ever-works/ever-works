@@ -9,6 +9,7 @@ export * from './task-gate-runner.service';
 export * from './task-transition.service';
 export * from './task-chat.service';
 export * from './task-dispatcher';
+export * from './run-steering-port';
 export * from './task-isolation';
 export * from './task-run-denorm.service';
 export * from './task-workspace.service';

@@ -20,6 +20,7 @@ import { TaskRecurringSection } from './TaskRecurringSection';
 import { TaskAttachmentsSection } from './TaskAttachmentsSection';
 import { TaskBranchSection } from './TaskBranchSection';
 import { TaskChecksSection } from './TaskChecksSection';
+import { TaskRunControls } from './TaskRunControls';
 
 // Status tones + dots mirror /tasks (TasksList) so colours stay
 // consistent across the list filter and the detail workflow buttons.
@@ -104,7 +105,13 @@ export function TaskDetailClient({
     initialAttachments?: TaskAttachmentRow[];
     initialChatError?: string | null;
     initialAttachmentsError?: string | null;
-    /** Quality gates (Wave 3 M6) — latest run w/ gate columns, server-fetched. */
+    /**
+     * Latest run for this Task, server-fetched (`listSessions({ taskId,
+     * limit: 1 })`). Feeds BOTH the quality-gate Checks section (Wave 3 M6 —
+     * where the prop got its name) and the run controls (Wave 4 M5/M8): they
+     * read different columns of the same row, so re-fetching it twice would
+     * be pure waste.
+     */
     initialGateRun?: AgentRunSession | null;
 }) {
     const t = useTranslations('dashboard.tasksPage.detail');
@@ -329,6 +336,11 @@ export function TaskDetailClient({
                             <p className="text-sm text-text-muted italic">{t('noDescription')}</p>
                         )}
                     </section>
+
+                    {/* Run steering (Wave 4 M5) + attach action (M8) — steer /
+                        interrupt / resume the Task's latest run. Renders
+                        nothing when there is no actionable run. */}
+                    <TaskRunControls run={initialGateRun} />
 
                     {/* Quality gates (Wave 3 M6) — Checks section */}
                     <TaskChecksSection task={task} initialGateRun={initialGateRun} />

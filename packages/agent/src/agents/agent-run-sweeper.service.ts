@@ -82,7 +82,22 @@ export class AgentRunSweeperService {
         const now = Date.now();
         const cutoff = new Date(now - cutoffMinutes * 60_000);
 
-        const stuck = await this.runs.findStuckNonTerminal(cutoff, limit);
+        const scanned = await this.runs.findStuckNonTerminal(cutoff, limit);
+        // Run steering (Wave 4 M5) — THE hard rule of this plan: a run parked
+        // on a human question must NEVER be reaped by a TTL sweep. It is not
+        // stuck, it is waiting, possibly for days, and killing it destroys
+        // work nobody can recover. The repository predicate already excludes
+        // these rows; re-asserting it here is deliberate belt-and-braces —
+        // this service is the last gate before `markStuckFailed`, and an
+        // older API replica (or a future second caller) handing back an
+        // awaiting row must still not reap it.
+        const stuck = scanned.filter((row) => row.awaitingInput !== true);
+        const skippedAwaiting = scanned.length - stuck.length;
+        if (skippedAwaiting > 0) {
+            this.logger.log(
+                `AgentRun sweep: skipped ${skippedAwaiting} run(s) awaiting human input (never reaped).`,
+            );
+        }
         if (stuck.length === 0) {
             // Logged even on zero so the ABSENCE of sweeps is positively
             // confirmed rather than inferred from silence.
@@ -103,7 +118,10 @@ export class AgentRunSweeperService {
             `${STUCK_SWEEP_PREFIX}: no worker checkpoint for ${cutoffMinutes}m`,
         );
 
-        const batchLimitReached = stuck.length >= limit;
+        // Measured on the RAW scan, not the awaiting-filtered set: the batch
+        // is what the query returned, so a page full of skipped rows still
+        // means "more remain, come back next tick".
+        const batchLimitReached = scanned.length >= limit;
         // Every non-zero sweep is an anomaly — a worker died. Loud on purpose:
         // a silent sweeper hides the upstream failure it is compensating for.
         // The per-kind breakdown is what separates "one node was evicted" from

@@ -99,6 +99,43 @@ describe('AgentRunSweeperService', () => {
         });
     });
 
+    describe('Wave 4 M5 — awaiting-input runs are never reaped', () => {
+        it('⭐ skips a stuck-looking run that is parked on human input', async () => {
+            // THE NEVER-REAP TEST. A run awaiting a human answer is not stuck,
+            // it is waiting — possibly for days. Reaping it destroys work
+            // nobody can recover, and it is the single production bug this
+            // whole rule exists to prevent. The repository predicate already
+            // excludes these rows; this asserts the service refuses them too,
+            // so an older API replica handing one back still cannot reap it.
+            runs.findStuckNonTerminal.mockResolvedValue([
+                stuckRow({ id: 'parked', awaitingInput: true }),
+            ]);
+            const summary = await makeSvc().sweepStuckRuns();
+            expect(summary.swept).toBe(0);
+            expect(summary.scanned).toBe(0);
+            expect(runs.markStuckFailed).not.toHaveBeenCalled();
+        });
+
+        it('still reaps the non-awaiting rows in the same batch', async () => {
+            // The exemption must be per-row, not "abort the whole sweep".
+            runs.findStuckNonTerminal.mockResolvedValue([
+                stuckRow({ id: 'parked', awaitingInput: true }),
+                stuckRow({ id: 'dead', awaitingInput: false }),
+            ]);
+            runs.markStuckFailed.mockResolvedValue(1);
+            const summary = await makeSvc().sweepStuckRuns();
+            expect(summary.swept).toBe(1);
+            expect(runs.markStuckFailed).toHaveBeenCalledWith(['dead'], expect.any(String));
+        });
+
+        it('treats a row with no awaitingInput column (pre-migration) as reapable', async () => {
+            runs.findStuckNonTerminal.mockResolvedValue([stuckRow({ id: 'legacy' })]);
+            runs.markStuckFailed.mockResolvedValue(1);
+            const summary = await makeSvc().sweepStuckRuns();
+            expect(summary.swept).toBe(1);
+        });
+    });
+
     it('⭐ reaps a run older than the cutoff', async () => {
         // THE NO-OP CATCHER. An implementation that returns { swept: 0 }
         // unconditionally passes every safety test in this file — only this

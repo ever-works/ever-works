@@ -613,6 +613,19 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                     runDenorm.recordTerminal(payload.taskId, claimedRunId, 'failed'),
                 );
                 await drainWork(taskRow.workId);
+            } else if (result.status === 'interrupted') {
+                // Run steering (Wave 4 M5) — a human stopped the loop between
+                // iterations. `AgentRunService.finalize` already marked the row
+                // `completed` with a summary, so NO status write here; what is
+                // still owed is the bookkeeping every other terminal path does:
+                // mirror the board chip off "running", and free the Work's
+                // concurrency slot. `runSucceeded` is false for this status, so
+                // the gate and the PR step below are skipped by construction —
+                // an interrupted run must not be graded or shipped.
+                await bestEffort(() =>
+                    runDenorm.recordTerminal(payload.taskId, claimedRunId, 'completed'),
+                );
+                await drainWork(taskRow.workId);
             }
 
             // Wave 2 M4 — green-path finalize of the isolated workspace:
