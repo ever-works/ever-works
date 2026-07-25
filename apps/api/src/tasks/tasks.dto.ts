@@ -43,7 +43,7 @@ export class CreateTaskDto {
      *  inherits the Work's taskIsolation setting. */
     @IsOptional()
     @IsIn(['on', 'off'])
-    isolationMode?: string | null;
+    isolationMode?: 'on' | 'off' | null;
 
     @IsOptional()
     @IsUUID()
@@ -107,7 +107,7 @@ export class UpdateTaskDto {
      *  inherits the Work's taskIsolation setting. */
     @IsOptional()
     @IsIn(['on', 'off'])
-    isolationMode?: string | null;
+    isolationMode?: 'on' | 'off' | null;
 
     /**
      * Re-filing a Task under a different owner. `null` detaches it from
