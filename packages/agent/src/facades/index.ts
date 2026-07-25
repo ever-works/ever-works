@@ -51,6 +51,11 @@ export {
     NoGitProviderError,
     GitProviderNotFoundError,
     NoGitCredentialsError,
+    // Merge-policy matrix (Wave 3, D4) — refusal error + the actor shape
+    // that marks a merge agent-driven. Both cross package boundaries
+    // (apps/api maps the error to 403), so both must be barrel-exported.
+    MergePolicyRefusedError,
+    type AgentMergeActor,
     type GitFacadeOptions,
     type GitProviderInfo,
     type FacadeCloneOptions,

@@ -63,6 +63,7 @@ import {
     USER_SELECTABLE_WORK_KINDS,
     getWorkCapabilities,
     normalizeWorkKind,
+    type MergePolicyOverride,
     type TaskAcceptanceCheck,
     type UserSelectableWorkKind,
     type WorkChecksPolicy,
@@ -463,6 +464,22 @@ export class Work {
      */
     @Column({ type: 'int', default: 2 })
     maxGateAttempts: number;
+
+    // ── Merge policy (Wave 3, founder decision D4) ───────────────────
+
+    /**
+     * Work-scoped slice of the merge-policy matrix. NULL = inherit the
+     * organization's policy, then the tenant's, then the platform default
+     * (`PLATFORM_DEFAULT_MERGE_POLICY`). A PARTIAL object is the normal
+     * case: resolution is field-by-field, so a Work can override just
+     * `allowAgentMerge` and inherit the rest.
+     *
+     * Never read this column directly to decide a merge — resolve through
+     * `MergePolicyService` (`@ever-works/agent/policy`), the single decision
+     * point.
+     */
+    @Column('simple-json', { nullable: true })
+    mergePolicy?: MergePolicyOverride | null;
 
     /**
      * Whether to generate the browsable repository published to the git

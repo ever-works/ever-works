@@ -17,6 +17,7 @@ import {
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { WORK_CHECKS_POLICIES, type WorkChecksPolicy } from '@ever-works/contracts';
 import { AcceptanceCheckDto } from './acceptance-check.dto';
+import { MergePolicyDto } from './merge-policy.dto';
 import { MarkdownReadmeConfigDto } from './create-work.dto';
 import { sanitizeName, sanitizeDescription } from '../utils/sanitize.util';
 
@@ -146,6 +147,19 @@ export class UpdateWorkDto {
     @Min(1)
     @Max(5)
     maxGateAttempts?: number;
+
+    @ApiPropertyOptional({
+        description:
+            'Work-scoped slice of the merge-policy matrix (Wave 3, D4). PARTIAL by design: every field ' +
+            'omitted inside the object inherits from the organization, then the tenant, then the platform ' +
+            'default. Pass `null` to clear the Work override entirely and inherit everything.',
+        type: MergePolicyDto,
+        nullable: true,
+    })
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => MergePolicyDto)
+    mergePolicy?: MergePolicyDto | null;
 
     @ApiPropertyOptional({ description: 'Whether community PR processing is enabled' })
     @IsOptional()

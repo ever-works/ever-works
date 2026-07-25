@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '../database/database.module';
 import { UsageModule } from '../usage/usage.module';
 import { BudgetsModule } from '../budgets/budgets.module';
+import { PolicyModule } from '../policy/policy.module';
 
 import { AiFacadeService } from './ai.facade';
 import { SearchFacadeService } from './search.facade';
@@ -77,7 +78,11 @@ const FACADES = [
  * at the application root level. Do not import PluginsModule directly here.
  */
 @Module({
-    imports: [DatabaseModule, UsageModule, BudgetsModule],
+    // PolicyModule is a leaf (four scope entities, no facade imports), so
+    // importing it here cannot cycle. It binds MERGE_POLICY_ENFORCER,
+    // which GitFacadeService consumes @Optional() to enforce the
+    // merge-policy matrix on agent-driven merges (Wave 3, D4).
+    imports: [DatabaseModule, UsageModule, BudgetsModule, PolicyModule],
     providers: FACADES,
     exports: FACADES,
 })

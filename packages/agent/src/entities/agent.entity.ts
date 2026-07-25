@@ -10,6 +10,7 @@ import {
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from 'typeorm';
+import type { MergePolicyOverride } from '@ever-works/contracts';
 import { User } from './user.entity';
 import { PortableDateColumn } from './_types';
 // Type-only import (erased at compile time) — no runtime cycle with the
@@ -412,6 +413,21 @@ export class Agent {
 
     @Column('simple-json', { nullable: true })
     scorecard?: AgentScorecardMetric[] | null;
+
+    // ── Merge policy (Wave 3, founder decision D4) ──
+    // The MOST SPECIFIC scope of the merge-policy matrix. NULL = inherit
+    // the Work's policy, then the organization's, then the tenant's, then
+    // the platform default. A PARTIAL object is the normal case:
+    // resolution is field-by-field, so one Agent can be granted
+    // `allowAgentMerge` without restating the rest of the matrix.
+    //
+    // Distinct from `permissions.canOpenPullRequests`: that decides
+    // whether this Agent may OPEN a PR; this decides who may LAND it.
+    // Resolve through `MergePolicyService` (`@ever-works/agent/policy`) —
+    // never read this column directly to decide a merge.
+
+    @Column('simple-json', { nullable: true })
+    mergePolicy?: MergePolicyOverride | null;
 
     // EW-655 (Tenants & Organizations Phase 3) — Tier A scope FKs.
     // Both NULL until the owning user creates their first Organization

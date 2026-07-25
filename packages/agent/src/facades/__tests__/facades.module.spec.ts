@@ -154,6 +154,8 @@ describe('FacadesModule + barrel re-exports', () => {
             expect(typeof facadesBarrel.NoGitProviderError).toBe('function');
             expect(typeof facadesBarrel.GitProviderNotFoundError).toBe('function');
             expect(typeof facadesBarrel.NoGitCredentialsError).toBe('function');
+            // Merge-policy matrix (Wave 3, D4) — agent merge refused by policy.
+            expect(typeof facadesBarrel.MergePolicyRefusedError).toBe('function');
             // oauth
             expect(typeof facadesBarrel.OAuthFacadeError).toBe('function');
             expect(typeof facadesBarrel.NoOAuthProviderError).toBe('function');
@@ -249,6 +251,9 @@ describe('FacadesModule + barrel re-exports', () => {
                     // Goals feature PR-7 — metrics-provider capability facade.
                     'MetricsFacadeError',
                     'MetricsFacadeService',
+                    // Merge-policy matrix (Wave 3, D4). `AgentMergeActor` is
+                    // type-only and correctly absent from this runtime list.
+                    'MergePolicyRefusedError',
                 ].sort(),
             );
         });
