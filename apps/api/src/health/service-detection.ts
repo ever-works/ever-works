@@ -74,6 +74,19 @@ export function detectInformationalServices(): ServiceStatus[] {
             mode: triggerConfigured ? 'enabled' : 'disabled',
         },
         {
+            // Vendor-neutral view of "can background agent runs execute at
+            // all?" — the signal the dashboard's degradation banner keys on.
+            // Today the dispatch path executes exclusively on the trigger
+            // runtime, so this mirrors trigger_dev; when the job-runtime
+            // provider registry is wired end-to-end (EW-686), this entry
+            // reflects WHICHEVER runtime `EVER_WORKS_JOB_RUNTIME` selects,
+            // while trigger_dev stays vendor-specific. Kept as a separate
+            // key so clients written against `job_runtime` never re-key.
+            key: 'job_runtime',
+            configured: triggerConfigured,
+            mode: triggerConfigured ? 'enabled' : 'disabled',
+        },
+        {
             key: 'stripe',
             configured: stripeConfigured,
             mode: stripeConfigured ? 'enabled' : 'disabled',

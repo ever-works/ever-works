@@ -5713,6 +5713,12 @@
             "awesome-repo": "Awesome Repo",
             "company": "Company",
             "default": "Work"
+        },
+        "jobRuntimeBanner": {
+            "title": "Background job runtime is not configured.",
+            "message": "Agent runs cannot execute on this install until a job runtime (e.g. Trigger.dev credentials) is set up.",
+            "docsLink": "Setup guide",
+            "dismiss": "Dismiss"
         }
     },
     "layout": {

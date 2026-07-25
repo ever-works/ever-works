@@ -15,7 +15,11 @@ import {
     TaskApproverRepository,
 } from '../database/repositories/task-side.repositories';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
-import { AGENT_TASK_EXECUTE_DISPATCHER, type AgentTaskExecuteDispatcher } from './task-dispatcher';
+import {
+    AGENT_TASK_EXECUTE_DISPATCHER,
+    JOB_RUNTIME_NOT_CONFIGURED_REASON,
+    type AgentTaskExecuteDispatcher,
+} from './task-dispatcher';
 import { TaskNotificationService } from './task-notification.service';
 
 /**
@@ -263,12 +267,21 @@ export class TaskTransitionService {
                 }
             } catch (err) {
                 const message = err instanceof Error ? err.message : String(err);
+                // Loud degradation: an unconfigured job runtime is a distinct,
+                // ACTIONABLE failure (install-level misconfiguration), not a
+                // transient dispatch error — record it under its stable marker
+                // so the run-detail UI and the health banner tell one story.
+                const notConfigured =
+                    err instanceof Error && err.name === 'JobRuntimeNotConfiguredError';
+                const reason = notConfigured
+                    ? `${JOB_RUNTIME_NOT_CONFIGURED_REASON}: ${message}`
+                    : `dispatch-failed: ${message}`;
                 this.logger.warn(
-                    `Failed to dispatch agent-task-execute for ${assignee.assigneeId}: ${message}`,
+                    `Failed to dispatch agent-task-execute for ${assignee.assigneeId}: ${reason}`,
                 );
                 if (run) {
                     try {
-                        await this.runs?.markDispatchFailed(run.id, `dispatch-failed: ${message}`);
+                        await this.runs?.markDispatchFailed(run.id, reason);
                     } catch (failErr) {
                         this.logger.warn(
                             `Failed to mark orphan AgentRun ${run.id} failed: ${failErr}`,
