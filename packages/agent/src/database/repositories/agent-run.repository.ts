@@ -405,6 +405,56 @@ export class AgentRunRepository {
     }
 
     /**
+     * Streaming-terminal M6 — patch the run's terminal lifecycle columns.
+     * Field-by-field construction from an explicit whitelist: callers
+     * (the internal heartbeat/state endpoints) receive worker-supplied
+     * payloads, and none of those may ever write status/summary/etc.
+     */
+    async updateTerminalColumns(
+        runId: string,
+        patch: {
+            persistent?: boolean;
+            terminalState?: string | null;
+            terminalEndedReason?: string | null;
+            terminalProviderId?: string | null;
+            cliSessionId?: string | null;
+            lastHeartbeatAt?: Date | null;
+            lastFrameSeq?: number | null;
+        },
+    ): Promise<void> {
+        const update: Record<string, unknown> = {};
+        if (patch.persistent !== undefined) update.persistent = patch.persistent;
+        if (patch.terminalState !== undefined) update.terminalState = patch.terminalState;
+        if (patch.terminalEndedReason !== undefined)
+            update.terminalEndedReason = patch.terminalEndedReason;
+        if (patch.terminalProviderId !== undefined)
+            update.terminalProviderId = patch.terminalProviderId;
+        if (patch.cliSessionId !== undefined) update.cliSessionId = patch.cliSessionId;
+        if (patch.lastHeartbeatAt !== undefined) update.lastHeartbeatAt = patch.lastHeartbeatAt;
+        if (patch.lastFrameSeq !== undefined) update.lastFrameSeq = patch.lastFrameSeq;
+        if (Object.keys(update).length === 0) return;
+        await this.repository.update(runId, update);
+    }
+
+    /**
+     * Streaming-terminal M6 — sweeper input: runs whose terminal claims
+     * to be live (`starting`/`attached`) but whose heartbeat is older
+     * than the cutoff. The sweeper marks them crashed and publishes a
+     * pinned exit frame so no viewer ever stares at a frozen pane.
+     */
+    async findStaleTerminalRuns(cutoff: Date, limit = 50): Promise<AgentRun[]> {
+        return this.repository
+            .createQueryBuilder('run')
+            .where('run.terminalState IN (:...states)', { states: ['starting', 'attached'] })
+            .andWhere('(run.lastHeartbeatAt IS NULL OR run.lastHeartbeatAt < :cutoff)', {
+                cutoff,
+            })
+            .orderBy('run.createdAt', 'ASC')
+            .take(limit)
+            .getMany();
+    }
+
+    /**
      * Find an in-flight run for the (taskId, agentId) pair — used by
      * the agent-chat-reply dedup guard (architecture/security §8 — T6
      * mitigation): if a chat-triggered run is already running for the

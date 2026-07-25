@@ -17,6 +17,7 @@ describe('TerminalInternalController', () => {
     const saved: Record<string, string | undefined> = {};
     let controller: TerminalInternalController;
     let registry: TerminalRelayRegistry;
+    let runsRepo: { updateTerminalColumns: jest.Mock };
 
     beforeEach(() => {
         for (const k of ENV_KEYS) {
@@ -24,7 +25,12 @@ describe('TerminalInternalController', () => {
             delete process.env[k];
         }
         registry = new TerminalRelayRegistry();
-        controller = new TerminalInternalController(registry, new TerminalAttachService());
+        runsRepo = { updateTerminalColumns: jest.fn().mockResolvedValue(undefined) };
+        controller = new TerminalInternalController(
+            registry,
+            new TerminalAttachService(),
+            runsRepo as never,
+        );
     });
 
     afterEach(() => {
@@ -43,20 +49,28 @@ describe('TerminalInternalController', () => {
 
     it('FAIL-CLOSED: refuses every publish when the internal secret is unconfigured', () => {
         expect(() =>
-            controller.publishFrames(bearer, RUN, [{ kind: 'stdout', seq: 0, data: 'aGk=' }]),
+            controller.publishFrames(bearer, undefined, RUN, [
+                { kind: 'stdout', seq: 0, data: 'aGk=' },
+            ]),
         ).toThrow(ForbiddenException);
     });
 
     it('refuses wrong/missing bearer secrets (constant-time compare path)', () => {
         configure();
-        expect(() => controller.publishFrames('Bearer wrong', RUN, [])).toThrow(ForbiddenException);
-        expect(() => controller.publishFrames(undefined, RUN, [])).toThrow(ForbiddenException);
-        expect(() => controller.publishFrames('Basic abc', RUN, [])).toThrow(ForbiddenException);
+        expect(() => controller.publishFrames('Bearer wrong', undefined, RUN, [])).toThrow(
+            ForbiddenException,
+        );
+        expect(() => controller.publishFrames(undefined, undefined, RUN, [])).toThrow(
+            ForbiddenException,
+        );
+        expect(() => controller.publishFrames('Basic abc', undefined, RUN, [])).toThrow(
+            ForbiddenException,
+        );
     });
 
     it('accepts valid frames, drops invalid ones, and counts both', () => {
         configure();
-        const result = controller.publishFrames(bearer, RUN, [
+        const result = controller.publishFrames(bearer, undefined, RUN, [
             { kind: 'stdout', seq: 0, data: 'aGk=' },
             { kind: 'stdout', seq: 1, data: 'aGk=' },
             { kind: 'stdout', seq: 1, data: 'aGk=' }, // dup seq → registry refuses
@@ -69,18 +83,55 @@ describe('TerminalInternalController', () => {
 
     it('rejects malformed run ids before any registry touch', () => {
         configure();
-        expect(() => controller.publishFrames(bearer, '../etc/passwd', [])).toThrow(
+        expect(() => controller.publishFrames(bearer, undefined, '../etc/passwd', [])).toThrow(
             ForbiddenException,
         );
     });
 
     it('mints a worker attach token behind the same gate', () => {
         configure();
-        const result = controller.mintWorkerToken(bearer, RUN);
+        const result = controller.mintWorkerToken(bearer, undefined, RUN);
         expect(result.wsPath).toBe(`/ws/terminal/${RUN}`);
         const claims = new TerminalAttachService().verify(result.token);
         expect(claims).toMatchObject({ role: 'worker', runId: RUN });
 
-        expect(() => controller.mintWorkerToken('Bearer wrong', RUN)).toThrow(ForbiddenException);
+        expect(() => controller.mintWorkerToken('Bearer wrong', undefined, RUN)).toThrow(
+            ForbiddenException,
+        );
+    });
+    it('heartbeat stamps the server clock and whitelists lifecycle fields', async () => {
+        configure();
+        await controller.heartbeat(bearer, undefined, RUN, {
+            state: 'attached',
+            providerId: 'pty-local',
+            persistent: true,
+            lastFrameSeq: 42,
+            endedReason: 'not-a-reason',
+        });
+        expect(runsRepo.updateTerminalColumns).toHaveBeenCalledWith(
+            RUN,
+            expect.objectContaining({
+                terminalState: 'attached',
+                terminalProviderId: 'pty-local',
+                persistent: true,
+                lastFrameSeq: 42,
+                lastHeartbeatAt: expect.any(Date),
+            }),
+        );
+        // Unknown endedReason value was dropped by the enum whitelist.
+        const patch = runsRepo.updateTerminalColumns.mock.calls[0][1];
+        expect('terminalEndedReason' in patch).toBe(false);
+    });
+
+    it('heartbeat also honors the x-trigger-secret header (house internal-API convention)', async () => {
+        configure();
+        await controller.heartbeat(undefined, 'internal-secret-value', RUN, {
+            state: 'ended',
+            endedReason: 'parked',
+        });
+        expect(runsRepo.updateTerminalColumns).toHaveBeenCalledWith(
+            RUN,
+            expect.objectContaining({ terminalState: 'ended', terminalEndedReason: 'parked' }),
+        );
     });
 });
