@@ -213,17 +213,30 @@ test.describe('KB workbench shell — slice A', () => {
         // assert on the visible body text rather than a `.toHaveValue()`.
         const editorBody = page.getByTestId('kb-tiptap-editor-body');
         await expect(editorBody).toBeVisible({ timeout: 60_000 });
-        await expect(editorBody).toContainText(`Autosave ${id}`);
-        await expect(editorBody).toContainText('original body');
+        // The contenteditable mounts with the "Start writing…" placeholder and is
+        // filled once the document body arrives; under CI shard load that fetch can
+        // outlast the default 5s expect budget, so wait explicitly for the SEEDED
+        // content before typing (otherwise the marker is appended to an empty doc).
+        await expect(editorBody).toContainText(`Autosave ${id}`, { timeout: 60_000 });
+        await expect(editorBody).toContainText('original body', { timeout: 30_000 });
 
         // Type a distinct marker the API poll below can pin against.
         // Click into the contenteditable, jump to the very end, and type
         // the marker on a fresh line. Tiptap serialises this back to
         // Markdown on the `update` event and schedules the debounced
         // autosave.
-        const marker = `Autosaved marker ${id}`;
+        // LETTERS-ONLY marker: Tiptap's typography extension rewrites a digit-x-digit
+        // run (e.g. "8x28") into "8×28", so a marker carrying the raw run id can be
+        // silently mangled and never match — a latent flake that only fires when the
+        // random id happens to contain that pattern.
+        const marker = `Autosaved marker ${id.replace(/[^a-z]/gi, '')}zz`;
         await editorBody.click();
-        await page.keyboard.press('Control+End');
+        // Collapse the selection to the very END of the document. A bare
+        // Control+End does not reliably move the caret in ProseMirror (observed:
+        // the marker was spliced into the MIDDLE of the heading), whereas
+        // select-all then ArrowRight always collapses to the document end.
+        await page.keyboard.press('Control+A');
+        await page.keyboard.press('ArrowRight');
         await page.keyboard.press('Enter');
         await page.keyboard.type(marker);
 
@@ -244,9 +257,14 @@ test.describe('KB workbench shell — slice A', () => {
                     return fresh.body;
                 },
                 {
-                    message: 'autosave should persist the marker within ~5s of the debounce',
-                    timeout: 5_000,
-                    intervals: [200, 500, 1_000],
+                    // The 800ms debounce is the FLOOR, not the budget: on a loaded
+                    // CI shard the save request itself queues behind the shard's
+                    // other traffic, so a 5s ceiling made this fail purely on load
+                    // (observed: the API still held the original body on all three
+                    // attempts). Poll well past the debounce instead.
+                    message: 'autosave should persist the marker after the debounce',
+                    timeout: 45_000,
+                    intervals: [200, 500, 1_000, 2_000],
                 },
             )
             .toContain(marker);

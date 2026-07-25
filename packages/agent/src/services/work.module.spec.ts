@@ -47,6 +47,7 @@ jest.mock('./work-ownership.service', () => ({ WorkOwnershipService: class {} })
 jest.mock('./work-query.service', () => ({ WorkQueryService: class {} }));
 jest.mock('./work-lifecycle.service', () => ({ WorkLifecycleService: class {} }));
 jest.mock('./work-generation.service', () => ({ WorkGenerationService: class {} }));
+jest.mock('./work-memory.service', () => ({ WorkMemoryService: class {} }));
 jest.mock('./work-schedule.service', () => ({ WorkScheduleService: class {} }));
 jest.mock('./work-schedule-dispatcher.service', () => ({
     WorkScheduleDispatcherService: class {},

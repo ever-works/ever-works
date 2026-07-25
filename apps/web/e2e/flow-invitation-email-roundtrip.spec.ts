@@ -178,8 +178,18 @@ test.describe('flow: work invitation email round-trip (real integration)', () =>
 
         // 2) MAIL is BEST-EFFORT. If a message arrives, it must reference the
         //    claim link / token; otherwise assert the API delivered the token.
+        //    The invitee's inbox ALSO holds a "Confirm your Ever Works account"
+        //    registration email (registerUserViaAPI triggers one). SMTP delivery
+        //    lags the API, so that confirmation can land AFTER the inbox clear and
+        //    be the newest message — matching on recipient alone would then grab
+        //    the confirmation (no /claim/ link) and fail the assertion. Filter by
+        //    the invitation subject ("You've been invited to …") so we wait for
+        //    THAT email, mirroring magic-link.spec.ts's subject-filtered poll.
         if (mailUp) {
-            const msg = await waitForMessageTo(request, invitee.email, { timeoutMs: 6000 });
+            const msg = await waitForMessageTo(request, invitee.email, {
+                timeoutMs: 15_000,
+                subject: /invit|claim/i,
+            });
             if (msg) {
                 const link = extractLinkFromBody(msg, /https?:\/\/[^\s"'<>]*\/claim\/[^\s"'<>]+/);
                 const bodyText = msg.Content?.Body ?? '';

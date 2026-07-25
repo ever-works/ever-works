@@ -215,8 +215,11 @@ test.describe('Task status lifecycle — board/detail UI (authenticated seeded u
 
         await expect(page.getByRole('heading', { name: title })).toBeVisible({ timeout: 30_000 });
 
-        // Header status pill renders `currentStatus.replace('_',' ')` (the raw
-        // status text, visually upper-cased via CSS). Initially "backlog".
+        // Status is rendered via the i18n `tStatus()` label in BOTH the
+        // workflow buttons (current status highlighted) and the right-rail
+        // "Details" status pill — verified against TaskDetailClient.tsx +
+        // en.json `dashboard.tasksPage.status.*`. The label for `backlog` is
+        // "Backlog" (no space), so the raw regex matches the i18n string.
         const statusPill = page.getByText(/^backlog$/i).first();
         await expect(statusPill).toBeVisible({ timeout: 30_000 });
 
@@ -232,7 +235,9 @@ test.describe('Task status lifecycle — board/detail UI (authenticated seeded u
             if (await moveToTodo.isEnabled().catch(() => false)) {
                 await moveToTodo.click({ timeout: 5_000 }).catch(() => undefined);
             }
-            await expect(page.getByText(/^todo$/i).first()).toBeVisible({ timeout: 4_000 });
+            // Rendered label is the i18n string "To do" (WITH a space), not a
+            // raw "todo" token — `tStatus('todo')` per en.json.
+            await expect(page.getByText(/^to do$/i).first()).toBeVisible({ timeout: 4_000 });
         }).toPass({ timeout: 30_000 });
 
         // Cross-layer truth check: the API reflects the UI-driven move.
@@ -255,7 +260,7 @@ test.describe('Task status lifecycle — board/detail UI (authenticated seeded u
         await page.reload({ waitUntil: 'domcontentloaded' });
         await page.waitForLoadState('networkidle').catch(() => undefined);
         await expect(page.getByRole('heading', { name: title })).toBeVisible({ timeout: 30_000 });
-        await expect(page.getByText(/^todo$/i).first()).toBeVisible({ timeout: 30_000 });
+        await expect(page.getByText(/^to do$/i).first()).toBeVisible({ timeout: 30_000 });
         const moveToInProgress = page.getByRole('button', {
             name: STATUS_LABEL.in_progress,
             exact: true,

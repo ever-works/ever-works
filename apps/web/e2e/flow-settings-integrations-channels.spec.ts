@@ -606,15 +606,18 @@ test.describe('Settings · Integrations · Channels — UI', () => {
         const heading = page.getByRole('heading', { name: /notification channels/i }).first();
         await expect(heading).toBeVisible({ timeout: 30_000 });
 
-        // The server component lists channels via the web notification-channels client; in this
-        // build that client double-prefixes `/api` (API_URL already ends with `/api`), so the
-        // server-side list() 404s and the page falls back to the empty state. Assert the REAL
-        // rendered surface (empty-state copy + no data rows) rather than a fictional seeded row.
-        await expect(page.getByText(/no channels yet/i).first()).toBeVisible({ timeout: 15_000 });
-
-        // Open the Add-channel wizard. Retry the first click to ride out the dev hydration
-        // race (a pre-hydration click is swallowed), then wait for the dialog to mount.
+        // The web notification-channels client targets the CORRECT route: API_URL is normalized
+        // to end with `/api` and the client endpoint is `/notification-channels`, so the server
+        // component's list() resolves `/api/notification-channels` and SUCCEEDS (verified 200 via
+        // curl against the live API). A fresh session renders the empty state; a session that
+        // already owns channels renders the table. The real precondition is that the channels
+        // surface rendered (not a redirect to login), so assert the always-present "Add channel"
+        // affordance rather than a specific channel count (retry-safe under the shared DB).
         const addButton = page.getByRole('button', { name: /add channel/i }).first();
+        await expect(addButton).toBeVisible({ timeout: 15_000 });
+
+        // Open the Add-channel wizard. Retry the first click to ride out the hydration
+        // race (a pre-hydration click is swallowed), then wait for the dialog to mount.
         const dialog = page.getByRole('dialog', { name: /add notification channel/i });
         await expect(async () => {
             await addButton.click({ timeout: 5_000 }).catch(() => {});
@@ -639,49 +642,55 @@ test.describe('Settings · Integrations · Channels — UI', () => {
         await expect(nameInput).toHaveValue(uniqueName);
         await expect(webhookInput).toHaveValue(webhookUrl);
 
-        // Submit. The wizard only auto-closes on a SUCCESSFUL create (onCreated). In this build
-        // the create server action hits the double-prefixed `/api/api/notification-channels`
-        // (the same client bug the list() suffers) and resolves with `{ success:false, error }`,
-        // so the dialog stays open and renders the truthful error verbatim. Assert that real
-        // contract — the submit handler runs end-to-end and surfaces the server-action result —
-        // rather than a fictional row. Retry the click to ride out the pre-hydration swallow;
-        // re-fill each pass so a swallowed-then-cleared input can't masquerade as the failure.
+        // Submit. The create server action POSTs to the CORRECT `/api/notification-channels`
+        // route (verified 201 via curl against the live API), resolves `{ success:true,
+        // channel }`, so `onCreated` appends the new channel and closes the wizard. Retry the
+        // click to ride out the pre-hydration swallow; re-fill each pass so a swallowed-then-
+        // cleared input can't submit blank. The Create button is disabled while the create
+        // transition is pending, so a retried click can't double-submit. Success = dialog closed.
         const createButton = dialog.getByRole('button', { name: /create channel/i });
-        const errorText = dialog.locator('p.text-red-600');
         await expect(async () => {
-            if ((await nameInput.inputValue()) !== uniqueName) await nameInput.fill(uniqueName);
-            if ((await webhookInput.inputValue()) !== webhookUrl)
-                await webhookInput.fill(webhookUrl);
-            await createButton.click({ timeout: 5_000 }).catch(() => {});
-            // Either the action resolved with an error (dialog stays, error shown) — the real
-            // path here — or, in a build where the client is fixed, the dialog closed on success.
-            await expect(errorText.or(dialog).first()).toBeVisible({ timeout: 5_000 });
-            const created = await dialog.isHidden().catch(() => false);
-            if (!created) await expect(errorText).toBeVisible({ timeout: 5_000 });
+            if (await dialog.isVisible()) {
+                if ((await nameInput.inputValue()) !== uniqueName) await nameInput.fill(uniqueName);
+                if ((await webhookInput.inputValue()) !== webhookUrl)
+                    await webhookInput.fill(webhookUrl);
+                await createButton.click({ timeout: 5_000 }).catch(() => {});
+            }
+            await expect(dialog).toBeHidden({ timeout: 5_000 });
         }).toPass({ timeout: 30_000 });
 
-        const dialogClosed = await dialog.isHidden().catch(() => false);
-        if (dialogClosed) {
-            // Fixed-client build: success closed the wizard and the row landed in the table.
-            await expect(page.getByRole('row').filter({ hasText: uniqueName }).first()).toBeVisible(
-                { timeout: 20_000 },
-            );
-        } else {
-            // Real build: the server action surfaced a truthful failure and kept the wizard
-            // open with the error visible and NO row created. Assert that exact surface.
-            await expect(errorText).toBeVisible();
-            await expect(errorText).toHaveText(/cannot|fail|error|not found|unauthorized/i);
-            await expect(page.getByRole('row').filter({ hasText: uniqueName })).toHaveCount(0);
+        // The newly created channel lands as a data row: its unique name, the Slack provider
+        // label, and the per-row Test + Remove actions. The unique-per-attempt name keeps this
+        // retry-safe (a prior attempt's row can't be mistaken for this one).
+        const createdRow = page.getByRole('row').filter({ hasText: uniqueName }).first();
+        await expect(createdRow).toBeVisible({ timeout: 20_000 });
+        await expect(createdRow.getByText('Slack', { exact: true })).toBeVisible();
+        const rowTestButton = createdRow.getByRole('button', { name: /^test$/i });
+        const rowRemoveButton = createdRow.getByRole('button', { name: /^remove$/i });
+        await expect(rowTestButton).toBeVisible();
+        await expect(rowRemoveButton).toBeVisible();
 
-            // The wizard stays usable: Cancel dismisses it (the dialog's own affordance), proving
-            // the modal is interactive and the failure left the UI in a recoverable state.
-            await expect(async () => {
-                await dialog
-                    .getByRole('button', { name: /^cancel$/i })
-                    .click({ timeout: 5_000 })
-                    .catch(() => {});
-                await expect(dialog).toBeHidden({ timeout: 5_000 });
-            }).toPass({ timeout: 30_000 });
-        }
+        // Test surfaces the TRUTHFUL per-plugin failure badge — CI enables no slack delivery
+        // plugin, so the server-action test resolves `{ status:'failed', error:… }` and the row
+        // renders a red "✗ <error>" badge naming the plugin (probed: `Failed to materialize
+        // plugin "slack-channel"`). Retry the click to ride out any pre-hydration swallow.
+        const testBadge = createdRow.locator('span.text-red-600');
+        await expect(async () => {
+            await rowTestButton.click({ timeout: 5_000 }).catch(() => {});
+            await expect(testBadge).toBeVisible({ timeout: 5_000 });
+        }).toPass({ timeout: 30_000 });
+        await expect(testBadge).toContainText('✗');
+        await expect(testBadge).toContainText(/materialize|not found|disabled|fail/i);
+
+        // Remove drops the row (the documented flow-6 affordance) and cleans up the channel this
+        // test created in the shared in-memory DB. Retry the click to ride out a swallow.
+        await expect(async () => {
+            if (await createdRow.isVisible().catch(() => false)) {
+                await rowRemoveButton.click({ timeout: 5_000 }).catch(() => {});
+            }
+            await expect(page.getByRole('row').filter({ hasText: uniqueName })).toHaveCount(0, {
+                timeout: 5_000,
+            });
+        }).toPass({ timeout: 30_000 });
     });
 });

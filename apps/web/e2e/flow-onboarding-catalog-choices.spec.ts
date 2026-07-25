@@ -42,7 +42,8 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *     github       caps ['git-provider','oauth']
  *     openrouter / grok  caps ['ai-provider']      (no remote-status capability)
  *     gemini / claude-code caps ['pipeline','code-edit', …] (NO device-auth)
- *     vercel / k8s caps ['deployment']             (no remote-status capability)
+ *     vercel       caps ['deployment','oauth']      (oauth → remote status path)
+ *     k8s          caps ['deployment']              (no remote-status capability)
  *
  *   The wizard's `getOnboardingPluginStatuses` server action resolves, per the
  *   chosen plugin's capabilities (see apps/web/.../actions/dashboard/onboarding.ts):
@@ -511,14 +512,30 @@ test.describe('Onboarding config steps — the wizard resolves each choice via i
         );
         expect(fieldBasedAi, 'at least one field-based BYOK AI exists').toBeTruthy();
 
-        // 3c — an own-provider deploy (vercel / k8s) is a plain 'deployment'
-        // plugin → also field-based, no remote status endpoint.
+        // 3c — an own-provider deploy plugin resolves its config-step status via
+        // the SAME capability routing getOnboardingPluginStatuses uses. `k8s` is
+        // a plain 'deployment' plugin → no remote-status capability, so its config
+        // step is field-based (no endpoint consulted). `vercel` ALSO declares
+        // 'oauth' (['deployment','oauth']), so the wizard resolves its status
+        // through the oauth connection path → a clean 200 not-connected descriptor
+        // for a fresh user, never a 5xx. Assert each plugin's real route.
         for (const id of ['vercel', 'k8s']) {
             if (!caps[id]) continue;
-            expect(
-                caps[id].some((c) => ['oauth', 'git-provider', 'device-auth'].includes(c)),
-                `${id} has no remote-status capability (field-based config step)`,
-            ).toBe(false);
+            const remoteStatusCaps = caps[id].filter((c) =>
+                ['oauth', 'git-provider', 'device-auth'].includes(c),
+            );
+            if (remoteStatusCaps.length === 0) {
+                // Field-based config step — no remote status endpoint is consulted.
+                continue;
+            }
+            // A deploy plugin that carries oauth (vercel) resolves via the oauth
+            // connection endpoint; the fresh user is a clean 200 not-connected.
+            expect(remoteStatusCaps, `${id} remote-status cap is oauth`).toContain('oauth');
+            const conn = await request.get(`${API_BASE}/api/oauth/${id}/connection`, {
+                headers: h,
+            });
+            expect(conn.status(), `${id} oauth connection is 200`).toBe(200);
+            expect((await conn.json()).connected, `${id} fresh user not connected`).toBe(false);
         }
 
         // 3d — the github OAuth connection path (the wizard's fallback when a

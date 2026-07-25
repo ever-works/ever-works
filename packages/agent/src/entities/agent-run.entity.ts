@@ -178,7 +178,12 @@ export class AgentRun {
     cliSessionId?: string | null;
 
     /** Sweeper input: stale heartbeat + live terminalState ⇒ crashed. */
-    @Column({ type: 'timestamp', nullable: true })
+    // MUST be @PortableDateColumn, not a raw `type: 'timestamp'` column: the
+    // e2e stack (and CI) runs better-sqlite3, which has no `timestamp` type, so
+    // a raw timestamp makes TypeORM's metadata validation throw
+    // `DataTypeNotSupportedError` and the API cannot boot AT ALL there. The
+    // sibling startedAt/finishedAt columns use the same decorator.
+    @PortableDateColumn({ nullable: true })
     lastHeartbeatAt?: Date | null;
 
     /** Highest published stdout seq (transcript/replay bookkeeping). */

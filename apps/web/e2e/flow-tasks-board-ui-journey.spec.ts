@@ -507,8 +507,22 @@ test.describe('Tasks board — cards/table filter (seeded UI)', () => {
         const card = kanbanCard(page, title);
         await expect(card).toBeVisible({ timeout: 30_000 });
 
-        await card.getByRole('link', { name: title, exact: true }).click();
-        await page.waitForURL(new RegExp(`/tasks/${created.id}`), { timeout: 30_000 });
+        // The card title is a client-side <Link> (href = /tasks/:id, unchanged —
+        // the table-view test above still asserts that exact href attribute).
+        // Its router navigation only fires once the board has hydrated; in the
+        // prod-web / next-dev stack the first click can land before the handler
+        // is wired, so retry the click until the URL actually flips to the detail
+        // route. This keeps the "clicking navigates" intent while absorbing the
+        // hydration/load-timing race.
+        const titleLink = card.getByRole('link', { name: title, exact: true });
+        await expect(titleLink).toHaveAttribute('href', new RegExp(`/tasks/${created.id}$`));
+        const detailUrl = new RegExp(`/tasks/${created.id}`);
+        await expect(async () => {
+            if (!detailUrl.test(page.url())) {
+                await titleLink.click({ timeout: 5_000 }).catch(() => undefined);
+            }
+            await expect(page).toHaveURL(detailUrl, { timeout: 5_000 });
+        }).toPass({ timeout: 30_000 });
         await expect(page.getByRole('heading', { name: title }).first()).toBeVisible({
             timeout: 30_000,
         });
