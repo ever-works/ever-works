@@ -26,6 +26,7 @@ jest.mock('@ever-works/agent/tasks-domain', () => ({
     TaskRecurrenceDispatcherService: class TaskRecurrenceDispatcherService {},
     TasksService: class TasksService {},
     TaskChatService: class TaskChatService {},
+    TaskRunDenormService: class TaskRunDenormService {},
 }));
 jest.mock('@ever-works/agent/entities', () => ({}));
 jest.mock('@ever-works/agent/cache', () => ({
@@ -166,6 +167,7 @@ describe('TriggerInternalController', () => {
             tasksService,
             taskChatService,
             undefined, // taskWorkspaceService (Wave 2 — not exercised here)
+            undefined, // taskRunDenormService (kanban run cockpit — not exercised here)
             undefined, // notificationChannelFacade
             // EW-742 P3.2 T22 — three new constructor args added by PRs
             // bbc24309 / 5e4e2483 / 41906b71 to expose the worker-host

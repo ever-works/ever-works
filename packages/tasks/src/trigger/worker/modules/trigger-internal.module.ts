@@ -17,6 +17,7 @@ import {
 import {
     TaskChatService,
     TaskRecurrenceDispatcherService,
+    TaskRunDenormService,
     TasksService,
     TaskWorkspaceService,
 } from '@ever-works/agent/tasks-domain';
@@ -154,6 +155,17 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
             useFactory: (apiClient) => createRemoteProxy(apiClient, 'TaskWorkspaceService'),
             inject: [TriggerInternalApiClient],
         },
+        // Kanban run cockpit (Wave 2) — latest-run denorm writes from the
+        // agent-task-execute worker (after claim + terminal transitions).
+        // The real service (TaskRepository graph) lives in the API; the
+        // worker only calls recordQueued/recordStarted/recordTerminal over
+        // the internal RPC channel, same shape as TaskWorkspaceService.
+        {
+            provide: TaskRunDenormService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'TaskRunDenormService'),
+            inject: [TriggerInternalApiClient],
+        },
         {
             provide: TaskChatService,
             useFactory: (apiClient: TriggerInternalApiClient) =>
@@ -212,6 +224,7 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         TaskRecurrenceDispatcherService,
         TasksService,
         TaskChatService,
+        TaskRunDenormService,
         TaskWorkspaceService,
         NotificationChannelFacadeService,
         AnonymousUserCleanupService,

@@ -124,6 +124,26 @@ export class AgentRun {
         reused: boolean;
     } | null;
 
+    // ── Run cockpit telemetry (kanban run cockpit, Wave 2) ──────────
+    // Written by the worker via `AgentRunRepository.updateTelemetry` and
+    // surfaced on the board through the `includeRun` list embed. All
+    // nullable — runs that predate these columns (or workers that never
+    // report) simply show no telemetry. branchRef/prUrl/prNumber are NOT
+    // duplicated here: the Task row + `workspaceMeta` already carry them.
+
+    /** One-line "what the agent is doing right now" feed for the board
+     *  chip. Plain text only — the UI must never render it as markup. */
+    @Column({ type: 'varchar', length: 300, nullable: true })
+    currentActivity?: string | null;
+
+    /** Cumulative token usage reported by the worker for this run. */
+    @Column({ type: 'int', nullable: true })
+    totalTokens?: number | null;
+
+    /** Number of files the run has changed in its workspace so far. */
+    @Column({ type: 'int', nullable: true })
+    changedFilesCount?: number | null;
+
     @CreateDateColumn()
     createdAt: Date;
 }

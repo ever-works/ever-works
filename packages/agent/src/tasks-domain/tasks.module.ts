@@ -38,6 +38,7 @@ import { TasksService } from './tasks.service';
 import { TaskChatService } from './task-chat.service';
 import { TaskRecurrenceDispatcherService } from './task-recurrence-dispatcher.service';
 import { TaskNotificationService } from './task-notification.service';
+import { TaskRunDenormService } from './task-run-denorm.service';
 import { TaskWorkspaceService } from './task-workspace.service';
 import { FacadesModule } from '../facades/facades.module';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
@@ -110,6 +111,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
         TaskChatService,
         TaskRecurrenceDispatcherService,
         TaskNotificationService,
+        TaskRunDenormService,
         TaskWorkspaceService,
     ],
     exports: [
@@ -132,6 +134,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
         TaskChatService,
         TaskRecurrenceDispatcherService,
         TaskNotificationService,
+        TaskRunDenormService,
         TaskWorkspaceService,
     ],
 })

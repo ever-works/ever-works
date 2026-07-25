@@ -29,6 +29,8 @@ import { ActivityActionType, ActivityStatus } from '../entities/activity-log.typ
 import { assertNoSecrets } from '../utils/secret-scan';
 import { computeNextOccurrence, validateRecurrenceRule } from './recurrence';
 import { AgentRepository } from '../database/repositories/agent.repository';
+import { AgentRunRepository } from '../database/repositories/agent-run.repository';
+import type { AgentRunStatus } from '../entities/agent-run.entity';
 import { TaskNotificationService } from './task-notification.service';
 import { WorkKnowledgeUploadRepository } from '../database/repositories/work-knowledge-upload.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
@@ -87,6 +89,24 @@ export const TASK_OWNER_KEYS = [
 
 export type TaskOwnerKey = (typeof TASK_OWNER_KEYS)[number];
 
+/**
+ * Kanban run cockpit (Wave 2 M2) — compact latest-run embed attached to
+ * list rows when the caller passes `includeRun=true`. Deliberately a
+ * projection, not the AgentRun entity: the board chip needs exactly
+ * these six fields and nothing sensitive (no errorMessage/summary/
+ * workspaceMeta) should ride along on every list response.
+ */
+export interface TaskRunEmbed {
+    id: string;
+    status: AgentRunStatus;
+    currentActivity: string | null;
+    totalTokens: number | null;
+    changedFilesCount: number | null;
+    startedAt: Date | null;
+}
+
+export type TaskWithRun = Task & { run?: TaskRunEmbed | null };
+
 @Injectable()
 export class TasksService {
     private readonly logger = new Logger(TasksService.name);
@@ -120,6 +140,11 @@ export class TasksService {
         @Optional()
         @InjectRepository(Goal)
         private readonly goals?: Repository<Goal>,
+        // Kanban run cockpit (Wave 2 M2) — batch latest-run embed for the
+        // `includeRun` list option. Appended LAST + Optional so positional
+        // test fixtures keep compiling and graphs without the Agents module
+        // simply skip the embed.
+        @Optional() private readonly agentRuns?: AgentRunRepository,
     ) {}
 
     /**
@@ -151,8 +176,60 @@ export class TasksService {
     async list(
         userId: string,
         filter: ListTasksFilter = {},
-    ): Promise<{ rows: Task[]; total: number }> {
-        return this.tasks.findByUserIdFiltered(userId, filter);
+        opts: { includeRun?: boolean } = {},
+    ): Promise<{ rows: TaskWithRun[]; total: number }> {
+        const { rows, total } = await this.tasks.findByUserIdFiltered(userId, filter);
+        if (!opts.includeRun || rows.length === 0 || !this.agentRuns) {
+            return { rows, total };
+        }
+        // Kanban run cockpit (Wave 2 M2) — batch-embed the latest AgentRun
+        // per returned row via ONE IN query on the denormalized
+        // `latestRunId` pointers. No N+1 by construction.
+        //
+        // Security: the batch is keyed exclusively on the `latestRunId`
+        // values of rows `findByUserIdFiltered` already scoped to the
+        // acting user — never on client input — so a foreign run id can
+        // only enter this query if it was denormalized onto a task the
+        // user owns, which only `TaskRunDenormService` (server-side, from
+        // owner-validated dispatch paths) ever does. Cross-user runs are
+        // therefore unreachable through this embed.
+        const runIds = [
+            ...new Set(
+                rows
+                    .map((row) => row.latestRunId)
+                    .filter((id): id is string => typeof id === 'string' && id.length > 0),
+            ),
+        ];
+        if (runIds.length === 0) {
+            return { rows, total };
+        }
+        let runsById = new Map<string, TaskRunEmbed>();
+        try {
+            const runs = await this.agentRuns.findByIds(runIds);
+            runsById = new Map(
+                runs.map((run) => [
+                    run.id,
+                    {
+                        id: run.id,
+                        status: run.status,
+                        currentActivity: run.currentActivity ?? null,
+                        totalTokens: run.totalTokens ?? null,
+                        changedFilesCount: run.changedFilesCount ?? null,
+                        startedAt: run.startedAt ?? null,
+                    },
+                ]),
+            );
+        } catch (err) {
+            // Best-effort embed: the list itself must not fail because the
+            // runs table hiccuped — rows simply ship without `run`.
+            this.logger.warn(`includeRun embed failed (${runIds.length} run ids): ${err}`);
+            return { rows, total };
+        }
+        const withRuns: TaskWithRun[] = rows.map((row) => ({
+            ...row,
+            run: (row.latestRunId && runsById.get(row.latestRunId)) || null,
+        }));
+        return { rows: withRuns, total };
     }
 
     async getOne(userId: string, id: string): Promise<Task> {

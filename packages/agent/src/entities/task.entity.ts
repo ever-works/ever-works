@@ -170,6 +170,23 @@ export class Task {
     @Column({ type: 'simple-json', nullable: true })
     conflictPaths?: string[] | null;
 
+    // ── Latest-run denorm (kanban run cockpit, Wave 2) ───────────────
+    // Maintained by `TaskRunDenormService` on queued creation, claim and
+    // terminal transition of task-kind AgentRuns. Denormalized so the
+    // board list can batch-embed the latest run per card (single IN
+    // query on `latestRunId`) without a per-task latest-run subquery.
+    // No `@ManyToOne` — same entities-import-cycle rule as the owner
+    // columns above; the pointer is best-effort telemetry, not a FK.
+
+    /** Id of the most recent AgentRun dispatched for this Task. */
+    @Column({ type: 'uuid', nullable: true })
+    latestRunId?: string | null;
+
+    /** Status mirror of that run (`queued|running|completed|failed|
+     *  cancelled`) so list filters/chips don't need the runs table. */
+    @Column({ type: 'varchar', length: 16, nullable: true })
+    latestRunStatus?: string | null;
+
     @Column({ type: 'varchar', length: 16 })
     createdByType: TaskActorType;
 

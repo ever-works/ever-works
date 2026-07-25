@@ -123,6 +123,10 @@ export class TasksController {
         @Query('search') search?: string,
         @Query('limit') limit?: string,
         @Query('offset') offset?: string,
+        // Kanban run cockpit (Wave 2 M2) — opt-in latest-run embed. The
+        // batch is keyed on the owner-scoped rows' `latestRunId` pointers
+        // server-side; this flag only toggles the embed, it carries no ids.
+        @Query('includeRun') includeRun?: string,
     ) {
         const filter: ListTasksFilter = {
             status: this.parseStatusList(status),
@@ -139,7 +143,9 @@ export class TasksController {
             limit: limit ? Math.min(200, Math.max(1, parseInt(limit, 10) || 50)) : 50,
             offset: offset ? Math.max(0, parseInt(offset, 10) || 0) : 0,
         };
-        const { rows, total } = await this.service.list(auth.userId, filter);
+        const { rows, total } = await this.service.list(auth.userId, filter, {
+            includeRun: includeRun === 'true',
+        });
         return { data: rows, meta: { total, limit: filter.limit, offset: filter.offset } };
     }
 

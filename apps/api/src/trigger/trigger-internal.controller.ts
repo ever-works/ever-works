@@ -52,6 +52,7 @@ import {
 } from '@ever-works/agent/agents';
 import {
     TaskChatService,
+    TaskRunDenormService,
     TaskWorkspaceService,
     TaskRecurrenceDispatcherService,
     TasksService,
@@ -232,6 +233,9 @@ export class TriggerInternalController implements OnModuleInit {
         private readonly taskChatService: TaskChatService,
         // Wave 2 — worktree-per-Task workspace lifecycle for worker RPC.
         private readonly taskWorkspaceService: TaskWorkspaceService,
+        // Kanban run cockpit (Wave 2) — latest-run denorm writes from the
+        // agent-task-execute worker over the internal RPC channel.
+        private readonly taskRunDenormService: TaskRunDenormService,
         // Notifications v2 (EW-663) — exposed for the
         // notification-channel-delivery Trigger task to run a single
         // channel attempt (plugins are loaded here, not in the worker).
@@ -309,6 +313,9 @@ export class TriggerInternalController implements OnModuleInit {
             TasksService: this.tasksService,
             TaskChatService: this.taskChatService,
             TaskWorkspaceService: this.taskWorkspaceService,
+            // Kanban run cockpit (Wave 2) — agent-task-execute calls
+            // recordQueued/recordStarted/recordTerminal here.
+            TaskRunDenormService: this.taskRunDenormService,
             // Notifications v2 (EW-663) — notification-channel-delivery task
             // calls `deliverToChannelOrThrow` here (allow-list auto-derived).
             NotificationChannelFacadeService: this.notificationChannelFacade,

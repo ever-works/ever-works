@@ -921,6 +921,14 @@
                 "title": "No Tasks yet.",
                 "subtitle": "Tasks ship in a later phase of the Agents/Skills/Tasks rollout. The page is reserved so the sidebar nav route resolves."
             },
+            "runChip": {
+                "queued": "Queued",
+                "running": "Running",
+                "completed": "Completed",
+                "failed": "Failed",
+                "cancelled": "Cancelled",
+                "tokens": "{count} tokens"
+            },
             "list": {
                 "newTask": "New Task",
                 "noDescription": "No description yet",

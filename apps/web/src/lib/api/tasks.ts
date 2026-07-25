@@ -27,6 +27,23 @@ export type TaskBranchState =
     | 'discarded'
     | 'cleaned';
 
+/** Kanban run cockpit (Wave 2) — AgentRun lifecycle mirrored on the board. */
+export type TaskRunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+
+/**
+ * Kanban run cockpit (Wave 2) — compact latest-run embed attached to
+ * list rows when `includeRun=true` is requested. `currentActivity` is
+ * plain text by contract — never render it as markup.
+ */
+export interface TaskRun {
+    id: string;
+    status: TaskRunStatus;
+    currentActivity: string | null;
+    totalTokens: number | null;
+    changedFilesCount: number | null;
+    startedAt: string | null;
+}
+
 export interface Task {
     id: string;
     userId: string;
@@ -63,6 +80,11 @@ export interface Task {
     prNumber: number | null;
     prUrl: string | null;
     conflictPaths: string[] | null;
+    // Kanban run cockpit (Wave 2) — latest-run denorm columns + the
+    // opt-in `run` embed (present only on `includeRun=true` responses).
+    latestRunId?: string | null;
+    latestRunStatus?: TaskRunStatus | null;
+    run?: TaskRun | null;
     createdAt: string;
     updatedAt: string;
 }
@@ -78,6 +100,8 @@ export interface ListTasksQuery {
     search?: string;
     limit?: number;
     offset?: number;
+    /** Kanban run cockpit (Wave 2) — embed each row's latest AgentRun. */
+    includeRun?: boolean;
 }
 
 function buildQuery(q: ListTasksQuery = {}): string {
@@ -93,6 +117,7 @@ function buildQuery(q: ListTasksQuery = {}): string {
     if (q.search) params.set('search', q.search);
     if (q.limit !== undefined) params.set('limit', String(q.limit));
     if (q.offset !== undefined) params.set('offset', String(q.offset));
+    if (q.includeRun) params.set('includeRun', 'true');
     const s = params.toString();
     return s ? `?${s}` : '';
 }

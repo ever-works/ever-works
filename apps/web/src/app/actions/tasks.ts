@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import {
     tasksAPI,
+    type ListTasksQuery,
     type Task,
     type TaskChatMessage,
     type TaskPriority,
@@ -79,6 +80,28 @@ export async function transitionTaskAction(
     revalidatePath('/tasks');
     revalidatePath(`/tasks/${id}`);
     return task;
+}
+
+/**
+ * Kanban run cockpit (Wave 2) — read-only refresh used by the board's
+ * run-chip polling hook. Re-fetches the user's tasks WITH the latest-run
+ * embed (`includeRun=true`); the client merges run data by task id, so a
+ * plain, filter-free page (bounded limit) is sufficient. No
+ * revalidatePath on purpose — this is a poll, not a mutation.
+ */
+export async function listTasksWithRunsAction(
+    query: Omit<ListTasksQuery, 'includeRun'> = {},
+): Promise<Task[]> {
+    // Security: verify session server-side before reading data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
+    const result = await tasksAPI.list({
+        ...query,
+        limit: Math.min(200, query.limit ?? 200),
+        includeRun: true,
+    });
+    return result.data;
 }
 
 /**
