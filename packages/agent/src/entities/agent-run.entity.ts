@@ -111,6 +111,43 @@ export class AgentRun {
     @Column({ type: 'varchar', length: 128, nullable: true })
     memorySessionId?: string | null;
 
+    // ── Streaming-terminal columns (M4). All nullable: NULL means "this
+    // run has no terminal" — every pre-existing and non-interactive run.
+    // INVARIANT (schema test): agent_runs gains no content/transcript
+    // bytes — terminal output lives in log chunks + the relay window.
+
+    /** Run intends a long-lived interactive session (park/resume-able). */
+    @Column({ type: 'boolean', default: false })
+    persistent: boolean;
+
+    /** `starting | attached | ended` — live terminal lifecycle. */
+    @Column({ type: 'varchar', length: 16, nullable: true })
+    terminalState?: string | null;
+
+    /** `completed | crashed | closed | parked` (+ provider hints). */
+    @Column({ type: 'varchar', length: 32, nullable: true })
+    terminalEndedReason?: string | null;
+
+    /** Which terminal-stream plugin hosted the session. */
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    terminalProviderId?: string | null;
+
+    /**
+     * The pipeline CLI's own resume id (conversation lifetime — sibling
+     * of `memorySessionId`). Park kills the process but keeps this, so
+     * Resume = new run + this id handed to the pipeline plugin.
+     */
+    @Column({ type: 'varchar', length: 128, nullable: true })
+    cliSessionId?: string | null;
+
+    /** Sweeper input: stale heartbeat + live terminalState ⇒ crashed. */
+    @Column({ type: 'timestamp', nullable: true })
+    lastHeartbeatAt?: Date | null;
+
+    /** Highest published stdout seq (transcript/replay bookkeeping). */
+    @Column({ type: 'int', nullable: true })
+    lastFrameSeq?: number | null;
+
     @CreateDateColumn()
     createdAt: Date;
 }
