@@ -172,21 +172,19 @@ describe('memory-recall helper', () => {
 
         it('times out a stalled backend instead of holding up the run (best-effort contract)', async () => {
             const source: MemoryRecallContextSource = {
-                buildContextWithProvider: jest
-                    .fn()
-                    .mockImplementation(
-                        () =>
-                            new Promise((resolve) =>
-                                setTimeout(
-                                    () =>
-                                        resolve({
-                                            context: { content: 'too late' },
-                                            providerId: 'slow',
-                                        }),
-                                    5_000,
-                                ).unref?.(),
-                            ),
-                    ),
+                buildContextWithProvider: jest.fn().mockImplementation(
+                    () =>
+                        new Promise((resolve) =>
+                            setTimeout(
+                                () =>
+                                    resolve({
+                                        context: { content: 'too late' },
+                                        providerId: 'slow',
+                                    }),
+                                5_000,
+                            ).unref?.(),
+                        ),
+                ),
             };
 
             const result = await resolveMemoryRecall(source, { timeoutMs: 25 }, { userId: 'u1' });
