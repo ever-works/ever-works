@@ -63,7 +63,9 @@ import {
     USER_SELECTABLE_WORK_KINDS,
     getWorkCapabilities,
     normalizeWorkKind,
+    type TaskAcceptanceCheck,
     type UserSelectableWorkKind,
+    type WorkChecksPolicy,
     type WorkKind,
 } from '@ever-works/contracts';
 
@@ -401,6 +403,32 @@ export class Work {
     // Comparison Generation FIELDS
     @Column({ type: 'boolean', default: false })
     comparisonsEnabled: boolean;
+
+    // Quality Gates FIELDS
+    /**
+     * Work-level default acceptance checks inherited by every agent-executed
+     * Task under this Work. A Task's own `acceptanceChecks` merge over these
+     * by id (same-id override, `disabled: true` suppression) — resolve via
+     * `tasks-domain/task-gates.ts`, never read this column directly when
+     * executing checks.
+     */
+    @Column('simple-json', { nullable: true })
+    checkDefaults?: TaskAcceptanceCheck[] | null;
+
+    /**
+     * Enforcement policy for the resolved checks. Defaults to `'off'` so the
+     * feature landing changes nothing for existing Works — checks only ever
+     * run for a Work that explicitly opted in to `'warn'` or `'required'`.
+     */
+    @Column({ type: 'varchar', length: 12, default: 'off' })
+    checksPolicy: WorkChecksPolicy;
+
+    /**
+     * Default gate-attempt budget for Tasks that leave their own
+     * `maxGateAttempts` null. Clamped to 1..5 at resolve time.
+     */
+    @Column({ type: 'int', default: 2 })
+    maxGateAttempts: number;
 
     /**
      * Whether to generate the browsable repository published to the git

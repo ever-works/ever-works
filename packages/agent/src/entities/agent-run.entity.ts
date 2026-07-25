@@ -1,5 +1,6 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 import { PortableDateColumn } from './_types';
+import type { GateStatus, TaskAcceptanceCheck, TaskCheckResult } from '@ever-works/contracts';
 
 /**
  * What kicked off this run.
@@ -80,6 +81,39 @@ export class AgentRun {
     /** Populated only when `triggerKind = 'chat'`. FK to `task_chat_messages.id`. */
     @Column('uuid', { nullable: true })
     chatMessageId?: string | null;
+
+    // ── Quality gates ──────────────────────────────────────────────
+    /**
+     * The acceptance checks this run is judged by, snapshotted at dispatch
+     * time via `resolveAcceptanceChecks(task, work)`. A snapshot, not a
+     * reference: editing the Task or the Work mid-run must not change what
+     * an in-flight run is graded against.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    resolvedChecks?: TaskAcceptanceCheck[] | null;
+
+    /**
+     * Per-check outcomes keyed by `TaskAcceptanceCheck.id`. `null` until
+     * the gate runner (a later milestone — this PR is schema only) reports.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    checkResults?: TaskCheckResult[] | null;
+
+    /**
+     * Aggregate gate outcome. `null` on runs that predate quality gates or
+     * that never reached the gate (crashed/cancelled before it). varchar(12)
+     * fits every `GateStatus` member.
+     */
+    @Column({ type: 'varchar', length: 12, nullable: true })
+    gateStatus?: GateStatus | null;
+
+    /**
+     * Gate attempts consumed by this run. NOT NULL default 0 so existing
+     * rows read as "never attempted" rather than unknown; bounded by
+     * `resolveMaxGateAttempts` (1..5) once the runner lands.
+     */
+    @Column({ type: 'int', default: 0 })
+    gateAttempts: number;
 
     // Tenant + Organization scope FKs (EW-657 Tier C denormalization).
     // No @ManyToOne — cycle-avoidance, see user.entity.ts EW-654 comment.

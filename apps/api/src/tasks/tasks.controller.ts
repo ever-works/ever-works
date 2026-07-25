@@ -161,6 +161,8 @@ export class TasksController {
             createdByType: 'user',
             createdById: auth.userId,
             requireAllApprovers: body.requireAllApprovers,
+            acceptanceChecks: body.acceptanceChecks ?? null,
+            maxGateAttempts: body.maxGateAttempts ?? null,
         });
     }
 

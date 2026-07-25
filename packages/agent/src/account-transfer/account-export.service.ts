@@ -195,6 +195,13 @@ export class AccountExportService {
             communityPrEnabled: dir.communityPrEnabled,
             communityPrAutoClose: dir.communityPrAutoClose,
             comparisonsEnabled: dir.comparisonsEnabled,
+            // Quality-gate settings must round-trip: a Work that opted into
+            // 'warn'/'required' or curated checkDefaults must not silently
+            // fall back to 'off'/none on the imported side.
+            checkDefaults: Array.isArray(dir.checkDefaults) ? dir.checkDefaults : undefined,
+            checksPolicy: dir.checksPolicy || undefined,
+            maxGateAttempts:
+                typeof dir.maxGateAttempts === 'number' ? dir.maxGateAttempts : undefined,
             members: members.map((m) => ({
                 userId: m.userId,
                 role: m.role,

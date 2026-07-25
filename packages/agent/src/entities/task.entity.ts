@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 import { PortableDateColumn } from './_types';
+import type { TaskAcceptanceCheck } from '@ever-works/contracts';
 
 /**
  * Tasks feature — Phase 11.1 (`features/task-tracking/plan.md §3.1` +
@@ -152,6 +153,26 @@ export class Task {
     // Reserve-only column — populated in v2 when "promote Task → Idea" lands.
     @Column({ type: 'uuid', nullable: true })
     promotedToIdeaId?: string | null;
+
+    // ── Quality gates ──────────────────────────────────────────────
+    /**
+     * Acceptance checks declared on this Task. `null` = inherit the Work's
+     * `checkDefaults` untouched. Merge semantics (a same-id entry replaces
+     * the Work default; `disabled: true` suppresses it) live in
+     * `tasks-domain/task-gates.ts#resolveAcceptanceChecks` — executors must
+     * read the resolved list, never this column directly, or suppression
+     * entries would be run as commands.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    acceptanceChecks?: TaskAcceptanceCheck[] | null;
+
+    /**
+     * Gate-attempt budget for this Task. `null` = inherit the Work's value
+     * (whose column default is 2). Clamped to 1..5 at resolve time so a
+     * hand-edited row can never grant an unbounded retry loop.
+     */
+    @Column({ type: 'int', nullable: true })
+    maxGateAttempts?: number | null;
 
     // ── Recurring (F5 override) ────────────────────────────────────
     @Column({ type: 'boolean', default: false })
