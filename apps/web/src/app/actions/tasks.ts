@@ -36,7 +36,13 @@ export async function updateTaskAction(
     patch: Partial<
         Pick<
             Task,
-            'title' | 'description' | 'priority' | 'labels' | 'parentTaskId' | 'requireAllApprovers'
+            | 'title'
+            | 'description'
+            | 'priority'
+            | 'labels'
+            | 'parentTaskId'
+            | 'requireAllApprovers'
+            | 'isolationMode'
         >
     >,
 ): Promise<Task> {
@@ -73,6 +79,37 @@ export async function transitionTaskAction(
     revalidatePath('/tasks');
     revalidatePath(`/tasks/${id}`);
     return task;
+}
+
+/**
+ * Wave 2 M7 — re-run the Task agent to resolve a workspace merge
+ * conflict. The API answers 409 when the branch is not in a conflict
+ * state; the resulting error message is surfaced to the caller.
+ */
+export async function resolveTaskConflictsAction(id: string): Promise<Task> {
+    // Security: verify session server-side before mutating data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
+    const task = await tasksAPI.resolveConflicts(id);
+    revalidatePath('/tasks');
+    revalidatePath(`/tasks/${id}`);
+    return task;
+}
+
+/**
+ * Wave 2 M7 — delete the Task branch and reset its workspace
+ * identity. Irreversible; the UI confirms before calling this.
+ */
+export async function discardTaskBranchAction(id: string): Promise<{ ok: true }> {
+    // Security: verify session server-side before mutating data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
+    const res = await tasksAPI.discardBranch(id);
+    revalidatePath('/tasks');
+    revalidatePath(`/tasks/${id}`);
+    return res;
 }
 
 export async function postTaskChatAction(taskId: string, body: string): Promise<TaskChatMessage> {

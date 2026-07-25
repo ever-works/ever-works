@@ -6,6 +6,7 @@ import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import type { Task, TaskStatus, TaskPriority } from '@/lib/api/tasks';
 import { transitionTaskAction } from '@/app/actions/tasks';
+import { TaskBranchChip } from './TaskBranchChip';
 import {
     Inbox,
     Circle,
@@ -213,6 +214,13 @@ function TaskKanbanCard({
             >
                 {task.title}
             </Link>
+
+            {/* Wave 2 M7 — isolated-branch chip */}
+            {task.branchRef && (
+                <div className="flex">
+                    <TaskBranchChip task={task} />
+                </div>
+            )}
 
             {/* Labels */}
             {(task.labels ?? []).length > 0 && (
