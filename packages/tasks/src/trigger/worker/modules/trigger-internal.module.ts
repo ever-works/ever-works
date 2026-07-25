@@ -25,7 +25,7 @@ import {
 } from '@ever-works/agent/tasks-domain';
 import { AgentRepository, AgentRunRepository, WorkRepository } from '@ever-works/agent/database';
 import { NotificationChannelFacadeService } from '@ever-works/agent/facades';
-import { EventIngestService } from '@ever-works/agent/ingest';
+import { EventIngestService, EventSourcePullService } from '@ever-works/agent/ingest';
 import { DigestService } from '@ever-works/agent/digest';
 import { CreditLedgerService } from '@ever-works/agent/subscriptions';
 import { TriggerInternalApiClient } from '../services/trigger-internal-api.client';
@@ -253,6 +253,16 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
                 createRemoteProxy(apiClient, 'EventIngestService'),
             inject: [TriggerInternalApiClient],
         },
+        // Event-ingest pull path (Wave 8) — the same cron's PULL half:
+        // `pullSources()` RPCs to the live API where the event-source
+        // plugins, settings resolution and `ingest_cursors` rows are
+        // wired. Same shape as EventIngestService above.
+        {
+            provide: EventSourcePullService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'EventSourcePullService'),
+            inject: [TriggerInternalApiClient],
+        },
         // Digest briefings (Wave 7) — the digest-dispatcher cron task
         // calls `dispatchDue(period)` on this proxy, which RPCs to the
         // live API where the digest composer's repositories + the
@@ -301,6 +311,7 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         AnonymousUserCleanupService,
         KnowledgeBaseReconcileService,
         EventIngestService,
+        EventSourcePullService,
         DigestService,
         CreditLedgerService,
     ],

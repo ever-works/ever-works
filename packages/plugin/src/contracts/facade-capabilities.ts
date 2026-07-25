@@ -54,6 +54,7 @@ export const PLUGIN_CAPABILITIES = {
 	CONNECTOR_SLACK: 'connector-slack',
 	CONNECTOR_DISCORD: 'connector-discord',
 	CONNECTOR_WHATSAPP: 'connector-whatsapp',
+	CONNECTOR_LINEAR: 'connector-linear',
 	CONNECTOR_NOTION: 'connector-notion',
 	CONNECTOR_MICROSOFT_365: 'connector-microsoft-365',
 	// Pluggable persistent memory for AI coding / generation agents.

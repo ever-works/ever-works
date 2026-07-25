@@ -1,5 +1,6 @@
 /**
- * Event-ingest spine (Wave 6) — module-shape pin for EventIngestModule.
+ * Event-ingest spine (Wave 6, pull path Wave 8) — module-shape pin for
+ * EventIngestModule.
  *
  * Pattern mirrors `knowledge-base.module.spec.ts`: heavy runtime trees
  * (TypeORM, the facades/activity-log graphs) are mocked at module scope
@@ -15,6 +16,9 @@ jest.mock('@nestjs/typeorm', () => ({
 jest.mock('../../entities/ingested-event.entity', () => ({
     IngestedEvent: class IngestedEvent {},
 }));
+jest.mock('../../entities/ingest-cursor.entity', () => ({
+    IngestCursor: class IngestCursor {},
+}));
 jest.mock('../../activity-log/activity-log.module', () => ({
     ActivityLogModule: class ActivityLogModule {},
 }));
@@ -27,23 +31,41 @@ jest.mock('../ingested-event.repository', () => ({
 jest.mock('../event-ingest.service', () => ({
     EventIngestService: class EventIngestService {},
 }));
+jest.mock('../ingest-cursor.repository', () => ({
+    IngestCursorRepository: class IngestCursorRepository {},
+}));
+jest.mock('../event-source-pull.service', () => ({
+    EventSourcePullService: class EventSourcePullService {},
+}));
 
 import 'reflect-metadata';
 import { EventIngestModule } from '../ingest.module';
 import { IngestedEventRepository } from '../ingested-event.repository';
 import { EventIngestService } from '../event-ingest.service';
+import { IngestCursorRepository } from '../ingest-cursor.repository';
+import { EventSourcePullService } from '../event-source-pull.service';
 import { ActivityLogModule } from '../../activity-log/activity-log.module';
 import { FacadesModule } from '../../facades/facades.module';
 
 describe('EventIngestModule', () => {
     const meta = (key: string): unknown[] => Reflect.getMetadata(key, EventIngestModule) ?? [];
 
-    it('provides the repository and the ingest service', () => {
-        expect(meta('providers')).toEqual([IngestedEventRepository, EventIngestService]);
+    it('provides the repositories, the ingest service and the pull service', () => {
+        expect(meta('providers')).toEqual([
+            IngestedEventRepository,
+            EventIngestService,
+            IngestCursorRepository,
+            EventSourcePullService,
+        ]);
     });
 
-    it('exports both for the API surface + trigger-internal RPC wiring', () => {
-        expect(meta('exports')).toEqual([IngestedEventRepository, EventIngestService]);
+    it('exports all four for the API surface + trigger-internal RPC wiring', () => {
+        expect(meta('exports')).toEqual([
+            IngestedEventRepository,
+            EventIngestService,
+            IngestCursorRepository,
+            EventSourcePullService,
+        ]);
     });
 
     it('imports the two processor modules (Activity log + Facades) beside the entity feature', () => {
@@ -58,10 +80,12 @@ describe('ingest barrel', () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const barrel = require('../index');
 
-    it('re-exports the module, service and repository', () => {
+    it('re-exports the module, services and repositories', () => {
         expect(barrel.EventIngestModule).toBe(EventIngestModule);
         expect(barrel.EventIngestService).toBe(EventIngestService);
         expect(barrel.IngestedEventRepository).toBe(IngestedEventRepository);
+        expect(barrel.EventSourcePullService).toBe(EventSourcePullService);
+        expect(barrel.IngestCursorRepository).toBe(IngestCursorRepository);
         expect(typeof barrel.buildIngestEventTools).toBe('function');
     });
 });
