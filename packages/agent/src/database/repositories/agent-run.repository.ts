@@ -405,6 +405,18 @@ export class AgentRunRepository {
     }
 
     /**
+     * Record the per-run workspace audit (worktree-per-Task isolation).
+     * The Task row keeps the durable branch identity; this is the
+     * run-scoped record for debugging and the run cockpit.
+     */
+    async setWorkspaceMeta(
+        runId: string,
+        workspaceMeta: NonNullable<AgentRun['workspaceMeta']>,
+    ): Promise<void> {
+        await this.repository.update(runId, { workspaceMeta });
+    }
+
+    /**
      * Find an in-flight run for the (taskId, agentId) pair — used by
      * the agent-chat-reply dedup guard (architecture/security §8 — T6
      * mitigation): if a chat-triggered run is already running for the

@@ -2,7 +2,7 @@ import { task } from '@trigger.dev/sdk';
 import { NestFactory } from '@nestjs/core';
 import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
 import { AgentRunService } from '@ever-works/agent/agents';
-import { TasksService } from '@ever-works/agent/tasks-domain';
+import { TasksService, TaskWorkspaceService } from '@ever-works/agent/tasks-domain';
 import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-internal.module';
 import { createTriggerLogger } from '../../trigger/worker/trigger-logger';
 // Security: import assertUuid to validate Trigger.dev payload fields before any DB access
@@ -188,6 +188,35 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                 return { status: 'skipped', reason: 'run-already-terminal', runId: run.id };
             }
 
+            // Wave 2 M3 — worktree-per-Task isolation. Resolves the Work +
+            // Task settings and provisions the isolated workspace when (and
+            // only when) isolation resolves on; null on the default-off
+            // path. Provisioning failure with isolation ON fails the run
+            // LOUDLY — the user opted into isolation; silently degrading to
+            // a shared checkout would betray that setting.
+            let workspaceCwd: string | null = null;
+            try {
+                const taskWorkspace = appContext.get(TaskWorkspaceService);
+                const provisioned = await taskWorkspace.provisionForRun({
+                    task: taskRow,
+                    userId: payload.userId,
+                    runId: run.id,
+                    agentCanCommit:
+                        (agent as { permissions?: { canCommitToRepo?: boolean } }).permissions
+                            ?.canCommitToRepo !== false,
+                });
+                workspaceCwd = provisioned?.cwd ?? null;
+            } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                await runs.markFailed(run.id, `Workspace provisioning failed: ${message}`);
+                return {
+                    status: 'failed',
+                    reason: 'workspace-provision-failed',
+                    runId: run.id,
+                    taskId: payload.taskId,
+                };
+            }
+
             // `taskRow` was resolved above (owner-scoped) before any run
             // mutation; it is guaranteed non-null here.
             const immediateInput = taskRow
@@ -212,6 +241,7 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                 signal,
                 taskId: payload.taskId,
                 immediateInput,
+                workspaceCwd,
                 scopeContext: taskRow
                     ? `Task scope: mission=${taskRow.missionId ?? 'none'}, idea=${taskRow.ideaId ?? 'none'}, work=${taskRow.workId ?? 'none'}`
                     : null,

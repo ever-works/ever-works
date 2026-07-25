@@ -38,6 +38,8 @@ import { TasksService } from './tasks.service';
 import { TaskChatService } from './task-chat.service';
 import { TaskRecurrenceDispatcherService } from './task-recurrence-dispatcher.service';
 import { TaskNotificationService } from './task-notification.service';
+import { TaskWorkspaceService } from './task-workspace.service';
+import { FacadesModule } from '../facades/facades.module';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { AgentsModule } from '../agents/agents.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -84,6 +86,9 @@ import { NotificationsModule } from '../notifications/notifications.module';
         // Phase 18.4 — TaskNotificationService wraps
         // NotificationService.create() for the new TASK category.
         NotificationsModule,
+        // Wave 2 M3 — TaskWorkspaceService resolves + provisions the
+        // per-Task isolated workspace through the workspace/git facades.
+        FacadesModule,
     ],
     providers: [
         TaskRepository,
@@ -105,6 +110,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
         TaskChatService,
         TaskRecurrenceDispatcherService,
         TaskNotificationService,
+        TaskWorkspaceService,
     ],
     exports: [
         TaskRepository,
@@ -126,6 +132,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
         TaskChatService,
         TaskRecurrenceDispatcherService,
         TaskNotificationService,
+        TaskWorkspaceService,
     ],
 })
 export class TasksDomainModule {}

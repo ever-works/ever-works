@@ -1,0 +1,65 @@
+{
+	"name": "@ever-works/sandbox-workspace-plugin",
+	"version": "1.0.0",
+	"description": "Sandbox Workspace - System plugin providing isolated git working contexts (branch-per-Task) inside ephemeral job sandboxes",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run --passWithNoTests",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"@types/node": "^22.0.0",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.3",
+		"vitest": "^4.1.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "sandbox-workspace",
+			"name": "Sandbox Workspace",
+			"version": "1.0.0",
+			"category": "utility",
+			"capabilities": [
+				"workspace"
+			],
+			"description": "System plugin providing isolated git working contexts for agent-executed Tasks: fetch-first branch provisioning, commit/push finalize, in-memory merge simulation with named conflict paths, and workspace GC. Designed for ephemeral job sandboxes; the remote branch is the durable identity.",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "AGPL-3.0",
+			"autoEnable": true,
+			"systemPlugin": true,
+			"builtIn": true,
+			"visibility": "public",
+			"defaultForCapabilities": [
+				"workspace"
+			]
+		}
+	}
+}
