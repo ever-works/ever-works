@@ -28,3 +28,5 @@ export * from './work-schedule-dispatcher.task';
 export * from './webhook-delivery.task';
 // EW-693 — long-running plugin execution (Phase 7 / T27).
 export * from './run-plugin-operation.task';
+// Pricing Wave 9 M1 — daily free-credit grant (idempotent per user/day).
+export * from './credits-daily-grant.task';

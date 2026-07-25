@@ -1,0 +1,206 @@
+import { In } from 'typeorm';
+import { CreditLedgerRepository } from './credit-ledger.repository';
+import { CreditLedgerEntry, CreditLedgerKind } from '@src/entities/credit-ledger-entry.entity';
+import { User } from '@src/entities/user.entity';
+
+/**
+ * CreditLedgerRepository owns the ONE ledger write path
+ * (`recordAtomic`): a single transaction that checks idempotency,
+ * serializes writers per user (postgres/mysql row lock; skipped on
+ * sqlite), sums the authoritative balance and materializes
+ * `balanceAfter` on the inserted row. These tests drive the mocked
+ * TypeORM manager through that transaction and pin the balance math,
+ * the idempotency short-circuits, the floor/ceiling guards, and the
+ * driver-gated lock.
+ */
+
+type QbMock = {
+    select: jest.Mock;
+    where: jest.Mock;
+    getRawOne: jest.Mock;
+};
+
+function makeQb(balance: number | string): QbMock {
+    const qb: any = {};
+    qb.select = jest.fn().mockReturnValue(qb);
+    qb.where = jest.fn().mockReturnValue(qb);
+    qb.getRawOne = jest.fn().mockResolvedValue({ balance });
+    return qb;
+}
+
+function makeHarness(options: { balance?: number | string; driver?: string } = {}) {
+    const entryRepo = {
+        findOne: jest.fn().mockResolvedValue(null),
+        create: jest.fn((value: any) => value),
+        save: jest.fn(async (value: any) => ({ id: 'entry-1', ...value })),
+        createQueryBuilder: jest.fn(() => makeQb(options.balance ?? 0)),
+        findAndCount: jest.fn().mockResolvedValue([[], 0]),
+    };
+    const userRepo = {
+        findOne: jest.fn().mockResolvedValue({ id: 'user-1' }),
+    };
+    const manager: any = {
+        connection: { options: { type: options.driver ?? 'better-sqlite3' } },
+        getRepository: jest.fn((entity: unknown) => {
+            if (entity === CreditLedgerEntry) return entryRepo;
+            if (entity === User) return userRepo;
+            throw new Error('Unexpected repository request');
+        }),
+        transaction: jest.fn(async (cb: (m: any) => Promise<unknown>) => cb(manager)),
+    };
+    const topLevelRepository: any = {
+        manager,
+        findOne: jest.fn().mockResolvedValue(null),
+        findAndCount: jest.fn().mockResolvedValue([[], 0]),
+    };
+    const repository = new CreditLedgerRepository(topLevelRepository);
+    return { repository, entryRepo, userRepo, manager, topLevelRepository };
+}
+
+const BASE_WRITE = {
+    userId: 'user-1',
+    kind: CreditLedgerKind.GRANT,
+    amountCredits: 25,
+};
+
+describe('CreditLedgerRepository.recordAtomic', () => {
+    it('computes balanceAfter from the summed prior balance and inserts the row', async () => {
+        const { repository, entryRepo } = makeHarness({ balance: 100 });
+
+        const result = await repository.recordAtomic({ ...BASE_WRITE, amountCredits: 25 });
+
+        expect(result.status).toBe('created');
+        expect(entryRepo.save).toHaveBeenCalledTimes(1);
+        const saved = entryRepo.save.mock.calls[0][0];
+        expect(saved.amountCredits).toBe(25);
+        expect(saved.balanceAfter).toBe(125);
+    });
+
+    it('is idempotent: an existing idempotencyKey row is returned without a second insert', async () => {
+        const { repository, entryRepo } = makeHarness();
+        const existing = { id: 'existing', idempotencyKey: 'daily:user-1:2026-07-25' };
+        entryRepo.findOne.mockResolvedValue(existing);
+
+        const result = await repository.recordAtomic({
+            ...BASE_WRITE,
+            idempotencyKey: 'daily:user-1:2026-07-25',
+        });
+
+        expect(result).toEqual({ status: 'idempotent', entry: existing });
+        expect(entryRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('resolves a concurrent-duplicate unique violation to the surviving row', async () => {
+        const { repository, manager, topLevelRepository } = makeHarness();
+        const survivor = { id: 'survivor', idempotencyKey: 'run:run-9' };
+        manager.transaction.mockRejectedValue({
+            code: '23505',
+            message: 'duplicate key value violates unique constraint',
+        });
+        topLevelRepository.findOne.mockResolvedValue(survivor);
+
+        const result = await repository.recordAtomic({
+            ...BASE_WRITE,
+            idempotencyKey: 'run:run-9',
+        });
+
+        expect(result).toEqual({ status: 'idempotent', entry: survivor });
+    });
+
+    it('rejects a debit that would cross the minBalanceAfter floor (negative guard)', async () => {
+        const { repository, entryRepo } = makeHarness({ balance: 10 });
+
+        const result = await repository.recordAtomic(
+            { ...BASE_WRITE, kind: CreditLedgerKind.CONSUMPTION, amountCredits: -20 },
+            { minBalanceAfter: 0 },
+        );
+
+        expect(result).toEqual({ status: 'insufficient', balance: 10 });
+        expect(entryRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('allows the debit when no floor is set (overdraft) and materializes the negative balance', async () => {
+        const { repository, entryRepo } = makeHarness({ balance: 10 });
+
+        const result = await repository.recordAtomic({
+            ...BASE_WRITE,
+            kind: CreditLedgerKind.CONSUMPTION,
+            amountCredits: -20,
+        });
+
+        expect(result.status).toBe('created');
+        expect(entryRepo.save.mock.calls[0][0].balanceAfter).toBe(-10);
+    });
+
+    it('clamps a grant to the maxBalanceAfter ceiling (non-accumulating daily grant)', async () => {
+        const { repository, entryRepo } = makeHarness({ balance: 30 });
+
+        const result = await repository.recordAtomic(
+            { ...BASE_WRITE, kind: CreditLedgerKind.DAILY_FREE, amountCredits: 50 },
+            { maxBalanceAfter: 50 },
+        );
+
+        expect(result.status).toBe('created');
+        const saved = entryRepo.save.mock.calls[0][0];
+        expect(saved.amountCredits).toBe(20);
+        expect(saved.balanceAfter).toBe(50);
+    });
+
+    it('skips entirely when the balance is already at/above the ceiling', async () => {
+        const { repository, entryRepo } = makeHarness({ balance: 80 });
+
+        const result = await repository.recordAtomic(
+            { ...BASE_WRITE, kind: CreditLedgerKind.DAILY_FREE, amountCredits: 50 },
+            { maxBalanceAfter: 50 },
+        );
+
+        expect(result).toEqual({ status: 'skipped', balance: 80 });
+        expect(entryRepo.save).not.toHaveBeenCalled();
+    });
+
+    it('takes a pessimistic user-row lock on postgres but skips it on sqlite', async () => {
+        const pg = makeHarness({ driver: 'postgres' });
+        await pg.repository.recordAtomic({ ...BASE_WRITE });
+        expect(pg.userRepo.findOne).toHaveBeenCalledWith({
+            where: { id: 'user-1' },
+            lock: { mode: 'pessimistic_write' },
+        });
+
+        const sqlite = makeHarness({ driver: 'better-sqlite3' });
+        await sqlite.repository.recordAtomic({ ...BASE_WRITE });
+        expect(sqlite.userRepo.findOne).not.toHaveBeenCalled();
+    });
+});
+
+describe('CreditLedgerRepository reads', () => {
+    it('getBalance sums the signed movements (string aggregates coerced to number)', async () => {
+        const { repository, manager } = makeHarness({ balance: '42' });
+        // getBalance goes through the top-level manager, not a transaction.
+        expect(await repository.getBalance('user-1')).toBe(42);
+        expect(manager.transaction).not.toHaveBeenCalled();
+    });
+
+    it('findForUser applies kind + period filters and pagination', async () => {
+        const { repository, topLevelRepository } = makeHarness();
+        const from = new Date(Date.UTC(2026, 6, 1));
+        const to = new Date(Date.UTC(2026, 7, 1));
+
+        await repository.findForUser('user-1', {
+            from,
+            to,
+            kinds: [CreditLedgerKind.PURCHASE, CreditLedgerKind.CONSUMPTION],
+            skip: 25,
+            take: 25,
+        });
+
+        expect(topLevelRepository.findAndCount).toHaveBeenCalledWith({
+            where: expect.objectContaining({
+                userId: 'user-1',
+                kind: In([CreditLedgerKind.PURCHASE, CreditLedgerKind.CONSUMPTION]),
+            }),
+            order: { createdAt: 'DESC' },
+            skip: 25,
+            take: 25,
+        });
+    });
+});

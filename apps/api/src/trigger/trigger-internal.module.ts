@@ -11,6 +11,7 @@ import { GoalsModule } from '@ever-works/agent/goals';
 import { AgentsModule } from '@ever-works/agent/agents';
 import { TasksDomainModule } from '@ever-works/agent/tasks-domain';
 import { EventIngestModule } from '@ever-works/agent/ingest';
+import { SubscriptionsModule as AgentSubscriptionsModule } from '@ever-works/agent/subscriptions';
 import { WorkProposalsModule } from '../work-proposals/work-proposals.module';
 import { DataSyncModule } from '../data-sync/data-sync.module';
 import { TenantJobRuntimeModule } from '../account/tenant-job-runtime/tenant-job-runtime.module';
@@ -76,6 +77,11 @@ import { OrganizationsModule } from '../organizations/organizations.module';
         // cron task (in packages/tasks) can drive `processBatch()` over
         // the internal RPC channel every 5 minutes.
         EventIngestModule,
+        // Credits ledger (pricing Wave 9 M1) — exposes CreditLedgerService
+        // through the remote-proxy controller so the credits-daily-grant
+        // cron task (in packages/tasks) can drive `dispatchDailyGrants()`
+        // over the internal RPC channel once a day.
+        AgentSubscriptionsModule,
     ],
     controllers: [TriggerInternalController],
 })

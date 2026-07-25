@@ -327,6 +327,46 @@ export const config = {
                 return process.env.STRIPE_WEBHOOK_SECRET;
             },
         },
+        // Credits ledger (pricing Wave 9 M1) — credits are the usage
+        // currency layered on the costCents metering. Every knob is
+        // env-configurable per the Wave 9 house rule; defaults keep
+        // 1 credit = 1 cent with zero margin until pricing lands.
+        credits: {
+            /** costCents → credits conversion: credits per $1 (default 100 = 1¢/credit). */
+            getCreditsPerDollar() {
+                const parsed = parseFloat(process.env.CREDITS_PER_DOLLAR || '100');
+                return Number.isFinite(parsed) && parsed > 0 ? parsed : 100;
+            },
+            /** Platform margin applied at debit time, in percent (default 0). */
+            getMarginPercent() {
+                const parsed = parseFloat(process.env.CREDITS_MARGIN_PERCENT || '0');
+                return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+            },
+            /**
+             * When true, consumption may take a balance below zero
+             * (overdraft). Default false: a debit that would cross zero
+             * is rejected with `InsufficientCreditsError` (mapped 4xx —
+             * never an unmapped 500), per the billing/usage PRD §6.
+             */
+            allowOverdraft() {
+                return process.env.CREDITS_ALLOW_OVERDRAFT === 'true';
+            },
+            /** Daily free credits fallback when the plan has no entitlement row. */
+            getDailyFreeCredits() {
+                const parsed = parseInt(process.env.CREDITS_DAILY_FREE || '50');
+                return Number.isFinite(parsed) && parsed >= 0 ? parsed : 50;
+            },
+            /** EntitlementsService in-memory cache TTL (ms, default 60s). */
+            getEntitlementsCacheTtlMs() {
+                const parsed = parseInt(process.env.CREDITS_ENTITLEMENTS_CACHE_TTL_MS || '60000');
+                return Number.isFinite(parsed) && parsed >= 0 ? parsed : 60000;
+            },
+            /** Users per page while sweeping the daily grant (default 500). */
+            getDailyGrantBatchSize() {
+                const parsed = parseInt(process.env.CREDITS_DAILY_GRANT_BATCH || '500');
+                return Number.isFinite(parsed) && parsed > 0 ? parsed : 500;
+            },
+        },
     },
 
     branding: {

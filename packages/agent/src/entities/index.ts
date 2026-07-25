@@ -116,3 +116,6 @@ export * from './team-resource.entity';
 export * from './inbound-trigger.entity';
 // Event-ingest spine (Wave 6) — normalized external events awaiting fan-out
 export * from './ingested-event.entity';
+// Credits ledger + plan entitlements (pricing Wave 9 M1)
+export * from './credit-ledger-entry.entity';
+export * from './plan-entitlement.entity';

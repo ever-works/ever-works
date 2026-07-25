@@ -26,6 +26,7 @@ import {
 import { AgentRepository, AgentRunRepository, WorkRepository } from '@ever-works/agent/database';
 import { NotificationChannelFacadeService } from '@ever-works/agent/facades';
 import { EventIngestService } from '@ever-works/agent/ingest';
+import { CreditLedgerService } from '@ever-works/agent/subscriptions';
 import { TriggerInternalApiClient } from '../services/trigger-internal-api.client';
 import { createRemoteProxy } from '../remote-proxy';
 
@@ -251,6 +252,16 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
                 createRemoteProxy(apiClient, 'EventIngestService'),
             inject: [TriggerInternalApiClient],
         },
+        // Credits ledger (pricing Wave 9 M1) — the credits-daily-grant
+        // cron task calls `dispatchDailyGrants()` on this proxy, which
+        // RPCs to the live API where the ledger/entitlement repositories
+        // are wired. Same shape as EventIngestService above.
+        {
+            provide: CreditLedgerService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'CreditLedgerService'),
+            inject: [TriggerInternalApiClient],
+        },
     ],
     exports: [
         TriggerInternalApiClient,
@@ -278,6 +289,7 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         AnonymousUserCleanupService,
         KnowledgeBaseReconcileService,
         EventIngestService,
+        CreditLedgerService,
     ],
 })
 export class TriggerInternalModule {}
