@@ -111,6 +111,19 @@ export class AgentRun {
     @Column({ type: 'varchar', length: 128, nullable: true })
     memorySessionId?: string | null;
 
+    /** Per-run workspace audit (worktree-per-Task isolation):
+     *  `{ provider, path?, baseSha, branchRef, reused }`. The Task row
+     *  keeps the durable subset (branchRef/branchState/baseSha); this is
+     *  the run-scoped record for debugging and the run cockpit. */
+    @Column({ type: 'simple-json', nullable: true })
+    workspaceMeta?: {
+        provider: string;
+        path?: string;
+        baseSha: string;
+        branchRef: string;
+        reused: boolean;
+    } | null;
+
     @CreateDateColumn()
     createdAt: Date;
 }

@@ -48,13 +48,39 @@ export class AddTaskIsolationColumns1782700000000 implements MigrationInterface 
             await add('isolationMode', `"isolationMode" varchar(8)`);
             await add('branchRef', `"branchRef" varchar(200)`);
             await add('branchState', `"branchState" varchar(16)`);
+            await add('baseSha', `"baseSha" varchar(40)`);
+            await add('prNumber', `"prNumber" int`);
+            await add('prUrl', `"prUrl" varchar(512)`);
+            await add('conflictPaths', `"conflictPaths" text`);
+            // GC sweeper + Tasks-tab filter both scan (workId, branchState).
+            await queryRunner.query(
+                `CREATE INDEX IF NOT EXISTS "idx_tasks_branch_state" ON "tasks" ("workId", "branchState")`,
+            );
+        }
+
+        const agentRuns = await queryRunner.getTable('agent_runs');
+        if (agentRuns && !agentRuns.findColumnByName('workspaceMeta')) {
+            await queryRunner.query(`ALTER TABLE "agent_runs" ADD COLUMN "workspaceMeta" text`);
         }
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
+        const agentRuns = await queryRunner.getTable('agent_runs');
+        if (agentRuns && agentRuns.findColumnByName('workspaceMeta')) {
+            await queryRunner.query(`ALTER TABLE "agent_runs" DROP COLUMN "workspaceMeta"`);
+        }
+        await queryRunner.query(`DROP INDEX IF EXISTS "idx_tasks_branch_state"`);
         const tasks = await queryRunner.getTable('tasks');
         if (tasks) {
-            for (const col of ['branchState', 'branchRef', 'isolationMode']) {
+            for (const col of [
+                'conflictPaths',
+                'prUrl',
+                'prNumber',
+                'baseSha',
+                'branchState',
+                'branchRef',
+                'isolationMode',
+            ]) {
                 if (tasks.findColumnByName(col)) {
                     await queryRunner.query(`ALTER TABLE "tasks" DROP COLUMN "${col}"`);
                 }

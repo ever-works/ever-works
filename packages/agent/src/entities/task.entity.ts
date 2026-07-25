@@ -64,6 +64,7 @@ export type TaskActorType = 'user' | 'agent';
 @Index('idx_tasks_agent', ['agentId', 'status'])
 @Index('idx_tasks_goal', ['goalId', 'status'])
 @Index('idx_tasks_parent', ['parentTaskId'])
+@Index('idx_tasks_branch_state', ['workId', 'branchState'])
 // Phase 17 hot path — dispatcher walks rows where (isRecurring, nextOccurrenceAt <= now).
 @Index('idx_tasks_recurrence_due', ['isRecurring', 'nextOccurrenceAt'])
 export class Task {
@@ -152,6 +153,22 @@ export class Task {
      *  merged | discarded`. NULL = isolation never engaged. */
     @Column({ type: 'varchar', length: 16, nullable: true })
     branchState?: string | null;
+
+    /** SHA of the fetched base commit the branch was cut from. */
+    @Column({ type: 'varchar', length: 40, nullable: true })
+    baseSha?: string | null;
+
+    /** PR opened from the Task branch (community-PR flow). */
+    @Column({ type: 'int', nullable: true })
+    prNumber?: number | null;
+
+    @Column({ type: 'varchar', length: 512, nullable: true })
+    prUrl?: string | null;
+
+    /** Named conflicting paths when `branchState='conflict'` — surfaced
+     *  verbatim in the blocked banner and the task-chat system message. */
+    @Column({ type: 'simple-json', nullable: true })
+    conflictPaths?: string[] | null;
 
     @Column({ type: 'varchar', length: 16 })
     createdByType: TaskActorType;
