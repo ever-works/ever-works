@@ -829,7 +829,8 @@
                 "instructions": "Instructions",
                 "skills": "Skills",
                 "budgets": "Budgets",
-                "settings": "Settings"
+                "settings": "Settings",
+                "terminal": "Terminal"
             },
             "newDialog": {
                 "title": "New Agent",
@@ -5713,6 +5714,18 @@
             "awesome-repo": "Awesome Repo",
             "company": "Company",
             "default": "Work"
+        },
+        "terminal": {
+            "stateStarting": "Connecting…",
+            "stateAttached": "Live",
+            "stateEnded": "Session ended ({reason})",
+            "stateCannotConnect": "Cannot connect — terminal streaming is not available for this run.",
+            "stateRefused": "You do not have access to this terminal.",
+            "readOnly": "read-only",
+            "reconnect": "Reconnect",
+            "waitingForOutput": "Waiting for output…",
+            "noRuns": "No runs yet — terminals attach to agent runs.",
+            "runPickerLabel": "Run"
         },
         "jobRuntimeBanner": {
             "title": "Background job runtime is not configured.",

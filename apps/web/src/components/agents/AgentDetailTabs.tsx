@@ -24,6 +24,7 @@ export function AgentDetailTabs({ agentId }: { agentId: string }) {
             label: t('dashboard'),
         },
         { key: 'activity', href: ROUTES.DASHBOARD_AGENT_ACTIVITY(agentId), label: t('activity') },
+        { key: 'terminal', href: ROUTES.DASHBOARD_AGENT_TERMINAL(agentId), label: t('terminal') },
         {
             key: 'instructions',
             href: ROUTES.DASHBOARD_AGENT_INSTRUCTIONS(agentId),

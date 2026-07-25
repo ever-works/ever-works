@@ -123,6 +123,7 @@ export const ROUTES = {
     DASHBOARD_AGENT: (id: string) => `/agents/${id}`,
     DASHBOARD_AGENT_DASHBOARD: (id: string) => `/agents/${id}`,
     DASHBOARD_AGENT_ACTIVITY: (id: string) => `/agents/${id}/activity`,
+    DASHBOARD_AGENT_TERMINAL: (id: string) => `/agents/${id}/terminal`,
     DASHBOARD_AGENT_INSTRUCTIONS: (id: string) => `/agents/${id}/instructions`,
     DASHBOARD_AGENT_SKILLS: (id: string) => `/agents/${id}/skills`,
     DASHBOARD_AGENT_BUDGETS: (id: string) => `/agents/${id}/budgets`,
