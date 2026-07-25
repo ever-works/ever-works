@@ -291,6 +291,123 @@ export class TaskWorkspaceService {
         }
     }
 
+    /**
+     * M5 — "Resolve conflicts" action (UI button and chat path
+     * converge here): flips the blocked Task back to in_progress, which
+     * re-fires the agent dispatch. The re-run re-provisions from the
+     * PUSHED branch and fetches a fresh base, so the agent works the
+     * conflict against current reality. Owner-scoped; 409-style error
+     * when the Task is not in a conflict state.
+     */
+    async resolveConflicts(userId: string, taskId: string): Promise<Task> {
+        const task = await this.tasks.findByIdAndUser(taskId, userId);
+        if (!task) {
+            throw new Error('TASK_NOT_FOUND');
+        }
+        if (task.branchState !== 'conflict') {
+            throw new Error('TASK_NOT_IN_CONFLICT');
+        }
+        if (!this.transitions) {
+            throw new Error('Task transitions unavailable in this runtime.');
+        }
+        // Back to created: the branch exists and is pushed; the conflict
+        // verdict is stale the moment a new run starts.
+        await this.tasks.updateById(task.id, { branchState: 'pushed', conflictPaths: null });
+        const fresh = await this.tasks.findById(task.id);
+        return this.transitions.transition(fresh ?? task, TaskStatus.IN_PROGRESS, {
+            force: true,
+        });
+    }
+
+    /**
+     * M6 — "Discard branch" escape hatch: delete the remote task branch
+     * and reset the Task's workspace identity so the next run starts
+     * clean. Irreversible for the branch (the UI confirms first).
+     */
+    async discardBranch(userId: string, taskId: string): Promise<void> {
+        const task = await this.tasks.findByIdAndUser(taskId, userId);
+        if (!task) {
+            throw new Error('TASK_NOT_FOUND');
+        }
+        if (!task.branchRef) {
+            return; // nothing to discard — idempotent
+        }
+        if (task.workId && this.gitFacade) {
+            const work = await this.works.findById(task.workId);
+            if (work) {
+                try {
+                    await this.gitFacade.deleteBranch(
+                        work.getRepoOwner(),
+                        work.getDataRepo(),
+                        task.branchRef,
+                        { userId, providerId: work.gitProvider, workId: work.id },
+                    );
+                } catch (error) {
+                    // Branch may already be gone (merged + auto-deleted) —
+                    // discard stays idempotent.
+                    this.logger.warn(
+                        `Task ${task.id} remote branch delete failed (continuing): ${
+                            error instanceof Error ? error.message : String(error)
+                        }`,
+                    );
+                }
+            }
+        }
+        await this.tasks.updateById(task.id, {
+            branchRef: null,
+            branchState: 'discarded',
+            baseSha: null,
+            prNumber: null,
+            prUrl: null,
+            conflictPaths: null,
+        });
+    }
+
+    /**
+     * M6 — GC sweep for remote task branches. Called by the
+     * workspace-gc cron: deletes branches of TERMINAL Tasks per the
+     * Work's `taskBranchCleanup` policy ('on-merge' → eligible as soon
+     * as the Task is done/cancelled; 'manual' → never auto-deleted),
+     * plus a hard staleness cutoff for abandoned non-terminal branches.
+     */
+    async sweepStaleBranches(opts: { staleDays: number }): Promise<{ cleaned: number }> {
+        const candidates = await this.tasks.findBranchCleanupCandidates(opts.staleDays);
+        let cleaned = 0;
+        for (const task of candidates) {
+            try {
+                await this.discardBranchForSweep(task);
+                cleaned += 1;
+            } catch (error) {
+                this.logger.warn(
+                    `branch GC failed for task ${task.id}: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+            }
+        }
+        if (cleaned > 0) this.logger.log(`branch GC cleaned ${cleaned} task branches`);
+        return { cleaned };
+    }
+
+    private async discardBranchForSweep(task: Task): Promise<void> {
+        if (task.workId && this.gitFacade && task.branchRef) {
+            const work = await this.works.findById(task.workId);
+            if (work && work.taskBranchCleanup !== 'manual') {
+                try {
+                    await this.gitFacade.deleteBranch(
+                        work.getRepoOwner(),
+                        work.getDataRepo(),
+                        task.branchRef,
+                        { userId: task.userId, providerId: work.gitProvider, workId: work.id },
+                    );
+                } catch {
+                    // already gone — fine
+                }
+                await this.tasks.updateById(task.id, { branchState: 'cleaned' });
+            }
+        }
+    }
+
     private async postSystemMessage(
         input: { task: Task; userId: string; agentId: string },
         body: string,

@@ -131,6 +131,29 @@ export class TaskRepository {
     }
 
     /**
+     * Branch-GC candidates (worktree-per-Task M6): Tasks that still hold
+     * a live branch (`branchState` pushed/pr-open/conflict/created) and
+     * are either TERMINAL (done/cancelled — eligible immediately, the
+     * per-Work cleanup policy is applied by the sweeper) or abandoned
+     * (not updated in `staleDays`). Uses idx_tasks_branch_state.
+     */
+    async findBranchCleanupCandidates(staleDays: number): Promise<Task[]> {
+        const cutoff = new Date(Date.now() - staleDays * 24 * 60 * 60 * 1000);
+        return this.repository
+            .createQueryBuilder('task')
+            .where('task.branchRef IS NOT NULL')
+            .andWhere('task.branchState IN (:...live)', {
+                live: ['created', 'pushed', 'pr-open', 'conflict'],
+            })
+            .andWhere('(task.status IN (:...terminal) OR task.updatedAt < :cutoff)', {
+                terminal: ['done', 'cancelled'],
+                cutoff,
+            })
+            .take(200)
+            .getMany();
+    }
+
+    /**
      * Compare-and-swap status update: applies `data` (which advances the
      * status) ONLY while the row is still at `expectedStatus`, in a single
      * atomic `UPDATE … WHERE id=? AND status=?`. Returns true iff exactly one

@@ -1,6 +1,7 @@
 import {
     BadRequestException,
     Body,
+    ConflictException,
     Controller,
     Delete,
     Get,
@@ -31,6 +32,7 @@ import { PluginUsageRepository } from '@ever-works/agent/database';
 // repository class lives under `@ever-works/agent/database` (the
 // agents barrel re-exports services + module only).
 import { AgentRepository } from '@ever-works/agent/database';
+import { TaskWorkspaceService } from '@ever-works/agent/tasks-domain';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import {
@@ -77,6 +79,8 @@ export class TasksController {
         private readonly pluginUsage: PluginUsageRepository,
         // Review-fix I5: AgentRepository for mention-lookup population.
         private readonly agents: AgentRepository,
+        // Wave 2 M5/M6 — workspace conflict-resolve + discard actions.
+        private readonly taskWorkspace: TaskWorkspaceService,
     ) {}
 
     /**
@@ -240,6 +244,46 @@ export class TasksController {
             throw new BadRequestException(`Invalid target status: ${body?.to}`);
         }
         return this.service.transition(auth.userId, id, body.to, { force: body.force === true });
+    }
+
+    @Post(':id/resolve-conflicts')
+    @ApiOperation({ summary: 'Re-run the Task agent to resolve a workspace merge conflict.' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 20, ttl: 60_000 } })
+    async resolveConflicts(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ) {
+        try {
+            return await this.taskWorkspace.resolveConflicts(auth.userId, id);
+        } catch (error) {
+            const message = error instanceof Error ? error.message : '';
+            if (message === 'TASK_NOT_FOUND') throw new NotFoundException('Task not found');
+            if (message === 'TASK_NOT_IN_CONFLICT') {
+                throw new ConflictException('Task branch is not in a conflict state');
+            }
+            throw error;
+        }
+    }
+
+    @Post(':id/discard-branch')
+    @ApiOperation({
+        summary: 'Delete the Task branch and reset its workspace identity (irreversible).',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 20, ttl: 60_000 } })
+    async discardBranch(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ) {
+        try {
+            await this.taskWorkspace.discardBranch(auth.userId, id);
+            return { ok: true };
+        } catch (error) {
+            const message = error instanceof Error ? error.message : '';
+            if (message === 'TASK_NOT_FOUND') throw new NotFoundException('Task not found');
+            throw error;
+        }
     }
 
     @Post(':id/assignees')

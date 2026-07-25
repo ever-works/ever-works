@@ -18,6 +18,7 @@ import {
     TaskChatService,
     TaskRecurrenceDispatcherService,
     TasksService,
+    TaskWorkspaceService,
 } from '@ever-works/agent/tasks-domain';
 import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
 import { NotificationChannelFacadeService } from '@ever-works/agent/facades';
@@ -141,6 +142,18 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
                 createRemoteProxy(apiClient, 'TasksService'),
             inject: [TriggerInternalApiClient],
         },
+        // Wave 2 M3/M6 — worktree-per-Task isolation. The real service
+        // (facades + repositories + the sandbox-workspace plugin) lives
+        // in the API; agent-task-execute and the task-branch-gc cron
+        // call provisionForRun/finalizeRun/sweepStaleBranches over the
+        // internal RPC channel. Execution is API-side today (the run
+        // itself is AgentRunService via this same proxy), so the
+        // checkout and the dispatch share one filesystem.
+        {
+            provide: TaskWorkspaceService,
+            useFactory: (apiClient) => createRemoteProxy(apiClient, 'TaskWorkspaceService'),
+            inject: [TriggerInternalApiClient],
+        },
         {
             provide: TaskChatService,
             useFactory: (apiClient: TriggerInternalApiClient) =>
@@ -199,6 +212,7 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         TaskRecurrenceDispatcherService,
         TasksService,
         TaskChatService,
+        TaskWorkspaceService,
         NotificationChannelFacadeService,
         AnonymousUserCleanupService,
         KnowledgeBaseReconcileService,

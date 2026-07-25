@@ -52,6 +52,7 @@ import {
 } from '@ever-works/agent/agents';
 import {
     TaskChatService,
+    TaskWorkspaceService,
     TaskRecurrenceDispatcherService,
     TasksService,
 } from '@ever-works/agent/tasks-domain';
@@ -229,6 +230,8 @@ export class TriggerInternalController implements OnModuleInit {
         private readonly taskRecurrenceDispatcherService: TaskRecurrenceDispatcherService,
         private readonly tasksService: TasksService,
         private readonly taskChatService: TaskChatService,
+        // Wave 2 — worktree-per-Task workspace lifecycle for worker RPC.
+        private readonly taskWorkspaceService: TaskWorkspaceService,
         // Notifications v2 (EW-663) — exposed for the
         // notification-channel-delivery Trigger task to run a single
         // channel attempt (plugins are loaded here, not in the worker).
@@ -305,6 +308,7 @@ export class TriggerInternalController implements OnModuleInit {
             TaskRecurrenceDispatcherService: this.taskRecurrenceDispatcherService,
             TasksService: this.tasksService,
             TaskChatService: this.taskChatService,
+            TaskWorkspaceService: this.taskWorkspaceService,
             // Notifications v2 (EW-663) — notification-channel-delivery task
             // calls `deliverToChannelOrThrow` here (allow-list auto-derived).
             NotificationChannelFacadeService: this.notificationChannelFacade,

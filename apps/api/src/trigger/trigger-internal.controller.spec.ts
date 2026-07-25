@@ -165,6 +165,7 @@ describe('TriggerInternalController', () => {
             undefined, // taskRecurrenceDispatcherService
             tasksService,
             taskChatService,
+            undefined, // taskWorkspaceService (Wave 2 — not exercised here)
             undefined, // notificationChannelFacade
             // EW-742 P3.2 T22 — three new constructor args added by PRs
             // bbc24309 / 5e4e2483 / 41906b71 to expose the worker-host
