@@ -466,7 +466,15 @@ jobs:
   # while still validating the ~4 prod-only invariants.
   e2e-prod-build:
     runs-on: ${{ vars.RUNNER_LINUX_X64_8 || 'ubuntu-latest' }}
-    timeout-minutes: 45
+    # 90m (was 45m) to match the sharded e2e job. This job does a FULL prod
+    # `next build` before running its ~4 prod-only specs, and that build has
+    # grown with the monorepo: ~25 min before the July-24 develop merge, ~32 min
+    # after it (new packages: postgres-db plugin, contracts/terminal, …). At 45m
+    # that left barely 40% headroom, so a merely-slow runner tipped the whole
+    # job into "exceeded the maximum execution time" — a pure-infra red with no
+    # failing test (observed on run 30154911523). The cap is a runaway backstop,
+    # not a performance budget; 90m keeps it that way as the build keeps growing.
+    timeout-minutes: 90
 
     strategy:
       fail-fast: false
