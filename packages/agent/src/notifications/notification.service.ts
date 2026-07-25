@@ -422,6 +422,52 @@ export class NotificationService {
     }
 
     /**
+     * Digest briefings (Wave 7) — in-app digest row + notifications-v2
+     * channel fanout. `message` is the deterministic one-line summary
+     * (capped like every other producer); the full markdown body rides
+     * in `metadata.markdown` for richer renderers. Dedup key is
+     * per-user+period+window-day so a re-run of the same cron window
+     * updates nothing instead of stacking duplicates.
+     */
+    async notifyDigest(args: {
+        userId: string;
+        period: 'daily' | 'weekly';
+        title: string;
+        message: string;
+        markdown?: string;
+        deduplicationKey?: string;
+    }): Promise<void> {
+        const safeMessage = sanitizeDescription(args.message, 500);
+        const metadata: Record<string, any> = { period: args.period };
+        if (args.markdown) {
+            // Defensive cap — markdown is composed from repository rows
+            // (titles/summaries are user content) and stored as simple-json.
+            metadata.markdown =
+                args.markdown.length > 8000 ? args.markdown.slice(0, 8000) : args.markdown;
+        }
+        await this.create({
+            userId: args.userId,
+            type: NotificationType.INFO,
+            category: NotificationCategory.DIGEST,
+            title: args.title,
+            message: safeMessage,
+            actionUrl: '/activity',
+            actionLabel: 'View activity',
+            metadata,
+            deduplicationKey: args.deduplicationKey ?? `digest_${args.period}`,
+        });
+        await this.dispatchFanout({
+            userId: args.userId,
+            eventKey: 'digest_ready',
+            title: args.title,
+            message: safeMessage,
+            actionUrl: '/activity',
+            actionLabel: 'View activity',
+            urgent: false,
+        });
+    }
+
+    /**
      * Delete expired and old notifications
      * Should be called periodically by a cleanup job
      */

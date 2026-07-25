@@ -83,6 +83,12 @@ jest.mock('@ever-works/agent/ingest', () => ({
     EventIngestService: class EventIngestService {},
     EventIngestModule: class EventIngestModule {},
 }));
+// Digest briefings (Wave 7) — same rationale as the ingest stub above:
+// the controller imports DigestService from the digest barrel.
+jest.mock('@ever-works/agent/digest', () => ({
+    DigestService: class DigestService {},
+    DigestModule: class DigestModule {},
+}));
 jest.mock('@ever-works/agent/activity-log', () => ({
     ActivityLogService: class ActivityLogService {},
     ActivityLogModule: class ActivityLogModule {},

@@ -71,6 +71,7 @@ import {
     WorkPluginRepository,
 } from '@ever-works/agent/plugins';
 import { EventIngestService } from '@ever-works/agent/ingest';
+import { DigestService } from '@ever-works/agent/digest';
 
 /**
  * C-05 RPC half — methods that must never be reachable via `POST
@@ -290,6 +291,11 @@ export class TriggerInternalController implements OnModuleInit {
         // RPC channel. Appended LAST + @Optional() per the arity rule above.
         @Optional()
         private readonly eventIngestService?: EventIngestService,
+        // Digest briefings (Wave 7) — backs the `digest-dispatcher` cron:
+        // the worker proxy calls `dispatchDue(period)` over the internal
+        // RPC channel. Appended LAST + @Optional() per the arity rule above.
+        @Optional()
+        private readonly digestService?: DigestService,
     ) {}
 
     onModuleInit() {
@@ -362,6 +368,9 @@ export class TriggerInternalController implements OnModuleInit {
             // Event-ingest spine (Wave 6) — `event-ingest-tick` calls
             // `processBatch()` here (allow-list auto-derived).
             EventIngestService: this.eventIngestService,
+            // Digest briefings (Wave 7) — `digest-dispatcher` calls
+            // `dispatchDue(period)` here (allow-list auto-derived).
+            DigestService: this.digestService,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),
