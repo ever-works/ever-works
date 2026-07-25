@@ -27,6 +27,7 @@ import type { OAuthConnectionInfo } from '@/lib/api/plugins-capabilities/oauth';
 import type { GitProviderConnectionInfo } from '@/lib/api/plugins-capabilities/git-providers';
 import type { PluginDeviceAuthStatus } from '@/lib/api/plugins-capabilities/device-auth';
 import type { ApiVersion } from '@/lib/api/version';
+import { JobRuntimeDegradedBanner } from '@/components/dashboard/JobRuntimeDegradedBanner';
 
 interface DashboardLayoutClientProps {
     user: AuthUser;
@@ -45,6 +46,9 @@ interface DashboardLayoutClientProps {
     initialOnboardingCatalog: OnboardingCatalogResponse;
     /** Build/release identity of the API, fetched once in the server layout. */
     apiVersion?: ApiVersion | null;
+    /** health `job_runtime.configured` — false = agent runs cannot execute
+     *  on this install (loud-degradation banner); null = unknown. */
+    jobRuntimeConfigured?: boolean | null;
 }
 
 // Security: include the Secure flag when the page is served over HTTPS so these
@@ -69,6 +73,7 @@ export function DashboardLayoutClient({
     initialOnboardingState,
     initialOnboardingCatalog,
     apiVersion,
+    jobRuntimeConfigured = null,
 }: DashboardLayoutClientProps) {
     const tChat = useTranslations('dashboard.aiChat');
     const DEFAULT_CHAT_WIDTH = 380;
@@ -502,6 +507,7 @@ export function DashboardLayoutClient({
                             className="flex-1 flex flex-col overflow-y-auto bg-white dark:bg-surface-dark min-h-0"
                             id="main-content"
                         >
+                            <JobRuntimeDegradedBanner configured={jobRuntimeConfigured} />
                             <div className="flex-1 mx-auto w-full px-4 @sm/main:px-6 @3xl/main:px-8 py-6 @3xl/main:py-8 max-w-full @5xl/main:max-w-7xl">
                                 <ChatPanelProvider open={chatOpen} setOpen={setChatOpen}>
                                     {children}

@@ -2,6 +2,7 @@ import { cookies } from 'next/headers';
 import { getAuthFromCookie } from '@/lib/auth';
 import { DashboardLayoutClient } from './layout-client';
 import { authAPI, versionAPI } from '@/lib/api';
+import { healthAPI } from '@/lib/api/health';
 import { getWorkStats } from '@/app/actions/dashboard/works';
 import { pluginsAPI } from '@/lib/api/plugins';
 import { onboardingAPI } from '@/lib/api/onboarding';
@@ -50,6 +51,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
         onboardingState,
         onboardingCatalog,
         apiVersion,
+        jobRuntimeConfigured,
     ] = await Promise.all([
         authAPI.getFreshProfile().catch(() => null),
         getWorkStats().catch(() => ({
@@ -63,6 +65,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
         // 5 min) and surfaced in the footer. Returns null on failure;
         // the footer just hides the API chip.
         versionAPI.get(),
+        // Loud degradation: whether a background job runtime is
+        // configured (agent runs can execute). null on failure — the
+        // banner only renders on a KNOWN misconfiguration.
+        healthAPI.getJobRuntimeConfigured(),
     ]);
 
     const hasGithubConnected =
@@ -107,6 +113,7 @@ export default async function DashboardLayout({ children }: { children: React.Re
             initialOnboardingState={onboardingState}
             initialOnboardingCatalog={onboardingCatalog}
             apiVersion={apiVersion}
+            jobRuntimeConfigured={jobRuntimeConfigured}
         >
             {children}
         </DashboardLayoutClient>
