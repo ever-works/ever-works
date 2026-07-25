@@ -70,7 +70,7 @@ import {
     UserPluginRepository,
     WorkPluginRepository,
 } from '@ever-works/agent/plugins';
-import { EventIngestService } from '@ever-works/agent/ingest';
+import { EventIngestService, EventSourcePullService } from '@ever-works/agent/ingest';
 import { DigestService } from '@ever-works/agent/digest';
 import { CreditLedgerService } from '@ever-works/agent/subscriptions';
 
@@ -303,6 +303,13 @@ export class TriggerInternalController implements OnModuleInit {
         // LAST + @Optional() per the arity rule above.
         @Optional()
         private readonly creditLedgerService?: CreditLedgerService,
+        // Event-ingest pull path (Wave 8) — backs the pull half of the
+        // `event-ingest-tick` cron: the worker proxy calls `pullSources()`
+        // over the internal RPC channel, landing here where the
+        // event-source plugins + settings + cursors are wired. Appended
+        // LAST + @Optional() per the arity rule above.
+        @Optional()
+        private readonly eventSourcePullService?: EventSourcePullService,
     ) {}
 
     onModuleInit() {
@@ -375,6 +382,9 @@ export class TriggerInternalController implements OnModuleInit {
             // Event-ingest spine (Wave 6) — `event-ingest-tick` calls
             // `processBatch()` here (allow-list auto-derived).
             EventIngestService: this.eventIngestService,
+            // Event-ingest pull path (Wave 8) — `event-ingest-tick` calls
+            // `pullSources()` here (allow-list auto-derived).
+            EventSourcePullService: this.eventSourcePullService,
             // Digest briefings (Wave 7) — `digest-dispatcher` calls
             // `dispatchDue(period)` here (allow-list auto-derived).
             DigestService: this.digestService,

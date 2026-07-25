@@ -69,6 +69,7 @@ jest.mock('@ever-works/agent/tasks-domain', () => ({
 jest.mock('@ever-works/agent/ingest', () => ({
     EventIngestModule: class EventIngestModule {},
     EventIngestService: class EventIngestService {},
+    EventSourcePullService: class EventSourcePullService {},
 }));
 // Digest briefings (Wave 7) — the module imports DigestModule (and the
 // controller it declares imports DigestService) from the digest barrel;

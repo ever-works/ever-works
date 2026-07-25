@@ -81,6 +81,7 @@ jest.mock('@ever-works/agent/plugins', () => ({
 // TypeORM under apps/api jest) is never loaded.
 jest.mock('@ever-works/agent/ingest', () => ({
     EventIngestService: class EventIngestService {},
+    EventSourcePullService: class EventSourcePullService {},
     EventIngestModule: class EventIngestModule {},
 }));
 // Digest briefings (Wave 7) — same rationale as the ingest stub above:

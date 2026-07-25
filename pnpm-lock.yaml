@@ -2085,6 +2085,31 @@ importers:
         specifier: ^4.1.0
         version: 4.1.0(@opentelemetry/api@1.9.0)(@types/node@22.19.11)(jsdom@29.1.1(@noble/hashes@2.2.0))(msw@2.12.10(@types/node@22.19.11)(typescript@5.9.3))(vite@8.0.16(@types/node@22.19.11)(esbuild@0.28.1)(jiti@2.6.1)(terser@5.46.1)(yaml@2.8.3))
 
+  packages/plugins/linear-connector:
+    dependencies:
+      '@ever-works/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+      '@ever-works/plugin':
+        specifier: workspace:*
+        version: link:../../plugin
+      '@linear/sdk':
+        specifier: ^88.0.0
+        version: 88.3.0(graphql@16.13.0)
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.11
+      tsup:
+        specifier: ^8.0.0
+        version: 8.5.1(@swc/core@1.15.33(@swc/helpers@0.5.21))(jiti@2.6.1)(postcss@8.5.20)(typescript@5.9.3)(yaml@2.8.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.0
+        version: 4.1.0(@opentelemetry/api@1.9.0)(@types/node@22.19.11)(jsdom@29.1.1(@noble/hashes@2.2.0))(msw@2.12.10(@types/node@22.19.11)(typescript@5.9.3))(vite@8.0.16(@types/node@22.19.11)(esbuild@0.28.1)(jiti@2.6.1)(terser@5.46.1)(yaml@2.8.3))
+
   packages/plugins/linkup:
     devDependencies:
       '@ever-works/plugin':
@@ -2320,6 +2345,31 @@ importers:
       '@langchain/openai':
         specifier: ^0.6.17
         version: 0.6.17(@langchain/core@0.3.80(@opentelemetry/api@1.9.0)(@opentelemetry/exporter-trace-otlp-proto@0.219.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.8.0(@opentelemetry/api@1.9.0))(openai@6.39.0(ws@8.21.0)(zod@4.4.3))(ws@8.21.0))(ws@8.21.0)
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.11
+      tsup:
+        specifier: ^8.0.0
+        version: 8.5.1(@swc/core@1.15.33(@swc/helpers@0.5.21))(jiti@2.6.1)(postcss@8.5.20)(typescript@5.9.3)(yaml@2.8.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.0
+        version: 4.1.0(@opentelemetry/api@1.9.0)(@types/node@22.19.11)(jsdom@29.1.1(@noble/hashes@2.2.0))(msw@2.12.10(@types/node@22.19.11)(typescript@5.9.3))(vite@8.0.16(@types/node@22.19.11)(esbuild@0.28.1)(jiti@2.6.1)(terser@5.46.1)(yaml@2.8.3))
+
+  packages/plugins/notion-connector:
+    dependencies:
+      '@ever-works/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+      '@ever-works/plugin':
+        specifier: workspace:*
+        version: link:../../plugin
+      '@notionhq/client':
+        specifier: ^2.3.0
+        version: 2.3.0
     devDependencies:
       '@types/node':
         specifier: ^22.0.0
@@ -5828,6 +5878,11 @@ packages:
   '@grammyjs/types@3.27.3':
     resolution: {integrity: sha512-yUKMLliGsGbnxu96YUJ7km7B0zy4PzeH/Jvti5705R/LeKDMqkDV4DckMSt+OrliWQpTwQljHE0QLol5zgxBkg==}
 
+  '@graphql-typed-document-node/core@3.2.0':
+    resolution: {integrity: sha512-mB9oAsNCm9aM3/SOv4YtBMqZbYj10R7dkq8byBqxGY/ncFwhf2oQzMV+LCRlWoDSEBJ3COiR1yeDvMtsoOsuFQ==}
+    peerDependencies:
+      graphql: ^0.8.0 || ^0.9.0 || ^0.10.0 || ^0.11.0 || ^0.12.0 || ^0.13.0 || ^14.0.0 || ^15.0.0 || ^16.0.0 || ^17.0.0
+
   '@grpc/grpc-js@1.14.4':
     resolution: {integrity: sha512-k9Dj3DV/itK9D06Y8f190Qgop7/Ui+D0njFV3LHMPwPT75DpXLQohE9Wmz0QElrJnzsjB7KPWiKJbOl7IPDArQ==}
     engines: {node: '>=12.10.0'}
@@ -6525,6 +6580,10 @@ packages:
 
   '@leichtgewicht/ip-codec@2.0.5':
     resolution: {integrity: sha512-Vo+PSpZG2/fmgmiNzYK9qWRh8h/CHrwD0mo1h1DzL4yzHNSfWYujGTYsWGreD000gcgmZ7K4Ys6Tx9TxtsKdDw==}
+
+  '@linear/sdk@88.3.0':
+    resolution: {integrity: sha512-F3bTsXQBDZja/UT+whtKAzHNPk8zTwoxq2Zs5tgbbHQLC3kueMOyHKO/u2RAYjxCKu3XtqB3vV0/6P/EqO+pOw==}
+    engines: {node: '>=18.x'}
 
   '@lottiefiles/dotlottie-react@0.18.10':
     resolution: {integrity: sha512-7ZquvmoH+KrotNw2n65GHgOjP/tirFwqgGOHQWA5Qxt7wkA6gs1Y7j43DrPqcyIm69+kecsoJb+CtOS26UoKlw==}
@@ -24912,6 +24971,10 @@ snapshots:
 
   '@grammyjs/types@3.27.3': {}
 
+  '@graphql-typed-document-node/core@3.2.0(graphql@16.13.0)':
+    dependencies:
+      graphql: 16.13.0
+
   '@grpc/grpc-js@1.14.4':
     dependencies:
       '@grpc/proto-loader': 0.8.1
@@ -25800,6 +25863,12 @@ snapshots:
       '@opentelemetry/api': 1.9.0
 
   '@leichtgewicht/ip-codec@2.0.5': {}
+
+  '@linear/sdk@88.3.0(graphql@16.13.0)':
+    dependencies:
+      '@graphql-typed-document-node/core': 3.2.0(graphql@16.13.0)
+    transitivePeerDependencies:
+      - graphql
 
   '@lottiefiles/dotlottie-react@0.18.10(react@19.2.5)':
     dependencies:
