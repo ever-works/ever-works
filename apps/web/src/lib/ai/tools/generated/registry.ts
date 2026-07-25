@@ -212,6 +212,40 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         bodyHint: 'taskId.',
     },
 
+    // ── Meetings (Wave 8, feature a) ─────────────────────────────
+    {
+        toolName: 'list_meetings',
+        method: 'GET',
+        path: '/api/meetings',
+        summary:
+            'List the current user’s captured meetings (synced recordings, imported and manual), newest first — org-wide or filtered to one Work. Rows carry a sourceUrl recording link.',
+        kind: 'read',
+        params: [
+            {
+                name: 'workId',
+                in: 'query',
+                type: 'string',
+                description: 'Only meetings routed to this Work',
+            },
+            {
+                name: 'source',
+                in: 'query',
+                type: 'string',
+                description: 'Filter by source: zoom, google-meet, manual or import',
+            },
+            { name: 'limit', in: 'query', type: 'number', description: 'Max rows (default 20)' },
+        ],
+    },
+    {
+        toolName: 'get_meeting_summary',
+        method: 'GET',
+        path: '/api/meetings/{id}',
+        summary:
+            'Get one meeting’s AI summary, transcript and metadata (participants, timing, recording link). Use after list_meetings when asked what a meeting covered or decided.',
+        kind: 'read',
+        params: [id('Meeting id (from list_meetings)')],
+    },
+
     // ── Tasks ────────────────────────────────────────────────────
     {
         toolName: 'list_tasks',
