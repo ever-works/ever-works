@@ -204,6 +204,7 @@ describe('AgentRunRepository — terminal transitions', () => {
                 found: true,
                 previousStatus: 'completed',
                 triggerRunId: 'run_abc',
+                workId: null,
             });
         });
 
@@ -216,6 +217,7 @@ describe('AgentRunRepository — terminal transitions', () => {
                 found: true,
                 previousStatus: 'running',
                 triggerRunId: 'run_late',
+                workId: null,
             });
         });
 
