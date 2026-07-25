@@ -11,6 +11,7 @@ import { TiptapEditor } from '@/components/kb/workbench/TiptapEditor';
 import { KbMetadataPanel } from '@/components/kb/workbench/KbMetadataPanel';
 import { KbDocumentViewerSwitch } from '@/components/kb/workbench/KbDocumentViewerSwitch';
 import { KbSearchPalette } from '@/components/kb/workbench/KbSearchPalette';
+import { KbReviewBanner } from '@/components/kb/workbench/KbReviewBanner';
 import type { KbUploadDto } from '@ever-works/contracts';
 
 type Params = {
@@ -127,6 +128,10 @@ export default async function WorkKnowledgeBaseDocumentPage({ params }: Params) 
                 left={<WorkbenchUploadCoordinator workId={id} currentDocPath={doc.path} />}
                 center={
                     <div className="flex h-full flex-col">
+                        {/* Memory upgrades M8 — renders only while the doc
+                            is still `proposed`; completes the review
+                            queue's "Edit & accept" flow in place. */}
+                        <KbReviewBanner workId={id} document={doc} />
                         <KbDocumentHeader workId={id} document={doc} />
                         {useInlineViewer && upload ? (
                             <div className="flex-1 overflow-auto p-4">

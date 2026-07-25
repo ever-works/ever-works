@@ -135,6 +135,15 @@ export interface KbDocumentListFilter {
 	locked?: boolean;
 	language?: string;
 	source?: KbDocumentSource;
+	/**
+	 * Review-state filter (memory upgrades M7 / M8). `'proposed'` returns
+	 * only the agent-authored / synthesized documents awaiting review —
+	 * the review queue's list call. `'accepted'` returns the reviewed set
+	 * INCLUDING pre-existing rows whose `review_state` column is still
+	 * `NULL` (null reads as accepted). Omit for the historical
+	 * "everything" behaviour.
+	 */
+	reviewState?: KbReviewState;
 	/** Lexical search across title + description + body via Postgres FTS. */
 	q?: string;
 	limit?: number;

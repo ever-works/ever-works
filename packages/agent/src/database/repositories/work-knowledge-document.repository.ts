@@ -8,6 +8,7 @@ import {
     KbDocumentSource,
     KbDocumentStatus,
     KbLockMode,
+    KbReviewState,
 } from '../../entities/kb-types';
 import { sanitizeLikePattern } from '../utils';
 
@@ -20,6 +21,14 @@ export interface KbDocumentListOptions {
     locked?: boolean;
     language?: string;
     source?: KbDocumentSource;
+    /**
+     * Memory upgrades M8 — review-state filter powering the review
+     * queue. `proposed` matches the column exactly; `accepted` also
+     * matches `NULL` because a null `review_state` reads as accepted
+     * everywhere else in the system (the M7 feature is additive and
+     * never backfilled pre-existing rows).
+     */
+    reviewState?: KbReviewState;
     q?: string;
     limit?: number;
     offset?: number;
@@ -207,6 +216,19 @@ export class WorkKnowledgeDocumentRepository {
 
         if (opts.source) {
             qb.andWhere('doc.source = :source', { source: opts.source });
+        }
+
+        if (opts.reviewState === KbReviewState.PROPOSED) {
+            qb.andWhere('doc.reviewState = :reviewState', {
+                reviewState: KbReviewState.PROPOSED,
+            });
+        } else if (opts.reviewState === KbReviewState.ACCEPTED) {
+            // `NULL` reads as accepted (M7 is additive — no backfill),
+            // so the accepted filter must include the un-stamped rows or
+            // it would hide every document created before the feature.
+            qb.andWhere('(doc.reviewState = :reviewState OR doc.reviewState IS NULL)', {
+                reviewState: KbReviewState.ACCEPTED,
+            });
         }
 
         if (opts.q) {

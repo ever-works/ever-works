@@ -17,6 +17,7 @@ import {
     Milestone,
     Palette,
     Search,
+    ShieldQuestion,
     Sparkles,
     UploadCloud,
     Users,
@@ -120,6 +121,13 @@ export function KbTreePanel({ workId, currentDocPath, refreshKey }: KbTreePanelP
     }, [workId, refreshKey]);
 
     const grouped = useMemo(() => groupByClass(documents), [documents]);
+    // Memory upgrades M8 — how many documents are waiting for review.
+    // Derived from the list this panel already fetched (the KB list is
+    // unfiltered, so `proposed` docs are in it) — zero extra requests.
+    const proposedCount = useMemo(
+        () => documents.filter((doc) => doc.reviewState === 'proposed').length,
+        [documents],
+    );
     // Pre-compute which class contains the active doc so it opens by
     // default on first render (without overriding subsequent user
     // toggles — see `expandedDefaults`).
@@ -145,6 +153,33 @@ export function KbTreePanel({ workId, currentDocPath, refreshKey }: KbTreePanelP
                     onClick={() => setTab('originals')}
                     testId="kb-workbench-tab-originals"
                 />
+                {/* Memory upgrades M8 — the review queue's entry point.
+                    A link (not a tab) because the queue is its own route
+                    inside the same workbench shell. The count badge is
+                    what makes the queue discoverable at all: without it
+                    `proposed` documents are captured and never surfaced. */}
+                <Link
+                    href={`${ROUTES.DASHBOARD_WORK_KB(workId)}/review`}
+                    data-testid="kb-workbench-review-link"
+                    aria-label={t('review.navAria', { count: proposedCount })}
+                    className={cn(
+                        'ml-auto inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium transition-colors',
+                        proposedCount > 0
+                            ? 'text-amber-700 hover:bg-amber-500/10 dark:text-amber-300'
+                            : 'text-text-muted hover:bg-card-hover hover:text-text dark:text-text-muted-dark/70 dark:hover:bg-card-primary-dark/40',
+                    )}
+                >
+                    <ShieldQuestion className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span>{t('review.nav')}</span>
+                    {proposedCount > 0 ? (
+                        <span
+                            data-testid="kb-workbench-review-badge"
+                            className="rounded-full bg-amber-500/20 px-1.5 text-[10px] font-semibold text-amber-800 dark:text-amber-200"
+                        >
+                            {proposedCount}
+                        </span>
+                    ) : null}
+                </Link>
             </header>
 
             <div className="flex-1 overflow-y-auto p-2">
