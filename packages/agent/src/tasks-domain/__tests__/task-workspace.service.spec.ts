@@ -230,7 +230,11 @@ describe('TaskWorkspaceService', () => {
                     prUrl: 'https://github.com/acme/site-data/pull/7',
                 }),
             );
-            expect(transitions.transition).toHaveBeenCalledWith(expect.anything(), 'in_review');
+            // Quality gates (Wave 3 M8): the finalize step's flip declares
+            // itself agent-driven so a red gate can never enter review here.
+            expect(transitions.transition).toHaveBeenCalledWith(expect.anything(), 'in_review', {
+                actorType: 'agent',
+            });
         });
 
         it('conflict → NAMES paths, posts chat message, moves Task to blocked, NO PR', async () => {
@@ -256,7 +260,9 @@ describe('TaskWorkspaceService', () => {
                     body: expect.stringContaining('src/app.ts'),
                 }),
             );
-            expect(transitions.transition).toHaveBeenCalledWith(expect.anything(), 'blocked');
+            expect(transitions.transition).toHaveBeenCalledWith(expect.anything(), 'blocked', {
+                actorType: 'agent',
+            });
         });
 
         it('no PR permission → pushed-no-pr, branch stays pushed', async () => {

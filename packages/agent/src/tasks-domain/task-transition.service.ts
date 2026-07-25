@@ -7,8 +7,10 @@ import {
     Optional,
 } from '@nestjs/common';
 import { TaskStatus } from '../entities/task.entity';
-import type { Task } from '../entities/task.entity';
+import type { Task, TaskActorType } from '../entities/task.entity';
 import { TaskRepository } from '../database/repositories/task.repository';
+import { WorkRepository } from '../database/repositories/work.repository';
+import { resolveChecksPolicy } from './task-gates';
 import {
     TaskAssigneeRepository,
     TaskBlockRepository,
@@ -74,6 +76,14 @@ const ALLOWED: Record<TaskStatus, TaskStatus[]> = {
 
 export interface TransitionOptions {
     force?: boolean;
+    /**
+     * Who is driving this transition (quality gates, Wave 3 M8). Callers
+     * acting on an Agent's behalf — the run finalizer, the workspace
+     * finalize step, the agent `transitionTask` chat tool — pass 'agent';
+     * human/API callers omit it (or pass 'user'). Only 'agent' activates
+     * the red-gate review refusal; every human path is unaffected.
+     */
+    actorType?: TaskActorType;
 }
 
 @Injectable()
@@ -101,6 +111,11 @@ export class TaskTransitionService {
         // positional `new TaskTransitionService(...)` in the specs keeps
         // compiling; Optional so fixtures without it dispatch ungated.
         @Optional() private readonly dispatchGate?: RunDispatchGateService,
+        // Quality gates (Wave 3 M8) — Work lookup for the checksPolicy of
+        // the agent-driven review-entry rule. Appended LAST (same
+        // positional-constructor reasoning as above); Optional so fixtures
+        // without it skip the rule entirely (fail toward the status quo).
+        @Optional() private readonly works?: WorkRepository,
     ) {}
 
     /**
@@ -123,6 +138,35 @@ export class TaskTransitionService {
             if (openBlockers.length > 0) {
                 throw new ConflictException(
                     `Task cannot transition to ${to} — has ${openBlockers.length} open blocker(s).`,
+                );
+            }
+        }
+        // Quality gates (Wave 3 M8) — AGENT-driven review entry is refused
+        // while the Task's latest run has a non-passing gate under a
+        // 'required' checks policy: red work never enters the review column
+        // on an agent's say-so. Scope is deliberately narrow:
+        //   - only `in_progress → in_review` (the review-entry edge);
+        //   - only when the caller declared `actorType: 'agent'` — every
+        //     human transition is untouched, a human can always pull a Task
+        //     into review deliberately;
+        //   - `force` overrides it exactly like the approver gate (policy
+        //     override, never an integrity override);
+        //   - refusal requires a POSITIVE 'red' / 'skipped' verdict on the
+        //     latest run — missing deps, lookup failures, no runs, or a
+        //     null gateStatus all fail toward allowing the move (status
+        //     quo), mirroring `resolveChecksPolicy`'s posture. 'skipped'
+        //     blocks too: under 'required', a gate that did not run must
+        //     never pass anything.
+        if (
+            from === TaskStatus.IN_PROGRESS &&
+            to === TaskStatus.IN_REVIEW &&
+            opts.actorType === 'agent' &&
+            !opts.force
+        ) {
+            const refusingGate = await this.findRefusingGateStatus(task);
+            if (refusingGate) {
+                throw new ConflictException(
+                    `Task cannot transition to in_review — the latest agent run's quality gate is '${refusingGate}' and this Work requires passing acceptance checks. Fix the failing checks (or pass force=true to override).`,
                 );
             }
         }
@@ -350,6 +394,41 @@ export class TaskTransitionService {
                 }
             }
         }
+    }
+
+    /**
+     * Quality gates (Wave 3 M8) — resolve the gate verdict that refuses an
+     * agent-driven review entry, or null when the move is allowed.
+     *
+     * Returns 'red' | 'skipped' ONLY when every link in the chain resolved
+     * positively: the Task belongs to a Work, that Work's checksPolicy is
+     * 'required', a latest run exists, and its persisted gateStatus is a
+     * non-passing verdict. Every failure/absence returns null — the rule
+     * must never invent a blocking verdict out of a lookup hiccup.
+     */
+    private async findRefusingGateStatus(task: Task): Promise<'red' | 'skipped' | null> {
+        if (!task.workId || !this.works || !this.runs) return null;
+        let work: Awaited<ReturnType<WorkRepository['findById']>> = null;
+        try {
+            work = await this.works.findById(task.workId);
+        } catch (err) {
+            this.logger.warn(
+                `Gate rule: Work ${task.workId} lookup failed for task ${task.id} — allowing: ${err}`,
+            );
+            return null;
+        }
+        if (resolveChecksPolicy(work) !== 'required') return null;
+        let latestRun: { gateStatus?: string | null } | null = null;
+        try {
+            latestRun = await this.runs.findLatestForTask(task.id);
+        } catch (err) {
+            this.logger.warn(
+                `Gate rule: latest-run lookup failed for task ${task.id} — allowing: ${err}`,
+            );
+            return null;
+        }
+        const gateStatus = latestRun?.gateStatus;
+        return gateStatus === 'red' || gateStatus === 'skipped' ? gateStatus : null;
     }
 
     private async findOpenBlockers(taskId: string): Promise<string[]> {

@@ -161,6 +161,12 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                 async finishTask({ userId, taskId, to, force }) {
                     const row = await tasks.transition(userId, taskId, to as TaskStatus, {
                         force: force ?? false,
+                        // Quality gates (Wave 3 M8): the run finalizer flips
+                        // status on the Agent's behalf, so its → in_review is
+                        // refused while the latest run's gate is red/skipped
+                        // under a 'required' checks policy. Human transitions
+                        // (API/UI) never pass actorType and are unaffected.
+                        actorType: 'agent',
                     });
                     return { status: row.status };
                 },

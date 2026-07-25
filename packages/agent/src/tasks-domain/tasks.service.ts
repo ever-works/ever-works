@@ -24,7 +24,7 @@ import {
     TaskRelationRepository,
     UserTaskCounterRepository,
 } from '../database/repositories/task-side.repositories';
-import { TaskTransitionService } from './task-transition.service';
+import { TaskTransitionService, type TransitionOptions } from './task-transition.service';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import { assertNoSecrets } from '../utils/secret-scan';
@@ -543,7 +543,10 @@ export class TasksService {
         userId: string,
         id: string,
         to: TaskStatus,
-        opts: { force?: boolean } = {},
+        // `actorType: 'agent'` (quality gates, Wave 3 M8) activates the
+        // red-gate review refusal in TaskTransitionService; human/API
+        // callers omit it and are unaffected.
+        opts: TransitionOptions = {},
     ): Promise<Task> {
         const task = await this.getOne(userId, id);
         const from = task.status;

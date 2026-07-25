@@ -290,7 +290,13 @@ export class TaskWorkspaceService {
         try {
             const fresh = await this.tasks.findById(task.id);
             if (fresh && fresh.status !== to) {
-                await this.transitions.transition(fresh, to);
+                // Quality gates (Wave 3 M8): the finalize step acts on the
+                // Agent's behalf, so its → in_review flip declares itself
+                // agent-driven. On the green path this is a no-op (the
+                // worker only reaches finalize on a passing/off/warn gate);
+                // it exists so a red gate can never be smuggled into the
+                // review column through this path either.
+                await this.transitions.transition(fresh, to, { actorType: 'agent' });
             }
         } catch (error) {
             this.logger.warn(

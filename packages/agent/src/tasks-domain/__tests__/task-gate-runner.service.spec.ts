@@ -232,6 +232,26 @@ describe('TaskGateRunnerService.runChecks', () => {
             expect(patch.checkResults[0]).toMatchObject({ id: 'ok', status: 'green' });
         });
 
+        it('persists the attempt counter threaded from the iterate loop (Wave 3 M5)', async () => {
+            await runner.runChecks({
+                checks: [check({ id: 'ok' })],
+                cwd: process.cwd(),
+                runId: RUN_ID,
+                attempt: 3,
+            });
+            expect(runs.updateGateResults.mock.calls[0][1].gateAttempts).toBe(3);
+        });
+
+        it('clamps a nonsense attempt value to 1 instead of persisting it', async () => {
+            await runner.runChecks({
+                checks: [check({ id: 'ok' })],
+                cwd: process.cwd(),
+                runId: RUN_ID,
+                attempt: -7,
+            });
+            expect(runs.updateGateResults.mock.calls[0][1].gateAttempts).toBe(1);
+        });
+
         it('a persistence failure is swallowed — the verdict the caller enforces still returns', async () => {
             runs.updateGateResults.mockRejectedValue(new Error('db down'));
             const outcome = await runner.runChecks({

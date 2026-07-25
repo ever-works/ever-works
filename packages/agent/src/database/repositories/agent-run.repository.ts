@@ -588,6 +588,26 @@ export class AgentRunRepository {
     }
 
     /**
+     * Most-recent run dispatched for a Task, any agent, any status —
+     * the "latest run" the quality-gate transition rule (Wave 3 M8)
+     * reads `gateStatus` from. Authoritative (queries the runs table
+     * directly) rather than following the best-effort `tasks.latestRunId`
+     * denorm pointer, because a policy gate must not depend on
+     * board-decoration telemetry.
+     *
+     * @internal Security: unscoped — callers must have verified Task
+     * ownership through another path (TaskTransitionService receives an
+     * owner-scoped Task row).
+     */
+    async findLatestForTask(taskId: string): Promise<AgentRun | null> {
+        return this.repository
+            .createQueryBuilder('run')
+            .where('run.taskId = :taskId', { taskId })
+            .orderBy('run.createdAt', 'DESC')
+            .getOne();
+    }
+
+    /**
      * Most-recent queued / running run for an Agent regardless of trigger
      * kind. Kept as a legacy fallback for Trigger payloads created before
      * workers started carrying explicit AgentRun ids.

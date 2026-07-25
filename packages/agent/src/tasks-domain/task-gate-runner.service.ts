@@ -35,6 +35,13 @@ export interface RunChecksInput {
      * blocking), mirroring `resolveChecksPolicy`'s posture.
      */
     policy?: WorkChecksPolicy;
+    /**
+     * Which gate attempt this execution is (Wave 3 M5 iterate loop) —
+     * persisted onto `agent_runs.gateAttempts` so a crash/resume cannot
+     * reset the bounded loop. Defaults to 1 (the single-attempt M2/M3
+     * behavior) when the caller doesn't iterate.
+     */
+    attempt?: number;
 }
 
 export interface RunChecksOutcome {
@@ -90,9 +97,14 @@ export class TaskGateRunnerService {
         );
         const gateStatus: GateStatus = failedRequired.length > 0 ? 'red' : 'green';
 
-        // One attempt only in M2/M3 — the bounded iterate loop (M5)
-        // threads the real attempt counter through here later.
-        await this.persist(input.runId, results, gateStatus, 1);
+        // Attempt counter threaded from the M5 iterate loop; clamped so a
+        // bad caller value can never write a nonsense counter. Defaults to
+        // 1 — the single-attempt M2/M3 behavior.
+        const attempt =
+            typeof input.attempt === 'number' && Number.isFinite(input.attempt)
+                ? Math.max(1, Math.trunc(input.attempt))
+                : 1;
+        await this.persist(input.runId, results, gateStatus, attempt);
         return { gateStatus, results };
     }
 

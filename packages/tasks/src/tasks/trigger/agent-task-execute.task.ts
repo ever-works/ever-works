@@ -1,11 +1,12 @@
 import { task } from '@trigger.dev/sdk';
 import { NestFactory } from '@nestjs/core';
-import type { TaskAcceptanceCheck } from '@ever-works/contracts';
+import type { TaskAcceptanceCheck, TaskCheckResult } from '@ever-works/contracts';
 import { AgentRepository, AgentRunRepository, WorkRepository } from '@ever-works/agent/database';
 import { AgentRunService, RunDispatchGateService } from '@ever-works/agent/agents';
 import {
     resolveAcceptanceChecks,
     resolveChecksPolicy,
+    resolveMaxGateAttempts,
     TaskChatService,
     TaskGateRunnerService,
     TaskRunDenormService,
@@ -41,6 +42,69 @@ const CHAT_TEMPLATE_MARKER_PATTERN =
  */
 function neutralizeControlTokens(value: string): string {
     return value.replace(CHAT_TEMPLATE_MARKER_PATTERN, '');
+}
+
+/**
+ * Quality gates — the check results that turned the gate red: not-green
+ * AND declared required (informational checks report but never block, so
+ * they must not drive the iterate loop or the failure summary either).
+ */
+function filterRequiredGateFailures(
+    results: TaskCheckResult[],
+    checks: TaskAcceptanceCheck[],
+): TaskCheckResult[] {
+    return results.filter((checkResult) => {
+        const check = checks.find((c) => c.id === checkResult.id);
+        return checkResult.status !== 'green' && check?.required !== false;
+    });
+}
+
+/** Human-readable verdict for one failed check result. */
+function describeCheckFailure(checkResult: TaskCheckResult): string {
+    return checkResult.status === 'timeout'
+        ? 'timed out'
+        : checkResult.status === 'error'
+          ? 'could not run'
+          : `exit code ${checkResult.exitCode}`;
+}
+
+/**
+ * Quality gates (Wave 3 M5) — compose the iterate message that resumes the
+ * agent loop after a red gate: the failing checks' ids, verdicts, and
+ * output tails, machine-generated in the same shape as human rejection
+ * feedback.
+ *
+ * Security (prompt-injection hardening): check ids are user-authored and
+ * `logTail` is whatever the checked-out repo's build/test output printed —
+ * both partially attacker-controlled — and this string becomes the run's
+ * `immediateInput`. Every dynamic field is passed through
+ * `neutralizeControlTokens` so a crafted chat-template control marker in a
+ * test name or build log cannot spoof a system/user turn. Same mechanical
+ * strip as Task title/description above: benign content passes unchanged.
+ */
+function composeGateIterateMessage(input: {
+    failing: TaskCheckResult[];
+    attempt: number;
+    maxAttempts: number;
+}): string {
+    const lines: string[] = [
+        `Quality gate: the task's acceptance checks FAILED (attempt ${input.attempt} of ${input.maxAttempts}).`,
+        'Fix the underlying problems in the workspace so every required check passes, then finish. The checks re-run automatically after you are done — do not just claim they pass.',
+        '',
+        'Failing checks:',
+    ];
+    for (const checkResult of input.failing) {
+        lines.push(
+            `- ${neutralizeControlTokens(String(checkResult.id))}: ${describeCheckFailure(checkResult)}`,
+        );
+        if (checkResult.logTail) {
+            lines.push('  Output tail:');
+            for (const tailLine of neutralizeControlTokens(checkResult.logTail).split('\n')) {
+                lines.push(`    ${tailLine}`);
+            }
+        }
+    }
+    return lines.join('\n');
 }
 
 /**
@@ -321,6 +385,9 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                       .join('\n')
                 : `Task ${payload.taskId}`;
 
+            const scopeContext = taskRow
+                ? `Task scope: mission=${taskRow.missionId ?? 'none'}, idea=${taskRow.ideaId ?? 'none'}, work=${taskRow.workId ?? 'none'}`
+                : null;
             const result = await runner.execute({
                 runId: run.id,
                 agentId: agent.id,
@@ -330,9 +397,7 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                 taskId: payload.taskId,
                 immediateInput,
                 workspaceCwd,
-                scopeContext: taskRow
-                    ? `Task scope: mission=${taskRow.missionId ?? 'none'}, idea=${taskRow.ideaId ?? 'none'}, work=${taskRow.workId ?? 'none'}`
-                    : null,
+                scopeContext,
             });
 
             // Wave 3 M3 — the PR gate: "a red check opens no PR". After the
@@ -340,20 +405,117 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
             // finalize/PR step, run the dispatch-frozen acceptance checks in
             // the provisioned workspace. Green (or a warn-only policy)
             // proceeds to finalize exactly as before; red under a 'required'
-            // policy withholds the PR. One attempt only in M3 — the bounded
-            // iterate loop is M5.
+            // policy withholds the PR.
             const runSucceeded = result.status === 'assembled' || result.status === 'dispatched';
             const gatePolicy = resolveChecksPolicy(gateWork);
             let gateOutcome: Awaited<ReturnType<TaskGateRunnerService['runChecks']>> | null = null;
+            let gateAttempts = 0;
+            // Wave 3 M5 — why the iterate loop stopped before green:
+            // 'budget' = the Agent's budget cap was reached between attempts;
+            // 'agent-loop' = an iterate attempt's agent loop did not complete
+            // (cancelled / budget-blocked inside execute / dispatch failure),
+            // so re-running the checks would grade unchanged work.
+            let iterateStop: 'budget' | 'agent-loop' | null = null;
             if (provisioned && runSucceeded && gatePolicy !== 'off') {
                 const gateRunner = appContext.get(TaskGateRunnerService);
+                const maxGateAttempts = resolveMaxGateAttempts(taskRow, gateWork);
                 try {
+                    gateAttempts = 1;
                     gateOutcome = await gateRunner.runChecks({
                         checks: resolvedChecks,
                         cwd: provisioned.cwd,
                         runId: run.id,
                         policy: gatePolicy,
+                        attempt: gateAttempts,
                     });
+
+                    // Wave 3 M5 — bounded red → iterate loop. On a red gate
+                    // under a 'required' policy the run does not end: the
+                    // failing checks (ids + output tails, control-token
+                    // neutralized) are fed back to the SAME run's agent loop
+                    // as machine-generated rejection feedback, then the
+                    // checks re-run — until green, the attempt cap
+                    // (`resolveMaxGateAttempts`, clamped 1..5), or the Agent
+                    // budget stops it. 'skipped' (zero checks) never
+                    // iterates: there is nothing for another attempt to fix.
+                    while (
+                        gatePolicy === 'required' &&
+                        gateOutcome.gateStatus === 'red' &&
+                        gateAttempts < maxGateAttempts
+                    ) {
+                        // Budget consult between attempts (existing
+                        // AgentBudget surface via AgentRunService — RPC).
+                        // Only an explicit `allowed: false` stops the loop:
+                        // an unreachable budget check falls back to the
+                        // attempt cap alone, never to a phantom "over
+                        // budget". (`runner.execute` also re-checks the
+                        // budget itself at the start of every attempt, so
+                        // this is an early-out, not the only enforcement.)
+                        try {
+                            const budget = await runner.checkBudget(agent);
+                            if (budget && budget.allowed === false) {
+                                iterateStop = 'budget';
+                                break;
+                            }
+                        } catch {
+                            // Budget check unreachable from the worker —
+                            // documented fail-open to the loop cap.
+                        }
+
+                        const iterateMessage = composeGateIterateMessage({
+                            failing: filterRequiredGateFailures(
+                                gateOutcome.results,
+                                resolvedChecks,
+                            ),
+                            attempt: gateAttempts,
+                            maxAttempts: maxGateAttempts,
+                        });
+                        const nextAttempt = gateAttempts + 1;
+                        await bestEffort(() =>
+                            runs.updateTelemetry(claimedRunId, {
+                                currentActivity: `Quality gate red — iterating (attempt ${nextAttempt} of ${maxGateAttempts})`,
+                            }),
+                        );
+                        let iterateSucceeded = false;
+                        try {
+                            const iterateResult = await runner.execute({
+                                runId: run.id,
+                                agentId: agent.id,
+                                userId: payload.userId,
+                                kind: 'task',
+                                signal,
+                                taskId: payload.taskId,
+                                immediateInput: iterateMessage,
+                                workspaceCwd,
+                                scopeContext,
+                            });
+                            iterateSucceeded =
+                                iterateResult.status === 'assembled' ||
+                                iterateResult.status === 'dispatched';
+                        } catch {
+                            // An iterate attempt that crashed in transit is
+                            // handled like any other incomplete attempt —
+                            // the FIRST attempt's verdict already stands and
+                            // the red path below reports honestly.
+                            iterateSucceeded = false;
+                        }
+                        if (!iterateSucceeded) {
+                            iterateStop = 'agent-loop';
+                            break;
+                        }
+                        // Only a completed agent loop consumes an attempt —
+                        // `gateAttempts` counts GATE EXECUTIONS, so the local
+                        // counter always matches the persisted
+                        // `agent_runs.gateAttempts` the runner writes.
+                        gateAttempts = nextAttempt;
+                        gateOutcome = await gateRunner.runChecks({
+                            checks: resolvedChecks,
+                            cwd: provisioned.cwd,
+                            runId: run.id,
+                            policy: gatePolicy,
+                            attempt: gateAttempts,
+                        });
+                    }
                 } catch (error) {
                     // A crashed gate step marks the run FAILED, never green —
                     // a gate that did not run must not pass anything.
@@ -362,6 +524,8 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                     await bestEffort(() =>
                         runDenorm.recordTerminal(payload.taskId, claimedRunId, 'failed'),
                     );
+                    // Terminal transition — free the Work's concurrency slot.
+                    await drainWork(taskRow.workId);
                     return {
                         status: 'failed',
                         reason: 'gate-execution-failed',
@@ -371,23 +535,28 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                 }
 
                 if (gatePolicy === 'required' && gateOutcome.gateStatus !== 'green') {
-                    // Red — or 'skipped' when the required policy found zero
-                    // checks. Either way: no finalize, no PR. The workspace
-                    // and the Task's branchState stay exactly as they are.
-                    const requiredFailed = gateOutcome.results.filter((checkResult) => {
-                        const check = resolvedChecks.find((c) => c.id === checkResult.id);
-                        return checkResult.status !== 'green' && check?.required !== false;
-                    });
+                    // Red after every allowed attempt — or 'skipped' when the
+                    // required policy found zero checks. Either way: no
+                    // finalize, no PR. The workspace and the Task's
+                    // branchState stay exactly as they are; a human reply in
+                    // task chat resumes the agent, which re-runs the checks.
+                    const requiredFailed = filterRequiredGateFailures(
+                        gateOutcome.results,
+                        resolvedChecks,
+                    );
+                    const attemptNoun = gateAttempts === 1 ? 'attempt' : 'attempts';
                     const summary =
                         resolvedChecks.length === 0
                             ? 'Quality gate: no checks configured — PR withheld (checks policy is required).'
-                            : `Quality gate red: ${requiredFailed
+                            : `Quality gate red after ${gateAttempts} ${attemptNoun}: ${requiredFailed
                                   .map((checkResult) => checkResult.id)
                                   .join(', ')} — PR withheld.`;
                     await runs.markCompleted(run.id, summary);
                     await bestEffort(() =>
                         runDenorm.recordTerminal(payload.taskId, claimedRunId, 'completed'),
                     );
+                    // Terminal transition — free the Work's concurrency slot.
+                    await drainWork(taskRow.workId);
                     // Task chat gets the human-facing breakdown. Plain text —
                     // the chat surface never renders agent messages as markup.
                     const taskChat = appContext.get(TaskChatService);
@@ -395,18 +564,18 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                         resolvedChecks.length === 0
                             ? 'Quality gate: no checks configured, and this Work requires acceptance checks — no PR was opened. Add checks to the Task or to the Work defaults, then send a message here to re-run.'
                             : [
-                                  'Quality gate red — no PR was opened.',
+                                  `Quality gate red after ${gateAttempts} ${attemptNoun} — no PR was opened.`,
+                                  ...(iterateStop === 'budget'
+                                      ? [
+                                            '',
+                                            "Iteration stopped early: the Agent's budget cap for this period was reached.",
+                                        ]
+                                      : []),
                                   '',
                                   'Failed checks:',
                                   ...requiredFailed.map(
                                       (checkResult) =>
-                                          `- ${checkResult.id}: ${
-                                              checkResult.status === 'timeout'
-                                                  ? 'timed out'
-                                                  : checkResult.status === 'error'
-                                                    ? 'could not run'
-                                                    : `exit code ${checkResult.exitCode}`
-                                          }`,
+                                          `- ${checkResult.id}: ${describeCheckFailure(checkResult)}`,
                                   ),
                                   '',
                                   'Fix the issues (or adjust the checks), then send a message here to re-run.',
@@ -427,6 +596,7 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                         runId: run.id,
                         dedupKey: payload.dedupKey,
                         gateStatus: gateOutcome.gateStatus,
+                        gateAttempts,
                     };
                 }
             }
