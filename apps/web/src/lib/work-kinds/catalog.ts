@@ -1,4 +1,13 @@
-import { BookOpen, Building2, Files, FolderClosed, FolderOpen, Globe, Star } from 'lucide-react';
+import {
+    BookOpen,
+    Building2,
+    Files,
+    FolderClosed,
+    FolderOpen,
+    Globe,
+    Megaphone,
+    Star,
+} from 'lucide-react';
 import type { LucideIcon } from 'lucide-react';
 import { WORK_KINDS, normalizeWorkKind, type WorkKind } from '@ever-works/contracts';
 
@@ -18,12 +27,14 @@ import { WORK_KINDS, normalizeWorkKind, type WorkKind } from '@ever-works/contra
  * does a badge use?" — so every read-only surface (cards, headers, info
  * blocks, filters) renders a kind identically.
  *
- * Every member of `WorkKind` is represented, including the two that are
+ * Every member of `WorkKind` is represented, including the three that are
  * never user-selectable at creation time:
  *   - `default` — the column default, carried by every Work that predates
  *     the kind-aware create path. Presented as the generic "Work".
  *   - `company` — minted only by the Register-Company flow
  *     (`WorkLifecycleService.createCompanyWork`).
+ *   - `campaign` — the go-to-market campaign Work, minted by template
+ *     activation rather than the general create path.
  */
 export { WORK_KINDS, normalizeWorkKind };
 
@@ -63,6 +74,10 @@ export const WORK_KIND_PRESENTATION: Record<WorkKindValue, WorkKindPresentation>
     company: {
         icon: Building2,
         tone: 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300',
+    },
+    campaign: {
+        icon: Megaphone,
+        tone: 'bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-300',
     },
     default: {
         icon: FolderClosed,

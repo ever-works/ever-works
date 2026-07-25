@@ -143,6 +143,26 @@ export const WORK_KIND_CAPABILITIES: Record<WorkKind, WorkCapabilities> = {
 		kb: true,
 		metrics: ['works-owned', 'team-members', 'agents', 'open-tasks', 'days-active'],
 		repos: { data: true, work: true, website: false }
+	},
+
+	// A campaign Work is where a go-to-market pipeline's output LIVES: lead
+	// lists, drafts awaiting the review gate, and period reports. It produces
+	// no deployable site, so `deploy` and the website repo are off; the
+	// knowledge base stays on because the campaign brief and the approved
+	// messaging belong there. Metrics reuse the existing vocabulary — the
+	// people and work driving the campaign, plus provider-backed conversions
+	// once an analytics provider is connected.
+	campaign: {
+		items: { enabled: false, labelKey: 'items' },
+		taxonomy: false,
+		comparisons: false,
+		communityPr: false,
+		itemImportExport: false,
+		sourceValidation: false,
+		deploy: false,
+		kb: true,
+		metrics: ['agents', 'open-tasks', 'conversions', 'days-active'],
+		repos: { data: true, work: true, website: false }
 	}
 };
 

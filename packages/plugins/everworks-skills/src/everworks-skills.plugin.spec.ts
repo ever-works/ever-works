@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { EverWorksSkillsPlugin } from './everworks-skills.plugin.js';
+import { GTM_CATALOG_ENTRIES } from './gtm-catalog.js';
 
 function textResponse(body: string, status = 200): Response {
 	return {
@@ -176,9 +177,14 @@ A skill for creating new skills, defaulting cron to UTC.`;
 		expect(entry?.body).not.toContain('---');
 	});
 
-	it('lists the live catalog entries', async () => {
+	it('lists the live catalog entries first, then the first-party pack', async () => {
 		const result = await plugin.listEntries({ limit: 50, offset: 0 });
-		expect(result.total).toBe(1);
+		// The served manifest entry leads; the compiled-in go-to-market pack
+		// is merged underneath it so template-suggested Skills always resolve.
 		expect(result.entries[0].slug).toBe('skill-creator');
+		expect(result.total).toBe(1 + GTM_CATALOG_ENTRIES.length);
+		expect(result.entries.map((e) => e.slug)).toEqual(
+			expect.arrayContaining(['skill-creator', 'lead-scoring', 'outreach-personalization'])
+		);
 	});
 });

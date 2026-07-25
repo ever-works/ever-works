@@ -6,3 +6,4 @@ export * from './kb/index.js';
 export * from './terminal/index.js';
 export * from './tasks/index.js';
 export * from './ingest/index.js';
+export * from './skills/index.js';
