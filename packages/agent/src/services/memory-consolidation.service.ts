@@ -6,6 +6,8 @@ import {
     KB_ALWAYS_INJECTED_CLASSES,
     KB_ORG_INHERITABLE_CLASSES,
     KbDocumentClass,
+    KbDocumentSource,
+    KbReviewState,
 } from '../entities/kb-types';
 import { AiFacadeService } from '../facades/ai.facade';
 import { KnowledgeBaseService } from './knowledge-base.service';
@@ -394,6 +396,12 @@ export class MemoryConsolidationService {
             body: summary,
             description: `Synthesized from ${ids.length} near-duplicate Memory documents.`,
             tags: ['synthesis'],
+            // Memory upgrades M7 — an LLM-synthesized document is
+            // agent-authored and review-gated: it lands as `proposed`
+            // (excluded from context injection) until a human accepts it,
+            // so an unreviewed merge can never teach other agents.
+            source: KbDocumentSource.AGENT,
+            reviewState: KbReviewState.PROPOSED,
         });
 
         const marker: KbConsolidationMarker = {

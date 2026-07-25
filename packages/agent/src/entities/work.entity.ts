@@ -63,7 +63,10 @@ import {
     USER_SELECTABLE_WORK_KINDS,
     getWorkCapabilities,
     normalizeWorkKind,
+    type MergePolicyOverride,
+    type TaskAcceptanceCheck,
     type UserSelectableWorkKind,
+    type WorkChecksPolicy,
     type WorkKind,
 } from '@ever-works/contracts';
 
@@ -401,6 +404,82 @@ export class Work {
     // Comparison Generation FIELDS
     @Column({ type: 'boolean', default: false })
     comparisonsEnabled: boolean;
+
+    // ── Task isolation (worktree-per-Task, Wave 2 M1) ────────────────
+    // Opt-in, per the founder: "not everyone needs it." A Task with
+    // isolation resolved off behaves exactly as today.
+
+    /** `'off' | 'worktree'` — default off; per-Task override on Task. */
+    @Column({ type: 'varchar', length: 16, default: 'off' })
+    taskIsolation: string;
+
+    /** Base branch Tasks branch FROM (ALWAYS fetched fresh — never a
+     *  cached HEAD). NULL = the repo's default branch. */
+    @Column({ type: 'varchar', length: 128, nullable: true })
+    taskIsolationBaseBranch?: string | null;
+
+    /** Which of the Work's repos the branch/PR flow targets:
+     *  `'work-output' | 'data' | 'provider'`. */
+    @Column({ type: 'varchar', length: 16, default: 'work-output' })
+    taskIsolationTargetRepo: string;
+
+    /** `'on-merge' | 'manual'` — when the Task branch is deleted. */
+    @Column({ type: 'varchar', length: 16, default: 'on-merge' })
+    taskBranchCleanup: string;
+
+    // ── Memory recall (memory upgrades M3) ───────────────────────────
+
+    /**
+     * Shared per-Work toggle for memory recall injection at pipeline
+     * dispatch. When true (the default — recall is on by default,
+     * configurable), self-managed pipeline runs for this Work receive
+     * a fenced recall block from the agent-memory provider in their
+     * session preamble (`execContext.memoryRecall`). `false` disables
+     * the splice; the memory write path is untouched.
+     */
+    @Column({ type: 'boolean', default: true })
+    memoryRecallEnabled: boolean;
+    // Quality Gates FIELDS
+    /**
+     * Work-level default acceptance checks inherited by every agent-executed
+     * Task under this Work. A Task's own `acceptanceChecks` merge over these
+     * by id (same-id override, `disabled: true` suppression) — resolve via
+     * `tasks-domain/task-gates.ts`, never read this column directly when
+     * executing checks.
+     */
+    @Column('simple-json', { nullable: true })
+    checkDefaults?: TaskAcceptanceCheck[] | null;
+
+    /**
+     * Enforcement policy for the resolved checks. Defaults to `'off'` so the
+     * feature landing changes nothing for existing Works — checks only ever
+     * run for a Work that explicitly opted in to `'warn'` or `'required'`.
+     */
+    @Column({ type: 'varchar', length: 12, default: 'off' })
+    checksPolicy: WorkChecksPolicy;
+
+    /**
+     * Default gate-attempt budget for Tasks that leave their own
+     * `maxGateAttempts` null. Clamped to 1..5 at resolve time.
+     */
+    @Column({ type: 'int', default: 2 })
+    maxGateAttempts: number;
+
+    // ── Merge policy (Wave 3, founder decision D4) ───────────────────
+
+    /**
+     * Work-scoped slice of the merge-policy matrix. NULL = inherit the
+     * organization's policy, then the tenant's, then the platform default
+     * (`PLATFORM_DEFAULT_MERGE_POLICY`). A PARTIAL object is the normal
+     * case: resolution is field-by-field, so a Work can override just
+     * `allowAgentMerge` and inherit the rest.
+     *
+     * Never read this column directly to decide a merge — resolve through
+     * `MergePolicyService` (`@ever-works/agent/policy`), the single decision
+     * point.
+     */
+    @Column('simple-json', { nullable: true })
+    mergePolicy?: MergePolicyOverride | null;
 
     /**
      * Whether to generate the browsable repository published to the git

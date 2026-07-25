@@ -189,6 +189,8 @@ export class MetricsFacadeService extends BaseFacadeService {
             // Phase 15.6 — Agent/Task attribution propagation.
             agentId: facadeOptions.agentId,
             taskId: facadeOptions.taskId,
+            // Wave 9 M2 — per-run cost attribution.
+            runId: facadeOptions.runId,
             pluginId,
             capability: PluginUsageCapability.METRICS,
             units: 1,

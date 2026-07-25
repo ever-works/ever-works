@@ -3,6 +3,7 @@
  * Supports versioned JSON export (v1) with full work data including
  * items, comparisons, site config, schedules, and advanced prompts.
  */
+import type { TaskAcceptanceCheck } from '@ever-works/contracts';
 
 // ─── Export Types ────────────────────────────────────────────────
 
@@ -141,6 +142,17 @@ export interface ExportedWork {
      *  an export/import round-trip — omitting it would silently re-enable
      *  provider-repo generation on the imported work. */
     providerRepositoryEnabled?: boolean;
+    /** Task-isolation settings (Wave 2) — user-visible Work settings
+     *  must round-trip; absent in old payloads = leave defaults. */
+    taskIsolation?: string;
+    taskIsolationBaseBranch?: string | null;
+    taskIsolationTargetRepo?: string;
+    taskBranchCleanup?: string;
+    /** Memory recall injection toggle (memory upgrades M3). A deliberate
+     *  `false` must survive an export/import round-trip — omitting it
+     *  would silently re-enable recall on the imported work. Absent in
+     *  old payloads = leave defaults. */
+    memoryRecallEnabled?: boolean;
     gitProvider: string;
     deployProvider?: string;
     readmeConfig?: any;
@@ -151,6 +163,29 @@ export interface ExportedWork {
     communityPrEnabled: boolean;
     communityPrAutoClose: boolean;
     comparisonsEnabled: boolean;
+    /** Work-level default acceptance checks (quality gates). Payloads are
+     *  user-supplied JSON — import only applies this when it is actually
+     *  an array. */
+    checkDefaults?: TaskAcceptanceCheck[] | null;
+    /** Quality-gate enforcement policy. Import is drop-if-unrecognized —
+     *  never default-if-unrecognized — so a tampered value cannot reset an
+     *  existing Work's enforcement. */
+    checksPolicy?: string;
+    /** Gate-attempt budget (1..5). Out-of-range values are dropped on
+     *  import, not clamped. */
+    maxGateAttempts?: number;
+    // NOTE — `works.mergePolicy` (Wave 3, D4) is DELIBERATELY absent from
+    // this envelope, and that omission is the correct behaviour, not the
+    // usual "new Work column forgotten in the transfer whitelist" bug.
+    // A merge policy can only LOOSEN enforcement (`allowAgentMerge: true`,
+    // `requireHumanApproval: false`), and the envelope is an
+    // attacker-editable JSON file. Carrying it across accounts would let
+    // an import grant agents merge rights in the importing account —
+    // exactly the privilege-escalation-across-import that made
+    // `AgentExportService` clamp `permissions` to the all-false default.
+    // An imported Work therefore starts with `mergePolicy = NULL`, i.e.
+    // INHERIT, and resolves against the importing owner's own
+    // organization / tenant / platform default.
     members: ExportedWorkMember[];
     customDomains: ExportedCustomDomain[];
     workPlugins: ExportedWorkPlugin[];

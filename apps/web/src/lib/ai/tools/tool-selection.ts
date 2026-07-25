@@ -32,6 +32,32 @@ export const MIN_MATCHED_SLOTS = 48;
 /** Domains that are always available regardless of the message. */
 const CORE_DOMAINS = new Set(['core', 'works']);
 
+/**
+ * Go-to-market vocabulary (Wave 10).
+ *
+ * The prebuilt Agent templates and the first-party Skills catalog are both
+ * reached with campaign language ("draft outreach", "audit my SEO", "build a
+ * lead list") that shares no stem with `agent` or `skill`. Without these
+ * slots the tools for the surface the user just asked for are gated out of
+ * the turn — the Mission-create outage is the cautionary tale for shipping a
+ * surface without its keyword slots. Applied to both domains because the
+ * flows cross them: pick a template (agents) → wire its Skills (skills).
+ */
+const GTM_KEYWORDS = [
+    'campaign',
+    'outreach',
+    'go-to-market',
+    'gtm',
+    'lead',
+    'prospect',
+    'newsletter',
+    'digest',
+    'competitor',
+    'seo',
+    'enrichment',
+    'follow-up',
+];
+
 /** Keywords that pull a domain's tools into the active set. */
 const DOMAIN_KEYWORDS: Record<string, string[]> = {
     works: [
@@ -47,9 +73,9 @@ const DOMAIN_KEYWORDS: Record<string, string[]> = {
         'readme',
         'markdown',
     ],
-    agents: ['agent'],
+    agents: ['agent', ...GTM_KEYWORDS],
     tasks: ['task'],
-    skills: ['skill'],
+    skills: ['skill', ...GTM_KEYWORDS],
     missions: ['mission'],
     ideas: ['idea', 'proposal'],
     workagent: ['work agent', 'work-agent', 'goal'],
@@ -57,6 +83,10 @@ const DOMAIN_KEYWORDS: Record<string, string[]> = {
     kb: ['knowledge', 'kb', 'document', 'doc', 'upload'],
     notifications: ['notification', 'notify', 'alert', 'channel'],
     email: ['email', 'inbox', 'message', 'mail'],
+    // Meetings v1 (Wave 8, feature a) — keyword slots ship WITH the
+    // feature (program DoD rule; the Mission-create outage is the
+    // cautionary tale for omitting them).
+    meetings: ['meeting', 'transcript', 'recording', 'standup', 'zoom', 'google meet'],
     members: ['member', 'invite', 'invitation', 'team', 'collaborator', 'people'],
     apikeys: ['api key', 'api-key', 'apikey', 'token'],
     budgets: ['budget', 'usage', 'spend', 'spending', 'cost', 'billing'],
@@ -95,6 +125,7 @@ function deriveDomain(path: string): string {
     if (p.includes('/kb/')) return 'kb';
     if (p.includes('/notification')) return 'notifications';
     if (p.includes('/api/email')) return 'email';
+    if (p.includes('/api/meetings')) return 'meetings';
     if (p.includes('/members') || p.includes('/invitations')) return 'members';
     if (p.includes('/api-keys')) return 'apikeys';
     if (p.includes('/budgets') || p.includes('/usage')) return 'budgets';

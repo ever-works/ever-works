@@ -635,6 +635,10 @@ export class AuthService {
         }
         if (typeof updateData.emailBudgetAlerts === 'boolean')
             updateFields.emailBudgetAlerts = updateData.emailBudgetAlerts;
+        // Digest briefings (Wave 7) — DTO's @IsIn already constrained the
+        // value to 'off' | 'daily' | 'weekly'.
+        if (typeof updateData.digestFrequency === 'string')
+            updateFields.digestFrequency = updateData.digestFrequency;
 
         await this.userRepository.update(userId, updateFields);
 

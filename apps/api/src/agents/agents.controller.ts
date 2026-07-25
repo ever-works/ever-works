@@ -33,6 +33,8 @@ import {
     AgentScope,
     AGENT_RUN_CANCELLER,
     type AgentRunCanceller,
+    RunDispatchGateService,
+    RunSteeringService,
     SkillBindingRepository,
     type AgentDto,
     type AgentExportEnvelope,
@@ -42,6 +44,8 @@ import {
     type AgentImportResult,
     type AgentScorecardMetric,
     type AgentTarget,
+    type AgentTemplate,
+    AgentTemplatesService,
     PluginUsageRepository,
 } from '@ever-works/agent/agents';
 import {
@@ -54,14 +58,19 @@ import {
     ActivityActionType,
     ActivityStatus,
 } from '@ever-works/agent/activity-log';
+import type { TaskAcceptanceCheck, TaskCheckResult } from '@ever-works/contracts';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import {
     AddAgentAttachmentDto,
     AssignTaskToAgentDto,
     CreateAgentDto,
+    CreateAgentFromTemplateDto,
     ListAgentRunsQueryDto,
     ListAgentsQueryDto,
+    ListRunSessionsQueryDto,
+    ResumeRunDto,
+    SteerRunDto,
     UpdateAgentDto,
     UpdateAgentGuardrailsDto,
 } from './dto/agent.dto';
@@ -114,6 +123,29 @@ const AGENT_LIFECYCLE_EVENT_TYPES: ActivityActionType[] = [
     ActivityActionType.AGENT_TASK_ASSIGNED,
 ];
 
+/**
+ * Attach-session action (Wave 4 M8) — is this run's terminal actually
+ * attachable RIGHT NOW?
+ *
+ * Two conditions, both required:
+ *  - the terminal lifecycle says a session exists or is coming up
+ *    (`starting` | `attached`) — `ended` sessions have no PTY to join; and
+ *  - the run itself is still open (`queued` | `running`) — a terminal run's
+ *    columns can legitimately still read `attached` (the last write the
+ *    worker managed before it died, which the terminal sweeper only corrects
+ *    minutes later), and offering Attach there is a guaranteed dead end.
+ *
+ * Computed server-side and shipped as one boolean so the Sessions list, the
+ * Task detail controls and any future surface can never drift on the rule.
+ */
+export function isSessionAttachable(run: {
+    status: string;
+    terminalState?: string | null;
+}): boolean {
+    const live = run.status === 'queued' || run.status === 'running';
+    return live && (run.terminalState === 'attached' || run.terminalState === 'starting');
+}
+
 @ApiTags('agents')
 @Controller('api/agents')
 export class AgentsController {
@@ -149,6 +181,21 @@ export class AgentsController {
         @Optional()
         @Inject(AGENT_RUN_CANCELLER)
         private readonly runCanceller?: AgentRunCanceller,
+        // Run orchestration (Wave 4 M2) — a successful cancel frees a
+        // concurrency slot, so the Work's parked queue is drained. Trailing
+        // + Optional for the same positional-spec reason as above.
+        @Optional()
+        private readonly dispatchGate?: RunDispatchGateService,
+        // Wave 10 — prebuilt agent-template activation. Trailing +
+        // Optional for the same positional-spec reason as above.
+        @Optional()
+        private readonly agentTemplates?: AgentTemplatesService,
+        // Run steering (Wave 4 M5) — steer / interrupt / resume. Trailing +
+        // Optional for the same positional-spec reason as above; when unbound
+        // the three endpoints report 500 "not available" rather than
+        // pretending the control landed.
+        @Optional()
+        private readonly steering?: RunSteeringService,
     ) {}
 
     @Get()
@@ -205,6 +252,162 @@ export class AgentsController {
         });
     }
 
+    /**
+     * Run orchestration (Wave 4 M3) — the Sessions list: every AgentRun
+     * of the acting user across all Agents/Works, filterable + paginated.
+     * Declared BEFORE the `:id` routes so the literal `runs` segment
+     * never reaches ParseUUIDPipe.
+     *
+     * Security: `listSessionsForUser` applies `userId = auth.userId`
+     * at the repository layer — cross-user rows are unreachable by
+     * construction, filters can only narrow the caller's own set.
+     */
+    @Get('runs')
+    @ApiOperation({
+        summary:
+            'Sessions list — my AgentRuns across all Agents (filter by status/workId/agentId/kind).',
+    })
+    @HttpCode(HttpStatus.OK)
+    async listRunSessions(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Query() query: ListRunSessionsQueryDto,
+    ): Promise<{
+        data: Array<{
+            id: string;
+            agentId: string;
+            status: string;
+            triggerKind: string;
+            taskId: string | null;
+            workId: string | null;
+            awaitingInput: boolean;
+            queuedReason: string | null;
+            runnerKind: string | null;
+            startedAt: string | null;
+            finishedAt: string | null;
+            durationMs: number | null;
+            summary: string | null;
+            errorMessage: string | null;
+            currentActivity: string | null;
+            totalTokens: number | null;
+            changedFilesCount: number | null;
+            costCents: number | null;
+            gateStatus: string | null;
+            gateAttempts: number;
+            resolvedChecks: TaskAcceptanceCheck[] | null;
+            checkResults: TaskCheckResult[] | null;
+            persistent: boolean;
+            terminalState: string | null;
+            terminalEndedReason: string | null;
+            terminalProviderId: string | null;
+            sessionAttachable: boolean;
+            createdAt: string;
+        }>;
+        meta: { total: number; limit: number; offset: number };
+    }> {
+        const limit = query.limit ?? 25;
+        const offset = query.offset ?? 0;
+        const [rows, total] = await this.agentRuns.listSessionsForUser(
+            auth.userId,
+            {
+                status: query.status,
+                workId: query.workId,
+                agentId: query.agentId,
+                taskId: query.taskId,
+                triggerKind: query.kind,
+            },
+            limit,
+            offset,
+        );
+        return {
+            data: rows.map((r) => ({
+                id: r.id,
+                agentId: r.agentId,
+                status: r.status,
+                triggerKind: r.triggerKind,
+                taskId: r.taskId ?? null,
+                workId: r.workId ?? null,
+                awaitingInput: r.awaitingInput ?? false,
+                queuedReason: r.queuedReason ?? null,
+                runnerKind: r.runnerKind ?? null,
+                startedAt: r.startedAt?.toISOString() ?? null,
+                finishedAt: r.finishedAt?.toISOString() ?? null,
+                durationMs: r.durationMs ?? null,
+                summary: r.summary ?? null,
+                errorMessage: r.errorMessage ?? null,
+                // Telemetry (kanban run cockpit columns). `currentActivity`
+                // is plain text by contract — the UI must never render it
+                // as markup.
+                currentActivity: r.currentActivity ?? null,
+                totalTokens: r.totalTokens ?? null,
+                changedFilesCount: r.changedFilesCount ?? null,
+                costCents: r.costCents ?? null,
+                // Quality-gate columns. `resolvedChecks` is the dispatch-
+                // frozen definition set; `checkResults` carries per-check
+                // exit/duration/logTail for the Task-detail Checks section.
+                gateStatus: r.gateStatus ?? null,
+                gateAttempts: r.gateAttempts ?? 0,
+                resolvedChecks: r.resolvedChecks ?? null,
+                checkResults: r.checkResults ?? null,
+                // Streaming-terminal lifecycle columns.
+                persistent: r.persistent ?? false,
+                terminalState: r.terminalState ?? null,
+                terminalEndedReason: r.terminalEndedReason ?? null,
+                terminalProviderId: r.terminalProviderId ?? null,
+                // Attach-session action (Wave 4 M8) — the UI gates its
+                // terminal-icon deep link on this, never on `terminalState`
+                // alone (see isSessionAttachable above).
+                sessionAttachable: isSessionAttachable(r),
+                createdAt: r.createdAt.toISOString(),
+            })),
+            meta: { total, limit, offset },
+        };
+    }
+
+    /**
+     * Wave 10 — prebuilt agent-template catalog (in-code, fully
+     * specified presets with prompts + safe defaults). Complements the
+     * repo-backed `GET /api/agent-templates` metadata catalog. Declared
+     * BEFORE the `:id` routes so the literal `templates` segment never
+     * reaches ParseUUIDPipe.
+     */
+    @Get('templates')
+    @ApiOperation({ summary: 'List prebuilt agent templates (marketing/sales/ops presets)' })
+    @HttpCode(HttpStatus.OK)
+    async listTemplates(): Promise<{ data: AgentTemplate[] }> {
+        if (!this.agentTemplates) {
+            throw new InternalServerErrorException('Agent templates service is not available.');
+        }
+        return { data: [...this.agentTemplates.list()] };
+    }
+
+    /**
+     * Wave 10 — create MY Agent from a prebuilt template. Owner-scoped:
+     * the created Agent belongs to the caller, starts in DRAFT with the
+     * template's prompt (SOUL.md), conservative permissions, and
+     * review-before-act guardrails. Body fields are optional placement
+     * overrides only. Declared BEFORE the `:id` routes (literal segment).
+     */
+    @Post('from-template/:slug')
+    @ApiOperation({ summary: 'Create an Agent for the current user from a prebuilt template' })
+    @HttpCode(HttpStatus.CREATED)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async createFromTemplate(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('slug') slug: string,
+        @Body() body: CreateAgentFromTemplateDto,
+    ): Promise<AgentDto> {
+        if (!this.agentTemplates) {
+            throw new InternalServerErrorException('Agent templates service is not available.');
+        }
+        return this.agentTemplates.createFromTemplate(auth.userId, slug, {
+            name: body.name ?? null,
+            scope: body.scope,
+            missionId: body.missionId ?? null,
+            ideaId: body.ideaId ?? null,
+            workId: body.workId ?? null,
+        });
+    }
+
     @Get(':id')
     @ApiOperation({ summary: 'Get one Agent' })
     @HttpCode(HttpStatus.OK)
@@ -231,6 +434,7 @@ export class AgentsController {
             aiProviderId: body.aiProviderId,
             modelId: body.modelId,
             maxSkillContextTokens: body.maxSkillContextTokens,
+            memoryRecallEnabled: body.memoryRecallEnabled,
             heartbeatCadence: body.heartbeatCadence,
             idleBehavior: body.idleBehavior,
             pauseAfterFailures: body.pauseAfterFailures,
@@ -243,6 +447,8 @@ export class AgentsController {
             committerEmail: body.committerEmail,
             reportsToAgentId: body.reportsToAgentId,
             scorecard: body.scorecard as AgentScorecardMetric[] | null | undefined,
+            // Merge-policy matrix (Wave 3, D4) — the Agent-scoped slice.
+            mergePolicy: body.mergePolicy,
         });
     }
 
@@ -669,8 +875,139 @@ export class AgentsController {
                 actionType: ActivityActionType.AGENT_RUN_CANCELLED,
                 details: { runId, previousStatus: result.previousStatus },
             });
+            // Run orchestration (Wave 4 M2) — the cancel freed a concurrency
+            // slot; promote the oldest parked run for the same Work. Fire-
+            // and-forget: drainForWork never throws by contract, and the
+            // cancel response must not wait on a fresh dispatch.
+            if (result.workId && this.dispatchGate) {
+                void this.dispatchGate.drainForWork(result.workId).catch(() => undefined);
+            }
         }
         return { cancelled: wasOpen, previousStatus: result.previousStatus };
+    }
+
+    /**
+     * Run steering (Wave 4 M5) — send a message to a run.
+     *
+     * LIVE run ⇒ the message is queued for the executing tool loop, which
+     * injects it between model round-trips (`dispatched: 'injected'`).
+     * TERMINAL run ⇒ `dispatched: 'new-run'`, telling the caller to start a
+     * fresh run instead. Deliberately NOT a 409: "the run finished while you
+     * were typing" is a normal race, not a client error, and the caller has a
+     * defined next step.
+     *
+     * Ownership is enforced twice — `getOne` 404s a cross-user Agent, and
+     * `RunSteeringService` loads the run through `findByIdAndUser`, so a run
+     * id belonging to someone else is indistinguishable from a missing one.
+     */
+    @Post(':id/runs/:runId/steer')
+    @ApiOperation({
+        summary:
+            'Send a steering message to a run: injected into the live session, or ' +
+            'answered with new-run when the run already finished.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async steerRun(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('runId', ParseUUIDPipe) runId: string,
+        @Body() body: SteerRunDto,
+    ): Promise<{ dispatched: 'injected' | 'new-run'; runId: string; queuedCount?: number }> {
+        await this.service.getOne(auth.userId, id);
+        const steering = this.requireSteering();
+        return steering.steer({ runId, userId: auth.userId, message: body.message });
+    }
+
+    /**
+     * Run steering (Wave 4 M5) — cooperative stop request.
+     *
+     * The run's tool loop honours it at its next per-iteration checkpoint, so
+     * the run stops BETWEEN iterations and finishes `completed` with a summary
+     * instead of being killed mid-round-trip. 409 when the run is already
+     * terminal — unlike steer, there is no meaningful fallback action.
+     *
+     * "Stop" (kill the process now) stays the existing
+     * `POST :id/runs/:runId/cancel` endpoint; it is not duplicated here.
+     */
+    @Post(':id/runs/:runId/interrupt')
+    @ApiOperation({
+        summary:
+            'Request a cooperative stop: the run halts between tool-loop iterations ' +
+            'and completes with a summary. 409 when the run is already terminal.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async interruptRun(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('runId', ParseUUIDPipe) runId: string,
+    ): Promise<{ interrupted: boolean; runId: string }> {
+        await this.service.getOne(auth.userId, id);
+        const steering = this.requireSteering();
+        const outcome = await steering.interrupt(runId, auth.userId);
+        void this.tryLog({
+            userId: auth.userId,
+            agentId: id,
+            actionType: ActivityActionType.AGENT_RUN_CANCELLED,
+            details: { runId, control: 'interrupt' },
+        });
+        return outcome;
+    }
+
+    /**
+     * Run steering (Wave 4 M5) — resume a parked / awaiting-input run.
+     *
+     * Dispatches a NEW run carrying the source run's `cliSessionId` (the
+     * pipeline plugin's own conversation id) and, optionally, a first message.
+     * Runs are immutable: the source row stays terminal. 409 when the run is
+     * not resumable (still live, or ended for a non-parked reason).
+     */
+    @Post(':id/runs/:runId/resume')
+    @ApiOperation({
+        summary:
+            'Resume a parked / awaiting-input run as a NEW run carrying the same ' +
+            'pipeline session. 409 when the run is not resumable.',
+    })
+    @HttpCode(HttpStatus.ACCEPTED)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async resumeRun(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('runId', ParseUUIDPipe) runId: string,
+        @Body() body: ResumeRunDto,
+    ): Promise<{
+        dispatched: 'new-run';
+        runId: string;
+        resumedFromRunId: string;
+        carriedCliSession: boolean;
+        queued: boolean;
+    }> {
+        await this.service.getOne(auth.userId, id);
+        const steering = this.requireSteering();
+        const outcome = await steering.resume(runId, auth.userId, body.message ?? null);
+        void this.tryLog({
+            userId: auth.userId,
+            agentId: id,
+            actionType: ActivityActionType.AGENT_RUN_TRIGGERED,
+            details: { runId: outcome.runId, source: 'resume', resumedFromRunId: runId },
+        });
+        return outcome;
+    }
+
+    /**
+     * The steering service is @Optional() so every positional spec
+     * constructor keeps compiling. An unbound service means the deployment is
+     * misconfigured — say so loudly rather than answering 200 for a control
+     * that never reached anything.
+     */
+    private requireSteering(): RunSteeringService {
+        if (!this.steering) {
+            throw new InternalServerErrorException(
+                'RunSteeringService is not available on this deployment.',
+            );
+        }
+        return this.steering;
     }
 
     @Get(':id/skills')

@@ -32,6 +32,9 @@ import {
     AGENT_ACTION_PROPOSAL_ACTION_TYPES,
     type AgentActionProposalActionType,
 } from '@ever-works/agent/agent-approvals';
+// Entity-free validation subpath on purpose — see the docstring on
+// `@ever-works/agent/validation`.
+import { MergePolicyDto } from '@ever-works/agent/validation';
 
 /**
  * Permissions partial sent on create/update — every flag optional;
@@ -223,6 +226,29 @@ export class CreateAgentDto {
     committerEmail?: string;
 }
 
+/**
+ * Wave 10 — POST /api/agents/from-template/:slug body. Everything is an
+ * OPTIONAL placement override: prompt, permissions, guardrails, and
+ * capabilities always come from the template itself.
+ */
+export class CreateAgentFromTemplateDto {
+    @ApiProperty({ required: false, minLength: 1, maxLength: 120 })
+    @IsOptional()
+    @IsString()
+    @MinLength(1)
+    @MaxLength(120)
+    name?: string;
+
+    @ApiProperty({ required: false, enum: AgentScope })
+    @IsOptional()
+    @IsEnum(AgentScope)
+    scope?: AgentScope;
+
+    @ApiProperty({ required: false }) @IsOptional() @IsUUID() missionId?: string;
+    @ApiProperty({ required: false }) @IsOptional() @IsUUID() ideaId?: string;
+    @ApiProperty({ required: false }) @IsOptional() @IsUUID() workId?: string;
+}
+
 export class UpdateAgentDto {
     @ApiProperty({ required: false, minLength: 1, maxLength: 120 })
     @IsOptional()
@@ -261,6 +287,15 @@ export class UpdateAgentDto {
     @Min(0)
     @Max(20000)
     maxSkillContextTokens?: number;
+
+    @ApiProperty({
+        required: false,
+        description:
+            'Memory recall injection toggle (on by default). When false, task-kind runs of this Agent skip the fenced agent-memory recall block.',
+    })
+    @IsOptional()
+    @IsBoolean()
+    memoryRecallEnabled?: boolean;
 
     @ApiProperty({ required: false, maxLength: 64 })
     @IsOptional()
@@ -338,6 +373,17 @@ export class UpdateAgentDto {
     @ValidateNested({ each: true })
     @Type(() => AgentScorecardMetricDto)
     scorecard?: AgentScorecardMetricDto[] | null;
+
+    /**
+     * Merge-policy matrix (Wave 3, D4) — this Agent's slice, the MOST
+     * specific scope. Every field inside is optional and inherits when
+     * omitted; `null` clears the Agent override entirely.
+     */
+    @ApiProperty({ required: false, type: MergePolicyDto, nullable: true })
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => MergePolicyDto)
+    mergePolicy?: MergePolicyDto | null;
 }
 
 /**
@@ -443,6 +489,90 @@ export class ListAgentRunsQueryDto {
     @IsInt()
     @Min(0)
     offset?: number;
+}
+
+/**
+ * Run orchestration (Wave 4 M3) — filters for the org-wide Sessions
+ * list (`GET /api/agents/runs`). Every filter optional; unset = all of
+ * the caller's runs. Enum whitelists mirror the entity unions — an
+ * unrecognized value is a 400, never a silent full-table answer.
+ */
+export class ListRunSessionsQueryDto {
+    @ApiProperty({
+        required: false,
+        enum: ['queued', 'running', 'completed', 'failed', 'cancelled'],
+    })
+    @IsOptional()
+    @IsIn(['queued', 'running', 'completed', 'failed', 'cancelled'])
+    status?: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+
+    @ApiProperty({ required: false, format: 'uuid' })
+    @IsOptional()
+    @IsUUID()
+    workId?: string;
+
+    @ApiProperty({ required: false, format: 'uuid' })
+    @IsOptional()
+    @IsUUID()
+    agentId?: string;
+
+    /** Quality gates (Wave 3 M6) — the Task detail Checks section fetches
+     *  the latest run for one Task (`taskId` + `limit=1`). */
+    @ApiProperty({ required: false, format: 'uuid' })
+    @IsOptional()
+    @IsUUID()
+    taskId?: string;
+
+    /** Trigger kind — named `kind` on the wire for the Sessions view. */
+    @ApiProperty({ required: false, enum: ['heartbeat', 'manual', 'task', 'chat', 'event'] })
+    @IsOptional()
+    @IsIn(['heartbeat', 'manual', 'task', 'chat', 'event'])
+    kind?: 'heartbeat' | 'manual' | 'task' | 'chat' | 'event';
+
+    @ApiProperty({ required: false, minimum: 1, maximum: 200 })
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(200)
+    limit?: number;
+
+    @ApiProperty({ required: false, minimum: 0 })
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(0)
+    offset?: number;
+}
+
+/**
+ * Run steering (Wave 4 M5) — payload for
+ * `POST /api/agents/:id/runs/:runId/steer`.
+ *
+ * The body cap mirrors the task-chat body cap (16 KB): steering is short
+ * by intent, and the message crosses a trust boundary into a live session's
+ * message list, so it is size-capped at the edge as well as in the service.
+ */
+export class SteerRunDto {
+    @ApiProperty({ maxLength: 16384 })
+    @IsString()
+    @IsNotEmpty()
+    @MaxLength(16384)
+    message: string;
+}
+
+/**
+ * Run steering (Wave 4 M5) — payload for
+ * `POST /api/agents/:id/runs/:runId/resume`. The message is optional:
+ * resuming a parked session with no new instruction is a valid, common
+ * action ("carry on").
+ */
+export class ResumeRunDto {
+    @ApiProperty({ required: false, maxLength: 16384 })
+    @IsOptional()
+    @IsString()
+    @MaxLength(16384)
+    message?: string;
 }
 
 /**

@@ -262,6 +262,52 @@ export class NotificationService {
         });
     }
 
+    /**
+     * Pricing Wave 9 M2 — platform credits balance could not cover a
+     * run's metered spend. Emitted by the run-cost settlement when a
+     * CONSUMPTION debit comes back insufficient (a zero-or-partial debit
+     * was recorded per the billing PRD policy; the run itself is never
+     * failed). Category reuses AI_CREDITS — the nearest existing
+     * billing-shaped category (no BILLING category exists yet).
+     */
+    async notifyCreditsBalanceExhausted(args: {
+        userId: string;
+        runId: string;
+        requiredCredits: number;
+        balanceCredits: number;
+    }): Promise<void> {
+        const balance = Math.max(0, Math.trunc(args.balanceCredits));
+        const message =
+            `A run's metered usage needed ${Math.trunc(args.requiredCredits)} credits but your ` +
+            `balance is ${balance}. The run finished normally; the uncovered remainder was not ` +
+            `debited. Top up credits to keep usage billing normally.`;
+        await this.create({
+            userId: args.userId,
+            type: NotificationType.ERROR,
+            category: NotificationCategory.AI_CREDITS,
+            title: 'Credits Balance Exhausted',
+            message,
+            actionUrl: '/settings',
+            actionLabel: 'Top Up Credits',
+            isPersistent: true,
+            metadata: {
+                runId: args.runId,
+                requiredCredits: Math.trunc(args.requiredCredits),
+                balanceCredits: balance,
+            },
+            deduplicationKey: 'credits_balance_exhausted',
+        });
+        await this.dispatchFanout({
+            userId: args.userId,
+            eventKey: 'credits_balance_exhausted',
+            title: 'Credits Balance Exhausted',
+            message,
+            actionUrl: '/settings',
+            actionLabel: 'Top Up Credits',
+            urgent: true,
+        });
+    }
+
     async notifyAiProviderError(
         userId: string,
         provider: string,
@@ -418,6 +464,52 @@ export class NotificationService {
             actionUrl: '/settings/oauth',
             actionLabel: 'Reconnect',
             urgent: true,
+        });
+    }
+
+    /**
+     * Digest briefings (Wave 7) — in-app digest row + notifications-v2
+     * channel fanout. `message` is the deterministic one-line summary
+     * (capped like every other producer); the full markdown body rides
+     * in `metadata.markdown` for richer renderers. Dedup key is
+     * per-user+period+window-day so a re-run of the same cron window
+     * updates nothing instead of stacking duplicates.
+     */
+    async notifyDigest(args: {
+        userId: string;
+        period: 'daily' | 'weekly';
+        title: string;
+        message: string;
+        markdown?: string;
+        deduplicationKey?: string;
+    }): Promise<void> {
+        const safeMessage = sanitizeDescription(args.message, 500);
+        const metadata: Record<string, any> = { period: args.period };
+        if (args.markdown) {
+            // Defensive cap — markdown is composed from repository rows
+            // (titles/summaries are user content) and stored as simple-json.
+            metadata.markdown =
+                args.markdown.length > 8000 ? args.markdown.slice(0, 8000) : args.markdown;
+        }
+        await this.create({
+            userId: args.userId,
+            type: NotificationType.INFO,
+            category: NotificationCategory.DIGEST,
+            title: args.title,
+            message: safeMessage,
+            actionUrl: '/activity',
+            actionLabel: 'View activity',
+            metadata,
+            deduplicationKey: args.deduplicationKey ?? `digest_${args.period}`,
+        });
+        await this.dispatchFanout({
+            userId: args.userId,
+            eventKey: 'digest_ready',
+            title: args.title,
+            message: safeMessage,
+            actionUrl: '/activity',
+            actionLabel: 'View activity',
+            urgent: false,
         });
     }
 

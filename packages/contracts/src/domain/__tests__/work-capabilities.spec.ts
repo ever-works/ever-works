@@ -129,9 +129,41 @@ describe('workKindHasItems', () => {
 	it('is false where an Items tab would be noise', () => {
 		expect(workKindHasItems('landing-page')).toBe(false);
 		expect(workKindHasItems('company')).toBe(false);
+		expect(workKindHasItems('campaign')).toBe(false);
 	});
 
 	it('defaults to true for an unknown kind, so nothing is hidden by accident', () => {
 		expect(workKindHasItems('storefront')).toBe(true);
+	});
+});
+
+/**
+ * The go-to-market campaign kind — the artifact home for what a go-to-market
+ * pipeline produces (lead lists, drafts awaiting the review gate, reports).
+ */
+describe('the campaign work kind', () => {
+	it('is a known kind that no longer degrades to "default"', () => {
+		expect(normalizeWorkKind('campaign')).toBe('campaign');
+		expect(normalizeWorkKind('  CAMPAIGN ')).toBe('campaign');
+	});
+
+	it('stays out of the create-path chip catalog, like company', () => {
+		expect(USER_SELECTABLE_WORK_KINDS as readonly string[]).not.toContain('campaign');
+		expect(WORK_KINDS as readonly string[]).toContain('campaign');
+	});
+
+	it('is a non-deployable, non-taxonomy shell with the knowledge base on', () => {
+		const caps = WORK_KIND_CAPABILITIES.campaign;
+		expect(caps.items.enabled).toBe(false);
+		expect(caps.taxonomy).toBe(false);
+		expect(caps.comparisons).toBe(false);
+		expect(caps.communityPr).toBe(false);
+		expect(caps.deploy).toBe(false);
+		expect(caps.kb).toBe(true);
+		expect(caps.repos.website).toBe(false);
+	});
+
+	it('maps to metrics that describe campaign effort and outcome', () => {
+		expect(WORK_KIND_CAPABILITIES.campaign.metrics).toEqual(['agents', 'open-tasks', 'conversions', 'days-active']);
 	});
 });

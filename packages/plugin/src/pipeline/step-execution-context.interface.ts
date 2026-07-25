@@ -155,4 +155,22 @@ export interface StepExecutionContext {
 	 * default per-run association (no explicit session id).
 	 */
 	readonly memorySessionId?: string;
+
+	/**
+	 * Memory recall preamble block (memory upgrades M3). A fully fenced,
+	 * neutralized `<agent_memory>…</agent_memory>` block resolved ONCE at
+	 * dispatch by the agent-side orchestrator (`FullPipelineExecutorService`
+	 * → shared `resolveMemoryRecall` helper) from the Work's agent-memory
+	 * provider. Self-managed pipeline plugins (claude-code, codex,
+	 * opencode, claude-managed-agent) splice it VERBATIM into their
+	 * session preamble / system prompt — no per-plugin formatting,
+	 * neutralizing, or truncation: the helper is the single trust
+	 * boundary for recalled memory content.
+	 *
+	 * Optional carrier (same posture as `kbContext` / `memorySessionId`):
+	 * absent when no agent-memory provider is enabled, when the Work's
+	 * `memoryRecallEnabled` toggle is off, or on older orchestrators —
+	 * plugins must treat `undefined` as "nothing to splice".
+	 */
+	readonly memoryRecall?: string;
 }

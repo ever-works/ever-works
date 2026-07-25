@@ -42,7 +42,9 @@
         "class-transformer": "^0.5.1",
         "reflect-metadata": "^0.2.2",
         "rxjs": "^7.8.2",
-        "superjson": "^1.13.3"
+        "superjson": "^1.13.3",
+        "@ever-works/pty-local-plugin": "workspace:*",
+        "@ever-works/contracts": "workspace:*"
     },
     "devDependencies": {
         "@trigger.dev/build": "^4.4.6",

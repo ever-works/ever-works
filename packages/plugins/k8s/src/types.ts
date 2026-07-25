@@ -141,6 +141,23 @@ export interface KubernetesClusterInfo {
 }
 
 /**
+ * One cluster node as reported by `listClusterNodes` (Fleet, Wave 12):
+ * a read-only inventory summary for USER-configured clusters
+ * (`clusterSource: 'custom-kubeconfig'`) — never persisted platform-side.
+ */
+export interface ClusterNodeDescriptor {
+	name: string;
+	/** True when the node's Ready condition is True. */
+	ready: boolean;
+	/** os/arch, e.g. 'linux/amd64' (from nodeInfo). */
+	platform?: string;
+	/** Kubelet version, e.g. 'v1.30.2'. */
+	version?: string;
+	/** Role labels (`node-role.kubernetes.io/<role>`), e.g. ['control-plane']. */
+	roles?: string[];
+}
+
+/**
  * Per-IngressClass info reported by `validateConnection`.
  */
 export interface IngressClassDescriptor {

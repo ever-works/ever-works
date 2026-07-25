@@ -1,5 +1,6 @@
 import type { Metadata } from 'next';
 import { tasksAPI } from '@/lib/api/tasks';
+import { workAPI } from '@/lib/api';
 import { TasksScopedSection } from '@/components/tasks/TasksScopedSection';
 
 export const metadata: Metadata = { title: 'Tasks' };
@@ -17,10 +18,20 @@ export const metadata: Metadata = { title: 'Tasks' };
  */
 export default async function WorkTasksTabPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
-    const result = await tasksAPI.list({ workId: id, limit: 100 });
+    // Wave 4 M4 — the fleet summary chips ride the Tasks tab header.
+    // Best-effort: a summary miss must never break the Tasks tab.
+    const [result, runsSummary] = await Promise.all([
+        tasksAPI.list({ workId: id, limit: 100, includeRun: true }),
+        workAPI.getRunsSummary(id).catch(() => null),
+    ]);
     return (
         <div className="p-6 max-w-screen-2xl mx-auto">
-            <TasksScopedSection tasks={result.data} scopeLabel="Work" scopeId={id} />
+            <TasksScopedSection
+                tasks={result.data}
+                scopeLabel="Work"
+                scopeId={id}
+                runsSummary={runsSummary}
+            />
         </div>
     );
 }

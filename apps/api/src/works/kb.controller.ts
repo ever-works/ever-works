@@ -35,12 +35,14 @@ import {
     KbDocumentQueryDto,
     LockKbDocumentDto,
     RestoreKbDocumentDto,
+    TransitionKbDecisionStatusDto,
     UpdateKbDocumentDto,
     UpdateKbTagDto,
 } from '@ever-works/agent/dto';
 import { AuthSessionGuard, CurrentUser } from '../auth';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
 import type {
+    KbDecisionStatus,
     KbDocumentClass,
     KbDocumentStatus,
     KbLockMode,
@@ -249,6 +251,71 @@ export class KbController {
         return this.kb.getDocumentHistory(workId, docId, auth.userId, {
             limit: parsedLimit,
         });
+    }
+
+    @Post('works/:id/kb/documents/:docId/decision-status')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Transition the status of a decision-class KB document',
+        description:
+            'Platform-side decision status machine (proposed → accepted → superseded → archived; archived reachable from every non-terminal state). Owner-scoped; validates the transition and returns 409 on an illegal move. Transitioning to superseded with `supersededByDocId` records the replacement chain on both documents.',
+    })
+    @ApiResponse({ status: 200, description: 'Decision status transitioned' })
+    @ApiResponse({ status: 400, description: 'Not a decision-class document' })
+    @ApiResponse({ status: 404, description: 'Document (or superseding document) not found' })
+    @ApiResponse({ status: 409, description: 'Illegal status transition' })
+    async transitionDecisionStatus(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', new ParseUUIDPipe()) workId: string,
+        @Param('docId', new ParseUUIDPipe()) docId: string,
+        @Body() body: TransitionKbDecisionStatusDto,
+    ) {
+        return this.kb.transitionDecisionStatus(
+            workId,
+            docId,
+            auth.userId,
+            // Contracts literal union → agent runtime enum at the
+            // controller→service boundary (same cast pattern as `class`).
+            body.status as KbDecisionStatus,
+            {
+                supersededByDocId: body.supersededByDocId,
+                rationale: body.rationale,
+            },
+        );
+    }
+
+    @Post('works/:id/kb/documents/:docId/accept')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Accept a proposed (agent-authored) KB document',
+        description:
+            'Review action (memory upgrades M7). Flips reviewState to accepted so the document starts feeding agent context; a decision-class document still in proposed status is accepted as current in the same call. Idempotent.',
+    })
+    @ApiResponse({ status: 200, description: 'Document accepted' })
+    @ApiResponse({ status: 404, description: 'Document not found' })
+    async acceptDocument(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', new ParseUUIDPipe()) workId: string,
+        @Param('docId', new ParseUUIDPipe()) docId: string,
+    ) {
+        return this.kb.acceptDocument(workId, docId, auth.userId);
+    }
+
+    @Post('works/:id/kb/documents/:docId/archive')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Archive a KB document (review action — never a physical delete)',
+        description:
+            'Review action (memory upgrades M7). Sets the document status to archived (kept readable, excluded from default listings and context injection); a decision-class document has its decision status archived too. Idempotent.',
+    })
+    @ApiResponse({ status: 200, description: 'Document archived' })
+    @ApiResponse({ status: 404, description: 'Document not found' })
+    async archiveDocument(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', new ParseUUIDPipe()) workId: string,
+        @Param('docId', new ParseUUIDPipe()) docId: string,
+    ) {
+        return this.kb.archiveDocument(workId, docId, auth.userId);
     }
 
     @Get('works/:id/kb/documents/:docId/citations')

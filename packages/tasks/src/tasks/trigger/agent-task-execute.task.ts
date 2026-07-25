@@ -1,8 +1,18 @@
 import { task } from '@trigger.dev/sdk';
 import { NestFactory } from '@nestjs/core';
-import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
-import { AgentRunService } from '@ever-works/agent/agents';
-import { TasksService } from '@ever-works/agent/tasks-domain';
+import type { TaskAcceptanceCheck, TaskCheckResult } from '@ever-works/contracts';
+import { AgentRepository, AgentRunRepository, WorkRepository } from '@ever-works/agent/database';
+import { AgentRunService, RunDispatchGateService } from '@ever-works/agent/agents';
+import {
+    resolveAcceptanceChecks,
+    resolveChecksPolicy,
+    resolveMaxGateAttempts,
+    TaskChatService,
+    TaskGateRunnerService,
+    TaskRunDenormService,
+    TasksService,
+    TaskWorkspaceService,
+} from '@ever-works/agent/tasks-domain';
 import { TriggerInternalModule } from '../../trigger/worker/modules/trigger-internal.module';
 import { createTriggerLogger } from '../../trigger/worker/trigger-logger';
 // Security: import assertUuid to validate Trigger.dev payload fields before any DB access
@@ -32,6 +42,84 @@ const CHAT_TEMPLATE_MARKER_PATTERN =
  */
 function neutralizeControlTokens(value: string): string {
     return value.replace(CHAT_TEMPLATE_MARKER_PATTERN, '');
+}
+
+/**
+ * Quality gates — the check results that turned the gate red: not-green
+ * AND declared required (informational checks report but never block, so
+ * they must not drive the iterate loop or the failure summary either).
+ */
+function filterRequiredGateFailures(
+    results: TaskCheckResult[],
+    checks: TaskAcceptanceCheck[],
+): TaskCheckResult[] {
+    return results.filter((checkResult) => {
+        const check = checks.find((c) => c.id === checkResult.id);
+        return checkResult.status !== 'green' && check?.required !== false;
+    });
+}
+
+/** Human-readable verdict for one failed check result. */
+function describeCheckFailure(checkResult: TaskCheckResult): string {
+    return checkResult.status === 'timeout'
+        ? 'timed out'
+        : checkResult.status === 'error'
+          ? 'could not run'
+          : `exit code ${checkResult.exitCode}`;
+}
+
+/**
+ * Quality gates (Wave 3 M5) — compose the iterate message that resumes the
+ * agent loop after a red gate: the failing checks' ids, verdicts, and
+ * output tails, machine-generated in the same shape as human rejection
+ * feedback.
+ *
+ * Security (prompt-injection hardening): check ids are user-authored and
+ * `logTail` is whatever the checked-out repo's build/test output printed —
+ * both partially attacker-controlled — and this string becomes the run's
+ * `immediateInput`. Every dynamic field is passed through
+ * `neutralizeControlTokens` so a crafted chat-template control marker in a
+ * test name or build log cannot spoof a system/user turn. Same mechanical
+ * strip as Task title/description above: benign content passes unchanged.
+ */
+function composeGateIterateMessage(input: {
+    failing: TaskCheckResult[];
+    attempt: number;
+    maxAttempts: number;
+}): string {
+    const lines: string[] = [
+        `Quality gate: the task's acceptance checks FAILED (attempt ${input.attempt} of ${input.maxAttempts}).`,
+        'Fix the underlying problems in the workspace so every required check passes, then finish. The checks re-run automatically after you are done — do not just claim they pass.',
+        '',
+        'Failing checks:',
+    ];
+    for (const checkResult of input.failing) {
+        lines.push(
+            `- ${neutralizeControlTokens(String(checkResult.id))}: ${describeCheckFailure(checkResult)}`,
+        );
+        if (checkResult.logTail) {
+            lines.push('  Output tail:');
+            for (const tailLine of neutralizeControlTokens(checkResult.logTail).split('\n')) {
+                lines.push(`    ${tailLine}`);
+            }
+        }
+    }
+    return lines.join('\n');
+}
+
+/**
+ * Kanban run cockpit (Wave 2) — the latest-run denorm + telemetry writes
+ * are board decoration, never source of truth (`agent_runs` is). They go
+ * over the internal RPC proxy, so the transport itself can throw even
+ * though `TaskRunDenormService` swallows its own DB errors — wrap every
+ * call so a telemetry hiccup can never fail or skip the run.
+ */
+async function bestEffort(write: () => Promise<unknown>): Promise<void> {
+    try {
+        await write();
+    } catch {
+        // Best-effort by contract.
+    }
 }
 
 export interface AgentTaskExecutePayload {
@@ -80,6 +168,18 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                     : await runs.findInFlightForTaskAgent(payload.taskId, payload.agentId);
                 if (inFlight && (inFlight.status === 'queued' || inFlight.status === 'running')) {
                     await runs.markFailed(inFlight.id, message);
+                    // Kanban run cockpit — mirror the failure onto the board.
+                    const denorm = appContext.get(TaskRunDenormService);
+                    await bestEffort(() =>
+                        denorm.recordTerminal(payload.taskId, inFlight.id, 'failed'),
+                    );
+                    // Run orchestration (Wave 4 M2) — the failure freed a
+                    // concurrency slot; drain the Work's parked queue (RPC).
+                    if (inFlight.workId) {
+                        const failedWorkId = inFlight.workId;
+                        const gate = appContext.get(RunDispatchGateService);
+                        await bestEffort(() => gate.drainForWork(failedWorkId));
+                    }
                 }
             } finally {
                 await appContext.close();
@@ -106,6 +206,17 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
             const runs = appContext.get(AgentRunRepository);
             const runner = appContext.get(AgentRunService);
             const tasks = appContext.get(TasksService);
+            // Kanban run cockpit (Wave 2) — latest-run denorm writes after
+            // claim + terminal transitions. RPC proxy; every call best-effort.
+            const runDenorm = appContext.get(TaskRunDenormService);
+            // Run orchestration (Wave 4 M2) — drain-on-terminal: every
+            // terminal write below frees a concurrency slot, so the Work's
+            // parked queue is drained (RPC proxy; always best-effort).
+            const dispatchGate = appContext.get(RunDispatchGateService);
+            const drainWork = async (workId: string | null | undefined): Promise<void> => {
+                if (!workId) return;
+                await bestEffort(() => dispatchGate.drainForWork(workId));
+            };
 
             // Security: scope the Agent lookup to the payload's userId
             // (defense-in-depth IDOR guard). The legitimate dispatch path
@@ -174,7 +285,14 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                     userId: agent.userId,
                     triggerKind: 'task',
                     taskId: payload.taskId,
+                    // Wave 4 M1 — workId denorm at creation (owner-scoped
+                    // taskRow resolved above).
+                    workId: taskRow.workId ?? null,
                 });
+                // Kanban run cockpit — on-the-fly creation (dispatcher row was
+                // never found), mirror it exactly like the fan-out path does.
+                const createdRunId = run.id;
+                await bestEffort(() => runDenorm.recordQueued(payload.taskId, createdRunId));
             }
 
             const claimed = await runs.markStarted(run.id, ctx?.run?.id ?? null);
@@ -186,6 +304,69 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
             // re-claiming an already-running row still returns true.
             if (!claimed) {
                 return { status: 'skipped', reason: 'run-already-terminal', runId: run.id };
+            }
+            // Kanban run cockpit — claim succeeded: flip the board chip to
+            // `running` and seed the live-activity line so the card shows
+            // what the run is doing from its very first seconds.
+            const claimedRunId = run.id;
+            await bestEffort(() => runDenorm.recordStarted(payload.taskId, claimedRunId));
+            await bestEffort(() =>
+                runs.updateTelemetry(claimedRunId, {
+                    currentActivity: `Executing task ${taskRow.slug ?? payload.taskId}`,
+                }),
+            );
+
+            // Wave 3 M2 — dispatch-freeze: resolve the acceptance-check set
+            // (Task checks merged over Work defaults) ONCE, right after the
+            // claim, and snapshot it onto the run. An in-flight run is graded
+            // against what was agreed when it started — later edits to the
+            // Task or the Work defaults affect the next run, not this one.
+            let gateWork: Awaited<ReturnType<WorkRepository['findById']>> = null;
+            let resolvedChecks: TaskAcceptanceCheck[] = [];
+            const works = appContext.get(WorkRepository);
+            try {
+                gateWork = taskRow.workId ? await works.findById(taskRow.workId) : null;
+                resolvedChecks = resolveAcceptanceChecks(taskRow, gateWork);
+            } catch {
+                // Work lookup failed (RPC hiccup). gateWork stays null, so the
+                // policy resolves 'off' below and the run proceeds exactly as
+                // it did before quality gates existed — fail toward the
+                // status quo, never toward a half-resolved gate.
+            }
+            await bestEffort(() => runs.updateGateResults(claimedRunId, { resolvedChecks }));
+
+            // Wave 2 M3 — worktree-per-Task isolation. Resolves the Work +
+            // Task settings and provisions the isolated workspace when (and
+            // only when) isolation resolves on; null on the default-off
+            // path. Provisioning failure with isolation ON fails the run
+            // LOUDLY — the user opted into isolation; silently degrading to
+            // a shared checkout would betray that setting.
+            let workspaceCwd: string | null = null;
+            const taskWorkspace = appContext.get(TaskWorkspaceService);
+            let provisioned: Awaited<ReturnType<TaskWorkspaceService['provisionForRun']>> = null;
+            try {
+                provisioned = await taskWorkspace.provisionForRun({
+                    task: taskRow,
+                    userId: payload.userId,
+                    runId: run.id,
+                    agentCanCommit:
+                        (agent as { permissions?: { canCommitToRepo?: boolean } }).permissions
+                            ?.canCommitToRepo !== false,
+                });
+                workspaceCwd = provisioned?.cwd ?? null;
+            } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                await runs.markFailed(run.id, `Workspace provisioning failed: ${message}`);
+                await bestEffort(() =>
+                    runDenorm.recordTerminal(payload.taskId, claimedRunId, 'failed'),
+                );
+                await drainWork(taskRow.workId);
+                return {
+                    status: 'failed',
+                    reason: 'workspace-provision-failed',
+                    runId: run.id,
+                    taskId: payload.taskId,
+                };
             }
 
             // `taskRow` was resolved above (owner-scoped) before any run
@@ -204,6 +385,9 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                       .join('\n')
                 : `Task ${payload.taskId}`;
 
+            const scopeContext = taskRow
+                ? `Task scope: mission=${taskRow.missionId ?? 'none'}, idea=${taskRow.ideaId ?? 'none'}, work=${taskRow.workId ?? 'none'}`
+                : null;
             const result = await runner.execute({
                 runId: run.id,
                 agentId: agent.id,
@@ -212,15 +396,295 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                 signal,
                 taskId: payload.taskId,
                 immediateInput,
-                scopeContext: taskRow
-                    ? `Task scope: mission=${taskRow.missionId ?? 'none'}, idea=${taskRow.ideaId ?? 'none'}, work=${taskRow.workId ?? 'none'}`
-                    : null,
+                workspaceCwd,
+                scopeContext,
             });
+
+            // Wave 3 M3 — the PR gate: "a red check opens no PR". After the
+            // agent loop succeeds and BEFORE any terminal bookkeeping or the
+            // finalize/PR step, run the dispatch-frozen acceptance checks in
+            // the provisioned workspace. Green (or a warn-only policy)
+            // proceeds to finalize exactly as before; red under a 'required'
+            // policy withholds the PR.
+            const runSucceeded = result.status === 'assembled' || result.status === 'dispatched';
+            const gatePolicy = resolveChecksPolicy(gateWork);
+            let gateOutcome: Awaited<ReturnType<TaskGateRunnerService['runChecks']>> | null = null;
+            let gateAttempts = 0;
+            // Wave 3 M5 — why the iterate loop stopped before green:
+            // 'budget' = the Agent's budget cap was reached between attempts;
+            // 'agent-loop' = an iterate attempt's agent loop did not complete
+            // (cancelled / budget-blocked inside execute / dispatch failure),
+            // so re-running the checks would grade unchanged work.
+            let iterateStop: 'budget' | 'agent-loop' | null = null;
+            if (provisioned && runSucceeded && gatePolicy !== 'off') {
+                const gateRunner = appContext.get(TaskGateRunnerService);
+                const maxGateAttempts = resolveMaxGateAttempts(taskRow, gateWork);
+                try {
+                    gateAttempts = 1;
+                    gateOutcome = await gateRunner.runChecks({
+                        checks: resolvedChecks,
+                        cwd: provisioned.cwd,
+                        runId: run.id,
+                        policy: gatePolicy,
+                        attempt: gateAttempts,
+                    });
+
+                    // Wave 3 M5 — bounded red → iterate loop. On a red gate
+                    // under a 'required' policy the run does not end: the
+                    // failing checks (ids + output tails, control-token
+                    // neutralized) are fed back to the SAME run's agent loop
+                    // as machine-generated rejection feedback, then the
+                    // checks re-run — until green, the attempt cap
+                    // (`resolveMaxGateAttempts`, clamped 1..5), or the Agent
+                    // budget stops it. 'skipped' (zero checks) never
+                    // iterates: there is nothing for another attempt to fix.
+                    while (
+                        gatePolicy === 'required' &&
+                        gateOutcome.gateStatus === 'red' &&
+                        gateAttempts < maxGateAttempts
+                    ) {
+                        // Budget consult between attempts (existing
+                        // AgentBudget surface via AgentRunService — RPC).
+                        // Only an explicit `allowed: false` stops the loop:
+                        // an unreachable budget check falls back to the
+                        // attempt cap alone, never to a phantom "over
+                        // budget". (`runner.execute` also re-checks the
+                        // budget itself at the start of every attempt, so
+                        // this is an early-out, not the only enforcement.)
+                        try {
+                            const budget = await runner.checkBudget(agent);
+                            if (budget && budget.allowed === false) {
+                                iterateStop = 'budget';
+                                break;
+                            }
+                        } catch {
+                            // Budget check unreachable from the worker —
+                            // documented fail-open to the loop cap.
+                        }
+
+                        const iterateMessage = composeGateIterateMessage({
+                            failing: filterRequiredGateFailures(
+                                gateOutcome.results,
+                                resolvedChecks,
+                            ),
+                            attempt: gateAttempts,
+                            maxAttempts: maxGateAttempts,
+                        });
+                        const nextAttempt = gateAttempts + 1;
+                        await bestEffort(() =>
+                            runs.updateTelemetry(claimedRunId, {
+                                currentActivity: `Quality gate red — iterating (attempt ${nextAttempt} of ${maxGateAttempts})`,
+                            }),
+                        );
+                        let iterateSucceeded = false;
+                        try {
+                            const iterateResult = await runner.execute({
+                                runId: run.id,
+                                agentId: agent.id,
+                                userId: payload.userId,
+                                kind: 'task',
+                                signal,
+                                taskId: payload.taskId,
+                                immediateInput: iterateMessage,
+                                workspaceCwd,
+                                scopeContext,
+                            });
+                            iterateSucceeded =
+                                iterateResult.status === 'assembled' ||
+                                iterateResult.status === 'dispatched';
+                        } catch {
+                            // An iterate attempt that crashed in transit is
+                            // handled like any other incomplete attempt —
+                            // the FIRST attempt's verdict already stands and
+                            // the red path below reports honestly.
+                            iterateSucceeded = false;
+                        }
+                        if (!iterateSucceeded) {
+                            iterateStop = 'agent-loop';
+                            break;
+                        }
+                        // Only a completed agent loop consumes an attempt —
+                        // `gateAttempts` counts GATE EXECUTIONS, so the local
+                        // counter always matches the persisted
+                        // `agent_runs.gateAttempts` the runner writes.
+                        gateAttempts = nextAttempt;
+                        gateOutcome = await gateRunner.runChecks({
+                            checks: resolvedChecks,
+                            cwd: provisioned.cwd,
+                            runId: run.id,
+                            policy: gatePolicy,
+                            attempt: gateAttempts,
+                        });
+                    }
+                } catch (error) {
+                    // A crashed gate step marks the run FAILED, never green —
+                    // a gate that did not run must not pass anything.
+                    const message = error instanceof Error ? error.message : String(error);
+                    await runs.markFailed(run.id, `Quality gate execution failed: ${message}`);
+                    await bestEffort(() =>
+                        runDenorm.recordTerminal(payload.taskId, claimedRunId, 'failed'),
+                    );
+                    // Terminal transition — free the Work's concurrency slot.
+                    await drainWork(taskRow.workId);
+                    return {
+                        status: 'failed',
+                        reason: 'gate-execution-failed',
+                        runId: run.id,
+                        taskId: payload.taskId,
+                    };
+                }
+
+                if (gatePolicy === 'required' && gateOutcome.gateStatus !== 'green') {
+                    // Red after every allowed attempt — or 'skipped' when the
+                    // required policy found zero checks. Either way: no
+                    // finalize, no PR. The workspace and the Task's
+                    // branchState stay exactly as they are; a human reply in
+                    // task chat resumes the agent, which re-runs the checks.
+                    const requiredFailed = filterRequiredGateFailures(
+                        gateOutcome.results,
+                        resolvedChecks,
+                    );
+                    const attemptNoun = gateAttempts === 1 ? 'attempt' : 'attempts';
+                    const summary =
+                        resolvedChecks.length === 0
+                            ? 'Quality gate: no checks configured — PR withheld (checks policy is required).'
+                            : `Quality gate red after ${gateAttempts} ${attemptNoun}: ${requiredFailed
+                                  .map((checkResult) => checkResult.id)
+                                  .join(', ')} — PR withheld.`;
+                    await runs.markCompleted(run.id, summary);
+                    await bestEffort(() =>
+                        runDenorm.recordTerminal(payload.taskId, claimedRunId, 'completed'),
+                    );
+                    // Terminal transition — free the Work's concurrency slot.
+                    await drainWork(taskRow.workId);
+                    // Task chat gets the human-facing breakdown. Plain text —
+                    // the chat surface never renders agent messages as markup.
+                    const taskChat = appContext.get(TaskChatService);
+                    const chatBody =
+                        resolvedChecks.length === 0
+                            ? 'Quality gate: no checks configured, and this Work requires acceptance checks — no PR was opened. Add checks to the Task or to the Work defaults, then send a message here to re-run.'
+                            : [
+                                  `Quality gate red after ${gateAttempts} ${attemptNoun} — no PR was opened.`,
+                                  ...(iterateStop === 'budget'
+                                      ? [
+                                            '',
+                                            "Iteration stopped early: the Agent's budget cap for this period was reached.",
+                                        ]
+                                      : []),
+                                  '',
+                                  'Failed checks:',
+                                  ...requiredFailed.map(
+                                      (checkResult) =>
+                                          `- ${checkResult.id}: ${describeCheckFailure(checkResult)}`,
+                                  ),
+                                  '',
+                                  'Fix the issues (or adjust the checks), then send a message here to re-run.',
+                              ].join('\n');
+                    await bestEffort(() =>
+                        taskChat.post(payload.userId, {
+                            taskId: payload.taskId,
+                            authorType: 'agent',
+                            authorId: agent.id,
+                            body: chatBody,
+                        }),
+                    );
+                    return {
+                        status: 'completed',
+                        reason: 'gate-red',
+                        agentId: agent.id,
+                        taskId: payload.taskId,
+                        runId: run.id,
+                        dedupKey: payload.dedupKey,
+                        gateStatus: gateOutcome.gateStatus,
+                        gateAttempts,
+                    };
+                }
+            }
 
             if (result.status === 'assembled') {
                 await runs.markCompleted(run.id, `Prompt assembled for task ${payload.taskId}`);
+                await bestEffort(() =>
+                    runDenorm.recordTerminal(payload.taskId, claimedRunId, 'completed'),
+                );
+                await drainWork(taskRow.workId);
             } else if (result.status === 'agent-not-found') {
                 await runs.markFailed(run.id, 'Agent not found');
+                await bestEffort(() =>
+                    runDenorm.recordTerminal(payload.taskId, claimedRunId, 'failed'),
+                );
+                await drainWork(taskRow.workId);
+            } else if (result.status === 'interrupted') {
+                // Run steering (Wave 4 M5) — a human stopped the loop between
+                // iterations. `AgentRunService.finalize` already marked the row
+                // `completed` with a summary, so NO status write here; what is
+                // still owed is the bookkeeping every other terminal path does:
+                // mirror the board chip off "running", and free the Work's
+                // concurrency slot. `runSucceeded` is false for this status, so
+                // the gate and the PR step below are skipped by construction —
+                // an interrupted run must not be graded or shipped.
+                await bestEffort(() =>
+                    runDenorm.recordTerminal(payload.taskId, claimedRunId, 'completed'),
+                );
+                await drainWork(taskRow.workId);
+            }
+
+            // Wave 2 M4 — green-path finalize of the isolated workspace:
+            // commit + push the run's output, simulate the merge against
+            // a FRESH base, then open the PR (→ in_review) or refuse it
+            // with NAMED conflict paths (→ blocked). Only runs when a
+            // workspace was provisioned and the run itself succeeded.
+            if (provisioned && runSucceeded) {
+                // Wave 3 M3 — a green gate earns a note on the PR body. Only
+                // when EVERY check (required and informational) came back
+                // green, so the note can never overstate the verdict.
+                const gateNote =
+                    gateOutcome &&
+                    gateOutcome.gateStatus === 'green' &&
+                    gateOutcome.results.length > 0 &&
+                    gateOutcome.results.every((checkResult) => checkResult.status === 'green')
+                        ? { checksPassed: gateOutcome.results.length }
+                        : undefined;
+                try {
+                    const finalize = await taskWorkspace.finalizeRun({
+                        task: taskRow,
+                        userId: payload.userId,
+                        agentId: agent.id,
+                        agentCanOpenPullRequests:
+                            (agent as { permissions?: { canOpenPullRequests?: boolean } })
+                                .permissions?.canOpenPullRequests !== false,
+                        workspace: provisioned,
+                        ...(gateNote ? { gate: gateNote } : {}),
+                    });
+                    return {
+                        status: 'completed',
+                        agentId: agent.id,
+                        taskId: payload.taskId,
+                        runId: run.id,
+                        dedupKey: payload.dedupKey,
+                        workspaceOutcome: finalize.outcome,
+                    };
+                } catch (error) {
+                    // The run executed but its output never landed on the
+                    // branch — that IS a failure of the Task's promise.
+                    const message = error instanceof Error ? error.message : String(error);
+                    await runs.markFailed(run.id, `Workspace finalize failed: ${message}`);
+                    await drainWork(taskRow.workId);
+                    // Mirror-consistency: for `assembled` runs the row was
+                    // already marked completed above, so this markFailed CAS
+                    // no-ops — only mirror `failed` when the row could
+                    // actually flip (still running, i.e. `dispatched`).
+                    if (result.status !== 'assembled') {
+                        await bestEffort(() =>
+                            runDenorm.recordTerminal(payload.taskId, claimedRunId, 'failed'),
+                        );
+                    }
+                    return {
+                        status: 'failed',
+                        reason: 'workspace-finalize-failed',
+                        runId: run.id,
+                        taskId: payload.taskId,
+                    };
+                }
             }
 
             return {

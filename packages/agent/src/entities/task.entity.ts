@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 import { PortableDateColumn } from './_types';
+import type { TaskAcceptanceCheck } from '@ever-works/contracts';
 
 /**
  * Tasks feature — Phase 11.1 (`features/task-tracking/plan.md §3.1` +
@@ -64,6 +65,7 @@ export type TaskActorType = 'user' | 'agent';
 @Index('idx_tasks_agent', ['agentId', 'status'])
 @Index('idx_tasks_goal', ['goalId', 'status'])
 @Index('idx_tasks_parent', ['parentTaskId'])
+@Index('idx_tasks_branch_state', ['workId', 'branchState'])
 // Phase 17 hot path — dispatcher walks rows where (isRecurring, nextOccurrenceAt <= now).
 @Index('idx_tasks_recurrence_due', ['isRecurring', 'nextOccurrenceAt'])
 export class Task {
@@ -134,6 +136,58 @@ export class Task {
     @Column({ type: 'uuid', nullable: true })
     parentTaskId?: string | null;
 
+    // ── Task isolation (worktree-per-Task, Wave 2 M1) ────────────────
+
+    /** Per-Task override of the Work's `taskIsolation` setting:
+     *  NULL = inherit; `'on' | 'off'` force it. Resolution lives in
+     *  `tasks-domain/task-isolation.ts` (one function, unit-tested). */
+    @Column({ type: 'varchar', length: 8, nullable: true })
+    isolationMode?: string | null;
+
+    /** The Task's branch (e.g. `task/t-42-9f3c1a2b`). AUTHORITATIVE once
+     *  written — never recomputed, so a slug edit can't orphan it. The
+     *  branch is the durable workspace identity in cloud mode. */
+    @Column({ type: 'varchar', length: 200, nullable: true })
+    branchRef?: string | null;
+
+    /** Branch lifecycle: `none | created | pushed | pr-open | conflict |
+     *  merged | discarded`. NULL = isolation never engaged. */
+    @Column({ type: 'varchar', length: 16, nullable: true })
+    branchState?: string | null;
+
+    /** SHA of the fetched base commit the branch was cut from. */
+    @Column({ type: 'varchar', length: 40, nullable: true })
+    baseSha?: string | null;
+
+    /** PR opened from the Task branch (community-PR flow). */
+    @Column({ type: 'int', nullable: true })
+    prNumber?: number | null;
+
+    @Column({ type: 'varchar', length: 512, nullable: true })
+    prUrl?: string | null;
+
+    /** Named conflicting paths when `branchState='conflict'` — surfaced
+     *  verbatim in the blocked banner and the task-chat system message. */
+    @Column({ type: 'simple-json', nullable: true })
+    conflictPaths?: string[] | null;
+
+    // ── Latest-run denorm (kanban run cockpit, Wave 2) ───────────────
+    // Maintained by `TaskRunDenormService` on queued creation, claim and
+    // terminal transition of task-kind AgentRuns. Denormalized so the
+    // board list can batch-embed the latest run per card (single IN
+    // query on `latestRunId`) without a per-task latest-run subquery.
+    // No `@ManyToOne` — same entities-import-cycle rule as the owner
+    // columns above; the pointer is best-effort telemetry, not a FK.
+
+    /** Id of the most recent AgentRun dispatched for this Task. */
+    @Column({ type: 'uuid', nullable: true })
+    latestRunId?: string | null;
+
+    /** Status mirror of that run (`queued|running|completed|failed|
+     *  cancelled`) so list filters/chips don't need the runs table. */
+    @Column({ type: 'varchar', length: 16, nullable: true })
+    latestRunStatus?: string | null;
+
     @Column({ type: 'varchar', length: 16 })
     createdByType: TaskActorType;
 
@@ -152,6 +206,26 @@ export class Task {
     // Reserve-only column — populated in v2 when "promote Task → Idea" lands.
     @Column({ type: 'uuid', nullable: true })
     promotedToIdeaId?: string | null;
+
+    // ── Quality gates ──────────────────────────────────────────────
+    /**
+     * Acceptance checks declared on this Task. `null` = inherit the Work's
+     * `checkDefaults` untouched. Merge semantics (a same-id entry replaces
+     * the Work default; `disabled: true` suppresses it) live in
+     * `tasks-domain/task-gates.ts#resolveAcceptanceChecks` — executors must
+     * read the resolved list, never this column directly, or suppression
+     * entries would be run as commands.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    acceptanceChecks?: TaskAcceptanceCheck[] | null;
+
+    /**
+     * Gate-attempt budget for this Task. `null` = inherit the Work's value
+     * (whose column default is 2). Clamped to 1..5 at resolve time so a
+     * hand-edited row can never grant an unbounded retry loop.
+     */
+    @Column({ type: 'int', nullable: true })
+    maxGateAttempts?: number | null;
 
     // ── Recurring (F5 override) ────────────────────────────────────
     @Column({ type: 'boolean', default: false })

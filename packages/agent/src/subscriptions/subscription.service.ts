@@ -103,6 +103,16 @@ export class SubscriptionService implements OnModuleInit {
         return config.subscriptions.isEnabled();
     }
 
+    /**
+     * Wave 13 (Billing page) — all active seeded plans for the plan/tier
+     * switcher. Read-only; plans are seeded at boot by {@link seedPlans}
+     * regardless of the `SUBSCRIPTIONS_ENABLED` flag, so the switcher can
+     * render (degraded) even on deploys where billing is off.
+     */
+    async listPlans(): Promise<SubscriptionPlan[]> {
+        return this.planRepository.findAllActive();
+    }
+
     async getActiveSubscription(userId: string) {
         return this.userSubscriptionRepository.findActiveByUser(userId);
     }

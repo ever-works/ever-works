@@ -373,7 +373,16 @@ export class OpenCodePlugin implements IPlugin, IPipelinePlugin, IFormSchemaProv
 					? await promptFacade.getPrompt(PROMPT_KEYS.SYSTEM, DEFAULT_SYSTEM_PROMPT, facadeOptions)
 					: DEFAULT_SYSTEM_PROMPT
 			) as typeof DEFAULT_SYSTEM_PROMPT;
-			const systemPrompt = substituteVariables(sysTemplate, buildSystemPromptVariables(promptOptions));
+			const baseSystemPrompt = substituteVariables(sysTemplate, buildSystemPromptVariables(promptOptions));
+			// Memory upgrades M3 — session preamble splice. The block
+			// arrives pre-fenced (`<agent_memory>…</agent_memory>`) +
+			// neutralized from the platform's shared recall helper; append
+			// verbatim AFTER template substitution so `{placeholders}`
+			// inside recalled content are never expanded. Absent = nothing
+			// to splice (provider off / toggle off / older orchestrator).
+			const systemPrompt = execContext?.memoryRecall
+				? `${baseSystemPrompt}\n\n${execContext.memoryRecall}`
+				: baseSystemPrompt;
 
 			const userTemplate = (
 				promptFacade

@@ -36,8 +36,13 @@ import {
 import { TaskTransitionService } from './task-transition.service';
 import { TasksService } from './tasks.service';
 import { TaskChatService } from './task-chat.service';
+import { TaskGateRunnerService } from './task-gate-runner.service';
 import { TaskRecurrenceDispatcherService } from './task-recurrence-dispatcher.service';
 import { TaskNotificationService } from './task-notification.service';
+import { TaskRunDenormService } from './task-run-denorm.service';
+import { TaskWorkspaceService } from './task-workspace.service';
+import { FacadesModule } from '../facades/facades.module';
+import { PolicyModule } from '../policy/policy.module';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { AgentsModule } from '../agents/agents.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -84,6 +89,12 @@ import { NotificationsModule } from '../notifications/notifications.module';
         // Phase 18.4 — TaskNotificationService wraps
         // NotificationService.create() for the new TASK category.
         NotificationsModule,
+        // Wave 2 M3 — TaskWorkspaceService resolves + provisions the
+        // per-Task isolated workspace through the workspace/git facades.
+        FacadesModule,
+        // Wave 3 D4 — TaskWorkspaceService.finalizeRun records the scope
+        // that governs this Work's merges in its PR-opened log line.
+        PolicyModule,
     ],
     providers: [
         TaskRepository,
@@ -105,6 +116,12 @@ import { NotificationsModule } from '../notifications/notifications.module';
         TaskChatService,
         TaskRecurrenceDispatcherService,
         TaskNotificationService,
+        TaskRunDenormService,
+        TaskWorkspaceService,
+        // Wave 3 M2 — acceptance-check runner (quality gates). Needs only
+        // AgentRunRepository (exported by AgentsModule above) to persist
+        // per-run gate results.
+        TaskGateRunnerService,
     ],
     exports: [
         TaskRepository,
@@ -126,6 +143,9 @@ import { NotificationsModule } from '../notifications/notifications.module';
         TaskChatService,
         TaskRecurrenceDispatcherService,
         TaskNotificationService,
+        TaskRunDenormService,
+        TaskWorkspaceService,
+        TaskGateRunnerService,
     ],
 })
 export class TasksDomainModule {}

@@ -85,6 +85,14 @@ describe('GitHubPlugin', () => {
 			expect(props.readPackagesPatOwner['x-scope']).toBe('user');
 			expect(props.readPackagesPatOwner['x-secret']).toBeUndefined();
 		});
+
+		it('exposes webhookSecret as a user-scoped secret for the ingest events receiver (Wave 7)', () => {
+			const props = plugin.settingsSchema.properties as Record<string, Record<string, unknown>>;
+			expect(props.webhookSecret).toBeDefined();
+			expect(props.webhookSecret['x-secret']).toBe(true);
+			expect(props.webhookSecret['x-scope']).toBe('user');
+			expect(props.webhookSecret['x-widget']).toBe('password');
+		});
 	});
 
 	describe('IGitProviderPlugin pure helpers', () => {

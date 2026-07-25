@@ -25,6 +25,10 @@
  * `research`     — long-form reference material (extracted PDFs etc.)
  * `output`       — agent-authored artifacts (reports, decks, dashboards)
  * `freeform`     — catch-all user notes
+ * `decision`     — a settled call with a status lifecycle (memory
+ *                  upgrades M4): rendered status-labelled in its own
+ *                  `<kb>` section; historical statuses are excluded
+ *                  from default injection
  */
 export enum KbDocumentClass {
     BRAND = 'brand',
@@ -37,6 +41,65 @@ export enum KbDocumentClass {
     RESEARCH = 'research',
     OUTPUT = 'output',
     FREEFORM = 'freeform',
+    DECISION = 'decision',
+}
+
+/**
+ * Lifecycle status of a `decision`-class document (memory upgrades M4).
+ * Transitions are platform-side and transactional (an API call flips
+ * them — never an external event), validated against
+ * {@link KB_DECISION_STATUS_TRANSITIONS}.
+ */
+export enum KbDecisionStatus {
+    PROPOSED = 'proposed',
+    ACCEPTED = 'accepted',
+    SUPERSEDED = 'superseded',
+    ARCHIVED = 'archived',
+}
+
+/**
+ * The decision status machine: `proposed → accepted → superseded →
+ * archived`, with `archived` reachable from every non-terminal state
+ * (rejecting a proposal, retiring a live decision). `archived` is
+ * terminal; nothing ever moves backwards — a reversed call is demoted
+ * (superseded, chain-linked), never resurrected in place.
+ */
+export const KB_DECISION_STATUS_TRANSITIONS: Readonly<
+    Record<KbDecisionStatus, ReadonlyArray<KbDecisionStatus>>
+> = {
+    [KbDecisionStatus.PROPOSED]: [KbDecisionStatus.ACCEPTED, KbDecisionStatus.ARCHIVED],
+    [KbDecisionStatus.ACCEPTED]: [KbDecisionStatus.SUPERSEDED, KbDecisionStatus.ARCHIVED],
+    [KbDecisionStatus.SUPERSEDED]: [KbDecisionStatus.ARCHIVED],
+    [KbDecisionStatus.ARCHIVED]: [],
+};
+
+/**
+ * Decision lifecycle state persisted on `WorkKnowledgeDocument.decision`
+ * (nullable `simple-json` column — `null` for every non-decision class).
+ * Mirror of the contracts-side `KbDecisionState` wire shape.
+ */
+export interface KbDecisionState {
+    status: KbDecisionStatus;
+    /** The replacement decision this one was superseded by. */
+    supersededByDocId?: string | null;
+    /** Slug of the replacement, denormalized for the historical label. */
+    supersededBySlug?: string | null;
+    /** The older decision this one replaces. */
+    supersedesDocId?: string | null;
+    /** One-line rationale rendered alongside the decision in context. */
+    rationale?: string | null;
+}
+
+/**
+ * Review state of a KB document (memory upgrades M7). Agent-authored and
+ * consolidation-synthesized documents land as `proposed` and are
+ * excluded from context injection until accepted. `null` (human-authored
+ * docs and every pre-existing row) is treated as `accepted` — the
+ * feature is additive by construction.
+ */
+export enum KbReviewState {
+    PROPOSED = 'proposed',
+    ACCEPTED = 'accepted',
 }
 
 /**
