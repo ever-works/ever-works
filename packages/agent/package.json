@@ -185,6 +185,10 @@
             "types": "./dist/digest/index.d.ts",
             "default": "./dist/digest/index.js"
         },
+        "./meetings": {
+            "types": "./dist/meetings/index.d.ts",
+            "default": "./dist/meetings/index.js"
+        },
         "./pr-review": {
             "types": "./dist/pr-review/index.d.ts",
             "default": "./dist/pr-review/index.js"

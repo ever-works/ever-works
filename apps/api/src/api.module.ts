@@ -53,6 +53,7 @@ import { TeamsModule } from './teams/teams.module';
 import { SchedulesModule } from './schedules/schedules.module';
 import { InboundTriggersModule } from './triggers/inbound-triggers.module';
 import { IngestModule } from './ingest/ingest.module';
+import { MeetingsApiModule } from './meetings/meetings.module';
 import { TelemetryModule } from './telemetry/telemetry.module';
 import { UsersModule } from './users/users.module';
 import { ScopeModule } from './scope/scope.module';
@@ -193,6 +194,11 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // surface over the agent-side EventIngestModule (dedupe-insert +
         // Activity/Memory fan-out; pull rides the event-ingest-tick cron).
         IngestModule,
+        // Meetings v1 (Wave 8, feature a) — /api/meetings CRUD +
+        // transcript capture over the agent-side MeetingsModule; also
+        // boots the zoom.recording envelope→Meeting processor on the
+        // ingest spine.
+        MeetingsApiModule,
         TelemetryModule,
         FunnelAnalyticsBindingModule,
         UploadsModule,

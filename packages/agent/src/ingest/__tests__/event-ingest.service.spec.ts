@@ -219,4 +219,65 @@ describe('EventIngestService', () => {
             expect(repository.findUnprocessed).toHaveBeenCalledWith(50);
         });
     });
+
+    // Wave 8 (Meetings v1) — kind-bound domain processors on the drain.
+    describe('kind processors', () => {
+        it('runs a registered processor for matching kinds BEFORE the Activity write', async () => {
+            const order: string[] = [];
+            const event = storedEvent({ kind: 'zoom.recording' });
+            repository.findUnprocessed.mockResolvedValue([event]);
+            activityLog.log.mockImplementation(async () => {
+                order.push('activity');
+                return { id: 'activity-1' };
+            });
+
+            const service = build();
+            const process = jest.fn(async () => {
+                order.push('processor');
+            });
+            service.registerKindProcessor({ kinds: ['zoom.recording'], process });
+
+            const result = await service.processBatch(10);
+
+            expect(process).toHaveBeenCalledWith(event);
+            expect(order).toEqual(['processor', 'activity']);
+            expect(result).toEqual({ processed: 1, activities: 1, memories: 1, failed: 0 });
+        });
+
+        it('never invokes a processor for kinds it did not register', async () => {
+            repository.findUnprocessed.mockResolvedValue([storedEvent({ kind: 'slack.message' })]);
+
+            const service = build();
+            const process = jest.fn(async () => undefined);
+            service.registerKindProcessor({ kinds: ['zoom.recording'], process });
+
+            const result = await service.processBatch(10);
+
+            expect(process).not.toHaveBeenCalled();
+            expect(result).toEqual({ processed: 1, activities: 1, memories: 1, failed: 0 });
+        });
+
+        it('processor failure is REQUIRED-grade: row left unprocessed, no Activity duplicate risk', async () => {
+            const bad = storedEvent({ id: 'row-bad', kind: 'zoom.recording' });
+            const good = storedEvent({ id: 'row-good', kind: 'slack.message' });
+            repository.findUnprocessed.mockResolvedValue([bad, good]);
+
+            const service = build();
+            service.registerKindProcessor({
+                kinds: ['zoom.recording'],
+                process: jest.fn(async () => {
+                    throw new Error('meetings table down');
+                }),
+            });
+
+            const result = await service.processBatch(10);
+
+            expect(result).toEqual({ processed: 1, activities: 1, memories: 1, failed: 1 });
+            expect(repository.markProcessed).not.toHaveBeenCalledWith('row-bad');
+            expect(repository.markProcessed).toHaveBeenCalledWith('row-good');
+            // The failed row's Activity was NOT written — the retry next
+            // tick cannot duplicate feed rows.
+            expect(activityLog.log).toHaveBeenCalledTimes(1);
+        });
+    });
 });

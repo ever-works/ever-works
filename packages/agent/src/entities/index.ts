@@ -118,6 +118,8 @@ export * from './inbound-trigger.entity';
 export * from './ingested-event.entity';
 // Event-ingest pull path (Wave 8) — per-(user, plugin) pull watermarks/cursors
 export * from './ingest-cursor.entity';
+// Meetings v1 (Wave 8, feature a) — captured meetings with transcripts
+export * from './meeting.entity';
 // Credits ledger + plan entitlements (pricing Wave 9 M1)
 export * from './credit-ledger-entry.entity';
 export * from './plan-entitlement.entity';

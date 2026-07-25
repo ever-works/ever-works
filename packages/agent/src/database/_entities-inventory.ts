@@ -115,6 +115,7 @@ import { TenantCredentialSnapshot } from '../entities/tenant-credential-snapshot
 import { InboundTrigger } from '../entities/inbound-trigger.entity';
 import { IngestedEvent } from '../entities/ingested-event.entity';
 import { IngestCursor } from '../entities/ingest-cursor.entity';
+import { Meeting } from '../entities/meeting.entity';
 import { CreditLedgerEntry } from '../entities/credit-ledger-entry.entity';
 import { PlanEntitlement } from '../entities/plan-entitlement.entity';
 import {
@@ -259,6 +260,9 @@ export const ENTITIES = [
     // Event-ingest pull path (Wave 8) — per-(user, plugin) event-source
     // pull watermarks + continuation cursors.
     IngestCursor,
+    // Meetings v1 (Wave 8, feature a) — captured meetings with
+    // transcripts, summaries and provider dedupe.
+    Meeting,
     // Credits ledger + plan entitlements (pricing Wave 9 M1) — credits
     // are the usage currency layered on the costCents metering.
     CreditLedgerEntry,

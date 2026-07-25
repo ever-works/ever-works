@@ -57,6 +57,10 @@ const DOMAIN_KEYWORDS: Record<string, string[]> = {
     kb: ['knowledge', 'kb', 'document', 'doc', 'upload'],
     notifications: ['notification', 'notify', 'alert', 'channel'],
     email: ['email', 'inbox', 'message', 'mail'],
+    // Meetings v1 (Wave 8, feature a) — keyword slots ship WITH the
+    // feature (program DoD rule; the Mission-create outage is the
+    // cautionary tale for omitting them).
+    meetings: ['meeting', 'transcript', 'recording', 'standup', 'zoom', 'google meet'],
     members: ['member', 'invite', 'invitation', 'team', 'collaborator', 'people'],
     apikeys: ['api key', 'api-key', 'apikey', 'token'],
     budgets: ['budget', 'usage', 'spend', 'spending', 'cost', 'billing'],
@@ -95,6 +99,7 @@ function deriveDomain(path: string): string {
     if (p.includes('/kb/')) return 'kb';
     if (p.includes('/notification')) return 'notifications';
     if (p.includes('/api/email')) return 'email';
+    if (p.includes('/api/meetings')) return 'meetings';
     if (p.includes('/members') || p.includes('/invitations')) return 'members';
     if (p.includes('/api-keys')) return 'apikeys';
     if (p.includes('/budgets') || p.includes('/usage')) return 'budgets';

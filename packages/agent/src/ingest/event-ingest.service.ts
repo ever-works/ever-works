@@ -23,8 +23,26 @@ export interface ProcessBatchResult {
     activities: number;
     /** Memory observations saved (0 when no provider is enabled). */
     memories: number;
-    /** Rows whose Activity write failed — left unprocessed for retry. */
+    /**
+     * Rows whose REQUIRED processor (kind processor or Activity write)
+     * failed — left unprocessed for retry.
+     */
     failed: number;
+}
+
+/**
+ * A domain processor bound to specific event kinds — e.g. the Meetings
+ * feature consuming `zoom.recording` envelopes into Meeting rows.
+ * Registered at boot (`registerKindProcessor`) by feature modules so
+ * the spine stays dependency-free of the features it feeds.
+ *
+ * Contract: `process` MUST be idempotent per event — a row whose later
+ * fan-out step failed is retried next tick, kind processor included.
+ */
+export interface IngestedEventKindProcessor {
+    /** Source-namespaced kinds this processor consumes. */
+    readonly kinds: readonly string[];
+    process(event: IngestedEvent): Promise<void>;
 }
 
 /**
@@ -46,16 +64,36 @@ export interface ProcessBatchResult {
  * Chat surfacing rides the existing Memory/Activity recall paths plus
  * the `list_recent_events` tool (`agent-ingest-tools.ts`) — answers
  * link back to the origin through `sourceUrl`.
+ *
+ * Wave 8 (Meetings v1): feature modules can additionally register
+ * KIND-BOUND processors (`registerKindProcessor`) that run before the
+ * Activity write — e.g. `zoom.recording` envelopes becoming Meeting
+ * rows. A kind-processor failure is REQUIRED-grade: the row stays
+ * unprocessed and retries next tick.
  */
 @Injectable()
 export class EventIngestService {
     private readonly logger = new Logger(EventIngestService.name);
+
+    /** Kind-bound domain processors (Meetings, …) — see the interface doc. */
+    private readonly kindProcessors: IngestedEventKindProcessor[] = [];
 
     constructor(
         private readonly repository: IngestedEventRepository,
         private readonly activityLogService: ActivityLogService,
         @Optional() private readonly agentMemory?: AgentMemoryFacadeService,
     ) {}
+
+    /**
+     * Register a domain processor for specific event kinds. Feature
+     * modules call this from `onModuleInit` (the service is a process
+     * singleton, so cron-driven `processBatch` runs see it too). The
+     * processor runs BEFORE the Activity write — its failure leaves the
+     * row unprocessed for retry WITHOUT duplicating Activity rows.
+     */
+    registerKindProcessor(processor: IngestedEventKindProcessor): void {
+        this.kindProcessors.push(processor);
+    }
 
     /** Dedupe-insert a batch of envelopes for one owner. */
     async ingest(userId: string, envelopes: IngestedEventEnvelope[]): Promise<IngestResult> {
@@ -110,6 +148,24 @@ export class EventIngestService {
 
         for (const event of events) {
             try {
+                // Kind-bound domain processors run FIRST (before the
+                // Activity write) so a processor failure retries the row
+                // next tick without duplicating Activity rows. Processors
+                // are idempotent by contract, so the inverse ordering
+                // hazard (processor reran after a later step failed) is
+                // safe.
+                await this.runKindProcessors(event);
+            } catch (error) {
+                result.failed += 1;
+                this.logger.warn(
+                    `Kind processor failed for ingested event ${event.id} (${event.kind}): ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+                continue;
+            }
+
+            try {
                 await this.writeActivity(event);
                 result.activities += 1;
             } catch (error) {
@@ -133,6 +189,15 @@ export class EventIngestService {
         }
 
         return result;
+    }
+
+    /** Run every registered processor whose kinds include this event's. */
+    private async runKindProcessors(event: IngestedEvent): Promise<void> {
+        for (const processor of this.kindProcessors) {
+            if (processor.kinds.includes(event.kind)) {
+                await processor.process(event);
+            }
+        }
     }
 
     private async writeActivity(event: IngestedEvent): Promise<void> {
