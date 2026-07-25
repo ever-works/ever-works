@@ -246,6 +246,17 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         params: [id('Meeting id (from list_meetings)')],
     },
 
+    // ── Fleet (Wave 12, slice 1) ─────────────────────────────────
+    {
+        toolName: 'list_fleet_nodes',
+        method: 'GET',
+        path: '/api/fleet/nodes',
+        summary:
+            'List the current user’s fleet — the machines enrolled to execute their work (desktop and headless nodes) plus live nodes of their own configured clusters. Each node carries kind, online/offline status, capability tags, platform and last-seen time.',
+        kind: 'read',
+        params: [],
+    },
+
     // ── Tasks ────────────────────────────────────────────────────
     {
         toolName: 'list_tasks',

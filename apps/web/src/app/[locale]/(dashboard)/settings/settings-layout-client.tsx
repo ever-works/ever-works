@@ -12,6 +12,7 @@ import {
     Bot,
     Cpu,
     Building2,
+    Server,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
@@ -76,6 +77,14 @@ export function SettingsLayoutClient({ children, settingsMenu }: SettingsLayoutC
                 label: t('tabs.workAgent'),
                 icon: Bot,
                 href: `${baseSettingsPath}/work-agent`,
+            },
+            // Fleet sits directly ABOVE Job Runtime by design: Fleet is
+            // WHERE work can run; Job Runtime stays HOW work is dispatched.
+            {
+                id: 'fleet',
+                label: t('tabs.fleet'),
+                icon: Server,
+                href: `${baseSettingsPath}/fleet`,
             },
             {
                 id: 'job-runtime',
