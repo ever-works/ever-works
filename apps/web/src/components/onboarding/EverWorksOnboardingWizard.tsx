@@ -13,6 +13,7 @@ import { WelcomeStep } from './steps/WelcomeStep';
 import { ChoiceStep } from './steps/ChoiceStep';
 import { ConfigStep } from './steps/ConfigStep';
 import { PluginsCatalogStep } from './steps/PluginsCatalogStep';
+import { CommunicationStep } from './steps/CommunicationStep';
 import { CreateWorkStep } from './steps/CreateWorkStep';
 import { useTurnstile } from './use-turnstile';
 import { AI_ICONS, DB_ICONS, DEPLOY_ICONS, STORAGE_ICONS } from './brand-icons';
@@ -496,6 +497,8 @@ function StepBody({
                 />
             );
         }
+        case 'communication':
+            return <CommunicationStep />;
         case 'plugins-catalog':
             return (
                 <PluginsCatalogStep
@@ -651,6 +654,8 @@ function labelForStep(step: WizardStep): string {
             return 'Your deployment';
         case 'deploy-config':
             return 'Configure deployment';
+        case 'communication':
+            return 'Communication';
         case 'plugins-catalog':
             return 'Plugins & Integrations';
         case 'create-work':

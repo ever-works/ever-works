@@ -266,6 +266,21 @@
             "loadingStatus": "Loading connection status...",
             "setupGuide": "Setup guide"
         },
+        "communicationStep": {
+            "title": "Communication",
+            "description": "Connect the chat workspaces your team lives in. Mention the Ever Works bot to chat, build, and follow your Works without leaving the conversation.",
+            "slack": {
+                "name": "Slack",
+                "description": "Install the Ever Works app for Slack: mention the bot to chat with the platform, ingest channel activity into Memory and Activities, and get replies in-thread.",
+                "action": "Connect Slack"
+            },
+            "discord": {
+                "name": "Discord",
+                "description": "The Ever Works app for Discord is on the way.",
+                "comingSoon": "Coming soon"
+            },
+            "skipHint": "You can connect these anytime from Settings → Plugins."
+        },
         "plugins": {
             "byokDescription": "Connect your own key to unlock the full configuration.",
             "byokDefaultButton": "Bring your own key",

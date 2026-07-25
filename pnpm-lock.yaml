@@ -2983,6 +2983,9 @@ importers:
 
   packages/plugins/slack-connector:
     dependencies:
+      '@ever-works/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
       '@ever-works/plugin':
         specifier: workspace:*
         version: link:../../plugin
