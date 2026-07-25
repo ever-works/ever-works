@@ -40,6 +40,32 @@ export const AGENT_TASK_EXECUTE_DISPATCHER = 'AGENT_TASK_EXECUTE_DISPATCHER' as 
 export const AGENT_CHAT_REPLY_DISPATCHER = 'AGENT_CHAT_REPLY_DISPATCHER' as const;
 
 /**
+ * Streaming-terminal — the seam `TaskTransitionService` reaches for when a
+ * freshly-dispatched run also wants a live interactive session.
+ *
+ * A PORT, not the launcher class: `TerminalSessionLauncher` lives in the
+ * agents module and this file must stay a leaf (it is imported by the
+ * dispatch gate). The api-side @Global() `AgentsModule` binds the token
+ * with `useExisting`, the same shape as `RUN_STEERING_PORT`.
+ *
+ * `requirePersistent` is the whole safety property of the automatic path:
+ * the implementation refuses any run not flagged persistent, so a normal
+ * one-shot task run never spawns (or pays for) a terminal session.
+ */
+export interface TerminalSessionStartRequest {
+    userId: string;
+    agentId: string;
+    runId: string;
+    requirePersistent?: boolean;
+}
+
+export interface TerminalSessionStarter {
+    startForRun(request: TerminalSessionStartRequest): Promise<{ started: boolean }>;
+}
+
+export const TERMINAL_SESSION_STARTER = 'TERMINAL_SESSION_STARTER' as const;
+
+/**
  * Stable, user-readable marker the run-failure UI keys on. Kept as an
  * exported constant so the producer (dispatcher adapters), the consumer
  * (TaskTransitionService's failure classification), and any UI matcher

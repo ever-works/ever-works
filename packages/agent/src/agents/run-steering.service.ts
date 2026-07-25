@@ -219,6 +219,11 @@ export class RunSteeringService implements RunSteeringPort {
             organizationId: run.organizationId ?? null,
             runnerKind: run.runnerKind ?? null,
             queuedReason: admission.admitted ? null : (admission.queuedReason ?? null),
+            // Streaming terminal — the conversation lifetime survives the
+            // process lifetime, and so does the SHAPE of the session. A
+            // resumed persistent run still wants an interactive terminal,
+            // which is what the fan-out's `requirePersistent` gate reads.
+            persistent: run.persistent === true,
         });
 
         // The conversation lifetime survives the process lifetime: hand the
