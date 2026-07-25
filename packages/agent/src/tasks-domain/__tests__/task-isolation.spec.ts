@@ -45,20 +45,30 @@ describe('taskBranchName', () => {
 
     it('is deterministic and carries slug readability + id uniqueness', () => {
         const name = taskBranchName({ id, slug: 'T-42' });
-        expect(name).toBe('task/t-42-9f3c1a2b');
+        expect(name).toBe('task/t-42-9f3c1a2b111142228333444455556666');
         expect(taskBranchName({ id, slug: 'T-42' })).toBe(name);
     });
 
     it('sanitizes hostile slugs into git-safe names', () => {
         expect(taskBranchName({ id, slug: '../..//evil branch!!' })).toBe(
-            'task/evil-branch-9f3c1a2b',
+            'task/evil-branch-9f3c1a2b111142228333444455556666',
         );
-        expect(taskBranchName({ id, slug: '   ' })).toBe('task/task-9f3c1a2b');
-        expect(taskBranchName({ id, slug: null })).toBe('task/task-9f3c1a2b');
+        expect(taskBranchName({ id, slug: '   ' })).toBe(
+            'task/task-9f3c1a2b111142228333444455556666',
+        );
+        expect(taskBranchName({ id, slug: null })).toBe(
+            'task/task-9f3c1a2b111142228333444455556666',
+        );
+    });
+
+    it('distinguishes ids sharing an 8-char prefix (full-id identity)', () => {
+        const a = taskBranchName({ id: '9f3c1a2b-aaaa-4aaa-8aaa-aaaaaaaaaaaa', slug: 'T-42' });
+        const b = taskBranchName({ id: '9f3c1a2b-bbbb-4bbb-8bbb-bbbbbbbbbbbb', slug: 'T-42' });
+        expect(a).not.toBe(b);
     });
 
     it('caps slug length so branch names stay manageable', () => {
         const name = taskBranchName({ id, slug: 'x'.repeat(200) });
-        expect(name.length).toBeLessThanOrEqual('task/'.length + 40 + 1 + 8);
+        expect(name.length).toBeLessThanOrEqual('task/'.length + 40 + 1 + 32);
     });
 });
