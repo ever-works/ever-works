@@ -33,6 +33,7 @@ import {
     AgentScope,
     AGENT_RUN_CANCELLER,
     type AgentRunCanceller,
+    RunDispatchGateService,
     SkillBindingRepository,
     type AgentDto,
     type AgentExportEnvelope,
@@ -62,6 +63,7 @@ import {
     CreateAgentDto,
     ListAgentRunsQueryDto,
     ListAgentsQueryDto,
+    ListRunSessionsQueryDto,
     UpdateAgentDto,
     UpdateAgentGuardrailsDto,
 } from './dto/agent.dto';
@@ -149,6 +151,11 @@ export class AgentsController {
         @Optional()
         @Inject(AGENT_RUN_CANCELLER)
         private readonly runCanceller?: AgentRunCanceller,
+        // Run orchestration (Wave 4 M2) — a successful cancel frees a
+        // concurrency slot, so the Work's parked queue is drained. Trailing
+        // + Optional for the same positional-spec reason as above.
+        @Optional()
+        private readonly dispatchGate?: RunDispatchGateService,
     ) {}
 
     @Get()
@@ -203,6 +210,105 @@ export class AgentsController {
             committerName: body.committerName ?? null,
             committerEmail: body.committerEmail ?? null,
         });
+    }
+
+    /**
+     * Run orchestration (Wave 4 M3) — the Sessions list: every AgentRun
+     * of the acting user across all Agents/Works, filterable + paginated.
+     * Declared BEFORE the `:id` routes so the literal `runs` segment
+     * never reaches ParseUUIDPipe.
+     *
+     * Security: `listSessionsForUser` applies `userId = auth.userId`
+     * at the repository layer — cross-user rows are unreachable by
+     * construction, filters can only narrow the caller's own set.
+     */
+    @Get('runs')
+    @ApiOperation({
+        summary:
+            'Sessions list — my AgentRuns across all Agents (filter by status/workId/agentId/kind).',
+    })
+    @HttpCode(HttpStatus.OK)
+    async listRunSessions(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Query() query: ListRunSessionsQueryDto,
+    ): Promise<{
+        data: Array<{
+            id: string;
+            agentId: string;
+            status: string;
+            triggerKind: string;
+            taskId: string | null;
+            workId: string | null;
+            awaitingInput: boolean;
+            queuedReason: string | null;
+            runnerKind: string | null;
+            startedAt: string | null;
+            finishedAt: string | null;
+            durationMs: number | null;
+            summary: string | null;
+            errorMessage: string | null;
+            currentActivity: string | null;
+            totalTokens: number | null;
+            changedFilesCount: number | null;
+            costCents: number | null;
+            gateStatus: string | null;
+            gateAttempts: number;
+            persistent: boolean;
+            terminalState: string | null;
+            terminalEndedReason: string | null;
+            terminalProviderId: string | null;
+            createdAt: string;
+        }>;
+        meta: { total: number; limit: number; offset: number };
+    }> {
+        const limit = query.limit ?? 25;
+        const offset = query.offset ?? 0;
+        const [rows, total] = await this.agentRuns.listSessionsForUser(
+            auth.userId,
+            {
+                status: query.status,
+                workId: query.workId,
+                agentId: query.agentId,
+                triggerKind: query.kind,
+            },
+            limit,
+            offset,
+        );
+        return {
+            data: rows.map((r) => ({
+                id: r.id,
+                agentId: r.agentId,
+                status: r.status,
+                triggerKind: r.triggerKind,
+                taskId: r.taskId ?? null,
+                workId: r.workId ?? null,
+                awaitingInput: r.awaitingInput ?? false,
+                queuedReason: r.queuedReason ?? null,
+                runnerKind: r.runnerKind ?? null,
+                startedAt: r.startedAt?.toISOString() ?? null,
+                finishedAt: r.finishedAt?.toISOString() ?? null,
+                durationMs: r.durationMs ?? null,
+                summary: r.summary ?? null,
+                errorMessage: r.errorMessage ?? null,
+                // Telemetry (kanban run cockpit columns). `currentActivity`
+                // is plain text by contract — the UI must never render it
+                // as markup.
+                currentActivity: r.currentActivity ?? null,
+                totalTokens: r.totalTokens ?? null,
+                changedFilesCount: r.changedFilesCount ?? null,
+                costCents: r.costCents ?? null,
+                // Quality-gate columns.
+                gateStatus: r.gateStatus ?? null,
+                gateAttempts: r.gateAttempts ?? 0,
+                // Streaming-terminal lifecycle columns.
+                persistent: r.persistent ?? false,
+                terminalState: r.terminalState ?? null,
+                terminalEndedReason: r.terminalEndedReason ?? null,
+                terminalProviderId: r.terminalProviderId ?? null,
+                createdAt: r.createdAt.toISOString(),
+            })),
+            meta: { total, limit, offset },
+        };
     }
 
     @Get(':id')
@@ -669,6 +775,13 @@ export class AgentsController {
                 actionType: ActivityActionType.AGENT_RUN_CANCELLED,
                 details: { runId, previousStatus: result.previousStatus },
             });
+            // Run orchestration (Wave 4 M2) — the cancel freed a concurrency
+            // slot; promote the oldest parked run for the same Work. Fire-
+            // and-forget: drainForWork never throws by contract, and the
+            // cancel response must not wait on a fresh dispatch.
+            if (result.workId && this.dispatchGate) {
+                void this.dispatchGate.drainForWork(result.workId).catch(() => undefined);
+            }
         }
         return { cancelled: wasOpen, previousStatus: result.previousStatus };
     }

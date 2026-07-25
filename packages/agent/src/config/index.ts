@@ -585,6 +585,28 @@ export const config = {
             const raw = parseInt(process.env.AGENT_RUN_STUCK_SWEEP_BATCH || '200', 10);
             return Number.isFinite(raw) && raw > 0 ? raw : 200;
         },
+        /**
+         * Run orchestration (Wave 4 M2) — concurrency safety valves for
+         * `RunDispatchGateService`. These are operator knobs, NOT product
+         * limits: defaults are deliberately generous (10 in-flight runs
+         * per Work, 25 per org/user) and `0` / negative disables the
+         * respective valve entirely.
+         *
+         * Future per-Work override: a nullable
+         * `works.maxConcurrentAgentRuns` column (works.yml v2 field +
+         * Work settings UI) will take precedence over this env default
+         * when it lands — the gate already resolves limits through these
+         * getters so only the resolution chain grows.
+         */
+        getMaxConcurrentRunsPerWork() {
+            const raw = parseInt(process.env.AGENT_MAX_CONCURRENT_RUNS_PER_WORK || '10', 10);
+            return Number.isFinite(raw) ? raw : 10;
+        },
+        /** Per-org (or, for org-less personal runs, per-user) valve. */
+        getMaxConcurrentRunsPerOrg() {
+            const raw = parseInt(process.env.AGENT_MAX_CONCURRENT_RUNS_PER_ORG || '25', 10);
+            return Number.isFinite(raw) ? raw : 25;
+        },
     },
 
     /**

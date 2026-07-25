@@ -25,6 +25,7 @@ import { AgentRunSweeperService } from './agent-run-sweeper.service';
 import { AgentExportService } from './agent-export.service';
 import { PromptAssemblerService } from './prompt-assembler.service';
 import { AgentRunService } from './agent-run.service';
+import { RunDispatchGateService } from './run-dispatch-gate.service';
 import { AgentToolService } from './agent-tool.service';
 import { VisionContextService } from '../services/vision-context.service';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
@@ -90,6 +91,10 @@ import { FacadesModule } from '../facades/facades.module';
         // appended COMPANY VISION segment (@Optional() injection).
         VisionContextService,
         AgentRunService,
+        // Wave 4 M2 — concurrency choke point for run dispatch. The
+        // AGENT_TASK_EXECUTE_DISPATCHER it drains through is @Optional()
+        // and bound by the api-side @Global() TasksModule.
+        RunDispatchGateService,
         AgentToolService,
     ],
     exports: [
@@ -106,6 +111,7 @@ import { FacadesModule } from '../facades/facades.module';
         AgentExportService,
         PromptAssemblerService,
         AgentRunService,
+        RunDispatchGateService,
         AgentToolService,
     ],
 })

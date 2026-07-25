@@ -29,6 +29,8 @@ jest.mock('@ever-works/agent/agents', () => ({
     AgentScheduleDispatcherService: class {},
     AgentRunRepository: class {},
     AgentRunLogRepository: class {},
+    // Wave 4 M2/M3 — dispatch gate injected for cancel-path draining.
+    RunDispatchGateService: class {},
     SkillBindingRepository: class {},
     PluginUsageRepository: class {},
 }));
@@ -112,6 +114,8 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
             markDispatchFailed: jest.fn().mockResolvedValue(undefined),
             setTriggerRunId: jest.fn().mockResolvedValue(undefined),
             findByIdAndUser: jest.fn().mockResolvedValue(null),
+            // Wave 4 M3 — org-wide Sessions list (owner-scoped variant).
+            listSessionsForUser: jest.fn().mockResolvedValue([[], 0]),
         };
         agentRunLogs = { findByRun: jest.fn().mockResolvedValue([]) };
         skillBindings = { resolveActive: jest.fn().mockResolvedValue([]) };
@@ -224,6 +228,97 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
             expect(result.data[0]).toMatchObject({ status: 'completed' });
             expect(agentRuns.findByAgentAndUser).toHaveBeenCalledWith(agentId, 'u1', 25, 0);
             expect(agentRuns.countByAgentAndUser).toHaveBeenCalledWith(agentId, 'u1');
+        });
+    });
+
+    describe('GET /runs — Sessions list (Wave 4 M3)', () => {
+        it('is owner-scoped at the repository layer — userId always comes from auth', async () => {
+            // Security: no agent ownership pre-check exists on this route
+            // (it spans all the caller's Agents), so the repository-level
+            // userId scope is the ONLY guard. Pin that the controller
+            // passes auth.userId, never anything caller-controlled.
+            await controller.listRunSessions(auth, {});
+            expect(agentRuns.listSessionsForUser).toHaveBeenCalledWith(
+                'u1',
+                {
+                    status: undefined,
+                    workId: undefined,
+                    agentId: undefined,
+                    triggerKind: undefined,
+                },
+                25,
+                0,
+            );
+        });
+
+        it('forwards filters (status/workId/agentId/kind) and pagination', async () => {
+            const workId = '00000000-0000-0000-0000-0000000000cc';
+            await controller.listRunSessions(auth, {
+                status: 'running',
+                workId,
+                agentId,
+                kind: 'task',
+                limit: 5,
+                offset: 10,
+            });
+            expect(agentRuns.listSessionsForUser).toHaveBeenCalledWith(
+                'u1',
+                { status: 'running', workId, agentId, triggerKind: 'task' },
+                5,
+                10,
+            );
+        });
+
+        it('returns telemetry + gate + terminal + orchestration columns per row', async () => {
+            agentRuns.listSessionsForUser.mockResolvedValueOnce([
+                [
+                    {
+                        id: runId,
+                        agentId,
+                        status: 'running',
+                        triggerKind: 'task',
+                        taskId,
+                        workId: '00000000-0000-0000-0000-0000000000cc',
+                        awaitingInput: false,
+                        queuedReason: null,
+                        runnerKind: 'claude-code',
+                        startedAt: new Date('2026-01-01T00:00:00Z'),
+                        finishedAt: null,
+                        durationMs: null,
+                        summary: null,
+                        errorMessage: null,
+                        currentActivity: 'editing src/auth/session.ts',
+                        totalTokens: 48_200,
+                        changedFilesCount: 3,
+                        costCents: 120,
+                        gateStatus: 'pending',
+                        gateAttempts: 1,
+                        persistent: true,
+                        terminalState: 'attached',
+                        terminalEndedReason: null,
+                        terminalProviderId: 'terminal-relay',
+                        createdAt: new Date('2026-01-01T00:00:00Z'),
+                    },
+                ],
+                1,
+            ]);
+            const result = await controller.listRunSessions(auth, {});
+            expect(result.meta).toEqual({ total: 1, limit: 25, offset: 0 });
+            expect(result.data[0]).toMatchObject({
+                id: runId,
+                workId: '00000000-0000-0000-0000-0000000000cc',
+                awaitingInput: false,
+                queuedReason: null,
+                runnerKind: 'claude-code',
+                currentActivity: 'editing src/auth/session.ts',
+                totalTokens: 48_200,
+                changedFilesCount: 3,
+                costCents: 120,
+                gateStatus: 'pending',
+                gateAttempts: 1,
+                persistent: true,
+                terminalState: 'attached',
+            });
         });
     });
 
@@ -444,6 +539,66 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
             const result = await controller.cancelRun(auth, agentId, runId);
             expect(result.cancelled).toBe(false);
             expect(runCanceller.cancel).not.toHaveBeenCalled();
+        });
+
+        it('drains the Work concurrency queue after cancelling an open run (Wave 4 M2)', async () => {
+            const workId = '00000000-0000-0000-0000-0000000000cc';
+            const dispatchGate = {
+                drainForWork: jest.fn().mockResolvedValue({ dispatched: true }),
+            };
+            const gated = new AgentsController(
+                service,
+                files,
+                exportService,
+                dispatcher,
+                agentRuns,
+                agentRunLogs,
+                skillBindings,
+                pluginUsage,
+                tasks,
+                activityLog,
+                heartbeatTrigger,
+                taskExecuteDispatcher,
+                runCanceller,
+                dispatchGate as any,
+            );
+            agentRuns.cancel.mockResolvedValueOnce({
+                found: true,
+                previousStatus: 'running',
+                triggerRunId: 'run_abc',
+                workId,
+            });
+            await gated.cancelRun(auth, agentId, runId);
+            await new Promise((r) => setImmediate(r)); // fire-and-forget drain
+            expect(dispatchGate.drainForWork).toHaveBeenCalledWith(workId);
+        });
+
+        it('does NOT drain after a no-op cancel of an already-terminal run', async () => {
+            const dispatchGate = { drainForWork: jest.fn() };
+            const gated = new AgentsController(
+                service,
+                files,
+                exportService,
+                dispatcher,
+                agentRuns,
+                agentRunLogs,
+                skillBindings,
+                pluginUsage,
+                tasks,
+                activityLog,
+                heartbeatTrigger,
+                taskExecuteDispatcher,
+                runCanceller,
+                dispatchGate as any,
+            );
+            agentRuns.cancel.mockResolvedValueOnce({
+                found: true,
+                previousStatus: 'completed',
+                workId: '00000000-0000-0000-0000-0000000000cc',
+            });
+            await gated.cancelRun(auth, agentId, runId);
+            await new Promise((r) => setImmediate(r));
+            expect(dispatchGate.drainForWork).not.toHaveBeenCalled();
         });
 
         it('still reports cancelled when the canceller reports a non-cancelled outcome', async () => {

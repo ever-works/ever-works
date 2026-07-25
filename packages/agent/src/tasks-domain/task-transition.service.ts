@@ -22,6 +22,11 @@ import {
 } from './task-dispatcher';
 import { TaskNotificationService } from './task-notification.service';
 import { TaskRunDenormService } from './task-run-denorm.service';
+// Value import (not `import type`): Nest resolves the @Optional() class
+// injection below via emitted design:paramtypes metadata, which needs the
+// real class reference. No cycle: run-dispatch-gate.service imports only
+// task-dispatcher (leaf), the run repository, and config.
+import { RunDispatchGateService } from '../agents/run-dispatch-gate.service';
 
 /**
  * Tasks feature — Phase 12.1.
@@ -91,6 +96,11 @@ export class TaskTransitionService {
         // Kanban run cockpit (Wave 2) — latest-run denorm on dispatch.
         // Optional for the same unit-test-fixture reason as the rest.
         @Optional() private readonly runDenorm?: TaskRunDenormService,
+        // Run orchestration (Wave 4 M2) — concurrency gate consulted per
+        // assignee before the job-runtime enqueue. Appended LAST so every
+        // positional `new TaskTransitionService(...)` in the specs keeps
+        // compiling; Optional so fixtures without it dispatch ungated.
+        @Optional() private readonly dispatchGate?: RunDispatchGateService,
     ) {}
 
     /**
@@ -234,14 +244,41 @@ export class TaskTransitionService {
             const dedupKey = `${task.id}:${assignee.assigneeId}:${generation}`;
             let run: { id: string } | null = null;
             try {
+                // Run orchestration (Wave 4 M2) — consult the concurrency
+                // gate BEFORE enqueuing. Fail-open on gate errors: the gate
+                // is a safety valve, and a broken valve must never stop
+                // legitimate dispatch (the valve's own counting query is the
+                // only thing that can throw here).
+                let admission: { admitted: boolean; queuedReason?: string } = {
+                    admitted: true,
+                };
+                if (this.dispatchGate) {
+                    try {
+                        admission = await this.dispatchGate.admit({
+                            userId: task.userId,
+                            workId: task.workId ?? null,
+                            organizationId: task.organizationId ?? null,
+                        });
+                    } catch (gateErr) {
+                        this.logger.warn(
+                            `Dispatch gate admit failed for task ${task.id} — failing open: ${gateErr}`,
+                        );
+                    }
+                }
                 // Pre-create a queued AgentRun row so the worker can find
                 // it via findInFlightForTaskAgent (T6 chat-dedup posture).
+                // `workId` is denormalized here (Wave 4 M1) so per-Work
+                // concurrency counts + the Sessions view need no join.
                 run = this.runs
                     ? await this.runs.createQueued({
                           agentId: assignee.assigneeId,
                           userId: task.userId,
                           triggerKind: 'task',
                           taskId: task.id,
+                          workId: task.workId ?? null,
+                          queuedReason: admission.admitted
+                              ? null
+                              : (admission.queuedReason ?? 'concurrency-limit'),
                       })
                     : null;
                 // Kanban run cockpit — mirror the freshly-queued run onto the
@@ -250,6 +287,15 @@ export class TaskTransitionService {
                 // never throws), so this cannot break the dispatch.
                 if (run) {
                     await this.runDenorm?.recordQueued(task.id, run.id);
+                }
+                // Over-limit: the run row exists (parked, queuedReason set)
+                // but the job-runtime enqueue is SKIPPED. The drain hook on
+                // terminal transitions promotes it when a slot frees.
+                if (!admission.admitted) {
+                    this.logger.log(
+                        `Run for agent ${assignee.assigneeId} on task ${task.id} parked by dispatch gate (${admission.queuedReason}).`,
+                    );
+                    continue;
                 }
                 const handle = await this.dispatcher.enqueue({
                     agentId: assignee.assigneeId,
