@@ -174,6 +174,18 @@ export interface ExportedWork {
     /** Gate-attempt budget (1..5). Out-of-range values are dropped on
      *  import, not clamped. */
     maxGateAttempts?: number;
+    // NOTE — `works.mergePolicy` (Wave 3, D4) is DELIBERATELY absent from
+    // this envelope, and that omission is the correct behaviour, not the
+    // usual "new Work column forgotten in the transfer whitelist" bug.
+    // A merge policy can only LOOSEN enforcement (`allowAgentMerge: true`,
+    // `requireHumanApproval: false`), and the envelope is an
+    // attacker-editable JSON file. Carrying it across accounts would let
+    // an import grant agents merge rights in the importing account —
+    // exactly the privilege-escalation-across-import that made
+    // `AgentExportService` clamp `permissions` to the all-false default.
+    // An imported Work therefore starts with `mergePolicy = NULL`, i.e.
+    // INHERIT, and resolves against the importing owner's own
+    // organization / tenant / platform default.
     members: ExportedWorkMember[];
     customDomains: ExportedCustomDomain[];
     workPlugins: ExportedWorkPlugin[];

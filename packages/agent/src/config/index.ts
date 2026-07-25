@@ -661,6 +661,19 @@ export const config = {
             const raw = parseInt(process.env.AGENT_MAX_CONCURRENT_RUNS_PER_ORG || '25', 10);
             return Number.isFinite(raw) ? raw : 25;
         },
+        /**
+         * Merge-policy matrix (Wave 3, D4) — operator kill-switch for
+         * enforcement at the git facade. Default ON: an agent-driven merge
+         * consults the resolved policy and is refused when the policy says
+         * no. Set `AGENT_MERGE_POLICY_ENFORCEMENT=off` to fall back to the
+         * pre-feature behavior (no policy consult at all) if enforcement
+         * ever misfires in production — a rollback valve, not a product
+         * knob. The POLICY itself is configured per tenant / org / Work /
+         * Agent, never by env.
+         */
+        isMergePolicyEnforcementEnabled() {
+            return (process.env.AGENT_MERGE_POLICY_ENFORCEMENT || 'on').toLowerCase() !== 'off';
+        },
     },
 
     /**

@@ -196,6 +196,14 @@
         "./pr-review": {
             "types": "./dist/pr-review/index.d.ts",
             "default": "./dist/pr-review/index.js"
+        },
+        "./policy": {
+            "types": "./dist/policy/index.d.ts",
+            "default": "./dist/policy/index.js"
+        },
+        "./validation": {
+            "types": "./dist/validation/index.d.ts",
+            "default": "./dist/validation/index.js"
         }
     },
     "scripts": {

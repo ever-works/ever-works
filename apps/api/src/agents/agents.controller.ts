@@ -447,6 +447,8 @@ export class AgentsController {
             committerEmail: body.committerEmail,
             reportsToAgentId: body.reportsToAgentId,
             scorecard: body.scorecard as AgentScorecardMetric[] | null | undefined,
+            // Merge-policy matrix (Wave 3, D4) — the Agent-scoped slice.
+            mergePolicy: body.mergePolicy,
         });
     }
 

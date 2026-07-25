@@ -257,6 +257,31 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         params: [],
     },
 
+    // ── Merge policy (Wave 3, founder decision D4) ───────────────
+    {
+        toolName: 'resolve_merge_policy',
+        method: 'GET',
+        path: '/api/merge-policy/resolve',
+        summary:
+            'Resolve the effective merge policy for a Work and/or Agent — whether agents may merge their own pull requests, whether a green quality gate and/or a human approval is required, which merge methods are allowed and which branches are protected. Also reports which scope (tenant, organization, Work, Agent or the platform default) each setting came from. Use when the user asks who may merge, why a merge was refused, or what the current policy is.',
+        kind: 'read',
+        params: [
+            {
+                name: 'workId',
+                in: 'query',
+                type: 'string',
+                description: 'Resolve the policy as it applies to this Work.',
+            },
+            {
+                name: 'agentId',
+                in: 'query',
+                type: 'string',
+                description:
+                    'Resolve the policy as it applies to this Agent (most specific scope; its Work, organization and tenant are discovered automatically).',
+            },
+        ],
+    },
+
     // ── Tasks ────────────────────────────────────────────────────
     {
         toolName: 'list_tasks',

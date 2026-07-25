@@ -42,6 +42,7 @@ import { TaskNotificationService } from './task-notification.service';
 import { TaskRunDenormService } from './task-run-denorm.service';
 import { TaskWorkspaceService } from './task-workspace.service';
 import { FacadesModule } from '../facades/facades.module';
+import { PolicyModule } from '../policy/policy.module';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { AgentsModule } from '../agents/agents.module';
 import { NotificationsModule } from '../notifications/notifications.module';
@@ -91,6 +92,9 @@ import { NotificationsModule } from '../notifications/notifications.module';
         // Wave 2 M3 — TaskWorkspaceService resolves + provisions the
         // per-Task isolated workspace through the workspace/git facades.
         FacadesModule,
+        // Wave 3 D4 — TaskWorkspaceService.finalizeRun records the scope
+        // that governs this Work's merges in its PR-opened log line.
+        PolicyModule,
     ],
     providers: [
         TaskRepository,

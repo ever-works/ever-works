@@ -32,6 +32,9 @@ import {
     AGENT_ACTION_PROPOSAL_ACTION_TYPES,
     type AgentActionProposalActionType,
 } from '@ever-works/agent/agent-approvals';
+// Entity-free validation subpath on purpose — see the docstring on
+// `@ever-works/agent/validation`.
+import { MergePolicyDto } from '@ever-works/agent/validation';
 
 /**
  * Permissions partial sent on create/update — every flag optional;
@@ -370,6 +373,17 @@ export class UpdateAgentDto {
     @ValidateNested({ each: true })
     @Type(() => AgentScorecardMetricDto)
     scorecard?: AgentScorecardMetricDto[] | null;
+
+    /**
+     * Merge-policy matrix (Wave 3, D4) — this Agent's slice, the MOST
+     * specific scope. Every field inside is optional and inherits when
+     * omitted; `null` clears the Agent override entirely.
+     */
+    @ApiProperty({ required: false, type: MergePolicyDto, nullable: true })
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => MergePolicyDto)
+    mergePolicy?: MergePolicyDto | null;
 }
 
 /**

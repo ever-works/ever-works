@@ -7,6 +7,7 @@ import { WorkspaceFacadeService } from '../facades/workspace.facade';
 import { GitFacadeService } from '../facades/git.facade';
 import { TaskTransitionService } from './task-transition.service';
 import { TaskChatService } from './task-chat.service';
+import { MergePolicyService } from '../policy/merge-policy.service';
 import { resolveTaskIsolation, taskBranchName } from './task-isolation';
 
 export interface ProvisionedTaskWorkspace {
@@ -58,6 +59,13 @@ export class TaskWorkspaceService {
         @Optional()
         @Inject(forwardRef(() => TaskChatService))
         private readonly taskChat?: TaskChatService,
+        // Merge-policy matrix (Wave 3, D4) — read-only here: finalize
+        // OPENS the PR, it never lands one, so the policy is RECORDED
+        // (which scope governs this Work's merges) rather than enforced.
+        // Enforcement lives at the one place a merge can happen,
+        // `GitFacadeService.mergePullRequest`. Appended LAST + @Optional()
+        // per the positional-spec arity rule.
+        @Optional() private readonly mergePolicy?: MergePolicyService,
     ) {}
 
     /**
@@ -281,8 +289,40 @@ export class TaskWorkspaceService {
             prUrl: pr.url,
         });
         await this.transitionTask(task, TaskStatus.IN_REVIEW);
-        this.logger.log(`Task ${task.id} opened PR #${pr.number} (${pr.url}).`);
+        this.logger.log(
+            `Task ${task.id} opened PR #${pr.number} (${pr.url})` +
+                `${await this.describeMergePolicy(input.agentId, work.id)}.`,
+        );
         return { outcome: 'pr-opened', prNumber: pr.number, prUrl: pr.url };
+    }
+
+    /**
+     * Merge-policy matrix (Wave 3, D4) — the audit half. The PR-opened log
+     * line names the SCOPE that governs who may land this PR (agent /
+     * work / organization / tenant / default) plus whether agent merges
+     * are allowed at all, so "why did/didn't the agent merge this?" is
+     * answerable from the run log alone.
+     *
+     * Best-effort by contract: returns an empty suffix when the policy
+     * service is unbound or the lookup fails. A logging concern must never
+     * fail a finalize that already opened a real pull request.
+     */
+    private async describeMergePolicy(agentId: string, workId: string): Promise<string> {
+        if (!this.mergePolicy) return '';
+        try {
+            const resolved = await this.mergePolicy.resolve({ agentId, workId });
+            return (
+                ` — merge policy from ${resolved.source} scope ` +
+                `(allowAgentMerge=${resolved.policy.allowAgentMerge})`
+            );
+        } catch (error) {
+            this.logger.warn(
+                `Task merge-policy lookup failed (continuing): ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return '';
+        }
     }
 
     private async transitionTask(task: Task, to: TaskStatus): Promise<void> {

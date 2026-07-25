@@ -55,6 +55,7 @@ import { InboundTriggersModule } from './triggers/inbound-triggers.module';
 import { IngestModule } from './ingest/ingest.module';
 import { MeetingsApiModule } from './meetings/meetings.module';
 import { FleetApiModule } from './fleet/fleet.module';
+import { MergePolicyApiModule } from './merge-policy/merge-policy.module';
 import { TelemetryModule } from './telemetry/telemetry.module';
 import { UsersModule } from './users/users.module';
 import { ScopeModule } from './scope/scope.module';
@@ -204,6 +205,11 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // CRUD-lite + public token-authenticated enroll/heartbeat) over
         // the agent-side FleetModule.
         FleetApiModule,
+        // Merge-policy matrix (Wave 3, founder decision D4) —
+        // GET /api/merge-policy/resolve owner-scoped preview over the
+        // agent-side PolicyModule. Writes ride the existing Work / Agent /
+        // organization PATCH endpoints.
+        MergePolicyApiModule,
         TelemetryModule,
         FunnelAnalyticsBindingModule,
         UploadsModule,

@@ -678,6 +678,15 @@ export class WorkLifecycleService {
                 updateData.maxGateAttempts = updateDto.maxGateAttempts;
             }
 
+            // Merge-policy matrix (Wave 3, D4). A PARTIAL object is normal —
+            // resolution is field-by-field, so a Work can set one knob and
+            // inherit the rest. `null` clears the Work override entirely
+            // (back to inheriting the org / tenant / platform default);
+            // the column is nullable precisely so NULL can mean INHERIT.
+            if (updateDto.mergePolicy !== undefined) {
+                updateData.mergePolicy = updateDto.mergePolicy;
+            }
+
             // Handle community PR processing settings
             if (updateDto.communityPrEnabled !== undefined) {
                 updateData.communityPrEnabled = updateDto.communityPrEnabled;

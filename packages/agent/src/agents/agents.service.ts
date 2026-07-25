@@ -35,6 +35,10 @@ import { toAgentDto, type AgentDto } from './types';
 import { computeNextHeartbeat } from './heartbeat-cron';
 import { validateScorecard } from './scorecard';
 import { validateGuardrails, type AgentGuardrails } from './guardrails';
+// Merge-policy matrix (Wave 3, D4). The sanitizer is a pure contracts
+// helper (no Nest graph, no DB), so the agents module gains no runtime
+// dependency on the policy module.
+import { sanitizeMergePolicyOverride, type MergePolicyOverride } from '@ever-works/contracts';
 
 // Upload IDs are SHA-256 hex strings (the `id` field returned by
 // POST /api/uploads/file). 64 lowercase hex chars — NOT UUID-shaped
@@ -124,6 +128,16 @@ export interface UpdateAgentInput {
      * (null clears it). Validated via `validateScorecard`.
      */
     scorecard?: AgentScorecardMetric[] | null;
+    /**
+     * Merge-policy matrix (Wave 3, D4) — this Agent's slice, the MOST
+     * specific scope. A PARTIAL object is normal (resolution is
+     * field-by-field); `null` clears the Agent override so it inherits
+     * the Work / organization / tenant / platform default.
+     *
+     * Distinct from `permissions.canOpenPullRequests`, which governs
+     * OPENING a PR; this governs LANDING one.
+     */
+    mergePolicy?: MergePolicyOverride | null;
 }
 
 /**
@@ -429,6 +443,22 @@ export class AgentsService {
             }
             patch.scorecard =
                 input.scorecard && input.scorecard.length > 0 ? input.scorecard : null;
+        }
+
+        // Merge-policy matrix (Wave 3, D4) — whole-object replace at THIS
+        // scope; `null` (or an empty object) clears the Agent override so
+        // resolution falls through to the Work / org / tenant / platform
+        // default. `sanitizeMergePolicyOverride` is the defense-in-depth
+        // check behind the DTO layer (tool/import callers reach this
+        // service without class-validator) and drops unknown values rather
+        // than coercing them to something permissive.
+        if (input.mergePolicy !== undefined) {
+            if (input.mergePolicy === null) {
+                patch.mergePolicy = null;
+            } else {
+                const sanitized = sanitizeMergePolicyOverride(input.mergePolicy);
+                patch.mergePolicy = Object.keys(sanitized).length > 0 ? sanitized : null;
+            }
         }
 
         await this.agents.updateById(id, patch);
