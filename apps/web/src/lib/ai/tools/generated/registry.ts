@@ -105,6 +105,33 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
         bodyHint: 'name, title, scope, scopeId, aiProvider, model, capabilities[].',
     },
     {
+        toolName: 'list_agent_templates',
+        method: 'GET',
+        path: '/api/agents/templates',
+        summary:
+            'List prebuilt agent templates (marketing/sales/ops presets with prompts, suggested skills, and a suggested pipeline).',
+        kind: 'read',
+    },
+    {
+        toolName: 'create_agent_from_template',
+        method: 'POST',
+        path: '/api/agents/from-template/{slug}',
+        summary:
+            'Create an agent for the current user from a prebuilt template (draft status, review-before-act guardrails).',
+        kind: 'create',
+        params: [
+            {
+                name: 'slug',
+                in: 'path',
+                required: true,
+                type: 'string',
+                description: 'Template slug from list_agent_templates (e.g. outreach-drafter)',
+            },
+        ],
+        body: true,
+        bodyHint: 'Optional placement overrides: name, scope, missionId, ideaId, workId.',
+    },
+    {
         toolName: 'update_agent',
         method: 'PATCH',
         path: '/api/agents/{id}',

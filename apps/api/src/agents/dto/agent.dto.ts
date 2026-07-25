@@ -223,6 +223,29 @@ export class CreateAgentDto {
     committerEmail?: string;
 }
 
+/**
+ * Wave 10 — POST /api/agents/from-template/:slug body. Everything is an
+ * OPTIONAL placement override: prompt, permissions, guardrails, and
+ * capabilities always come from the template itself.
+ */
+export class CreateAgentFromTemplateDto {
+    @ApiProperty({ required: false, minLength: 1, maxLength: 120 })
+    @IsOptional()
+    @IsString()
+    @MinLength(1)
+    @MaxLength(120)
+    name?: string;
+
+    @ApiProperty({ required: false, enum: AgentScope })
+    @IsOptional()
+    @IsEnum(AgentScope)
+    scope?: AgentScope;
+
+    @ApiProperty({ required: false }) @IsOptional() @IsUUID() missionId?: string;
+    @ApiProperty({ required: false }) @IsOptional() @IsUUID() ideaId?: string;
+    @ApiProperty({ required: false }) @IsOptional() @IsUUID() workId?: string;
+}
+
 export class UpdateAgentDto {
     @ApiProperty({ required: false, minLength: 1, maxLength: 120 })
     @IsOptional()
