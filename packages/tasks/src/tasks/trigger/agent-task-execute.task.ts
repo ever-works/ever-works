@@ -2,7 +2,7 @@ import { task } from '@trigger.dev/sdk';
 import { NestFactory } from '@nestjs/core';
 import type { TaskAcceptanceCheck } from '@ever-works/contracts';
 import { AgentRepository, AgentRunRepository, WorkRepository } from '@ever-works/agent/database';
-import { AgentRunService } from '@ever-works/agent/agents';
+import { AgentRunService, RunDispatchGateService } from '@ever-works/agent/agents';
 import {
     resolveAcceptanceChecks,
     resolveChecksPolicy,
@@ -109,6 +109,13 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                     await bestEffort(() =>
                         denorm.recordTerminal(payload.taskId, inFlight.id, 'failed'),
                     );
+                    // Run orchestration (Wave 4 M2) — the failure freed a
+                    // concurrency slot; drain the Work's parked queue (RPC).
+                    if (inFlight.workId) {
+                        const failedWorkId = inFlight.workId;
+                        const gate = appContext.get(RunDispatchGateService);
+                        await bestEffort(() => gate.drainForWork(failedWorkId));
+                    }
                 }
             } finally {
                 await appContext.close();
@@ -138,6 +145,14 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
             // Kanban run cockpit (Wave 2) — latest-run denorm writes after
             // claim + terminal transitions. RPC proxy; every call best-effort.
             const runDenorm = appContext.get(TaskRunDenormService);
+            // Run orchestration (Wave 4 M2) — drain-on-terminal: every
+            // terminal write below frees a concurrency slot, so the Work's
+            // parked queue is drained (RPC proxy; always best-effort).
+            const dispatchGate = appContext.get(RunDispatchGateService);
+            const drainWork = async (workId: string | null | undefined): Promise<void> => {
+                if (!workId) return;
+                await bestEffort(() => dispatchGate.drainForWork(workId));
+            };
 
             // Security: scope the Agent lookup to the payload's userId
             // (defense-in-depth IDOR guard). The legitimate dispatch path
@@ -206,6 +221,9 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                     userId: agent.userId,
                     triggerKind: 'task',
                     taskId: payload.taskId,
+                    // Wave 4 M1 — workId denorm at creation (owner-scoped
+                    // taskRow resolved above).
+                    workId: taskRow.workId ?? null,
                 });
                 // Kanban run cockpit — on-the-fly creation (dispatcher row was
                 // never found), mirror it exactly like the fan-out path does.
@@ -278,6 +296,7 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                 await bestEffort(() =>
                     runDenorm.recordTerminal(payload.taskId, claimedRunId, 'failed'),
                 );
+                await drainWork(taskRow.workId);
                 return {
                     status: 'failed',
                     reason: 'workspace-provision-failed',
@@ -417,11 +436,13 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                 await bestEffort(() =>
                     runDenorm.recordTerminal(payload.taskId, claimedRunId, 'completed'),
                 );
+                await drainWork(taskRow.workId);
             } else if (result.status === 'agent-not-found') {
                 await runs.markFailed(run.id, 'Agent not found');
                 await bestEffort(() =>
                     runDenorm.recordTerminal(payload.taskId, claimedRunId, 'failed'),
                 );
+                await drainWork(taskRow.workId);
             }
 
             // Wave 2 M4 — green-path finalize of the isolated workspace:
@@ -464,6 +485,7 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                     // branch — that IS a failure of the Task's promise.
                     const message = error instanceof Error ? error.message : String(error);
                     await runs.markFailed(run.id, `Workspace finalize failed: ${message}`);
+                    await drainWork(taskRow.workId);
                     // Mirror-consistency: for `assembled` runs the row was
                     // already marked completed above, so this markFailed CAS
                     // no-ops — only mirror `failed` when the row could

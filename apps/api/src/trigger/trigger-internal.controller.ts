@@ -49,6 +49,7 @@ import {
     AgentRunService,
     AgentRunSweeperService,
     AgentScheduleDispatcherService,
+    RunDispatchGateService,
 } from '@ever-works/agent/agents';
 import {
     TaskChatService,
@@ -278,6 +279,11 @@ export class TriggerInternalController implements OnModuleInit {
         // appended-last @Optional() posture as the sweeper above.
         @Optional()
         private readonly taskGateRunnerService?: TaskGateRunnerService,
+        // Run orchestration (Wave 4 M2) — drain-on-terminal RPC target for
+        // the agent-task-execute worker. Appended LAST + @Optional() for
+        // the same positional-spec reason as the sweeper above.
+        @Optional()
+        private readonly runDispatchGateService?: RunDispatchGateService,
     ) {}
 
     onModuleInit() {
@@ -312,6 +318,9 @@ export class TriggerInternalController implements OnModuleInit {
             // agent-heartbeat dispatcher cron + agent-heartbeat one-shot.
             AgentScheduleDispatcherService: this.agentScheduleDispatcherService,
             AgentRunSweeperService: this.agentRunSweeperService,
+            // Run orchestration (Wave 4 M2) — agent-task-execute calls
+            // drainForWork here after every terminal transition.
+            RunDispatchGateService: this.runDispatchGateService,
             AgentRunService: this.agentRunService,
             AgentRepository: this.agentRepositoryRef,
             AgentRunRepository: this.agentRunRepositoryRef,

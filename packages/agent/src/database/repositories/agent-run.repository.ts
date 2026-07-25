@@ -157,14 +157,25 @@ export class AgentRunRepository {
          * worker had not yet reached `markStarted`.
          */
         triggerRunId?: string | null;
+        /**
+         * Wave 4 M2 — denormalized Work scope of the cancelled row, so the
+         * caller can drain the concurrency queue for that Work after a
+         * successful cancel. Null for Work-less runs.
+         */
+        workId?: string | null;
     }> {
         const run = await this.repository.findOne({
             where: { id: runId, userId },
-            select: ['id', 'status', 'triggerRunId'],
+            select: ['id', 'status', 'triggerRunId', 'workId'],
         });
         if (!run) return { found: false };
         if (run.status !== 'queued' && run.status !== 'running') {
-            return { found: true, previousStatus: run.status, triggerRunId: run.triggerRunId };
+            return {
+                found: true,
+                previousStatus: run.status,
+                triggerRunId: run.triggerRunId,
+                workId: run.workId ?? null,
+            };
         }
         const result = await this.repository
             .createQueryBuilder()
@@ -191,9 +202,15 @@ export class AgentRunRepository {
                 // Re-read: the worker may have stamped `triggerRunId` via
                 // markStarted between our first read and this CAS.
                 triggerRunId: fresh?.triggerRunId ?? run.triggerRunId,
+                workId: run.workId ?? null,
             };
         }
-        return { found: true, previousStatus: run.status, triggerRunId: run.triggerRunId };
+        return {
+            found: true,
+            previousStatus: run.status,
+            triggerRunId: run.triggerRunId,
+            workId: run.workId ?? null,
+        };
     }
 
     /**
@@ -219,7 +236,10 @@ export class AgentRunRepository {
         cutoff: Date,
         limit: number,
     ): Promise<
-        Pick<AgentRun, 'id' | 'agentId' | 'triggerKind' | 'status' | 'startedAt' | 'createdAt'>[]
+        Pick<
+            AgentRun,
+            'id' | 'agentId' | 'triggerKind' | 'status' | 'startedAt' | 'createdAt' | 'workId'
+        >[]
     > {
         return this.repository
             .createQueryBuilder('run')
@@ -230,6 +250,9 @@ export class AgentRunRepository {
                 'run.status',
                 'run.startedAt',
                 'run.createdAt',
+                // Wave 4 M2 — the sweeper drains the concurrency queue for
+                // every Work whose stuck run it just reaped.
+                'run.workId',
             ])
             .where('run.status IN (:...statuses)', { statuses: NON_TERMINAL })
             .andWhere('COALESCE(run.startedAt, run.createdAt) <= :cutoff', { cutoff })
@@ -269,6 +292,13 @@ export class AgentRunRepository {
         triggerKind: AgentRunTriggerKind;
         taskId?: string | null;
         chatMessageId?: string | null;
+        /** Wave 4 M1 — denormalized from `task.workId` at creation when present. */
+        workId?: string | null;
+        /** Wave 4 M2 — set to `concurrency-limit` when the dispatch gate parks the run. */
+        queuedReason?: string | null;
+        /** Wave 4 M1 — pipeline plugin id when known at creation. */
+        runnerKind?: string | null;
+        organizationId?: string | null;
     }): Promise<AgentRun> {
         const run = this.repository.create({
             agentId: args.agentId,
@@ -277,6 +307,12 @@ export class AgentRunRepository {
             status: 'queued',
             taskId: args.taskId ?? null,
             chatMessageId: args.chatMessageId ?? null,
+            workId: args.workId ?? null,
+            queuedReason: args.queuedReason ?? null,
+            runnerKind: args.runnerKind ?? null,
+            // Only stamp when explicitly provided — the ambient scope
+            // subscriber (EW-657) remains the default writer.
+            ...(args.organizationId !== undefined ? { organizationId: args.organizationId } : {}),
         });
         return this.repository.save(run);
     }
@@ -565,5 +601,168 @@ export class AgentRunRepository {
             })
             .orderBy('run.createdAt', 'DESC')
             .getOne();
+    }
+
+    // ── Run orchestration (Wave 4 M2/M3) ───────────────────────────
+
+    /**
+     * In-flight = `running`, plus `queued` rows that were actually handed
+     * to the job runtime (`queuedReason IS NULL`). Rows parked by the
+     * dispatch gate (`queuedReason = 'concurrency-limit'`) are WAITING for
+     * capacity, not consuming it — counting them would deadlock the drain:
+     * the parked run itself would keep the count at the limit forever.
+     */
+    private inFlightQb(alias = 'run') {
+        return this.repository
+            .createQueryBuilder(alias)
+            .where(`${alias}.status IN (:...statuses)`, {
+                statuses: ['queued', 'running'] satisfies AgentRunStatus[],
+            })
+            .andWhere(`${alias}.queuedReason IS NULL`);
+    }
+
+    /** Per-Work in-flight count for the dispatch gate. */
+    async countInFlightForWork(workId: string): Promise<number> {
+        return this.inFlightQb().andWhere('run.workId = :workId', { workId }).getCount();
+    }
+
+    /** Per-user in-flight count (the org valve for org-less personal runs). */
+    async countInFlightForUser(userId: string): Promise<number> {
+        return this.inFlightQb().andWhere('run.userId = :userId', { userId }).getCount();
+    }
+
+    /** Per-organization in-flight count for the dispatch gate. */
+    async countInFlightForOrganization(organizationId: string): Promise<number> {
+        return this.inFlightQb()
+            .andWhere('run.organizationId = :organizationId', { organizationId })
+            .getCount();
+    }
+
+    /**
+     * Oldest run parked by the dispatch gate for this Work — FIFO drain
+     * order (priority-aware ordering is a documented later milestone).
+     */
+    async findOldestQueuedForConcurrency(
+        workId: string,
+        queuedReason: string,
+    ): Promise<AgentRun | null> {
+        return this.repository
+            .createQueryBuilder('run')
+            .where('run.workId = :workId', { workId })
+            .andWhere('run.status = :status', { status: 'queued' satisfies AgentRunStatus })
+            .andWhere('run.queuedReason = :queuedReason', { queuedReason })
+            .orderBy('run.createdAt', 'ASC')
+            .getOne();
+    }
+
+    /**
+     * CAS-claim a parked run for dispatch: clears `queuedReason` only
+     * while the row is still `queued` AND still parked, so two drains
+     * racing for the same run resolve to exactly one dispatcher. Returns
+     * whether THIS caller won the claim.
+     */
+    async claimQueuedForDispatch(runId: string, queuedReason: string): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(AgentRun)
+            .set({ queuedReason: null })
+            .where('id = :id', { id: runId })
+            .andWhere('status = :status', { status: 'queued' satisfies AgentRunStatus })
+            .andWhere('queuedReason = :queuedReason', { queuedReason })
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Roll a drain-claimed run back to parked after its dispatch could
+     * not be attempted (no dispatcher bound). No-clobber: only a still-
+     * `queued` row with a cleared reason is restored.
+     */
+    async restoreQueuedReason(runId: string, queuedReason: string): Promise<void> {
+        await this.repository
+            .createQueryBuilder()
+            .update(AgentRun)
+            .set({ queuedReason })
+            .where('id = :id', { id: runId })
+            .andWhere('status = :status', { status: 'queued' satisfies AgentRunStatus })
+            .andWhere('queuedReason IS NULL')
+            .execute();
+    }
+
+    /**
+     * Sessions list (Wave 4 M3) — owner-scoped, filterable, paginated.
+     * `userId` is mandatory and always applied at the repository layer:
+     * this is the HTTP-facing method, so cross-user rows must be
+     * unreachable even if a future controller forgets its own guard.
+     */
+    async listSessionsForUser(
+        userId: string,
+        filters: {
+            status?: AgentRunStatus;
+            workId?: string;
+            agentId?: string;
+            triggerKind?: AgentRunTriggerKind;
+        },
+        limit = 25,
+        offset = 0,
+    ): Promise<[AgentRun[], number]> {
+        const qb = this.repository
+            .createQueryBuilder('run')
+            .where('run.userId = :userId', { userId });
+        if (filters.status) {
+            qb.andWhere('run.status = :status', { status: filters.status });
+        }
+        if (filters.workId) {
+            qb.andWhere('run.workId = :workId', { workId: filters.workId });
+        }
+        if (filters.agentId) {
+            qb.andWhere('run.agentId = :agentId', { agentId: filters.agentId });
+        }
+        if (filters.triggerKind) {
+            qb.andWhere('run.triggerKind = :triggerKind', { triggerKind: filters.triggerKind });
+        }
+        return qb.orderBy('run.createdAt', 'DESC').take(limit).skip(offset).getManyAndCount();
+    }
+
+    /**
+     * Per-Work session summary (Wave 4 M3) — one grouped scan over
+     * `(workId, status)` instead of four counts. CASE/SUM is portable
+     * across Postgres and sqlite (the e2e suite runs on sqlite);
+     * `awaitingInput = :true` binds a real boolean so both drivers
+     * compare their native representation.
+     */
+    async summarizeForWork(workId: string): Promise<{
+        running: number;
+        queued: number;
+        awaiting: number;
+        failedLast24h: number;
+    }> {
+        const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
+        const raw = await this.repository
+            .createQueryBuilder('run')
+            .select(`SUM(CASE WHEN run.status = 'running' THEN 1 ELSE 0 END)`, 'running')
+            .addSelect(`SUM(CASE WHEN run.status = 'queued' THEN 1 ELSE 0 END)`, 'queued')
+            .addSelect(
+                `SUM(CASE WHEN run.awaitingInput = :isAwaiting AND run.status IN ('queued', 'running') THEN 1 ELSE 0 END)`,
+                'awaiting',
+            )
+            .addSelect(
+                `SUM(CASE WHEN run.status = 'failed' AND run.finishedAt >= :cutoff THEN 1 ELSE 0 END)`,
+                'failedLast24h',
+            )
+            .where('run.workId = :workId', { workId })
+            .setParameters({ isAwaiting: true, cutoff })
+            .getRawOne<{
+                running: string | number | null;
+                queued: string | number | null;
+                awaiting: string | number | null;
+                failedLast24h: string | number | null;
+            }>();
+        return {
+            running: Number(raw?.running ?? 0),
+            queued: Number(raw?.queued ?? 0),
+            awaiting: Number(raw?.awaiting ?? 0),
+            failedLast24h: Number(raw?.failedLast24h ?? 0),
+        };
     }
 }

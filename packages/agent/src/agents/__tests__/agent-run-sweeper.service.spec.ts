@@ -61,6 +61,44 @@ describe('AgentRunSweeperService', () => {
         jest.restoreAllMocks();
     });
 
+    describe('Wave 4 M2 — drain safety net', () => {
+        function makeGatedSvc(gate: any): AgentRunSweeperService {
+            const svc = new AgentRunSweeperService(runs, gate);
+            jest.spyOn(
+                (svc as never as { logger: { warn: () => void } }).logger,
+                'warn',
+            ).mockImplementation(() => undefined);
+            jest.spyOn(
+                (svc as never as { logger: { log: () => void } }).logger,
+                'log',
+            ).mockImplementation(() => undefined);
+            return svc;
+        }
+
+        it('drains each affected Work exactly once after reaping stuck runs', async () => {
+            runs.findStuckNonTerminal.mockResolvedValue([
+                stuckRow({ id: 'r1', workId: 'work-a' }),
+                stuckRow({ id: 'r2', workId: 'work-a' }),
+                stuckRow({ id: 'r3', workId: 'work-b' }),
+                stuckRow({ id: 'r4', workId: null }),
+            ]);
+            runs.markStuckFailed.mockResolvedValue(4);
+            const gate = { drainForWork: jest.fn().mockResolvedValue({ dispatched: true }) };
+            await makeGatedSvc(gate).sweepStuckRuns();
+            expect(gate.drainForWork).toHaveBeenCalledTimes(2);
+            expect(gate.drainForWork).toHaveBeenCalledWith('work-a');
+            expect(gate.drainForWork).toHaveBeenCalledWith('work-b');
+        });
+
+        it('does not drain when the CAS lost every row (nothing was freed)', async () => {
+            runs.findStuckNonTerminal.mockResolvedValue([stuckRow({ workId: 'work-a' })]);
+            runs.markStuckFailed.mockResolvedValue(0);
+            const gate = { drainForWork: jest.fn() };
+            await makeGatedSvc(gate).sweepStuckRuns();
+            expect(gate.drainForWork).not.toHaveBeenCalled();
+        });
+    });
+
     it('⭐ reaps a run older than the cutoff', async () => {
         // THE NO-OP CATCHER. An implementation that returns { swept: 0 }
         // unconditionally passes every safety test in this file — only this

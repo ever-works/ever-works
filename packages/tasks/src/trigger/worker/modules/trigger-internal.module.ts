@@ -13,6 +13,7 @@ import {
     AgentRunService,
     AgentRunSweeperService,
     AgentScheduleDispatcherService,
+    RunDispatchGateService,
 } from '@ever-works/agent/agents';
 import {
     TaskChatService,
@@ -130,6 +131,17 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
                 createRemoteProxy(apiClient, 'AgentRunRepository'),
             inject: [TriggerInternalApiClient],
         },
+        // Run orchestration (Wave 4 M2) — drain-on-terminal from the
+        // agent-task-execute worker. The real gate (repository counts +
+        // the @Global dispatcher token) lives in the API; the worker only
+        // calls drainForWork over the internal RPC channel, same shape as
+        // TaskWorkspaceService.
+        {
+            provide: RunDispatchGateService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'RunDispatchGateService'),
+            inject: [TriggerInternalApiClient],
+        },
         // Agents/Skills/Tasks PR #1017 — Phase 17. Recurring Task
         // dispatcher exposed for the task-recurrence-dispatcher cron.
         {
@@ -243,6 +255,7 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         AgentRunService,
         AgentRepository,
         AgentRunRepository,
+        RunDispatchGateService,
         TaskRecurrenceDispatcherService,
         TasksService,
         TaskChatService,

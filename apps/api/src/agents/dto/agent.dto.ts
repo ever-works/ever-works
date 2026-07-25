@@ -446,6 +446,53 @@ export class ListAgentRunsQueryDto {
 }
 
 /**
+ * Run orchestration (Wave 4 M3) — filters for the org-wide Sessions
+ * list (`GET /api/agents/runs`). Every filter optional; unset = all of
+ * the caller's runs. Enum whitelists mirror the entity unions — an
+ * unrecognized value is a 400, never a silent full-table answer.
+ */
+export class ListRunSessionsQueryDto {
+    @ApiProperty({
+        required: false,
+        enum: ['queued', 'running', 'completed', 'failed', 'cancelled'],
+    })
+    @IsOptional()
+    @IsIn(['queued', 'running', 'completed', 'failed', 'cancelled'])
+    status?: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+
+    @ApiProperty({ required: false, format: 'uuid' })
+    @IsOptional()
+    @IsUUID()
+    workId?: string;
+
+    @ApiProperty({ required: false, format: 'uuid' })
+    @IsOptional()
+    @IsUUID()
+    agentId?: string;
+
+    /** Trigger kind — named `kind` on the wire for the Sessions view. */
+    @ApiProperty({ required: false, enum: ['heartbeat', 'manual', 'task', 'chat', 'event'] })
+    @IsOptional()
+    @IsIn(['heartbeat', 'manual', 'task', 'chat', 'event'])
+    kind?: 'heartbeat' | 'manual' | 'task' | 'chat' | 'event';
+
+    @ApiProperty({ required: false, minimum: 1, maximum: 200 })
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(200)
+    limit?: number;
+
+    @ApiProperty({ required: false, minimum: 0 })
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(0)
+    offset?: number;
+}
+
+/**
  * FU-2 — payload for `POST /api/agents/:id/assign-task`.
  */
 export class AssignTaskToAgentDto {

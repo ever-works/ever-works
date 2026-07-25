@@ -38,6 +38,9 @@ export type AgentRunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'ca
 @Index('idx_agent_runs_status', ['status'])
 @Index('idx_agent_runs_task', ['taskId'])
 @Index('idx_agent_runs_chat_message', ['chatMessageId'])
+// Run orchestration (Wave 4 M1) — cheap per-Work concurrency counts +
+// Sessions-view grouping both scan (workId, status).
+@Index('idx_agent_runs_work_status', ['workId', 'status'])
 export class AgentRun {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -213,6 +216,54 @@ export class AgentRun {
     /** Number of files the run has changed in its workspace so far. */
     @Column({ type: 'int', nullable: true })
     changedFilesCount?: number | null;
+
+    // ── Run orchestration (Wave 4 M1). All additive; NULL/false on
+    // every pre-existing row. The dispatch gate + Sessions list are the
+    // consumers — nothing here changes the status state machine.
+
+    /**
+     * Denormalized Work scope, derived at creation from `task.workId`
+     * when the run is task-attached (NULL otherwise — heartbeat/manual
+     * runs have no Work). Powers per-Work concurrency counts and the
+     * Sessions view's group-by-Work without a join per row.
+     */
+    @Column({ type: 'uuid', nullable: true })
+    workId?: string | null;
+
+    /**
+     * The run is parked on a question/approval for a human. Set by
+     * lifecycle signals (never agent self-report prose); a run in this
+     * state must NEVER be reaped by TTL sweeps. Boolean (not a status
+     * member) so the existing status state machine and every CAS guard
+     * keep working unchanged.
+     */
+    @Column({ type: 'boolean', default: false })
+    awaitingInput: boolean;
+
+    /**
+     * Why a `queued` run has NOT been dispatched to the job runtime.
+     * `concurrency-limit` = parked by `RunDispatchGateService`; NULL =
+     * dispatched (or predates the gate). Cleared when a drain promotes
+     * the run. Short machine token, never free text.
+     */
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    queuedReason?: string | null;
+
+    /**
+     * Which pipeline plugin id executes this run (claude-code, codex,
+     * standard-pipeline, …) — the Sessions view's "runs on" chip. NULL
+     * for runs that predate the column or never reported.
+     */
+    @Column({ type: 'varchar', length: 32, nullable: true })
+    runnerKind?: string | null;
+
+    /**
+     * Cumulative cost estimate for this run in integer cents. Sibling
+     * of `totalTokens` (per-run rollup); the per-event source of truth
+     * stays `plugin_usage_events.costCents`.
+     */
+    @Column({ type: 'int', nullable: true })
+    costCents?: number | null;
 
     @CreateDateColumn()
     createdAt: Date;

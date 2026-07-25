@@ -148,6 +148,10 @@ export class TaskChatService {
                                   triggerKind: 'chat',
                                   taskId: task.id,
                                   chatMessageId: row.id,
+                                  // Wave 4 M1 — workId denorm at creation so
+                                  // chat-triggered runs count toward (and show
+                                  // under) their Work like task runs do.
+                                  workId: task.workId ?? null,
                               })
                             : null;
                         const handle = await this.chatDispatcher!.enqueue({

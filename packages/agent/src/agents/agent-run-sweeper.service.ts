@@ -1,6 +1,7 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { config } from '../config';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
+import { RunDispatchGateService } from './run-dispatch-gate.service';
 
 /**
  * Error message prefix for a swept run.
@@ -47,7 +48,13 @@ export interface AgentRunSweepSummary {
 export class AgentRunSweeperService {
     private readonly logger = new Logger(AgentRunSweeperService.name);
 
-    constructor(private readonly runs: AgentRunRepository) {}
+    constructor(
+        private readonly runs: AgentRunRepository,
+        // Run orchestration (Wave 4 M2) — drain safety net: after reaping
+        // stuck runs, promote parked runs for the affected Works. Appended
+        // LAST + Optional so positional spec constructors keep compiling.
+        @Optional() private readonly dispatchGate?: RunDispatchGateService,
+    ) {}
 
     /**
      * Zero-arg by design: the worker resolves this service as a superjson RPC
@@ -114,6 +121,20 @@ export class AgentRunSweeperService {
             this.logger.warn(
                 `AgentRun sweep: batch limit ${limit} reached — more stuck runs remain, next tick will continue`,
             );
+        }
+
+        // Run orchestration (Wave 4 M2) — drain safety net. Every reaped
+        // run may have freed a concurrency slot; promote the oldest parked
+        // run for each affected Work. Best-effort by contract (the gate
+        // never throws from drainForWork), and only when rows actually
+        // transitioned — a lost CAS race freed nothing.
+        if (this.dispatchGate && swept > 0) {
+            const workIds = [
+                ...new Set(stuck.map((r) => r.workId).filter((w): w is string => !!w)),
+            ];
+            for (const workId of workIds) {
+                await this.dispatchGate.drainForWork(workId);
+            }
         }
 
         return {
