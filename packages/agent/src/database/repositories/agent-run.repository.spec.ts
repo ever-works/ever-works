@@ -285,4 +285,36 @@ describe('AgentRunRepository — terminal transitions', () => {
             );
         });
     });
+
+    describe('updateGateResults (quality gates, Wave 3 M2)', () => {
+        let update: jest.Mock;
+
+        beforeEach(() => {
+            update = jest.fn().mockResolvedValue(undefined);
+            (repository as { update?: jest.Mock }).update = update;
+        });
+
+        it('writes only the whitelisted gate columns that were provided', async () => {
+            await runs.updateGateResults('r1', {
+                checkResults: [{ id: 'build', exitCode: 1, status: 'red', durationMs: 10 }],
+                gateStatus: 'red',
+                gateAttempts: 1,
+            });
+            expect(update).toHaveBeenCalledWith('r1', {
+                checkResults: [{ id: 'build', exitCode: 1, status: 'red', durationMs: 10 }],
+                gateStatus: 'red',
+                gateAttempts: 1,
+            });
+        });
+
+        it('omitted fields are NOT written — a snapshot-only patch touches nothing else', async () => {
+            await runs.updateGateResults('r1', { resolvedChecks: [] });
+            expect(update).toHaveBeenCalledWith('r1', { resolvedChecks: [] });
+        });
+
+        it('an empty patch is a no-op (no SQL round-trip)', async () => {
+            await runs.updateGateResults('r1', {});
+            expect(update).not.toHaveBeenCalled();
+        });
+    });
 });

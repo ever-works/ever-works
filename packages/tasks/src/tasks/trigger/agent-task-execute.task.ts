@@ -1,8 +1,13 @@
 import { task } from '@trigger.dev/sdk';
 import { NestFactory } from '@nestjs/core';
-import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
+import type { TaskAcceptanceCheck } from '@ever-works/contracts';
+import { AgentRepository, AgentRunRepository, WorkRepository } from '@ever-works/agent/database';
 import { AgentRunService } from '@ever-works/agent/agents';
 import {
+    resolveAcceptanceChecks,
+    resolveChecksPolicy,
+    TaskChatService,
+    TaskGateRunnerService,
     TaskRunDenormService,
     TasksService,
     TaskWorkspaceService,
@@ -229,6 +234,25 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                 }),
             );
 
+            // Wave 3 M2 — dispatch-freeze: resolve the acceptance-check set
+            // (Task checks merged over Work defaults) ONCE, right after the
+            // claim, and snapshot it onto the run. An in-flight run is graded
+            // against what was agreed when it started — later edits to the
+            // Task or the Work defaults affect the next run, not this one.
+            let gateWork: Awaited<ReturnType<WorkRepository['findById']>> = null;
+            let resolvedChecks: TaskAcceptanceCheck[] = [];
+            const works = appContext.get(WorkRepository);
+            try {
+                gateWork = taskRow.workId ? await works.findById(taskRow.workId) : null;
+                resolvedChecks = resolveAcceptanceChecks(taskRow, gateWork);
+            } catch {
+                // Work lookup failed (RPC hiccup). gateWork stays null, so the
+                // policy resolves 'off' below and the run proceeds exactly as
+                // it did before quality gates existed — fail toward the
+                // status quo, never toward a half-resolved gate.
+            }
+            await bestEffort(() => runs.updateGateResults(claimedRunId, { resolvedChecks }));
+
             // Wave 2 M3 — worktree-per-Task isolation. Resolves the Work +
             // Task settings and provisions the isolated workspace when (and
             // only when) isolation resolves on; null on the default-off
@@ -292,6 +316,102 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                     : null,
             });
 
+            // Wave 3 M3 — the PR gate: "a red check opens no PR". After the
+            // agent loop succeeds and BEFORE any terminal bookkeeping or the
+            // finalize/PR step, run the dispatch-frozen acceptance checks in
+            // the provisioned workspace. Green (or a warn-only policy)
+            // proceeds to finalize exactly as before; red under a 'required'
+            // policy withholds the PR. One attempt only in M3 — the bounded
+            // iterate loop is M5.
+            const runSucceeded = result.status === 'assembled' || result.status === 'dispatched';
+            const gatePolicy = resolveChecksPolicy(gateWork);
+            let gateOutcome: Awaited<ReturnType<TaskGateRunnerService['runChecks']>> | null = null;
+            if (provisioned && runSucceeded && gatePolicy !== 'off') {
+                const gateRunner = appContext.get(TaskGateRunnerService);
+                try {
+                    gateOutcome = await gateRunner.runChecks({
+                        checks: resolvedChecks,
+                        cwd: provisioned.cwd,
+                        runId: run.id,
+                        policy: gatePolicy,
+                    });
+                } catch (error) {
+                    // A crashed gate step marks the run FAILED, never green —
+                    // a gate that did not run must not pass anything.
+                    const message = error instanceof Error ? error.message : String(error);
+                    await runs.markFailed(run.id, `Quality gate execution failed: ${message}`);
+                    await bestEffort(() =>
+                        runDenorm.recordTerminal(payload.taskId, claimedRunId, 'failed'),
+                    );
+                    return {
+                        status: 'failed',
+                        reason: 'gate-execution-failed',
+                        runId: run.id,
+                        taskId: payload.taskId,
+                    };
+                }
+
+                if (gatePolicy === 'required' && gateOutcome.gateStatus !== 'green') {
+                    // Red — or 'skipped' when the required policy found zero
+                    // checks. Either way: no finalize, no PR. The workspace
+                    // and the Task's branchState stay exactly as they are.
+                    const requiredFailed = gateOutcome.results.filter((checkResult) => {
+                        const check = resolvedChecks.find((c) => c.id === checkResult.id);
+                        return checkResult.status !== 'green' && check?.required !== false;
+                    });
+                    const summary =
+                        resolvedChecks.length === 0
+                            ? 'Quality gate: no checks configured — PR withheld (checks policy is required).'
+                            : `Quality gate red: ${requiredFailed
+                                  .map((checkResult) => checkResult.id)
+                                  .join(', ')} — PR withheld.`;
+                    await runs.markCompleted(run.id, summary);
+                    await bestEffort(() =>
+                        runDenorm.recordTerminal(payload.taskId, claimedRunId, 'completed'),
+                    );
+                    // Task chat gets the human-facing breakdown. Plain text —
+                    // the chat surface never renders agent messages as markup.
+                    const taskChat = appContext.get(TaskChatService);
+                    const chatBody =
+                        resolvedChecks.length === 0
+                            ? 'Quality gate: no checks configured, and this Work requires acceptance checks — no PR was opened. Add checks to the Task or to the Work defaults, then send a message here to re-run.'
+                            : [
+                                  'Quality gate red — no PR was opened.',
+                                  '',
+                                  'Failed checks:',
+                                  ...requiredFailed.map(
+                                      (checkResult) =>
+                                          `- ${checkResult.id}: ${
+                                              checkResult.status === 'timeout'
+                                                  ? 'timed out'
+                                                  : checkResult.status === 'error'
+                                                    ? 'could not run'
+                                                    : `exit code ${checkResult.exitCode}`
+                                          }`,
+                                  ),
+                                  '',
+                                  'Fix the issues (or adjust the checks), then send a message here to re-run.',
+                              ].join('\n');
+                    await bestEffort(() =>
+                        taskChat.post(payload.userId, {
+                            taskId: payload.taskId,
+                            authorType: 'agent',
+                            authorId: agent.id,
+                            body: chatBody,
+                        }),
+                    );
+                    return {
+                        status: 'completed',
+                        reason: 'gate-red',
+                        agentId: agent.id,
+                        taskId: payload.taskId,
+                        runId: run.id,
+                        dedupKey: payload.dedupKey,
+                        gateStatus: gateOutcome.gateStatus,
+                    };
+                }
+            }
+
             if (result.status === 'assembled') {
                 await runs.markCompleted(run.id, `Prompt assembled for task ${payload.taskId}`);
                 await bestEffort(() =>
@@ -309,8 +429,17 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
             // a FRESH base, then open the PR (→ in_review) or refuse it
             // with NAMED conflict paths (→ blocked). Only runs when a
             // workspace was provisioned and the run itself succeeded.
-            const runSucceeded = result.status === 'assembled' || result.status === 'dispatched';
             if (provisioned && runSucceeded) {
+                // Wave 3 M3 — a green gate earns a note on the PR body. Only
+                // when EVERY check (required and informational) came back
+                // green, so the note can never overstate the verdict.
+                const gateNote =
+                    gateOutcome &&
+                    gateOutcome.gateStatus === 'green' &&
+                    gateOutcome.results.length > 0 &&
+                    gateOutcome.results.every((checkResult) => checkResult.status === 'green')
+                        ? { checksPassed: gateOutcome.results.length }
+                        : undefined;
                 try {
                     const finalize = await taskWorkspace.finalizeRun({
                         task: taskRow,
@@ -320,6 +449,7 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                             (agent as { permissions?: { canOpenPullRequests?: boolean } })
                                 .permissions?.canOpenPullRequests !== false,
                         workspace: provisioned,
+                        ...(gateNote ? { gate: gateNote } : {}),
                     });
                     return {
                         status: 'completed',

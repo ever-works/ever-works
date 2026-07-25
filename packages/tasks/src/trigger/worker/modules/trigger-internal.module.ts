@@ -16,12 +16,13 @@ import {
 } from '@ever-works/agent/agents';
 import {
     TaskChatService,
+    TaskGateRunnerService,
     TaskRecurrenceDispatcherService,
     TaskRunDenormService,
     TasksService,
     TaskWorkspaceService,
 } from '@ever-works/agent/tasks-domain';
-import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
+import { AgentRepository, AgentRunRepository, WorkRepository } from '@ever-works/agent/database';
 import { NotificationChannelFacadeService } from '@ever-works/agent/facades';
 import { TriggerInternalApiClient } from '../services/trigger-internal-api.client';
 import { createRemoteProxy } from '../remote-proxy';
@@ -155,6 +156,27 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
             useFactory: (apiClient) => createRemoteProxy(apiClient, 'TaskWorkspaceService'),
             inject: [TriggerInternalApiClient],
         },
+        // Wave 3 M2/M3 — quality gates. The acceptance-check runner lives
+        // API-side (same filesystem as the provisioned workspace — see the
+        // TaskWorkspaceService note above); agent-task-execute calls
+        // runChecks over the internal RPC channel after the agent loop and
+        // before the finalize/PR step.
+        {
+            provide: TaskGateRunnerService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'TaskGateRunnerService'),
+            inject: [TriggerInternalApiClient],
+        },
+        // Wave 3 M2 — dispatch-freeze. agent-task-execute loads the Task's
+        // Work to resolve the acceptance-check set + policy right after the
+        // run claim. The API already exposes 'WorkRepository' in its remote
+        // map; this is just the worker-side proxy for it.
+        {
+            provide: WorkRepository,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'WorkRepository'),
+            inject: [TriggerInternalApiClient],
+        },
         // Kanban run cockpit (Wave 2) — latest-run denorm writes from the
         // agent-task-execute worker (after claim + terminal transitions).
         // The real service (TaskRepository graph) lives in the API; the
@@ -226,6 +248,8 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         TaskChatService,
         TaskRunDenormService,
         TaskWorkspaceService,
+        TaskGateRunnerService,
+        WorkRepository,
         NotificationChannelFacadeService,
         AnonymousUserCleanupService,
         KnowledgeBaseReconcileService,
