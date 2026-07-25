@@ -19,7 +19,7 @@ function initialReducerState() {
 }
 
 describe('computeStepList', () => {
-    it('returns the minimal 8-step list when every choice is the Ever Works default', () => {
+    it('returns the minimal 9-step list when every choice is the Ever Works default', () => {
         const list = computeStepList(ONBOARDING_DEFAULT_STATE);
         expect(list.map((s) => s.kind)).toEqual([
             'welcome',
@@ -27,6 +27,7 @@ describe('computeStepList', () => {
             'storage-choice',
             'db-choice',
             'deploy-choice',
+            'profile',
             'communication',
             'plugins-catalog',
             'create-work',
@@ -62,7 +63,7 @@ describe('computeStepList', () => {
         );
     });
 
-    it('builds the full 11-step list when every BYOK is chosen', () => {
+    it('builds the full 12-step list when every BYOK is chosen', () => {
         const list = computeStepList(
             defaultsWith({
                 ai: { choice: 'claude-code' },
@@ -70,7 +71,7 @@ describe('computeStepList', () => {
                 deploy: { choice: 'vercel' },
             }),
         );
-        expect(list).toHaveLength(11);
+        expect(list).toHaveLength(12);
         expect(list.map((s) => s.kind)).toEqual([
             'welcome',
             'ai-choice',
@@ -80,16 +81,31 @@ describe('computeStepList', () => {
             'db-choice',
             'deploy-choice',
             'deploy-config',
+            'profile',
             'communication',
             'plugins-catalog',
             'create-work',
         ]);
     });
 
-    it('always inserts the Communication step between deployment and the plugins catalog', () => {
+    it('always inserts the Communication step between the profile step and the plugins catalog', () => {
         const kinds = computeStepList(ONBOARDING_DEFAULT_STATE).map((s) => s.kind);
         expect(kinds.indexOf('communication')).toBeGreaterThan(kinds.indexOf('deploy-choice'));
         expect(kinds.indexOf('communication')).toBe(kinds.indexOf('plugins-catalog') - 1);
+    });
+
+    // Wave 11 — the "What do you do" step is always present, after the
+    // provider choice/config steps and immediately before Communication.
+    it('always inserts the profile step immediately before Communication', () => {
+        const minimal = computeStepList(ONBOARDING_DEFAULT_STATE).map((s) => s.kind);
+        expect(minimal.indexOf('profile')).toBeGreaterThan(minimal.indexOf('deploy-choice'));
+        expect(minimal.indexOf('profile')).toBe(minimal.indexOf('communication') - 1);
+
+        const full = computeStepList(defaultsWith({ deploy: { choice: 'vercel' } })).map(
+            (s) => s.kind,
+        );
+        expect(full.indexOf('profile')).toBe(full.indexOf('deploy-config') + 1);
+        expect(full.indexOf('profile')).toBe(full.indexOf('communication') - 1);
     });
 
     it('encodes the chosen vendor into the step id so React keys stay stable across rechooses', () => {
@@ -185,6 +201,55 @@ describe('reduce', () => {
 
         const cleared = reduce(set, { type: 'setPrompt', value: '   ' });
         expect(cleared.state.prompt).toBeUndefined();
+    });
+
+    // Wave 11 — "What do you do" reducer coverage.
+    it('toggleRole appends a role to the profile', () => {
+        const next = reduce(initialReducerState(), { type: 'toggleRole', value: 'marketing' });
+        expect(next.state.profile?.roles).toEqual(['marketing']);
+    });
+
+    it('toggleRole removes an already-selected role on the second toggle', () => {
+        const first = reduce(initialReducerState(), { type: 'toggleRole', value: 'marketing' });
+        const second = reduce(first, { type: 'toggleRole', value: 'engineering' });
+        const removed = reduce(second, { type: 'toggleRole', value: 'marketing' });
+        expect(second.state.profile?.roles).toEqual(['marketing', 'engineering']);
+        expect(removed.state.profile?.roles).toEqual(['engineering']);
+    });
+
+    it('selecting several (or all) roles is allowed', () => {
+        const all = ['founder-ceo', 'engineering', 'product', 'marketing', 'sales'];
+        const next = all.reduce(
+            (acc, role) => reduce(acc, { type: 'toggleRole', value: role }),
+            initialReducerState(),
+        );
+        expect(next.state.profile?.roles).toEqual(all);
+    });
+
+    it('setTeamSize sets and replaces the single-select team size', () => {
+        const solo = reduce(initialReducerState(), { type: 'setTeamSize', value: 'solo' });
+        expect(solo.state.profile?.teamSize).toBe('solo');
+        const mid = reduce(solo, { type: 'setTeamSize', value: 'mid-11-50' });
+        expect(mid.state.profile?.teamSize).toBe('mid-11-50');
+    });
+
+    it('toggleRole preserves the team size and setTeamSize preserves the roles', () => {
+        const withSize = reduce(initialReducerState(), { type: 'setTeamSize', value: 'solo' });
+        const withRole = reduce(withSize, { type: 'toggleRole', value: 'sales' });
+        expect(withRole.state.profile).toEqual({ teamSize: 'solo', roles: ['sales'] });
+
+        const resized = reduce(withRole, { type: 'setTeamSize', value: 'small-2-10' });
+        expect(resized.state.profile).toEqual({ teamSize: 'small-2-10', roles: ['sales'] });
+    });
+
+    it('profile survives unrelated actions (provider choices, skips)', () => {
+        const withProfile = reduce(
+            reduce(initialReducerState(), { type: 'toggleRole', value: 'marketing' }),
+            { type: 'setTeamSize', value: 'solo' },
+        );
+        const afterAi = reduce(withProfile, { type: 'setAiChoice', value: 'openrouter' });
+        const afterSkip = reduce(afterAi, { type: 'recordSkip', stepId: 'profile' });
+        expect(afterSkip.state.profile).toEqual({ roles: ['marketing'], teamSize: 'solo' });
     });
 
     it('mergeServerState replaces state and clamps the current step index', () => {

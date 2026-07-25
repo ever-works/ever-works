@@ -281,6 +281,87 @@
             },
             "skipHint": "You can connect these anytime from Settings → Plugins."
         },
+        "profileStep": {
+            "title": "What do you do",
+            "description": "Tell us about your role and team so we can suggest better starting points — pick as many roles as apply. Nothing is hidden based on your answers.",
+            "rolesLabel": "Your roles",
+            "teamSizeLabel": "Team size",
+            "roles": {
+                "founder-ceo": {
+                    "label": "Founder / CEO",
+                    "description": "I run the company and wear many hats"
+                },
+                "engineering": {
+                    "label": "Engineering",
+                    "description": "I build and ship software"
+                },
+                "product": {
+                    "label": "Product",
+                    "description": "I define what we build and why"
+                },
+                "marketing": {
+                    "label": "Marketing",
+                    "description": "I grow awareness, content, and campaigns"
+                },
+                "sales": {
+                    "label": "Sales",
+                    "description": "I find, pitch, and close customers"
+                },
+                "consultant": {
+                    "label": "Consultant",
+                    "description": "I deliver projects and advice for clients"
+                },
+                "research": {
+                    "label": "Research",
+                    "description": "I investigate, analyze, and synthesize"
+                },
+                "operations": {
+                    "label": "Operations",
+                    "description": "I keep the business running smoothly"
+                },
+                "support": {
+                    "label": "Support",
+                    "description": "I help customers succeed and resolve issues"
+                },
+                "finance": {
+                    "label": "Finance",
+                    "description": "I manage budgets, billing, and reporting"
+                },
+                "hr": {
+                    "label": "HR",
+                    "description": "I hire, onboard, and support our people"
+                },
+                "legal": {
+                    "label": "Legal",
+                    "description": "I handle contracts, compliance, and policy"
+                },
+                "education": {
+                    "label": "Education",
+                    "description": "I teach, train, or create learning content"
+                },
+                "other": {
+                    "label": "Other",
+                    "description": "Something else — tell us more later"
+                }
+            },
+            "teamSizes": {
+                "solo": "Solo",
+                "small-2-10": "Small (2–10)",
+                "mid-11-50": "Mid (11–50)",
+                "large-51-200": "Large (51–200)",
+                "enterprise-200-plus": "Enterprise (200+)"
+            },
+            "suggestions": {
+                "title": "Suggested agents for you",
+                "description": "Based on your roles — create one now, customize it later from Agents.",
+                "create": "Create agent",
+                "creating": "Creating…",
+                "created": "Created",
+                "createdToast": "Agent created — find it under Agents.",
+                "createFailed": "Failed to create the agent. Try again."
+            },
+            "skipHint": "Optional — skip if you'd rather not say. Your answers only improve suggestions and can be changed later."
+        },
         "plugins": {
             "byokDescription": "Connect your own key to unlock the full configuration.",
             "byokDefaultButton": "Bring your own key",

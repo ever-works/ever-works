@@ -12,6 +12,7 @@ import {
     Min,
     ValidateNested,
 } from 'class-validator';
+import { ROLE_OPTIONS, TEAM_SIZE_OPTIONS } from '@ever-works/contracts/api';
 import type {
     OnboardingAiChoice,
     OnboardingDbChoice,
@@ -63,6 +64,28 @@ class DbChoicePatchDto {
     @ApiProperty({ enum: DB_CHOICES })
     @IsIn(DB_CHOICES)
     choice!: OnboardingDbChoice;
+}
+
+// Wave 11 — "What do you do" profile answers. Ids come from the typed
+// contract consts so the accepted set can never drift from what the
+// wizard renders. Unknown values are REJECTED (400), never defaulted.
+const ROLE_IDS: readonly string[] = ROLE_OPTIONS.map((option) => option.id);
+const TEAM_SIZE_IDS: readonly string[] = TEAM_SIZE_OPTIONS.map((option) => option.id);
+
+class ProfilePatchDto {
+    @ApiPropertyOptional({ type: [String], enum: ROLE_IDS, isArray: true })
+    @IsOptional()
+    @IsArray()
+    // Multi-select over a fixed catalog — selecting every role is legal,
+    // so the bound is exactly the catalog size (DoS-bounds the column).
+    @ArrayMaxSize(ROLE_IDS.length)
+    @IsIn(ROLE_IDS, { each: true })
+    roles?: string[];
+
+    @ApiPropertyOptional({ enum: TEAM_SIZE_IDS })
+    @IsOptional()
+    @IsIn(TEAM_SIZE_IDS)
+    teamSize?: string;
 }
 
 // `OnboardingStatePatchInnerDto` MUST be declared BEFORE
@@ -127,6 +150,15 @@ export class OnboardingStatePatchInnerDto {
     @IsString()
     @MaxLength(5000)
     prompt?: string;
+
+    // Wave 11 — "What do you do" answers (roles multi-select + team size
+    // single-select). Additive and optional; nested values are validated
+    // against the contract option ids above.
+    @ApiPropertyOptional({ type: ProfilePatchDto })
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => ProfilePatchDto)
+    profile?: ProfilePatchDto;
 }
 
 export class OnboardingStatePatchBodyDto {

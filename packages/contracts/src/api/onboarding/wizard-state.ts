@@ -20,6 +20,66 @@ export type OnboardingDbChoice = 'ever-works-db' | 'custom';
 
 export type OnboardingDeployChoice = 'ever-works' | 'vercel' | 'k8s';
 
+/**
+ * Wave 11 — "What do you do" onboarding step. A generic option row:
+ * stable kebab-case id + English display label + one-line description.
+ * The web wizard renders these through i18n keys keyed by `id`; the
+ * label/description here are the canonical English fallback used by
+ * non-web surfaces (desktop embeds, API docs).
+ */
+export interface OnboardingProfileOption<Id extends string = string> {
+	readonly id: Id;
+	readonly label: string;
+	readonly description: string;
+}
+
+/**
+ * Roles for the "What do you do" step (multi-select — picking several
+ * or all is fine). Selections are hints for suggestion surfaces, never
+ * gates: nothing is hidden based on them.
+ */
+export const ROLE_OPTIONS = [
+	{ id: 'founder-ceo', label: 'Founder / CEO', description: 'I run the company and wear many hats' },
+	{ id: 'engineering', label: 'Engineering', description: 'I build and ship software' },
+	{ id: 'product', label: 'Product', description: 'I define what we build and why' },
+	{ id: 'marketing', label: 'Marketing', description: 'I grow awareness, content, and campaigns' },
+	{ id: 'sales', label: 'Sales', description: 'I find, pitch, and close customers' },
+	{ id: 'consultant', label: 'Consultant', description: 'I deliver projects and advice for clients' },
+	{ id: 'research', label: 'Research', description: 'I investigate, analyze, and synthesize' },
+	{ id: 'operations', label: 'Operations', description: 'I keep the business running smoothly' },
+	{ id: 'support', label: 'Support', description: 'I help customers succeed and resolve issues' },
+	{ id: 'finance', label: 'Finance', description: 'I manage budgets, billing, and reporting' },
+	{ id: 'hr', label: 'HR', description: 'I hire, onboard, and support our people' },
+	{ id: 'legal', label: 'Legal', description: 'I handle contracts, compliance, and policy' },
+	{ id: 'education', label: 'Education', description: 'I teach, train, or create learning content' },
+	{ id: 'other', label: 'Other', description: 'Something else — tell us more later' }
+] as const satisfies readonly OnboardingProfileOption[];
+
+export type OnboardingRoleId = (typeof ROLE_OPTIONS)[number]['id'];
+
+/** Team size for the "What do you do" step (single-select). */
+export const TEAM_SIZE_OPTIONS = [
+	{ id: 'solo', label: 'Solo', description: 'Just me' },
+	{ id: 'small-2-10', label: 'Small (2–10)', description: '2–10 people' },
+	{ id: 'mid-11-50', label: 'Mid (11–50)', description: '11–50 people' },
+	{ id: 'large-51-200', label: 'Large (51–200)', description: '51–200 people' },
+	{ id: 'enterprise-200-plus', label: 'Enterprise (200+)', description: 'More than 200 people' }
+] as const satisfies readonly OnboardingProfileOption[];
+
+export type OnboardingTeamSizeId = (typeof TEAM_SIZE_OPTIONS)[number]['id'];
+
+/**
+ * Wave 11 — persisted answers of the "What do you do" step. Values are
+ * plain strings (not the narrowed id unions) so older clients keep
+ * round-tripping payloads written by newer ones; consumers validate
+ * against ROLE_OPTIONS / TEAM_SIZE_OPTIONS and DROP unrecognised values
+ * (never default them).
+ */
+export interface OnboardingProfile {
+	readonly roles?: readonly string[];
+	readonly teamSize?: string;
+}
+
 export interface OnboardingWizardStateV2 {
 	readonly version: 2;
 	readonly lastStep: number;
@@ -36,6 +96,8 @@ export interface OnboardingWizardStateV2 {
 	 * same 5000-char limit as `CreateItemsGeneratorDto.prompt`.
 	 */
 	readonly prompt?: string;
+	/** Wave 11 — optional "What do you do" answers (roles + team size). */
+	readonly profile?: OnboardingProfile;
 }
 
 /** Wire shape of `GET /api/onboarding/state`. */
@@ -66,6 +128,15 @@ export interface OnboardingStatePatchRequest {
 		readonly pluginsReviewed: boolean;
 		/** Max 5 000 chars — enforced by `@MaxLength(5000)` in the server DTO. */
 		readonly prompt: string;
+		/**
+		 * Wave 11 — "What do you do" answers. `roles` entries are validated
+		 * server-side against ROLE_OPTIONS ids, `teamSize` against
+		 * TEAM_SIZE_OPTIONS ids (unknown values are rejected with 400).
+		 */
+		readonly profile: {
+			readonly roles?: readonly string[];
+			readonly teamSize?: string;
+		};
 	}>;
 }
 

@@ -13,6 +13,7 @@ import { WelcomeStep } from './steps/WelcomeStep';
 import { ChoiceStep } from './steps/ChoiceStep';
 import { ConfigStep } from './steps/ConfigStep';
 import { PluginsCatalogStep } from './steps/PluginsCatalogStep';
+import { ProfileStep } from './steps/ProfileStep';
 import { CommunicationStep } from './steps/CommunicationStep';
 import { CreateWorkStep } from './steps/CreateWorkStep';
 import { useTurnstile } from './use-turnstile';
@@ -497,6 +498,15 @@ function StepBody({
                 />
             );
         }
+        case 'profile':
+            return (
+                <ProfileStep
+                    roles={flow.state.profile?.roles ?? []}
+                    teamSize={flow.state.profile?.teamSize}
+                    onToggleRole={flow.toggleRole}
+                    onSelectTeamSize={flow.setTeamSize}
+                />
+            );
         case 'communication':
             return <CommunicationStep />;
         case 'plugins-catalog':
@@ -654,6 +664,8 @@ function labelForStep(step: WizardStep): string {
             return 'Your deployment';
         case 'deploy-config':
             return 'Configure deployment';
+        case 'profile':
+            return 'What do you do';
         case 'communication':
             return 'Communication';
         case 'plugins-catalog':

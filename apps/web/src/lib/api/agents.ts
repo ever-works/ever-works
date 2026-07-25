@@ -249,6 +249,24 @@ export interface AgentImportResult {
     finalSlug: string;
 }
 
+/**
+ * Wave 10 prebuilt agent-template catalog row as served by
+ * `GET /api/agents/templates` (in-code marketing/sales/ops presets).
+ * Wave 11 consumes `suggestedRoles` to surface 2-3 suggestions on the
+ * onboarding "What do you do" step.
+ */
+export interface AgentTemplateSummary {
+    slug: string;
+    name: string;
+    title: string;
+    category: string;
+    description: string;
+    capabilities: string;
+    suggestedSkills: string[];
+    suggestedPipeline: string | null;
+    suggestedRoles: string[];
+}
+
 function buildQuery(q: ListAgentsQuery = {}): string {
     const params = new URLSearchParams();
     if (q.scope) params.set('scope', q.scope);
@@ -274,6 +292,27 @@ export const agentsAPI = {
         } catch {
             return null;
         }
+    },
+
+    /** Wave 10 — list the prebuilt agent-template catalog. */
+    async listTemplates(): Promise<{ data: AgentTemplateSummary[] }> {
+        return serverFetch<{ data: AgentTemplateSummary[] }>('/agents/templates', {
+            method: 'GET',
+        });
+    },
+
+    /**
+     * Wave 10 — create MY Agent from a prebuilt template (DRAFT,
+     * review-before-act guardrails). Body fields are optional placement
+     * overrides; the onboarding suggestion flow passes none.
+     */
+    async createFromTemplate(slug: string): Promise<Agent> {
+        return serverMutation<Agent>({
+            endpoint: `/agents/from-template/${encodeURIComponent(slug)}`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
     },
 
     async create(input: CreateAgentInput): Promise<Agent> {
