@@ -178,6 +178,8 @@ export class WorkProposalRepository {
         title: string;
         description: string;
         slugSuggestion: string;
+        targetWorkId?: string | null;
+        extraPrompt?: string | null;
     }): Promise<WorkProposal> {
         return this.repository.save(
             this.repository.create({
@@ -185,6 +187,8 @@ export class WorkProposalRepository {
                 title: input.title,
                 description: input.description,
                 slugSuggestion: input.slugSuggestion,
+                targetWorkId: input.targetWorkId ?? null,
+                extraPrompt: input.extraPrompt ?? null,
                 suggestedCategories: [],
                 suggestedFields: [],
                 recommendedPlugins: [],
