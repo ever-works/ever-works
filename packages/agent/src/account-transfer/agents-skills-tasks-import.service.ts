@@ -2,10 +2,46 @@ import { Injectable, Logger } from '@nestjs/common';
 import { AgentExportService } from '../agents/agent-export.service';
 import { SkillsService } from '../skills/skills.service';
 import { TasksService } from '../tasks-domain/tasks.service';
+import type { TaskAcceptanceCheck } from '@ever-works/contracts';
 import {
     type AccountExportV2Tail,
     type AgentsSkillsTasksImportOptions,
 } from './agents-skills-tasks-types';
+
+/** Per-Task isolation override values (drop-if-unrecognized on import). */
+const TASK_ISOLATION_MODES: readonly string[] = ['on', 'off'];
+
+/**
+ * Task isolation override from an untrusted payload. `null` is MEANINGFUL
+ * (= inherit the Work's setting) and is preserved; an unrecognized string
+ * is dropped (treated as absent) rather than defaulted.
+ */
+function normalizeImportedIsolationMode(value: unknown): 'on' | 'off' | null | undefined {
+    if (value === null) return null;
+    return typeof value === 'string' && TASK_ISOLATION_MODES.includes(value)
+        ? (value as 'on' | 'off')
+        : undefined;
+}
+
+/** Task acceptance checks: arrays only ever import as arrays; `null` = inherit. */
+function normalizeImportedAcceptanceChecks(
+    value: unknown,
+): TaskAcceptanceCheck[] | null | undefined {
+    if (value === null) return null;
+    return Array.isArray(value) ? (value as TaskAcceptanceCheck[]) : undefined;
+}
+
+/**
+ * Task gate-attempt budget: integers inside the resolve-time clamp range
+ * only. `null` = inherit the Work's value and is preserved; out-of-range
+ * values are dropped, never clamped.
+ */
+function normalizeImportedMaxGateAttempts(value: unknown): number | null | undefined {
+    if (value === null) return null;
+    return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 5
+        ? value
+        : undefined;
+}
 
 export interface AgentsSkillsTasksImportSummary {
     agents: { imported: number; skipped: number; errors: string[] };
@@ -107,6 +143,18 @@ export class AgentsSkillsTasksImportService {
             // missionId/ideaId/workId).
             for (const task of tail.tasks) {
                 try {
+                    // User-authored Task settings round-trip with the same
+                    // posture as every other imported field: `null` means
+                    // "inherit" and is preserved, arrays only apply when
+                    // they really are arrays, and unrecognized enum / out
+                    // of range values are DROPPED (never defaulted, never
+                    // clamped) so a hand-edited payload cannot reset an
+                    // isolation or gate setting into something plausible.
+                    const isolationMode = normalizeImportedIsolationMode(task.isolationMode);
+                    const acceptanceChecks = normalizeImportedAcceptanceChecks(
+                        task.acceptanceChecks,
+                    );
+                    const maxGateAttempts = normalizeImportedMaxGateAttempts(task.maxGateAttempts);
                     await this.tasksService.create(userId, {
                         title: task.title,
                         description: task.description ?? null,
@@ -119,6 +167,9 @@ export class AgentsSkillsTasksImportService {
                         createdByType: 'user',
                         createdById: userId,
                         requireAllApprovers: task.requireAllApprovers,
+                        ...(isolationMode !== undefined ? { isolationMode } : {}),
+                        ...(acceptanceChecks !== undefined ? { acceptanceChecks } : {}),
+                        ...(maxGateAttempts !== undefined ? { maxGateAttempts } : {}),
                     });
                     summary.tasks.imported += 1;
                 } catch (err) {

@@ -173,6 +173,121 @@ describe('AgentsSkillsTasksExportService.exportTail', () => {
         expect(child.parentTaskSlug).toBe('T-1');
     });
 
+    /**
+     * Account-transfer whitelist sweep — Task isolation + quality-gate
+     * settings. These are user-authored settings and previously did NOT
+     * round-trip, so an export/import silently reset a Task that opted
+     * into isolation or curated its own acceptance checks.
+     *
+     * The BRANCH columns are the deliberate counterpart: they name a git
+     * ref, base commit and PR inside the exporting account's repository,
+     * so replaying them would point the imported Task at someone else's
+     * branch. They must stay out of the envelope.
+     */
+    it('exports Task isolation + gate settings, and never the branch/run state', async () => {
+        const { svc, tasks } = makeSvc();
+        const checks = [
+            { id: 'build', name: 'Build', kind: 'build', command: 'pnpm build', required: true },
+        ];
+        tasks.findByUserIdFiltered.mockResolvedValueOnce({
+            rows: [
+                {
+                    id: 't1',
+                    slug: 'T-1',
+                    title: 'gated',
+                    description: null,
+                    status: 'todo',
+                    priority: 'p3',
+                    labels: null,
+                    missionId: null,
+                    ideaId: null,
+                    workId: null,
+                    parentTaskId: null,
+                    isRecurring: false,
+                    recurrenceRule: null,
+                    recurrenceTimezone: null,
+                    recurrenceEndsAt: null,
+                    recurrenceMaxOccurrences: null,
+                    parentRecurringTaskId: null,
+                    requireAllApprovers: true,
+                    isolationMode: 'on',
+                    acceptanceChecks: checks,
+                    maxGateAttempts: 4,
+                    branchRef: 'task/t-1-9f3c1a2b',
+                    branchState: 'pr-open',
+                    baseSha: 'a'.repeat(40),
+                    prNumber: 42,
+                    prUrl: 'https://example.invalid/pr/42',
+                    conflictPaths: ['src/a.ts'],
+                    latestRunId: 'run-1',
+                    latestRunStatus: 'completed',
+                    createdAt: new Date(),
+                    startedAt: null,
+                    completedAt: null,
+                },
+            ],
+            total: 1,
+        });
+
+        const tail = await svc.exportTail('u1', { includeTasks: true });
+        const task = tail.tasks![0];
+
+        expect(task.isolationMode).toBe('on');
+        expect(task.acceptanceChecks).toEqual(checks);
+        expect(task.maxGateAttempts).toBe(4);
+
+        const serialized = JSON.stringify(task);
+        for (const excluded of [
+            'branchRef',
+            'branchState',
+            'baseSha',
+            'prNumber',
+            'prUrl',
+            'conflictPaths',
+            'latestRunId',
+            'latestRunStatus',
+        ]) {
+            expect(serialized).not.toContain(excluded);
+        }
+    });
+
+    it('serializes absent Task isolation/gate settings as explicit null (= inherit)', async () => {
+        const { svc, tasks } = makeSvc();
+        tasks.findByUserIdFiltered.mockResolvedValueOnce({
+            rows: [
+                {
+                    id: 't1',
+                    slug: 'T-1',
+                    title: 'plain',
+                    description: null,
+                    status: 'todo',
+                    priority: 'p3',
+                    labels: null,
+                    missionId: null,
+                    ideaId: null,
+                    workId: null,
+                    parentTaskId: null,
+                    isRecurring: false,
+                    recurrenceRule: null,
+                    recurrenceTimezone: null,
+                    recurrenceEndsAt: null,
+                    recurrenceMaxOccurrences: null,
+                    parentRecurringTaskId: null,
+                    requireAllApprovers: true,
+                    createdAt: new Date(),
+                    startedAt: null,
+                    completedAt: null,
+                },
+            ],
+            total: 1,
+        });
+
+        const task = (await svc.exportTail('u1', { includeTasks: true })).tasks![0];
+        expect(task.isolationMode).toBeNull();
+        expect(task.acceptanceChecks).toBeNull();
+        expect(task.maxGateAttempts).toBeNull();
+    });
+
     it('omits chat by default; includes it when toggle set', async () => {
         const { svc, tasks, chat } = makeSvc();
         tasks.findByUserIdFiltered.mockResolvedValue({

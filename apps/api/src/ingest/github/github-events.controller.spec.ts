@@ -1,6 +1,9 @@
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 
-jest.mock('@ever-works/agent/ingest', () => ({ EventIngestService: class {} }));
+jest.mock('@ever-works/agent/ingest', () => ({
+    EventIngestService: class {},
+    IngestInstallBindingRepository: class {},
+}));
 jest.mock('@ever-works/agent/pr-review', () => ({ PrReviewService: class {} }));
 jest.mock('@ever-works/agent/plugins', () => ({
     PluginSettingsService: class {},
@@ -14,12 +17,13 @@ import { GitHubEventsController } from './github-events.controller';
 import { computeGitHubSignature } from './github-signature.util';
 
 const SECRET = 'test-webhook-secret';
-const BINDING = { userId: 'user-1', webhookSecret: SECRET };
+const BINDING = { userId: 'user-1', webhookSecret: SECRET, matchedBy: 'binding' as const };
 
 describe('GitHubEventsController (POST /api/ingest/github/events)', () => {
     function createController() {
         const bridge = {
-            resolveBinding: jest.fn().mockResolvedValue(BINDING),
+            resolveBinding: jest.fn().mockResolvedValue({ status: 'resolved', binding: BINDING }),
+            recordBinding: jest.fn().mockResolvedValue(undefined),
             handleEvent: jest.fn().mockResolvedValue({ ingested: null }),
         };
         const controller = new GitHubEventsController(bridge as any);
@@ -55,7 +59,7 @@ describe('GitHubEventsController (POST /api/ingest/github/events)', () => {
 
     it('fails closed with 401 when no binding is configured — even for ping', async () => {
         const { controller, bridge } = createController();
-        bridge.resolveBinding.mockResolvedValue(null);
+        bridge.resolveBinding.mockResolvedValue({ status: 'not-configured' });
         const { req, signature } = signedRequest({ zen: 'Keep it logically awesome.' });
         await expect(controller.receiveEvents(req as any, signature, 'ping')).rejects.toThrow(
             UnauthorizedException,
@@ -94,5 +98,65 @@ describe('GitHubEventsController (POST /api/ingest/github/events)', () => {
         const result = await controller.receiveEvents(req as any, signature, 'pull_request');
         expect(result).toEqual({ ok: true });
         expect(bridge.handleEvent).toHaveBeenCalledWith(BINDING, 'pull_request', body);
+    });
+
+    /**
+     * Per-installation routing: the delivery's `installation.id` (or
+     * repository owner) selects WHICH install's webhook secret verifies
+     * it, and an unresolvable installation is a clean no-op rather than a
+     * guess or a 500.
+     */
+    describe('per-installation binding', () => {
+        it('passes the delivery installation + a signature probe to the resolver', async () => {
+            const { controller, bridge } = createController();
+            const { req, signature } = signedRequest({
+                action: 'opened',
+                installation: { id: 99 },
+                repository: { full_name: 'octo/site' },
+            });
+
+            await controller.receiveEvents(req as any, signature, 'pull_request');
+
+            const lookup = bridge.resolveBinding.mock.calls[0][0];
+            expect(lookup.workspace).toEqual({
+                keys: ['installation:99', 'owner:octo'],
+                label: 'octo',
+            });
+            expect(lookup.verifySignature(SECRET)).toBe(true);
+            expect(lookup.verifySignature('someone-elses-secret')).toBe(false);
+        });
+
+        it('refuses an unresolvable installation as a 200 no-op — never a 500, never a guess', async () => {
+            const { controller, bridge } = createController();
+            bridge.resolveBinding.mockResolvedValue({
+                status: 'unresolved',
+                reason: 'unknown-workspace',
+            });
+            const { req, signature } = signedRequest({
+                action: 'opened',
+                repository: { full_name: 'stranger/site' },
+            });
+
+            const result = await controller.receiveEvents(req as any, signature, 'pull_request');
+
+            expect(result).toEqual({ ok: true, ignored: 'unknown-workspace' });
+            expect(bridge.handleEvent).not.toHaveBeenCalled();
+            expect(bridge.recordBinding).not.toHaveBeenCalled();
+        });
+
+        it('records the binding only after the signature verified', async () => {
+            const { controller, bridge } = createController();
+            const body = { action: 'opened', repository: { full_name: 'octo/site' } };
+
+            const bad = signedRequest(body);
+            await expect(
+                controller.receiveEvents(bad.req as any, 'sha256=deadbeef', 'pull_request'),
+            ).rejects.toThrow(UnauthorizedException);
+            expect(bridge.recordBinding).not.toHaveBeenCalled();
+
+            const good = signedRequest(body);
+            await controller.receiveEvents(good.req as any, good.signature, 'pull_request');
+            expect(bridge.recordBinding).toHaveBeenCalledWith(BINDING);
+        });
     });
 });

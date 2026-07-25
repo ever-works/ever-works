@@ -173,6 +173,78 @@ describe('AccountExportService', () => {
             });
         });
 
+        it('exports the onboarding answers + account preferences (whitelist sweep)', async () => {
+            const { service, mocks } = makeService();
+            mocks.userRepository.findById.mockResolvedValue({
+                username: 'octo',
+                email: 'o@e.com',
+                onboardingState: {
+                    version: 2,
+                    lastStep: 4,
+                    profile: { roles: ['engineering', 'product'], teamSize: 'small-2-10' },
+                },
+                digestFrequency: 'weekly',
+                emailAgentAlerts: true,
+                // A deliberate opt-OUT is exactly the value that must survive
+                // the round trip, so `false` has to be serialized, not dropped.
+                emailTaskNotifications: false,
+                emailBudgetAlerts: false,
+                userResearchOptOut: true,
+            });
+
+            const result = await service.exportAccountData('user-1');
+
+            expect(result.data.profile.onboarding).toEqual({
+                roles: ['engineering', 'product'],
+                teamSize: 'small-2-10',
+            });
+            expect(result.data.profile.preferences).toEqual({
+                digestFrequency: 'weekly',
+                emailAgentAlerts: true,
+                emailTaskNotifications: false,
+                emailBudgetAlerts: false,
+                userResearchOptOut: true,
+            });
+        });
+
+        it('omits onboarding/preferences entirely when the user has none', async () => {
+            const { service, mocks } = makeService();
+            mocks.userRepository.findById.mockResolvedValue({
+                username: 'octo',
+                email: 'o@e.com',
+            });
+
+            const result = await service.exportAccountData('user-1');
+
+            expect(result.data.profile).toEqual({
+                username: 'octo',
+                email: 'o@e.com',
+                avatar: undefined,
+            });
+        });
+
+        it('never exports privileged or money columns on the profile', async () => {
+            const { service, mocks } = makeService();
+            mocks.userRepository.findById.mockResolvedValue({
+                username: 'octo',
+                email: 'o@e.com',
+                isPlatformAdmin: true,
+                tenantId: 't-1',
+                organizationId: 'o-1',
+                defaultPlanId: 'plan-pro',
+                digestFrequency: 'daily',
+            });
+
+            const result = await service.exportAccountData('user-1');
+            const serialized = JSON.stringify(result.data.profile);
+
+            expect(serialized).not.toContain('isPlatformAdmin');
+            expect(serialized).not.toContain('tenantId');
+            expect(serialized).not.toContain('organizationId');
+            expect(serialized).not.toContain('defaultPlanId');
+            expect(result.data.profile.preferences).toEqual({ digestFrequency: 'daily' });
+        });
+
         it('preserves a real avatar URL', async () => {
             const { service, mocks } = makeService();
             mocks.userRepository.findById.mockResolvedValue({

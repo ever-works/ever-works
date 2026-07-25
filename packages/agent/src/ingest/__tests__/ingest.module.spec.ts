@@ -19,6 +19,9 @@ jest.mock('../../entities/ingested-event.entity', () => ({
 jest.mock('../../entities/ingest-cursor.entity', () => ({
     IngestCursor: class IngestCursor {},
 }));
+jest.mock('../../entities/ingest-install-binding.entity', () => ({
+    IngestInstallBinding: class IngestInstallBinding {},
+}));
 jest.mock('../../activity-log/activity-log.module', () => ({
     ActivityLogModule: class ActivityLogModule {},
 }));
@@ -37,6 +40,9 @@ jest.mock('../ingest-cursor.repository', () => ({
 jest.mock('../event-source-pull.service', () => ({
     EventSourcePullService: class EventSourcePullService {},
 }));
+jest.mock('../ingest-install-binding.repository', () => ({
+    IngestInstallBindingRepository: class IngestInstallBindingRepository {},
+}));
 
 import 'reflect-metadata';
 import { EventIngestModule } from '../ingest.module';
@@ -44,6 +50,7 @@ import { IngestedEventRepository } from '../ingested-event.repository';
 import { EventIngestService } from '../event-ingest.service';
 import { IngestCursorRepository } from '../ingest-cursor.repository';
 import { EventSourcePullService } from '../event-source-pull.service';
+import { IngestInstallBindingRepository } from '../ingest-install-binding.repository';
 import { ActivityLogModule } from '../../activity-log/activity-log.module';
 import { FacadesModule } from '../../facades/facades.module';
 
@@ -56,15 +63,17 @@ describe('EventIngestModule', () => {
             EventIngestService,
             IngestCursorRepository,
             EventSourcePullService,
+            IngestInstallBindingRepository,
         ]);
     });
 
-    it('exports all four for the API surface + trigger-internal RPC wiring', () => {
+    it('exports all five for the API surface + trigger-internal RPC wiring', () => {
         expect(meta('exports')).toEqual([
             IngestedEventRepository,
             EventIngestService,
             IngestCursorRepository,
             EventSourcePullService,
+            IngestInstallBindingRepository,
         ]);
     });
 
@@ -86,6 +95,7 @@ describe('ingest barrel', () => {
         expect(barrel.IngestedEventRepository).toBe(IngestedEventRepository);
         expect(barrel.EventSourcePullService).toBe(EventSourcePullService);
         expect(barrel.IngestCursorRepository).toBe(IngestCursorRepository);
+        expect(barrel.IngestInstallBindingRepository).toBe(IngestInstallBindingRepository);
         expect(typeof barrel.buildIngestEventTools).toBe('function');
     });
 });

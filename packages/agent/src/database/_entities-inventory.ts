@@ -115,6 +115,7 @@ import { TenantCredentialSnapshot } from '../entities/tenant-credential-snapshot
 import { InboundTrigger } from '../entities/inbound-trigger.entity';
 import { IngestedEvent } from '../entities/ingested-event.entity';
 import { IngestCursor } from '../entities/ingest-cursor.entity';
+import { IngestInstallBinding } from '../entities/ingest-install-binding.entity';
 import { Meeting } from '../entities/meeting.entity';
 import { CreditLedgerEntry } from '../entities/credit-ledger-entry.entity';
 import { PlanEntitlement } from '../entities/plan-entitlement.entity';
@@ -261,6 +262,10 @@ export const ENTITIES = [
     // Event-ingest pull path (Wave 8) — per-(user, plugin) event-source
     // pull watermarks + continuation cursors.
     IngestCursor,
+    // Inbound receivers — external workspace/installation → platform user
+    // binding, so Slack/GitHub deliveries are attributed to the account
+    // that actually owns the workspace instead of the oldest install.
+    IngestInstallBinding,
     // Meetings v1 (Wave 8, feature a) — captured meetings with
     // transcripts, summaries and provider dedupe.
     Meeting,
