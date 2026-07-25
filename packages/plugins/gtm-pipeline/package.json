@@ -1,0 +1,74 @@
+{
+	"name": "@ever-works/gtm-pipeline-plugin",
+	"version": "1.0.0",
+	"description": "Go-to-market pipeline plugin — research, qualify, draft, review, act, follow-up, enrich, and measure stages with declared stage input/output keys and a review-before-act human gate",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"private": true,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"clean": "rm -rf dist",
+		"type-check": "tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"dependencies": {
+		"zod": "^3.25.0"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@ever-works/contracts": "workspace:*",
+		"@ever-works/plugin": "workspace:*",
+		"@types/node": "^22.0.0",
+		"tsup": "^8.0.0",
+		"typescript": "^5.9.3",
+		"vitest": "^4.1.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "gtm-pipeline",
+			"name": "Go-to-Market Pipeline",
+			"version": "1.0.0",
+			"category": "pipeline",
+			"capabilities": [
+				"pipeline",
+				"form-schema-provider"
+			],
+			"description": "Go-to-market pipeline with research, qualify, draft, review, act, follow-up, enrich, and measure stages. Every stage declares its input/output keys; the review stage is a human gate placed before any outbound action.",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "AGPL-3.0",
+			"builtIn": true,
+			"autoEnable": false,
+			"visibility": "public",
+			"distribution": "registry",
+			"selectableProviderCategories": [
+				"ai-provider",
+				"search"
+			]
+		}
+	}
+}

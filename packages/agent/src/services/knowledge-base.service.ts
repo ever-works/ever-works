@@ -39,11 +39,15 @@ import { WorkKnowledgeDocument } from '../entities/work-knowledge-document.entit
 import { WorkKnowledgeTag } from '../entities/work-knowledge-tag.entity';
 import {
     KB_ALWAYS_INJECTED_CLASSES,
+    KB_DECISION_STATUS_TRANSITIONS,
     KB_ORG_INHERITABLE_CLASSES,
+    KbDecisionState,
+    KbDecisionStatus,
     KbDocumentClass,
     KbDocumentSource,
     KbDocumentStatus,
     KbLockMode,
+    KbReviewState,
 } from '../entities/kb-types';
 import { KB_MIRROR_DOCUMENT_DISPATCHER, type KbMirrorDocumentDispatcher } from '../tasks';
 import { KB_EMBED_DOCUMENT_DISPATCHER, type KbEmbedDocumentDispatcher } from '../tasks';
@@ -98,6 +102,19 @@ interface CreateDocumentInput {
      * lacks its idempotency marker (Greptile P2 on PR #1219).
      */
     metadata?: Record<string, unknown>;
+    /**
+     * Memory upgrades M7 — explicit review state. When omitted, the
+     * service derives it from `source`: agent-authored docs land as
+     * `proposed` (excluded from injection until accepted), everything
+     * else as `accepted`.
+     */
+    reviewState?: KbReviewState;
+    /**
+     * Memory upgrades M4 — initial decision state for `class=decision`
+     * docs. When omitted, decision docs are born `proposed`; ignored for
+     * every other class.
+     */
+    decision?: KbDecisionState;
 }
 
 interface UpdateDocumentInput {
@@ -864,13 +881,21 @@ export class KnowledgeBaseService {
     ): Promise<KbContextBundle> {
         const alwaysInjected = await this.fetchAlwaysInjectedDocs(workId);
 
+        // M5 — the Work's ACCEPTED decisions ride along on every bundle,
+        // rendered in their own labelled `<kb>` section (status-prefixed)
+        // ahead of generic query-retrieved docs. Historical (superseded /
+        // archived) and proposed decisions are excluded here; a direct
+        // query hit can still surface a historical decision via
+        // `queryRetrieved`, labelled historical by the formatter.
+        const decisions = await this.fetchAcceptedDecisionDocs(workId);
+
         const trimmedQuery = opts.query?.trim() ?? '';
         const queryRetrieved =
             trimmedQuery.length > 0
                 ? await this.fetchQueryRetrievedDocs(workId, trimmedQuery, opts.limit ?? 8)
                 : [];
 
-        return buildKbContextBundle(alwaysInjected, queryRetrieved);
+        return buildKbContextBundle(alwaysInjected, queryRetrieved, decisions);
     }
 
     /**
@@ -890,8 +915,39 @@ export class KnowledgeBaseService {
         // survivor — contradictory context served as current truth. The
         // survivor is part of this same ACTIVE list, so exclusion is the
         // whole fix here.
+        //
+        // M7 — `proposed` (unreviewed agent-authored) docs are excluded
+        // from injection until a human accepts them: nothing an agent
+        // wrote teaches other agents before review (the double-learning
+        // circuit breaker).
         return items
             .filter((d) => d.consolidation?.state !== 'superseded')
+            .filter((d) => d.reviewState !== KbReviewState.PROPOSED)
+            .map((d) => this.toBodyDto(d));
+    }
+
+    /**
+     * Memory upgrades M5 — fetch the Work's ACCEPTED decision documents
+     * for the bundle's labelled decisions section.
+     *
+     * Exclusions mirror the always-inject rules: historical decision
+     * statuses (`superseded` / `archived`) and unreviewed (`proposed`
+     * reviewState) docs never ride in by default, and a
+     * consolidation-superseded doc is skipped the same way. Decisions
+     * whose own status is `proposed` are not settled yet, so they are
+     * excluded from default injection too — they surface only via a
+     * direct query hit, honestly status-labelled.
+     */
+    private async fetchAcceptedDecisionDocs(workId: string): Promise<KbDocumentBodyDto[]> {
+        const { items } = await this.documentRepository.list({
+            workId,
+            classes: [KbDocumentClass.DECISION],
+            statuses: [KbDocumentStatus.ACTIVE],
+        });
+        return items
+            .filter((d) => d.decision?.status === KbDecisionStatus.ACCEPTED)
+            .filter((d) => d.consolidation?.state !== 'superseded')
+            .filter((d) => d.reviewState !== KbReviewState.PROPOSED)
             .map((d) => this.toBodyDto(d));
     }
 
@@ -929,12 +985,33 @@ export class KnowledgeBaseService {
         for (const docId of orderedDocIds) {
             if (results.length >= limit) break;
             const doc = await this.resolveCurrentDocument(workId, docId);
-            if (doc && !included.has(doc.id)) {
-                included.add(doc.id);
-                results.push(this.toBodyDto(doc));
-            }
+            if (!doc || included.has(doc.id)) continue;
+            // M7 — unreviewed (`proposed`) docs never reach a prompt, not
+            // even via a direct semantic hit. They stay retrievable through
+            // the normal list/get endpoints (the review queue), only the
+            // injection path is gated.
+            if (doc.reviewState === KbReviewState.PROPOSED) continue;
+            included.add(doc.id);
+            results.push(this.toBodyDto(doc));
         }
-        return results;
+
+        // M5 — decision-aware ranking: within the retrieved set, ACCEPTED
+        // decisions rank above generic docs, and historical decisions
+        // (superseded / archived — served only because the query hit them
+        // directly) are demoted to the tail, labelled historical by the
+        // formatter downstream ("demote, never drop"). Stable partition —
+        // relative RRF order is preserved within each band.
+        const rankBand = (d: KbDocumentBodyDto): number => {
+            if (d.class !== 'decision') return 1;
+            const status = d.decision?.status ?? 'proposed';
+            if (status === 'accepted') return 0;
+            if (status === 'superseded' || status === 'archived') return 2;
+            return 1;
+        };
+        return results
+            .map((doc, index) => ({ doc, index }))
+            .sort((a, b) => rankBand(a.doc) - rankBand(b.doc) || a.index - b.index)
+            .map((entry) => entry.doc);
     }
 
     /**
@@ -1033,6 +1110,8 @@ export class KnowledgeBaseService {
         const wordCount = this.countWords(body);
         const tokenCount = this.estimateTokens(body);
 
+        const source = input.source ?? ('user' as KbDocumentSource);
+
         const doc = await this.documentRepository.create({
             workId: input.workId,
             organizationId: null,
@@ -1049,13 +1128,23 @@ export class KnowledgeBaseService {
             language: input.language ?? 'en',
             wordCount,
             tokenCount,
-            source: input.source ?? ('user' as KbDocumentSource),
+            source,
             sourceUploadId: input.sourceUploadId ?? null,
             sourceUrl: input.sourceUrl ?? null,
             generatedByAgentRunId: input.generatedByAgentRunId ?? null,
             createdById: input.userId,
             updatedById: input.userId,
             metadata: { ...(input.metadata ?? {}), body } as Record<string, unknown>,
+            // M7 — agent-authored docs land as `proposed` (review-gated:
+            // excluded from injection until a human accepts). Human /
+            // imported / seeded docs are `accepted` from birth.
+            reviewState: this.deriveReviewState(input.reviewState, source),
+            // M4 — decision docs are born `proposed` unless the caller
+            // supplies an explicit initial state; every other class is null.
+            decision:
+                input.class === KbDocumentClass.DECISION
+                    ? (input.decision ?? { status: KbDecisionStatus.PROPOSED })
+                    : null,
         });
 
         // Ensure any new tag slugs are in the tag catalog (create-on-first-use).
@@ -1125,6 +1214,201 @@ export class KnowledgeBaseService {
             await this.enqueueEmbed(workId, updated.id);
         }
 
+        return this.toBodyDto(updated);
+    }
+
+    /**
+     * Memory upgrades M7 — derive the review state for a freshly created
+     * document. Explicit input wins; otherwise agent-authored docs are
+     * review-gated (`proposed`, excluded from injection until accepted)
+     * and every other source is `accepted` from birth.
+     */
+    private deriveReviewState(
+        explicit: KbReviewState | undefined,
+        source: KbDocumentSource,
+    ): KbReviewState {
+        if (explicit) return explicit;
+        return source === KbDocumentSource.AGENT ? KbReviewState.PROPOSED : KbReviewState.ACCEPTED;
+    }
+
+    /**
+     * Memory upgrades M4 — platform-side decision status transition.
+     *
+     * Owner-scoped (`ensureCanEdit`), validates the status machine
+     * (`KB_DECISION_STATUS_TRANSITIONS`) and throws 409 on an illegal
+     * transition — statuses only ever move forward, transactionally,
+     * via this API call (never an external event, so a missed delivery
+     * can never strand a decision in the wrong state).
+     *
+     * Transition to `superseded` optionally records the replacement
+     * chain: `supersededByDocId` is validated (same Work, decision
+     * class), its slug is denormalized onto the doc for the historical
+     * label, and the survivor gets the reverse `supersedesDocId` link.
+     * The survivor link is written FIRST so a failure between the two
+     * writes degrades to a dangling forward-pointer on the survivor
+     * (benign), never to a superseded doc without its replacement.
+     *
+     * Accepting a `proposed` decision also flips `reviewState` to
+     * `accepted` — an explicit status acceptance IS the human review.
+     */
+    async transitionDecisionStatus(
+        workId: string,
+        docId: string,
+        userId: string,
+        next: KbDecisionStatus,
+        opts: { supersededByDocId?: string; rationale?: string } = {},
+    ): Promise<KbDocumentBodyDto> {
+        await this.ownershipService.ensureCanEdit(workId, userId);
+
+        const existing = await this.documentRepository.findById(workId, docId);
+        if (!existing) {
+            throw new NotFoundException(`KB document not found: ${docId}`);
+        }
+        if (existing.kbDocumentClass !== KbDocumentClass.DECISION) {
+            throw new BadRequestException(
+                `Decision status transitions apply only to class=decision documents (got '${existing.kbDocumentClass}')`,
+            );
+        }
+
+        const current = existing.decision?.status ?? KbDecisionStatus.PROPOSED;
+        if (!KB_DECISION_STATUS_TRANSITIONS[current].includes(next)) {
+            throw new ConflictException(
+                `Illegal decision status transition: '${current}' → '${next}'. ` +
+                    `Legal next statuses: [${KB_DECISION_STATUS_TRANSITIONS[current].join(', ')}]`,
+            );
+        }
+
+        const decision: KbDecisionState = {
+            ...(existing.decision ?? { status: current }),
+            status: next,
+        };
+        if (opts.rationale !== undefined) {
+            decision.rationale = opts.rationale;
+        }
+
+        if (next === KbDecisionStatus.SUPERSEDED && opts.supersededByDocId) {
+            if (opts.supersededByDocId === docId) {
+                throw new BadRequestException('A decision cannot supersede itself');
+            }
+            const survivor = await this.documentRepository.findById(workId, opts.supersededByDocId);
+            if (!survivor) {
+                throw new NotFoundException(
+                    `Superseding decision not found: ${opts.supersededByDocId}`,
+                );
+            }
+            if (survivor.kbDocumentClass !== KbDocumentClass.DECISION) {
+                throw new BadRequestException(
+                    `Superseding document must be class=decision (got '${survivor.kbDocumentClass}')`,
+                );
+            }
+            decision.supersededByDocId = survivor.id;
+            decision.supersededBySlug = survivor.slug;
+
+            // Reverse chain link on the survivor (its own status is NOT
+            // touched — only the explicit `supersedesDocId` pointer).
+            await this.documentRepository.update(survivor.id, {
+                decision: {
+                    ...(survivor.decision ?? { status: KbDecisionStatus.PROPOSED }),
+                    supersedesDocId: docId,
+                },
+                updatedById: userId,
+            });
+        }
+
+        const patch: Partial<WorkKnowledgeDocument> = { decision, updatedById: userId };
+        if (current === KbDecisionStatus.PROPOSED && next === KbDecisionStatus.ACCEPTED) {
+            patch.reviewState = KbReviewState.ACCEPTED;
+        }
+
+        const updated = await this.documentRepository.update(docId, patch);
+        if (!updated) {
+            throw new NotFoundException(`KB document not found after transition: ${docId}`);
+        }
+        return this.toBodyDto(updated);
+    }
+
+    /**
+     * Memory upgrades M7 — review action: accept a proposed document.
+     *
+     * Owner-scoped. Flips `reviewState` to `accepted` so the doc starts
+     * feeding context injection; for `decision`-class docs still in
+     * `proposed` status the decision itself is accepted too (the status
+     * machine's `proposed → accepted` edge — one review, one flip to
+     * current). Idempotent: accepting an already-accepted doc is a no-op.
+     */
+    async acceptDocument(
+        workId: string,
+        docId: string,
+        userId: string,
+    ): Promise<KbDocumentBodyDto> {
+        await this.ownershipService.ensureCanEdit(workId, userId);
+
+        const existing = await this.documentRepository.findById(workId, docId);
+        if (!existing) {
+            throw new NotFoundException(`KB document not found: ${docId}`);
+        }
+
+        const patch: Partial<WorkKnowledgeDocument> = {
+            reviewState: KbReviewState.ACCEPTED,
+            updatedById: userId,
+        };
+        if (
+            existing.kbDocumentClass === KbDocumentClass.DECISION &&
+            (existing.decision?.status ?? KbDecisionStatus.PROPOSED) === KbDecisionStatus.PROPOSED
+        ) {
+            patch.decision = {
+                ...(existing.decision ?? { status: KbDecisionStatus.PROPOSED }),
+                status: KbDecisionStatus.ACCEPTED,
+            };
+        }
+
+        const updated = await this.documentRepository.update(docId, patch);
+        if (!updated) {
+            throw new NotFoundException(`KB document not found after accept: ${docId}`);
+        }
+        return this.toBodyDto(updated);
+    }
+
+    /**
+     * Memory upgrades M7 — review action: archive a document.
+     *
+     * Owner-scoped. Sets the KB `status` to `archived` (NEVER a physical
+     * delete — same never-delete discipline as consolidation) which
+     * removes the doc from every default listing + injection path while
+     * keeping it readable. For `decision`-class docs the decision status
+     * is archived too (`archived` is reachable from every non-terminal
+     * state). Idempotent.
+     */
+    async archiveDocument(
+        workId: string,
+        docId: string,
+        userId: string,
+    ): Promise<KbDocumentBodyDto> {
+        await this.ownershipService.ensureCanEdit(workId, userId);
+
+        const existing = await this.documentRepository.findById(workId, docId);
+        if (!existing) {
+            throw new NotFoundException(`KB document not found: ${docId}`);
+        }
+
+        const patch: Partial<WorkKnowledgeDocument> = {
+            status: KbDocumentStatus.ARCHIVED,
+            updatedById: userId,
+        };
+        if (
+            existing.kbDocumentClass === KbDocumentClass.DECISION &&
+            existing.decision?.status !== KbDecisionStatus.ARCHIVED
+        ) {
+            patch.decision = {
+                ...(existing.decision ?? { status: KbDecisionStatus.PROPOSED }),
+                status: KbDecisionStatus.ARCHIVED,
+            };
+        }
+
+        const updated = await this.documentRepository.update(docId, patch);
+        if (!updated) {
+            throw new NotFoundException(`KB document not found after archive: ${docId}`);
+        }
         return this.toBodyDto(updated);
     }
 
@@ -1620,10 +1904,18 @@ export class KnowledgeBaseService {
             language: input.language ?? 'en',
             wordCount,
             tokenCount,
-            source: 'user' as KbDocumentSource,
+            source: input.source ?? ('user' as KbDocumentSource),
             createdById: userId,
             updatedById: userId,
             metadata: { body } as Record<string, unknown>,
+            // M7 — same review-gate derivation as `createDocument`: the
+            // consolidation synthesis path passes `source: agent` so
+            // LLM-merged docs land as `proposed` (review queue), while
+            // operator-authored org docs stay `accepted`.
+            reviewState: this.deriveReviewState(
+                input.reviewState,
+                input.source ?? ('user' as KbDocumentSource),
+            ),
         });
 
         // EW-641 Phase 2/e row 37d — fan the org overlay out to every
@@ -2685,6 +2977,8 @@ export class KnowledgeBaseService {
             updatedAt: doc.updatedAt.toISOString(),
             lastCommitSha: doc.lastCommitSha ?? null,
             lastIndexedAt: doc.lastIndexedAt ? doc.lastIndexedAt.toISOString() : null,
+            decision: doc.decision ?? null,
+            reviewState: doc.reviewState ?? null,
         };
     }
 

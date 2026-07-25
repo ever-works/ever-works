@@ -29,6 +29,10 @@ jest.mock('@ever-works/agent/agents', () => ({
     AgentScheduleDispatcherService: class {},
     AgentRunRepository: class {},
     AgentRunLogRepository: class {},
+    // Wave 4 M2/M3 — dispatch gate injected for cancel-path draining.
+    RunDispatchGateService: class {},
+    // Wave 4 M5 — steer / interrupt / resume run controls.
+    RunSteeringService: class {},
     SkillBindingRepository: class {},
     PluginUsageRepository: class {},
 }));
@@ -112,6 +116,8 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
             markDispatchFailed: jest.fn().mockResolvedValue(undefined),
             setTriggerRunId: jest.fn().mockResolvedValue(undefined),
             findByIdAndUser: jest.fn().mockResolvedValue(null),
+            // Wave 4 M3 — org-wide Sessions list (owner-scoped variant).
+            listSessionsForUser: jest.fn().mockResolvedValue([[], 0]),
         };
         agentRunLogs = { findByRun: jest.fn().mockResolvedValue([]) };
         skillBindings = { resolveActive: jest.fn().mockResolvedValue([]) };
@@ -224,6 +230,291 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
             expect(result.data[0]).toMatchObject({ status: 'completed' });
             expect(agentRuns.findByAgentAndUser).toHaveBeenCalledWith(agentId, 'u1', 25, 0);
             expect(agentRuns.countByAgentAndUser).toHaveBeenCalledWith(agentId, 'u1');
+        });
+    });
+
+    describe('GET /runs — Sessions list (Wave 4 M3)', () => {
+        it('is owner-scoped at the repository layer — userId always comes from auth', async () => {
+            // Security: no agent ownership pre-check exists on this route
+            // (it spans all the caller's Agents), so the repository-level
+            // userId scope is the ONLY guard. Pin that the controller
+            // passes auth.userId, never anything caller-controlled.
+            await controller.listRunSessions(auth, {});
+            expect(agentRuns.listSessionsForUser).toHaveBeenCalledWith(
+                'u1',
+                {
+                    status: undefined,
+                    workId: undefined,
+                    agentId: undefined,
+                    triggerKind: undefined,
+                },
+                25,
+                0,
+            );
+        });
+
+        it('forwards filters (status/workId/agentId/kind) and pagination', async () => {
+            const workId = '00000000-0000-0000-0000-0000000000cc';
+            await controller.listRunSessions(auth, {
+                status: 'running',
+                workId,
+                agentId,
+                kind: 'task',
+                limit: 5,
+                offset: 10,
+            });
+            expect(agentRuns.listSessionsForUser).toHaveBeenCalledWith(
+                'u1',
+                { status: 'running', workId, agentId, triggerKind: 'task' },
+                5,
+                10,
+            );
+        });
+
+        it('returns telemetry + gate + terminal + orchestration columns per row', async () => {
+            agentRuns.listSessionsForUser.mockResolvedValueOnce([
+                [
+                    {
+                        id: runId,
+                        agentId,
+                        status: 'running',
+                        triggerKind: 'task',
+                        taskId,
+                        workId: '00000000-0000-0000-0000-0000000000cc',
+                        awaitingInput: false,
+                        queuedReason: null,
+                        runnerKind: 'claude-code',
+                        startedAt: new Date('2026-01-01T00:00:00Z'),
+                        finishedAt: null,
+                        durationMs: null,
+                        summary: null,
+                        errorMessage: null,
+                        currentActivity: 'editing src/auth/session.ts',
+                        totalTokens: 48_200,
+                        changedFilesCount: 3,
+                        costCents: 120,
+                        gateStatus: 'pending',
+                        gateAttempts: 1,
+                        persistent: true,
+                        terminalState: 'attached',
+                        terminalEndedReason: null,
+                        terminalProviderId: 'terminal-relay',
+                        createdAt: new Date('2026-01-01T00:00:00Z'),
+                    },
+                ],
+                1,
+            ]);
+            const result = await controller.listRunSessions(auth, {});
+            expect(result.meta).toEqual({ total: 1, limit: 25, offset: 0 });
+            expect(result.data[0]).toMatchObject({
+                id: runId,
+                workId: '00000000-0000-0000-0000-0000000000cc',
+                awaitingInput: false,
+                queuedReason: null,
+                runnerKind: 'claude-code',
+                currentActivity: 'editing src/auth/session.ts',
+                totalTokens: 48_200,
+                changedFilesCount: 3,
+                costCents: 120,
+                gateStatus: 'pending',
+                gateAttempts: 1,
+                persistent: true,
+                terminalState: 'attached',
+            });
+        });
+
+        describe('sessionAttachable (Wave 4 M8)', () => {
+            function sessionRow(over: Record<string, unknown> = {}) {
+                return {
+                    id: runId,
+                    agentId,
+                    status: 'running',
+                    triggerKind: 'task',
+                    taskId,
+                    workId: null,
+                    awaitingInput: false,
+                    queuedReason: null,
+                    runnerKind: null,
+                    startedAt: null,
+                    finishedAt: null,
+                    durationMs: null,
+                    summary: null,
+                    errorMessage: null,
+                    currentActivity: null,
+                    totalTokens: null,
+                    changedFilesCount: null,
+                    costCents: null,
+                    gateStatus: null,
+                    gateAttempts: 0,
+                    persistent: true,
+                    terminalState: 'attached',
+                    terminalEndedReason: null,
+                    terminalProviderId: null,
+                    createdAt: new Date('2026-01-01T00:00:00Z'),
+                    ...over,
+                };
+            }
+
+            async function attachableFor(over: Record<string, unknown>) {
+                agentRuns.listSessionsForUser.mockResolvedValueOnce([[sessionRow(over)], 1]);
+                const result = await controller.listRunSessions(auth, {});
+                return result.data[0].sessionAttachable;
+            }
+
+            it('⭐ is true for a live run with an attached terminal', async () => {
+                expect(await attachableFor({ status: 'running', terminalState: 'attached' })).toBe(
+                    true,
+                );
+            });
+
+            it('is true while the terminal is still starting', async () => {
+                expect(await attachableFor({ status: 'queued', terminalState: 'starting' })).toBe(
+                    true,
+                );
+            });
+
+            it('⭐ is FALSE for a terminal run whose columns still read attached', async () => {
+                // The worker's last write before it died can legitimately still
+                // say `attached` for minutes, until the terminal sweeper
+                // corrects it. Offering Attach there is a guaranteed dead end —
+                // this is exactly what gating on `terminalState` alone got
+                // wrong.
+                expect(
+                    await attachableFor({ status: 'completed', terminalState: 'attached' }),
+                ).toBe(false);
+            });
+
+            it('is false once the terminal has ended', async () => {
+                expect(await attachableFor({ status: 'running', terminalState: 'ended' })).toBe(
+                    false,
+                );
+            });
+
+            it('is false for a run that never had a terminal', async () => {
+                expect(await attachableFor({ status: 'running', terminalState: null })).toBe(false);
+            });
+        });
+    });
+
+    /**
+     * Run steering (Wave 4 M5) — steer / interrupt / resume.
+     *
+     * The controller is deliberately thin: it re-asserts Agent ownership
+     * (cross-user 404 via `service.getOne`) and hands off to
+     * `RunSteeringService`, which owns the run-level ownership scope and the
+     * 409 state rules. These tests pin the wiring and the two things the
+     * controller itself does — the ownership pre-check and the executor
+     * activity trail.
+     */
+    describe('run controls — steer / interrupt / resume', () => {
+        let steering: any;
+
+        function makeControllerWithSteering(bound = true): AgentsController {
+            return new AgentsController(
+                service,
+                files,
+                exportService,
+                dispatcher,
+                agentRuns,
+                agentRunLogs,
+                skillBindings,
+                pluginUsage,
+                tasks,
+                activityLog,
+                heartbeatTrigger,
+                taskExecuteDispatcher,
+                runCanceller,
+                undefined,
+                undefined,
+                bound ? steering : undefined,
+            );
+        }
+
+        beforeEach(() => {
+            steering = {
+                steer: jest
+                    .fn()
+                    .mockResolvedValue({ dispatched: 'injected', runId, queuedCount: 1 }),
+                interrupt: jest.fn().mockResolvedValue({ interrupted: true, runId }),
+                resume: jest.fn().mockResolvedValue({
+                    dispatched: 'new-run',
+                    runId: '00000000-0000-0000-0000-0000000000dd',
+                    resumedFromRunId: runId,
+                    carriedCliSession: true,
+                    queued: false,
+                }),
+            };
+            controller = makeControllerWithSteering();
+        });
+
+        it('⭐ steer forwards the auth user, never a caller-supplied one', async () => {
+            const result = await controller.steerRun(auth, agentId, runId, { message: 'go left' });
+            expect(result).toMatchObject({ dispatched: 'injected', runId });
+            expect(steering.steer).toHaveBeenCalledWith({
+                runId,
+                userId: 'u1',
+                message: 'go left',
+            });
+        });
+
+        it('steer 404s a cross-user Agent before touching the run', async () => {
+            service.getOne.mockRejectedValueOnce(new NotFoundException('nope'));
+            await expect(
+                controller.steerRun(auth, agentId, runId, { message: 'go left' }),
+            ).rejects.toBeInstanceOf(NotFoundException);
+            expect(steering.steer).not.toHaveBeenCalled();
+        });
+
+        it('steer answers new-run for an already-finished run (not an error)', async () => {
+            steering.steer.mockResolvedValueOnce({ dispatched: 'new-run', runId });
+            const result = await controller.steerRun(auth, agentId, runId, { message: 'go left' });
+            expect(result.dispatched).toBe('new-run');
+        });
+
+        it('⭐ interrupt surfaces the service 409 for a terminal run', async () => {
+            steering.interrupt.mockRejectedValueOnce(new ConflictException('already terminal'));
+            await expect(controller.interruptRun(auth, agentId, runId)).rejects.toBeInstanceOf(
+                ConflictException,
+            );
+        });
+
+        it('interrupt records an activity row for the acting user', async () => {
+            await controller.interruptRun(auth, agentId, runId);
+            expect(activityLog.log).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    userId: 'u1',
+                    details: expect.objectContaining({ runId, control: 'interrupt' }),
+                }),
+            );
+        });
+
+        it('resume forwards the optional message and returns the NEW run id', async () => {
+            const result = await controller.resumeRun(auth, agentId, runId, { message: 'go on' });
+            expect(steering.resume).toHaveBeenCalledWith(runId, 'u1', 'go on');
+            expect(result).toMatchObject({
+                dispatched: 'new-run',
+                resumedFromRunId: runId,
+                carriedCliSession: true,
+            });
+        });
+
+        it('resume passes null when no message was sent ("carry on")', async () => {
+            await controller.resumeRun(auth, agentId, runId, {});
+            expect(steering.resume).toHaveBeenCalledWith(runId, 'u1', null);
+        });
+
+        it('resume surfaces the service 409 for a non-resumable run', async () => {
+            steering.resume.mockRejectedValueOnce(new ConflictException('still running'));
+            await expect(controller.resumeRun(auth, agentId, runId, {})).rejects.toBeInstanceOf(
+                ConflictException,
+            );
+        });
+
+        it('500s rather than answering 200 when the steering service is unbound', async () => {
+            const unbound = makeControllerWithSteering(false);
+            await expect(
+                unbound.steerRun(auth, agentId, runId, { message: 'x' }),
+            ).rejects.toBeInstanceOf(InternalServerErrorException);
         });
     });
 
@@ -444,6 +735,66 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
             const result = await controller.cancelRun(auth, agentId, runId);
             expect(result.cancelled).toBe(false);
             expect(runCanceller.cancel).not.toHaveBeenCalled();
+        });
+
+        it('drains the Work concurrency queue after cancelling an open run (Wave 4 M2)', async () => {
+            const workId = '00000000-0000-0000-0000-0000000000cc';
+            const dispatchGate = {
+                drainForWork: jest.fn().mockResolvedValue({ dispatched: true }),
+            };
+            const gated = new AgentsController(
+                service,
+                files,
+                exportService,
+                dispatcher,
+                agentRuns,
+                agentRunLogs,
+                skillBindings,
+                pluginUsage,
+                tasks,
+                activityLog,
+                heartbeatTrigger,
+                taskExecuteDispatcher,
+                runCanceller,
+                dispatchGate as any,
+            );
+            agentRuns.cancel.mockResolvedValueOnce({
+                found: true,
+                previousStatus: 'running',
+                triggerRunId: 'run_abc',
+                workId,
+            });
+            await gated.cancelRun(auth, agentId, runId);
+            await new Promise((r) => setImmediate(r)); // fire-and-forget drain
+            expect(dispatchGate.drainForWork).toHaveBeenCalledWith(workId);
+        });
+
+        it('does NOT drain after a no-op cancel of an already-terminal run', async () => {
+            const dispatchGate = { drainForWork: jest.fn() };
+            const gated = new AgentsController(
+                service,
+                files,
+                exportService,
+                dispatcher,
+                agentRuns,
+                agentRunLogs,
+                skillBindings,
+                pluginUsage,
+                tasks,
+                activityLog,
+                heartbeatTrigger,
+                taskExecuteDispatcher,
+                runCanceller,
+                dispatchGate as any,
+            );
+            agentRuns.cancel.mockResolvedValueOnce({
+                found: true,
+                previousStatus: 'completed',
+                workId: '00000000-0000-0000-0000-0000000000cc',
+            });
+            await gated.cancelRun(auth, agentId, runId);
+            await new Promise((r) => setImmediate(r));
+            expect(dispatchGate.drainForWork).not.toHaveBeenCalled();
         });
 
         it('still reports cancelled when the canceller reports a non-cancelled outcome', async () => {

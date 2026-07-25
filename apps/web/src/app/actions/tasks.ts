@@ -2,8 +2,10 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
+import type { TaskAcceptanceCheck } from '@ever-works/contracts';
 import {
     tasksAPI,
+    type ListTasksQuery,
     type Task,
     type TaskChatMessage,
     type TaskPriority,
@@ -21,6 +23,9 @@ export async function createTaskAction(input: {
     ideaId?: string | null;
     workId?: string | null;
     parentTaskId?: string | null;
+    /** Quality gates (Wave 3 M6) — acceptance checks declared at create. */
+    acceptanceChecks?: TaskAcceptanceCheck[] | null;
+    maxGateAttempts?: number | null;
 }): Promise<Task> {
     // Security: verify session server-side before mutating data
     const user = await getAuthFromCookie();
@@ -36,7 +41,15 @@ export async function updateTaskAction(
     patch: Partial<
         Pick<
             Task,
-            'title' | 'description' | 'priority' | 'labels' | 'parentTaskId' | 'requireAllApprovers'
+            | 'title'
+            | 'description'
+            | 'priority'
+            | 'labels'
+            | 'parentTaskId'
+            | 'requireAllApprovers'
+            | 'isolationMode'
+            | 'acceptanceChecks'
+            | 'maxGateAttempts'
         >
     >,
 ): Promise<Task> {
@@ -73,6 +86,59 @@ export async function transitionTaskAction(
     revalidatePath('/tasks');
     revalidatePath(`/tasks/${id}`);
     return task;
+}
+
+/**
+ * Kanban run cockpit (Wave 2) — read-only refresh used by the board's
+ * run-chip polling hook. Re-fetches the user's tasks WITH the latest-run
+ * embed (`includeRun=true`); the client merges run data by task id, so a
+ * plain, filter-free page (bounded limit) is sufficient. No
+ * revalidatePath on purpose — this is a poll, not a mutation.
+ */
+export async function listTasksWithRunsAction(
+    query: Omit<ListTasksQuery, 'includeRun'> = {},
+): Promise<Task[]> {
+    // Security: verify session server-side before reading data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
+    const result = await tasksAPI.list({
+        ...query,
+        limit: Math.min(200, query.limit ?? 200),
+        includeRun: true,
+    });
+    return result.data;
+}
+
+/**
+ * Wave 2 M7 — re-run the Task agent to resolve a workspace merge
+ * conflict. The API answers 409 when the branch is not in a conflict
+ * state; the resulting error message is surfaced to the caller.
+ */
+export async function resolveTaskConflictsAction(id: string): Promise<Task> {
+    // Security: verify session server-side before mutating data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
+    const task = await tasksAPI.resolveConflicts(id);
+    revalidatePath('/tasks');
+    revalidatePath(`/tasks/${id}`);
+    return task;
+}
+
+/**
+ * Wave 2 M7 — delete the Task branch and reset its workspace
+ * identity. Irreversible; the UI confirms before calling this.
+ */
+export async function discardTaskBranchAction(id: string): Promise<{ ok: true }> {
+    // Security: verify session server-side before mutating data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
+    const res = await tasksAPI.discardBranch(id);
+    revalidatePath('/tasks');
+    revalidatePath(`/tasks/${id}`);
+    return res;
 }
 
 export async function postTaskChatAction(taskId: string, body: string): Promise<TaskChatMessage> {

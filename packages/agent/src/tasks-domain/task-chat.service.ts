@@ -19,6 +19,7 @@ import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import { assertNoSecrets } from '../utils/secret-scan';
 import { AGENT_CHAT_REPLY_DISPATCHER, type AgentChatReplyDispatcher } from './task-dispatcher';
+import { RUN_STEERING_PORT, type RunSteeringPort } from './run-steering-port';
 
 /**
  * Tasks feature — Phase 13.2.
@@ -75,6 +76,13 @@ export class TaskChatService {
         @Optional()
         @Inject(AGENT_CHAT_REPLY_DISPATCHER)
         private readonly chatDispatcher?: AgentChatReplyDispatcher,
+        // Run steering (Wave 4 M5) — bound to `RunSteeringService` by the
+        // api-side @Global() AgentsModule. Appended LAST + @Optional() so
+        // every positional `new TaskChatService(...)` in the specs keeps
+        // compiling, and so an install without it behaves exactly as before.
+        @Optional()
+        @Inject(RUN_STEERING_PORT)
+        private readonly steering?: RunSteeringPort,
     ) {}
 
     async list(
@@ -131,6 +139,14 @@ export class TaskChatService {
         // key is `${taskId}:${agentId}:${messageId}` — T6 chat-dedup
         // posture also enforced inside the trigger via
         // findInFlightForTaskAgent.
+        //
+        // Run steering (Wave 4 M5) adds ONE routing rule ahead of that, and
+        // changes nothing else: if the mentioned agent already has a LIVE run
+        // on this Task, the message is injected into that run instead of
+        // spawning a second one — "queue user messages while the agent is
+        // streaming" is the UX contract, and a Task chat is the steering
+        // channel. No live run ⇒ today's behaviour, unchanged. Extension, not
+        // replacement.
         if (this.chatDispatcher) {
             const agentMentions = mentions.records.filter(
                 (m): m is { type: 'agent'; id: string; slug?: string } =>
@@ -139,6 +155,9 @@ export class TaskChatService {
             for (const mention of agentMentions) {
                 const dedupKey = `${task.id}:${mention.id}:${row.id}`;
                 void (async () => {
+                    if (await this.trySteerLiveRun(task.id, mention.id, userId, input.body)) {
+                        return;
+                    }
                     let run: { id: string } | null = null;
                     try {
                         run = this.runs
@@ -148,6 +167,10 @@ export class TaskChatService {
                                   triggerKind: 'chat',
                                   taskId: task.id,
                                   chatMessageId: row.id,
+                                  // Wave 4 M1 — workId denorm at creation so
+                                  // chat-triggered runs count toward (and show
+                                  // under) their Work like task runs do.
+                                  workId: task.workId ?? null,
                               })
                             : null;
                         const handle = await this.chatDispatcher!.enqueue({
@@ -318,6 +341,40 @@ export class TaskChatService {
     }
 
     // ── internals ─────────────────────────────────────────────────
+
+    /**
+     * Run steering (Wave 4 M5) — the live-run routing rule.
+     *
+     * Returns `true` when the message was injected into an already-running
+     * session for this (task, agent) pair, i.e. the caller must NOT dispatch a
+     * second run. Returns `false` for every other outcome — no live run, no
+     * steering port bound, the run went terminal mid-flight, or the steer
+     * itself failed — so the fan-out falls through to today's dispatch and a
+     * steering hiccup can never swallow a user's message.
+     */
+    private async trySteerLiveRun(
+        taskId: string,
+        agentId: string,
+        userId: string,
+        body: string,
+    ): Promise<boolean> {
+        if (!this.steering || !this.runs) return false;
+        try {
+            const live = await this.runs.findInFlightForTaskAgent(taskId, agentId);
+            if (!live) return false;
+            const outcome = await this.steering.steer({ runId: live.id, userId, message: body });
+            if (outcome.dispatched !== 'injected') return false;
+            this.logger.log(
+                `Task ${taskId}: steered live run ${live.id} for agent ${agentId} instead of dispatching a second run.`,
+            );
+            return true;
+        } catch (err) {
+            this.logger.warn(
+                `Task ${taskId}: live-run steering for agent ${agentId} failed, falling back to a new run: ${err}`,
+            );
+            return false;
+        }
+    }
 
     private async requireOwnedTask(userId: string, taskId: string) {
         const task = await this.tasks.findByIdAndUser(taskId, userId);

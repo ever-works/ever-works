@@ -6,7 +6,7 @@
  * raw HTTP requests ourselves.
  */
 import { createRequire } from 'node:module';
-import type { IngressClassDescriptor, KubernetesClusterInfo } from './types.js';
+import type { ClusterNodeDescriptor, IngressClassDescriptor, KubernetesClusterInfo } from './types.js';
 import type { ParsedKubeconfig } from './kubeconfig.parser.js';
 import type { DeploymentStatusInput } from './status.mapper.js';
 import { K8sPluginError, scrubError } from './errors.js';
@@ -78,6 +78,19 @@ interface AppsV1ApiLike {
 }
 
 interface CoreV1ApiLike {
+	listNode(): Promise<{
+		items: Array<{
+			metadata?: { name?: string; labels?: Record<string, string> };
+			status?: {
+				conditions?: Array<{ type?: string; status?: string }>;
+				nodeInfo?: {
+					operatingSystem?: string;
+					architecture?: string;
+					kubeletVersion?: string;
+				};
+			};
+		}>;
+	}>;
 	patchNamespacedService(args: {
 		name: string;
 		namespace: string;
@@ -263,6 +276,45 @@ export class KubernetesApiService {
 				hasStrategy: hasStrategyFor(controller)
 			};
 		});
+	}
+
+	/**
+	 * Node inventory for the Fleet surface (Wave 12) — read-only summary
+	 * of every node in the cluster the kubeconfig points at. Callers are
+	 * responsible for the cluster-source boundary (custom kubeconfigs
+	 * only); this method just lists what the credentials can see.
+	 */
+	async listNodes(kubeconfigYaml: string, contextOverride?: string): Promise<ClusterNodeDescriptor[]> {
+		const client = this.factory.createKubeConfig(kubeconfigYaml, contextOverride);
+		const core = this.factory.coreV1Api(client);
+		try {
+			const resp = await core.listNode();
+			return (resp.items ?? []).map((item) => {
+				const labels = item.metadata?.labels ?? {};
+				const roles = Object.keys(labels)
+					.filter((key) => key.startsWith('node-role.kubernetes.io/'))
+					.map((key) => key.slice('node-role.kubernetes.io/'.length))
+					.filter((role) => role.length > 0);
+				const ready = (item.status?.conditions ?? []).some(
+					(condition) => condition.type === 'Ready' && condition.status === 'True'
+				);
+				const info = item.status?.nodeInfo;
+				const platform =
+					info?.operatingSystem && info?.architecture
+						? `${info.operatingSystem}/${info.architecture}`
+						: undefined;
+				return {
+					name: item.metadata?.name ?? '',
+					ready,
+					...(platform ? { platform } : {}),
+					...(info?.kubeletVersion ? { version: info.kubeletVersion } : {}),
+					...(roles.length > 0 ? { roles } : {})
+				};
+			});
+		} catch (err) {
+			const scrubbed = scrubError(err);
+			throw new K8sPluginError(scrubbed.code, scrubbed.message, err);
+		}
 	}
 
 	async getDeployment(

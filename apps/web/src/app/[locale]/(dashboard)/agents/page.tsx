@@ -4,6 +4,7 @@ import { agentsAPI, type Agent } from '@/lib/api/agents';
 import type { AstTemplateEntry } from '@/lib/api/agent-templates';
 import { fetchAgentTemplateCatalog } from '@/lib/api/agent-templates.server';
 import { AgentsList } from '@/components/agents';
+import { AgentsPageTabs } from '@/components/agents/AgentsPageTabs';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('dashboard.agentsPage');
@@ -40,5 +41,12 @@ export default async function AgentsPage() {
         iconName: a.avatarIcon ?? undefined,
     }));
 
-    return <AgentsList agents={result.data} templates={templates} userTemplates={userTemplates} />;
+    // Run orchestration (Wave 4 M4) — Agents | Sessions tab strip above
+    // the catalog; the Sessions tab is the org-wide fleet view.
+    return (
+        <div className="w-full">
+            <AgentsPageTabs active="agents" />
+            <AgentsList agents={result.data} templates={templates} userTemplates={userTemplates} />
+        </div>
+    );
 }

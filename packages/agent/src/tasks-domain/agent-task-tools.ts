@@ -236,6 +236,10 @@ export function buildAgentTaskTools(args: {
                         a.to,
                         {
                             force: a.force === true || (a.force as any) === 'true',
+                            // Quality gates (Wave 3 M8): this tool acts on an
+                            // Agent's behalf, so a red/skipped gate under a
+                            // 'required' policy refuses → in_review here.
+                            actorType: 'agent',
                         },
                     );
                     return { id: updated.id, status: updated.status };

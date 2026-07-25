@@ -176,6 +176,34 @@
         "./triggers": {
             "types": "./dist/triggers/index.d.ts",
             "default": "./dist/triggers/index.js"
+        },
+        "./ingest": {
+            "types": "./dist/ingest/index.d.ts",
+            "default": "./dist/ingest/index.js"
+        },
+        "./digest": {
+            "types": "./dist/digest/index.d.ts",
+            "default": "./dist/digest/index.js"
+        },
+        "./meetings": {
+            "types": "./dist/meetings/index.d.ts",
+            "default": "./dist/meetings/index.js"
+        },
+        "./fleet": {
+            "types": "./dist/fleet/index.d.ts",
+            "default": "./dist/fleet/index.js"
+        },
+        "./pr-review": {
+            "types": "./dist/pr-review/index.d.ts",
+            "default": "./dist/pr-review/index.js"
+        },
+        "./policy": {
+            "types": "./dist/policy/index.d.ts",
+            "default": "./dist/policy/index.js"
+        },
+        "./validation": {
+            "types": "./dist/validation/index.d.ts",
+            "default": "./dist/validation/index.js"
         }
     },
     "scripts": {

@@ -7,16 +7,28 @@ import {
     Optional,
 } from '@nestjs/common';
 import { TaskStatus } from '../entities/task.entity';
-import type { Task } from '../entities/task.entity';
+import type { Task, TaskActorType } from '../entities/task.entity';
 import { TaskRepository } from '../database/repositories/task.repository';
+import { WorkRepository } from '../database/repositories/work.repository';
+import { resolveChecksPolicy } from './task-gates';
 import {
     TaskAssigneeRepository,
     TaskBlockRepository,
     TaskApproverRepository,
 } from '../database/repositories/task-side.repositories';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
-import { AGENT_TASK_EXECUTE_DISPATCHER, type AgentTaskExecuteDispatcher } from './task-dispatcher';
+import {
+    AGENT_TASK_EXECUTE_DISPATCHER,
+    JOB_RUNTIME_NOT_CONFIGURED_REASON,
+    type AgentTaskExecuteDispatcher,
+} from './task-dispatcher';
 import { TaskNotificationService } from './task-notification.service';
+import { TaskRunDenormService } from './task-run-denorm.service';
+// Value import (not `import type`): Nest resolves the @Optional() class
+// injection below via emitted design:paramtypes metadata, which needs the
+// real class reference. No cycle: run-dispatch-gate.service imports only
+// task-dispatcher (leaf), the run repository, and config.
+import { RunDispatchGateService } from '../agents/run-dispatch-gate.service';
 
 /**
  * Tasks feature — Phase 12.1.
@@ -64,6 +76,14 @@ const ALLOWED: Record<TaskStatus, TaskStatus[]> = {
 
 export interface TransitionOptions {
     force?: boolean;
+    /**
+     * Who is driving this transition (quality gates, Wave 3 M8). Callers
+     * acting on an Agent's behalf — the run finalizer, the workspace
+     * finalize step, the agent `transitionTask` chat tool — pass 'agent';
+     * human/API callers omit it (or pass 'user'). Only 'agent' activates
+     * the red-gate review refusal; every human path is unaffected.
+     */
+    actorType?: TaskActorType;
 }
 
 @Injectable()
@@ -83,6 +103,19 @@ export class TaskTransitionService {
         // + blocked event. Optional so unit-test fixtures without the
         // Notifications graph still work.
         @Optional() private readonly notifications?: TaskNotificationService,
+        // Kanban run cockpit (Wave 2) — latest-run denorm on dispatch.
+        // Optional for the same unit-test-fixture reason as the rest.
+        @Optional() private readonly runDenorm?: TaskRunDenormService,
+        // Run orchestration (Wave 4 M2) — concurrency gate consulted per
+        // assignee before the job-runtime enqueue. Appended LAST so every
+        // positional `new TaskTransitionService(...)` in the specs keeps
+        // compiling; Optional so fixtures without it dispatch ungated.
+        @Optional() private readonly dispatchGate?: RunDispatchGateService,
+        // Quality gates (Wave 3 M8) — Work lookup for the checksPolicy of
+        // the agent-driven review-entry rule. Appended LAST (same
+        // positional-constructor reasoning as above); Optional so fixtures
+        // without it skip the rule entirely (fail toward the status quo).
+        @Optional() private readonly works?: WorkRepository,
     ) {}
 
     /**
@@ -105,6 +138,35 @@ export class TaskTransitionService {
             if (openBlockers.length > 0) {
                 throw new ConflictException(
                     `Task cannot transition to ${to} — has ${openBlockers.length} open blocker(s).`,
+                );
+            }
+        }
+        // Quality gates (Wave 3 M8) — AGENT-driven review entry is refused
+        // while the Task's latest run has a non-passing gate under a
+        // 'required' checks policy: red work never enters the review column
+        // on an agent's say-so. Scope is deliberately narrow:
+        //   - only `in_progress → in_review` (the review-entry edge);
+        //   - only when the caller declared `actorType: 'agent'` — every
+        //     human transition is untouched, a human can always pull a Task
+        //     into review deliberately;
+        //   - `force` overrides it exactly like the approver gate (policy
+        //     override, never an integrity override);
+        //   - refusal requires a POSITIVE 'red' / 'skipped' verdict on the
+        //     latest run — missing deps, lookup failures, no runs, or a
+        //     null gateStatus all fail toward allowing the move (status
+        //     quo), mirroring `resolveChecksPolicy`'s posture. 'skipped'
+        //     blocks too: under 'required', a gate that did not run must
+        //     never pass anything.
+        if (
+            from === TaskStatus.IN_PROGRESS &&
+            to === TaskStatus.IN_REVIEW &&
+            opts.actorType === 'agent' &&
+            !opts.force
+        ) {
+            const refusingGate = await this.findRefusingGateStatus(task);
+            if (refusingGate) {
+                throw new ConflictException(
+                    `Task cannot transition to in_review — the latest agent run's quality gate is '${refusingGate}' and this Work requires passing acceptance checks. Fix the failing checks (or pass force=true to override).`,
                 );
             }
         }
@@ -226,16 +288,59 @@ export class TaskTransitionService {
             const dedupKey = `${task.id}:${assignee.assigneeId}:${generation}`;
             let run: { id: string } | null = null;
             try {
+                // Run orchestration (Wave 4 M2) — consult the concurrency
+                // gate BEFORE enqueuing. Fail-open on gate errors: the gate
+                // is a safety valve, and a broken valve must never stop
+                // legitimate dispatch (the valve's own counting query is the
+                // only thing that can throw here).
+                let admission: { admitted: boolean; queuedReason?: string } = {
+                    admitted: true,
+                };
+                if (this.dispatchGate) {
+                    try {
+                        admission = await this.dispatchGate.admit({
+                            userId: task.userId,
+                            workId: task.workId ?? null,
+                            organizationId: task.organizationId ?? null,
+                        });
+                    } catch (gateErr) {
+                        this.logger.warn(
+                            `Dispatch gate admit failed for task ${task.id} — failing open: ${gateErr}`,
+                        );
+                    }
+                }
                 // Pre-create a queued AgentRun row so the worker can find
                 // it via findInFlightForTaskAgent (T6 chat-dedup posture).
+                // `workId` is denormalized here (Wave 4 M1) so per-Work
+                // concurrency counts + the Sessions view need no join.
                 run = this.runs
                     ? await this.runs.createQueued({
                           agentId: assignee.assigneeId,
                           userId: task.userId,
                           triggerKind: 'task',
                           taskId: task.id,
+                          workId: task.workId ?? null,
+                          queuedReason: admission.admitted
+                              ? null
+                              : (admission.queuedReason ?? 'concurrency-limit'),
                       })
                     : null;
+                // Kanban run cockpit — mirror the freshly-queued run onto the
+                // Task row so the board chip appears before the worker even
+                // claims it. The service is best-effort by contract (logs +
+                // never throws), so this cannot break the dispatch.
+                if (run) {
+                    await this.runDenorm?.recordQueued(task.id, run.id);
+                }
+                // Over-limit: the run row exists (parked, queuedReason set)
+                // but the job-runtime enqueue is SKIPPED. The drain hook on
+                // terminal transitions promotes it when a slot frees.
+                if (!admission.admitted) {
+                    this.logger.log(
+                        `Run for agent ${assignee.assigneeId} on task ${task.id} parked by dispatch gate (${admission.queuedReason}).`,
+                    );
+                    continue;
+                }
                 const handle = await this.dispatcher.enqueue({
                     agentId: assignee.assigneeId,
                     userId: task.userId,
@@ -263,20 +368,67 @@ export class TaskTransitionService {
                 }
             } catch (err) {
                 const message = err instanceof Error ? err.message : String(err);
+                // Loud degradation: an unconfigured job runtime is a distinct,
+                // ACTIONABLE failure (install-level misconfiguration), not a
+                // transient dispatch error — record it under its stable marker
+                // so the run-detail UI and the health banner tell one story.
+                const notConfigured =
+                    err instanceof Error && err.name === 'JobRuntimeNotConfiguredError';
+                const reason = notConfigured
+                    ? `${JOB_RUNTIME_NOT_CONFIGURED_REASON}: ${message}`
+                    : `dispatch-failed: ${message}`;
                 this.logger.warn(
-                    `Failed to dispatch agent-task-execute for ${assignee.assigneeId}: ${message}`,
+                    `Failed to dispatch agent-task-execute for ${assignee.assigneeId}: ${reason}`,
                 );
                 if (run) {
                     try {
-                        await this.runs?.markDispatchFailed(run.id, `dispatch-failed: ${message}`);
+                        await this.runs?.markDispatchFailed(run.id, reason);
                     } catch (failErr) {
                         this.logger.warn(
                             `Failed to mark orphan AgentRun ${run.id} failed: ${failErr}`,
                         );
                     }
+                    // Kanban run cockpit — mirror the dispatch failure so the
+                    // board chip doesn't show a phantom queued run forever.
+                    await this.runDenorm?.recordTerminal(task.id, run.id, 'failed');
                 }
             }
         }
+    }
+
+    /**
+     * Quality gates (Wave 3 M8) — resolve the gate verdict that refuses an
+     * agent-driven review entry, or null when the move is allowed.
+     *
+     * Returns 'red' | 'skipped' ONLY when every link in the chain resolved
+     * positively: the Task belongs to a Work, that Work's checksPolicy is
+     * 'required', a latest run exists, and its persisted gateStatus is a
+     * non-passing verdict. Every failure/absence returns null — the rule
+     * must never invent a blocking verdict out of a lookup hiccup.
+     */
+    private async findRefusingGateStatus(task: Task): Promise<'red' | 'skipped' | null> {
+        if (!task.workId || !this.works || !this.runs) return null;
+        let work: Awaited<ReturnType<WorkRepository['findById']>> = null;
+        try {
+            work = await this.works.findById(task.workId);
+        } catch (err) {
+            this.logger.warn(
+                `Gate rule: Work ${task.workId} lookup failed for task ${task.id} — allowing: ${err}`,
+            );
+            return null;
+        }
+        if (resolveChecksPolicy(work) !== 'required') return null;
+        let latestRun: { gateStatus?: string | null } | null = null;
+        try {
+            latestRun = await this.runs.findLatestForTask(task.id);
+        } catch (err) {
+            this.logger.warn(
+                `Gate rule: latest-run lookup failed for task ${task.id} — allowing: ${err}`,
+            );
+            return null;
+        }
+        const gateStatus = latestRun?.gateStatus;
+        return gateStatus === 'red' || gateStatus === 'skipped' ? gateStatus : null;
     }
 
     private async findOpenBlockers(taskId: string): Promise<string[]> {

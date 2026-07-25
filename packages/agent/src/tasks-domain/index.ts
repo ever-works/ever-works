@@ -4,9 +4,15 @@
 // — this module owns the per-Task DB entities + repositories.
 export * from './tasks.module';
 export * from './tasks.service';
+export * from './task-gates';
+export * from './task-gate-runner.service';
 export * from './task-transition.service';
 export * from './task-chat.service';
 export * from './task-dispatcher';
+export * from './run-steering-port';
+export * from './task-isolation';
+export * from './task-run-denorm.service';
+export * from './task-workspace.service';
 export * from './agent-task-tools';
 export * from './recurrence';
 export * from './task-recurrence-dispatcher.service';

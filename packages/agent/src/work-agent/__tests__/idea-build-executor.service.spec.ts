@@ -1,3 +1,21 @@
+// The executor now imports WorkLifecycleService / WorkGenerationService
+// (real-generation path), whose transitive generator imports include
+// ESM-only packages (github-slugger) Jest can't parse. Same mock header
+// the work-lifecycle specs use — these classes are never constructed in
+// this suite (the optionals are left undefined).
+jest.mock('@src/generators/data-generator/data-generator.service', () => ({
+    DataGeneratorService: class DataGeneratorService {},
+}));
+jest.mock('@src/generators/markdown-generator/markdown-generator.service', () => ({
+    MarkdownGeneratorService: class MarkdownGeneratorService {},
+}));
+jest.mock('@src/generators/website-generator/website-generator.service', () => ({
+    WebsiteGeneratorService: class WebsiteGeneratorService {},
+}));
+jest.mock('@src/generators/website-generator/website-update.service', () => ({
+    WebsiteUpdateService: class WebsiteUpdateService {},
+}));
+
 import type { Repository } from 'typeorm';
 import { IdeaBuildExecutorService } from '../idea-build-executor.service';
 import {
@@ -279,7 +297,78 @@ describe('IdeaBuildExecutorService', () => {
             process.env[DRY_RUN] = 'false';
         });
 
-        it('is a documented not-implemented stub that never mutates Goal/Idea state', async () => {
+        function makeIdea(overrides: Record<string, unknown> = {}) {
+            return {
+                id: 'aaaaaaaa-1111-2222-3333-444444444444',
+                userId: 'user-1',
+                title: 'Best AI Tools',
+                description: 'A directory of the best AI tools with reviews.',
+                slugSuggestion: 'best-ai-tools',
+                generatedPrompt: null,
+                targetWorkId: null,
+                extraPrompt: null,
+                ...overrides,
+            };
+        }
+
+        function buildReal(
+            goal: WorkBuildRequest | null,
+            idea: Record<string, unknown> | null,
+            decision: GoalCompletionDecision = {
+                outcome: 'accepted',
+                ideaId: 'idea-1',
+                workId: 'work-new',
+            },
+        ) {
+            const goals = makeGoalsRepo(goal, 1);
+            const runs = makeRunsRepo(makeRun());
+            const logs = makeLogsRepo();
+            const workAgent = makeWorkAgent();
+            const workProposals = makeWorkProposals(decision);
+            const repo = {
+                markBuilding: jest.fn(async () => true),
+                findByIdForUser: jest.fn(async () => idea),
+            } as unknown as WorkProposalRepository & {
+                markBuilding: jest.Mock;
+                findByIdForUser: jest.Mock;
+            };
+            const users = { findById: jest.fn(async () => ({ id: 'user-1', username: 'u' })) };
+            const workRepo = { existsByUserAndSlug: jest.fn(async () => false) };
+            const workLifecycle = {
+                createWork: jest.fn(async () => ({
+                    status: 'success',
+                    work: { id: 'work-new' },
+                })),
+            };
+            const workGeneration = {
+                generateItems: jest.fn(async () => ({ status: 'pending' })),
+                updateItemsGenerator: jest.fn(async () => ({ status: 'pending' })),
+            };
+            const service = new IdeaBuildExecutorService(
+                goals,
+                runs,
+                logs,
+                workAgent,
+                workProposals,
+                repo,
+                users as never,
+                workRepo as never,
+                workLifecycle as never,
+                workGeneration as never,
+            );
+            return {
+                service,
+                goals,
+                workProposals,
+                repo,
+                users,
+                workRepo,
+                workLifecycle,
+                workGeneration,
+            };
+        }
+
+        it('with real deps unwired: skips WITHOUT mutating Goal/Idea state (never-strand invariant)', async () => {
             // goal.dryRun must also be false, else the executor treats it as dry-run.
             const { service, goals, workProposals, repo } = build(makeGoal({ dryRun: false }));
 
@@ -289,11 +378,123 @@ describe('IdeaBuildExecutorService', () => {
                 ideaId: 'idea-1',
             });
 
-            expect(result).toEqual({ status: 'not-implemented', reason: 'real-generation-stub' });
-            // Crucially: no state mutation, so an Idea can never be stranded in BUILDING.
+            expect(result).toEqual({
+                status: 'skipped',
+                reason: 'real-generation-dependencies-unwired',
+            });
             expect(goals.save).not.toHaveBeenCalled();
             expect(repo.markBuilding).not.toHaveBeenCalled();
             expect(workProposals.handleGoalCompletion).not.toHaveBeenCalled();
+        });
+
+        it('CREATE path: creates a Work from the Idea, runs generation, and accepts on success', async () => {
+            const h = buildReal(makeGoal({ dryRun: false }), makeIdea());
+
+            const result = await h.service.executeBuild({
+                goalId: 'goal-1',
+                userId: 'user-1',
+                ideaId: 'idea-1',
+            });
+
+            expect(h.workLifecycle.createWork).toHaveBeenCalledWith(
+                expect.objectContaining({ slug: 'best-ai-tools', name: 'Best AI Tools' }),
+                expect.objectContaining({ id: 'user-1' }),
+            );
+            expect(h.workGeneration.generateItems).toHaveBeenCalledWith(
+                'work-new',
+                expect.objectContaining({
+                    prompt: expect.stringContaining('best AI tools'),
+                }),
+                expect.objectContaining({ id: 'user-1' }),
+                true,
+                { triggeredBy: 'api' },
+            );
+            expect(h.workProposals.handleGoalCompletion).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    outcome: { kind: 'success', workId: 'work-new' },
+                }),
+            );
+            expect(result).toMatchObject({ status: 'completed', decision: 'accepted' });
+            // Goal went RUNNING then COMPLETED.
+            const statuses = h.goals._saved.map((g) => g.status);
+            expect(statuses).toEqual([
+                WorkBuildRequestStatus.RUNNING,
+                WorkBuildRequestStatus.COMPLETED,
+            ]);
+        });
+
+        it('RE-RUN path: targetWorkId re-runs generation with the composed prompt override', async () => {
+            const h = buildReal(
+                makeGoal({ dryRun: false }),
+                makeIdea({ targetWorkId: 'work-existing', extraPrompt: 'Also add pricing pages.' }),
+            );
+
+            await h.service.executeBuild({
+                goalId: 'goal-1',
+                userId: 'user-1',
+                ideaId: 'idea-1',
+            });
+
+            expect(h.workGeneration.updateItemsGenerator).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    workId: 'work-existing',
+                    updateDto: expect.objectContaining({
+                        prompt: expect.stringContaining('Also add pricing pages.'),
+                    }),
+                    awaitCompletion: true,
+                    context: { triggeredBy: 'api' },
+                }),
+            );
+            expect(h.workLifecycle.createWork).not.toHaveBeenCalled();
+            expect(h.workProposals.handleGoalCompletion).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    outcome: { kind: 'success', workId: 'work-existing' },
+                }),
+            );
+        });
+
+        it('generation failure flows into the completion machine as a failure outcome', async () => {
+            const h = buildReal(makeGoal({ dryRun: false }), makeIdea(), {
+                outcome: 'failed',
+                ideaId: 'idea-1',
+                kind: 'generation' as never,
+                message: 'boom',
+            } as GoalCompletionDecision);
+            h.workGeneration.generateItems.mockRejectedValueOnce(new Error('generation blew up'));
+
+            const result = await h.service.executeBuild({
+                goalId: 'goal-1',
+                userId: 'user-1',
+                ideaId: 'idea-1',
+            });
+
+            expect(h.workProposals.handleGoalCompletion).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    outcome: expect.objectContaining({ kind: 'failure' }),
+                }),
+            );
+            expect(result).toMatchObject({ status: 'failed', decision: 'failed', dryRun: false });
+            const statuses = h.goals._saved.map((g) => g.status);
+            expect(statuses).toEqual([
+                WorkBuildRequestStatus.RUNNING,
+                WorkBuildRequestStatus.FAILED,
+            ]);
+        });
+
+        it('slug collision falls back to an id-suffixed slug', async () => {
+            const h = buildReal(makeGoal({ dryRun: false }), makeIdea());
+            h.workRepo.existsByUserAndSlug.mockResolvedValueOnce(true);
+
+            await h.service.executeBuild({
+                goalId: 'goal-1',
+                userId: 'user-1',
+                ideaId: 'idea-1',
+            });
+
+            expect(h.workLifecycle.createWork).toHaveBeenCalledWith(
+                expect.objectContaining({ slug: 'best-ai-tools-aaaaaaaa' }),
+                expect.anything(),
+            );
         });
     });
 });

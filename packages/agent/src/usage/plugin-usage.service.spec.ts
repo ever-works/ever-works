@@ -216,4 +216,39 @@ describe('PluginUsageService.record', () => {
             );
         });
     });
+
+    /**
+     * Pricing Wave 9 M2 — per-run attribution: rows tagged with the run
+     * id are what the run-cost accumulator sums at run-terminal time.
+     */
+    describe('runId attribution (Wave 9 M2)', () => {
+        it('persists runId when supplied', async () => {
+            const { service, repository } = makeService();
+            await service.record({
+                workId: 'work-1',
+                userId: 'user-1',
+                agentId: 'agent-9',
+                runId: 'run-7',
+                pluginId: 'openai',
+                capability: PluginUsageCapability.AI,
+                costCents: 12,
+            });
+            expect(repository.record).toHaveBeenCalledWith(
+                expect.objectContaining({ runId: 'run-7' }),
+            );
+        });
+
+        it('defaults runId to null when omitted (non-run calls stay untagged)', async () => {
+            const { service, repository } = makeService();
+            await service.record({
+                workId: 'work-1',
+                userId: 'user-1',
+                pluginId: 'openai',
+                capability: PluginUsageCapability.AI,
+            });
+            expect(repository.record).toHaveBeenCalledWith(
+                expect.objectContaining({ runId: null }),
+            );
+        });
+    });
 });

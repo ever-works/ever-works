@@ -114,8 +114,8 @@ describe('HealthController', () => {
 
             expect(health.check).toHaveBeenCalledTimes(1);
             const checks = health.check.mock.calls[0][0] as Array<() => unknown>;
-            // 1 DB ping + 7 informational services (no redis when unconfigured).
-            expect(checks).toHaveLength(8);
+            // 1 DB ping + 8 informational services (no redis when unconfigured).
+            expect(checks).toHaveLength(9);
             // The DB ping is the first registered check.
             checks[0]();
             expect(db.pingCheck).toHaveBeenCalledWith('database', { timeout: 3000 });
@@ -130,8 +130,8 @@ describe('HealthController', () => {
             await controller.ready();
 
             const checks = health.check.mock.calls[0][0] as Array<() => unknown>;
-            // DB + Redis + 7 informational.
-            expect(checks).toHaveLength(9);
+            // DB + Redis + 8 informational.
+            expect(checks).toHaveLength(10);
             // Redis is the second check, right after the DB ping.
             checks[1]();
             expect(redis.isHealthy).toHaveBeenCalledWith('redis');

@@ -49,9 +49,13 @@ import {
     AgentRunService,
     AgentRunSweeperService,
     AgentScheduleDispatcherService,
+    RunDispatchGateService,
 } from '@ever-works/agent/agents';
 import {
     TaskChatService,
+    TaskGateRunnerService,
+    TaskRunDenormService,
+    TaskWorkspaceService,
     TaskRecurrenceDispatcherService,
     TasksService,
 } from '@ever-works/agent/tasks-domain';
@@ -66,6 +70,9 @@ import {
     UserPluginRepository,
     WorkPluginRepository,
 } from '@ever-works/agent/plugins';
+import { EventIngestService, EventSourcePullService } from '@ever-works/agent/ingest';
+import { DigestService } from '@ever-works/agent/digest';
+import { CreditLedgerService } from '@ever-works/agent/subscriptions';
 
 /**
  * C-05 RPC half — methods that must never be reachable via `POST
@@ -229,6 +236,11 @@ export class TriggerInternalController implements OnModuleInit {
         private readonly taskRecurrenceDispatcherService: TaskRecurrenceDispatcherService,
         private readonly tasksService: TasksService,
         private readonly taskChatService: TaskChatService,
+        // Wave 2 — worktree-per-Task workspace lifecycle for worker RPC.
+        private readonly taskWorkspaceService: TaskWorkspaceService,
+        // Kanban run cockpit (Wave 2) — latest-run denorm writes from the
+        // agent-task-execute worker over the internal RPC channel.
+        private readonly taskRunDenormService: TaskRunDenormService,
         // Notifications v2 (EW-663) — exposed for the
         // notification-channel-delivery Trigger task to run a single
         // channel attempt (plugins are loaded here, not in the worker).
@@ -264,6 +276,40 @@ export class TriggerInternalController implements OnModuleInit {
         // keeps compiling — inserting mid-list silently shifts all later args.
         @Optional()
         private readonly agentRunSweeperService?: AgentRunSweeperService,
+        // Wave 3 M2 — acceptance-check runner (quality gates). The
+        // agent-task-execute worker calls `runChecks` over the internal RPC
+        // channel after the agent loop, before the finalize/PR step. Same
+        // appended-last @Optional() posture as the sweeper above.
+        @Optional()
+        private readonly taskGateRunnerService?: TaskGateRunnerService,
+        // Run orchestration (Wave 4 M2) — drain-on-terminal RPC target for
+        // the agent-task-execute worker. Appended LAST + @Optional() for
+        // the same positional-spec reason as the sweeper above.
+        @Optional()
+        private readonly runDispatchGateService?: RunDispatchGateService,
+        // Event-ingest spine (Wave 6) — backs the `event-ingest-tick`
+        // cron: the worker proxy calls `processBatch()` over the internal
+        // RPC channel. Appended LAST + @Optional() per the arity rule above.
+        @Optional()
+        private readonly eventIngestService?: EventIngestService,
+        // Digest briefings (Wave 7) — backs the `digest-dispatcher` cron:
+        // the worker proxy calls `dispatchDue(period)` over the internal
+        // RPC channel. Appended LAST + @Optional() per the arity rule above.
+        @Optional()
+        private readonly digestService?: DigestService,
+        // Credits ledger (pricing Wave 9 M1) — backs the
+        // `credits-daily-grant` cron: the worker proxy calls
+        // `dispatchDailyGrants()` over the internal RPC channel. Appended
+        // LAST + @Optional() per the arity rule above.
+        @Optional()
+        private readonly creditLedgerService?: CreditLedgerService,
+        // Event-ingest pull path (Wave 8) — backs the pull half of the
+        // `event-ingest-tick` cron: the worker proxy calls `pullSources()`
+        // over the internal RPC channel, landing here where the
+        // event-source plugins + settings + cursors are wired. Appended
+        // LAST + @Optional() per the arity rule above.
+        @Optional()
+        private readonly eventSourcePullService?: EventSourcePullService,
     ) {}
 
     onModuleInit() {
@@ -298,6 +344,9 @@ export class TriggerInternalController implements OnModuleInit {
             // agent-heartbeat dispatcher cron + agent-heartbeat one-shot.
             AgentScheduleDispatcherService: this.agentScheduleDispatcherService,
             AgentRunSweeperService: this.agentRunSweeperService,
+            // Run orchestration (Wave 4 M2) — agent-task-execute calls
+            // drainForWork here after every terminal transition.
+            RunDispatchGateService: this.runDispatchGateService,
             AgentRunService: this.agentRunService,
             AgentRepository: this.agentRepositoryRef,
             AgentRunRepository: this.agentRunRepositoryRef,
@@ -305,6 +354,13 @@ export class TriggerInternalController implements OnModuleInit {
             TaskRecurrenceDispatcherService: this.taskRecurrenceDispatcherService,
             TasksService: this.tasksService,
             TaskChatService: this.taskChatService,
+            TaskWorkspaceService: this.taskWorkspaceService,
+            // Wave 3 M2 — agent-task-execute calls `runChecks` here after the
+            // agent loop (quality gates; allow-list auto-derived).
+            TaskGateRunnerService: this.taskGateRunnerService,
+            // Kanban run cockpit (Wave 2) — agent-task-execute calls
+            // recordQueued/recordStarted/recordTerminal here.
+            TaskRunDenormService: this.taskRunDenormService,
             // Notifications v2 (EW-663) — notification-channel-delivery task
             // calls `deliverToChannelOrThrow` here (allow-list auto-derived).
             NotificationChannelFacadeService: this.notificationChannelFacade,
@@ -323,6 +379,18 @@ export class TriggerInternalController implements OnModuleInit {
             AnonymousUserCleanupService: this.anonymousUserCleanupService,
             // EW-643 Phase 3 slice 4a - `kb-reconcile` calls `reconcile()`.
             KnowledgeBaseReconcileService: this.knowledgeBaseReconcileService,
+            // Event-ingest spine (Wave 6) — `event-ingest-tick` calls
+            // `processBatch()` here (allow-list auto-derived).
+            EventIngestService: this.eventIngestService,
+            // Event-ingest pull path (Wave 8) — `event-ingest-tick` calls
+            // `pullSources()` here (allow-list auto-derived).
+            EventSourcePullService: this.eventSourcePullService,
+            // Digest briefings (Wave 7) — `digest-dispatcher` calls
+            // `dispatchDue(period)` here (allow-list auto-derived).
+            DigestService: this.digestService,
+            // Credits ledger (pricing Wave 9 M1) — `credits-daily-grant`
+            // calls `dispatchDailyGrants()` here (allow-list auto-derived).
+            CreditLedgerService: this.creditLedgerService,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),

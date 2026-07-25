@@ -327,6 +327,60 @@ export const config = {
                 return process.env.STRIPE_WEBHOOK_SECRET;
             },
         },
+        // Credits ledger (pricing Wave 9 M1) — credits are the usage
+        // currency layered on the costCents metering. Every knob is
+        // env-configurable per the Wave 9 house rule; defaults keep
+        // 1 credit = 1 cent with zero margin until pricing lands.
+        credits: {
+            /** costCents → credits conversion: credits per $1 (default 100 = 1¢/credit). */
+            getCreditsPerDollar() {
+                const parsed = parseFloat(process.env.CREDITS_PER_DOLLAR || '100');
+                return Number.isFinite(parsed) && parsed > 0 ? parsed : 100;
+            },
+            /** Platform margin applied at debit time, in percent (default 0). */
+            getMarginPercent() {
+                const parsed = parseFloat(process.env.CREDITS_MARGIN_PERCENT || '0');
+                return Number.isFinite(parsed) && parsed >= 0 ? parsed : 0;
+            },
+            /**
+             * When true, consumption may take a balance below zero
+             * (overdraft). Default false: a debit that would cross zero
+             * is rejected with `InsufficientCreditsError` (mapped 4xx —
+             * never an unmapped 500), per the billing/usage PRD §6.
+             */
+            allowOverdraft() {
+                return process.env.CREDITS_ALLOW_OVERDRAFT === 'true';
+            },
+            /** Daily free credits fallback when the plan has no entitlement row. */
+            getDailyFreeCredits() {
+                const parsed = parseInt(process.env.CREDITS_DAILY_FREE || '50');
+                return Number.isFinite(parsed) && parsed >= 0 ? parsed : 50;
+            },
+            /** EntitlementsService in-memory cache TTL (ms, default 60s). */
+            getEntitlementsCacheTtlMs() {
+                const parsed = parseInt(process.env.CREDITS_ENTITLEMENTS_CACHE_TTL_MS || '60000');
+                return Number.isFinite(parsed) && parsed >= 0 ? parsed : 60000;
+            },
+            /** Users per page while sweeping the daily grant (default 500). */
+            getDailyGrantBatchSize() {
+                const parsed = parseInt(process.env.CREDITS_DAILY_GRANT_BATCH || '500');
+                return Number.isFinite(parsed) && parsed > 0 ? parsed : 500;
+            },
+            /**
+             * Soft credits enforcement kill-switch (pricing Wave 9 M2 —
+             * ship dark). Default OFF: the dispatch gate's credits
+             * precheck only runs when `CREDITS_ENFORCEMENT=on` (or
+             * `true`). Debits/metering are unaffected by this flag —
+             * it gates ONLY whether a credit-limited plan with an
+             * exhausted balance parks new runs
+             * (`queuedReason='insufficient-credits'`) instead of
+             * dispatching them.
+             */
+            isEnforcementEnabled() {
+                const raw = (process.env.CREDITS_ENFORCEMENT || '').toLowerCase();
+                return raw === 'on' || raw === 'true' || raw === '1';
+            },
+        },
     },
 
     branding: {
@@ -584,6 +638,41 @@ export const config = {
         getRunStuckSweepBatch() {
             const raw = parseInt(process.env.AGENT_RUN_STUCK_SWEEP_BATCH || '200', 10);
             return Number.isFinite(raw) && raw > 0 ? raw : 200;
+        },
+        /**
+         * Run orchestration (Wave 4 M2) — concurrency safety valves for
+         * `RunDispatchGateService`. These are operator knobs, NOT product
+         * limits: defaults are deliberately generous (10 in-flight runs
+         * per Work, 25 per org/user) and `0` / negative disables the
+         * respective valve entirely.
+         *
+         * Future per-Work override: a nullable
+         * `works.maxConcurrentAgentRuns` column (works.yml v2 field +
+         * Work settings UI) will take precedence over this env default
+         * when it lands — the gate already resolves limits through these
+         * getters so only the resolution chain grows.
+         */
+        getMaxConcurrentRunsPerWork() {
+            const raw = parseInt(process.env.AGENT_MAX_CONCURRENT_RUNS_PER_WORK || '10', 10);
+            return Number.isFinite(raw) ? raw : 10;
+        },
+        /** Per-org (or, for org-less personal runs, per-user) valve. */
+        getMaxConcurrentRunsPerOrg() {
+            const raw = parseInt(process.env.AGENT_MAX_CONCURRENT_RUNS_PER_ORG || '25', 10);
+            return Number.isFinite(raw) ? raw : 25;
+        },
+        /**
+         * Merge-policy matrix (Wave 3, D4) — operator kill-switch for
+         * enforcement at the git facade. Default ON: an agent-driven merge
+         * consults the resolved policy and is refused when the policy says
+         * no. Set `AGENT_MERGE_POLICY_ENFORCEMENT=off` to fall back to the
+         * pre-feature behavior (no policy consult at all) if enforcement
+         * ever misfires in production — a rollback valve, not a product
+         * knob. The POLICY itself is configured per tenant / org / Work /
+         * Agent, never by env.
+         */
+        isMergePolicyEnforcementEnabled() {
+            return (process.env.AGENT_MERGE_POLICY_ENFORCEMENT || 'on').toLowerCase() !== 'off';
         },
     },
 

@@ -274,6 +274,112 @@ describe('TaskChatService', () => {
         });
     });
 
+    /**
+     * Run steering (Wave 4 M5) — the live-run routing rule. ONE new branch in
+     * front of the existing fan-out: a mention aimed at an agent that already
+     * has a live run on this Task steers that run instead of spawning a second
+     * one. Everything else is unchanged, which is what the "no live run" test
+     * below exists to prove.
+     */
+    describe('post — live-run steering routing', () => {
+        function makeSteeringSvc(over: {
+            live?: { id: string } | null;
+            steerResult?: { dispatched: 'injected' | 'new-run'; runId: string };
+            steerImpl?: jest.Mock;
+        }) {
+            const runs = {
+                findInFlightForTaskAgent: jest.fn().mockResolvedValue(over.live ?? null),
+                createQueued: jest.fn().mockResolvedValue({ id: 'run-chat-1' }),
+                setTriggerRunId: jest.fn().mockResolvedValue(undefined),
+                markDispatchFailed: jest.fn().mockResolvedValue(undefined),
+            };
+            const chatDispatcher = { enqueue: jest.fn().mockResolvedValue({ runId: 'trd-1' }) };
+            const steering = {
+                steer:
+                    over.steerImpl ??
+                    jest
+                        .fn()
+                        .mockResolvedValue(
+                            over.steerResult ?? { dispatched: 'injected', runId: 'run-live-1' },
+                        ),
+            };
+            const svcUnderTest = new TaskChatService(
+                tasks,
+                messages,
+                kbMentions,
+                activity,
+                runs as any,
+                chatDispatcher,
+                steering as any,
+            );
+            return { svcUnderTest, runs, chatDispatcher, steering };
+        }
+
+        async function postMention(target: TaskChatService) {
+            tasks.findByIdAndUser.mockResolvedValueOnce({ id: 't1', workId: 'w1' });
+            messages.create.mockImplementationOnce((d: any) => Promise.resolve({ id: 'm1', ...d }));
+            await target.post(
+                'u1',
+                {
+                    taskId: 't1',
+                    authorType: 'user',
+                    authorId: 'u1',
+                    body: 'hey @ceo, use the staging bucket instead',
+                },
+                { ownedAgentSlugs: new Map([['ceo', 'agent-a1']]) },
+            );
+            await new Promise((resolve) => setImmediate(resolve));
+        }
+
+        it('⭐ steers the LIVE run instead of dispatching a second one', async () => {
+            const { svcUnderTest, runs, chatDispatcher, steering } = makeSteeringSvc({
+                live: { id: 'run-live-1' },
+            });
+            await postMention(svcUnderTest);
+
+            expect(steering.steer).toHaveBeenCalledWith({
+                runId: 'run-live-1',
+                userId: 'u1',
+                message: 'hey @ceo, use the staging bucket instead',
+            });
+            expect(runs.createQueued).not.toHaveBeenCalled();
+            expect(chatDispatcher.enqueue).not.toHaveBeenCalled();
+        });
+
+        it('⭐ dispatches a new run as before when there is NO live run', async () => {
+            // THE NO-REGRESSION TEST. The routing rule is additive: the
+            // overwhelmingly common path must behave exactly as it did.
+            const { svcUnderTest, runs, chatDispatcher, steering } = makeSteeringSvc({
+                live: null,
+            });
+            await postMention(svcUnderTest);
+
+            expect(steering.steer).not.toHaveBeenCalled();
+            expect(runs.createQueued).toHaveBeenCalledWith(
+                expect.objectContaining({ agentId: 'agent-a1', triggerKind: 'chat' }),
+            );
+            expect(chatDispatcher.enqueue).toHaveBeenCalled();
+        });
+
+        it('falls back to a new run when the live run went terminal mid-flight', async () => {
+            const { svcUnderTest, runs } = makeSteeringSvc({
+                live: { id: 'run-live-1' },
+                steerResult: { dispatched: 'new-run', runId: 'run-live-1' },
+            });
+            await postMention(svcUnderTest);
+            expect(runs.createQueued).toHaveBeenCalled();
+        });
+
+        it('falls back to a new run when steering itself throws — a message is never swallowed', async () => {
+            const { svcUnderTest, runs } = makeSteeringSvc({
+                live: { id: 'run-live-1' },
+                steerImpl: jest.fn().mockRejectedValue(new Error('steer exploded')),
+            });
+            await postMention(svcUnderTest);
+            expect(runs.createQueued).toHaveBeenCalled();
+        });
+    });
+
     describe('edit', () => {
         it('404s for a non-existent message', async () => {
             messages.findById.mockResolvedValueOnce(null);

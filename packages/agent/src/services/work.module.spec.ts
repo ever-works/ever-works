@@ -125,6 +125,7 @@ import { WorkOwnershipService } from './work-ownership.service';
 import { WorkQueryService } from './work-query.service';
 import { WorkLifecycleService } from './work-lifecycle.service';
 import { WorkGenerationService } from './work-generation.service';
+import { WorkMemoryService } from './work-memory.service';
 import { WorkScheduleService } from './work-schedule.service';
 import { WorkScheduleDispatcherService } from './work-schedule-dispatcher.service';
 import { AnonymousUserCleanupService } from './anonymous-user-cleanup.service';
@@ -204,6 +205,8 @@ describe('WorkModule', () => {
             WorkQueryService,
             WorkLifecycleService,
             WorkGenerationService,
+            // Scheduled-run learnings → shared Memory (develop eb3a317a).
+            WorkMemoryService,
             WorkDetailService,
             WorkScheduleService,
             WorkScheduleDispatcherService,
@@ -316,7 +319,7 @@ describe('WorkModule', () => {
             expect(exports).toContain(TemplateCatalogModule);
         });
 
-        it('keeps the exports list at the documented 32-entry shape (29 services + 3 re-exported modules)', () => {
+        it('keeps the exports list at the documented 33-entry shape (30 services + 3 re-exported modules)', () => {
             // Bumped to 28 with the PlatformSyncSecretService resurrection for
             // EW-120 dual-mode (pull/push/disabled) Activity Feed sync.
             // Bumped to 29 with AnonymousUserCleanupService for EW-617 G2
@@ -327,7 +330,9 @@ describe('WorkModule', () => {
             // WEBHOOK_SECRET (mirrors PlatformSyncSecretService pattern).
             // Bumped to 33 with WorkRuntimeEnvService for the per-Work runtime
             // DATABASE_URL surface (#1315).
-            expect(meta('exports')).toHaveLength(33);
+            // Bumped to 34 with WorkMemoryService (scheduled-run learnings
+            // written into shared Memory).
+            expect(meta('exports')).toHaveLength(34);
         });
 
         it('does NOT re-export DatabaseModule (callers must import it explicitly when they need entities/repositories)', () => {

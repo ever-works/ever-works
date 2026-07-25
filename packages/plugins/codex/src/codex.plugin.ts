@@ -638,7 +638,10 @@ export class CodexPlugin
 				existing,
 				workspacePath,
 				promptFacade,
-				facadeOptions
+				facadeOptions,
+				// Memory upgrades M3 — pre-fenced agent-memory recall block
+				// resolved once at dispatch; spliced verbatim (never re-wrapped).
+				execContext?.memoryRecall
 			);
 
 			const targetItems = ((request.config || {}).target_items as number) || DEFAULT_TARGET_ITEMS;
@@ -859,7 +862,8 @@ export class CodexPlugin
 		existing: ExistingItems,
 		workspacePath: string,
 		promptFacade?: { getPrompt(key: string, defaultPrompt: string, options: FacadeOptions): Promise<string> },
-		facadeOptions?: FacadeOptions
+		facadeOptions?: FacadeOptions,
+		memoryRecall?: string
 	): Promise<string> {
 		const promptOptions = {
 			work,
@@ -888,7 +892,16 @@ export class CodexPlugin
 		) as typeof DEFAULT_USER_PROMPT;
 		const userPrompt = substituteVariables(userTemplate, buildUserPromptVariables(promptOptions));
 
-		return [systemPrompt, '', userPrompt].join('\n');
+		// Memory upgrades M3 — session preamble splice. The block arrives
+		// pre-fenced (`<agent_memory>…</agent_memory>`) + neutralized from
+		// the platform's shared recall helper; append AFTER template
+		// substitution so `{placeholders}` inside recalled content are
+		// never expanded, and between system + user segments so it reads
+		// as background context, not as the user request.
+		const segments = memoryRecall
+			? [systemPrompt, '', memoryRecall, '', userPrompt]
+			: [systemPrompt, '', userPrompt];
+		return segments.join('\n');
 	}
 
 	private async runCodexPrompt({

@@ -21,10 +21,38 @@ export const KB_DOCUMENT_CLASSES = [
 	'personas',
 	'research',
 	'output',
-	'freeform'
+	'freeform',
+	'decision'
 ] as const;
 
 export type KbDocumentClass = (typeof KB_DOCUMENT_CLASSES)[number];
+
+/**
+ * Lifecycle status of a `decision`-class KB document (memory upgrades
+ * M4). Transitions are platform-side only — an API call flips the
+ * status transactionally, validated against the status machine:
+ *
+ *   proposed → accepted | archived
+ *   accepted → superseded | archived
+ *   superseded → archived
+ *   archived → (terminal)
+ *
+ * `superseded` / `archived` decisions are "historical": excluded from
+ * default context injection and labelled as historical when directly
+ * retrieved. See the agent-side `KB_DECISION_STATUS_TRANSITIONS`.
+ */
+export const KB_DECISION_STATUSES = ['proposed', 'accepted', 'superseded', 'archived'] as const;
+export type KbDecisionStatus = (typeof KB_DECISION_STATUSES)[number];
+
+/**
+ * Review state of a KB document (memory upgrades M7). Agent-authored
+ * and consolidation-synthesized documents land as `proposed` and are
+ * excluded from context injection until a human accepts them. `null` /
+ * absent (all human-authored docs, plus every pre-existing row) is
+ * treated as `accepted`.
+ */
+export const KB_REVIEW_STATES = ['proposed', 'accepted'] as const;
+export type KbReviewState = (typeof KB_REVIEW_STATES)[number];
 
 /**
  * Classes that may be authored at the organization level and inherited

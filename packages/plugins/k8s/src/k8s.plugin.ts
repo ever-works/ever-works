@@ -36,6 +36,7 @@ import {
 	type DnsResolver
 } from './domain.handler.js';
 import type {
+	ClusterNodeDescriptor,
 	ClusterSource,
 	IngressClassDescriptor,
 	KubernetesSettings,
@@ -405,6 +406,17 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		// Kubernetes has no built-in teams concept. Returning [] is the
 		// honest answer; the deploy facade falls back to "no team scope".
 		return [];
+	}
+
+	/**
+	 * Fleet (Wave 12) — read-only node inventory of the cluster the
+	 * given kubeconfig points at. The platform side calls this ONLY for
+	 * user-configured clusters (`clusterSource: 'custom-kubeconfig'`);
+	 * platform-managed sources never reach here from Fleet.
+	 */
+	async listClusterNodes(kubeconfig: string, contextOverride?: string): Promise<ClusterNodeDescriptor[]> {
+		if (!kubeconfig) return [];
+		return this.api.listNodes(kubeconfig, contextOverride);
 	}
 
 	async deploy(config: DeploymentConfig, kubeconfig: string): Promise<DeploymentResult> {

@@ -642,6 +642,51 @@ export class WorkLifecycleService {
                 updateData.providerRepositoryEnabled = updateDto.providerRepositoryEnabled;
             }
 
+            // Task isolation settings (worktree-per-Task, Wave 2 M1).
+            // DTO enum-validated; NULL baseBranch = repo default.
+            if (updateDto.taskIsolation !== undefined) {
+                updateData.taskIsolation = updateDto.taskIsolation;
+            }
+            if (updateDto.taskIsolationBaseBranch !== undefined) {
+                updateData.taskIsolationBaseBranch = updateDto.taskIsolationBaseBranch;
+            }
+            if (updateDto.taskIsolationTargetRepo !== undefined) {
+                updateData.taskIsolationTargetRepo = updateDto.taskIsolationTargetRepo;
+            }
+            if (updateDto.taskBranchCleanup !== undefined) {
+                updateData.taskBranchCleanup = updateDto.taskBranchCleanup;
+            }
+
+            // Memory recall injection toggle (memory upgrades M3) —
+            // boolean, on by default; false disables the pipeline
+            // preamble splice for this Work.
+            if (updateDto.memoryRecallEnabled !== undefined) {
+                updateData.memoryRecallEnabled = updateDto.memoryRecallEnabled;
+            }
+
+            // Quality-gate settings. `checkDefaults: null` clears the
+            // Work-level defaults; checksPolicy / maxGateAttempts are
+            // NOT NULL columns, so only defined values flow through (the
+            // DTO already constrains them to the known set / 1..5).
+            if (updateDto.checkDefaults !== undefined) {
+                updateData.checkDefaults = updateDto.checkDefaults;
+            }
+            if (updateDto.checksPolicy !== undefined) {
+                updateData.checksPolicy = updateDto.checksPolicy;
+            }
+            if (updateDto.maxGateAttempts !== undefined) {
+                updateData.maxGateAttempts = updateDto.maxGateAttempts;
+            }
+
+            // Merge-policy matrix (Wave 3, D4). A PARTIAL object is normal —
+            // resolution is field-by-field, so a Work can set one knob and
+            // inherit the rest. `null` clears the Work override entirely
+            // (back to inheriting the org / tenant / platform default);
+            // the column is nullable precisely so NULL can mean INHERIT.
+            if (updateDto.mergePolicy !== undefined) {
+                updateData.mergePolicy = updateDto.mergePolicy;
+            }
+
             // Handle community PR processing settings
             if (updateDto.communityPrEnabled !== undefined) {
                 updateData.communityPrEnabled = updateDto.communityPrEnabled;

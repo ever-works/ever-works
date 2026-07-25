@@ -14,6 +14,7 @@ import {
     Globe2,
     Lightbulb,
     Lock,
+    Milestone,
     Palette,
     Search,
     Sparkles,
@@ -76,6 +77,11 @@ const CLASS_ICONS: Record<KbDocumentClass, LucideIcon> = {
     research: Search,
     output: FileText,
     freeform: Lightbulb,
+    // Memory upgrades M4 — decision class. Icon only: the full decision
+    // workbench UI (status chips, supersession chain view, review queue)
+    // is a tracked follow-up; this entry keeps the exhaustive icon map
+    // total so the tree renders decision docs like any other class.
+    decision: Milestone,
 };
 
 export function KbTreePanel({ workId, currentDocPath, refreshKey }: KbTreePanelProps) {

@@ -177,6 +177,8 @@ export class ContentExtractorFacadeService
                     // Phase 15.6 — Agent/Task attribution propagation.
                     agentId: facadeOptions.agentId,
                     taskId: facadeOptions.taskId,
+                    // Wave 9 M2 — per-run cost attribution.
+                    runId: facadeOptions.runId,
                     pluginId: candidate.id,
                     capability: PluginUsageCapability.EXTRACTOR,
                     units: 1,
