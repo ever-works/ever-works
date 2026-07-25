@@ -186,7 +186,10 @@ export class AccountExportService {
                     ? dir.providerRepositoryEnabled
                     : undefined,
             taskIsolation: dir.taskIsolation || undefined,
-            taskIsolationBaseBranch: dir.taskIsolationBaseBranch ?? undefined,
+            // Serialize explicit null (= repo default branch) — omitting it
+            // would make an overwrite import silently RETAIN a custom base.
+            taskIsolationBaseBranch:
+                dir.taskIsolationBaseBranch === undefined ? undefined : dir.taskIsolationBaseBranch,
             taskIsolationTargetRepo: dir.taskIsolationTargetRepo || undefined,
             taskBranchCleanup: dir.taskBranchCleanup || undefined,
             gitProvider: dir.gitProvider,

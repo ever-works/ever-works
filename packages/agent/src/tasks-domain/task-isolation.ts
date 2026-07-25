@@ -1,3 +1,6 @@
+/** Per-Task isolation override values accepted end-to-end (API DTO ↔ domain ↔ entity). */
+export type TaskIsolationMode = 'on' | 'off';
+
 /**
  * Task-isolation resolution + branch identity (Wave 2 M1).
  *
@@ -44,6 +47,9 @@ export function taskBranchName(task: { id: string; slug?: string | null }): stri
         .replace(/-+/g, '-')
         .replace(/^-|-$/g, '')
         .slice(0, 40);
-    const idBlock = task.id.replace(/-/g, '').slice(0, 8);
+    // FULL normalized id — an 8-char prefix is only 32 bits, and a
+    // remote-branch collision would silently share a branch between two
+    // Tasks (the binding stamp only heals the LOCAL dir).
+    const idBlock = task.id.replace(/-/g, '');
     return `task/${slug || 'task'}-${idBlock}`;
 }

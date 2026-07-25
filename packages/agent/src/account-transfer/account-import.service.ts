@@ -545,9 +545,11 @@ export class AccountImportService {
                     updateData.taskBranchCleanup = dir.taskBranchCleanup;
                 }
                 if (
-                    typeof dir.taskIsolationBaseBranch === 'string' &&
-                    dir.taskIsolationBaseBranch.length <= 128
+                    dir.taskIsolationBaseBranch === null ||
+                    (typeof dir.taskIsolationBaseBranch === 'string' &&
+                        dir.taskIsolationBaseBranch.length <= 128)
                 ) {
+                    // null = 'use repo default' and must overwrite a custom base.
                     updateData.taskIsolationBaseBranch = dir.taskIsolationBaseBranch;
                 }
                 await this.workRepository.update(existing.id, updateData);

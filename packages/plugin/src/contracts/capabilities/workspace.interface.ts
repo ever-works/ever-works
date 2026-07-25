@@ -1,5 +1,6 @@
 import type { IPlugin } from '../plugin.interface.js';
 import type { PluginSettings } from '../../settings/settings.types.js';
+import type { FacadeOptions } from '../../facades/facade-options.interface.js';
 
 /**
  * Workspace capability — pluggable isolated git working contexts for
@@ -111,18 +112,18 @@ export interface IWorkspacePlugin extends IPlugin {
 
 /** Facade interface — implementation lives in `@ever-works/agent`. */
 export interface IWorkspaceFacade {
-	provision(spec: Omit<WorkspaceProvisionSpec, 'settings'>, facadeOptions: unknown): Promise<WorkspaceHandle>;
+	provision(spec: Omit<WorkspaceProvisionSpec, 'settings'>, facadeOptions: FacadeOptions): Promise<WorkspaceHandle>;
 	finalize(
 		handle: WorkspaceHandle,
 		opts: { commitMessage: string; push: boolean },
-		facadeOptions: unknown
+		facadeOptions: FacadeOptions
 	): Promise<WorkspaceFinalizeResult>;
 	simulateMerge(
 		handle: WorkspaceHandle,
 		targetRef: string,
-		facadeOptions: unknown
+		facadeOptions: FacadeOptions
 	): Promise<WorkspaceMergeSimulation>;
-	teardown(handle: WorkspaceHandle, facadeOptions: unknown): Promise<void>;
+	teardown(handle: WorkspaceHandle, facadeOptions: FacadeOptions): Promise<void>;
 }
 
 /** Type guard — true when a plugin declares the `workspace` capability. */

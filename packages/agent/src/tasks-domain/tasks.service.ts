@@ -6,6 +6,7 @@ import {
     NotFoundException,
     Optional,
 } from '@nestjs/common';
+import type { TaskIsolationMode } from './task-isolation';
 import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
 import { Task, TaskPriority, TaskStatus, type TaskActorType } from '../entities/task.entity';
@@ -39,7 +40,7 @@ export interface CreateTaskInput {
     status?: TaskStatus;
     priority?: TaskPriority;
     labels?: string[] | null;
-    isolationMode?: string | null;
+    isolationMode?: TaskIsolationMode | null;
     missionId?: string | null;
     ideaId?: string | null;
     workId?: string | null;
@@ -57,7 +58,7 @@ export interface UpdateTaskInput {
     description?: string | null;
     priority?: TaskPriority;
     labels?: string[] | null;
-    isolationMode?: string | null;
+    isolationMode?: TaskIsolationMode | null;
     missionId?: string | null;
     ideaId?: string | null;
     workId?: string | null;
