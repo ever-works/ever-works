@@ -2,12 +2,14 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { IngestedEvent } from '../entities/ingested-event.entity';
 import { IngestCursor } from '../entities/ingest-cursor.entity';
+import { IngestInstallBinding } from '../entities/ingest-install-binding.entity';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { FacadesModule } from '../facades/facades.module';
 import { IngestedEventRepository } from './ingested-event.repository';
 import { EventIngestService } from './event-ingest.service';
 import { IngestCursorRepository } from './ingest-cursor.repository';
 import { EventSourcePullService } from './event-source-pull.service';
+import { IngestInstallBindingRepository } from './ingest-install-binding.repository';
 
 /**
  * Event-ingest spine (Wave 6, pull path Wave 8) — agent-side module
@@ -21,14 +23,21 @@ import { EventSourcePullService } from './event-source-pull.service';
  * pull path needs (registry / settings / user-plugin rows) are
  * `@Global` providers in the API process and injected `@Optional()`.
  *
- * `IngestedEvent` + `IngestCursor` MUST also stay registered in the
- * DataSource ENTITIES array (`database/_entities-inventory.ts`) — this
- * repo has no `autoLoadEntities`, so a forFeature'd-but-unregistered
- * entity throws EntityMetadataNotFoundError on first query.
+ * Also owns `IngestInstallBindingRepository` — the external
+ * workspace/installation → platform user binding the INBOUND receivers
+ * (Slack events, GitHub webhooks) resolve deliveries through, so an
+ * event is attributed to the account that actually owns the workspace
+ * instead of "the oldest enabled install platform-wide".
+ *
+ * `IngestedEvent` + `IngestCursor` + `IngestInstallBinding` MUST also
+ * stay registered in the DataSource ENTITIES array
+ * (`database/_entities-inventory.ts`) — this repo has no
+ * `autoLoadEntities`, so a forFeature'd-but-unregistered entity throws
+ * EntityMetadataNotFoundError on first query.
  */
 @Module({
     imports: [
-        TypeOrmModule.forFeature([IngestedEvent, IngestCursor]),
+        TypeOrmModule.forFeature([IngestedEvent, IngestCursor, IngestInstallBinding]),
         // Processor 1 — Activity-log rows with sourceUrl provenance.
         ActivityLogModule,
         // Processor 2 — best-effort Memory observations via
@@ -40,12 +49,14 @@ import { EventSourcePullService } from './event-source-pull.service';
         EventIngestService,
         IngestCursorRepository,
         EventSourcePullService,
+        IngestInstallBindingRepository,
     ],
     exports: [
         IngestedEventRepository,
         EventIngestService,
         IngestCursorRepository,
         EventSourcePullService,
+        IngestInstallBindingRepository,
     ],
 })
 export class EventIngestModule {}
