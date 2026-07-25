@@ -1,0 +1,204 @@
+:root {
+	color-scheme: dark;
+	--bg: #0b0d14;
+	--panel: #151824;
+	--border: #262b3d;
+	--text: #e7e9f1;
+	--muted: #9aa1b5;
+	--accent: #4f46e5;
+	--accent-hover: #6366f1;
+	--ok: #22c55e;
+	--warn: #f59e0b;
+	--err: #ef4444;
+}
+
+* {
+	box-sizing: border-box;
+}
+
+body {
+	margin: 0;
+	background: var(--bg);
+	color: var(--text);
+	font-family:
+		system-ui,
+		-apple-system,
+		'Segoe UI',
+		sans-serif;
+	font-size: 14px;
+}
+
+.shell {
+	max-width: 860px;
+	margin: 0 auto;
+	padding: 32px 24px 48px;
+}
+
+h1 {
+	font-size: 22px;
+	margin: 0 0 4px;
+}
+
+h2 {
+	font-size: 17px;
+	margin: 0 0 12px;
+}
+
+.muted {
+	color: var(--muted);
+}
+
+.panel {
+	background: var(--panel);
+	border: 1px solid var(--border);
+	border-radius: 10px;
+	padding: 20px;
+	margin-top: 16px;
+}
+
+.steps-nav {
+	display: flex;
+	gap: 8px;
+	flex-wrap: wrap;
+	margin-top: 20px;
+}
+
+.steps-nav .step {
+	padding: 4px 10px;
+	border-radius: 999px;
+	border: 1px solid var(--border);
+	color: var(--muted);
+	font-size: 12px;
+}
+
+.steps-nav .step.active {
+	border-color: var(--accent);
+	color: var(--text);
+}
+
+.steps-nav .step.done {
+	border-color: var(--ok);
+	color: var(--ok);
+}
+
+button {
+	background: var(--accent);
+	color: #fff;
+	border: 0;
+	border-radius: 8px;
+	padding: 9px 16px;
+	font-size: 14px;
+	cursor: pointer;
+}
+
+button:hover:not(:disabled) {
+	background: var(--accent-hover);
+}
+
+button:disabled {
+	opacity: 0.45;
+	cursor: not-allowed;
+}
+
+button.secondary {
+	background: transparent;
+	border: 1px solid var(--border);
+	color: var(--text);
+}
+
+.actions {
+	display: flex;
+	gap: 10px;
+	margin-top: 20px;
+}
+
+.check-row,
+.runtime-card,
+.service-row {
+	display: flex;
+	align-items: center;
+	gap: 10px;
+	padding: 10px 12px;
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	margin-top: 8px;
+}
+
+.runtime-card {
+	cursor: pointer;
+	align-items: flex-start;
+	flex-direction: column;
+}
+
+.runtime-card.selected {
+	border-color: var(--accent);
+	background: rgba(79, 70, 229, 0.08);
+}
+
+.badge {
+	font-size: 11px;
+	padding: 2px 8px;
+	border-radius: 999px;
+	border: 1px solid var(--border);
+	color: var(--muted);
+}
+
+.badge.ok {
+	color: var(--ok);
+	border-color: var(--ok);
+}
+
+.badge.warn {
+	color: var(--warn);
+	border-color: var(--warn);
+}
+
+.badge.err {
+	color: var(--err);
+	border-color: var(--err);
+}
+
+label.field {
+	display: block;
+	margin-top: 12px;
+}
+
+label.field span {
+	display: block;
+	margin-bottom: 4px;
+	color: var(--muted);
+	font-size: 12px;
+}
+
+input[type='text'],
+input[type='password'] {
+	width: 100%;
+	background: var(--bg);
+	border: 1px solid var(--border);
+	border-radius: 6px;
+	color: var(--text);
+	padding: 8px 10px;
+	font-size: 13px;
+}
+
+.log-pane {
+	background: #05070c;
+	border: 1px solid var(--border);
+	border-radius: 8px;
+	padding: 10px;
+	margin-top: 10px;
+	height: 260px;
+	overflow: auto;
+	font-family: ui-monospace, Consolas, monospace;
+	font-size: 12px;
+	white-space: pre-wrap;
+	word-break: break-all;
+}
+
+.log-line.stderr {
+	color: var(--warn);
+}
+
+.log-line.system {
+	color: var(--accent-hover);
+}
