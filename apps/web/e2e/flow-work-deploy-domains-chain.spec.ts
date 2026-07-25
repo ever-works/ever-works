@@ -45,8 +45,8 @@ import { API_BASE, authedHeaders, registerUserViaAPI, createWorkViaAPI } from '.
  *    POST /deploy/works/:id/check          → 201 { status:'success', canDeploy:false,
  *          isShared:false, ownerHasToken:false, userHasToken:false }
  *    GET  /deploy/works/:id/deployments    → 200 { status:'success', deployments:[] }
- *    GET  /deploy/works/:id/subdomain      → 200 { subdomain:null, fqdn:null, url:null,
- *          recordOk:false, editable:false }
+ *    GET  /deploy/works/:id/subdomain      → 200 { status:'success', subdomain:null, fqdn:null,
+ *          url:null, recordOk:false, editable:false }
  *    GET  /deploy/works/:id/runtime-env    → 200 { status:'success',
  *          databaseUrl:{ configured:false, masked:null }, managed:[AUTH_SECRET,COOKIE_SECRET,COOKIE_SECURE] }
  *    PUT  /deploy/works/:id/runtime-env    → 200 masks password (user:***@host/db), redeploy hint
@@ -242,6 +242,7 @@ test.describe('Deploy chain — precondition partition on one undeployed Work', 
         });
         expect(sub.status()).toBe(200);
         expect(await sub.json()).toEqual({
+            status: 'success',
             subdomain: null,
             fqdn: null,
             url: null,

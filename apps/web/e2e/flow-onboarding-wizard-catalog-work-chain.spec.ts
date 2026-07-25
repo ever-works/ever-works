@@ -34,14 +34,14 @@ import { API_BASE, authedHeaders, registerUserViaAPI, createWorkViaAPI } from '.
  *
  * ── PROBED CONTRACTS (verified live) ─────────────────────────────────────
  *  GET  /api/onboarding/catalog → 200 authed / 401 anon; { ai[6], storage[4],
- *    deploy[3], plugins[] }; server-authoritative (byte-identical across users).
+ *    db[2], deploy[3], plugins[] }; server-authoritative (byte-identical across users).
  *    Each bucket has exactly ONE default; a card carries the 'planned' badge IFF
  *    available:false; the AI default 'ever-works' is available:true; BYOK/own
  *    cards carry a pluginId + 'byok'/[] badges. plugins[] is DISJOINT from every
  *    card pluginId (reservedPluginIds) and sorted by onboardingPriority asc.
  *  GET  /api/onboarding/state (fresh) → { completedAt:null, dismissedAt:null,
- *    state: ONBOARDING_DEFAULT_STATE (version 2, ever-works triple, lastStep 0,
- *    []/false, no prompt) }; anon → 401.
+ *    state: ONBOARDING_DEFAULT_STATE (version 2, ever-works ai/storage/db/deploy
+ *    quad, lastStep 0, []/false, no prompt) }; anon → 401.
  *  PATCH /api/onboarding/state → 200 deep-merge (version pinned 2); invalid ai
  *    choice → 400 enum msg; lastStep<0 → 400; skippedSteps >20 → 400, element
  *    >64 → 400; prompt >5000 → 400; unknown key top-level / state-level / nested
@@ -76,6 +76,7 @@ const UNKNOWN_UUID = '00000000-0000-0000-0000-000000000000';
 
 const AI_CHOICES = ['ever-works', 'openrouter', 'claude-code', 'codex', 'gemini', 'grok'] as const;
 const STORAGE_CHOICES = ['ever-works-git', 'user-github', 'user-gitlab', 'user-git'] as const;
+const DB_CHOICES = ['ever-works-db', 'custom'] as const;
 const DEPLOY_CHOICES = ['ever-works', 'vercel', 'k8s'] as const;
 
 function stamp(): string {
@@ -91,6 +92,7 @@ interface WizardState {
     lastStep: number;
     ai: { choice: string };
     storage: { choice: string };
+    db: { choice: string };
     deploy: { choice: string };
     skippedSteps: string[];
     pluginsReviewed: boolean;
@@ -124,6 +126,7 @@ interface PluginCard {
 interface Catalog {
     ai: CatalogCard[];
     storage: CatalogCard[];
+    db: CatalogCard[];
     deploy: CatalogCard[];
     plugins: PluginCard[];
 }
@@ -218,6 +221,7 @@ function expectDefaultState(env: StateEnvelope): void {
         lastStep: 0,
         ai: { choice: 'ever-works' },
         storage: { choice: 'ever-works-git' },
+        db: { choice: 'ever-works-db' },
         deploy: { choice: 'ever-works' },
         skippedSteps: [],
         pluginsReviewed: false,
@@ -247,6 +251,7 @@ test.describe('Onboarding chain — catalog ↔ state default coherence', () => 
         const buckets: Array<[CatalogCard[], string]> = [
             [catalog.ai, fresh.ai.choice],
             [catalog.storage, fresh.storage.choice],
+            [catalog.db, fresh.db.choice],
             [catalog.deploy, fresh.deploy.choice],
         ];
         for (const [cards, persistedDefault] of buckets) {
@@ -276,11 +281,12 @@ test.describe('Onboarding chain — catalog ↔ state default coherence', () => 
 
         expect(catalog.ai.map((c) => c.choice)).toEqual([...AI_CHOICES]);
         expect(catalog.storage.map((c) => c.choice)).toEqual([...STORAGE_CHOICES]);
+        expect(catalog.db.map((c) => c.choice)).toEqual([...DB_CHOICES]);
         expect(catalog.deploy.map((c) => c.choice)).toEqual([...DEPLOY_CHOICES]);
 
-        // A non-default card that names a plugin carries its pluginId; the default
-        // Ever-Works card in each bucket never does.
-        for (const cards of [catalog.ai, catalog.storage, catalog.deploy]) {
+        // Any card that names a plugin carries its pluginId as a non-empty string
+        // (the managed DB default aside, the Ever-Works choice cards carry none).
+        for (const cards of [catalog.ai, catalog.storage, catalog.db, catalog.deploy]) {
             for (const c of cards) {
                 if (c.pluginId !== undefined) {
                     expect(typeof c.pluginId).toBe('string');
@@ -302,7 +308,7 @@ test.describe('Onboarding chain — catalog ↔ state default coherence', () => 
         const catalog = await getCatalog(request, user.access_token);
 
         const reserved = new Set(
-            [...catalog.ai, ...catalog.storage, ...catalog.deploy]
+            [...catalog.ai, ...catalog.storage, ...catalog.db, ...catalog.deploy]
                 .map((c) => c.pluginId)
                 .filter((id): id is string => Boolean(id)),
         );

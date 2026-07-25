@@ -57,7 +57,7 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *            empty/missing   → 400 (multi-message: matches + isNotEmpty + isString)
  *            extra key       → 400 { message:['property <k> should not exist'] }
  *     GET  /api/deploy/works/:id/subdomain → 200
- *            { subdomain:null, fqdn:null, url:null, recordOk:false, editable:false }
+ *            { status:'success', subdomain:null, fqdn:null, url:null, recordOk:false, editable:false }
  *     PUT  /api/deploy/works/:id/subdomain { subdomain } — guard ORDER:
  *            bad format    → 400 { message:['Invalid subdomain format...'] }
  *            reserved www  → 400 { status:'error', message:/reserved by the platform/ }
@@ -367,6 +367,7 @@ test.describe('Deploy lifecycle — managed subdomain (EW-739)', () => {
         expect(res.status()).toBe(200);
         const body = await res.json();
         expect(body).toEqual({
+            status: 'success',
             subdomain: null,
             fqdn: null,
             url: null,

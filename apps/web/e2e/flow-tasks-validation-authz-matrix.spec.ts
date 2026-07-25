@@ -1,5 +1,5 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
-import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
+import { API_BASE, authedHeaders, createWorkViaAPI, registerUserViaAPI } from './helpers/api';
 
 /**
  * Tasks — exhaustive VALIDATION + AUTHZ MATRIX.
@@ -37,8 +37,13 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *       - malformed        → 400 ["<field> must be a UUID"]          (DTO layer)
  *       - unknown VALID v4 → 400 "<Work|Mission|Idea|Parent Task> … not found."
  *                                                                    (service ownership)
- *     scope exclusivity: >1 of work/mission/idea (all valid uuids)
- *                        → 400 "Task must be scoped to exactly zero or one …"
+ *     scope multi-linkage: >1 of work/mission/idea (all REAL & owned) is now
+ *                        ALLOWED — ownership is deliberately NON-exclusive, so
+ *                        every supplied scope column persists on one Task (201).
+ *                        The prior "exactly zero or one" rule was REMOVED.
+ *                        Existence is resolved FIRST (work→mission→idea), so a
+ *                        fake id anywhere in the set 400s "<Entity> … not found."
+ *                        — never a scope-exclusivity error.
  *     requireAllApprovers @IsOptional @IsBoolean  non-bool → 400
  *     unknown field       → 400 "property <x> should not exist"
  *     null optional fields → 201 (@IsOptional admits null)
@@ -112,6 +117,32 @@ async function makeTask(
     const res = await post(request, token, '/api/tasks', { title: `t-${uniq()}`, ...body });
     expect(res.status(), `setup makeTask body=${await res.text().catch(() => '')}`).toBe(201);
     return res.json();
+}
+
+/** Create a real owned Mission via the public API; returns its id (setup fixture). */
+async function makeMission(
+    request: APIRequestContext,
+    token: string,
+    title: string,
+): Promise<string> {
+    const res = await post(request, token, '/api/me/missions', {
+        title,
+        description: 'scope multi-linkage probe',
+        type: 'one-shot',
+    });
+    expect(res.status(), `setup makeMission body=${await res.text().catch(() => '')}`).toBe(201);
+    return (await res.json()).id;
+}
+
+/** Create a real owned Idea (work-proposal) via the public API; returns its id. */
+async function makeIdea(
+    request: APIRequestContext,
+    token: string,
+    description: string,
+): Promise<string> {
+    const res = await post(request, token, '/api/me/work-proposals', { description });
+    expect(res.status(), `setup makeIdea body=${await res.text().catch(() => '')}`).toBe(201);
+    return (await res.json()).id;
 }
 
 test.describe('POST /api/tasks — CreateTaskDto validation matrix', () => {
@@ -274,19 +305,49 @@ test.describe('POST /api/tasks — CreateTaskDto validation matrix', () => {
         }
     });
 
-    test('scope exclusivity: supplying more than one of work/mission/idea → 400 (exactly zero or one)', async ({
+    test('scope multi-linkage: >1 of work/mission/idea (all REAL) now COEXIST on one Task; a fake id is rejected existence-first', async ({
         request,
     }) => {
         const u = await registerUserViaAPI(request);
+
+        // Build three REAL owned parents so the per-field existence checks pass.
+        const missionId = await makeMission(request, u.access_token, `X-Mission ${uniq()}`);
+        const ideaId = await makeIdea(
+            request,
+            u.access_token,
+            `X-Idea ${uniq()} — directory of dev tools`,
+        );
+        const { id: workId } = await createWorkViaAPI(request, u.access_token, {
+            name: `X-Work ${uniq()}`,
+            slug: `x-work-${uniq()}`,
+        });
+
+        // The old "exactly zero or one" exclusivity rule was REMOVED: ownership
+        // is deliberately non-exclusive, so supplying ALL THREE scopes at once
+        // succeeds and every scope column persists on the single created Task.
         const res = await post(request, u.access_token, '/api/tasks', {
+            title: `x-${uniq()}`,
+            workId,
+            missionId,
+            ideaId,
+        });
+        expect(res.status(), `multi-scope body=${await res.text().catch(() => '')}`).toBe(201);
+        const body = await res.json();
+        expect(body.workId).toBe(workId);
+        expect(body.missionId).toBe(missionId);
+        expect(body.ideaId).toBe(ideaId);
+
+        // Existence is resolved BEFORE anything else, in work→mission→idea order:
+        // a fake id anywhere in the set 400s with THAT entity's "not found."
+        // message (never a scope-exclusivity error). Two fakes → the first
+        // (work) fires.
+        const fake = await post(request, u.access_token, '/api/tasks', {
             title: `x-${uniq()}`,
             workId: UNKNOWN_UUID,
             missionId: UNKNOWN_UUID_2,
         });
-        expect(res.status()).toBe(400);
-        expect(errText(await res.json())).toContain(
-            'Task must be scoped to exactly zero or one of missionId / ideaId / workId.',
-        );
+        expect(fake.status()).toBe(400);
+        expect(errText(await fake.json())).toContain(`Work ${UNKNOWN_UUID} not found.`);
     });
 
     test('requireAllApprovers must be boolean; unknown top-level field is forbidden', async ({
