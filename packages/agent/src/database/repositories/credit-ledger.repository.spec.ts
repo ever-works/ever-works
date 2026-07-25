@@ -203,4 +203,44 @@ describe('CreditLedgerRepository reads', () => {
             take: 25,
         });
     });
+
+    // Wave 13 (Billing/Usage UI) — the stat-tile period rollup.
+    it('getPeriodTotals returns consumed/added as coerced positive numbers, half-open window', async () => {
+        const { repository, topLevelRepository } = makeHarness();
+        const qb: any = {};
+        qb.select = jest.fn().mockReturnValue(qb);
+        qb.addSelect = jest.fn().mockReturnValue(qb);
+        qb.where = jest.fn().mockReturnValue(qb);
+        qb.andWhere = jest.fn().mockReturnValue(qb);
+        qb.getRawOne = jest.fn().mockResolvedValue({ consumed: '260', added: '300' });
+        topLevelRepository.createQueryBuilder = jest.fn().mockReturnValue(qb);
+
+        const from = new Date(Date.UTC(2026, 6, 1));
+        const to = new Date(Date.UTC(2026, 7, 1));
+        const totals = await repository.getPeriodTotals('user-1', from, to);
+
+        expect(totals).toEqual({ consumedCredits: 260, addedCredits: 300 });
+        expect(qb.where).toHaveBeenCalledWith('e.userId = :userId', { userId: 'user-1' });
+        expect(qb.andWhere).toHaveBeenCalledWith('e.createdAt >= :from', { from });
+        expect(qb.andWhere).toHaveBeenCalledWith('e.createdAt < :to', { to });
+    });
+
+    it('getPeriodTotals degrades to zeros when the aggregate row is empty', async () => {
+        const { repository, topLevelRepository } = makeHarness();
+        const qb: any = {};
+        qb.select = jest.fn().mockReturnValue(qb);
+        qb.addSelect = jest.fn().mockReturnValue(qb);
+        qb.where = jest.fn().mockReturnValue(qb);
+        qb.andWhere = jest.fn().mockReturnValue(qb);
+        qb.getRawOne = jest.fn().mockResolvedValue(undefined);
+        topLevelRepository.createQueryBuilder = jest.fn().mockReturnValue(qb);
+
+        const totals = await repository.getPeriodTotals(
+            'user-1',
+            new Date(Date.UTC(2026, 6, 1)),
+            new Date(Date.UTC(2026, 7, 1)),
+        );
+
+        expect(totals).toEqual({ consumedCredits: 0, addedCredits: 0 });
+    });
 });

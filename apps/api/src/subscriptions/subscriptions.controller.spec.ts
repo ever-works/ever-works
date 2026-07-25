@@ -1,4 +1,12 @@
-jest.mock('@ever-works/agent/subscriptions', () => ({}));
+jest.mock('@ever-works/agent/subscriptions', () => ({
+    // Wave 13 — the controller value-imports ENTITLEMENT_KEYS for the
+    // plans endpoint's daily-free-credits lookup.
+    ENTITLEMENT_KEYS: {
+        DAILY_FREE_CREDITS: 'daily-free-credits',
+        MAX_CONCURRENT_RUNS: 'max-concurrent-runs',
+        WORKS_LIMIT: 'works-limit',
+    },
+}));
 jest.mock('@ever-works/agent/entities', () => ({
     SubscriptionPlanCode: {
         FREE: 'free',
@@ -18,15 +26,19 @@ jest.mock('../auth', () => ({
 
 import { BadRequestException } from '@nestjs/common';
 import { SubscriptionsController } from './subscriptions.controller';
-import type { SubscriptionService } from '@ever-works/agent/subscriptions';
+import type { EntitlementsService, SubscriptionService } from '@ever-works/agent/subscriptions';
 import type { AuthService } from '../auth';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 
 describe('SubscriptionsController', () => {
     let subscriptionService: jest.Mocked<
-        Pick<SubscriptionService, 'summarizePlan' | 'isEnabled' | 'changePlanSelfService'>
+        Pick<
+            SubscriptionService,
+            'summarizePlan' | 'isEnabled' | 'changePlanSelfService' | 'listPlans'
+        >
     >;
     let authService: jest.Mocked<Pick<AuthService, 'getUser'>>;
+    let entitlementsService: jest.Mocked<Pick<EntitlementsService, 'getNumber'>>;
     let controller: SubscriptionsController;
 
     const auth: AuthenticatedUser = {
@@ -49,13 +61,18 @@ describe('SubscriptionsController', () => {
             summarizePlan: jest.fn(),
             isEnabled: jest.fn(),
             changePlanSelfService: jest.fn(),
+            listPlans: jest.fn(),
         } as any;
         authService = {
             getUser: jest.fn().mockResolvedValue(user),
         } as any;
+        entitlementsService = {
+            getNumber: jest.fn().mockResolvedValue(0),
+        } as any;
         controller = new SubscriptionsController(
             subscriptionService as unknown as SubscriptionService,
             authService as unknown as AuthService,
+            entitlementsService as unknown as EntitlementsService,
         );
     });
 
@@ -112,6 +129,97 @@ describe('SubscriptionsController', () => {
             subscriptionService.summarizePlan.mockRejectedValue(new Error('boom'));
 
             await expect(controller.getPlan(auth)).rejects.toThrow('boom');
+        });
+    });
+
+    describe('listPlans (Wave 13 — Billing page plan switcher)', () => {
+        const seededPlans = [
+            {
+                code: 'free',
+                displayName: 'Free',
+                maxWorks: 1,
+                allowedCadences: ['monthly'],
+                monthlyPrice: '0',
+                overagePricePerRun: '10',
+                currency: 'usd',
+            },
+            {
+                code: 'premium',
+                displayName: 'Premium',
+                maxWorks: 15,
+                allowedCadences: ['monthly', 'weekly'],
+                monthlyPrice: '99',
+                overagePricePerRun: '0',
+                currency: 'usd',
+            },
+        ] as any[];
+
+        it('marks the current plan and maps the credits-forward projection when enabled', async () => {
+            subscriptionService.summarizePlan.mockResolvedValue({
+                enabled: true,
+                plan: { code: 'premium', displayName: 'Premium' },
+                allowances: [],
+            } as any);
+            subscriptionService.listPlans.mockResolvedValue(seededPlans);
+            entitlementsService.getNumber.mockResolvedValue(50);
+
+            const result = await controller.listPlans(auth);
+
+            expect(authService.getUser).toHaveBeenCalledWith('user-1');
+            expect(result.status).toBe('success');
+            expect(result.enabled).toBe(true);
+            expect(result.currentPlanCode).toBe('premium');
+            expect(result.plans).toHaveLength(2);
+            expect(result.plans[0]).toEqual({
+                code: 'free',
+                name: 'Free',
+                maxWorks: 1,
+                allowedCadences: ['monthly'],
+                monthlyPrice: '0',
+                overagePricePerRun: '10',
+                currency: 'usd',
+                isCurrent: false,
+                dailyFreeCredits: 50,
+            });
+            expect(result.plans[1].isCurrent).toBe(true);
+        });
+
+        it('falls back to free as the current plan when subscriptions are disabled', async () => {
+            subscriptionService.summarizePlan.mockResolvedValue({
+                enabled: false,
+                plan: null,
+                allowances: [],
+            } as any);
+            subscriptionService.listPlans.mockResolvedValue(seededPlans);
+
+            const result = await controller.listPlans(auth);
+
+            expect(result.enabled).toBe(false);
+            expect(result.currentPlanCode).toBe('free');
+            expect(result.plans[0].isCurrent).toBe(true);
+            expect(result.plans[1].isCurrent).toBe(false);
+        });
+
+        it('reads the daily-free-credits entitlement per plan code (fallback 0)', async () => {
+            subscriptionService.summarizePlan.mockResolvedValue({
+                enabled: true,
+                plan: { code: 'free', displayName: 'Free' },
+                allowances: [],
+            } as any);
+            subscriptionService.listPlans.mockResolvedValue(seededPlans);
+
+            await controller.listPlans(auth);
+
+            expect(entitlementsService.getNumber).toHaveBeenCalledWith(
+                'free',
+                'daily-free-credits',
+                0,
+            );
+            expect(entitlementsService.getNumber).toHaveBeenCalledWith(
+                'premium',
+                'daily-free-credits',
+                0,
+            );
         });
     });
 

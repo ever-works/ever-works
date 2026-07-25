@@ -12,6 +12,8 @@ import {
     Bot,
     Cpu,
     Building2,
+    CreditCard,
+    BarChart3,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
@@ -82,6 +84,20 @@ export function SettingsLayoutClient({ children, settingsMenu }: SettingsLayoutC
                 label: t('tabs.jobRuntime'),
                 icon: Cpu,
                 href: `${baseSettingsPath}/job-runtime`,
+            },
+            // Wave 13 — Billing + Usage & Credits (billing/usage PRD §2):
+            // also reachable from the settings shell like api-keys/security.
+            {
+                id: 'billing',
+                label: t('tabs.billing'),
+                icon: CreditCard,
+                href: `${baseSettingsPath}/billing`,
+            },
+            {
+                id: 'usage',
+                label: t('tabs.usageCredits'),
+                icon: BarChart3,
+                href: `${baseSettingsPath}/usage`,
             },
         ],
         [t],

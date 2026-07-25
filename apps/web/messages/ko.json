@@ -1402,7 +1402,9 @@
                 "githubApp": "GitHub 앱",
                 "workAgent": "Work Agent",
                 "gitProviders": "Git 공급자",
-                "dangerZone": "위험 영역"
+                "dangerZone": "위험 영역",
+                "billing": "Billing",
+                "usageCredits": "Usage & Credits"
             },
             "githubApp": {
                 "title": "GitHub 앱 설치",
@@ -1769,6 +1771,108 @@
                     "revokeSuccess": "API 키가 성공적으로 취소되었습니다",
                     "revokeError": "API 키 취소에 실패했습니다",
                     "copyError": "클립보드에 복사하는 데 실패했습니다"
+                }
+            },
+            "billing": {
+                "title": "Billing",
+                "subtitle": "Manage your plan, credits, payment method, and invoices.",
+                "disabledNotice": "Billing is not enabled on this deployment. Plans are shown for reference; every account runs on the Free tier.",
+                "loadError": "Some billing data could not be loaded. Refresh the page to try again.",
+                "currentPlan": {
+                    "title": "Current plan",
+                    "statusActive": "Active"
+                },
+                "plans": {
+                    "title": "Plans",
+                    "subtitle": "Plans gate features and limits; usage is billed from your credits balance.",
+                    "empty": "No plans available.",
+                    "perMonth": "/mo",
+                    "free": "Free",
+                    "maxWorks": "Up to {count} Works",
+                    "cadences": "{count} schedule cadences",
+                    "dailyFreeCredits": "{amount} daily free credits",
+                    "payAsYouGo": "Pay-as-you-go from your credits balance",
+                    "current": "Current plan",
+                    "switchFree": "Switch to {name}",
+                    "upgrade": "Upgrade",
+                    "upgradeHint": "Paid plans are activated through billing once payments launch.",
+                    "changeSuccess": "Plan updated to {name}",
+                    "changeError": "Failed to change plan"
+                },
+                "credits": {
+                    "title": "Credits",
+                    "balanceLabel": "current balance",
+                    "buy": "Buy credits",
+                    "buySubtitle": "Top up your usage balance. 1 credit = 1¢ of platform-billed usage.",
+                    "presetCredits": "You will receive {credits} credits",
+                    "customAmount": "Custom $",
+                    "comingSoon": "Payments are coming soon",
+                    "comingSoonBody": "Card top-ups are not yet available on this deployment. Your balance still tracks grants and usage."
+                },
+                "paymentMethod": {
+                    "title": "Payment method",
+                    "comingSoon": "Payment method management arrives with the payments launch.",
+                    "empty": "No payment method on file."
+                },
+                "autoRecharge": {
+                    "title": "Auto-recharge",
+                    "comingSoon": "Automatic top-ups arrive with the payments launch.",
+                    "description": "Automatically top up your balance when it falls below a threshold."
+                },
+                "invoices": {
+                    "title": "Invoice history",
+                    "empty": "No invoices yet. Invoices appear here once billing is live."
+                },
+                "ledger": {
+                    "title": "Credits ledger",
+                    "subtitle": "Every credit added or consumed, in dollars.",
+                    "empty": "No credit activity yet.",
+                    "loading": "Loading…",
+                    "loadError": "Failed to load the ledger.",
+                    "filterAll": "All types",
+                    "kinds": {
+                        "purchase": "Purchase",
+                        "grant": "Grant",
+                        "daily-free": "Daily free",
+                        "consumption": "Consumption",
+                        "adjustment": "Adjustment",
+                        "expiry": "Expiry"
+                    },
+                    "colDate": "Date",
+                    "colType": "Type",
+                    "colDescription": "Description",
+                    "colAmount": "Amount",
+                    "colBalance": "Balance",
+                    "pagePrev": "Previous",
+                    "pageNext": "Next",
+                    "pageInfo": "Page {page} of {pages}"
+                }
+            },
+            "usage": {
+                "title": "Usage & Credits",
+                "subtitle": "Where your credits and spend went — by day, model, agent, and Work.",
+                "loadError": "Some usage data could not be loaded. Refresh the page to try again.",
+                "tiles": {
+                    "balance": "Credits balance",
+                    "consumed": "Credits used",
+                    "added": "Credits added",
+                    "spend": "Month spend",
+                    "tasksCompleted": "Tasks completed",
+                    "worksActive": "Works active",
+                    "agentRuns": "Agent runs",
+                    "periodNote": "Showing period {period}"
+                },
+                "charts": {
+                    "byDay": "Usage per day",
+                    "byModel": "Usage by model",
+                    "byAgent": "Usage by agent",
+                    "byWork": "Usage by Work",
+                    "range7d": "7d",
+                    "range30d": "30d",
+                    "empty": "No usage in this period.",
+                    "loading": "Loading…",
+                    "error": "Failed to load chart data.",
+                    "unattributed": "Unattributed"
                 }
             }
         },
@@ -4432,7 +4536,9 @@
                 "accountSettings": "계정 설정",
                 "helpDocs": "도움말 및 문서",
                 "support": "지원",
-                "keyboardShortcuts": "키보드 단축키"
+                "keyboardShortcuts": "키보드 단축키",
+                "billing": "Billing",
+                "usageCredits": "Usage & Credits"
             },
             "signOut": "로그아웃",
             "signingOut": "로그아웃 중..."
@@ -5259,7 +5365,9 @@
             "apiKeys": "API 키",
             "dangerZone": "위험 영역",
             "pluginSettings": "플러그인 설정",
-            "discover": "Discover"
+            "discover": "Discover",
+            "billing": "Billing",
+            "usage": "Usage & Credits"
         }
     },
     "api": {

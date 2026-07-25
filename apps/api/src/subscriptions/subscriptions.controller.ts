@@ -10,7 +10,11 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiBearerAuth, ApiOperation, ApiResponse } from '@nestjs/swagger';
 import { AuthSessionGuard, AuthService, CurrentUser } from '@src/auth';
-import { SubscriptionService } from '@ever-works/agent/subscriptions';
+import {
+    ENTITLEMENT_KEYS,
+    EntitlementsService,
+    SubscriptionService,
+} from '@ever-works/agent/subscriptions';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
 import { SubscriptionPlanCode } from '@ever-works/agent/entities';
 import { IsEnum } from 'class-validator';
@@ -28,6 +32,9 @@ export class SubscriptionsController {
     constructor(
         private readonly subscriptionService: SubscriptionService,
         private readonly authService: AuthService,
+        // Wave 13 (Billing page) — per-plan daily-free-credits for the
+        // credits-forward plan switcher (`GET plans` below).
+        private readonly entitlementsService: EntitlementsService,
     ) {}
 
     @Get('plan')
@@ -60,6 +67,52 @@ export class SubscriptionsController {
                 name: summary.plan.displayName,
                 allowedCadences: summary.allowances,
             },
+        };
+    }
+
+    @Get('plans')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'List subscription plans',
+        description:
+            'All active plans with their feature/limit gates + credits levers (Wave 13 Billing page — ' +
+            'credits-forward plan switcher). Read-only and additive; works (degraded) when subscriptions ' +
+            'are disabled so the switcher can still render the catalog.',
+    })
+    @ApiResponse({ status: 200, description: 'Active plans + current plan code' })
+    async listPlans(@CurrentUser() auth: AuthenticatedUser) {
+        const user = await this.authService.getUser(auth.userId);
+        const [summary, plans] = await Promise.all([
+            this.subscriptionService.summarizePlan(user),
+            this.subscriptionService.listPlans(),
+        ]);
+        const currentPlanCode = summary.enabled ? summary.plan.code : 'free';
+
+        // Plan count is tiny (seeded catalog) and EntitlementsService
+        // caches reads — this is one lookup per plan, not a per-row N+1.
+        const items = await Promise.all(
+            plans.map(async (plan) => ({
+                code: plan.code,
+                name: plan.displayName,
+                maxWorks: plan.maxWorks,
+                allowedCadences: plan.allowedCadences ?? [],
+                monthlyPrice: plan.monthlyPrice,
+                overagePricePerRun: plan.overagePricePerRun,
+                currency: plan.currency,
+                isCurrent: plan.code === currentPlanCode,
+                dailyFreeCredits: await this.entitlementsService.getNumber(
+                    plan.code,
+                    ENTITLEMENT_KEYS.DAILY_FREE_CREDITS,
+                    0,
+                ),
+            })),
+        );
+
+        return {
+            status: 'success',
+            enabled: summary.enabled,
+            currentPlanCode,
+            plans: items,
         };
     }
 

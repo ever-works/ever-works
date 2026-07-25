@@ -170,6 +170,40 @@ export class CreditLedgerRepository {
     }
 
     /**
+     * Wave 13 (Billing/Usage UI) — period movement totals for the
+     * Usage & Credits stat tiles: credits consumed (sum of debits,
+     * returned positive) and credits added (sum of credits) inside a
+     * half-open `[from, to)` window. ONE grouped query using the
+     * `(userId, createdAt)` index; `CASE WHEN` is standard SQL so the
+     * same statement runs on SQLite (CI/dev) and Postgres (prod).
+     */
+    async getPeriodTotals(
+        userId: string,
+        from: Date,
+        to: Date,
+    ): Promise<{ consumedCredits: number; addedCredits: number }> {
+        const row = await this.repository
+            .createQueryBuilder('e')
+            .select(
+                'COALESCE(SUM(CASE WHEN e.amountCredits < 0 THEN -e.amountCredits ELSE 0 END), 0)',
+                'consumed',
+            )
+            .addSelect(
+                'COALESCE(SUM(CASE WHEN e.amountCredits > 0 THEN e.amountCredits ELSE 0 END), 0)',
+                'added',
+            )
+            .where('e.userId = :userId', { userId })
+            .andWhere('e.createdAt >= :from', { from })
+            .andWhere('e.createdAt < :to', { to })
+            .getRawOne<{ consumed: string; added: string }>();
+
+        return {
+            consumedCredits: Number(row?.consumed ?? 0),
+            addedCredits: Number(row?.added ?? 0),
+        };
+    }
+
+    /**
      * Serialize concurrent ledger writes for one user. Pessimistic row
      * locks are only supported on postgres/mysql/mariadb; better-sqlite3
      * throws `LockNotSupportedOnGivenDriverError` AND serializes writes

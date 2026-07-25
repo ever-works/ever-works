@@ -6,6 +6,12 @@ import { BillingProvider, ManualBillingProvider } from './billing/billing.provid
 import { CreditLedgerService, InsufficientCreditsError } from './credits/credit-ledger.service';
 import { ENTITLEMENT_KEYS, EntitlementsService } from './credits/entitlements.service';
 import { RunCostSettlementService } from './credits/run-cost-settlement.service';
+import {
+    InvalidUsagePeriodError,
+    resolveUsageSummaryWindow,
+    USAGE_SUMMARY_GROUP_BYS,
+    UsageSummaryService,
+} from './credits/usage-summary.service';
 
 /**
  * Pins the public `@ever-works/agent/subscriptions` barrel surface and the
@@ -50,6 +56,13 @@ describe('SubscriptionsModule + barrel re-exports', () => {
             expect(subscriptionsBarrel.RunCostSettlementService).toBe(RunCostSettlementService);
         });
 
+        it('re-exports the usage-summary surface (Wave 13 Billing/Usage UI)', () => {
+            expect(subscriptionsBarrel.UsageSummaryService).toBe(UsageSummaryService);
+            expect(subscriptionsBarrel.resolveUsageSummaryWindow).toBe(resolveUsageSummaryWindow);
+            expect(subscriptionsBarrel.InvalidUsagePeriodError).toBe(InvalidUsagePeriodError);
+            expect(subscriptionsBarrel.USAGE_SUMMARY_GROUP_BYS).toBe(USAGE_SUMMARY_GROUP_BYS);
+        });
+
         it('exposes the documented runtime symbols only (no extras silently appearing)', () => {
             const runtimeKeys = Object.keys(subscriptionsBarrel).sort();
             expect(runtimeKeys).toEqual(
@@ -66,6 +79,11 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                     'ENTITLEMENT_KEYS',
                     // Run-cost settlement (pricing Wave 9 M2)
                     'RunCostSettlementService',
+                    // Usage-summary aggregations (Wave 13 Billing/Usage UI)
+                    'UsageSummaryService',
+                    'resolveUsageSummaryWindow',
+                    'InvalidUsagePeriodError',
+                    'USAGE_SUMMARY_GROUP_BYS',
                 ].sort(),
             );
         });
@@ -94,6 +112,11 @@ describe('SubscriptionsModule + barrel re-exports', () => {
         it('declares + exports RunCostSettlementService (Wave 9 M2)', () => {
             expect(getMeta('providers')).toContain(RunCostSettlementService);
             expect(getMeta('exports')).toContain(RunCostSettlementService);
+        });
+
+        it('declares + exports UsageSummaryService (Wave 13 — consumed by apps/api CreditsController)', () => {
+            expect(getMeta('providers')).toContain(UsageSummaryService);
+            expect(getMeta('exports')).toContain(UsageSummaryService);
         });
 
         it('binds the abstract BillingProvider token to ManualBillingProvider via useClass', () => {

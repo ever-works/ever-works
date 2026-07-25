@@ -7,6 +7,7 @@ import { BillingProvider, ManualBillingProvider } from './billing/billing.provid
 import { CreditLedgerService } from './credits/credit-ledger.service';
 import { EntitlementsService } from './credits/entitlements.service';
 import { RunCostSettlementService } from './credits/run-cost-settlement.service';
+import { UsageSummaryService } from './credits/usage-summary.service';
 
 @Module({
     imports: [
@@ -26,6 +27,9 @@ import { RunCostSettlementService } from './credits/run-cost-settlement.service'
         // api-side @Global() SubscriptionsModule binds this instance to
         // the RUN_COST_SETTLER + RUN_CREDITS_PRECHECK tokens.
         RunCostSettlementService,
+        // Account-wide usage aggregations behind
+        // `GET /api/credits/usage-summary` (Wave 13 Billing/Usage UI).
+        UsageSummaryService,
         { provide: BillingProvider, useClass: ManualBillingProvider },
     ],
     exports: [
@@ -34,6 +38,7 @@ import { RunCostSettlementService } from './credits/run-cost-settlement.service'
         CreditLedgerService,
         EntitlementsService,
         RunCostSettlementService,
+        UsageSummaryService,
         BillingProvider,
     ],
 })

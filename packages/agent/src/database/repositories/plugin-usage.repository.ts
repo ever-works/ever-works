@@ -1,7 +1,11 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Between, LessThan, Repository } from 'typeorm';
+import { Between, In, LessThan, Repository } from 'typeorm';
 import { PluginUsageCapability, PluginUsageEvent } from '@src/entities/plugin-usage-event.entity';
+import { Agent } from '@src/entities/agent.entity';
+import { AgentRun } from '@src/entities/agent-run.entity';
+import { Task, TaskStatus } from '@src/entities/task.entity';
+import { Work } from '@src/entities/work.entity';
 
 export type PerPluginSpend = {
     pluginId: string;
@@ -26,6 +30,25 @@ export type CrossUserSpendRow = {
 export type RunPluginSpend = {
     pluginId: string;
     costCents: number;
+};
+
+/**
+ * Wave 13 (Billing/Usage UI) — one grouped account-wide spend row.
+ * `key` is the raw grouping value (modelId / agentId / workId); NULL
+ * when the source events carry no attribution (e.g. non-Agent calls
+ * have `agentId = NULL`) — surfaced honestly, never silently dropped.
+ */
+export type UserSpendGroupRow = {
+    key: string | null;
+    units: number;
+    costCents: number;
+};
+
+/** Wave 13 — §4.2 consumption counts for the Usage & Credits page. */
+export type UserUsageCounts = {
+    tasksCompleted: number;
+    worksActive: number;
+    agentRuns: number;
 };
 
 @Injectable()
@@ -251,6 +274,158 @@ export class PluginUsageRepository {
         return Array.from(byDay.entries())
             .map(([day, costCents]) => ({ day, costCents }))
             .sort((a, b) => a.day.localeCompare(b.day));
+    }
+
+    /**
+     * Wave 13 (Billing/Usage UI) — account-wide daily spend buckets for
+     * ONE user. Same driver-agnostic JS bucketing as `getDailySpend`
+     * (no DB date functions — SQLite in CI/dev, Postgres in prod), but
+     * keyed on `userId` via the existing `(userId, occurredAt)` index.
+     * Volume is bounded by one user's events in one period window.
+     */
+    async getDailySpendForUser(
+        userId: string,
+        periodStart: Date,
+        periodEnd: Date,
+    ): Promise<DailySpendBucket[]> {
+        const events = await this.repository
+            .createQueryBuilder('e')
+            .select(['e.occurredAt', 'e.costCents'])
+            .where('e.userId = :userId', { userId })
+            .andWhere('e.occurredAt >= :start', { start: periodStart })
+            .andWhere('e.occurredAt < :end', { end: periodEnd })
+            .getMany();
+
+        const byDay = new Map<string, number>();
+        for (const event of events) {
+            const day = event.occurredAt.toISOString().slice(0, 10); // YYYY-MM-DD
+            byDay.set(day, (byDay.get(day) ?? 0) + Number(event.costCents ?? 0));
+        }
+        return Array.from(byDay.entries())
+            .map(([day, costCents]) => ({ day, costCents }))
+            .sort((a, b) => a.day.localeCompare(b.day));
+    }
+
+    /**
+     * Wave 13 — shared account-wide grouped rollup: ONE grouped query
+     * over the user's events in the window (owner-scoped, no N+1). The
+     * column is an internal whitelist — never caller-supplied.
+     */
+    private async getSpendGroupedForUser(
+        column: 'modelId' | 'agentId' | 'workId',
+        userId: string,
+        periodStart: Date,
+        periodEnd: Date,
+    ): Promise<UserSpendGroupRow[]> {
+        const rows = await this.repository
+            .createQueryBuilder('e')
+            .select(`e.${column}`, 'key')
+            .addSelect('COALESCE(SUM(e.units), 0)', 'units')
+            .addSelect('COALESCE(SUM(e.costCents), 0)', 'costCents')
+            .where('e.userId = :userId', { userId })
+            .andWhere('e.occurredAt >= :start', { start: periodStart })
+            .andWhere('e.occurredAt < :end', { end: periodEnd })
+            .groupBy(`e.${column}`)
+            .orderBy('"costCents"', 'DESC')
+            .getRawMany<{ key: string | null; units: string; costCents: string }>();
+
+        return rows.map((r) => ({
+            key: r.key ?? null,
+            units: Number(r.units ?? 0),
+            costCents: Number(r.costCents ?? 0),
+        }));
+    }
+
+    /** Wave 13 — user's spend per `modelId` in the window (one query). */
+    async getSpendByModelForUser(
+        userId: string,
+        periodStart: Date,
+        periodEnd: Date,
+    ): Promise<UserSpendGroupRow[]> {
+        return this.getSpendGroupedForUser('modelId', userId, periodStart, periodEnd);
+    }
+
+    /** Wave 13 — user's spend per Agent in the window (one query). */
+    async getSpendByAgentForUser(
+        userId: string,
+        periodStart: Date,
+        periodEnd: Date,
+    ): Promise<UserSpendGroupRow[]> {
+        return this.getSpendGroupedForUser('agentId', userId, periodStart, periodEnd);
+    }
+
+    /** Wave 13 — user's spend per Work in the window (one query). */
+    async getSpendByWorkForUser(
+        userId: string,
+        periodStart: Date,
+        periodEnd: Date,
+    ): Promise<UserSpendGroupRow[]> {
+        return this.getSpendGroupedForUser('workId', userId, periodStart, periodEnd);
+    }
+
+    /**
+     * Wave 13 — §4.2 consumption counts for the Usage & Credits page:
+     * Tasks completed in the window, currently-active Works, and Agent
+     * runs started in the window — all owner-scoped to one user.
+     *
+     * Cross-entity counts ride `repository.manager` (same precedent as
+     * `WorkRepository.getStatsForUser` counting Missions/Ideas): three
+     * COUNT queries in parallel, no N+1, no new module wiring. Each is
+     * `.catch(() => 0)`-guarded so a missing table on a half-migrated
+     * dev box degrades to 0 instead of failing the whole summary.
+     */
+    async getUsageCountsForUser(
+        userId: string,
+        periodStart: Date,
+        periodEnd: Date,
+    ): Promise<UserUsageCounts> {
+        const manager = this.repository.manager;
+        const [tasksCompleted, worksActive, agentRuns] = await Promise.all([
+            manager
+                .count(Task, {
+                    where: {
+                        userId,
+                        status: TaskStatus.DONE,
+                        completedAt: Between(periodStart, periodEnd),
+                    },
+                })
+                .catch(() => 0),
+            manager.count(Work, { where: { userId, status: 'active' } }).catch(() => 0),
+            manager
+                .count(AgentRun, {
+                    where: { userId, createdAt: Between(periodStart, periodEnd) },
+                })
+                .catch(() => 0),
+        ]);
+        return { tasksCompleted, worksActive, agentRuns };
+    }
+
+    /**
+     * Wave 13 — display-name resolution for grouped rows: ONE `IN`
+     * query per entity type (never per row). Unknown/deleted ids are
+     * simply absent from the map; callers label them honestly.
+     */
+    async getAgentNames(ids: string[]): Promise<Map<string, string>> {
+        if (ids.length === 0) {
+            return new Map();
+        }
+        const agents = await this.repository.manager.find(Agent, {
+            where: { id: In(ids) },
+            select: ['id', 'name'],
+        });
+        return new Map(agents.map((a) => [a.id, a.name]));
+    }
+
+    /** Wave 13 — Work display names for grouped rows (one `IN` query). */
+    async getWorkNames(ids: string[]): Promise<Map<string, string>> {
+        if (ids.length === 0) {
+            return new Map();
+        }
+        const works = await this.repository.manager.find(Work, {
+            where: { id: In(ids) },
+            select: ['id', 'name'],
+        });
+        return new Map(works.map((w) => [w.id, w.name]));
     }
 
     /**

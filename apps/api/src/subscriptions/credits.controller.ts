@@ -9,11 +9,35 @@ import {
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-import { IsInt, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
+import { IsIn, IsInt, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
 import { AuthSessionGuard, CurrentUser } from '@src/auth';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
-import { CreditLedgerService } from '@ever-works/agent/subscriptions';
+import {
+    CreditLedgerService,
+    InvalidUsagePeriodError,
+    USAGE_SUMMARY_GROUP_BYS,
+    UsageSummaryService,
+    type UsageSummaryGroupBy,
+} from '@ever-works/agent/subscriptions';
 import { CreditLedgerEntry, CreditLedgerKind } from '@ever-works/agent/entities';
+
+export class CreditsUsageSummaryQueryDto {
+    /**
+     * Grouping dimension for the §4.3 charts. Omitted = the §4.1/§4.2
+     * stat-tile totals (credits used/added, tasks completed, works
+     * active, agent runs).
+     */
+    @IsOptional()
+    @IsIn(USAGE_SUMMARY_GROUP_BYS)
+    groupBy?: UsageSummaryGroupBy;
+
+    /** `YYYY-MM` calendar month (default: current), or rolling `7d`/`30d`. */
+    @IsOptional()
+    @Matches(/^(\d{4}-(0[1-9]|1[0-2])|7d|30d)$/, {
+        message: 'period must be YYYY-MM, 7d, or 30d',
+    })
+    period?: string;
+}
 
 class CreditsLedgerQueryDto {
     /** Calendar month filter, e.g. `2026-07` (matches the usage controllers). */
@@ -53,7 +77,12 @@ const VALID_KINDS = new Set<string>(Object.values(CreditLedgerKind));
 @Controller('api/credits')
 @UseGuards(AuthSessionGuard)
 export class CreditsController {
-    constructor(private readonly creditLedgerService: CreditLedgerService) {}
+    constructor(
+        private readonly creditLedgerService: CreditLedgerService,
+        // Wave 13 — account-wide usage aggregations for the Usage &
+        // Credits page (`usage-summary` below).
+        private readonly usageSummaryService: UsageSummaryService,
+    ) {}
 
     @Get('balance')
     @HttpCode(HttpStatus.OK)
@@ -96,6 +125,44 @@ export class CreditsController {
             page,
             pageSize,
         };
+    }
+
+    @Get('usage-summary')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Account-wide usage summary',
+        description:
+            'Owner-scoped usage aggregations for the Usage & Credits page (Wave 13). ' +
+            'Without groupBy: period totals (credits consumed/added, metered spend, tasks completed, ' +
+            'works active, agent runs). With groupBy=day|model|agent|work: grouped spend rows for the charts. ' +
+            'period accepts YYYY-MM (default: current month), 7d, or 30d.',
+    })
+    @ApiResponse({ status: 200, description: 'Usage summary (totals or grouped rows)' })
+    @ApiResponse({ status: 400, description: 'Invalid groupBy or period' })
+    async getUsageSummary(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Query() query: CreditsUsageSummaryQueryDto,
+    ) {
+        try {
+            if (query.groupBy) {
+                const grouped = await this.usageSummaryService.getGrouped(
+                    auth.userId,
+                    query.groupBy,
+                    query.period,
+                );
+                return { status: 'success', ...grouped };
+            }
+            const totals = await this.usageSummaryService.getTotals(auth.userId, query.period);
+            return { status: 'success', ...totals };
+        } catch (error) {
+            // Defence-in-depth: the DTO regex already rejects bad periods,
+            // but the service's stable-named error must still map to a 4xx
+            // (billing PRD §6 — never an unmapped 500).
+            if (error instanceof InvalidUsagePeriodError) {
+                throw new BadRequestException(error.message);
+            }
+            throw error;
+        }
     }
 
     private parseKinds(raw?: string): CreditLedgerKind[] | undefined {
