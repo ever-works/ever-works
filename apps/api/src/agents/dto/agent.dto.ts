@@ -532,6 +532,36 @@ export class ListRunSessionsQueryDto {
 }
 
 /**
+ * Run steering (Wave 4 M5) — payload for
+ * `POST /api/agents/:id/runs/:runId/steer`.
+ *
+ * The body cap mirrors the task-chat body cap (16 KB): steering is short
+ * by intent, and the message crosses a trust boundary into a live session's
+ * message list, so it is size-capped at the edge as well as in the service.
+ */
+export class SteerRunDto {
+    @ApiProperty({ maxLength: 16384 })
+    @IsString()
+    @IsNotEmpty()
+    @MaxLength(16384)
+    message: string;
+}
+
+/**
+ * Run steering (Wave 4 M5) — payload for
+ * `POST /api/agents/:id/runs/:runId/resume`. The message is optional:
+ * resuming a parked session with no new instruction is a valid, common
+ * action ("carry on").
+ */
+export class ResumeRunDto {
+    @ApiProperty({ required: false, maxLength: 16384 })
+    @IsOptional()
+    @IsString()
+    @MaxLength(16384)
+    message?: string;
+}
+
+/**
  * FU-2 — payload for `POST /api/agents/:id/assign-task`.
  */
 export class AssignTaskToAgentDto {

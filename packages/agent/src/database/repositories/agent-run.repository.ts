@@ -273,27 +273,47 @@ export class AgentRunRepository {
     ): Promise<
         Pick<
             AgentRun,
-            'id' | 'agentId' | 'triggerKind' | 'status' | 'startedAt' | 'createdAt' | 'workId'
+            | 'id'
+            | 'agentId'
+            | 'triggerKind'
+            | 'status'
+            | 'startedAt'
+            | 'createdAt'
+            | 'workId'
+            | 'awaitingInput'
         >[]
     > {
-        return this.repository
-            .createQueryBuilder('run')
-            .select([
-                'run.id',
-                'run.agentId',
-                'run.triggerKind',
-                'run.status',
-                'run.startedAt',
-                'run.createdAt',
-                // Wave 4 M2 — the sweeper drains the concurrency queue for
-                // every Work whose stuck run it just reaped.
-                'run.workId',
-            ])
-            .where('run.status IN (:...statuses)', { statuses: NON_TERMINAL })
-            .andWhere('COALESCE(run.startedAt, run.createdAt) <= :cutoff', { cutoff })
-            .orderBy('COALESCE(run.startedAt, run.createdAt)', 'ASC')
-            .limit(limit)
-            .getMany();
+        return (
+            this.repository
+                .createQueryBuilder('run')
+                .select([
+                    'run.id',
+                    'run.agentId',
+                    'run.triggerKind',
+                    'run.status',
+                    'run.startedAt',
+                    'run.createdAt',
+                    // Wave 4 M2 — the sweeper drains the concurrency queue for
+                    // every Work whose stuck run it just reaped.
+                    'run.workId',
+                    // Wave 4 M5 — selected so the sweeper can re-assert the
+                    // never-reap-awaiting_input rule in the service layer too.
+                    'run.awaitingInput',
+                ])
+                .where('run.status IN (:...statuses)', { statuses: NON_TERMINAL })
+                // Wave 4 M5 — a run parked on a human question is NOT stuck; it is
+                // waiting, possibly for days. Reaping it is the production bug this
+                // predicate exists to prevent, so the exemption lives in the SQL
+                // (and again in `AgentRunSweeperService`, belt-and-braces). The
+                // NULL arm covers rows written before the column existed.
+                .andWhere('(run.awaitingInput IS NULL OR run.awaitingInput = :notAwaiting)', {
+                    notAwaiting: false,
+                })
+                .andWhere('COALESCE(run.startedAt, run.createdAt) <= :cutoff', { cutoff })
+                .orderBy('COALESCE(run.startedAt, run.createdAt)', 'ASC')
+                .limit(limit)
+                .getMany()
+        );
     }
 
     /**
@@ -773,6 +793,114 @@ export class AgentRunRepository {
             .andWhere('status = :status', { status: 'queued' satisfies AgentRunStatus })
             .andWhere('queuedReason IS NULL')
             .execute();
+    }
+
+    // ── Run steering (Wave 4 M5) ───────────────────────────────────
+
+    /**
+     * Append one steering message to a LIVE run's pending-input queue.
+     *
+     * Read-modify-write rather than a SQL array append: `pendingInput` is a
+     * `simple-json` (text) column, and the two supported drivers (Postgres in
+     * prod, sqlite in e2e) have no portable JSON-append. The status re-check
+     * inside the UPDATE's WHERE is what makes it safe: a run that went terminal
+     * between the read and the write takes no message, and the caller is told
+     * so (`false`) and starts a new run instead. Two concurrent steers on the
+     * same live run can drop one message under a lost update — acceptable for a
+     * human-paced control channel, and strictly better than a terminal run
+     * silently swallowing input.
+     *
+     * `awaitingInput` is cleared in the SAME statement: an answered question is
+     * no longer a question, and doing it here means no window where the run is
+     * both parked and holding fresh input.
+     */
+    async appendPendingInput(runId: string, message: string): Promise<boolean> {
+        const run = await this.repository.findOne({
+            where: { id: runId },
+            select: ['id', 'status', 'pendingInput'],
+        });
+        if (!run) return false;
+        if (!NON_TERMINAL.includes(run.status)) return false;
+        const queue = Array.isArray(run.pendingInput) ? [...run.pendingInput] : [];
+        queue.push(message);
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(AgentRun)
+            .set({ pendingInput: queue, awaitingInput: false })
+            .where('id = :id', { id: runId })
+            .andWhere('status IN (:...statuses)', { statuses: NON_TERMINAL })
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Drain the steering signals for the executing run: the queued input
+     * messages (cleared as they are handed over, so the same message is never
+     * injected twice) plus the cooperative interrupt flag.
+     *
+     * Called once per model round-trip by `AgentRunService.runToolLoop`, i.e.
+     * at most `TOOL_LOOP_MAX_ITERATIONS` times per run, and it only writes when
+     * there was actually something queued.
+     */
+    async takeSteeringSignals(runId: string): Promise<{
+        pendingInput: string[];
+        interruptRequested: boolean;
+    }> {
+        const run = await this.repository.findOne({
+            where: { id: runId },
+            select: ['id', 'pendingInput', 'interruptRequested'],
+        });
+        if (!run) return { pendingInput: [], interruptRequested: false };
+        const pendingInput = Array.isArray(run.pendingInput) ? run.pendingInput : [];
+        if (pendingInput.length > 0) {
+            await this.repository.update(runId, { pendingInput: null });
+        }
+        return { pendingInput, interruptRequested: run.interruptRequested === true };
+    }
+
+    /**
+     * Request a cooperative stop. CAS-guarded on `queued|running` so an
+     * interrupt racing a terminal write cannot resurrect a finished run's
+     * flag. Returns whether the request was recorded.
+     */
+    async requestInterrupt(runId: string): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(AgentRun)
+            .set({ interruptRequested: true })
+            .where('id = :id', { id: runId })
+            .andWhere('status IN (:...statuses)', { statuses: NON_TERMINAL })
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Lifecycle signal: the run is (or is no longer) parked on a human.
+     *
+     * Deliberately NOT status-guarded — a run parks itself as its LAST act
+     * before finishing, so the write frequently lands on a row that is already
+     * terminal, and that is the correct state to record (the Sessions view
+     * shows "awaiting input" on a finished-but-parked run, and Resume is
+     * offered from exactly there).
+     */
+    async setAwaitingInput(runId: string, awaitingInput: boolean): Promise<void> {
+        await this.repository.update(runId, { awaitingInput });
+    }
+
+    /**
+     * Seed a freshly-created run with the conversation identity + first
+     * message it should resume from. Field-by-field whitelist, mirroring
+     * {@link updateTerminalColumns}.
+     */
+    async seedResumeContext(
+        runId: string,
+        patch: { cliSessionId?: string | null; pendingInput?: string[] | null },
+    ): Promise<void> {
+        const update: Record<string, unknown> = {};
+        if (patch.cliSessionId !== undefined) update.cliSessionId = patch.cliSessionId;
+        if (patch.pendingInput !== undefined) update.pendingInput = patch.pendingInput;
+        if (Object.keys(update).length === 0) return;
+        await this.repository.update(runId, update);
     }
 
     /**

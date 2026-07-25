@@ -1134,7 +1134,27 @@
                 "updated": "Updated",
                 "scopeWork": "Work",
                 "scopeMission": "Mission",
-                "scopeIdea": "Idea"
+                "scopeIdea": "Idea",
+                "runControls": {
+                    "title": "Run controls",
+                    "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",
+                    "parkedHint": "This run is parked. Resume it to continue the same session, optionally with a new instruction.",
+                    "steerPlaceholder": "Message the running agent…",
+                    "resumePlaceholder": "Optional instruction to resume with…",
+                    "steer": "Steer",
+                    "interrupt": "Interrupt",
+                    "resume": "Resume",
+                    "attach": "Attach",
+                    "attachHint": "Open this run's live terminal session",
+                    "awaitingInput": "Awaiting input",
+                    "confirmInterrupt": "Ask this agent to stop after its current step? It will finish with a summary of the work done so far.",
+                    "steerInjected": "Message delivered to the running agent.",
+                    "steerNeedsNewRun": "That run already finished, so the message was not delivered. Mention the agent in the conversation to start a new run.",
+                    "interruptRequested": "Interrupt requested — the agent will stop after its current step.",
+                    "resumeDispatched": "Resumed — a new run is picking up the same session.",
+                    "resumeQueued": "Resume queued — it starts as soon as a concurrency slot frees up.",
+                    "genericError": "That run control could not be applied."
+                }
             },
             "recurring": {
                 "section": "Recurring schedule",

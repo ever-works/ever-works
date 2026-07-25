@@ -82,7 +82,41 @@ export interface AgentRunSession {
     terminalState: string | null;
     terminalEndedReason: string | null;
     terminalProviderId: string | null;
+    /**
+     * Attach-session action (Wave 4 M8) — server-computed "can a viewer join
+     * this run's terminal RIGHT NOW?". True only when the terminal is
+     * `starting`/`attached` AND the run is still open. The UI gates its
+     * terminal-icon deep link on THIS, never on `terminalState` alone: a run
+     * that died can keep reading `attached` for minutes until the terminal
+     * sweeper corrects it, and offering Attach there is a dead end.
+     */
+    sessionAttachable: boolean;
     createdAt: string;
+}
+
+/**
+ * Run steering (Wave 4 M5) — the shape returned by the steer endpoint.
+ * `new-run` is a normal answer, not an error: the run finished while the
+ * user was typing, so the caller starts a fresh one.
+ */
+export interface RunSteerResponse {
+    dispatched: 'injected' | 'new-run';
+    runId: string;
+    queuedCount?: number;
+}
+
+export interface RunInterruptResponse {
+    interrupted: boolean;
+    runId: string;
+}
+
+export interface RunResumeResponse {
+    dispatched: 'new-run';
+    /** The NEW run. The source run stays terminal — runs are immutable. */
+    runId: string;
+    resumedFromRunId: string;
+    carriedCliSession: boolean;
+    queued: boolean;
 }
 
 export interface ListRunSessionsQuery {

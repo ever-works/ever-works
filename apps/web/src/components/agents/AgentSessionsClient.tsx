@@ -182,8 +182,18 @@ function SessionRow({
                     {durationMs != null && ` · ${formatDuration(durationMs)}`}
                 </span>
 
-                {/* Attach → the run's terminal tab (streaming-terminal M7). */}
-                {session.terminalState && (
+                {/* Attach → the run's terminal tab (streaming-terminal M7).
+                    Gated on the server-computed `sessionAttachable` (Wave 4
+                    M8), NOT on `terminalState` alone: a dead run's columns can
+                    keep reading `attached` for minutes until the terminal
+                    sweeper corrects them, and a link into a session nobody can
+                    join is worse than no link. Falls back to the old rule for
+                    rows served by an API replica that predates the field. */}
+                {(session.sessionAttachable ??
+                    Boolean(
+                        session.terminalState &&
+                        (session.status === 'running' || session.status === 'queued'),
+                    )) && (
                     <Link
                         href={`${ROUTES.DASHBOARD_AGENT_TERMINAL(session.agentId)}?run=${session.id}`}
                         className="inline-flex items-center gap-1 text-[11px] text-primary hover:underline shrink-0"

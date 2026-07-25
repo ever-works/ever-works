@@ -34,8 +34,18 @@ export {
     type AgentRunSessionStatus,
     type AgentRunTriggerKind,
     type ListRunSessionsQuery,
+    type RunSteerResponse,
+    type RunInterruptResponse,
+    type RunResumeResponse,
 } from './agents.shared';
-import type { AgentGuardrails, AgentRunSession, ListRunSessionsQuery } from './agents.shared';
+import type {
+    AgentGuardrails,
+    AgentRunSession,
+    ListRunSessionsQuery,
+    RunSteerResponse,
+    RunInterruptResponse,
+    RunResumeResponse,
+} from './agents.shared';
 
 export interface AgentPermissions {
     canCreateAgents: boolean;
@@ -561,6 +571,41 @@ export const agentsAPI = {
         return serverMutation({
             endpoint: `/agents/${id}/runs/${runId}/cancel`,
             data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    // ── Run controls (Wave 4 M5) ──
+    // steer / interrupt / resume. "Stop" is the existing `cancelRun` above —
+    // deliberately not duplicated here.
+
+    async steerRun(id: string, runId: string, message: string): Promise<RunSteerResponse> {
+        return serverMutation({
+            endpoint: `/agents/${id}/runs/${runId}/steer`,
+            data: { message },
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    async interruptRun(id: string, runId: string): Promise<RunInterruptResponse> {
+        return serverMutation({
+            endpoint: `/agents/${id}/runs/${runId}/interrupt`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    async resumeRun(
+        id: string,
+        runId: string,
+        message?: string | null,
+    ): Promise<RunResumeResponse> {
+        return serverMutation({
+            endpoint: `/agents/${id}/runs/${runId}/resume`,
+            data: message && message.trim().length > 0 ? { message: message.trim() } : {},
             method: 'POST',
             wrapInData: false,
         });

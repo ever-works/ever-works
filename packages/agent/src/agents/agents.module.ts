@@ -27,6 +27,7 @@ import { AgentExportService } from './agent-export.service';
 import { PromptAssemblerService } from './prompt-assembler.service';
 import { AgentRunService } from './agent-run.service';
 import { RunDispatchGateService } from './run-dispatch-gate.service';
+import { RunSteeringService } from './run-steering.service';
 import { AgentToolService } from './agent-tool.service';
 import { VisionContextService } from '../services/vision-context.service';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
@@ -99,6 +100,9 @@ import { FacadesModule } from '../facades/facades.module';
         // AGENT_TASK_EXECUTE_DISPATCHER it drains through is @Optional()
         // and bound by the api-side @Global() TasksModule.
         RunDispatchGateService,
+        // Wave 4 M5 — steer / interrupt / resume. Reuses the gate for resume
+        // admission and the existing cancel path for stop.
+        RunSteeringService,
         AgentToolService,
     ],
     exports: [
@@ -117,6 +121,7 @@ import { FacadesModule } from '../facades/facades.module';
         PromptAssemblerService,
         AgentRunService,
         RunDispatchGateService,
+        RunSteeringService,
         AgentToolService,
     ],
 })
