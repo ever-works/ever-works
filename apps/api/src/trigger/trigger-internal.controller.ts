@@ -70,6 +70,7 @@ import {
     UserPluginRepository,
     WorkPluginRepository,
 } from '@ever-works/agent/plugins';
+import { EventIngestService } from '@ever-works/agent/ingest';
 
 /**
  * C-05 RPC half — methods that must never be reachable via `POST
@@ -284,6 +285,11 @@ export class TriggerInternalController implements OnModuleInit {
         // the same positional-spec reason as the sweeper above.
         @Optional()
         private readonly runDispatchGateService?: RunDispatchGateService,
+        // Event-ingest spine (Wave 6) — backs the `event-ingest-tick`
+        // cron: the worker proxy calls `processBatch()` over the internal
+        // RPC channel. Appended LAST + @Optional() per the arity rule above.
+        @Optional()
+        private readonly eventIngestService?: EventIngestService,
     ) {}
 
     onModuleInit() {
@@ -353,6 +359,9 @@ export class TriggerInternalController implements OnModuleInit {
             AnonymousUserCleanupService: this.anonymousUserCleanupService,
             // EW-643 Phase 3 slice 4a - `kb-reconcile` calls `reconcile()`.
             KnowledgeBaseReconcileService: this.knowledgeBaseReconcileService,
+            // Event-ingest spine (Wave 6) — `event-ingest-tick` calls
+            // `processBatch()` here (allow-list auto-derived).
+            EventIngestService: this.eventIngestService,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),

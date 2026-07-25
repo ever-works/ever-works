@@ -74,7 +74,11 @@ export const PLUGIN_CAPABILITIES = {
 	// k8s-exec. See capabilities/terminal-stream.interface.ts.
 	TERMINAL_STREAM: 'terminal-stream',
 	// Isolated git working contexts for agent Tasks (Wave 2).
-	WORKSPACE: 'workspace'
+	WORKSPACE: 'workspace',
+	// Event-ingest spine (Wave 6) — plugins that pull/push normalized
+	// external events into the platform ingest pipeline. See
+	// capabilities/event-source.interface.ts.
+	EVENT_SOURCE: 'event-source'
 } as const;
 
 export type PluginCapability = (typeof PLUGIN_CAPABILITIES)[keyof typeof PLUGIN_CAPABILITIES];

@@ -176,6 +176,10 @@
         "./triggers": {
             "types": "./dist/triggers/index.d.ts",
             "default": "./dist/triggers/index.js"
+        },
+        "./ingest": {
+            "types": "./dist/ingest/index.d.ts",
+            "default": "./dist/ingest/index.js"
         }
     },
     "scripts": {

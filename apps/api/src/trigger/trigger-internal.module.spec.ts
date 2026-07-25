@@ -63,6 +63,13 @@ jest.mock('@ever-works/agent/agents', () => ({
 jest.mock('@ever-works/agent/tasks-domain', () => ({
     TasksDomainModule: class TasksDomainModule {},
 }));
+// Event-ingest spine (Wave 6) — the module imports EventIngestModule
+// (and the controller it declares imports EventIngestService) from the
+// ingest barrel; stub both so the entity chain is never loaded.
+jest.mock('@ever-works/agent/ingest', () => ({
+    EventIngestModule: class EventIngestModule {},
+    EventIngestService: class EventIngestService {},
+}));
 // EW-742 P3.2 T22 — trigger-internal.module imports TenantJobRuntimeModule
 // + OrganizationsModule (added by bbc24309 / 5e4e2483 / 41906b71). Loading
 // those modules pulls in real `@ever-works/agent/entities` + `@ever-works/agent/tasks`

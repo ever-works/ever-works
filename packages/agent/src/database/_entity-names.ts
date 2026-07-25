@@ -69,6 +69,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'GitHubAppUserLink',
     // Inbound Triggers (Trigger Schedules) — signed webhook/API triggers
     'InboundTrigger',
+    // Event-ingest spine (Wave 6) — normalized external events
+    'IngestedEvent',
     'Mission',
     // Domain-model evolution PR-8 — Goals + measurement
     'Goal',

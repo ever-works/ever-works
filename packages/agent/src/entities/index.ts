@@ -114,3 +114,5 @@ export * from './team-member.entity';
 export * from './team-resource.entity';
 // Inbound Triggers (Trigger Schedules) — signed webhook/API triggers that spawn Tasks
 export * from './inbound-trigger.entity';
+// Event-ingest spine (Wave 6) — normalized external events awaiting fan-out
+export * from './ingested-event.entity';

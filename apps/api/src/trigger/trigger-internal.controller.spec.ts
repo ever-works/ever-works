@@ -76,6 +76,13 @@ jest.mock('@ever-works/agent/plugins', () => ({
     UserPluginRepository: class UserPluginRepository {},
     WorkPluginRepository: class WorkPluginRepository {},
 }));
+// Event-ingest spine (Wave 6) — the controller imports EventIngestService
+// from the ingest barrel; stub it so the real barrel (entity chain →
+// TypeORM under apps/api jest) is never loaded.
+jest.mock('@ever-works/agent/ingest', () => ({
+    EventIngestService: class EventIngestService {},
+    EventIngestModule: class EventIngestModule {},
+}));
 jest.mock('@ever-works/agent/activity-log', () => ({
     ActivityLogService: class ActivityLogService {},
     ActivityLogModule: class ActivityLogModule {},

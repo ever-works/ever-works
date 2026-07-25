@@ -25,6 +25,7 @@ import {
 } from '@ever-works/agent/tasks-domain';
 import { AgentRepository, AgentRunRepository, WorkRepository } from '@ever-works/agent/database';
 import { NotificationChannelFacadeService } from '@ever-works/agent/facades';
+import { EventIngestService } from '@ever-works/agent/ingest';
 import { TriggerInternalApiClient } from '../services/trigger-internal-api.client';
 import { createRemoteProxy } from '../remote-proxy';
 
@@ -240,6 +241,16 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
                 createRemoteProxy(apiClient, 'KnowledgeBaseReconcileService'),
             inject: [TriggerInternalApiClient],
         },
+        // Event-ingest spine (Wave 6) — the event-ingest-tick cron task
+        // calls `processBatch()` on this proxy, which RPCs to the live
+        // API where the ingest repositories + Activity/Memory processors
+        // are wired. Same shape as TaskWorkspaceService.
+        {
+            provide: EventIngestService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'EventIngestService'),
+            inject: [TriggerInternalApiClient],
+        },
     ],
     exports: [
         TriggerInternalApiClient,
@@ -266,6 +277,7 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         NotificationChannelFacadeService,
         AnonymousUserCleanupService,
         KnowledgeBaseReconcileService,
+        EventIngestService,
     ],
 })
 export class TriggerInternalModule {}

@@ -52,6 +52,7 @@ import { TerminalModule } from './terminal/terminal.module';
 import { TeamsModule } from './teams/teams.module';
 import { SchedulesModule } from './schedules/schedules.module';
 import { InboundTriggersModule } from './triggers/inbound-triggers.module';
+import { IngestModule } from './ingest/ingest.module';
 import { TelemetryModule } from './telemetry/telemetry.module';
 import { UsersModule } from './users/users.module';
 import { ScopeModule } from './scope/scope.module';
@@ -188,6 +189,10 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // triggers that spawn Tasks on verified HMAC deliveries.
         // Management CRUD + the public /:id/fire endpoint.
         InboundTriggersModule,
+        // Event-ingest spine (Wave 6) — POST /api/ingest/events push
+        // surface over the agent-side EventIngestModule (dedupe-insert +
+        // Activity/Memory fan-out; pull rides the event-ingest-tick cron).
+        IngestModule,
         TelemetryModule,
         FunnelAnalyticsBindingModule,
         UploadsModule,

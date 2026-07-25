@@ -10,6 +10,7 @@ import { WorkAgentModule } from '@ever-works/agent/work-agent';
 import { GoalsModule } from '@ever-works/agent/goals';
 import { AgentsModule } from '@ever-works/agent/agents';
 import { TasksDomainModule } from '@ever-works/agent/tasks-domain';
+import { EventIngestModule } from '@ever-works/agent/ingest';
 import { WorkProposalsModule } from '../work-proposals/work-proposals.module';
 import { DataSyncModule } from '../data-sync/data-sync.module';
 import { TenantJobRuntimeModule } from '../account/tenant-job-runtime/tenant-job-runtime.module';
@@ -70,6 +71,11 @@ import { OrganizationsModule } from '../organizations/organizations.module';
         // controller so the task-recurrence-dispatcher cron task
         // can drive `dispatchDue()` over the internal RPC channel.
         TasksDomainModule,
+        // Event-ingest spine (Wave 6) — exposes EventIngestService
+        // through the remote-proxy controller so the event-ingest-tick
+        // cron task (in packages/tasks) can drive `processBatch()` over
+        // the internal RPC channel every 5 minutes.
+        EventIngestModule,
     ],
     controllers: [TriggerInternalController],
 })
