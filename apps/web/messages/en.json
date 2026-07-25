@@ -4163,6 +4163,7 @@
                     }
                 },
                 "classes": {
+                    "decision": "Decision",
                     "brand": "Brand",
                     "legal": "Legal",
                     "seo": "SEO",
