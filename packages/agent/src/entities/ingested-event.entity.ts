@@ -1,4 +1,5 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
+import { PortableDateColumn } from './_types';
 
 /**
  * Event-ingest spine (Wave 6) — one normalized external event, landed.
@@ -55,7 +56,10 @@ export class IngestedEvent {
     kind: string;
 
     /** When the event happened at the source. */
-    @Column({ type: 'timestamp' })
+    // Portable date: better-sqlite3 (the e2e/CI driver) has no `timestamp`
+    // type, so a raw one makes TypeORM metadata validation throw
+    // DataTypeNotSupportedError and the API cannot boot there at all.
+    @PortableDateColumn()
     occurredAt: Date;
 
     @Column({ type: 'varchar', length: 200, nullable: true })
@@ -79,7 +83,10 @@ export class IngestedEvent {
     payload: Record<string, unknown>;
 
     /** Set when the processor fan-out (Activity + Memory) has run. */
-    @Column({ type: 'timestamp', nullable: true })
+    // Portable date: better-sqlite3 (the e2e/CI driver) has no `timestamp`
+    // type, so a raw one makes TypeORM metadata validation throw
+    // DataTypeNotSupportedError and the API cannot boot there at all.
+    @PortableDateColumn({ nullable: true })
     processedAt?: Date | null;
 
     /** sha256 hex over (userId, source, sourceEventId). */
