@@ -102,7 +102,8 @@ describe('activity-log.types', () => {
             // The Schedules feature then added MISSION_TICK (idea_generated was
             // already added by the domain-model train, so it is shared) -> 115.
             const literals = Object.values(ActivityActionType).filter((v) => typeof v === 'string');
-            expect(literals).toHaveLength(115);
+            // +1 EXTERNAL_EVENT_INGESTED (event-ingest spine, Wave 6) -> 116.
+            expect(literals).toHaveLength(116);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {
