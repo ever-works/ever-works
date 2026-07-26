@@ -119,6 +119,20 @@ function stableCore(e: AccountExport): string {
     return JSON.stringify({ version: e.version, includesSecrets: e.includesSecrets, data: e.data });
 }
 
+/**
+ * `export.profile` carries two different kinds of key: the IDENTITY mirror
+ * (username / email / avatar?) and, since account preferences were made
+ * portable, a nested `preferences` object plus the onboarding answers.
+ *
+ * The identity contract is what these specs pin, so they filter to those keys
+ * rather than asserting a total count — otherwise every future portable
+ * setting reds a test that has nothing to do with it.
+ */
+const IDENTITY_KEYS = ['avatar', 'email', 'username'] as const;
+function isIdentityKey(key: string): boolean {
+    return (IDENTITY_KEYS as readonly string[]).includes(key);
+}
+
 async function fresh(request: APIRequestContext, token: string): Promise<Record<string, unknown>> {
     const res = await request.get(FRESH_PATH, { headers: authedHeaders(token), timeout: TIMEOUT });
     expect(res.status(), `fresh status ${res.status()}`).toBe(200);
@@ -181,19 +195,24 @@ test.describe('Account lifecycle — identity ⇄ export projection coupling', (
         const token = u.access_token;
 
         // 1. A fresh account has no avatar → the export omits the key entirely.
+        //    `preferences` joined the projection when account preferences were
+        //    made portable (digest cadence + notification/privacy opt-outs), so
+        //    the identity keys are asserted precisely and `preferences` is
+        //    allowed alongside them — what this test owns is that avatar is
+        //    absent until set, not the total key count.
         const first = await exportAccount(request, token);
         expect(
-            Object.keys(first.data.profile).sort(),
-            'no-avatar profile is exactly 2 keys',
+            Object.keys(first.data.profile).sort().filter(isIdentityKey),
+            'no-avatar identity projection is exactly email + username',
         ).toEqual(['email', 'username']);
         expect(first.data.profile).not.toHaveProperty('avatar');
         expect(first.data.profile.username, 'mirrors the registered username').toBe(u.name);
         expect(first.data.profile.email, 'mirrors the registered email').toBe(u.email);
 
-        // 2. Set an avatar → the NEXT export carries it verbatim (3-key profile).
+        // 2. Set an avatar → the NEXT export carries it verbatim.
         await putProfileOk(request, token, { avatar: AVATAR_GH });
         const withAvatar = await exportAccount(request, token);
-        expect(Object.keys(withAvatar.data.profile).sort()).toEqual([
+        expect(Object.keys(withAvatar.data.profile).sort().filter(isIdentityKey)).toEqual([
             'avatar',
             'email',
             'username',
@@ -239,9 +258,12 @@ test.describe('Account lifecycle — identity ⇄ export projection coupling', (
         expect(exported.data.profile.username, 'username change reflects in the export').toBe(
             newName,
         );
-        // …but the export.profile carries ONLY the 3 canonical keys — no committer/
-        // budget leakage into the portable payload.
-        expect(Object.keys(exported.data.profile).sort()).toEqual(['email', 'username']);
+        // …and the identity projection stays exactly email + username — the
+        // committer fields never enter the portable payload.
+        expect(Object.keys(exported.data.profile).sort().filter(isIdentityKey)).toEqual([
+            'email',
+            'username',
+        ]);
         const profileBytes = JSON.stringify(exported.data.profile);
         expect(profileBytes.includes('Identity Bot'), 'committerName absent from export').toBe(
             false,
@@ -249,9 +271,17 @@ test.describe('Account lifecycle — identity ⇄ export projection coupling', (
         expect(profileBytes.includes(committerEmail), 'committerEmail absent from export').toBe(
             false,
         );
+
+        // `emailBudgetAlerts` DID change sides: it used to be invisible to the
+        // export, and is now a portable preference (so an export/import no
+        // longer silently resets the notification opt-outs). Pin the new
+        // contract precisely — it lives under `preferences`, never at the top
+        // level next to the identity keys.
+        expect(exported.data.profile).not.toHaveProperty('emailBudgetAlerts');
         expect(
-            profileBytes.toLowerCase().includes('budget'),
-            'budget flag absent from export',
+            (exported.data.profile as { preferences?: Record<string, unknown> }).preferences
+                ?.emailBudgetAlerts,
+            'the budget opt-OUT round-trips as a preference',
         ).toBe(false);
     });
 
@@ -402,10 +432,12 @@ test.describe('Account lifecycle — profile PUT is a strict per-facet whitelist
 
 // ─────────────────────────────────────────────────────────────────────────────
 test.describe('Account lifecycle — research opt-out is orthogonal to the transfer payload', () => {
-    // Opt-out is a telemetry/inference gate, not portable account data. Toggling
-    // it true→false→true never perturbs the export bytes (opt-out is simply not in
-    // the payload) — the export core is stable across the whole cycle.
-    test('the export is byte-stable across a full opt-out true→false→true cycle', async ({
+    // Opt-out USED to be invisible to the export; it is now a portable
+    // preference, so the export tracks it. What must still hold is that it is
+    // the ONLY thing the toggle moves: returning to a previously-seen value
+    // reproduces that state's bytes exactly, so the cycle is a clean two-state
+    // oscillation and never drifts.
+    test('the export tracks the opt-out and returns byte-identical on a true→false→true cycle', async ({
         request,
     }) => {
         const u = await registerUserViaAPI(request);
@@ -418,8 +450,6 @@ test.describe('Account lifecycle — research opt-out is orthogonal to the trans
             slug: uniq('stable-w'),
         });
 
-        const baseline = stableCore(await exportAccount(request, token));
-
         const setOptOut = async (optOut: boolean) => {
             const res = await request.put(PREFS_PATH, {
                 headers: authedHeaders(token),
@@ -431,20 +461,26 @@ test.describe('Account lifecycle — research opt-out is orthogonal to the trans
         };
 
         await setOptOut(true);
-        expect(
-            stableCore(await exportAccount(request, token)),
-            'export unchanged after opt-OUT',
-        ).toBe(baseline);
+        const optedOut = stableCore(await exportAccount(request, token));
+        expect(optedOut, 'the opt-OUT is carried in the payload').toContain(
+            '"userResearchOptOut":true',
+        );
+
         await setOptOut(false);
-        expect(
-            stableCore(await exportAccount(request, token)),
-            'export unchanged after opt-IN',
-        ).toBe(baseline);
+        const optedIn = stableCore(await exportAccount(request, token));
+        expect(optedIn, 'the opt-IN is carried in the payload').toContain(
+            '"userResearchOptOut":false',
+        );
+        expect(optedIn, 'the toggle actually moves the export').not.toBe(optedOut);
+
+        // Back to opt-OUT: byte-identical to the first opt-OUT export. The
+        // toggle moves exactly one field and nothing else drifts across the
+        // cycle — no re-ordered keys, no timestamps leaking into the core.
         await setOptOut(true);
         expect(
             stableCore(await exportAccount(request, token)),
-            'export unchanged after re-opt-OUT',
-        ).toBe(baseline);
+            'returning to opt-OUT reproduces the earlier opt-OUT export exactly',
+        ).toBe(optedOut);
     });
 
     // An IMPORT never touches the caller's opt-out preference. B opts out, applies

@@ -641,8 +641,21 @@ export class AccountImportService {
             if (typeof preferences.emailBudgetAlerts === 'boolean') {
                 update.emailBudgetAlerts = preferences.emailBudgetAlerts;
             }
-            if (typeof preferences.userResearchOptOut === 'boolean') {
-                update.userResearchOptOut = preferences.userResearchOptOut;
+            // RATCHET — the research opt-out is the one preference an import
+            // may only ever STRENGTHEN.
+            //
+            // The payload is attacker-editable JSON and an import is commonly
+            // somebody ELSE's export. Applying it symmetrically means a
+            // `userResearchOptOut: false` in the file silently turns OFF the
+            // importing account's privacy opt-out — a consent decision
+            // reversed by a data-transfer action nobody framed as a privacy
+            // change. Round-tripping your own export still works: the value
+            // either matches (no-op) or is `true` (applied).
+            //
+            // Opting back IN stays possible, but only through the preference
+            // surface itself, where it is an explicit act.
+            if (preferences.userResearchOptOut === true) {
+                update.userResearchOptOut = true;
             }
         }
 
