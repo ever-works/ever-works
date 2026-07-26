@@ -123,6 +123,21 @@ function SessionRow({
                         {t('awaitingInput')}
                     </span>
                 )}
+                {/* State-aware sweeper (Wave 4 M6) - the PLATFORM flagged
+                    this run (queued too long / parked while stale), as
+                    opposed to the agent asking a question. Rendered as the
+                    raw machine token, the same fallback the unknown-
+                    queuedReason branch above already uses, so a token added
+                    server-side surfaces immediately instead of rendering
+                    blank until 20 locale files catch up. */}
+                {session.attentionReason && (
+                    <span
+                        className="text-[10px] px-1.5 py-0.5 rounded bg-rose-100 dark:bg-rose-900/40 text-rose-700 dark:text-rose-300 shrink-0"
+                        data-testid="agent-session-attention"
+                    >
+                        {session.attentionReason}
+                    </span>
+                )}
 
                 {/* Agent + Work */}
                 <span className="text-xs font-medium text-text dark:text-text-dark truncate shrink-0 max-w-40">

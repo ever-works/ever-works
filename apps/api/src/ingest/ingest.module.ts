@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { EventIngestModule } from '@ever-works/agent/ingest';
 import { PrReviewModule } from '@ever-works/agent/pr-review';
+import { TasksDomainModule } from '@ever-works/agent/tasks-domain';
 import { AiConversationModule } from '../ai-conversation/ai-conversation.module';
 import { IngestController } from './ingest.controller';
 import { SlackEventsController } from './slack/slack-events.controller';
@@ -21,10 +22,11 @@ import { GitHubPrReviewBridgeService } from './github/github-pr-review-bridge.se
  * user-plugin repository) come from the @Global agent PluginsModule
  * bootstrapped in api.module.ts; `OpenAiCompatService` (the platform
  * chat surface) comes from `AiConversationModule`; the Work-aware
- * reviewer comes from the agent-side `PrReviewModule`.
+ * reviewer comes from the agent-side `PrReviewModule`; the durable
+ * rejection recorder (orchestration M9) comes from `TasksDomainModule`.
  */
 @Module({
-    imports: [EventIngestModule, AiConversationModule, PrReviewModule],
+    imports: [EventIngestModule, AiConversationModule, PrReviewModule, TasksDomainModule],
     controllers: [IngestController, SlackEventsController, GitHubEventsController],
     providers: [SlackChatBridgeService, GitHubPrReviewBridgeService],
     exports: [EventIngestModule],

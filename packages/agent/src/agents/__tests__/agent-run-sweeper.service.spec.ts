@@ -6,6 +6,13 @@ import { AgentRunSweeperService, STUCK_SWEEP_PREFIX } from '../agent-run-sweeper
  * Two tests here carry the entire safety argument and are called out inline:
  * one proves the sweep actually reaps (a no-op implementation would pass every
  * other test in this file), the other proves a live run is NOT reaped.
+ *
+ * State-aware policy (Wave 4 M6): the sweep now branches on the row's
+ * STATE. A stale `running` row is checkpoint-and-PARKED (terminal
+ * `completed` + `terminalEndedReason='parked'`, resumable) instead of
+ * hard-failed; a stale `queued` row never started, so it is still reaped.
+ * Tests below that are about the reap path therefore use a `queued`
+ * fixture, and tests about the running path assert `parkStaleRunning`.
  */
 describe('AgentRunSweeperService', () => {
     const ENV_KEYS = [
@@ -13,6 +20,9 @@ describe('AgentRunSweeperService', () => {
         'AGENT_RUN_STUCK_SWEEP_MINUTES',
         'AGENT_RUN_STUCK_SWEEP_BATCH',
         'AGENT_MAX_RUN_DURATION_SECONDS',
+        'AGENT_RUN_STALE_PARK_ENABLED',
+        'AGENT_RUN_QUEUED_TOO_LONG_MINUTES',
+        'AGENT_RUN_QUEUED_ATTENTION_BATCH',
     ];
     let saved: Record<string, string | undefined>;
     let runs: any;
@@ -50,6 +60,11 @@ describe('AgentRunSweeperService', () => {
         runs = {
             findStuckNonTerminal: jest.fn().mockResolvedValue([]),
             markStuckFailed: jest.fn().mockResolvedValue(0),
+            // Wave 4 M6 - the park path for stale `running` rows.
+            parkStaleRunning: jest.fn().mockResolvedValue(0),
+            findQueuedTooLong: jest.fn().mockResolvedValue([]),
+            setAttention: jest.fn().mockResolvedValue(true),
+            findById: jest.fn().mockResolvedValue(null),
         };
     });
 
@@ -82,7 +97,7 @@ describe('AgentRunSweeperService', () => {
                 stuckRow({ id: 'r3', workId: 'work-b' }),
                 stuckRow({ id: 'r4', workId: null }),
             ]);
-            runs.markStuckFailed.mockResolvedValue(4);
+            runs.parkStaleRunning.mockResolvedValue(4);
             const gate = { drainForWork: jest.fn().mockResolvedValue({ dispatched: true }) };
             await makeGatedSvc(gate).sweepStuckRuns();
             expect(gate.drainForWork).toHaveBeenCalledTimes(2);
@@ -92,7 +107,7 @@ describe('AgentRunSweeperService', () => {
 
         it('does not drain when the CAS lost every row (nothing was freed)', async () => {
             runs.findStuckNonTerminal.mockResolvedValue([stuckRow({ workId: 'work-a' })]);
-            runs.markStuckFailed.mockResolvedValue(0);
+            runs.parkStaleRunning.mockResolvedValue(0);
             const gate = { drainForWork: jest.fn() };
             await makeGatedSvc(gate).sweepStuckRuns();
             expect(gate.drainForWork).not.toHaveBeenCalled();
@@ -114,6 +129,8 @@ describe('AgentRunSweeperService', () => {
             expect(summary.swept).toBe(0);
             expect(summary.scanned).toBe(0);
             expect(runs.markStuckFailed).not.toHaveBeenCalled();
+            // M6: parking is not a loophole around the never-reap rule.
+            expect(runs.parkStaleRunning).not.toHaveBeenCalled();
         });
 
         it('still reaps the non-awaiting rows in the same batch', async () => {
@@ -122,15 +139,16 @@ describe('AgentRunSweeperService', () => {
                 stuckRow({ id: 'parked', awaitingInput: true }),
                 stuckRow({ id: 'dead', awaitingInput: false }),
             ]);
-            runs.markStuckFailed.mockResolvedValue(1);
+            runs.parkStaleRunning.mockResolvedValue(1);
             const summary = await makeSvc().sweepStuckRuns();
             expect(summary.swept).toBe(1);
-            expect(runs.markStuckFailed).toHaveBeenCalledWith(['dead'], expect.any(String));
+            // 'dead' is `running`, so M6 parks it rather than failing it.
+            expect(runs.parkStaleRunning).toHaveBeenCalledWith(['dead'], expect.any(String));
         });
 
         it('treats a row with no awaitingInput column (pre-migration) as reapable', async () => {
             runs.findStuckNonTerminal.mockResolvedValue([stuckRow({ id: 'legacy' })]);
-            runs.markStuckFailed.mockResolvedValue(1);
+            runs.parkStaleRunning.mockResolvedValue(1);
             const summary = await makeSvc().sweepStuckRuns();
             expect(summary.swept).toBe(1);
         });
@@ -140,7 +158,9 @@ describe('AgentRunSweeperService', () => {
         // THE NO-OP CATCHER. An implementation that returns { swept: 0 }
         // unconditionally passes every safety test in this file — only this
         // one fails it.
-        runs.findStuckNonTerminal.mockResolvedValue([stuckRow()]);
+        runs.findStuckNonTerminal.mockResolvedValue([
+            stuckRow({ status: 'queued', startedAt: null }),
+        ]);
         runs.markStuckFailed.mockResolvedValue(1);
         const summary = await makeSvc().sweepStuckRuns();
         expect(summary.swept).toBe(1);
@@ -188,14 +208,16 @@ describe('AgentRunSweeperService', () => {
             stuckRow({ id: 'r2' }),
             stuckRow({ id: 'r3' }),
         ]);
-        runs.markStuckFailed.mockResolvedValue(1);
+        runs.parkStaleRunning.mockResolvedValue(1);
         const summary = await makeSvc().sweepStuckRuns();
         expect(summary.scanned).toBe(3);
         expect(summary.swept).toBe(1);
     });
 
     it('uses a distinct errorMessage prefix that cannot collide with the dispatch prefixes', async () => {
-        runs.findStuckNonTerminal.mockResolvedValue([stuckRow()]);
+        runs.findStuckNonTerminal.mockResolvedValue([
+            stuckRow({ status: 'queued', startedAt: null }),
+        ]);
         runs.markStuckFailed.mockResolvedValue(1);
         await makeSvc().sweepStuckRuns();
         const message: string = runs.markStuckFailed.mock.calls[0][1];
@@ -212,7 +234,7 @@ describe('AgentRunSweeperService', () => {
             stuckRow({ id: 'r1' }),
             stuckRow({ id: 'r2' }),
         ]);
-        runs.markStuckFailed.mockResolvedValue(2);
+        runs.parkStaleRunning.mockResolvedValue(2);
         const summary = await makeSvc().sweepStuckRuns();
         expect(summary.batchLimitReached).toBe(true);
         expect(warn).toHaveBeenCalledWith(expect.stringContaining('batch limit'));
@@ -224,6 +246,7 @@ describe('AgentRunSweeperService', () => {
         expect(summary).toEqual(expect.objectContaining({ enabled: false, swept: 0 }));
         expect(runs.findStuckNonTerminal).not.toHaveBeenCalled();
         expect(runs.markStuckFailed).not.toHaveBeenCalled();
+        expect(runs.parkStaleRunning).not.toHaveBeenCalled();
     });
 
     it('stays quiet when nothing is stuck', async () => {
@@ -248,7 +271,7 @@ describe('AgentRunSweeperService', () => {
                 startedAt: new Date(Date.now() - 600 * 60_000),
             }),
         ]);
-        runs.markStuckFailed.mockResolvedValue(2);
+        runs.parkStaleRunning.mockResolvedValue(2);
         const summary = await makeSvc().sweepStuckRuns();
         expect(summary.byKind).toEqual({ task: 1, chat: 1 });
         expect(Math.round((summary.oldestAgeMs ?? 0) / 60_000)).toBe(600);

@@ -1,14 +1,22 @@
-import { task } from '@trigger.dev/sdk';
+import { logger as triggerLogger, task } from '@trigger.dev/sdk';
 import { NestFactory } from '@nestjs/core';
 import type { TaskAcceptanceCheck, TaskCheckResult } from '@ever-works/contracts';
 import { AgentRepository, AgentRunRepository, WorkRepository } from '@ever-works/agent/database';
-import { AgentRunService, RunDispatchGateService } from '@ever-works/agent/agents';
+import {
+    AgentEscalationService,
+    AgentRunService,
+    RunDispatchGateService,
+} from '@ever-works/agent/agents';
+import { config } from '@ever-works/agent/config';
 import {
     resolveAcceptanceChecks,
     resolveChecksPolicy,
+    resolveL0Checks,
     resolveMaxGateAttempts,
+    shouldRunL0PreCheck,
     TaskChatService,
     TaskGateRunnerService,
+    TaskReviewRejectionService,
     TaskRunDenormService,
     TasksService,
     TaskWorkspaceService,
@@ -94,6 +102,39 @@ function composeGateIterateMessage(input: {
         'Failing checks:',
     ];
     for (const checkResult of input.failing) {
+        lines.push(
+            `- ${neutralizeControlTokens(String(checkResult.id))}: ${describeCheckFailure(checkResult)}`,
+        );
+        if (checkResult.logTail) {
+            lines.push('  Output tail:');
+            for (const tailLine of neutralizeControlTokens(checkResult.logTail).split('\n')) {
+                lines.push(`    ${tailLine}`);
+            }
+        }
+    }
+    return lines.join('\n');
+}
+
+/**
+ * Judgment layer G2 — compose the L0 pre-check block prepended to the
+ * run's FIRST input.
+ *
+ * Same shape and the same neutralization as the red-gate iterate message
+ * (check ids are user-authored and `logTail` is whatever the checked-out
+ * repo printed — both partially attacker-controlled on a prompt path),
+ * but the framing is deliberately different: this is context the agent
+ * receives BEFORE doing anything, not a verdict on work it already did.
+ * Saying "your work failed" about work that has not happened would push
+ * the model into re-explaining instead of fixing.
+ */
+function composeL0PreCheckMessage(failing: TaskCheckResult[]): string {
+    const lines: string[] = [
+        'Pre-flight check: the workspace ALREADY fails the following fast checks before you have changed anything.',
+        'Treat this as the current state of the repository, not as feedback on your work. Fix what is relevant to this task; ignore what is not.',
+        '',
+        'Failing pre-checks:',
+    ];
+    for (const checkResult of failing) {
         lines.push(
             `- ${neutralizeControlTokens(String(checkResult.id))}: ${describeCheckFailure(checkResult)}`,
         );
@@ -369,9 +410,58 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                 };
             }
 
+            // Judgment layer G2 — the cheap L0 pre-check. Runs BEFORE the
+            // model call, in the provisioned workspace, and only when
+            // three things hold: the operator switch is on
+            // (`AGENT_GATE_L0_PRECHECK=on`, default OFF), the Work's
+            // checks policy is not `off`, and at least one resolved check
+            // declares `level: 'L0'`. Its output is prepended to the
+            // run's first input through the SAME path the red-gate
+            // iterate message uses, so the model reads one consistent
+            // format for "here is what the checks say".
+            //
+            // Never blocking, never persisted: this is context for the
+            // prompt, not a verdict on work that has not happened. Any
+            // failure here degrades to "no pre-check block", which is
+            // exactly the default-off behavior.
+            const l0Policy = resolveChecksPolicy(gateWork);
+            const l0Checks = resolveL0Checks(resolvedChecks);
+            let preCheckBlock: string | null = null;
+            if (
+                provisioned &&
+                shouldRunL0PreCheck({
+                    enabled: config.agents.isGateL0PreCheckEnabled(),
+                    policy: l0Policy,
+                    l0Checks,
+                })
+            ) {
+                try {
+                    await bestEffort(() =>
+                        runs.updateTelemetry(claimedRunId, {
+                            currentActivity: `Running ${l0Checks.length} pre-flight check(s)`,
+                        }),
+                    );
+                    const preCheck = await appContext
+                        .get(TaskGateRunnerService)
+                        .runPreChecks({ checks: l0Checks, cwd: provisioned.cwd });
+                    if (preCheck.failing.length > 0) {
+                        preCheckBlock = composeL0PreCheckMessage(preCheck.failing);
+                    }
+                } catch (error) {
+                    // A pre-check that cannot run is a pre-check that
+                    // contributes nothing — never a reason to fail a run
+                    // the agent has not even started.
+                    triggerLogger.warn(
+                        `L0 pre-check skipped for run ${claimedRunId}: ${
+                            error instanceof Error ? error.message : String(error)
+                        }`,
+                    );
+                }
+            }
+
             // `taskRow` was resolved above (owner-scoped) before any run
             // mutation; it is guaranteed non-null here.
-            const immediateInput = taskRow
+            const taskBrief = taskRow
                 ? [
                       `Task ${taskRow.slug ?? taskRow.id}: ${neutralizeControlTokens(taskRow.title)}`,
                       taskRow.description
@@ -384,6 +474,11 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                       .filter(Boolean)
                       .join('\n')
                 : `Task ${payload.taskId}`;
+            // G2 — the pre-check block goes AFTER the task brief: the
+            // agent should know what it was asked to do before it reads
+            // what is already broken. When the pass did not run (the
+            // default), `immediateInput` is byte-identical to before.
+            const immediateInput = preCheckBlock ? `${taskBrief}\n\n${preCheckBlock}` : taskBrief;
 
             const scopeContext = taskRow
                 ? `Task scope: mission=${taskRow.missionId ?? 'none'}, idea=${taskRow.ideaId ?? 'none'}, work=${taskRow.workId ?? 'none'}`
@@ -588,6 +683,52 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                             body: chatBody,
                         }),
                     );
+
+                    // Judgment layer G3 — the agent GAVE UP. Until now this
+                    // ended as a chat message and a log line, so "what is
+                    // waiting on me?" had no answer. Record the structured
+                    // escalation the Task detail + digest read.
+                    await bestEffort(() =>
+                        appContext.get(AgentEscalationService).record({
+                            userId: payload.userId,
+                            reasonCode: iterateStop === 'budget' ? 'budget-stop' : 'gate-exhausted',
+                            runId: run.id,
+                            taskId: payload.taskId,
+                            workId: taskRow.workId ?? null,
+                            agentId: agent.id,
+                            summary,
+                            decisionNeeded:
+                                resolvedChecks.length === 0
+                                    ? 'This Work requires acceptance checks but none are configured. Add checks to the Task or the Work defaults, or change the checks policy.'
+                                    : iterateStop === 'budget'
+                                      ? "The Agent's budget cap stopped the fix loop before the checks went green. Decide whether to raise the budget, fix the failures by hand, or narrow the task."
+                                      : 'The agent could not get the required checks green within its attempt budget. Decide whether to fix the failures by hand, adjust the checks, or raise the attempt budget.',
+                            attempted: requiredFailed.map((checkResult) => ({
+                                label: String(checkResult.id),
+                                outcome: describeCheckFailure(checkResult),
+                                ...(checkResult.logTail ? { detail: checkResult.logTail } : {}),
+                            })),
+                        }),
+                    );
+                    // Orchestration M9 — persist the machine feedback so a
+                    // LATER resume replays it. The iterate loop already fed
+                    // it to the run that was executing, but that run is
+                    // terminal now and its context is gone.
+                    if (requiredFailed.length > 0) {
+                        await bestEffort(() =>
+                            appContext.get(TaskReviewRejectionService).recordGateRejection({
+                                taskId: payload.taskId,
+                                workId: taskRow.workId ?? null,
+                                runId: run.id,
+                                feedback: composeGateIterateMessage({
+                                    failing: requiredFailed,
+                                    attempt: gateAttempts,
+                                    maxAttempts: gateAttempts,
+                                }),
+                            }),
+                        );
+                    }
+
                     return {
                         status: 'completed',
                         reason: 'gate-red',

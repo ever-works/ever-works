@@ -103,7 +103,7 @@ export type TaskOwnerKey = (typeof TASK_OWNER_KEYS)[number];
  * Kanban run cockpit (Wave 2 M2) — compact latest-run embed attached to
  * list rows when the caller passes `includeRun=true`. Deliberately a
  * projection, not the AgentRun entity: the board chip needs exactly
- * these six fields and nothing sensitive (no errorMessage/summary/
+ * these fields and nothing sensitive (no errorMessage/summary/
  * workspaceMeta) should ride along on every list response.
  */
 export interface TaskRunEmbed {
@@ -111,6 +111,14 @@ export interface TaskRunEmbed {
     status: AgentRunStatus;
     currentActivity: string | null;
     totalTokens: number | null;
+    /**
+     * Cost telemetry (Wave 4 M7) - settled cost for this run in integer
+     * cents. Sibling of `totalTokens`, which the board chip already
+     * rendered; without it the cockpit could show how much the run
+     * THOUGHT and not how much it COST. `null` for a run that has not
+     * settled (or predates the column).
+     */
+    costCents: number | null;
     changedFilesCount: number | null;
     startedAt: Date | null;
     /** Quality gates (Wave 3 M6) — latest-run gate verdict for the board
@@ -282,6 +290,7 @@ export class TasksService {
                         status: run.status,
                         currentActivity: run.currentActivity ?? null,
                         totalTokens: run.totalTokens ?? null,
+                        costCents: run.costCents ?? null,
                         changedFilesCount: run.changedFilesCount ?? null,
                         startedAt: run.startedAt ?? null,
                         gateStatus: run.gateStatus ?? null,

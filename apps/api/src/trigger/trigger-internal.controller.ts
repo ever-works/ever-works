@@ -46,6 +46,7 @@ import { MissionTickService } from '@ever-works/agent/missions';
 import { IdeaBuildExecutorService } from '@ever-works/agent/work-agent';
 import { GoalEvaluationService } from '@ever-works/agent/goals';
 import {
+    AgentEscalationService,
     AgentRunService,
     AgentRunSweeperService,
     AgentScheduleDispatcherService,
@@ -55,6 +56,7 @@ import {
 import {
     TaskChatService,
     TaskGateRunnerService,
+    TaskReviewRejectionService,
     TaskRunDenormService,
     TaskWorkspaceService,
     TaskRecurrenceDispatcherService,
@@ -327,6 +329,18 @@ export class TriggerInternalController implements OnModuleInit {
         // arity rule above.
         private readonly fleetJobService?: FleetJobService,
 
+        // Judgment layer G3 — backs the escalation write from
+        // `agent-task-execute` when the quality gate is exhausted or the
+        // budget stopped the iterate loop. Appended LAST + @Optional()
+        // per the arity rule above.
+        @Optional()
+        private readonly agentEscalationService?: AgentEscalationService,
+        // Orchestration M9 — backs the durable gate-rejection write from
+        // `agent-task-execute`, so a LATER resume replays the machine
+        // feedback the terminal run already consumed. Appended LAST +
+        // @Optional() per the arity rule above.
+        @Optional()
+        private readonly taskReviewRejectionService?: TaskReviewRejectionService,
     ) {}
 
     onModuleInit() {
@@ -361,6 +375,12 @@ export class TriggerInternalController implements OnModuleInit {
             // agent-heartbeat dispatcher cron + agent-heartbeat one-shot.
             AgentScheduleDispatcherService: this.agentScheduleDispatcherService,
             AgentRunSweeperService: this.agentRunSweeperService,
+            // Judgment layer G3 — agent-task-execute files escalations here
+            // when the gate is exhausted / the budget stopped the loop.
+            AgentEscalationService: this.agentEscalationService,
+            // Orchestration M9 — agent-task-execute persists the machine
+            // gate feedback here so a later resume replays it.
+            TaskReviewRejectionService: this.taskReviewRejectionService,
             // Run orchestration (Wave 4 M2) — agent-task-execute calls
             // drainForWork here after every terminal transition.
             RunDispatchGateService: this.runDispatchGateService,

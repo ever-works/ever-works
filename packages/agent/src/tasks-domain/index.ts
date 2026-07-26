@@ -46,3 +46,8 @@ export {
     TaskKbMentionRepository,
     UserTaskCounterRepository,
 } from '../database/repositories/task-side.repositories';
+export * from './task-review-rejection.service';
+export {
+    TaskReviewRejectionRepository,
+    type RecordTaskReviewRejectionInput,
+} from '../database/repositories/task-review-rejection.repository';

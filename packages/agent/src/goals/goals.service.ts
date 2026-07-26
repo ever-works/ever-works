@@ -13,6 +13,7 @@ import { GoalMetricSample } from '../entities/goal-metric-sample.entity';
 import { MissionGoal } from '../entities/mission-goal.entity';
 import { Mission } from '../entities/mission.entity';
 import { GoalEvaluationService } from './goal-evaluation.service';
+import { validateGoalJudgment } from './goal-criteria';
 import {
     DEFAULT_CHECK_FREQUENCY_MINUTES,
     MIN_CHECK_FREQUENCY_MINUTES,
@@ -128,6 +129,7 @@ export class GoalsService {
         this.assertComparator(input.comparator);
         this.assertWindow(input.window);
         this.assertFiniteNumber(input.targetValue, 'targetValue');
+        this.assertJudgment({ criteria: input.criteria, constraints: input.constraints });
 
         const saved = await this.goals.save(
             this.goals.create({
@@ -145,6 +147,10 @@ export class GoalsService {
                 nextCheckAt: null,
                 status: GoalStatus.DRAFT,
                 outcome: null,
+                // Judgment layer G1 - additive. Omitted stays NULL, which
+                // IS the single-metric Goal this service already created.
+                criteria: input.criteria ?? null,
+                constraints: input.constraints ?? null,
             }),
         );
         return toGoalDto(saved);
@@ -193,6 +199,25 @@ export class GoalsService {
         if (input.deadline !== undefined) existing.deadline = input.deadline;
         if (input.checkFrequencyMinutes !== undefined) {
             existing.checkFrequencyMinutes = this.clampFrequency(input.checkFrequencyMinutes);
+        }
+        if (input.criteria !== undefined || input.constraints !== undefined) {
+            // Validate the SUBMITTED shape only: an untouched column is
+            // already-valid data and must not be re-litigated by a
+            // stricter later rule.
+            this.assertJudgment({
+                ...(input.criteria !== undefined ? { criteria: input.criteria } : {}),
+                ...(input.constraints !== undefined ? { constraints: input.constraints } : {}),
+            });
+            if (input.criteria !== undefined) {
+                existing.criteria = input.criteria;
+                // Clearing the weighted path invalidates the score that
+                // path produced - leaving a stale 0.42 on a now
+                // single-metric Goal would be a lie on the UI.
+                if (input.criteria === null || input.criteria.length === 0) {
+                    existing.resolvedScore = null;
+                }
+            }
+            if (input.constraints !== undefined) existing.constraints = input.constraints;
         }
         if (input.outcome !== undefined) {
             if (input.outcome !== null && !GOAL_OUTCOMES.includes(input.outcome)) {
@@ -389,6 +414,19 @@ export class GoalsService {
     }
 
     /** Spec FR-12 — clamp to ≥ 15 minutes; default 60. */
+    /**
+     * Judgment layer G1 - reject an invalid criteria/constraint payload
+     * with EVERY problem at once. The helper returns a list rather than
+     * throwing so this service owns the exception type (the same idiom as
+     * `validateMetricSource`).
+     */
+    private assertJudgment(input: Parameters<typeof validateGoalJudgment>[0]): void {
+        const errors = validateGoalJudgment(input);
+        if (errors.length > 0) {
+            throw new BadRequestException(errors.map((e) => `${e.field}: ${e.message}`).join('; '));
+        }
+    }
+
     private clampFrequency(minutes: number | undefined): number {
         if (minutes === undefined || minutes === null) return DEFAULT_CHECK_FREQUENCY_MINUTES;
         if (!Number.isInteger(minutes)) {

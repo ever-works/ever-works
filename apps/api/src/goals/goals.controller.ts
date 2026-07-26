@@ -86,6 +86,10 @@ export class GoalsController {
             baselineValue: body.baselineValue ?? null,
             deadline: this.parseDeadline(body.deadline),
             checkFrequencyMinutes: body.checkFrequencyMinutes,
+            // Judgment layer G1 - additive. Omitted stays undefined, which
+            // the service persists as NULL: the single-metric Goal.
+            criteria: body.criteria,
+            constraints: body.constraints,
         });
     }
 
@@ -138,6 +142,8 @@ export class GoalsController {
             deadline: body.deadline === undefined ? undefined : this.parseDeadline(body.deadline),
             checkFrequencyMinutes: body.checkFrequencyMinutes,
             outcome: body.outcome,
+            criteria: body.criteria,
+            constraints: body.constraints,
         });
     }
 

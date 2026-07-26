@@ -63,6 +63,13 @@ export interface AgentRunSession {
     workId: string | null;
     awaitingInput: boolean;
     queuedReason: string | null;
+    /**
+     * State-aware sweeper (Wave 4 M6) - short machine token saying why
+     * the PLATFORM flagged this run (`queued-too-long`, `stale-parked`).
+     * `null` = nothing wrong. Optional-safe: an older API omits it, and
+     * the row simply renders no attention chip.
+     */
+    attentionReason?: string | null;
     runnerKind: string | null;
     startedAt: string | null;
     finishedAt: string | null;

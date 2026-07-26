@@ -647,6 +647,92 @@ export const config = {
             return Number.isFinite(raw) && raw > 0 ? raw : 200;
         },
         /**
+         * State-aware sweeper (Wave 4 M6) — park a stale RUNNING run
+         * instead of hard-failing it. Default ON.
+         *
+         * A `running` row past the cutoff means the worker died, not that
+         * the work was wrong: the conversation (`cliSessionId`) is still
+         * valid and `RunSteeringService.resume` can revive it. Parking
+         * writes `terminalEndedReason='parked'`, which is exactly the
+         * token `RESUMABLE_ENDED_REASONS` already recognises — so a
+         * parked run gets a Resume button instead of a red error row.
+         *
+         * Set `AGENT_RUN_STALE_PARK_ENABLED=false` to fall back to the
+         * pre-M6 behavior (every stale row hard-fails). A rollback valve,
+         * not a product knob. `queued` rows are unaffected by this switch:
+         * a queued row never started, so there is no conversation to park
+         * — see {@link getRunQueuedTooLongMinutes}.
+         */
+        getRunStaleParkEnabled() {
+            return process.env.AGENT_RUN_STALE_PARK_ENABLED !== 'false';
+        },
+        /**
+         * How long a run may sit `queued` before it is surfaced as needing
+         * a human. Default 60 minutes.
+         *
+         * This is a NOTICE threshold, never a reap threshold: crossing it
+         * stamps `attentionReason='queued-too-long'`, notifies the owner
+         * once, and leaves the row exactly where it is. The plan is
+         * explicit — "`queued` older than a bound → surface, don't
+         * silently drop".
+         *
+         * Deliberately much shorter than the stuck cutoff (hours): a run
+         * that cannot get capacity for an hour is a capacity problem
+         * somebody should see, whereas the stuck cutoff protects a
+         * legitimately long-running worker from being killed.
+         *
+         * `0` (or negative) disables queued-too-long surfacing entirely.
+         */
+        getRunQueuedTooLongMinutes() {
+            const raw = parseInt(process.env.AGENT_RUN_QUEUED_TOO_LONG_MINUTES || '60', 10);
+            return Number.isFinite(raw) ? raw : 60;
+        },
+        /**
+         * Rows flagged per tick by the queued-too-long scan. Bounded for
+         * the same reason as {@link getRunStuckSweepBatch}: a saturated
+         * org is precisely when this runs, and each flagged row also emits
+         * a notification.
+         */
+        getRunQueuedAttentionBatch() {
+            const raw = parseInt(process.env.AGENT_RUN_QUEUED_ATTENTION_BATCH || '50', 10);
+            return Number.isFinite(raw) && raw > 0 ? raw : 50;
+        },
+        /**
+         * Judgment layer G2 — run the cheap L0 pre-check before spending a
+         * model call. Default **off**.
+         *
+         * Off by default because it changes what the agent sees on its
+         * FIRST turn: a Work whose L0 command is misconfigured would start
+         * every run by describing a failure that is not the agent's to
+         * fix. Operators turn it on once their `level: 'L0'` checks are
+         * trustworthy. When off — or when the Work declares no L0 check —
+         * the run is byte-for-byte what it is today.
+         */
+        isGateL0PreCheckEnabled() {
+            return (process.env.AGENT_GATE_L0_PRECHECK || 'off').toLowerCase() === 'on';
+        },
+        /**
+         * Wall-clock ceiling for the WHOLE L0 pre-check pass, in seconds.
+         * Default 120.
+         *
+         * A pre-check exists to be cheap; if it is not cheap it is a
+         * regression, not a feature. Applied per check on top of the
+         * check's own `timeoutSec`, so a pre-check can never approach the
+         * post-run gate's 30-minute ceiling.
+         */
+        getGateL0PreCheckTimeoutSec() {
+            const raw = parseInt(process.env.AGENT_GATE_L0_PRECHECK_TIMEOUT_SEC || '120', 10);
+            return Number.isFinite(raw) && raw > 0 ? raw : 120;
+        },
+        /**
+         * Judgment layer G3 — kill switch for structured escalation
+         * records. Default ON: when an agent gives up, a human needs a
+         * card saying so. Off falls back to log-lines-only.
+         */
+        isEscalationLoggingEnabled() {
+            return process.env.AGENT_ESCALATION_LOGGING_ENABLED !== 'false';
+        },
+        /**
          * Run orchestration (Wave 4 M2) — concurrency safety valves for
          * `RunDispatchGateService`. These are operator knobs, NOT product
          * limits: defaults are deliberately generous (10 in-flight runs

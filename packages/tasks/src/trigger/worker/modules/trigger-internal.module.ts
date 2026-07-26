@@ -10,6 +10,7 @@ import { MissionTickService } from '@ever-works/agent/missions';
 import { IdeaBuildExecutorService } from '@ever-works/agent/work-agent';
 import { GoalEvaluationService } from '@ever-works/agent/goals';
 import {
+    AgentEscalationService,
     AgentRunService,
     AgentRunSweeperService,
     AgentScheduleDispatcherService,
@@ -20,6 +21,7 @@ import {
     TaskChatService,
     TaskGateRunnerService,
     TaskRecurrenceDispatcherService,
+    TaskReviewRejectionService,
     TaskRunDenormService,
     TasksService,
     TaskWorkspaceService,
@@ -122,6 +124,23 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
             provide: AgentRunService,
             useFactory: (apiClient: TriggerInternalApiClient) =>
                 createRemoteProxy(apiClient, 'AgentRunService'),
+            inject: [TriggerInternalApiClient],
+        },
+        // Judgment layer G3 - `agent-task-execute` files an escalation
+        // here when the gate is exhausted (or the budget stopped the
+        // iterate loop).
+        {
+            provide: AgentEscalationService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'AgentEscalationService'),
+            inject: [TriggerInternalApiClient],
+        },
+        // Orchestration M9 - `agent-task-execute` persists the machine
+        // gate feedback here so a LATER resume can replay it.
+        {
+            provide: TaskReviewRejectionService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'TaskReviewRejectionService'),
             inject: [TriggerInternalApiClient],
         },
         {
@@ -320,6 +339,8 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         AgentScheduleDispatcherService,
         AgentRunSweeperService,
         AgentRunService,
+        AgentEscalationService,
+        TaskReviewRejectionService,
         AgentRepository,
         AgentRunRepository,
         RunDispatchGateService,
