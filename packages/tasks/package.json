@@ -1,57 +1,58 @@
 {
-    "name": "@ever-works/trigger-tasks",
-    "version": "0.1.0",
-    "description": "Ever Works Trigger Tasks - Background jobs and Trigger.dev integration for the Ever Works platform",
-    "author": {
-        "name": "Ever Co. LTD",
-        "email": "ever@ever.co",
-        "url": "https://ever.co"
-    },
-    "license": "AGPL-3.0",
-    "private": true,
-    "files": [
-        "dist"
-    ],
-    "main": "dist/index.js",
-    "types": "dist/index.d.ts",
-    "scripts": {
-        "build": "tsc -p tsconfig.json",
-        "type-check": "tsc -p tsconfig.json --noEmit",
-        "dev": "tsc -p tsconfig.json --watch",
-        "build:plugins": "pnpm --filter './packages/plugins/*' build",
-        "prepare:plugins": "node scripts/prepare-plugins.js",
-        "dev:trigger": "pnpm dlx trigger.dev@4.4.6 dev",
-        "predeploy:trigger": "pnpm prepare:plugins",
-        "deploy:trigger": "pnpm dlx trigger.dev@4.4.6 deploy",
-        "test": "vitest run --passWithNoTests",
-        "test:watch": "vitest",
-        "test:coverage": "vitest run --coverage"
-    },
-    "dependencies": {
-        "@ever-works/agent": "workspace:*",
-        "@ever-works/contracts": "workspace:*",
-        "@ever-works/job-runtime-trigger-plugin": "workspace:*",
-        "@ever-works/plugin": "workspace:*",
-        "@ever-works/pty-local-plugin": "workspace:*",
-        "@nestjs/cache-manager": "^3.1.0",
-        "@nestjs/common": "^11.1.18",
-        "@nestjs/core": "^11.1.18",
-        "@nestjs/event-emitter": "^3.0.1",
-        "@nestjs/microservices": "^11.1.19",
-        "@nestjs/platform-express": "^11.1.18",
-        "@nestjs/websockets": "^11.1.18",
-        "@trigger.dev/sdk": "^4.4.6",
-        "class-transformer": "^0.5.1",
-        "reflect-metadata": "^0.2.2",
-        "rxjs": "^7.8.2",
-        "superjson": "^1.13.3",
-        "ws": "^8.21.0"
-    },
-    "devDependencies": {
-        "@trigger.dev/build": "^4.4.6",
-        "@types/node": "^22.19.3",
-        "@types/ws": "^8.18.0",
-        "typescript": "^5.9.3",
-        "vitest": "^4.1.0"
-    }
+	"name": "@ever-works/trigger-tasks",
+	"version": "0.1.0",
+	"description": "Ever Works Trigger Tasks - Background jobs and Trigger.dev integration for the Ever Works platform",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"private": true,
+	"files": [
+		"dist"
+	],
+	"main": "dist/index.js",
+	"types": "dist/index.d.ts",
+	"scripts": {
+		"build": "tsc -p tsconfig.json",
+		"type-check": "tsc -p tsconfig.json --noEmit",
+		"dev": "tsc -p tsconfig.json --watch",
+		"build:plugins": "pnpm --filter './packages/plugins/*' build",
+		"prepare:plugins": "node scripts/prepare-plugins.js",
+		"dev:trigger": "trigger dev",
+		"predeploy:trigger": "pnpm prepare:plugins",
+		"deploy:trigger": "trigger deploy",
+		"test": "vitest run --passWithNoTests",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"dependencies": {
+		"@ever-works/agent": "workspace:*",
+		"@ever-works/contracts": "workspace:*",
+		"@ever-works/job-runtime-trigger-plugin": "workspace:*",
+		"@ever-works/plugin": "workspace:*",
+		"@ever-works/pty-local-plugin": "workspace:*",
+		"@nestjs/cache-manager": "^3.1.0",
+		"@nestjs/common": "^11.1.18",
+		"@nestjs/core": "^11.1.18",
+		"@nestjs/event-emitter": "^3.0.1",
+		"@nestjs/microservices": "^11.1.19",
+		"@nestjs/platform-express": "^11.1.18",
+		"@nestjs/websockets": "^11.1.18",
+		"@trigger.dev/sdk": "4.4.6",
+		"class-transformer": "^0.5.1",
+		"reflect-metadata": "^0.2.2",
+		"rxjs": "^7.8.2",
+		"superjson": "^1.13.3",
+		"ws": "^8.21.0"
+	},
+	"devDependencies": {
+		"@trigger.dev/build": "4.4.6",
+		"@types/node": "^22.19.3",
+		"@types/ws": "^8.18.0",
+		"trigger.dev": "4.4.6",
+		"typescript": "^5.9.3",
+		"vitest": "^4.1.0"
+	}
 }
