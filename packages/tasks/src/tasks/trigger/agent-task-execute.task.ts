@@ -649,6 +649,10 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                         task: taskRow,
                         userId: payload.userId,
                         agentId: agent.id,
+                        // Run telemetry — lets finalize stamp
+                        // `agent_runs.changedFilesCount` for the board chip
+                        // + Sessions cockpit (best-effort inside).
+                        runId: claimedRunId,
                         agentCanOpenPullRequests:
                             (agent as { permissions?: { canOpenPullRequests?: boolean } })
                                 .permissions?.canOpenPullRequests !== false,
