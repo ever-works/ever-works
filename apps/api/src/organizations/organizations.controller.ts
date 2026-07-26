@@ -239,6 +239,11 @@ export class OrganizationsController {
             visionUpdatedAt: org.visionUpdatedAt
                 ? new Date(org.visionUpdatedAt).toISOString()
                 : null,
+            // Merge-policy matrix (Wave 3, D4) — the STORED partial, which
+            // is what a settings card needs in order to offer
+            // reset-to-inherit. The EFFECTIVE policy comes from
+            // `GET /api/merge-policy/resolve`, never from this field.
+            mergePolicy: org.mergePolicy ?? null,
             createdAt: org.createdAt.toISOString(),
             updatedAt: org.updatedAt.toISOString(),
         };

@@ -1,13 +1,21 @@
 import { forwardRef, Inject, Injectable, Logger, Optional } from '@nestjs/common';
+import type {
+    GateStatus,
+    MergeMethod,
+    MergePolicySource,
+    MergeRefusalCode,
+} from '@ever-works/contracts';
 import { TaskStatus, type Task } from '../entities/task.entity';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
 import { WorkspaceFacadeService } from '../facades/workspace.facade';
-import { GitFacadeService } from '../facades/git.facade';
+import { GitFacadeService, MergePolicyRefusedError } from '../facades/git.facade';
 import { TaskTransitionService } from './task-transition.service';
 import { TaskChatService } from './task-chat.service';
 import { MergePolicyService } from '../policy/merge-policy.service';
+import { ActivityLogService } from '../activity-log/activity-log.service';
+import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import { resolveTaskIsolation, taskBranchName } from './task-isolation';
 
 export interface ProvisionedTaskWorkspace {
@@ -19,11 +27,37 @@ export interface ProvisionedTaskWorkspace {
     provider: string;
 }
 
+/**
+ * Merge-policy matrix (Wave 3, D4) — what the agent-merge attempt did,
+ * reported back to the worker so the run result is self-explaining.
+ *
+ * `attempted: false` is the DEFAULT and the common case: the effective
+ * policy did not opt into agent merges, so nothing was tried and nothing
+ * was said. Once an operator opts in, every outcome — landed or refused —
+ * is reported here AND recorded (task chat + activity log).
+ */
+export interface TaskAgentMergeOutcome {
+    attempted: boolean;
+    merged: boolean;
+    /** Merge strategy actually requested; absent when nothing was tried. */
+    mergeMethod?: MergeMethod;
+    /** Stable refusal code from the single decision point. */
+    refusalCode?: MergeRefusalCode;
+    /** Human-readable explanation for a refusal or a transport failure. */
+    reason?: string;
+    /** Which scope of the matrix governed the decision. */
+    policySource?: MergePolicySource;
+    /** Merge commit SHA when the provider reported one. */
+    sha?: string;
+}
+
 export interface TaskWorkspaceFinalizeOutcome {
     outcome: 'no-changes' | 'pr-opened' | 'pushed-no-pr' | 'conflict';
     prNumber?: number;
     prUrl?: string;
     conflictPaths?: string[];
+    /** Present only on the `pr-opened` path (Wave 3, D4). */
+    merge?: TaskAgentMergeOutcome;
 }
 
 /**
@@ -59,13 +93,19 @@ export class TaskWorkspaceService {
         @Optional()
         @Inject(forwardRef(() => TaskChatService))
         private readonly taskChat?: TaskChatService,
-        // Merge-policy matrix (Wave 3, D4) — read-only here: finalize
-        // OPENS the PR, it never lands one, so the policy is RECORDED
-        // (which scope governs this Work's merges) rather than enforced.
-        // Enforcement lives at the one place a merge can happen,
-        // `GitFacadeService.mergePullRequest`. Appended LAST + @Optional()
-        // per the positional-spec arity rule.
+        // Merge-policy matrix (Wave 3, D4). Finalize opens the PR and then
+        // ASKS whether this agent may land it. The decision itself is not
+        // re-implemented here — this service only reads the resolved policy
+        // to decide whether attempting is even meaningful, then delegates
+        // to the one place a merge can happen,
+        // `GitFacadeService.mergePullRequest`, which routes through
+        // `canAgentMerge`. Appended LAST + @Optional() per the
+        // positional-spec arity rule.
         @Optional() private readonly mergePolicy?: MergePolicyService,
+        // Merge-policy matrix (Wave 3, D4) — refusals and landings are
+        // RECORDED, never swallowed. Appended after `mergePolicy` so every
+        // existing positional construction keeps working.
+        @Optional() private readonly activityLog?: ActivityLogService,
     ) {}
 
     /**
@@ -195,6 +235,15 @@ export class TaskWorkspaceService {
          * is presentation only, which is why omitting it changes nothing.
          */
         gate?: { checksPassed: number };
+        /**
+         * Merge-policy matrix (Wave 3, D4) — the run's ACTUAL gate verdict,
+         * fed to `requireGreenGate`. Distinct from `gate` above, which is a
+         * PR-body note only set when every check was green: a Work whose
+         * `checksPolicy` is `'warn'` can reach finalize with a red gate, and
+         * the merge decision must see that. Omitted (`undefined`) resolves
+         * as an unknown gate, which a `requireGreenGate` policy refuses.
+         */
+        gateStatus?: GateStatus | null;
     }): Promise<TaskWorkspaceFinalizeOutcome> {
         const { task, userId, workspace } = input;
         if (!this.workspaceFacade || !this.gitFacade) {
@@ -293,7 +342,287 @@ export class TaskWorkspaceService {
             `Task ${task.id} opened PR #${pr.number} (${pr.url})` +
                 `${await this.describeMergePolicy(input.agentId, work.id)}.`,
         );
-        return { outcome: 'pr-opened', prNumber: pr.number, prUrl: pr.url };
+
+        // Merge-policy matrix (Wave 3, D4) — the agent-merge path. The PR
+        // exists and the gate has already spoken; ask the policy whether
+        // THIS agent may land it. Everything below is best-effort by
+        // contract: an open pull request is the promise this method made,
+        // and no merge outcome may retroactively fail it.
+        const merge = await this.attemptAgentMerge({
+            task,
+            work,
+            userId,
+            agentId: input.agentId,
+            owner,
+            repo,
+            gitOptions,
+            prNumber: pr.number,
+            baseRef,
+            gateStatus: input.gateStatus ?? null,
+        });
+
+        return {
+            outcome: 'pr-opened',
+            prNumber: pr.number,
+            prUrl: pr.url,
+            ...(merge ? { merge } : {}),
+        };
+    }
+
+    /**
+     * Merge-policy matrix (Wave 3, D4) — THE agent-merge path.
+     *
+     * Posture, in order:
+     *
+     * 1. **Silent by default.** The resolved policy is read first, and when
+     *    `allowAgentMerge` is not explicitly on, nothing is attempted and
+     *    nothing is said. With `PLATFORM_DEFAULT_MERGE_POLICY` that is
+     *    every Work on the platform — the shipped behaviour is byte-for-byte
+     *    what it was before this path existed. This is a *noise* guard, not
+     *    a second decision point: it only skips work that the real decision
+     *    point would refuse anyway.
+     * 2. **One decision point.** Once an operator has opted in, the merge
+     *    goes through `GitFacadeService.mergePullRequest` with an
+     *    `AgentMergeActor`, and the facade routes it through
+     *    `MergePolicyService.canAgentMerge`. Gate status, protected
+     *    branches, allowed methods and human approval are evaluated THERE.
+     *    No rule is duplicated here.
+     * 3. **Refusals are recorded, never swallowed.** A refusal posts a task
+     *    chat message naming the stable code, the human reason and the
+     *    governing scope, and writes a `task_merge_refused` activity row.
+     *    A user can always answer "why did the agent not merge this?"
+     */
+    private async attemptAgentMerge(args: {
+        task: Task;
+        work: { id: string; organizationId?: string | null; tenantId?: string | null };
+        userId: string;
+        agentId: string;
+        owner: string;
+        repo: string;
+        gitOptions: { userId: string; providerId: string; workId: string };
+        prNumber: number;
+        baseRef: string;
+        gateStatus: GateStatus | null;
+    }): Promise<TaskAgentMergeOutcome | undefined> {
+        const { task, work, userId, agentId, owner, repo, prNumber, baseRef } = args;
+        if (!this.mergePolicy || !this.gitFacade) return undefined;
+
+        let resolved;
+        try {
+            resolved = await this.mergePolicy.resolve({
+                agentId,
+                workId: work.id,
+                organizationId: work.organizationId ?? null,
+                tenantId: work.tenantId ?? null,
+            });
+        } catch (error) {
+            // A policy read that failed is not permission to merge — and it
+            // is not worth a user-facing message either. Log and stand down.
+            this.logger.warn(
+                `Task ${task.id} merge-policy read failed before the merge attempt (no merge attempted): ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return { attempted: false, merged: false };
+        }
+
+        if (!resolved.policy.allowAgentMerge) {
+            // The conservative default. Nothing attempted, nothing said.
+            return { attempted: false, merged: false, policySource: resolved.source };
+        }
+
+        // The strategy the agent asks for is the most-preferred one the
+        // effective policy allows, so the request can never contradict the
+        // policy that produced it. An empty list leaves `undefined`, which
+        // the decision point evaluates as the provider default ('merge')
+        // and refuses with `merge-method-not-allowed` — a refusal with a
+        // reason beats a silent no-op.
+        const mergeMethod = resolved.policy.allowedMergeMethods[0];
+
+        try {
+            const result = await this.gitFacade.mergePullRequest(
+                owner,
+                repo,
+                prNumber,
+                mergeMethod ? { mergeMethod } : undefined,
+                args.gitOptions,
+                {
+                    agentId,
+                    workId: work.id,
+                    organizationId: work.organizationId ?? null,
+                    tenantId: work.tenantId ?? null,
+                    gateStatus: args.gateStatus,
+                    // No human-approval record exists for an agent-opened PR
+                    // at finalize time. A policy that requires one therefore
+                    // refuses here BY DESIGN — the approval lives with the
+                    // human who gives it, not with the agent asking.
+                    humanApproved: false,
+                    targetBranch: baseRef,
+                },
+            );
+
+            if (!result?.merged) {
+                // The provider declined (branch protection, stale head,
+                // required review). Not a policy refusal — reported as-is.
+                return this.recordMergeFailure(args, {
+                    attempted: true,
+                    merged: false,
+                    ...(mergeMethod ? { mergeMethod } : {}),
+                    policySource: resolved.source,
+                    reason:
+                        result?.message ??
+                        'The git provider declined the merge (it may require a review, or the branch may be protected upstream).',
+                });
+            }
+
+            await this.tasks.updateById(task.id, { branchState: 'merged' });
+            await this.postSystemMessage(
+                { task, userId, agentId },
+                [
+                    `Merged PR #${prNumber} into \`${baseRef}\`${
+                        mergeMethod ? ` (${mergeMethod})` : ''
+                    }.`,
+                    '',
+                    `Allowed by the merge policy from the ${resolved.source} scope.`,
+                ].join('\n'),
+            );
+            await this.logMergeActivity({
+                userId,
+                task,
+                actionType: ActivityActionType.TASK_MERGED,
+                status: ActivityStatus.COMPLETED,
+                summary: `Task ${task.slug} — agent merged PR #${prNumber} into ${baseRef}`,
+                details: {
+                    agentId,
+                    workId: work.id,
+                    prNumber,
+                    targetBranch: baseRef,
+                    ...(mergeMethod ? { mergeMethod } : {}),
+                    policySource: resolved.source,
+                    ...(result.sha ? { sha: result.sha } : {}),
+                },
+            });
+            this.logger.log(
+                `Task ${task.id} agent-merged PR #${prNumber} into ${baseRef} (policy source: ${resolved.source}).`,
+            );
+            return {
+                attempted: true,
+                merged: true,
+                ...(mergeMethod ? { mergeMethod } : {}),
+                policySource: resolved.source,
+                ...(result.sha ? { sha: result.sha } : {}),
+            };
+        } catch (error) {
+            if (error instanceof MergePolicyRefusedError) {
+                return this.recordMergeFailure(args, {
+                    attempted: true,
+                    merged: false,
+                    ...(mergeMethod ? { mergeMethod } : {}),
+                    ...(error.code ? { refusalCode: error.code } : {}),
+                    policySource: error.policySource ?? resolved.source,
+                    reason: error.message,
+                });
+            }
+            // Transport / provider fault. The PR is open and reviewable, so
+            // this is reported, not thrown.
+            return this.recordMergeFailure(args, {
+                attempted: true,
+                merged: false,
+                ...(mergeMethod ? { mergeMethod } : {}),
+                policySource: resolved.source,
+                reason: error instanceof Error ? error.message : String(error),
+            });
+        }
+    }
+
+    /**
+     * The "recorded, not swallowed" half: one task chat message a human can
+     * read plus one activity row a feed can render, for every merge that
+     * was attempted and did not land.
+     */
+    private async recordMergeFailure(
+        args: {
+            task: Task;
+            userId: string;
+            agentId: string;
+            prNumber: number;
+            baseRef: string;
+        },
+        outcome: TaskAgentMergeOutcome,
+    ): Promise<TaskAgentMergeOutcome> {
+        const { task, userId, agentId, prNumber, baseRef } = args;
+        const headline = outcome.refusalCode
+            ? `The merge policy refused this merge (${outcome.refusalCode}).`
+            : 'The merge did not complete.';
+        this.logger.log(
+            `Task ${task.id} agent merge of PR #${prNumber} did NOT land ` +
+                `(${outcome.refusalCode ?? 'not-merged'}, policy source: ${
+                    outcome.policySource ?? 'default'
+                }).`,
+        );
+        await this.postSystemMessage(
+            { task, userId, agentId },
+            [
+                `PR #${prNumber} into \`${baseRef}\` was NOT merged.`,
+                '',
+                headline,
+                ...(outcome.reason ? ['', outcome.reason] : []),
+                ...(outcome.policySource
+                    ? ['', `Effective policy scope: ${outcome.policySource}.`]
+                    : []),
+                '',
+                'The pull request is open and unchanged — merge it yourself, or change the merge policy and re-run.',
+            ].join('\n'),
+        );
+        await this.logMergeActivity({
+            userId,
+            task,
+            actionType: ActivityActionType.TASK_MERGE_REFUSED,
+            status: ActivityStatus.FAILED,
+            summary: `Task ${task.slug} — agent merge of PR #${prNumber} refused`,
+            details: {
+                agentId,
+                prNumber,
+                targetBranch: baseRef,
+                ...(outcome.refusalCode ? { refusalCode: outcome.refusalCode } : {}),
+                ...(outcome.reason ? { reason: outcome.reason } : {}),
+                ...(outcome.policySource ? { policySource: outcome.policySource } : {}),
+                ...(outcome.mergeMethod ? { mergeMethod: outcome.mergeMethod } : {}),
+            },
+        });
+        return outcome;
+    }
+
+    private async logMergeActivity(args: {
+        userId: string;
+        task: Task;
+        actionType: ActivityActionType;
+        status: ActivityStatus;
+        summary: string;
+        details: Record<string, unknown>;
+    }): Promise<void> {
+        if (!this.activityLog) return;
+        try {
+            await this.activityLog.log({
+                userId: args.userId,
+                ...(args.task.workId ? { workId: args.task.workId } : {}),
+                action: args.actionType,
+                actionType: args.actionType,
+                status: args.status,
+                summary: args.summary,
+                details: {
+                    ...args.details,
+                    resourceType: 'task',
+                    resourceId: args.task.id,
+                },
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Task ${args.task.id} merge activity log failed (continuing): ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
     }
 
     /**

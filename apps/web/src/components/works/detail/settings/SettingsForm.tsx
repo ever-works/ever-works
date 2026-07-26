@@ -18,6 +18,7 @@ import { CommitterSettings } from './CommitterSettings';
 import { ActivitySyncSettings } from './ActivitySyncSettings';
 import { TaskIsolationSettings } from './TaskIsolationSettings';
 import { QualityGatesSettings } from './QualityGatesSettings';
+import { MergePolicySettings } from './MergePolicySettings';
 interface SettingsFormProps {
     work: Work;
     user: AuthUser;
@@ -51,6 +52,9 @@ export function SettingsForm({ work, user, initialRepositories }: SettingsFormPr
 
                 {/* Wave 3 M6 — quality gates (acceptance-check defaults) */}
                 <QualityGatesSettings />
+
+                {/* Wave 3 D4 — merge policy (may agents land their own PRs) */}
+                <MergePolicySettings />
 
                 {/* Advanced Prompts Settings */}
                 <AdvancedPromptsSettings workId={work.id} />
