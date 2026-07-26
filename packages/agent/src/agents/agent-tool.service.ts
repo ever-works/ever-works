@@ -310,6 +310,16 @@ export class AgentToolService {
      *
      * A failing factory must never take down tool resolution — a broken
      * domain simply contributes no tools.
+     *
+     * ## Naming
+     *
+     * NEW tools are `snake_case` (action verb + singular noun) — the
+     * convention every domain tool here already follows and the one the
+     * whole web manifest uses. The built-in tools above are camelCase and
+     * stay that way: a tool name is part of a live model contract and is
+     * recorded in stored conversation histories, so renaming them breaks
+     * replay for no user-visible gain. Documented, not churned — see
+     * `docs/specs/features/chat-everything/README.md` §4.1.
      */
     private buildDomainTools(agent: Agent): AgentToolDescriptor[] {
         const sources = this.domainToolSources;
