@@ -17,6 +17,10 @@ const composed = (period: 'daily' | 'weekly'): ComposedDigest => ({
         eventsBySource: {},
         eventsTotal: 0,
         goalsTracked: 0,
+        // Judgment layer G3 — open escalations ("what needs your
+        // decision"). Zero here so this fixture keeps describing an
+        // ordinary, non-blocking digest.
+        escalationsOpen: 0,
     },
 });
 

@@ -246,7 +246,10 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
                     status: undefined,
                     workId: undefined,
                     agentId: undefined,
+                    taskId: undefined,
                     triggerKind: undefined,
+                    // Wave 4 M6 - absent `attention` never narrows the list.
+                    attention: false,
                 },
                 25,
                 0,
@@ -265,9 +268,28 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
             });
             expect(agentRuns.listSessionsForUser).toHaveBeenCalledWith(
                 'u1',
-                { status: 'running', workId, agentId, triggerKind: 'task' },
+                {
+                    status: 'running',
+                    workId,
+                    agentId,
+                    taskId: undefined,
+                    triggerKind: 'task',
+                    attention: false,
+                },
                 5,
                 10,
+            );
+        });
+
+        it('forwards the needs-attention quick filter (Wave 4 M6)', async () => {
+            // The notification deep-links to `?attention=1`, so this exact
+            // wire value has to reach the repository as a narrowing filter.
+            await controller.listRunSessions(auth, { attention: '1' });
+            expect(agentRuns.listSessionsForUser).toHaveBeenCalledWith(
+                'u1',
+                expect.objectContaining({ attention: true }),
+                25,
+                0,
             );
         });
 

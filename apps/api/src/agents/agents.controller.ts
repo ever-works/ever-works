@@ -281,6 +281,9 @@ export class AgentsController {
             workId: string | null;
             awaitingInput: boolean;
             queuedReason: string | null;
+            /** Wave 4 M6 - platform-raised needs-attention flag. */
+            attentionReason: string | null;
+            attentionAt: string | null;
             runnerKind: string | null;
             startedAt: string | null;
             finishedAt: string | null;
@@ -314,6 +317,11 @@ export class AgentsController {
                 agentId: query.agentId,
                 taskId: query.taskId,
                 triggerKind: query.kind,
+                // Wave 4 M6 - `attention=1` is the union of "the agent
+                // asked" and "the platform flagged"; the repository owns
+                // that OR so this surface and the per-Work summary chip
+                // can never drift apart.
+                attention: query.attention !== undefined,
             },
             limit,
             offset,
@@ -328,6 +336,8 @@ export class AgentsController {
                 workId: r.workId ?? null,
                 awaitingInput: r.awaitingInput ?? false,
                 queuedReason: r.queuedReason ?? null,
+                attentionReason: r.attentionReason ?? null,
+                attentionAt: r.attentionAt?.toISOString() ?? null,
                 runnerKind: r.runnerKind ?? null,
                 startedAt: r.startedAt?.toISOString() ?? null,
                 finishedAt: r.finishedAt?.toISOString() ?? null,

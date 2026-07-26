@@ -29,6 +29,16 @@ export interface DigestCounts {
     eventsTotal: number;
     /** Active goals included in the progress snapshot. */
     goalsTracked: number;
+    /**
+     * Judgment layer G3 - OPEN escalations raised in the window: the
+     * things an agent gave up on and a human still owes a decision.
+     *
+     * Deliberately part of the quiet calculation, unlike `goalsTracked`:
+     * a window in which nothing else happened BUT an agent stopped and
+     * asked for a decision is the opposite of quiet, and suppressing that
+     * digest would hide exactly the signal the digest exists to carry.
+     */
+    escalationsOpen: number;
 }
 
 export interface ComposeDigestOptions {

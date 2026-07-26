@@ -255,6 +255,25 @@ export class AgentRun {
     queuedReason?: string | null;
 
     /**
+     * State-aware sweeper (Wave 4 M6) — why this run needs a HUMAN, as a
+     * short machine token (`queued-too-long`, `stale-parked`). NULL = the
+     * run is fine, which is every pre-existing row and the overwhelming
+     * majority of live ones.
+     *
+     * Distinct from `awaitingInput` on purpose: `awaitingInput` means the
+     * AGENT asked a question, this means the PLATFORM noticed something
+     * wrong with the run's lifecycle. The Sessions list filters on
+     * "either" (`attention=1`), so the two never have to be merged into a
+     * single overloaded flag.
+     */
+    @Column({ type: 'varchar', length: 32, nullable: true })
+    attentionReason?: string | null;
+
+    /** When {@link attentionReason} was raised. NULL whenever it is NULL. */
+    @PortableDateColumn({ nullable: true })
+    attentionAt?: Date | null;
+
+    /**
      * Which pipeline plugin id executes this run (claude-code, codex,
      * standard-pipeline, …) — the Sessions view's "runs on" chip. NULL
      * for runs that predate the column or never reported.

@@ -86,6 +86,28 @@ const CORE_EVENTS: readonly CoreEventRow[] = [
         urgent: false,
         defaultChannels: ['in-app'],
     },
+    // Attention surface (Wave 4 M6 + judgment layer G3). Seeded on
+    // Postgres by `1784600000000-CreateEscalationsAndReviewRejections`
+    // too; this list is what makes them exist on SQLite / CI, where
+    // migrations do not run.
+    {
+        key: 'agent_run_queued_too_long',
+        category: 'agent',
+        title: 'Agent run queued too long',
+        description:
+            'An agent run has been waiting for capacity longer than the configured bound. Nothing was cancelled.',
+        urgent: false,
+        defaultChannels: ['in-app'],
+    },
+    {
+        key: 'agent_run_escalated',
+        category: 'agent',
+        title: 'Agent needs a decision',
+        description:
+            'An agent stopped without finishing (checks exhausted, guardrail refusal, budget stop or refused merge) and a human decision is required.',
+        urgent: false,
+        defaultChannels: ['in-app'],
+    },
 ];
 
 /**

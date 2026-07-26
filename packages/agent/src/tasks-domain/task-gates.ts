@@ -80,6 +80,39 @@ export function resolveChecksPolicy(work: WorkPolicySource): WorkChecksPolicy {
 }
 
 /**
+ * Judgment layer G2 — the L0 subset of a resolved check list.
+ *
+ * `level` is optional on `TaskAcceptanceCheck` and defaults to `'L1'`, so
+ * a repo full of pre-G2 checks yields an EMPTY list here and the
+ * pre-check pass never runs. Opting a check in is a one-word edit
+ * (`level: 'L0'`), which is the whole point: the pre-check is only as
+ * cheap as the commands an operator declares for it.
+ */
+export function resolveL0Checks(checks: readonly TaskAcceptanceCheck[]): TaskAcceptanceCheck[] {
+    return checks.filter((check) => check?.level === 'L0');
+}
+
+/**
+ * Should the cheap L0 pre-check run for this run?
+ *
+ * THREE conditions, all required, and the order is the cost order:
+ * the operator switch (free), then a declared L0 check (free), then the
+ * Work's policy being something other than `off` (free). Only when all
+ * three hold does a subprocess get spawned before the model call.
+ *
+ * `policy === 'off'` disqualifies deliberately: a Work that has switched
+ * its gate off is telling the platform not to run its check commands, and
+ * "except before the model call" would be a surprising exception to that.
+ */
+export function shouldRunL0PreCheck(input: {
+    enabled: boolean;
+    policy: WorkChecksPolicy;
+    l0Checks: readonly TaskAcceptanceCheck[];
+}): boolean {
+    return input.enabled && input.policy !== 'off' && input.l0Checks.length > 0;
+}
+
+/**
  * Resolve the gate-attempt budget: Task value, else Work value, else 2 —
  * always clamped to 1..5 (fractions truncate toward the clamp range).
  */

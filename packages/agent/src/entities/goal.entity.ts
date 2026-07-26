@@ -77,6 +77,122 @@ export interface GoalMetricSource {
 }
 
 /**
+ * Judgment layer G1 — one WEIGHTED success criterion.
+ *
+ * A Goal today is a single metric + comparator + target. That is one
+ * criterion with weight 1, and it keeps working exactly as it did. This
+ * shape lets a Goal instead declare SEVERAL, each pulling its own metric
+ * and contributing a weighted share of a resolved 0..1 score — the
+ * machine-checkable target a quality gate (or an LLM judge) can be told
+ * to aim at.
+ *
+ * `direction` mirrors {@link GoalComparator} rather than reusing it so a
+ * criterion stays readable on its own ("higher is better" / "lower is
+ * better") and so the two can diverge later without a migration.
+ */
+export interface GoalCriterion {
+    /** Stable slug, unique within the Goal. Also the merge/report key. */
+    id: string;
+    /** Human-readable label rendered in progress/score breakdowns. */
+    name: string;
+    /**
+     * Which metric this criterion reads. Omitted = the Goal's own
+     * `metricSource` — the common "same metric, different thresholds"
+     * case costs no extra configuration.
+     */
+    metricSource?: GoalMetricSource;
+    /**
+     * Aggregation window override. Omitted = the Goal's `window`.
+     */
+    window?: GoalWindow;
+    /** Relative weight (> 0). Normalized across criteria at score time. */
+    weight: number;
+    /** Value at which this criterion is fully satisfied. */
+    target: number;
+    /** `gte` = higher is better; `lte` = lower is better. */
+    direction: GoalComparator;
+    /** Unit of `target` (display only). Omitted = the Goal's `unit`. */
+    unit?: string;
+}
+
+/**
+ * Judgment layer G1 — categories a hard constraint can belong to. Purely
+ * descriptive (grouping + reporting); enforcement is identical for all
+ * five. Mirrors the constraint taxonomy the gates already reason about.
+ */
+export type GoalConstraintCategory = 'time' | 'cost' | 'safety' | 'scope' | 'quality';
+
+export const GOAL_CONSTRAINT_CATEGORIES: readonly GoalConstraintCategory[] = [
+    'time',
+    'cost',
+    'safety',
+    'scope',
+    'quality',
+];
+
+/**
+ * Judgment layer G1 — a constraint that MUST hold.
+ *
+ * `hard: true` (the default) means violation is disqualifying: the Goal
+ * cannot be ACHIEVED while it is violated, no matter how high the
+ * weighted score is, and the violation is escalated for a human (G3).
+ * `hard: false` records the violation on the evaluation and lets the
+ * score speak — a soft constraint is a warning, not a veto.
+ *
+ * A constraint with no `metricSource` and no `maxValue`/`minValue` is a
+ * DECLARATIVE one (e.g. "never send unconfirmed email"): it is carried
+ * for prompts and reports and is never auto-evaluated. That is the
+ * honest behavior — the platform must not claim to have checked
+ * something it cannot measure.
+ */
+export interface GoalConstraint {
+    /** Stable slug, unique within the Goal. */
+    id: string;
+    /** Human-readable statement of the rule. */
+    name: string;
+    category: GoalConstraintCategory;
+    /** Disqualifying when violated. Omitted = `true`. */
+    hard?: boolean;
+    /** Metric to read when the constraint is measurable. */
+    metricSource?: GoalMetricSource;
+    /** Window override for `metricSource`. Omitted = the Goal's `window`. */
+    window?: GoalWindow;
+    /** Violated when the observed value exceeds this. */
+    maxValue?: number;
+    /** Violated when the observed value falls below this. */
+    minValue?: number;
+}
+
+/**
+ * Judgment layer G1 — the resolved score written back after evaluation.
+ * NULL on every single-metric Goal (nothing to resolve) and on a Goal
+ * that has never been evaluated.
+ */
+export interface GoalResolvedScore {
+    /** Weighted, normalized 0..1 across every criterion that resolved. */
+    score: number;
+    /** Per-criterion detail, in declared order. */
+    criteria: Array<{
+        id: string;
+        /** Observed metric value, or null when the read failed. */
+        value: number | null;
+        target: number;
+        weight: number;
+        /** 0..1 contribution BEFORE weighting. */
+        ratio: number;
+        satisfied: boolean;
+        /** Present only when the metric read failed. */
+        error?: string;
+    }>;
+    /** Ids of constraints observed to be violated at this evaluation. */
+    violatedConstraintIds: string[];
+    /** Subset of the above declared `hard` — these veto ACHIEVED. */
+    violatedHardConstraintIds: string[];
+    /** ISO timestamp of the evaluation that produced this score. */
+    at: string;
+}
+
+/**
  * A measurable target — "income >= $1000/month via Stripe" — evaluated
  * automatically against real business metrics (Goals & Metrics spec
  * FR-9..FR-14; domain-model review §23.4).
@@ -187,6 +303,35 @@ export class Goal {
 
     @Column({ type: 'varchar', length: 16, nullable: true })
     outcome?: GoalOutcome | null;
+
+    // ── Judgment layer G1 — weighted criteria + hard constraints. All
+    // three are additive and NULL on every pre-existing row, which is
+    // exactly the single-metric Goal this entity already described:
+    // evaluation only takes the weighted path when `criteria` holds at
+    // least one entry, so nothing about an existing Goal changes.
+
+    /**
+     * Weighted success criteria. NULL/empty = single-metric Goal
+     * (`metricSource` + `comparator` + `targetValue` decide everything,
+     * unchanged). Stored `simple-json` like `metricSource`.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    criteria?: GoalCriterion[] | null;
+
+    /**
+     * Constraints that must hold. A violated HARD constraint vetoes
+     * ACHIEVED even at a perfect score and raises an escalation (G3).
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    constraints?: GoalConstraint[] | null;
+
+    /**
+     * Last resolved weighted score + per-criterion breakdown. Written by
+     * `GoalEvaluationService` on every weighted evaluation; never written
+     * for single-metric Goals.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    resolvedScore?: GoalResolvedScore | null;
 
     // Tier A scope columns (EW-655 pattern) — nullable until the lazy
     // Organization backfill, no @ManyToOne to avoid the entities

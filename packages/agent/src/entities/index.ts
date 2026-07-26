@@ -58,6 +58,7 @@ export * from './agent.entity';
 // Agent Action Approval Queue — human-in-the-loop gate for side-effectful actions.
 export * from './agent-action-proposal.entity';
 export * from './agent-run.entity';
+export * from './agent-escalation.entity';
 export * from './agent-run-log.entity';
 export * from './agent-budget.entity';
 export * from './agent-membership.entity';
@@ -66,6 +67,7 @@ export * from './skill-binding.entity';
 export * from './task.entity';
 export * from './task-assignee.entity';
 export * from './task-reviewer.entity';
+export * from './task-review-rejection.entity';
 export * from './task-approver.entity';
 export * from './task-block.entity';
 export * from './task-relation.entity';
@@ -137,4 +139,3 @@ export * from './fleet-node.entity';
 export * from './terminal-transcript-chunk.entity';
 
 export * from './fleet-job.entity';
-

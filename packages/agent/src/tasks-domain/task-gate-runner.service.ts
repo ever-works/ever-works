@@ -8,6 +8,7 @@ import type {
     WorkChecksPolicy,
 } from '@ever-works/contracts';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
+import { config } from '../config';
 import { buildCheckEnv } from './check-env';
 
 /** Wall-clock budget applied when a check declares no `timeoutSec`. */
@@ -76,6 +77,57 @@ export class TaskGateRunnerService {
     private readonly logger = new Logger(TaskGateRunnerService.name);
 
     constructor(private readonly runs: AgentRunRepository) {}
+
+    /**
+     * Judgment layer G2 — the **L0 pre-check**: run the cheap structural
+     * checks BEFORE the model call, so an obviously broken workspace is
+     * described to the agent instead of discovered by it.
+     *
+     * Three deliberate differences from {@link runChecks}:
+     *
+     * 1. **Nothing is persisted.** No `gateStatus`, no `checkResults`, no
+     *    `gateAttempts`. A pre-check is not a verdict on the run's work —
+     *    the work has not happened yet — and writing one would make the
+     *    Sessions view show a red gate for a run that never executed.
+     * 2. **It never blocks.** The caller feeds the output into the prompt
+     *    and continues, whatever the result. A pre-check that could fail
+     *    a run would turn a misconfigured lint command into an outage.
+     * 3. **Its own tighter timeout.** Capped by
+     *    `AGENT_GATE_L0_PRECHECK_TIMEOUT_SEC` (default 120s) on top of
+     *    each check's own `timeoutSec`: a pre-check exists to be cheap,
+     *    and one that approaches the post-run gate's 30-minute ceiling is
+     *    a regression, not a feature.
+     */
+    async runPreChecks(input: {
+        checks: TaskAcceptanceCheck[];
+        cwd: string;
+        /** Hard per-check ceiling in seconds; defaults to the config value. */
+        timeoutSec?: number;
+    }): Promise<{ results: TaskCheckResult[]; failing: TaskCheckResult[] }> {
+        const checks = Array.isArray(input.checks) ? input.checks : [];
+        if (checks.length === 0) return { results: [], failing: [] };
+
+        const ceiling =
+            typeof input.timeoutSec === 'number' && input.timeoutSec > 0
+                ? input.timeoutSec
+                : config.agents.getGateL0PreCheckTimeoutSec();
+
+        const results: TaskCheckResult[] = [];
+        for (const check of checks) {
+            results.push(await this.executeCheck(check, input.cwd, ceiling));
+        }
+        // `required` is irrelevant here: a pre-check is INFORMATION for the
+        // prompt, so every non-green result is worth telling the agent
+        // about, including the ones that could never turn the gate red.
+        const failing = results.filter((result) => result.status !== 'green');
+        if (failing.length > 0) {
+            this.logger.log(
+                `L0 pre-check: ${failing.length}/${results.length} check(s) not green — ` +
+                    `feeding output into the run's first input.`,
+            );
+        }
+        return { results, failing };
+    }
 
     async runChecks(input: RunChecksInput): Promise<RunChecksOutcome> {
         const checks = Array.isArray(input.checks) ? input.checks : [];
@@ -151,13 +203,26 @@ export class TaskGateRunnerService {
      * credentials. A check that genuinely needs one more variable names it
      * in `envPassthrough`.
      */
-    private executeCheck(check: TaskAcceptanceCheck, rootCwd: string): Promise<TaskCheckResult> {
+    private executeCheck(
+        check: TaskAcceptanceCheck,
+        rootCwd: string,
+        /**
+         * Judgment layer G2 — optional tighter ceiling for the L0
+         * pre-check pass. Omitted = the normal `MAX_CHECK_TIMEOUT_SEC`
+         * gate ceiling, so the post-run path is byte-identical.
+         */
+        ceilingSec?: number,
+    ): Promise<TaskCheckResult> {
         const cwd = check.cwd ? join(rootCwd, check.cwd) : rootCwd;
+        const ceiling =
+            typeof ceilingSec === 'number' && ceilingSec > 0
+                ? Math.min(ceilingSec, MAX_CHECK_TIMEOUT_SEC)
+                : MAX_CHECK_TIMEOUT_SEC;
         const timeoutSec = Math.min(
             typeof check.timeoutSec === 'number' && check.timeoutSec > 0
                 ? check.timeoutSec
                 : DEFAULT_CHECK_TIMEOUT_SEC,
-            MAX_CHECK_TIMEOUT_SEC,
+            ceiling,
         );
         const startedAt = Date.now();
 

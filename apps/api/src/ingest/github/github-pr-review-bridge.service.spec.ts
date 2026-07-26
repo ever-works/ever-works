@@ -79,12 +79,17 @@ describe('GitHubPrReviewBridgeService', () => {
             findByWorkspace: jest.fn().mockResolvedValue(null),
             record: jest.fn().mockResolvedValue(null),
         };
+        // Orchestration M9 - the durable rejection recorder.
+        const rejections = {
+            recordPullRequestRejection: jest.fn().mockResolvedValue({ id: 'rej-1' }),
+        };
         const service = new GitHubPrReviewBridgeService(
             userPluginRepository as any,
             pluginSettingsService as any,
             eventIngestService as any,
             prReviewService as any,
             installBindings as any,
+            rejections as any,
         );
         return {
             service,
@@ -93,6 +98,7 @@ describe('GitHubPrReviewBridgeService', () => {
             eventIngestService,
             prReviewService,
             installBindings,
+            rejections,
         };
     }
 
@@ -454,6 +460,94 @@ describe('GitHubPrReviewBridgeService', () => {
         });
         expect(result.ingested).toBeNull();
         expect(eventIngestService.ingest).not.toHaveBeenCalled();
+    });
+
+    describe('pull_request_review -> durable rejection (orchestration M9)', () => {
+        function reviewBody(over: Record<string, unknown> = {}) {
+            return {
+                action: 'submitted',
+                repository: { full_name: 'octo/site' },
+                pull_request: { number: 9, html_url: 'https://github.com/octo/site/pull/9' },
+                review: {
+                    id: 1,
+                    state: 'changes_requested',
+                    body: 'the migration has no down()',
+                    user: { login: 'octocat', type: 'User' },
+                },
+                ...over,
+            };
+        }
+
+        it('records a changes_requested review as rejection feedback', async () => {
+            const { service, rejections } = createService();
+            await service.handleEvent(BINDING, 'pull_request_review', reviewBody());
+            expect(rejections.recordPullRequestRejection).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    userId: BINDING.userId,
+                    owner: 'octo',
+                    repo: 'site',
+                    prNumber: 9,
+                    feedback: 'the migration has no down()',
+                    reviewerLabel: 'octocat',
+                }),
+            );
+        });
+
+        it('never routes a review into the review loop - the loop reviews, it does not react', async () => {
+            const { service, prReviewService, eventIngestService } = createService();
+            const result = await service.handleEvent(BINDING, 'pull_request_review', reviewBody());
+            expect(result.ingested).toBeNull();
+            expect(eventIngestService.ingest).not.toHaveBeenCalled();
+            await flush();
+            expect(prReviewService.reviewPullRequest).not.toHaveBeenCalled();
+        });
+
+        it('ignores an approval - only a rejection carries feedback for the next run', async () => {
+            const { service, rejections } = createService();
+            await service.handleEvent(
+                BINDING,
+                'pull_request_review',
+                reviewBody({ review: { id: 1, state: 'approved', body: 'ship it' } }),
+            );
+            expect(rejections.recordPullRequestRejection).not.toHaveBeenCalled();
+        });
+
+        it('ignores a BOT reviewer - the loop must not treat its own output as human feedback', async () => {
+            const { service, rejections } = createService();
+            await service.handleEvent(
+                BINDING,
+                'pull_request_review',
+                reviewBody({
+                    review: {
+                        id: 1,
+                        state: 'changes_requested',
+                        body: 'automated nit',
+                        user: { login: 'ever-works[bot]', type: 'Bot' },
+                    },
+                }),
+            );
+            expect(rejections.recordPullRequestRejection).not.toHaveBeenCalled();
+        });
+
+        it('ignores a rejection with an empty body - it would prepend nothing useful', async () => {
+            const { service, rejections } = createService();
+            await service.handleEvent(
+                BINDING,
+                'pull_request_review',
+                reviewBody({
+                    review: { id: 1, state: 'changes_requested', body: '   ', user: {} },
+                }),
+            );
+            expect(rejections.recordPullRequestRejection).not.toHaveBeenCalled();
+        });
+
+        it('a recorder failure never rejects the webhook path', async () => {
+            const { service, rejections } = createService();
+            rejections.recordPullRequestRejection.mockRejectedValue(new Error('db down'));
+            await expect(
+                service.handleEvent(BINDING, 'pull_request_review', reviewBody()),
+            ).resolves.toEqual({ ingested: null });
+        });
     });
 
     it('a review failure never rejects the webhook path', async () => {

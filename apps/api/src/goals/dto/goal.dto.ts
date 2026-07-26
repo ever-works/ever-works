@@ -1,5 +1,7 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
+    ArrayMaxSize,
+    IsArray,
     IsBoolean,
     IsDateString,
     IsIn,
@@ -7,6 +9,7 @@ import {
     IsNumber,
     IsObject,
     IsOptional,
+    IsPositive,
     IsString,
     IsUUID,
     MaxLength,
@@ -15,7 +18,15 @@ import {
     ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import type { GoalComparator, GoalOutcome, GoalWindow } from '@ever-works/agent/goals';
+import {
+    GOAL_CONSTRAINT_CATEGORIES,
+    MAX_GOAL_CONSTRAINTS,
+    MAX_GOAL_CRITERIA,
+    type GoalComparator,
+    type GoalConstraintCategory,
+    type GoalOutcome,
+    type GoalWindow,
+} from '@ever-works/agent/goals';
 
 const GOAL_COMPARATORS: GoalComparator[] = ['gte', 'lte'];
 const GOAL_WINDOWS: GoalWindow[] = ['day', 'week', 'month', 'total', 'point'];
@@ -47,6 +58,117 @@ export class GoalMetricSourceDto {
     @IsOptional()
     @IsObject()
     params?: Record<string, unknown>;
+}
+
+/**
+ * Judgment layer G1 — one WEIGHTED success criterion.
+ *
+ * `metricSource`/`window`/`unit` are all optional and inherit from the
+ * Goal, so the common "same metric, several thresholds" Goal needs one
+ * line per criterion. `GoalsService.create/update` re-validates the
+ * semantic rules (unique ids, positive weight, finite target) as the
+ * single source of truth — this class is the edge shape.
+ */
+export class GoalCriterionDto {
+    @ApiProperty({ maxLength: 64, description: 'Stable slug, unique within the Goal.' })
+    @IsString()
+    @MinLength(1)
+    @MaxLength(64)
+    id: string;
+
+    @ApiProperty({ maxLength: 200 })
+    @IsString()
+    @MinLength(1)
+    @MaxLength(200)
+    name: string;
+
+    @ApiProperty({
+        required: false,
+        type: GoalMetricSourceDto,
+        description: "Metric override; omitted inherits the Goal's own metricSource.",
+    })
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => GoalMetricSourceDto)
+    metricSource?: GoalMetricSourceDto;
+
+    @ApiProperty({ required: false, enum: GOAL_WINDOWS })
+    @IsOptional()
+    @IsIn(GOAL_WINDOWS)
+    window?: GoalWindow;
+
+    @ApiProperty({ description: 'Relative weight (> 0); normalized across criteria.' })
+    @IsNumber()
+    @IsPositive()
+    weight: number;
+
+    @ApiProperty({ description: 'Value at which this criterion is fully satisfied.' })
+    @IsNumber()
+    target: number;
+
+    @ApiProperty({ enum: GOAL_COMPARATORS, description: 'gte = higher is better.' })
+    @IsIn(GOAL_COMPARATORS)
+    direction: GoalComparator;
+
+    @ApiProperty({ required: false, maxLength: 32 })
+    @IsOptional()
+    @IsString()
+    @MaxLength(32)
+    unit?: string;
+}
+
+/**
+ * Judgment layer G1 — a constraint that must hold.
+ *
+ * A constraint with neither `maxValue` nor `minValue` is DECLARATIVE:
+ * it is carried for prompts and reports and never auto-evaluated,
+ * because the platform must not claim to have checked something it
+ * cannot measure. `hard` defaults to true — a constraint is a rule
+ * until it says otherwise — and a violated hard constraint vetoes
+ * ACHIEVED and raises an escalation.
+ */
+export class GoalConstraintDto {
+    @ApiProperty({ maxLength: 64 })
+    @IsString()
+    @MinLength(1)
+    @MaxLength(64)
+    id: string;
+
+    @ApiProperty({ maxLength: 300 })
+    @IsString()
+    @MinLength(1)
+    @MaxLength(300)
+    name: string;
+
+    @ApiProperty({ enum: GOAL_CONSTRAINT_CATEGORIES })
+    @IsIn(GOAL_CONSTRAINT_CATEGORIES)
+    category: GoalConstraintCategory;
+
+    @ApiProperty({ required: false, default: true, description: 'Violation disqualifies.' })
+    @IsOptional()
+    @IsBoolean()
+    hard?: boolean;
+
+    @ApiProperty({ required: false, type: GoalMetricSourceDto })
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => GoalMetricSourceDto)
+    metricSource?: GoalMetricSourceDto;
+
+    @ApiProperty({ required: false, enum: GOAL_WINDOWS })
+    @IsOptional()
+    @IsIn(GOAL_WINDOWS)
+    window?: GoalWindow;
+
+    @ApiProperty({ required: false, description: 'Violated when the value exceeds this.' })
+    @IsOptional()
+    @IsNumber()
+    maxValue?: number;
+
+    @ApiProperty({ required: false, description: 'Violated when the value falls below this.' })
+    @IsOptional()
+    @IsNumber()
+    minValue?: number;
 }
 
 /**
@@ -114,6 +236,32 @@ export class CreateGoalDto {
     @IsInt()
     @Min(1)
     checkFrequencyMinutes?: number;
+
+    @ApiProperty({
+        required: false,
+        type: [GoalCriterionDto],
+        description:
+            'Judgment layer G1 - weighted success criteria. Omitted keeps this a single-metric Goal (comparator + targetValue decide everything, unchanged).',
+    })
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(MAX_GOAL_CRITERIA)
+    @ValidateNested({ each: true })
+    @Type(() => GoalCriterionDto)
+    criteria?: GoalCriterionDto[];
+
+    @ApiProperty({
+        required: false,
+        type: [GoalConstraintDto],
+        description:
+            'Judgment layer G1 - constraints that must hold; a hard violation vetoes ACHIEVED.',
+    })
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(MAX_GOAL_CONSTRAINTS)
+    @ValidateNested({ each: true })
+    @Type(() => GoalConstraintDto)
+    constraints?: GoalConstraintDto[];
 }
 
 /**
@@ -191,6 +339,28 @@ export class UpdateGoalDto {
     @IsOptional()
     @IsIn(GOAL_OUTCOMES)
     outcome?: GoalOutcome | null;
+
+    @ApiProperty({
+        required: false,
+        nullable: true,
+        type: [GoalCriterionDto],
+        description:
+            'Judgment layer G1. `null` (or an empty array) clears the weighted path and the stale resolved score with it.',
+    })
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(MAX_GOAL_CRITERIA)
+    @ValidateNested({ each: true })
+    @Type(() => GoalCriterionDto)
+    criteria?: GoalCriterionDto[] | null;
+
+    @ApiProperty({ required: false, nullable: true, type: [GoalConstraintDto] })
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(MAX_GOAL_CONSTRAINTS)
+    @ValidateNested({ each: true })
+    @Type(() => GoalConstraintDto)
+    constraints?: GoalConstraintDto[] | null;
 }
 
 /**

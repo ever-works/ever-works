@@ -50,6 +50,7 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'AgentAttachment',
     'AgentBudget',
     'AgentEmailAssignment',
+    'AgentEscalation',
     'AgentMembership',
     'AgentRun',
     'AgentRunLog',
@@ -124,6 +125,7 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'TaskChatMessage',
     'TaskKbMention',
     'TaskRelation',
+    'TaskReviewRejection',
     'TaskReviewer',
     'TaskWatcher',
     // ──────────────────────────

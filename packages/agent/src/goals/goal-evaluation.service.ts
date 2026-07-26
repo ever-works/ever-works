@@ -1,9 +1,27 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { LessThanOrEqual, Repository } from 'typeorm';
-import { Goal, GoalOutcome, GoalStatus } from '../entities/goal.entity';
+import {
+    Goal,
+    GoalOutcome,
+    GoalStatus,
+    type GoalConstraint,
+    type GoalResolvedScore,
+} from '../entities/goal.entity';
 import { GoalMetricSample } from '../entities/goal-metric-sample.entity';
 import { MetricsFacadeService } from '../facades/metrics.facade';
+import { AgentEscalationService } from '../agents/agent-escalation.service';
+import {
+    computeResolvedScore,
+    constraintViolated,
+    hasWeightedCriteria,
+    isHardConstraint,
+    isMeasurableConstraint,
+    isWeightedGoalAchieved,
+    resolveConstraints,
+    resolveSourceFor,
+    type CriterionObservation,
+} from './goal-criteria';
 import {
     MIN_CHECK_FREQUENCY_MINUTES,
     type GoalEvaluationEntry,
@@ -42,6 +60,11 @@ export class GoalEvaluationService {
         @InjectRepository(GoalMetricSample)
         private readonly samples: Repository<GoalMetricSample>,
         private readonly metricsFacade: MetricsFacadeService,
+        // Judgment layer G1/G3 — "escalate-on-hard". A violated HARD
+        // constraint is a decision a human owes, not a number on a chart.
+        // @Optional() + appended LAST so positional spec constructors and
+        // installs without the escalation stack keep compiling.
+        @Optional() private readonly escalations?: AgentEscalationService,
     ) {}
 
     /**
@@ -132,6 +155,12 @@ export class GoalEvaluationService {
             { userId: goal.userId },
         );
 
+        // Judgment layer G1 — resolve weighted criteria + constraints
+        // BEFORE the outcome rules, because both can veto an achievement.
+        // `null` for a single-metric Goal, which is the overwhelming
+        // majority and takes the byte-identical original path below.
+        const resolved = await this.resolveJudgment(goal);
+
         const now = new Date();
         const sampledAtMs = Date.parse(sample.at);
         const sampledAt = Number.isFinite(sampledAtMs) ? new Date(sampledAtMs) : now;
@@ -153,7 +182,16 @@ export class GoalEvaluationService {
         }
 
         let outcome: GoalEvaluationEntry['outcome'] = 'evaluated';
-        if (this.isSatisfied(goal, sample.value)) {
+        // Weighted Goals are judged by their criteria + constraints; a
+        // single-metric Goal is judged by the comparator exactly as
+        // before. One `if`, no shared branch — the two rules never mix.
+        const satisfied = resolved
+            ? isWeightedGoalAchieved(resolved)
+            : this.isSatisfied(goal, sample.value);
+        if (resolved) {
+            goal.resolvedScore = resolved;
+        }
+        if (satisfied) {
             goal.status = GoalStatus.COMPLETED;
             goal.outcome = GoalOutcome.ACHIEVED;
             goal.nextCheckAt = null;
@@ -169,7 +207,19 @@ export class GoalEvaluationService {
         // Missions are NEVER auto-completed from here.
         await this.goals.save(goal);
 
-        return { goalId: goal.id, outcome, value: sample.value };
+        // Escalate-on-hard (G1's stated behavior). AFTER the save so the
+        // escalation always describes persisted state, and best-effort so
+        // an escalation-store hiccup can never fail an evaluation.
+        if (resolved && resolved.violatedHardConstraintIds.length > 0) {
+            await this.escalateHardViolation(goal, resolved);
+        }
+
+        return {
+            goalId: goal.id,
+            outcome,
+            value: sample.value,
+            ...(resolved ? { score: resolved.score } : {}),
+        };
     }
 
     // ─── internals ──────────────────────────────────────────────────
@@ -208,5 +258,121 @@ export class GoalEvaluationService {
 
     private isSatisfied(goal: Goal, value: number): boolean {
         return goal.comparator === 'gte' ? value >= goal.targetValue : value <= goal.targetValue;
+    }
+
+    /**
+     * Judgment layer G1 — read every weighted criterion and every
+     * MEASURABLE constraint, then fold them into a resolved score.
+     *
+     * Returns `null` when the Goal declares no criteria: that is the
+     * single-metric Goal this service has always evaluated, and it must
+     * take the original path untouched. Constraints alone do not trigger
+     * the weighted path — a Goal with constraints but one metric is still
+     * scored by its comparator; the constraints simply veto.
+     *
+     * Per-metric failures are CONTAINED: a provider outage on one
+     * criterion records the error on that entry and drops it out of the
+     * normalization, rather than throwing and losing the whole
+     * evaluation. That is the difference between "we could not read one
+     * number" and "this Goal cannot be evaluated".
+     */
+    private async resolveJudgment(goal: Goal): Promise<GoalResolvedScore | null> {
+        const constraints = resolveConstraints(goal);
+        if (!hasWeightedCriteria(goal)) {
+            // No criteria: no weighted score. Constraints on a
+            // single-metric Goal are carried for prompts/reports only —
+            // vetoing an outcome the user configured with a comparator
+            // would change existing behavior, which G1 must not do.
+            return null;
+        }
+
+        const observations: CriterionObservation[] = [];
+        for (const criterion of goal.criteria) {
+            const { source, window } = resolveSourceFor(goal, criterion);
+            try {
+                const sample = await this.metricsFacade.getMetricValue(
+                    source.pluginId,
+                    {
+                        metricId: source.metricId,
+                        window,
+                        ...(source.params ? { params: source.params } : {}),
+                    },
+                    { userId: goal.userId },
+                );
+                observations.push({ criterion, value: sample.value });
+            } catch (error) {
+                const message = error instanceof Error ? error.message : String(error);
+                this.logger.warn(
+                    `Goal ${goal.id} criterion '${criterion.id}' metric read failed: ${message}`,
+                );
+                observations.push({ criterion, value: null, error: message });
+            }
+        }
+
+        const violated: GoalConstraint[] = [];
+        const violatedHard: GoalConstraint[] = [];
+        for (const constraint of constraints) {
+            // Declarative constraints are never auto-violated — the
+            // platform does not claim to have checked what it cannot read.
+            if (!isMeasurableConstraint(constraint)) continue;
+            const { source, window } = resolveSourceFor(goal, constraint);
+            try {
+                const sample = await this.metricsFacade.getMetricValue(
+                    source.pluginId,
+                    {
+                        metricId: source.metricId,
+                        window,
+                        ...(source.params ? { params: source.params } : {}),
+                    },
+                    { userId: goal.userId },
+                );
+                if (constraintViolated(constraint, sample.value)) {
+                    violated.push(constraint);
+                    if (isHardConstraint(constraint)) violatedHard.push(constraint);
+                }
+            } catch (error) {
+                // An unreadable constraint is UNKNOWN, never violated:
+                // failing a Goal because a provider was down would be the
+                // worst possible default for a rule that vetoes outcomes.
+                this.logger.warn(
+                    `Goal ${goal.id} constraint '${constraint.id}' metric read failed (treated as ` +
+                        `not violated): ${error instanceof Error ? error.message : String(error)}`,
+                );
+            }
+        }
+
+        return computeResolvedScore(observations, { violated, violatedHard });
+    }
+
+    /**
+     * Escalate-on-hard. Deduplicated per (goal, constraint set) so a Goal
+     * that keeps evaluating while a constraint stays violated files ONE
+     * card, not one per tick.
+     */
+    private async escalateHardViolation(goal: Goal, resolved: GoalResolvedScore): Promise<void> {
+        if (!this.escalations) return;
+        const ids = [...resolved.violatedHardConstraintIds].sort().join(',');
+        await this.escalations.record({
+            userId: goal.userId,
+            reasonCode: 'guardrail-refusal',
+            dedupKey: `goal-hard-constraint:${goal.id}:${ids}`,
+            summary:
+                `Goal "${goal.title}" violates hard constraint(s): ${ids}. ` +
+                `Weighted score ${resolved.score.toFixed(2)}.`,
+            decisionNeeded:
+                'A hard constraint on this Goal is violated, so it cannot be achieved as ' +
+                'configured. Decide whether to relax the constraint, change the target, or ' +
+                'stop pursuing this Goal.',
+            attempted: resolved.criteria.map((entry) => ({
+                label: entry.id,
+                outcome:
+                    entry.value === null
+                        ? `metric unreadable${entry.error ? `: ${entry.error}` : ''}`
+                        : `${entry.value} vs target ${entry.target} (${
+                              entry.satisfied ? 'met' : 'not met'
+                          })`,
+            })),
+            ...(goal.organizationId !== undefined ? { organizationId: goal.organizationId } : {}),
+        });
     }
 }

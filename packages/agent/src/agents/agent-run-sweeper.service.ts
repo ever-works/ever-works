@@ -1,7 +1,14 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { config } from '../config';
-import { AgentRunRepository } from '../database/repositories/agent-run.repository';
+import {
+    ATTENTION_REASON_QUEUED_TOO_LONG,
+    ATTENTION_REASON_STALE_PARKED,
+    AgentRunRepository,
+    STALE_PARK_SUMMARY_PREFIX,
+} from '../database/repositories/agent-run.repository';
 import { RunDispatchGateService } from './run-dispatch-gate.service';
+import { AgentEscalationService } from './agent-escalation.service';
+import { NotificationService } from '../notifications/notification.service';
 
 /**
  * Error message prefix for a swept run.
@@ -21,10 +28,29 @@ export interface AgentRunSweepSummary {
     scanned: number;
     /** Rows actually transitioned. Lower than `scanned` when a worker won the CAS race. */
     swept: number;
+    /**
+     * State-aware sweeper (Wave 4 M6) — of `swept`, how many were
+     * checkpoint-and-PARKED (stale `running`, conversation kept,
+     * resumable) rather than hard-failed. `swept - parked` is the reaped
+     * count.
+     */
+    parked: number;
     /** True when the batch filled — more stuck rows remain for the next tick. */
     batchLimitReached: boolean;
     oldestAgeMs: number | null;
     byKind: Record<string, number>;
+}
+
+/** Outcome of the queued-too-long surfacing pass (Wave 4 M6). */
+export interface QueuedTooLongSweepSummary {
+    enabled: boolean;
+    thresholdMinutes: number;
+    /** Rows over the bound and not yet flagged. */
+    scanned: number;
+    /** Rows this tick actually flagged (CAS winners). */
+    flagged: number;
+    /** Of those, how many produced an owner notification. */
+    notified: number;
 }
 
 /**
@@ -43,6 +69,26 @@ export interface AgentRunSweepSummary {
  * `markStarted`'s CAS result and treats a `failed` status as an abort signal at
  * its next checkpoint, so even in the impossible case where a sweep lands on a
  * live run, the worker bails before applying side effects.
+ *
+ * ## State-aware policy (Wave 4 M6)
+ *
+ * One TTL used to produce one verdict (`failed`) for three different
+ * situations. It now branches on the run's actual state:
+ *
+ * | state                     | policy                                       |
+ * |---------------------------|----------------------------------------------|
+ * | `awaitingInput`           | **never reaped, never flagged.** Exempt from  |
+ * |                           | every TTL — it is waiting, not stuck.         |
+ * | `running` + stale         | **checkpoint-and-park**: terminal `completed` |
+ * |                           | + `terminalEndedReason='parked'`, so `resume` |
+ * |                           | can revive the conversation. Not an error.    |
+ * | `queued` + stale          | hard-fail (unchanged): a queued row never      |
+ * |                           | started, so there is nothing to checkpoint.    |
+ * | `queued` + over the bound | **surface**: flag + notify, never reap.        |
+ *
+ * Every threshold is env-configurable (`AGENT_RUN_STUCK_SWEEP_MINUTES`,
+ * `AGENT_RUN_QUEUED_TOO_LONG_MINUTES`, `AGENT_RUN_STALE_PARK_ENABLED`,
+ * batch sizes) with the defaults documented on the config getters.
  */
 @Injectable()
 export class AgentRunSweeperService {
@@ -54,6 +100,11 @@ export class AgentRunSweeperService {
         // stuck runs, promote parked runs for the affected Works. Appended
         // LAST + Optional so positional spec constructors keep compiling.
         @Optional() private readonly dispatchGate?: RunDispatchGateService,
+        // Wave 4 M6 — the attention surface. Both @Optional() and both
+        // appended after the existing positional args, for the same
+        // reason: unit tests construct this service positionally.
+        @Optional() private readonly notifications?: NotificationService,
+        @Optional() private readonly escalations?: AgentEscalationService,
     ) {}
 
     /**
@@ -68,6 +119,7 @@ export class AgentRunSweeperService {
             cutoffMinutes,
             scanned: 0,
             swept: 0,
+            parked: 0,
             batchLimitReached: false,
             oldestAgeMs: null,
             byKind: {},
@@ -113,10 +165,39 @@ export class AgentRunSweeperService {
             if (typeof at === 'number') oldestAgeMs = Math.max(oldestAgeMs, now - at);
         }
 
-        const swept = await this.runs.markStuckFailed(
-            stuck.map((r) => r.id),
-            `${STUCK_SWEEP_PREFIX}: no worker checkpoint for ${cutoffMinutes}m`,
-        );
+        // Wave 4 M6 — split the batch by STATE, not by age. A `running`
+        // row has a live conversation behind it (`cliSessionId`) and gets
+        // checkpoint-and-parked; a `queued` row never started, so there is
+        // nothing to checkpoint and the pre-M6 hard fail is still right.
+        const parkEnabled = config.agents.getRunStaleParkEnabled();
+        const parkable = parkEnabled ? stuck.filter((row) => row.status === 'running') : [];
+        const parkableIds = new Set(parkable.map((row) => row.id));
+        const reapable = stuck.filter((row) => !parkableIds.has(row.id));
+
+        let parked = 0;
+        if (parkable.length > 0) {
+            parked = await this.runs.parkStaleRunning(
+                parkable.map((r) => r.id),
+                `${STALE_PARK_SUMMARY_PREFIX}: no worker checkpoint for ${cutoffMinutes}m — ` +
+                    `session parked, resume to continue`,
+            );
+        }
+
+        const reaped =
+            reapable.length > 0
+                ? await this.runs.markStuckFailed(
+                      reapable.map((r) => r.id),
+                      `${STUCK_SWEEP_PREFIX}: no worker checkpoint for ${cutoffMinutes}m`,
+                  )
+                : 0;
+        const swept = parked + reaped;
+
+        // A parked run is a run nobody is driving any more. Record it so
+        // the Task detail + digest can say "this stopped, here is how to
+        // pick it up" instead of the user finding it by scrolling.
+        for (const row of parkable) {
+            await this.recordParkEscalation(row, cutoffMinutes);
+        }
 
         // Measured on the RAW scan, not the awaiting-filtered set: the batch
         // is what the query returned, so a page full of skipped rows still
@@ -127,7 +208,7 @@ export class AgentRunSweeperService {
         // The per-kind breakdown is what separates "one node was evicted" from
         // "agent-task-execute is systematically dying".
         this.logger.warn(
-            `AgentRun sweep: reaped ${swept}/${stuck.length} stuck run(s) — ` +
+            `AgentRun sweep: parked ${parked}, reaped ${reaped} of ${stuck.length} stuck run(s) — ` +
                 `cutoff=${cutoffMinutes}m oldest=${Math.round(oldestAgeMs / 60_000)}m ` +
                 `byKind=${JSON.stringify(byKind)} ids=${JSON.stringify(
                     stuck.slice(0, 20).map((r) => r.id),
@@ -142,10 +223,10 @@ export class AgentRunSweeperService {
         }
 
         // Run orchestration (Wave 4 M2) — drain safety net. Every reaped
-        // run may have freed a concurrency slot; promote the oldest parked
-        // run for each affected Work. Best-effort by contract (the gate
-        // never throws from drainForWork), and only when rows actually
-        // transitioned — a lost CAS race freed nothing.
+        // OR parked run may have freed a concurrency slot; promote the
+        // oldest parked run for each affected Work. Best-effort by
+        // contract (the gate never throws from drainForWork), and only
+        // when rows actually transitioned — a lost CAS race freed nothing.
         if (this.dispatchGate && swept > 0) {
             const workIds = [
                 ...new Set(stuck.map((r) => r.workId).filter((w): w is string => !!w)),
@@ -160,10 +241,84 @@ export class AgentRunSweeperService {
             cutoffMinutes,
             scanned: stuck.length,
             swept,
+            parked,
             batchLimitReached,
             oldestAgeMs,
             byKind,
         };
+    }
+
+    /**
+     * State-aware sweeper (Wave 4 M6) — **surface** runs that have been
+     * `queued` past the bound instead of letting them sit silently.
+     *
+     * This pass NEVER reaps and never transitions a run: a run that cannot
+     * get capacity is a capacity problem, and killing it would destroy
+     * queued work to hide a symptom. It stamps
+     * `attentionReason='queued-too-long'` (which the Sessions list's
+     * `attention=1` filter reads), notifies the owner once, and files an
+     * escalation so the Task detail and the digest can show it.
+     *
+     * One-shot per run by construction: the scan excludes rows that
+     * already carry an `attentionReason`, and the flag write is CAS'd, so
+     * neither a second tick nor a second replica can double-notify.
+     *
+     * Zero-arg, like {@link sweepStuckRuns} — same superjson RPC proxy.
+     */
+    async sweepQueuedTooLong(): Promise<QueuedTooLongSweepSummary> {
+        const thresholdMinutes = config.agents.getRunQueuedTooLongMinutes();
+        const base: QueuedTooLongSweepSummary = {
+            enabled: true,
+            thresholdMinutes,
+            scanned: 0,
+            flagged: 0,
+            notified: 0,
+        };
+        if (!config.agents.getRunSweeperEnabled() || thresholdMinutes <= 0) {
+            return { ...base, enabled: false };
+        }
+
+        const limit = config.agents.getRunQueuedAttentionBatch();
+        const cutoff = new Date(Date.now() - thresholdMinutes * 60_000);
+        const candidates = await this.runs.findQueuedTooLong(cutoff, limit);
+        if (candidates.length === 0) {
+            return base;
+        }
+
+        let flagged = 0;
+        let notified = 0;
+        for (const run of candidates) {
+            let won = false;
+            try {
+                won = await this.runs.setAttention(run.id, ATTENTION_REASON_QUEUED_TOO_LONG);
+            } catch (error) {
+                this.logger.warn(
+                    `AgentRun queued-too-long: flag failed for ${run.id}: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+                continue;
+            }
+            // Lost the CAS — another tick/replica already flagged and
+            // notified. Doing either again would double-notify.
+            if (!won) continue;
+            flagged += 1;
+
+            const waitedMinutes = Math.max(
+                thresholdMinutes,
+                Math.round((Date.now() - (run.createdAt?.getTime?.() ?? Date.now())) / 60_000),
+            );
+            if (await this.notifyQueuedTooLong(run, waitedMinutes)) {
+                notified += 1;
+            }
+            await this.recordQueuedTooLongEscalation(run, waitedMinutes);
+        }
+
+        this.logger.log(
+            `AgentRun queued-too-long: flagged ${flagged}/${candidates.length} run(s) over ` +
+                `${thresholdMinutes}m (notified ${notified}).`,
+        );
+        return { ...base, scanned: candidates.length, flagged, notified };
     }
 
     /**
@@ -196,4 +351,107 @@ export class AgentRunSweeperService {
         }
         return { swept, cutoffMinutes };
     }
+
+    // ── internals ──────────────────────────────────────────────────
+
+    /**
+     * Best-effort by contract: neither a notification nor an escalation
+     * may fail (or slow) a sweep tick. Every failure is logged so a silent
+     * attention gap is impossible.
+     */
+    private async notifyQueuedTooLong(
+        run: { id: string; userId: string; taskId?: string | null; queuedReason?: string | null },
+        waitedMinutes: number,
+    ): Promise<boolean> {
+        if (!this.notifications) return false;
+        try {
+            await this.notifications.notifyAgentRunQueuedTooLong({
+                userId: run.userId,
+                runId: run.id,
+                taskId: run.taskId ?? null,
+                waitedMinutes,
+                queuedReason: run.queuedReason ?? null,
+            });
+            return true;
+        } catch (error) {
+            this.logger.warn(
+                `AgentRun queued-too-long: notify failed for ${run.id}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return false;
+        }
+    }
+
+    private async recordQueuedTooLongEscalation(
+        run: {
+            id: string;
+            userId: string;
+            agentId: string;
+            taskId?: string | null;
+            workId?: string | null;
+            queuedReason?: string | null;
+        },
+        waitedMinutes: number,
+    ): Promise<void> {
+        if (!this.escalations) return;
+        await this.escalations.record({
+            userId: run.userId,
+            reasonCode: 'queued-too-long',
+            runId: run.id,
+            taskId: run.taskId ?? null,
+            workId: run.workId ?? null,
+            agentId: run.agentId,
+            summary: `Run has been queued for ${waitedMinutes} minutes without starting.`,
+            decisionNeeded:
+                'Decide whether to raise the concurrency limit for this Work/org, cancel the ' +
+                'run, or let it keep waiting. Nothing was reaped — the run is still queued.',
+            attempted: [
+                {
+                    label: 'dispatch',
+                    outcome: run.queuedReason
+                        ? `parked with reason '${run.queuedReason}'`
+                        : 'queued, never handed to the job runtime',
+                },
+            ],
+        });
+    }
+
+    private async recordParkEscalation(
+        run: { id: string; agentId: string; workId?: string | null },
+        cutoffMinutes: number,
+    ): Promise<void> {
+        if (!this.escalations) return;
+        // The stuck-scan projection is deliberately narrow (it does not
+        // select userId), so resolve the owner only when we actually have
+        // an escalation sink. A miss is not an error — the park itself
+        // already landed.
+        let userId: string | null = null;
+        try {
+            const full = await this.runs.findById(run.id);
+            userId = full?.userId ?? null;
+        } catch {
+            userId = null;
+        }
+        if (!userId) return;
+        await this.escalations.record({
+            userId,
+            reasonCode: 'run-parked',
+            runId: run.id,
+            workId: run.workId ?? null,
+            agentId: run.agentId,
+            summary: `Run was parked after ${cutoffMinutes} minutes with no worker checkpoint.`,
+            decisionNeeded:
+                'The conversation was kept and can be resumed. Decide whether to resume this ' +
+                'run, or investigate why its worker stopped reporting.',
+            attempted: [
+                {
+                    label: 'worker-heartbeat',
+                    outcome: `no checkpoint for ${cutoffMinutes}m — process presumed dead`,
+                },
+            ],
+        });
+    }
 }
+
+export { ATTENTION_REASON_QUEUED_TOO_LONG, ATTENTION_REASON_STALE_PARKED };

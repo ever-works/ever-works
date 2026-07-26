@@ -64,10 +64,23 @@ export {
 // reaches for directly (run-history pagination, cancel, skill rollup,
 // budget rollup). Mirrors the same pattern as `AgentFileService` etc.
 export { AgentRepository } from '../database/repositories/agent.repository';
-export { AgentRunRepository } from '../database/repositories/agent-run.repository';
+export {
+    AgentRunRepository,
+    ATTENTION_REASON_QUEUED_TOO_LONG,
+    ATTENTION_REASON_STALE_PARKED,
+    STALE_PARK_SUMMARY_PREFIX,
+    type WorkRunsSummary,
+} from '../database/repositories/agent-run.repository';
 export { AgentRunLogRepository } from '../database/repositories/agent-run-log.repository';
 export { SkillBindingRepository } from '../database/repositories/skill-binding.repository';
 export { PluginUsageRepository } from '../database/repositories/plugin-usage.repository';
 // FU-14 — re-export WorkRepository for the AGENT_GIT_FACADE binding
 // (it resolves the Work's git config + owner/repo before the commit).
 export { WorkRepository } from '../database/repositories/work.repository';
+// Judgment layer G3 - escalation records.
+export * from './agent-escalation.service';
+export {
+    AgentEscalationRepository,
+    type RecordEscalationInput,
+} from '../database/repositories/agent-escalation.repository';
+export { AgentEscalation } from '../entities/agent-escalation.entity';

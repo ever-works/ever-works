@@ -21,6 +21,7 @@ import type {
 } from '../tasks-domain/run-steering-port';
 import { RunDispatchGateService } from './run-dispatch-gate.service';
 import { TerminalSessionLauncher } from './terminal-session-launcher.service';
+import { TaskReviewRejectionRepository } from '../database/repositories/task-review-rejection.repository';
 
 /**
  * `terminalEndedReason` values that make a finished run resumable: the
@@ -31,6 +32,69 @@ const RESUMABLE_ENDED_REASONS = ['parked'] as const;
 
 /** Longest steering message accepted. Matches the task-chat body cap. */
 const MAX_STEER_BYTES = 16 * 1024;
+
+/**
+ * Orchestration M9 — how many pending rejections a single resume replays.
+ * Bounded so a Task that accumulated a rejection storm cannot blow the
+ * resumed run's first prompt; the oldest are replayed first (a comment
+ * thread reads in order), and anything beyond the cap stays pending for
+ * the resume after this one.
+ */
+const MAX_REPLAYED_REJECTIONS = 3;
+
+/**
+ * Chat-template control markers a rejection body could try to forge.
+ * Mirrors the worker's `neutralizeControlTokens`: rejection feedback is
+ * written by a HUMAN REVIEWER — including, for `pull-request` rejections,
+ * anyone who can comment on the repo — and it is spliced into the resumed
+ * run's first turn, so it is untrusted input on a prompt path.
+ */
+const CHAT_TEMPLATE_MARKER_PATTERN =
+    /<\|(?:im_start|im_end|system|user|assistant|endoftext|eot_id|start_header_id|end_header_id)\|>/gi;
+
+/** Strip forgeable control markers; leave everything else byte-identical. */
+export function neutralizeRejectionText(value: string): string {
+    return value.replace(CHAT_TEMPLATE_MARKER_PATTERN, '');
+}
+
+/**
+ * Orchestration M9 — compose the seeded first input for a resumed run
+ * from the rejections it is answering.
+ *
+ * Machine-generated in the same shape as the red-gate iterate message, so
+ * an agent that has learned to read one reads the other. Exported for the
+ * spec: the exact wording is the contract with the model.
+ */
+export function composeRejectionFeedbackMessage(
+    rejections: Array<{
+        source: string;
+        feedback: string;
+        reviewerLabel?: string | null;
+        prNumber?: number | null;
+    }>,
+): string {
+    const lines: string[] = [
+        'Your previous work on this task was REJECTED by a reviewer. Address the feedback below before doing anything else, then finish.',
+        '',
+    ];
+    for (const rejection of rejections) {
+        const who = rejection.reviewerLabel
+            ? neutralizeRejectionText(String(rejection.reviewerLabel))
+            : 'reviewer';
+        const where =
+            rejection.source === 'pull-request'
+                ? `pull request${rejection.prNumber ? ` #${rejection.prNumber}` : ''}`
+                : rejection.source === 'gate'
+                  ? 'quality gate'
+                  : 'task review';
+        lines.push(`Rejection from ${who} (${where}):`);
+        for (const feedbackLine of neutralizeRejectionText(rejection.feedback).split('\n')) {
+            lines.push(`  ${feedbackLine}`);
+        }
+        lines.push('');
+    }
+    return lines.join('\n').trimEnd();
+}
 
 export interface RunInterruptOutcome {
     /** True when the flag was recorded on a live run. */
@@ -48,6 +112,11 @@ export interface RunResumeOutcome {
     carriedCliSession: boolean;
     /** True when the dispatch gate parked the new run instead of enqueuing it. */
     queued: boolean;
+    /**
+     * Orchestration M9 — how many durable reviewer rejections were
+     * replayed into the resumed run's first input. 0 = a plain resume.
+     */
+    rejectionsReplayed: number;
 }
 
 /**
@@ -102,6 +171,11 @@ export class RunSteeringService implements RunSteeringPort {
         // A resumed persistent run wants its terminal back. Appended last +
         // @Optional() so existing positional test constructions keep working.
         @Optional() private readonly terminalLauncher?: TerminalSessionLauncher,
+        // Orchestration M9 — durable reviewer rejections replayed into the
+        // resumed run's first input. @Optional() + appended LAST for the
+        // same positional-arity reason as every constructor arg above it;
+        // absent = today's plain resume, unchanged.
+        @Optional() private readonly rejections?: TaskReviewRejectionRepository,
     ) {}
 
     /** A run that can still receive injected input. */
@@ -246,12 +320,32 @@ export class RunSteeringService implements RunSteeringPort {
         // Non-null from here: `reserve` either ran above or threw.
         const next = created!;
 
+        // Orchestration M9 — rejection-feedback prepend. A run is most
+        // often resumed BECAUSE a human rejected its work, and until now
+        // the reason was lost: the reviewer's words lived on a PR or in a
+        // review row, and the resumed run started from nothing. Any
+        // durable rejections recorded for this Task since the last resume
+        // become the FIRST thing the new run reads, ahead of the caller's
+        // own message.
+        //
+        // Best-effort by contract: a resume must never fail because the
+        // feedback lookup hiccuped — the run still resumes, just without
+        // the prepend, which is exactly today's behavior.
+        const replayed = await this.claimRejectionFeedback(run.taskId, next.id);
+
         // The conversation lifetime survives the process lifetime: hand the
         // pipeline plugin its own resume id, and seed the first message so
         // the resumed loop starts from the human's answer.
+        //
+        // Order matters: the rejection block goes FIRST so the agent reads
+        // "here is what was wrong" before "here is what to do about it".
+        const seeded = [
+            ...(replayed.message ? [replayed.message] : []),
+            ...(trimmed ? [trimmed] : []),
+        ];
         await this.runs.seedResumeContext(next.id, {
             cliSessionId: run.cliSessionId ?? null,
-            pendingInput: trimmed ? [trimmed] : null,
+            pendingInput: seeded.length > 0 ? seeded : null,
         });
 
         // The source run is answered — it must stop showing up in the
@@ -298,6 +392,7 @@ export class RunSteeringService implements RunSteeringPort {
             carriedCliSession: Boolean(run.cliSessionId),
             hasMessage: Boolean(trimmed),
             queued: !admission.admitted,
+            rejectionsReplayed: replayed.count,
         });
         // Streaming terminal: the fan-out path gates on `requirePersistent`,
         // but resume dispatches `agent-task-execute` directly, so without this
@@ -334,10 +429,59 @@ export class RunSteeringService implements RunSteeringPort {
             resumedFromRunId: run.id,
             carriedCliSession: Boolean(run.cliSessionId),
             queued: !admission.admitted,
+            rejectionsReplayed: replayed.count,
         };
     }
 
     // ── internals ──────────────────────────────────────────────────
+
+    /**
+     * Orchestration M9 — read the Task's pending reviewer rejections,
+     * compose the prepend block, and CLAIM the rows for this run.
+     *
+     * Claiming (not just reading) is what makes the replay exactly-once:
+     * `markConsumed` is CAS-guarded on `consumedByRunId IS NULL`, so two
+     * concurrent resumes cannot both seed the same feedback, and a third
+     * resume after the work was actually redone does not re-litigate a
+     * rejection that has already been answered.
+     *
+     * If a row is claimed but the dispatch later fails, the feedback is
+     * "spent" on a run that never executed. That is the deliberate trade:
+     * the alternative (claim after dispatch) risks the far worse failure
+     * of replaying the same rejection forever. The rejection text is still
+     * on the record and in the run's seeded input, so nothing is lost —
+     * only the automatic replay is.
+     */
+    private async claimRejectionFeedback(
+        taskId: string,
+        newRunId: string,
+    ): Promise<{ message: string | null; count: number }> {
+        if (!this.rejections) return { message: null, count: 0 };
+        try {
+            const pending = await this.rejections.findPendingForTask(
+                taskId,
+                MAX_REPLAYED_REJECTIONS,
+            );
+            if (pending.length === 0) return { message: null, count: 0 };
+            const claimed = await this.rejections.markConsumed(
+                pending.map((row) => row.id),
+                newRunId,
+            );
+            // Lost every row to a concurrent resume — that resume is
+            // carrying the feedback, so this one must not duplicate it.
+            if (claimed === 0) return { message: null, count: 0 };
+            const message = composeRejectionFeedbackMessage(pending);
+            this.logger.log(
+                `Run ${newRunId}: replaying ${pending.length} reviewer rejection(s) for task ${taskId}.`,
+            );
+            return { message, count: pending.length };
+        } catch (err) {
+            this.logger.warn(
+                `Run ${newRunId}: rejection-feedback lookup failed (resuming without it): ${err}`,
+            );
+            return { message: null, count: 0 };
+        }
+    }
 
     private async requireOwnedRun(runId: string, userId: string): Promise<AgentRun> {
         const run = await this.runs.findByIdAndUser(runId, userId);

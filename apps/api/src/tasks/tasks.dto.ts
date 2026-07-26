@@ -242,6 +242,33 @@ export class AddReviewerDto {
     reviewerId: string;
 }
 
+/**
+ * Orchestration M9 — `POST /api/tasks/:id/reject`.
+ *
+ * The 8 KB cap matches `TASK_REVIEW_REJECTION_MAX_FEEDBACK_CHARS`: the
+ * text is persisted AND spliced into the next resumed run's first turn,
+ * so it is bounded at the edge as well as in the repository (which
+ * truncates rather than rejects — two different jobs, both needed).
+ */
+export class RejectTaskDto {
+    @IsString()
+    @MaxLength(8000)
+    feedback: string;
+
+    /** The run whose output is being rejected, when the caller knows it. */
+    @IsOptional()
+    @IsUUID()
+    runId?: string;
+}
+
+/** Judgment layer G3 — `POST /api/tasks/:id/escalations/:eid/resolve`. */
+export class ResolveEscalationDto {
+    @IsOptional()
+    @IsString()
+    @MaxLength(1000)
+    note?: string;
+}
+
 export class AddApproverDto {
     @IsIn(['user', 'agent'])
     approverType: TaskActorType;

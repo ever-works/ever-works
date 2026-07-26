@@ -33,9 +33,13 @@ const {
     TaskRunDenormServiceToken,
     TaskWorkspaceServiceToken,
     WorkRepositoryToken,
+    AgentEscalationServiceToken,
+    TaskReviewRejectionServiceToken,
     resolveAcceptanceChecksMock,
     resolveChecksPolicyMock,
+    resolveL0ChecksMock,
     resolveMaxGateAttemptsMock,
+    shouldRunL0PreCheckMock,
 } = vi.hoisted(() => {
     class StubInternalModule {}
     class AgentRepositoryToken {}
@@ -48,6 +52,10 @@ const {
     class TaskRunDenormServiceToken {}
     class TaskWorkspaceServiceToken {}
     class WorkRepositoryToken {}
+    // Judgment layer G3 / orchestration M9 - the two services the gate
+    // exhaustion path files its record through.
+    class AgentEscalationServiceToken {}
+    class TaskReviewRejectionServiceToken {}
     return {
         taskMock: vi.fn(),
         createApplicationContextMock: vi.fn(),
@@ -63,12 +71,20 @@ const {
         TaskRunDenormServiceToken,
         TaskWorkspaceServiceToken,
         WorkRepositoryToken,
+        AgentEscalationServiceToken,
+        TaskReviewRejectionServiceToken,
         // Quality gates (Wave 3): the pure resolution helpers are mocked as
         // controllable fns — their merge/clamp logic is pinned by the agent
         // package's own task-gates.spec; THIS suite tests the orchestration.
         resolveAcceptanceChecksMock: vi.fn(),
         resolveChecksPolicyMock: vi.fn(),
         resolveMaxGateAttemptsMock: vi.fn(),
+        // Judgment layer G2 - L0 pre-check gating. Mocked as controllable
+        // fns for the same reason the other gate helpers are: their own
+        // logic is pinned by the agent package's task-gate-precheck.spec,
+        // THIS suite tests the orchestration around them.
+        resolveL0ChecksMock: vi.fn(),
+        shouldRunL0PreCheckMock: vi.fn(),
     };
 });
 
@@ -91,6 +107,19 @@ vi.mock('@ever-works/agent/database', () => ({
 vi.mock('@ever-works/agent/agents', () => ({
     AgentRunService: AgentRunServiceToken,
     RunDispatchGateService: RunDispatchGateServiceToken,
+    AgentEscalationService: AgentEscalationServiceToken,
+}));
+
+// Judgment layer G2 - the worker reads the L0 pre-check operator switch
+// straight off `config.agents`; default OFF keeps every existing case in
+// this suite on the byte-identical pre-G2 path.
+vi.mock('@ever-works/agent/config', () => ({
+    config: {
+        agents: {
+            isGateL0PreCheckEnabled: () => false,
+            getGateL0PreCheckTimeoutSec: () => 120,
+        },
+    },
 }));
 
 vi.mock('@ever-works/agent/tasks-domain', () => ({
@@ -99,9 +128,12 @@ vi.mock('@ever-works/agent/tasks-domain', () => ({
     TaskGateRunnerService: TaskGateRunnerServiceToken,
     TaskRunDenormService: TaskRunDenormServiceToken,
     TaskWorkspaceService: TaskWorkspaceServiceToken,
+    TaskReviewRejectionService: TaskReviewRejectionServiceToken,
     resolveAcceptanceChecks: resolveAcceptanceChecksMock,
     resolveChecksPolicy: resolveChecksPolicyMock,
+    resolveL0Checks: resolveL0ChecksMock,
     resolveMaxGateAttempts: resolveMaxGateAttemptsMock,
+    shouldRunL0PreCheck: shouldRunL0PreCheckMock,
 }));
 
 vi.mock('../trigger/worker/modules/trigger-internal.module', () => ({
@@ -160,6 +192,8 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
         finalizeRun: ReturnType<typeof vi.fn>;
     };
     let works: { findById: ReturnType<typeof vi.fn> };
+    let escalations: { record: ReturnType<typeof vi.fn> };
+    let reviewRejections: { recordGateRejection: ReturnType<typeof vi.fn> };
     let registeredConfig: TaskConfig;
 
     /**
@@ -223,12 +257,21 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
             finalizeRun: vi.fn().mockResolvedValue({ outcome: 'no-changes' }),
         };
         works = { findById: vi.fn().mockResolvedValue(null) };
+        // Judgment layer G3 / orchestration M9 - both best-effort writes on
+        // the gate-exhausted path; resolve to no-ops by default so every
+        // pre-existing case is unaffected.
+        escalations = { record: vi.fn().mockResolvedValue({ id: 'esc-1' }) };
+        reviewRejections = { recordGateRejection: vi.fn().mockResolvedValue(null) };
         // Quality gates default OFF — pre-gate behavior everywhere unless a
         // test opts in. maxGateAttempts defaults to 1 (no iterate loop) so
         // every pre-M5 test keeps its single-attempt shape.
         resolveAcceptanceChecksMock.mockReturnValue([]);
         resolveChecksPolicyMock.mockReturnValue('off');
         resolveMaxGateAttemptsMock.mockReturnValue(1);
+        // G2 pre-check OFF by default (no declared L0 checks) - the
+        // byte-identical pre-G2 first turn.
+        resolveL0ChecksMock.mockReturnValue([]);
+        shouldRunL0PreCheckMock.mockReturnValue(false);
 
         // The owner owns AGENT_ID and OWNED_TASK_ID. A foreign taskId is
         // rejected by TasksService.getOne exactly like the real
@@ -267,6 +310,8 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
                 if (token === TaskRunDenormServiceToken) return runDenorm;
                 if (token === TaskWorkspaceServiceToken) return taskWorkspace;
                 if (token === WorkRepositoryToken) return works;
+                if (token === AgentEscalationServiceToken) return escalations;
+                if (token === TaskReviewRejectionServiceToken) return reviewRejections;
                 throw new Error(`Unexpected DI token: ${String(token)}`);
             }),
             close: vi.fn().mockResolvedValue(undefined),
@@ -848,6 +893,187 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
                 expect(runner.checkBudget).not.toHaveBeenCalled();
                 expect(gateRunner.runChecks).toHaveBeenCalledTimes(1);
                 expect(result).toMatchObject({ status: 'completed', reason: 'gate-red' });
+            });
+        });
+
+        describe('L0 pre-check (judgment layer G2)', () => {
+            const L0_CHECK = {
+                id: 'fast-lint',
+                name: 'Fast lint',
+                kind: 'lint',
+                command: 'pnpm lint',
+                required: true,
+                level: 'L0',
+            };
+
+            /** required policy + provisioned workspace + one declared L0 check. */
+            const useL0Fixture = () => {
+                useWorkTask();
+                taskWorkspace.provisionForRun.mockResolvedValue(WORKSPACE);
+                resolveAcceptanceChecksMock.mockReturnValue([BUILD_CHECK, L0_CHECK]);
+                resolveChecksPolicyMock.mockReturnValue('required');
+                resolveL0ChecksMock.mockReturnValue([L0_CHECK]);
+                shouldRunL0PreCheckMock.mockReturnValue(true);
+                gateRunner.runChecks.mockResolvedValue({
+                    gateStatus: 'green',
+                    results: [{ id: 'build', status: 'green', exitCode: 0, durationMs: 5 }],
+                });
+            };
+
+            it('does NOT run before the model call by default', async () => {
+                // THE DEFAULT-OFF TEST. `shouldRunL0PreCheck` is false in
+                // the shared beforeEach, which is what every existing case
+                // in this suite relies on to stay byte-identical.
+                useWorkTask();
+                taskWorkspace.provisionForRun.mockResolvedValue(WORKSPACE);
+                resolveAcceptanceChecksMock.mockReturnValue([BUILD_CHECK]);
+                resolveChecksPolicyMock.mockReturnValue('off');
+
+                await registeredConfig.run(basePayload(OWNED_TASK_ID));
+
+                expect(gateRunner.runPreChecks).toBeUndefined();
+                expect(runner.execute.mock.calls[0][0].immediateInput).not.toContain(
+                    'Pre-flight check',
+                );
+            });
+
+            it('feeds a failing pre-check into the run FIRST input', async () => {
+                // THE G2 TEST: the agent learns the workspace is already
+                // broken before it spends a single token discovering it.
+                useL0Fixture();
+                gateRunner.runPreChecks = vi.fn().mockResolvedValue({
+                    results: [],
+                    failing: [
+                        {
+                            id: 'fast-lint',
+                            status: 'red',
+                            exitCode: 1,
+                            durationMs: 40,
+                            logTail: 'src/a.ts:1:1  error  unused variable',
+                        },
+                    ],
+                });
+
+                await registeredConfig.run(basePayload(OWNED_TASK_ID));
+
+                expect(gateRunner.runPreChecks).toHaveBeenCalledWith({
+                    checks: [L0_CHECK],
+                    cwd: WORKSPACE.cwd,
+                });
+                const firstInput = runner.execute.mock.calls[0][0].immediateInput;
+                expect(firstInput).toContain('Pre-flight check');
+                expect(firstInput).toContain('fast-lint');
+                expect(firstInput).toContain('unused variable');
+                // The task brief still leads - "what you were asked to do"
+                // comes before "what is already broken".
+                expect(firstInput.indexOf('Owned Task')).toBeLessThan(
+                    firstInput.indexOf('Pre-flight check'),
+                );
+            });
+
+            it('adds nothing when every pre-check is green', async () => {
+                useL0Fixture();
+                gateRunner.runPreChecks = vi.fn().mockResolvedValue({
+                    results: [{ id: 'fast-lint', status: 'green', exitCode: 0, durationMs: 9 }],
+                    failing: [],
+                });
+
+                await registeredConfig.run(basePayload(OWNED_TASK_ID));
+
+                expect(runner.execute.mock.calls[0][0].immediateInput).not.toContain(
+                    'Pre-flight check',
+                );
+            });
+
+            it('a crashed pre-check never fails the run - it just contributes nothing', async () => {
+                // A misconfigured lint command must not become an outage
+                // for work the agent has not even started.
+                useL0Fixture();
+                gateRunner.runPreChecks = vi.fn().mockRejectedValue(new Error('spawn EACCES'));
+
+                const result = await registeredConfig.run(basePayload(OWNED_TASK_ID));
+
+                expect(runner.execute).toHaveBeenCalled();
+                expect(result).toMatchObject({ status: 'completed' });
+            });
+        });
+
+        describe('escalation on give-up (judgment layer G3)', () => {
+            const RED = {
+                gateStatus: 'red',
+                results: [
+                    { id: 'build', status: 'red', exitCode: 1, durationMs: 12, logTail: 'boom' },
+                ],
+            };
+
+            const useExhaustedGate = () => {
+                useWorkTask();
+                taskWorkspace.provisionForRun.mockResolvedValue(WORKSPACE);
+                resolveAcceptanceChecksMock.mockReturnValue([BUILD_CHECK]);
+                resolveChecksPolicyMock.mockReturnValue('required');
+                resolveMaxGateAttemptsMock.mockReturnValue(1);
+                gateRunner.runChecks.mockResolvedValue(RED);
+            };
+
+            it('files a gate-exhausted escalation a human can act on', async () => {
+                // THE G3 TEST. Before this the give-up ended as a chat
+                // message and a log line, so "what is waiting on me?" had
+                // no answer at all.
+                useExhaustedGate();
+
+                await registeredConfig.run(basePayload(OWNED_TASK_ID));
+
+                expect(escalations.record).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        userId: OWNER,
+                        reasonCode: 'gate-exhausted',
+                        taskId: OWNED_TASK_ID,
+                        workId: WORK_ID,
+                        decisionNeeded: expect.stringContaining('Decide'),
+                        attempted: [expect.objectContaining({ label: 'build', detail: 'boom' })],
+                    }),
+                );
+            });
+
+            it('persists the gate feedback so a LATER resume replays it (M9)', async () => {
+                useExhaustedGate();
+
+                await registeredConfig.run(basePayload(OWNED_TASK_ID));
+
+                expect(reviewRejections.recordGateRejection).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        taskId: OWNED_TASK_ID,
+                        runId: 'run-1',
+                        feedback: expect.stringContaining('build'),
+                    }),
+                );
+            });
+
+            it('an escalation-store failure never changes the run outcome', async () => {
+                // Best-effort by contract: this write describes a failure,
+                // it must not manufacture a different one.
+                useExhaustedGate();
+                escalations.record.mockRejectedValue(new Error('db down'));
+
+                const result = await registeredConfig.run(basePayload(OWNED_TASK_ID));
+
+                expect(result).toMatchObject({ status: 'completed', reason: 'gate-red' });
+            });
+
+            it('records nothing on a GREEN gate - an escalation is a give-up, not a report', async () => {
+                useWorkTask();
+                taskWorkspace.provisionForRun.mockResolvedValue(WORKSPACE);
+                resolveAcceptanceChecksMock.mockReturnValue([BUILD_CHECK]);
+                resolveChecksPolicyMock.mockReturnValue('required');
+                gateRunner.runChecks.mockResolvedValue({
+                    gateStatus: 'green',
+                    results: [{ id: 'build', status: 'green', exitCode: 0, durationMs: 5 }],
+                });
+
+                await registeredConfig.run(basePayload(OWNED_TASK_ID));
+
+                expect(escalations.record).not.toHaveBeenCalled();
+                expect(reviewRejections.recordGateRejection).not.toHaveBeenCalled();
             });
         });
     });

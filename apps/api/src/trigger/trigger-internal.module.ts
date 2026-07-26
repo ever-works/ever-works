@@ -103,7 +103,6 @@ import { OrganizationsModule } from '../organizations/organizations.module';
         // runs inline on every node lease poll; the cron is what makes a
         // fleet whose nodes ALL died still converge.
         AgentFleetModule,
-
     ],
     controllers: [TriggerInternalController],
 })

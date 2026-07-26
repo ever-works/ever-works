@@ -5,12 +5,18 @@ export * from './goals.service';
 export * from './goal-evaluation.service';
 export * from './goals.module';
 export * from './types';
+export * from './goal-criteria';
 export {
     Goal,
     GoalStatus,
     GoalOutcome,
+    GOAL_CONSTRAINT_CATEGORIES,
     type GoalComparator,
+    type GoalConstraint,
+    type GoalConstraintCategory,
+    type GoalCriterion,
     type GoalMetricSource,
+    type GoalResolvedScore,
     type GoalWindow,
 } from '../entities/goal.entity';
 export { GoalMetricSample } from '../entities/goal-metric-sample.entity';

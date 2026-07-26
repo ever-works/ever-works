@@ -5,10 +5,12 @@ import { AgentRunRepository } from '../database/repositories/agent-run.repositor
 import { IngestedEventRepository } from '../ingest/ingested-event.repository';
 import { NotificationService } from '../notifications/notification.service';
 import { GoalsService } from '../goals/goals.service';
+import { AgentEscalationService } from '../agents/agent-escalation.service';
 import { GoalStatus } from '../entities/goal.entity';
 import { Task, TaskStatus } from '../entities/task.entity';
 import type { AgentRun } from '../entities/agent-run.entity';
 import type { GoalDto } from '../goals/types';
+import type { AgentEscalationDto } from '@ever-works/contracts';
 import {
     ComposeDigestOptions,
     ComposedDigest,
@@ -85,6 +87,10 @@ export class DigestService {
         // Optional: the goals snapshot is a nice-to-have section; a
         // deployment without GoalsModule wired still composes digests.
         @Optional() private readonly goalsService?: GoalsService,
+        // Judgment layer G3 - "what is waiting on me?". @Optional() +
+        // appended LAST per the positional-spec arity rule; absent means
+        // the section is simply omitted.
+        @Optional() private readonly escalations?: AgentEscalationService,
     ) {}
 
     /**
@@ -110,6 +116,7 @@ export class DigestService {
             EVENT_SCAN_LIMIT,
         );
         const goals = await this.loadActiveGoals(userId);
+        const escalations = await this.loadOpenEscalations(userId, since);
 
         const inWindow = (ts: Date | null | undefined): boolean =>
             !!ts && ts.getTime() >= since.getTime() && ts.getTime() <= until.getTime();
@@ -144,6 +151,7 @@ export class DigestService {
             eventsBySource,
             eventsTotal,
             goalsTracked: goals.length,
+            escalationsOpen: escalations.length,
         };
 
         // Goals are a progress SNAPSHOT, not window activity — they never
@@ -154,7 +162,8 @@ export class DigestService {
                 counts.tasksDone +
                 counts.tasksInReview +
                 counts.prsOpened +
-                counts.eventsTotal ===
+                counts.eventsTotal +
+                counts.escalationsOpen ===
             0;
 
         return {
@@ -174,6 +183,7 @@ export class DigestService {
                 tasksInReview,
                 prsOpened,
                 goals,
+                escalations,
             }),
             text: this.renderText(options.period, quiet, counts),
             counts,
@@ -288,6 +298,25 @@ export class DigestService {
         }
     }
 
+    /**
+     * Judgment layer G3 - open escalations raised in this window.
+     * Best-effort: the digest is a read path and an escalation-store
+     * hiccup must degrade to "no section", never to no digest.
+     */
+    private async loadOpenEscalations(userId: string, since: Date): Promise<AgentEscalationDto[]> {
+        if (!this.escalations) return [];
+        try {
+            return await this.escalations.listOpenForUser(userId, since, MAX_ITEMS_PER_SECTION * 2);
+        } catch (error) {
+            this.logger.warn(
+                `digest: escalation lookup failed for user ${userId}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return [];
+        }
+    }
+
     private renderText(period: DigestPeriod, quiet: boolean, counts: DigestCounts): string {
         const label = period === 'daily' ? 'Daily digest' : 'Weekly digest';
         if (quiet) {
@@ -317,6 +346,13 @@ export class DigestService {
                 }`,
             );
         }
+        if (counts.escalationsOpen > 0) {
+            // Leads the one-line summary for the same reason it leads the
+            // markdown: it is the only part that is blocking on a human.
+            parts.unshift(
+                `${counts.escalationsOpen} decision${counts.escalationsOpen === 1 ? '' : 's'} needed`,
+            );
+        }
         if (counts.goalsTracked > 0) {
             parts.push(`${counts.goalsTracked} active goal${counts.goalsTracked === 1 ? '' : 's'}`);
         }
@@ -335,6 +371,7 @@ export class DigestService {
         tasksInReview: Task[];
         prsOpened: Task[];
         goals: GoalDto[];
+        escalations: AgentEscalationDto[];
     }): string {
         const { counts } = input;
         const day = (d: Date) => d.toISOString().slice(0, 10);
@@ -390,6 +427,22 @@ export class DigestService {
                 for (const [source, count] of bySource) {
                     lines.push(`- ${source}: ${count} event${count === 1 ? '' : 's'}`);
                 }
+            }
+        }
+
+        // Judgment layer G3 - FIRST content section after the header:
+        // an escalation is the only item in a digest that is blocking on
+        // the reader, so burying it under run counts would defeat it.
+        if (input.escalations.length > 0) {
+            lines.push('', '## Needs your decision', '');
+            for (const escalation of input.escalations.slice(0, MAX_ITEMS_PER_SECTION)) {
+                lines.push(
+                    `- **${escalation.reasonCode}** — ${this.cap(escalation.summary)} ` +
+                        `→ ${this.cap(escalation.decisionNeeded)}`,
+                );
+            }
+            if (input.escalations.length > MAX_ITEMS_PER_SECTION) {
+                lines.push(`- …and ${input.escalations.length - MAX_ITEMS_PER_SECTION} more`);
             }
         }
 

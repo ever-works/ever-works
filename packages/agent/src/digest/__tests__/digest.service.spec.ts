@@ -23,8 +23,9 @@ describe('DigestService', () => {
     let ingestedEventRepository: { findRecentByUser: jest.Mock };
     let notificationService: { notifyDigest: jest.Mock };
     let goalsService: { listForUser: jest.Mock };
+    let escalationService: { listOpenForUser: jest.Mock };
 
-    const build = (opts: { withGoals?: boolean } = {}) =>
+    const build = (opts: { withGoals?: boolean; withEscalations?: boolean } = {}) =>
         new DigestService(
             userRepository as any,
             taskRepository as any,
@@ -32,6 +33,7 @@ describe('DigestService', () => {
             ingestedEventRepository as any,
             notificationService as any,
             opts.withGoals === false ? undefined : (goalsService as any),
+            opts.withEscalations === false ? undefined : (escalationService as any),
         );
 
     beforeEach(() => {
@@ -50,6 +52,7 @@ describe('DigestService', () => {
         };
         notificationService = { notifyDigest: jest.fn().mockResolvedValue(undefined) };
         goalsService = { listForUser: jest.fn().mockResolvedValue([]) };
+        escalationService = { listOpenForUser: jest.fn().mockResolvedValue([]) };
     });
 
     describe('composeDigest', () => {
@@ -209,6 +212,60 @@ describe('DigestService', () => {
             });
             expect(digest.counts.goalsTracked).toBe(1);
             expect(digest.markdown).toContain('- Weekly visitors: 420 / 1000 visits');
+        });
+
+        it('⭐ leads with open escalations — the only digest item blocking on a human', async () => {
+            // Judgment layer G3. Everything else in a digest is a report;
+            // an escalation is a request. Burying it under run counts is
+            // how a stopped agent goes unnoticed for a week.
+            escalationService.listOpenForUser.mockResolvedValue([
+                {
+                    id: 'e1',
+                    reasonCode: 'gate-exhausted',
+                    summary: 'Checks still red after 2 attempts.',
+                    decisionNeeded: 'Fix by hand or raise the attempt budget.',
+                },
+            ]);
+
+            const digest = await build().composeDigest('user-1', { period: 'daily', now: NOW });
+
+            expect(digest.counts.escalationsOpen).toBe(1);
+            expect(digest.markdown).toContain('## Needs your decision');
+            expect(digest.markdown).toContain('gate-exhausted');
+            expect(digest.text).toContain('1 decision needed');
+        });
+
+        it('⭐ an escalation alone un-quiets the window, so the digest is not suppressed', async () => {
+            // A window in which nothing happened BUT an agent stopped and
+            // asked for a decision is the opposite of quiet — suppressing
+            // it would hide exactly the signal the digest exists to carry.
+            escalationService.listOpenForUser.mockResolvedValue([
+                {
+                    id: 'e1',
+                    reasonCode: 'budget-stop',
+                    summary: 'Budget cap reached mid-run.',
+                    decisionNeeded: 'Raise the cap or stop the work.',
+                },
+            ]);
+
+            const digest = await build().composeDigest('user-1', { period: 'daily', now: NOW });
+
+            expect(digest.quiet).toBe(false);
+        });
+
+        it('composes without an escalation section when the service is not wired', async () => {
+            const digest = await build({ withEscalations: false }).composeDigest('user-1', {
+                period: 'daily',
+                now: NOW,
+            });
+            expect(digest.counts.escalationsOpen).toBe(0);
+            expect(digest.markdown).not.toContain('## Needs your decision');
+        });
+
+        it('still composes when the escalation lookup throws', async () => {
+            escalationService.listOpenForUser.mockRejectedValue(new Error('db down'));
+            const digest = await build().composeDigest('user-1', { period: 'daily', now: NOW });
+            expect(digest.counts.escalationsOpen).toBe(0);
         });
 
         it('composes without a goals section when GoalsService is not wired', async () => {

@@ -69,9 +69,30 @@ export const agentRunSweeperTask = schedules.task({
                     }
                 }
 
+                // State-aware sweeper (Wave 4 M6) — SURFACE runs that have
+                // been queued past the bound. Deliberately a separate pass
+                // from the reap above, because it is the opposite kind of
+                // action: nothing is transitioned, nothing is reaped, the
+                // run is flagged and its owner is told. Runs on the same
+                // 2h cadence — a queued-too-long run is a capacity
+                // problem, and capacity problems do not need per-minute
+                // detection, they need to stop being invisible.
+                const queuedTooLong = await svc.sweepQueuedTooLong();
+                if (queuedTooLong.flagged > 0) {
+                    logger.warn('agent-run-sweeper flagged queued-too-long runs', {
+                        flagged: queuedTooLong.flagged,
+                        scanned: queuedTooLong.scanned,
+                        notified: queuedTooLong.notified,
+                        thresholdMinutes: queuedTooLong.thresholdMinutes,
+                    });
+                }
+
                 if (summary.swept > 0) {
                     logger.warn('agent-run-sweeper reaped stuck runs', {
                         swept: summary.swept,
+                        // M6: of `swept`, how many were checkpoint-and-parked
+                        // (resumable) rather than hard-failed.
+                        parked: summary.parked,
                         scanned: summary.scanned,
                         cutoffMinutes: summary.cutoffMinutes,
                         oldestAgeMs: summary.oldestAgeMs,
@@ -85,7 +106,7 @@ export const agentRunSweeperTask = schedules.task({
                     });
                 }
 
-                return { status: 'completed' as const, ...summary };
+                return { status: 'completed' as const, ...summary, queuedTooLong };
             },
             TriggerInternalModule,
         );

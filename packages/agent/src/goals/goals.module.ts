@@ -5,6 +5,7 @@ import { GoalMetricSample } from '../entities/goal-metric-sample.entity';
 import { MissionGoal } from '../entities/mission-goal.entity';
 import { Mission } from '../entities/mission.entity';
 import { FacadesModule } from '../facades/facades.module';
+import { AgentsModule } from '../agents/agents.module';
 import { GoalEvaluationService } from './goal-evaluation.service';
 import { GoalsService } from './goals.service';
 
@@ -31,6 +32,10 @@ import { GoalsService } from './goals.service';
     imports: [
         TypeOrmModule.forFeature([Goal, GoalMetricSample, MissionGoal, Mission]),
         FacadesModule,
+        // Judgment layer G1/G3 - escalate-on-hard. GoalEvaluationService
+        // injects AgentEscalationService (@Optional()); AgentsModule owns
+        // and exports it.
+        AgentsModule,
     ],
     providers: [GoalsService, GoalEvaluationService],
     exports: [GoalsService, GoalEvaluationService],
