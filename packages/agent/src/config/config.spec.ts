@@ -787,6 +787,7 @@ describe('agent/config', () => {
                 'posthog',
                 'sentry',
                 'subscriptions',
+                'terminal',
                 'trigger',
                 'websiteTemplate',
             ]);

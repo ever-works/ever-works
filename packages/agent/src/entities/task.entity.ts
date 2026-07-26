@@ -190,7 +190,7 @@ export class Task {
     ciState?: string | null;
 
     /** When the PR status was last refreshed — drives the sync throttle. */
-    @Column({ type: 'timestamp', nullable: true })
+    @PortableDateColumn({ nullable: true })
     ciCheckedAt?: Date | null;
 
     /** Bounded check summary for the pill tooltip (plain text names only). */

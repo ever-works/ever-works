@@ -35,6 +35,9 @@ jest.mock('../facades/facades.module', () => ({
 jest.mock('../activity-log/activity-log.module', () => ({
     ActivityLogModule: class ActivityLogModule {},
 }));
+jest.mock('../notifications/notifications.module', () => ({
+    NotificationsModule: class NotificationsModule {},
+}));
 
 // Provider classes — replace with empty shells so the metadata still
 // records the right class identities without dragging in the full
@@ -62,6 +65,13 @@ jest.mock('./knowledge-base-buffer-extractor.service', () => ({
     KnowledgeBaseBufferExtractorService: class {},
 }));
 jest.mock('./decision-conflict.service', () => ({ DecisionConflictService: class {} }));
+jest.mock('../database/repositories/kb-retrieval-log.repository', () => ({
+    KbRetrievalLogRepository: class {},
+}));
+jest.mock('./memory-health.service', () => ({ MemoryHealthService: class {} }));
+jest.mock('./memory-consolidation-schedule.service', () => ({
+    MemoryConsolidationScheduleService: class {},
+}));
 jest.mock('./kb-mention-resolver.service', () => ({ KbMentionResolverService: class {} }));
 jest.mock('./kb-agent-tools.service', () => ({ KbAgentToolsService: class {} }));
 jest.mock('./kb-tools-facade.adapter', () => ({ KbToolsFacadeAdapter: class {} }));
@@ -73,6 +83,10 @@ import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { DatabaseModule } from '../database/database.module';
 import { FacadesModule } from '../facades/facades.module';
 import { DecisionConflictService } from './decision-conflict.service';
+import { NotificationsModule } from '../notifications/notifications.module';
+import { MemoryHealthService } from './memory-health.service';
+import { MemoryConsolidationScheduleService } from './memory-consolidation-schedule.service';
+import { KbRetrievalLogRepository } from '../database/repositories/kb-retrieval-log.repository';
 
 describe('KnowledgeBaseModule — static metadata', () => {
     const imports = Reflect.getMetadata('imports', KnowledgeBaseModule) as unknown[];
@@ -109,5 +123,32 @@ describe('KnowledgeBaseModule — static metadata', () => {
         // tsc nor the unit suite would otherwise catch.
         expect(providers).toContain(DecisionConflictService);
         expect(exports_).toContain(DecisionConflictService);
+    });
+
+    it('imports NotificationsModule so the consolidation cadence can actually notify (memory upgrades M9)', () => {
+        // Same DI-walkback trap as ActivityLogModule above: NestJS only
+        // resolves a provider's `@Optional()` deps from THIS module's own
+        // imports. Drop this import and `memory-consolidation-tick` still
+        // runs, still writes, and silently tells nobody — the failure mode
+        // is an invisible feature, not a boot error.
+        expect(imports).toContain(NotificationsModule);
+    });
+
+    it('provides AND exports the memory eval-loop + cadence services (memory upgrades M9/M10)', () => {
+        // `OrgMemoryController` injects MemoryHealthService and the
+        // trigger-internal RPC registry injects
+        // MemoryConsolidationScheduleService — both from OTHER modules, so
+        // a provider missing from `exports` fails the whole API boot with
+        // an UnknownDependenciesException that neither tsc nor the unit
+        // suite would otherwise catch.
+        expect(providers).toContain(MemoryHealthService);
+        expect(exports_).toContain(MemoryHealthService);
+        expect(providers).toContain(MemoryConsolidationScheduleService);
+        expect(exports_).toContain(MemoryConsolidationScheduleService);
+    });
+
+    it('provides AND exports KbRetrievalLogRepository (memory upgrades M10)', () => {
+        expect(providers).toContain(KbRetrievalLogRepository);
+        expect(exports_).toContain(KbRetrievalLogRepository);
     });
 });

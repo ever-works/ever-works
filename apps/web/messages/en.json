@@ -4819,6 +4819,78 @@
                         "failed": "Restore failed",
                         "close": "Close"
                     }
+                },
+                "facets": {
+                    "searchLabel": "Search memory",
+                    "searchPlaceholder": "Search titles and content…",
+                    "clear": "Clear filters",
+                    "typeLabel": "Type",
+                    "sourceLabel": "Source",
+                    "noMatches": "No documents match these filters.",
+                    "activeCount": "{count} matching",
+                    "badge": {
+                        "human": "Human",
+                        "agent": "Agent",
+                        "synthesized": "Synthesized",
+                        "connector": "Connector"
+                    },
+                    "badgeAria": {
+                        "human": "Written by a person",
+                        "agent": "Written by an agent run",
+                        "synthesized": "Merged by memory consolidation",
+                        "connector": "Came from a connected tool: {source}"
+                    }
+                },
+                "health": {
+                    "title": "Memory health",
+                    "subtitle": "How well the Knowledge Base is answering the questions agents actually ask.",
+                    "loading": "Measuring memory health…",
+                    "error": "Could not load memory health.",
+                    "retry": "Try again",
+                    "window": "Last {days} days",
+                    "notMeasurable": "Not measurable yet",
+                    "recall": {
+                        "label": "Recall hit rate",
+                        "explainer": "Of the documents we put in front of an agent, how many did it actually use. Low means we are injecting the wrong things.",
+                        "detail": "{cited} of {retrieved} injected documents were cited.",
+                        "noSignal": "Nothing has cited a document yet, so this cannot be measured — a 0% here would be a guess, not a fact."
+                    },
+                    "stale": {
+                        "label": "Stale decisions",
+                        "explainer": "Settled decisions nobody has touched in {days} days. High means the decision log is drifting from how the team actually works.",
+                        "detail": "{stale} of {accepted} accepted decisions are stale.",
+                        "none": "No accepted decisions yet."
+                    },
+                    "backlog": {
+                        "label": "Awaiting review",
+                        "explainer": "Agent-written notes stay out of agent context until a human accepts them. A growing backlog means learning is being captured and then discarded.",
+                        "detail": "Oldest has waited {oldest} days; average {average} days.",
+                        "none": "Nothing is waiting for review."
+                    },
+                    "gaps": {
+                        "label": "Questions we could not answer",
+                        "explainer": "Searches that returned nothing. These are fed into the next consolidation pass as synthesis candidates.",
+                        "occurrences": "asked {count}x",
+                        "none": "Every question in this window returned something."
+                    },
+                    "uncited": {
+                        "label": "Injected but never used",
+                        "retrievals": "injected {count}x",
+                        "none": "Everything injected has been used."
+                    }
+                },
+                "askWhy": {
+                    "trigger": "Ask why",
+                    "title": "Why this document showed up",
+                    "subtitle": "The recorded retrieval trail — no AI, no guessing.",
+                    "loading": "Loading the retrieval trail…",
+                    "error": "Could not load the retrieval trail.",
+                    "empty": "This document has not been retrieved in the last {days} days.",
+                    "alwaysInjected": "Always injected (no query)",
+                    "resultCount": "{count} documents returned",
+                    "citations": "Cited {count}x",
+                    "total": "{count} retrievals in the last {days} days",
+                    "close": "Close"
                 }
             },
             "runsSummary": {
