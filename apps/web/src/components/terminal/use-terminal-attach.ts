@@ -15,9 +15,21 @@ import { useCallback, useEffect, useRef, useState } from 'react';
  *   'refused'         authorization said no (401/403/404)
  *
  * Flow: proxy-mint attach token (the proxy also computes the absolute
- * ws URL server-side) → open WS → FIRST message is the auth frame →
- * bytes flow. All seams (fetch, WebSocket ctor) are injectable for
- * jsdom tests.
+ * ws URL server-side) → REHYDRATE the persisted transcript (M9) → open
+ * WS → FIRST message is the auth frame → bytes flow. All seams (fetch,
+ * WebSocket ctor) are injectable for jsdom tests.
+ *
+ * Rehydration (streaming-terminal M9 / founder decision D1): the relay's
+ * scrollback is in-memory, byte-bounded and dies with the replica, so
+ * before this a closed tab lost the session. The pane now replays the
+ * durable server-side transcript first, records the highest `seq` it
+ * rendered, and DROPS any live/replayed frame at or below that seq — the
+ * relay replays its own backlog on attach, and without the seq gate
+ * every rehydrated line would print twice.
+ *
+ * Rehydration is strictly best-effort: an install with transcripts off,
+ * an older API, or any transport hiccup simply yields no history and the
+ * pane behaves exactly as it did before M9.
  */
 export type TerminalAttachState = 'starting' | 'attached' | 'ended' | 'cannot-connect' | 'refused';
 
@@ -43,6 +55,16 @@ export interface TerminalAttachDeps {
     webSocketImpl?: typeof WebSocket;
 }
 
+/** Bound on rehydration paging so a huge transcript cannot spin forever. */
+const TRANSCRIPT_MAX_PAGES = 20;
+
+/** Shape of one `GET .../terminal/transcript` page (M9). */
+interface TranscriptPageResponse {
+    chunks?: Array<{ seq?: number; text?: string; direction?: string }>;
+    lastSeq?: number | null;
+    hasMore?: boolean;
+}
+
 export function useTerminalAttach(
     agentId: string,
     runId: string,
@@ -56,6 +78,12 @@ export function useTerminalAttach(
     const socketRef = useRef<WebSocket | null>(null);
     const callbacksRef = useRef(callbacks);
     callbacksRef.current = callbacks;
+    /**
+     * Highest transcript `seq` already rendered from the persisted
+     * replay. Live + relay-replayed frames at or below it are dropped so
+     * rehydrated output never double-prints. -1 = nothing rehydrated.
+     */
+    const hydratedSeqRef = useRef(-1);
 
     useEffect(() => {
         let cancelled = false;
@@ -65,6 +93,52 @@ export function useTerminalAttach(
 
         setState('starting');
         setEndedReason(null);
+        hydratedSeqRef.current = -1;
+
+        /**
+         * Replay the persisted transcript into the renderer, page by
+         * page, and return the highest seq rendered (-1 for none).
+         * Never throws: history is a bonus, the live session is the
+         * product.
+         */
+        const rehydrate = async (): Promise<number> => {
+            let fromSeq = 0;
+            let highest = -1;
+            for (let page = 0; page < TRANSCRIPT_MAX_PAGES; page++) {
+                if (cancelled) return highest;
+                let body: TranscriptPageResponse;
+                try {
+                    const res = await doFetch(
+                        `/api/agents/${agentId}/runs/${runId}/terminal/transcript?fromSeq=${fromSeq}`,
+                        { method: 'GET' },
+                    );
+                    if (!res.ok) return highest;
+                    body = (await res.json()) as TranscriptPageResponse;
+                } catch {
+                    return highest;
+                }
+                const chunks = Array.isArray(body?.chunks) ? body.chunks : [];
+                if (chunks.length === 0) return highest;
+
+                for (const chunk of chunks) {
+                    if (typeof chunk?.text !== 'string') continue;
+                    // Text was stored decoded + redacted server-side, so
+                    // it goes to the renderer as UTF-8 — no base64 leg.
+                    callbacksRef.current.onBytes(new TextEncoder().encode(chunk.text));
+                    if (typeof chunk.seq === 'number' && chunk.seq > highest) {
+                        highest = chunk.seq;
+                    }
+                }
+
+                if (!body?.hasMore) return highest;
+                const next = typeof body.lastSeq === 'number' ? body.lastSeq + 1 : fromSeq;
+                // Guard against a server that reports hasMore without
+                // advancing — never loop on the same page.
+                if (next <= fromSeq) return highest;
+                fromSeq = next;
+            }
+            return highest;
+        };
 
         void (async () => {
             let token: string;
@@ -96,6 +170,12 @@ export function useTerminalAttach(
             }
             if (cancelled) return;
 
+            // M9: durable history BEFORE the live tail, so the pane reads
+            // in chronological order and the seq gate below can dedupe
+            // the relay's own attach-time replay against it.
+            hydratedSeqRef.current = await rehydrate();
+            if (cancelled) return;
+
             try {
                 socket = new WS(wsUrl);
             } catch {
@@ -112,12 +192,20 @@ export function useTerminalAttach(
                 try {
                     const frame = JSON.parse(String(event.data)) as {
                         kind: string;
+                        seq?: number;
                         data?: string;
                         message?: string;
                         reason?: string;
                         code?: number;
                     };
                     if (frame.kind === 'stdout' && typeof frame.data === 'string') {
+                        // Already rendered from the persisted transcript —
+                        // the relay replays its scrollback on attach, and
+                        // without this gate every rehydrated line prints
+                        // twice.
+                        if (typeof frame.seq === 'number' && frame.seq <= hydratedSeqRef.current) {
+                            return;
+                        }
                         const raw = atob(frame.data);
                         const bytes = new Uint8Array(raw.length);
                         for (let i = 0; i < raw.length; i++) bytes[i] = raw.charCodeAt(i);

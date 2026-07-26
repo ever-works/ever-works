@@ -134,6 +134,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'TenantJobRuntimeConfig',
     'TenantRuntimeProviderAllowlist',
     // ──────────────────────────────────────────────────────────
+    // Streaming-terminal M9 / D1 — persisted terminal transcripts.
+    'TerminalTranscriptChunk',
     'UsageLedgerEntry',
     'User',
     'UserNotificationCategoryMute',

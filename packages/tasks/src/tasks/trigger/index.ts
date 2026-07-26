@@ -8,6 +8,9 @@ export * from './kb-org-overlay-fanout.task';
 export * from './kb-reconcile.task';
 export * from './agent-run-sweeper.task';
 export * from './terminal-session.task';
+// Streaming-terminal M9 / D1 — nightly plan-tier retention sweep over
+// persisted terminal transcripts.
+export * from './terminal-transcript-gc.task';
 export * from './task-branch-gc.task';
 // Desktop PRD M4 — return lapsed fleet-job leases to the pool so a
 // fleet whose nodes ALL died still converges (inline reclaim on the

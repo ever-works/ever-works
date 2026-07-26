@@ -8,7 +8,7 @@ import { FacadesModule } from '@ever-works/agent/facades';
 import { MissionsModule } from '@ever-works/agent/missions';
 import { WorkAgentModule } from '@ever-works/agent/work-agent';
 import { GoalsModule } from '@ever-works/agent/goals';
-import { AgentsModule } from '@ever-works/agent/agents';
+import { AgentsModule, TerminalTranscriptModule } from '@ever-works/agent/agents';
 import { TasksDomainModule } from '@ever-works/agent/tasks-domain';
 import { EventIngestModule } from '@ever-works/agent/ingest';
 import { DigestModule } from '@ever-works/agent/digest';
@@ -89,6 +89,13 @@ import { OrganizationsModule } from '../organizations/organizations.module';
         // cron task (in packages/tasks) can drive `dispatchDailyGrants()`
         // over the internal RPC channel once a day.
         AgentSubscriptionsModule,
+        // Streaming-terminal M9 / founder decision D1 — exposes
+        // TerminalTranscriptService through the remote-proxy controller
+        // so the terminal-transcript-gc cron task (in packages/tasks)
+        // can drive `sweepExpired()` over the internal RPC channel each
+        // night, pruning each run's transcript to its plan-tier window.
+        TerminalTranscriptModule,
+
         // Fleet job runtime (Desktop PRD M4) — exposes FleetJobService
         // through the remote-proxy controller so the
         // fleet-job-lease-sweeper cron task (in packages/tasks) can drive
@@ -96,6 +103,7 @@ import { OrganizationsModule } from '../organizations/organizations.module';
         // runs inline on every node lease poll; the cron is what makes a
         // fleet whose nodes ALL died still converge.
         AgentFleetModule,
+
     ],
     controllers: [TriggerInternalController],
 })

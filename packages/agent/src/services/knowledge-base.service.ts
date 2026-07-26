@@ -1358,6 +1358,11 @@ export class KnowledgeBaseService {
         if (!updated) {
             throw new NotFoundException(`KB document not found after transition: ${docId}`);
         }
+        // M12 — the mirror now carries `decision_status` / `review_state`
+        // in the sidecar, so a status transition MUST re-mirror. Without
+        // this the two fields only reached Git incidentally, whenever some
+        // unrelated body/title edit happened to trigger a mirror next.
+        await this.enqueueMirror(workId, docId, 'upsert', updated.path, updated.kbDocumentClass);
         return this.toBodyDto(updated);
     }
 
@@ -1400,6 +1405,8 @@ export class KnowledgeBaseService {
         if (!updated) {
             throw new NotFoundException(`KB document not found after accept: ${docId}`);
         }
+        // M12 — see transitionDecisionStatus: review state is mirrored now.
+        await this.enqueueMirror(workId, docId, 'upsert', updated.path, updated.kbDocumentClass);
         return this.toBodyDto(updated);
     }
 
@@ -1443,6 +1450,9 @@ export class KnowledgeBaseService {
         if (!updated) {
             throw new NotFoundException(`KB document not found after archive: ${docId}`);
         }
+        // M12 — see transitionDecisionStatus: the sidecar's `status` and
+        // `review_state` both move on an archive.
+        await this.enqueueMirror(workId, docId, 'upsert', updated.path, updated.kbDocumentClass);
         return this.toBodyDto(updated);
     }
 
