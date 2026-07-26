@@ -1,3 +1,4 @@
+import { PortableDateColumn } from './_types';
 import {
     Column,
     CreateDateColumn,
@@ -85,7 +86,7 @@ export class FleetJob {
      * When the current claim lapses. Server-computed at lease/heartbeat
      * time — the node never supplies its own clock.
      */
-    @Column({ type: 'timestamp', nullable: true })
+    @PortableDateColumn({ nullable: true })
     leaseExpiresAt?: Date | null;
 
     /** Lease attempts consumed. Reclaim fails the job once it hits `maxAttempts`. */
@@ -112,10 +113,10 @@ export class FleetJob {
     error?: string | null;
 
     /** First transition into `running` (the node acknowledged the claim). */
-    @Column({ type: 'timestamp', nullable: true })
+    @PortableDateColumn({ nullable: true })
     startedAt?: Date | null;
 
-    @Column({ type: 'timestamp', nullable: true })
+    @PortableDateColumn({ nullable: true })
     completedAt?: Date | null;
 
     @CreateDateColumn()

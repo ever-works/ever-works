@@ -787,6 +787,9 @@ describe('agent/config', () => {
                 'posthog',
                 'sentry',
                 'subscriptions',
+                // Terminal transcripts (plan 01 M9 / founder D1) — retention
+                // window + size caps for persisted session output.
+                'terminal',
                 'trigger',
                 'websiteTemplate',
             ]);

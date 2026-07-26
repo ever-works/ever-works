@@ -1,3 +1,4 @@
+import { PortableDateColumn } from './_types';
 import {
     Column,
     CreateDateColumn,
@@ -82,10 +83,10 @@ export class Invoice {
     @Column({ type: 'varchar', length: 16 })
     status: InvoiceStatus;
 
-    @Column({ type: 'timestamp', nullable: true })
+    @PortableDateColumn({ nullable: true })
     periodStart?: Date | null;
 
-    @Column({ type: 'timestamp', nullable: true })
+    @PortableDateColumn({ nullable: true })
     periodEnd?: Date | null;
 
     @Column({ type: 'int' })
@@ -112,7 +113,7 @@ export class Invoice {
     @Column({ type: 'simple-json', nullable: true })
     lineItems?: InvoiceLineItem[] | null;
 
-    @Column({ type: 'timestamp', nullable: true })
+    @PortableDateColumn({ nullable: true })
     issuedAt?: Date | null;
 
     @CreateDateColumn()
