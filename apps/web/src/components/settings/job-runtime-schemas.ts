@@ -210,6 +210,43 @@ export const JOB_RUNTIME_CREDENTIAL_SCHEMAS: Record<
             envVar: 'INNGEST_SIGNING_KEY',
         },
     ],
+    // Desktop PRD M4 — the fleet runtime. There is no broker credential
+    // to supply: the "queue" is the machines the owner enrolled in
+    // Fleet, and a node's own credential is minted at enrollment on the
+    // Fleet settings page. The fields below are sizing/targeting knobs,
+    // which is why none of them is a secret.
+    node: [
+        {
+            name: 'apiUrl',
+            label: 'Platform API URL',
+            description:
+                'Origin the nodes poll for work, e.g. https://api.ever.works. Nodes connect outbound only — no inbound port is opened on the machine.',
+            secret: false,
+            required: false,
+            envVar: 'FLEET_NODE_API_URL',
+            placeholder: 'https://api.ever.works',
+        },
+        {
+            name: 'leaseTtlSeconds',
+            label: 'Lease TTL (seconds)',
+            description:
+                'How long a node holds a claim before it must renew. A node that dies mid-job has its work reclaimed and re-offered after this window.',
+            secret: false,
+            required: false,
+            envVar: 'FLEET_NODE_LEASE_TTL_SECONDS',
+            placeholder: '300',
+        },
+        {
+            name: 'requiredCapabilities',
+            label: 'Required capability tags',
+            description:
+                'Comma-separated tags a node must advertise to be eligible for this work (e.g. workspace,git). Blank means any enrolled node.',
+            secret: false,
+            required: false,
+            envVar: 'FLEET_NODE_REQUIRED_CAPABILITIES',
+            placeholder: 'workspace,git',
+        },
+    ],
 };
 
 /**

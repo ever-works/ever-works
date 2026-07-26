@@ -689,7 +689,7 @@ describe('config/constants', () => {
     });
 
     describe('BUNDLED_TENANT_JOB_RUNTIME_PROVIDERS (drift gate)', () => {
-        it('lists the 5 documented bundled provider ids in the canonical order', () => {
+        it('lists the 6 documented bundled provider ids in the canonical order', () => {
             // Source of truth: dto/upsert-tenant-job-runtime.dto.ts
             // TENANT_JOB_RUNTIME_PROVIDER_IDS. The service layer asserts the
             // two lists stay in sync; this test pins the local copy.
@@ -699,6 +699,7 @@ describe('config/constants', () => {
                 'bullmq',
                 'pgboss',
                 'inngest',
+                'node',
             ]);
         });
     });

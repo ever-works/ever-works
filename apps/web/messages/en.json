@@ -2323,7 +2323,8 @@
                     "status": "Status",
                     "platform": "Platform",
                     "capabilities": "Capabilities",
-                    "lastSeen": "Last seen"
+                    "lastSeen": "Last seen",
+                    "load": "Load"
                 },
                 "empty": {
                     "title": "No nodes enrolled yet",
@@ -2381,6 +2382,11 @@
                     "disabled": "Node disabled — it stops accepting work and heartbeats",
                     "enabled": "Node enabled — it will come back online on its next heartbeat",
                     "removed": "Node removed"
+                },
+                "load": {
+                    "idle": "Idle",
+                    "busy": "{count} running",
+                    "currentJob": "Current job: {kind}"
                 }
             },
             "jobRuntime": {

@@ -28,6 +28,7 @@ import { NotificationChannelFacadeService } from '@ever-works/agent/facades';
 import { EventIngestService, EventSourcePullService } from '@ever-works/agent/ingest';
 import { DigestService } from '@ever-works/agent/digest';
 import { CreditLedgerService } from '@ever-works/agent/subscriptions';
+import { FleetJobService } from '@ever-works/agent/fleet';
 import { TriggerInternalApiClient } from '../services/trigger-internal-api.client';
 import { createRemoteProxy } from '../remote-proxy';
 
@@ -171,6 +172,16 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
             useFactory: (apiClient) => createRemoteProxy(apiClient, 'TaskWorkspaceService'),
             inject: [TriggerInternalApiClient],
         },
+        // Fleet job runtime (Desktop PRD M4) — the fleet-job-lease-sweeper
+        // cron calls reclaimExpired() over the internal RPC channel. The
+        // real service (repositories + the fleet entities) lives API-side,
+        // same shape as TaskWorkspaceService.
+        {
+            provide: FleetJobService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'FleetJobService'),
+            inject: [TriggerInternalApiClient],
+        },
         // Wave 3 M2/M3 — quality gates. The acceptance-check runner lives
         // API-side (same filesystem as the provisioned workspace — see the
         // TaskWorkspaceService note above); agent-task-execute calls
@@ -305,6 +316,7 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         TaskChatService,
         TaskRunDenormService,
         TaskWorkspaceService,
+        FleetJobService,
         TaskGateRunnerService,
         WorkRepository,
         NotificationChannelFacadeService,

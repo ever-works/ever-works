@@ -108,8 +108,8 @@ describe('TenantJobRuntimeService.getAvailableProvidersForTenant — resolver in
 
             const result = await service.getAvailableProvidersForTenant(tenantId);
 
-            // All 5 bundled providers, no narrowing.
-            expect(result).toEqual(['trigger', 'temporal', 'bullmq', 'pgboss', 'inngest']);
+            // All bundled providers, no narrowing.
+            expect(result).toEqual(['trigger', 'temporal', 'bullmq', 'pgboss', 'inngest', 'node']);
         });
     });
 
@@ -237,7 +237,7 @@ describe('TenantJobRuntimeService.getAvailableProvidersForTenant — resolver in
 
             // Bundled fallback wins — flag OFF returns the unfiltered
             // bundled list and the per-tenant overlay is ignored.
-            expect(result).toEqual(['trigger', 'temporal', 'bullmq', 'pgboss', 'inngest']);
+            expect(result).toEqual(['trigger', 'temporal', 'bullmq', 'pgboss', 'inngest', 'node']);
         });
 
         it('intersects the bundled fallback with per-tenant rows when flag is ON', async () => {

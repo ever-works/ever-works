@@ -15,7 +15,7 @@ import {
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import type { CreateEnrollmentTokenResult, FleetNodeView } from '@ever-works/agent/fleet';
-import { FleetService } from '@ever-works/agent/fleet';
+import { FleetJobService, FleetService } from '@ever-works/agent/fleet';
 import { Public } from '../auth/decorators/public.decorator';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
@@ -46,16 +46,35 @@ import {
 @ApiTags('fleet')
 @Controller('api/fleet')
 export class FleetController {
-    constructor(private readonly service: FleetService) {}
+    constructor(
+        private readonly service: FleetService,
+        private readonly jobs: FleetJobService,
+    ) {}
 
     @Get('nodes')
     @ApiOperation({
         summary:
-            'List my fleet nodes (enrolled machines + live nodes of my own configured clusters)',
+            'List my fleet nodes (enrolled machines + live nodes of my own configured clusters), each with its current execution load',
     })
     @HttpCode(HttpStatus.OK)
     async list(@CurrentUser() auth: AuthenticatedUser): Promise<FleetNodeView[]> {
-        return this.service.listForUser(auth.userId);
+        const nodes = await this.service.listForUser(auth.userId);
+        // Per-node load (Desktop PRD §4.1 "current load (running Tasks)")
+        // is composed at the edge rather than inside `FleetService`, so
+        // the registry stays independent of the job runtime. Strictly
+        // best-effort: a load-lookup failure must never take down the
+        // node list, which is the page's whole reason to exist.
+        let load: Record<string, { activeJobCount: number }> = {};
+        try {
+            load = await this.jobs.loadByNodeForUser(auth.userId);
+        } catch {
+            load = {};
+        }
+        return nodes.map((node) => ({
+            ...node,
+            // Cluster-sourced rows are never leased onto, so they stay null.
+            load: node.persisted ? (load[node.id] ?? null) : null,
+        })) as FleetNodeView[];
     }
 
     @Post('nodes/enrollment-token')

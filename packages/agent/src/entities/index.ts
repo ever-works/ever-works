@@ -125,3 +125,4 @@ export * from './credit-ledger-entry.entity';
 export * from './plan-entitlement.entity';
 // Fleet (Wave 12, slice 1) — enrolled execution nodes with heartbeat
 export * from './fleet-node.entity';
+export * from './fleet-job.entity';
