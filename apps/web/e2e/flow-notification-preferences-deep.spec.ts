@@ -36,7 +36,7 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *      (absent === null overwrite), distinct from the explicit all-null clear.
  *   4. mute CATEGORY enum gate — POST mute with an unknown category, the plural
  *      event-type label 'agents', or a MISSING category each 400 with the exact
- *      7-value enum message; mutedUntil coercion on write (past stored verbatim,
+ *      8-value enum message; mutedUntil coercion on write (past stored verbatim,
  *      garbage → Invalid Date echoed as null) vs the read's ACTIVE-mute filter
  *      (`mutedUntil IS NULL OR > now`): a past AND a garbage→Invalid-Date mute are
  *      both filtered out of the view; explicit-null + future mutes are returned.
@@ -160,7 +160,7 @@ function deleteMute(request: APIRequestContext, headers: Record<string, string>,
 }
 
 const MUTE_ENUM_MESSAGE =
-    'category must be one of: ai_credits, subscription, generation, system, security, agent, task';
+    'category must be one of: ai_credits, subscription, generation, system, security, agent, task, digest';
 
 test.describe('Notification preferences — validation & error contracts (deep)', () => {
     // ----------------------------------------------------------------------- //
@@ -360,7 +360,7 @@ test.describe('Notification preferences — validation & error contracts (deep)'
     //  Mute CATEGORY enum gate + mutedUntil coercion                           //
     // ----------------------------------------------------------------------- //
 
-    test('mute rejects an unknown category, the plural event-type label "agents", and a missing category — each with the exact 7-value enum message', async ({
+    test('mute rejects an unknown category, the plural event-type label "agents", and a missing category — each with the exact 8-value enum message', async ({
         request,
     }) => {
         const { token, headers } = await freshUser(request, 'mute-enum');
