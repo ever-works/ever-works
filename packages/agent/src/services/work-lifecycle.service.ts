@@ -1,5 +1,6 @@
 import {
     BadRequestException,
+    ConflictException,
     HttpException,
     Injectable,
     Logger,
@@ -41,6 +42,12 @@ import {
 } from '@src/generators/website-generator';
 import { WebsiteRepositoryCreationMethod } from '@src/items-generator/dto/create-items-generator.dto';
 import { TemplateCatalogService } from '../template-catalog/template-catalog.service';
+import {
+    describeExternalRefConflicts,
+    findExternalRefConflicts,
+    validateWorkExternalRefs,
+    WorkExternalRefsValidationError,
+} from '../works/work-external-refs';
 import { WorkWebsiteRepositoryStateService } from './work-website-repository-state.service';
 import {
     EverWorksDeployQuotaService,
@@ -456,6 +463,48 @@ export class WorkLifecycleService {
     }
 
     /**
+     * Campaign activation (roadmap 14.1) — a `campaign` Work row without
+     * the repo/git side-effects `createWork` triggers.
+     *
+     * A campaign Work is where a go-to-market pipeline's output lives
+     * (lead lists, drafts awaiting the review gate, period reports); it
+     * produces no deployable site, so `WORK_KIND_CAPABILITIES.campaign`
+     * turns `deploy` and the website repo off. Same posture as
+     * {@link createCompanyWork}: minimal row, quota-safe
+     * `deployProvider: null`, no generators.
+     *
+     * `campaign` is deliberately absent from `USER_SELECTABLE_WORK_KINDS`
+     * — this method (driven by {@link CampaignActivationService}) is the
+     * only way one gets minted, so the general create path can never
+     * produce a campaign Work with none of its contents.
+     */
+    async createCampaignWork(
+        user: User,
+        params: {
+            name: string;
+            slug: string;
+            description?: string;
+            status?: WorkStatus;
+        },
+    ): Promise<Work> {
+        const workData: Partial<Work> = {
+            slug: params.slug,
+            name: params.name,
+            description: params.description ?? params.name,
+            userId: user.id,
+            kind: 'campaign',
+            status: params.status ?? 'active',
+            deployProvider: null,
+        };
+
+        try {
+            return await this.workRepository.create(workData, user);
+        } catch (error) {
+            rethrowAsNormalized(error, this.logger, 'creating campaign work');
+        }
+    }
+
+    /**
      * Teams & Prebuilt Companies (spec §6.2) — bare DRAFT Work row with
      * zero repo/git/generation side-effects. The company-template importer
      * maps each `PROJECT.md` in a package onto one of these; a later
@@ -741,6 +790,19 @@ export class WorkLifecycleService {
                 updateData.organizationId = updateDto.organizationId;
             }
 
+            // Ingest routing claims (`works.externalRefs`). Two gates before
+            // the write: shape validation against the closed kind set + the
+            // per-kind cap, then an owner-scoped duplicate scan — two Works
+            // owned by the same user claiming one channel is ambiguous, and
+            // the resolver would silently pick whichever it saw first.
+            if (updateDto.externalRefs !== undefined) {
+                updateData.externalRefs = await this.resolveExternalRefsUpdate(
+                    id,
+                    user.id,
+                    updateDto.externalRefs,
+                );
+            }
+
             const updatedWork = await this.workRepository.update(id, updateData);
 
             if (!updatedWork) {
@@ -776,6 +838,45 @@ export class WorkLifecycleService {
         } catch (error) {
             rethrowAsNormalized(error, this.logger, 'updating work');
         }
+    }
+
+    /**
+     * Validate a claim map and prove no sibling Work of the same owner
+     * already claims any of its identifiers.
+     *
+     * Returns the normalized map, or `null` when the caller cleared every
+     * claim (`null` is the column's canonical "claims nothing" value).
+     *
+     * @throws BadRequestException on a malformed map (unknown kind,
+     *   non-string / empty / oversized id, over the per-kind cap).
+     * @throws ConflictException when another Work owned by the same user
+     *   already claims one of the identifiers — the message names both
+     *   the identifier and the Work holding it.
+     */
+    private async resolveExternalRefsUpdate(workId: string, userId: string, value: unknown) {
+        let normalized: ReturnType<typeof validateWorkExternalRefs>;
+        try {
+            normalized = validateWorkExternalRefs(value);
+        } catch (error) {
+            if (error instanceof WorkExternalRefsValidationError) {
+                throw new BadRequestException({ status: 'error', message: error.message });
+            }
+            throw error;
+        }
+
+        if (normalized) {
+            const siblings = await this.workRepository.findByUser(userId);
+            const conflicts = findExternalRefConflicts(normalized, siblings, workId);
+            if (conflicts.length > 0) {
+                throw new ConflictException({
+                    status: 'error',
+                    message: describeExternalRefConflicts(conflicts),
+                    conflicts,
+                });
+            }
+        }
+
+        return normalized;
     }
 
     async switchWebsiteTemplate(

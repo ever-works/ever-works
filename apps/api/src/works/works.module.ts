@@ -15,6 +15,9 @@ import { OrganizationsModule } from '../organizations/organizations.module';
 // Run orchestration (Wave 4 M3) — AgentsModule exports AgentRunRepository
 // for the per-Work runs-summary endpoint (DatabaseModule does not provide it).
 import { AgentsModule } from '@ever-works/agent/agents';
+// Campaign activation (roadmap 14.1) — composition module over Works,
+// Goals, Agent templates and Tasks; provides CampaignActivationService.
+import { CampaignsModule } from '@ever-works/agent/campaigns';
 
 // Controllers
 import { WorksController } from './works.controller';
@@ -27,6 +30,7 @@ import { KbController } from './kb.controller';
 import { OrgKbController } from './org-kb.controller';
 import { OrgMemoryController } from './org-memory.controller';
 import { WorkTemplatesController } from './work-templates.controller';
+import { WorkCampaignsController } from './work-campaigns.controller';
 
 // Services
 import { WorksTemplateCatalogService } from './works-template-catalog.service';
@@ -60,6 +64,9 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
         // Run orchestration (Wave 4 M3) — AgentRunRepository for the
         // per-Work runs-summary endpoint.
         AgentsModule,
+        // Campaign activation (roadmap 14.1) — CampaignActivationService
+        // for POST /api/works/from-campaign-template.
+        CampaignsModule,
     ],
     providers: [
         CacheEntryRepository,
@@ -122,6 +129,8 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
         // KnowledgeBaseModule + OrganizationsModule (membership guard) wiring.
         OrgMemoryController,
         WorkTemplatesController,
+        // Roadmap 14.1 — the only path that mints a `campaign` Work.
+        WorkCampaignsController,
     ],
 })
 export class WorksModule {}

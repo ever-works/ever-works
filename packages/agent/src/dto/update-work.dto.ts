@@ -15,7 +15,13 @@ import {
     Min,
 } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { WORK_CHECKS_POLICIES, type WorkChecksPolicy } from '@ever-works/contracts';
+import {
+    WORK_CHECKS_POLICIES,
+    WORK_EXTERNAL_REFS_MAX_PER_KIND,
+    WORK_EXTERNAL_REF_KINDS,
+    type WorkChecksPolicy,
+    type WorkExternalRefs,
+} from '@ever-works/contracts';
 import { AcceptanceCheckDto } from './acceptance-check.dto';
 import { MergePolicyDto } from './merge-policy.dto';
 import { MarkdownReadmeConfigDto } from './create-work.dto';
@@ -215,4 +221,25 @@ export class UpdateWorkDto {
         value === null || value === '' ? null : typeof value === 'string' ? value.trim() : value,
     )
     organizationId?: string | null;
+
+    @ApiPropertyOptional({
+        description:
+            'External containers this Work claims, keyed by ingest hint kind (' +
+            `${WORK_EXTERNAL_REF_KINDS.join(' | ')}). Ingested events carrying one of these ` +
+            'identifiers route to this Work. At most ' +
+            `${WORK_EXTERNAL_REFS_MAX_PER_KIND} identifiers per kind; matching is ` +
+            'case-insensitive and trimmed. Pass `null` (or an object whose kinds are all ' +
+            'empty) to clear every claim. `repo` is intentionally absent — repository ' +
+            'hints resolve through the repositories the Work already declares.',
+        example: { 'chat-channel': ['C0123456789'], 'tracker-team': ['ENG'] },
+        nullable: true,
+    })
+    @IsOptional()
+    // Shape validation (known kinds, per-kind cap, id length) and the
+    // cross-Work duplicate-claim check both live in the service layer
+    // (`validateWorkExternalRefs` / `findExternalRefConflicts`), which is
+    // the single source of truth shared with the campaign-activation and
+    // account-import paths. The DTO only declares the property so
+    // `forbidNonWhitelisted` lets it through.
+    externalRefs?: WorkExternalRefs | null;
 }
