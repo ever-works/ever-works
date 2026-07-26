@@ -54,6 +54,23 @@ export interface TaskAcceptanceCheck {
 	/** Required checks decide the gate; non-required ones only report. */
 	required: boolean;
 	/**
+	 * Environment variable NAMES (never values) the check is explicitly
+	 * granted from the platform process environment.
+	 *
+	 * A check command is user-authored input, so its subprocess runs with a
+	 * scrubbed environment built from a fixed allowlist (`PATH`, `HOME`,
+	 * locale/temp vars, …) — it does NOT inherit the platform's own
+	 * environment. This field is the opt-in escape hatch for a build that
+	 * genuinely needs one more variable: listing a name is a DELIBERATE
+	 * GRANT of that value to every command the check runs.
+	 *
+	 * Values are read from the parent environment at spawn time; a name
+	 * that is unset there is simply absent. Platform-owned configuration
+	 * (database/auth/trigger/plugin credentials) is never grantable — see
+	 * `buildCheckEnv` in `@ever-works/agent`. Optional, defaults to none.
+	 */
+	envPassthrough?: string[];
+	/**
 	 * `true` removes the check from the resolved list. On a Task entry
 	 * this is how an inherited Work default is suppressed without
 	 * redeclaring the rest.

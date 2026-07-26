@@ -1215,6 +1215,16 @@
                 "skipped": "Gate skipped",
                 "none": "No checks"
             },
+            "decisionConflicts": {
+                "title": "This may re-open {count} settled decision(s)",
+                "subtitle": "Your organization already recorded a call on this subject.",
+                "overlap": "Shared terms: {terms}",
+                "advisory": "Advisory only — nothing is blocked. Open a decision to read the rationale, or supersede it if the call has changed.",
+                "signal": {
+                    "strong": "Strong match",
+                    "moderate": "Possible match"
+                }
+            },
             "checks": {
                 "title": "Checks",
                 "edit": "Edit",
@@ -4584,6 +4594,29 @@
                     "errorBusy": "Deleting…",
                     "errorPartial": "Deleted {ok}, failed {failed}."
                 },
+                "review": {
+                    "nav": "Review",
+                    "navAria": "Review queue — {count} documents awaiting review",
+                    "metaTitle": "Knowledge Base review queue",
+                    "title": "Review queue",
+                    "subtitle": "Agent-written notes stay out of agent context until you accept them.",
+                    "empty": "Nothing to review. New agent-written documents will appear here.",
+                    "loading": "Loading the review queue…",
+                    "retry": "Try again",
+                    "source": "From {source}",
+                    "accept": "Accept",
+                    "editThenAccept": "Edit & accept",
+                    "supersede": "Supersede",
+                    "supersedePrompt": "Replaced by",
+                    "supersedePlaceholder": "Pick the surviving decision…",
+                    "supersedeConfirm": "Supersede",
+                    "archive": "Archive",
+                    "cancel": "Cancel",
+                    "preview": "Toggle content preview",
+                    "previewLoading": "Loading preview…",
+                    "previewEmpty": "This document has no body yet.",
+                    "bannerMessage": "This document is awaiting review — it is not feeding agent context yet. Edit it if needed, then accept."
+                },
                 "workbench": {
                     "title": "Knowledge Base workbench",
                     "metaTitle": "Knowledge Base workbench",
@@ -6182,7 +6215,10 @@
             "reconnect": "Reconnect",
             "waitingForOutput": "Waiting for output…",
             "noRuns": "No runs yet — terminals attach to agent runs.",
-            "runPickerLabel": "Run"
+            "runPickerLabel": "Run",
+            "startSession": "Start session",
+            "startingSession": "Starting…",
+            "startFailed": "Could not start a terminal session for this run."
         },
         "jobRuntimeBanner": {
             "title": "Background job runtime is not configured.",

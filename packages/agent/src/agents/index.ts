@@ -12,6 +12,8 @@ export * from './agent-run.service';
 export * from './run-dispatch-gate.service';
 export * from './run-steering.service';
 export * from './run-credits-precheck';
+export * from './terminal-session-dispatcher';
+export * from './terminal-session-launcher.service';
 export * from './agent-run-canceller';
 export * from './agent-run-abort';
 export * from './agent-run-sweeper.service';

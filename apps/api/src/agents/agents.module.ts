@@ -14,6 +14,8 @@ import {
     AGENT_DOMAIN_TOOL_SOURCES,
     RunSteeringService,
     type AgentDomainToolSources,
+    TERMINAL_SESSION_DISPATCHER,
+    TerminalSessionLauncher,
     type AgentRunChatBackPoster,
     type AgentRunTaskFinisher,
     type AgentPluginToolsFacade,
@@ -38,6 +40,7 @@ import {
 import {
     agentHeartbeatTriggerAdapter,
     createAgentRunCancellerAdapter,
+    terminalSessionTriggerAdapter,
     TriggerModule as TasksTriggerModule,
     TriggerService,
 } from '@ever-works/trigger-tasks';
@@ -59,6 +62,7 @@ import {
     TaskReviewerRepository,
     TaskApproverRepository,
     RUN_STEERING_PORT,
+    TERMINAL_SESSION_STARTER,
 } from '@ever-works/agent/tasks-domain';
 // Domain chat-tool sources (AGENT_DOMAIN_TOOL_SOURCES binding below).
 // Each module contributes the ONE service/repository its descriptor
@@ -213,6 +217,19 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
         // TasksDomainModule, and neither package gains a runtime import of
         // the other.
         { provide: RUN_STEERING_PORT, useExisting: RunSteeringService },
+        // Streaming terminal — the two halves of the session dispatch.
+        //
+        // TERMINAL_SESSION_DISPATCHER is the job-runtime producer for the
+        // `terminal-session` task (which shipped with NO producer at all,
+        // so no session was ever started). TERMINAL_SESSION_STARTER is the
+        // port `TaskTransitionService` reaches for after a successful
+        // fan-out; it points at the same launcher so the ownership check,
+        // the CAS duplicate refusal and the persistent gate are stated
+        // exactly once. Same @Global() token posture as RUN_STEERING_PORT:
+        // implementation in the imported agent-side AgentsModule, consumer
+        // in TasksDomainModule, neither package importing the other.
+        { provide: TERMINAL_SESSION_DISPATCHER, useValue: terminalSessionTriggerAdapter },
+        { provide: TERMINAL_SESSION_STARTER, useExisting: TerminalSessionLauncher },
         // Notifications v2 (EW-670) — INBOUND_EMAIL_TASK_SPAWNER binding.
         // The inbound-email dispatcher's `task-spawn` mode delegates here:
         // create a Task from the inbound email (scoped to the address
@@ -757,6 +774,8 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
         AGENT_DOMAIN_TOOL_SOURCES,
         INBOUND_EMAIL_TASK_SPAWNER,
         RUN_STEERING_PORT,
+        TERMINAL_SESSION_DISPATCHER,
+        TERMINAL_SESSION_STARTER,
     ],
 })
 export class AgentsModule {}

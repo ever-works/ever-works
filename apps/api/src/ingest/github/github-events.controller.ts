@@ -13,6 +13,7 @@ import { Throttle } from '@nestjs/throttler';
 import { Public } from '../../auth/decorators/public.decorator';
 import {
     GitHubPrReviewBridgeService,
+    extractGitHubWorkspaceRef,
     type GitHubWebhookBody,
 } from './github-pr-review-bridge.service';
 import { verifyGitHubSignature } from './github-signature.util';
@@ -35,6 +36,19 @@ import { verifyGitHubSignature } from './github-signature.util';
  * signature verification; the parsed body is consumed as-is,
  * bypassing the global whitelist ValidationPipe (GitHub's event
  * schema is theirs, not ours).
+ *
+ * Per-user resolution is PER INSTALLATION: the delivery's
+ * `installation.id` (or, for a user-configured repo/org webhook, the
+ * repository owner) selects the platform user bound to it, so two
+ * customers' repositories never cross-attribute. The identity is read
+ * from the not-yet-verified body, which is safe because it only SELECTS
+ * which install's webhook secret to verify against — a forged id picks a
+ * secret that fails the HMAC.
+ *
+ * An unknown or ambiguous installation is REFUSED rather than guessed,
+ * and the refusal is a clean no-op (warn log, 200, nothing ingested) —
+ * never a 500. Only "no install configured at all" and "bad signature"
+ * are 401s, preserving the fail-closed posture.
  *
  * Distinct from the platform GitHub App webhook
  * (`/api/github-app/webhooks`, app-level secret, install/push sync):
@@ -66,15 +80,35 @@ export class GitHubEventsController {
             throw new BadRequestException('Missing raw request payload');
         }
 
-        // Fail-closed: no configured binding → no secret → reject,
-        // including the initial `ping` (GitHub signs that too).
-        const binding = await this.bridge.resolveBinding();
-        if (!binding) {
+        const rawBody = req.rawBody;
+        const body = (req.body ?? {}) as GitHubWebhookBody;
+
+        // Resolve WHICH install owns this installation/repository before
+        // verifying, so the right webhook secret is used. The workspace
+        // ref comes from the unverified body and only selects a candidate
+        // secret — a forged id picks a secret that fails the HMAC below.
+        const resolution = await this.bridge.resolveBinding({
+            workspace: extractGitHubWorkspaceRef(body),
+            verifySignature: (webhookSecret) =>
+                verifyGitHubSignature({ rawBody, signature, webhookSecret }).valid,
+        });
+
+        // Fail-closed: nothing configured → reject, including the initial
+        // `ping` (GitHub signs that too).
+        if (resolution.status === 'not-configured') {
             throw new UnauthorizedException('GitHub events receiver is not configured');
         }
+        // Unknown/ambiguous installation → clean no-op. The bridge already
+        // logged the refusal; 200 so GitHub does not retry a delivery we
+        // will never be able to attribute.
+        if (resolution.status === 'unresolved') {
+            return { ok: true, ignored: resolution.reason };
+        }
+
+        const binding = resolution.binding;
 
         const verdict = verifyGitHubSignature({
-            rawBody: req.rawBody,
+            rawBody,
             signature,
             webhookSecret: binding.webhookSecret,
         });
@@ -82,12 +116,16 @@ export class GitHubEventsController {
             throw new UnauthorizedException('Invalid GitHub webhook signature');
         }
 
+        // Verified — persist the installation→user binding so subsequent
+        // deliveries resolve exactly instead of through the fallback.
+        await this.bridge.recordBinding(binding);
+
         // Webhook-creation handshake — acknowledge without dispatching.
         if (eventName === 'ping') {
             return { ok: true };
         }
 
-        await this.bridge.handleEvent(binding, eventName, (req.body ?? {}) as GitHubWebhookBody);
+        await this.bridge.handleEvent(binding, eventName, body);
 
         return { ok: true };
     }
