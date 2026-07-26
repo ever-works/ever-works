@@ -46,10 +46,68 @@ export interface TaskRun {
     currentActivity: string | null;
     totalTokens: number | null;
     changedFilesCount: number | null;
+    /** Cost surfacing (orchestration M7) — settled run cost in cents;
+     *  null until the run reaches a terminal state. */
+    costCents?: number | null;
     startedAt: string | null;
     /** Quality gates (Wave 3 M6) — latest-run gate verdict for the board
      *  chip. `null`/absent = the run has no gate verdict. */
     gateStatus?: GateStatus | null;
+}
+
+// ── PR insights (kanban M5 / M6) ──────────────────────────────────
+
+/** Rolled-up CI verdict for the PR head, as the board's dot renders it. */
+export type TaskCiState = 'passing' | 'failing' | 'pending' | 'unknown';
+
+/** PR lifecycle as last observed from the git provider. */
+export type TaskPrState = 'open' | 'draft' | 'closed' | 'merged';
+
+/** One CI check on the PR head. All strings are PLAIN TEXT by contract. */
+export interface TaskPrCheck {
+    name: string;
+    status: string;
+    conclusion?: string | null;
+    detailsUrl?: string;
+}
+
+export interface TaskPrStatus {
+    taskId: string;
+    prNumber: number | null;
+    prUrl: string | null;
+    prState: TaskPrState | null;
+    ciState: TaskCiState | null;
+    ciCheckedAt: string | null;
+    checks: TaskPrCheck[];
+    /** True when this came from the server cache with no provider call. */
+    cached: boolean;
+}
+
+export interface TaskDiffFile {
+    path: string;
+    status: string;
+    additions: number;
+    deletions: number;
+    patch?: string;
+    /** The server dropped this file's patch to honour the byte budget. */
+    patchOmitted?: boolean;
+}
+
+export interface TaskDiff {
+    taskId: string;
+    source: 'pull-request' | 'compare';
+    prNumber: number | null;
+    prUrl: string | null;
+    branchRef: string | null;
+    baseRef: string | null;
+    diff: {
+        files: TaskDiffFile[];
+        truncated: boolean;
+        totalFiles: number;
+        totalAdditions: number;
+        totalDeletions: number;
+        patchBytes: number;
+    };
 }
 
 // ── Board dispatch (kanban M3 / M4) ───────────────────────────────
@@ -123,6 +181,12 @@ export interface Task {
     prNumber: number | null;
     prUrl: string | null;
     conflictPaths: string[] | null;
+    // PR insights (kanban M5) — cached PR/CI verdict, refreshed by the
+    // `task-pr-status-sync` cron. All null until the Task opens a PR.
+    prState?: TaskPrState | null;
+    ciState?: TaskCiState | null;
+    ciCheckedAt?: string | null;
+    prChecks?: TaskPrCheck[] | null;
     // Kanban run cockpit (Wave 2) — latest-run denorm columns + the
     // opt-in `run` embed (present only on `includeRun=true` responses).
     latestRunId?: string | null;
@@ -277,6 +341,36 @@ export const tasksAPI = {
     /** Agents the board's picker offers for this Task. */
     async listRunCandidates(id: string) {
         return serverFetch<{ data: RunCandidateAgent[] }>(`/tasks/${id}/run-candidates`, {
+            method: 'GET',
+        });
+    },
+
+    /**
+     * PR insights (kanban M5) — cached PR state + CI verdict for this
+     * Task's pull request. The server owns the refresh throttle, so the
+     * client may call this as often as it likes.
+     */
+    async prStatus(id: string, opts: { refresh?: boolean } = {}) {
+        return serverFetch<TaskPrStatus>(
+            `/tasks/${id}/pr-status${opts.refresh ? '?refresh=true' : ''}`,
+            { method: 'GET' },
+        );
+    },
+
+    /**
+     * PR insights (kanban M6) — capped diff for this Task's PR (or its
+     * pushed branch). `maxFiles`/`maxBytes` may only narrow the platform
+     * caps; the API clamps anything larger.
+     */
+    async diff(id: string, opts: { maxFiles?: number; maxBytes?: number } = {}) {
+        const params = new URLSearchParams();
+        if (opts.maxFiles !== undefined) params.set('maxFiles', String(opts.maxFiles));
+        if (opts.maxBytes !== undefined) params.set('maxBytes', String(opts.maxBytes));
+        const query = params.toString();
+        return serverFetch<TaskDiff>(`/tasks/${id}/diff${query ? `?${query}` : ''}`, {
+            method: 'GET',
+        });
+    },
     /**
      * Re-litigation guard (memory upgrades M6) — settled decisions this
      * Task appears to re-open. Deterministic term-overlap check on the

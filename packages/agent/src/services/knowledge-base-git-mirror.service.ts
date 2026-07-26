@@ -9,7 +9,27 @@ import { WorkKnowledgeDocumentRepository } from '../database/repositories/work-k
 import { WorkKnowledgeDocument } from '../entities/work-knowledge-document.entity';
 import { Work } from '../entities/work.entity';
 import { User } from '../entities/user.entity';
-import { KbDocumentClass } from '../entities/kb-types';
+import {
+    KbDecisionState,
+    KbDecisionStatus,
+    KbDocumentClass,
+    KbReviewState,
+} from '../entities/kb-types';
+
+/**
+ * Memory upgrades M12 — decision metadata read back off the mirror.
+ *
+ * `undefined` means "the sidecar did not carry a usable value" (absent,
+ * null, or an unrecognized string). Callers must treat that as
+ * "leave the DB row alone", never as "clear the field": drop-if-
+ * unrecognized is the same posture account-import uses for enums, and
+ * it is what keeps a newer platform writing a value an older reader
+ * cannot parse from silently wiping state.
+ */
+export interface MirroredDecisionMetadata {
+    decisionStatus?: KbDecisionStatus;
+    reviewState?: KbReviewState;
+}
 
 /**
  * EW-641 Phase 1B/a — two-layer KB sync.
@@ -109,6 +129,65 @@ export class KnowledgeBaseGitMirrorService {
                 `KB document path must start with a known class folder: ${relativePath}`,
             );
         }
+    }
+
+    /**
+     * Memory upgrades M12 — parse `decision_status` / `review_state` out
+     * of a mirrored sidecar `.yml`.
+     *
+     * Contract (deliberately identical to the account-import enum rule):
+     *
+     *  - **Never throws.** A corrupt / truncated / non-object YAML blob
+     *    yields `{}`. A sidecar is data from a git repo a user can edit
+     *    by hand; a parse failure must degrade to "no metadata", not to
+     *    a 500 on the restore path.
+     *  - **Drop-if-unrecognized, never default-if-unrecognized.** An
+     *    unknown status string is discarded, so a hand-edited
+     *    `decision_status: yolo` leaves the row's real status intact
+     *    instead of resetting it to `proposed`.
+     *  - Static + pure so the round-trip can be tested against the exact
+     *    bytes `buildSidecar` writes, with no Git or filesystem in play.
+     */
+    static parseSidecarDecisionMetadata(sidecarYaml: string): MirroredDecisionMetadata {
+        if (typeof sidecarYaml !== 'string' || sidecarYaml.length === 0) {
+            return {};
+        }
+
+        let parsed: unknown;
+        try {
+            parsed = yaml.parse(sidecarYaml);
+        } catch {
+            return {};
+        }
+        if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) {
+            return {};
+        }
+
+        // Own-property reads only: a `__proto__`-shaped key in a
+        // user-editable YAML file must never reach the result object.
+        const record = parsed as Record<string, unknown>;
+        const readOwn = (key: string): unknown =>
+            Object.prototype.hasOwnProperty.call(record, key) ? record[key] : undefined;
+
+        const out: MirroredDecisionMetadata = {};
+
+        const rawDecisionStatus = readOwn('decision_status');
+        if (
+            typeof rawDecisionStatus === 'string' &&
+            (Object.values(KbDecisionStatus) as string[]).includes(rawDecisionStatus)
+        ) {
+            out.decisionStatus = rawDecisionStatus as KbDecisionStatus;
+        }
+
+        const rawReviewState = readOwn('review_state');
+        if (
+            typeof rawReviewState === 'string' &&
+            (Object.values(KbReviewState) as string[]).includes(rawReviewState)
+        ) {
+            out.reviewState = rawReviewState as KbReviewState;
+        }
+
+        return out;
     }
 
     private readonly logger = new Logger(KnowledgeBaseGitMirrorService.name);
@@ -296,6 +375,14 @@ export class KnowledgeBaseGitMirrorService {
      * enqueues a fresh mirror so the head commit moves forward with the
      * restored content. Returns the updated doc.
      *
+     * Memory upgrades M12: the sidecar's `decision_status` /
+     * `review_state` are read back and restored ALONGSIDE the body, so
+     * restoring an old commit of a decision doc restores the decision
+     * state that commit recorded — the write side alone only got the
+     * data out, this closes the round trip. Drop-if-unrecognized applies:
+     * a sidecar the provider cannot serve, or one whose values are
+     * absent/unknown, leaves the row's current decision state untouched.
+     *
      * Falls back gracefully when the provider does not implement
      * `getFileContent` (very old plugins) — the caller sees a 400 from
      * the service layer.
@@ -342,13 +429,79 @@ export class KnowledgeBaseGitMirrorService {
 
         const body = this.decodeFileContent(file);
         const metadata = { ...(doc.metadata ?? {}), body };
-        await this.documentRepository.update(doc.id, {
+        const patch: Partial<WorkKnowledgeDocument> = {
             metadata: metadata as Record<string, unknown>,
             wordCount: this.countWords(body),
             tokenCount: Math.ceil(body.length / 4),
-        });
+        };
+
+        // M12 — pull the decision metadata off the sidecar at the same
+        // commit. Best-effort: a provider that cannot serve the sidecar,
+        // or a sidecar with no usable values, restores the body alone.
+        const mirrored = await this.readSidecarDecisionMetadata(work, doc.path, commitSha);
+        if (mirrored.decisionStatus) {
+            patch.decision = {
+                ...((doc.decision ?? {}) as KbDecisionState),
+                status: mirrored.decisionStatus,
+            };
+        }
+        if (mirrored.reviewState) {
+            patch.reviewState = mirrored.reviewState;
+        }
+
+        await this.documentRepository.update(doc.id, patch);
 
         return { restored: true, body };
+    }
+
+    /**
+     * Memory upgrades M12 — fetch + parse one document's mirrored
+     * sidecar at a commit (defaults to the branch head).
+     *
+     * Public so a sync/import path can reconcile decision state from the
+     * repo without going through a full body restore. Returns `{}` on
+     * every failure mode (no owner, provider lacks `getFileContent`,
+     * file missing, unparseable YAML) — reading the mirror must never be
+     * able to fail a caller.
+     */
+    async readSidecarDecisionMetadata(
+        work: Work,
+        docPath: string,
+        commitSha?: string,
+    ): Promise<MirroredDecisionMetadata> {
+        try {
+            const workOwner = work.user as User | undefined;
+            if (!workOwner?.id) {
+                return {};
+            }
+            KnowledgeBaseGitMirrorService.validateRelativeKbPath(docPath);
+            const relPath = path.posix.join(
+                KnowledgeBaseGitMirrorService.KB_ROOT,
+                this.sidecarPath(docPath),
+            );
+            const file = await this.gitFacade.getFileContent(
+                work.getRepoOwner('data'),
+                work.getDataRepo(),
+                relPath,
+                {
+                    providerId: work.gitProvider,
+                    userId: workOwner.id,
+                    workId: work.id,
+                },
+                commitSha,
+            );
+            if (!file) {
+                return {};
+            }
+            return KnowledgeBaseGitMirrorService.parseSidecarDecisionMetadata(
+                this.decodeFileContent(file),
+            );
+        } catch (error) {
+            this.logger.warn(
+                `Failed to read KB sidecar decision metadata for ${docPath} (work=${work?.id}): ${(error as Error)?.message ?? 'unknown error'}`,
+            );
+            return {};
+        }
     }
 
     /**
@@ -656,6 +809,11 @@ export class KnowledgeBaseGitMirrorService {
                     class: d.kbDocumentClass,
                     tags: d.tags ?? [],
                     status: d.status,
+                    // M12 — the catalogue carries the same decision
+                    // metadata as the sidecars so a reader can filter
+                    // reversed/unreviewed docs without opening each file.
+                    decision_status: d.decision?.status ?? null,
+                    review_state: d.reviewState ?? null,
                     locked: d.locked,
                     lock_mode: d.lockMode ?? null,
                     word_count: d.wordCount ?? null,
@@ -747,6 +905,17 @@ export class KnowledgeBaseGitMirrorService {
             description: doc.description ?? null,
             class: doc.kbDocumentClass,
             status: doc.status,
+            // Memory upgrades M12 — decision metadata in the mirror.
+            // Without these two keys an agent reading the checked-out
+            // files cannot tell a LIVE decision from a REVERSED one, and
+            // an agent-proposed doc awaiting review looks identical to an
+            // accepted one: `status` is the KB lifecycle (draft/active/
+            // archived), which is orthogonal to both. `decisionStatus`
+            // lives inside the `decision` JSON blob on the row, so it is
+            // flattened here rather than nested — the sidecar is a flat
+            // key/value document by spec §7.3.
+            decision_status: doc.decision?.status ?? null,
+            review_state: doc.reviewState ?? null,
             language: doc.language,
             tags: doc.tags ?? [],
             categories: doc.categories ?? [],

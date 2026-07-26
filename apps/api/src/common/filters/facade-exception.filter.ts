@@ -71,6 +71,11 @@ const FACADE_ERROR_STATUS: Readonly<Record<string, HttpStatus>> = {
     NoDeployCredentialsError: HttpStatus.CONFLICT,
     // "the resolved plugin does not implement this operation".
     OAuthNotSupportedError: HttpStatus.BAD_REQUEST,
+    // PR insights (kanban run cockpit M5/M6) — the connected git provider
+    // has no PR-status / diff capability. A 409 (not a 500): the caller
+    // resolves it by connecting a provider that implements it. Plan 04
+    // §7.7 calls this out by name.
+    GitOperationNotSupportedError: HttpStatus.CONFLICT,
     // Merge-policy matrix (Wave 3, D4) — an agent-driven merge the
     // effective policy refuses. Not a fault: the caller resolves it by
     // changing the policy at the tenant / org / Work / Agent scope, or by

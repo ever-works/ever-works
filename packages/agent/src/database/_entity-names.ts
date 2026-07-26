@@ -58,6 +58,9 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'AuthAccount',
     'AuthSession',
     'AuthVerification',
+    // Payment provider bridge (billing PRD §5.3(3)/(4)) — customer +
+    // payment-method summary + auto-recharge state, and the invoice mirror
+    'BillingProfile',
     'CacheEntry',
     'ComposioTriggerSubscription',
     'Conversation',
@@ -83,6 +86,9 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'IngestedEvent',
     // Memory eval loop (memory upgrades M10) — append-only retrieval log
     'KbRetrievalLog',
+    // Invoice mirror (billing PRD §3.5) — provider invoices/receipts,
+    // written only by the signature-verified webhook
+    'Invoice',
     // Meetings v1 (Wave 8, feature a) — captured meetings w/ transcripts
     'Meeting',
     'Mission',
@@ -136,6 +142,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'TenantJobRuntimeConfig',
     'TenantRuntimeProviderAllowlist',
     // ──────────────────────────────────────────────────────────
+    // Streaming-terminal M9 / D1 — persisted terminal transcripts.
+    'TerminalTranscriptChunk',
     'UsageLedgerEntry',
     'User',
     'UserNotificationCategoryMute',

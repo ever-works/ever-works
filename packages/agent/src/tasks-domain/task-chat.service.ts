@@ -20,6 +20,7 @@ import { ActivityActionType, ActivityStatus } from '../entities/activity-log.typ
 import { assertNoSecrets } from '../utils/secret-scan';
 import { AGENT_CHAT_REPLY_DISPATCHER, type AgentChatReplyDispatcher } from './task-dispatcher';
 import { RUN_STEERING_PORT, type RunSteeringPort } from './run-steering-port';
+import { RunDispatchGateService } from '../agents/run-dispatch-gate.service';
 
 /**
  * Tasks feature — Phase 13.2.
@@ -83,6 +84,13 @@ export class TaskChatService {
         @Optional()
         @Inject(RUN_STEERING_PORT)
         private readonly steering?: RunSteeringPort,
+        // Run orchestration — the SAME concurrency choke point the task
+        // fan-out, board run and resume go through. An @agent mention is
+        // a dispatch like any other: before this, a chat storm could put
+        // unbounded runs on a Work that the board path would have parked.
+        // Appended LAST + @Optional() per the positional-spec arity rule;
+        // without it the path behaves exactly as it did before.
+        @Optional() private readonly dispatchGate?: RunDispatchGateService,
     ) {}
 
     async list(
@@ -160,19 +168,69 @@ export class TaskChatService {
                     }
                     let run: { id: string } | null = null;
                     try {
-                        run = this.runs
-                            ? await this.runs.createQueued({
-                                  agentId: mention.id,
-                                  userId,
-                                  triggerKind: 'chat',
-                                  taskId: task.id,
-                                  chatMessageId: row.id,
-                                  // Wave 4 M1 — workId denorm at creation so
-                                  // chat-triggered runs count toward (and show
-                                  // under) their Work like task runs do.
-                                  workId: task.workId ?? null,
-                              })
-                            : null;
+                        // Run orchestration — admit + reserve as ONE
+                        // critical section, exactly like the task fan-out.
+                        // Over-limit parks the row (queuedReason set, no
+                        // enqueue); `RunDispatchGateService.drainForWork`
+                        // promotes it back onto the CHAT path when a slot
+                        // frees, carrying `chatMessageId` so the agent
+                        // still replies to the message it was mentioned in.
+                        const reserve = async (verdict: {
+                            admitted: boolean;
+                            queuedReason?: string;
+                        }): Promise<void> => {
+                            run = this.runs
+                                ? await this.runs.createQueued({
+                                      agentId: mention.id,
+                                      userId,
+                                      triggerKind: 'chat',
+                                      taskId: task.id,
+                                      chatMessageId: row.id,
+                                      // Wave 4 M1 — workId denorm at creation so
+                                      // chat-triggered runs count toward (and show
+                                      // under) their Work like task runs do.
+                                      workId: task.workId ?? null,
+                                      queuedReason: verdict.admitted
+                                          ? null
+                                          : (verdict.queuedReason ?? null),
+                                  })
+                                : null;
+                        };
+                        let admission: { admitted: boolean; queuedReason?: string } = {
+                            admitted: true,
+                        };
+                        if (this.dispatchGate) {
+                            try {
+                                admission = await this.dispatchGate.admit(
+                                    {
+                                        userId,
+                                        workId: task.workId ?? null,
+                                        organizationId: task.organizationId ?? null,
+                                    },
+                                    reserve,
+                                );
+                            } catch (gateErr) {
+                                // Fail-open: a broken safety valve must
+                                // never swallow a user's @mention.
+                                this.logger.warn(
+                                    `Dispatch gate admit failed for chat message ${row.id} — failing open: ${gateErr}`,
+                                );
+                            }
+                            if (!run) await reserve(admission);
+                        } else {
+                            await reserve(admission);
+                        }
+                        // TypeScript's control-flow analysis cannot see the
+                        // assignment that happens inside `reserve`, so it
+                        // still believes `run` is the `null` it was
+                        // initialised to. Re-widen to the declared type.
+                        run = run as { id: string } | null;
+                        if (!admission.admitted) {
+                            this.logger.log(
+                                `Chat reply for agent ${mention.id} on task ${task.id} parked by dispatch gate (${admission.queuedReason}).`,
+                            );
+                            return;
+                        }
                         const handle = await this.chatDispatcher!.enqueue({
                             agentId: mention.id,
                             userId,

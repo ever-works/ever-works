@@ -103,7 +103,8 @@ describe('activity-log.types', () => {
             // already added by the domain-model train, so it is shared) -> 115.
             const literals = Object.values(ActivityActionType).filter((v) => typeof v === 'string');
             // +1 EXTERNAL_EVENT_INGESTED (event-ingest spine, Wave 6) -> 116.
-            expect(literals).toHaveLength(116);
+            // +2 task_merged / task_merge_refused (agent-merge path, #1874) -> 118.
+            expect(literals).toHaveLength(118);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

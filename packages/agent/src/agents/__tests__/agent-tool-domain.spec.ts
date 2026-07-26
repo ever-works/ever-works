@@ -229,9 +229,11 @@ describe('AgentToolService — domain chat tool assembly', () => {
         const byName = new Map(tools.map((tool) => [tool.name, tool]));
 
         await byName.get('list_recent_events')!.invoke({ limit: 5 });
+        // #1872 gave findRecentByUser a filter object (workId/source support);
+        // the owner stays the first positional arg — that is what this pins.
         expect((sources.ingest!.repository as any).findRecentByUser).toHaveBeenCalledWith(
             'owner-9',
-            5,
+            { limit: 5 },
         );
 
         await byName.get('list_meetings')!.invoke({});

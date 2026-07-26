@@ -261,11 +261,18 @@ describe('TaskTransitionService — Phase 15.3 agent dispatch hook', () => {
                 workId: 'work-1',
                 organizationId: 'org-1',
             } as Partial<Task>);
-            expect(gate.admit).toHaveBeenCalledWith({
-                userId: 'u1',
-                workId: 'work-1',
-                organizationId: 'org-1',
-            });
+            // The second argument is the `reserve` half of the admission:
+            // the gate runs the `createQueued` insert INSIDE its critical
+            // section so the count and the row that consumes the counted
+            // slot cannot be split by a parallel burst.
+            expect(gate.admit).toHaveBeenCalledWith(
+                {
+                    userId: 'u1',
+                    workId: 'work-1',
+                    organizationId: 'org-1',
+                },
+                expect.any(Function),
+            );
             expect(dispatcher.enqueue).toHaveBeenCalledTimes(1);
         });
 

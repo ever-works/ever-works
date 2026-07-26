@@ -8,12 +8,18 @@ import {
     Param,
     ParseUUIDPipe,
     Post,
+    Query,
     ServiceUnavailableException,
     Get,
 } from '@nestjs/common';
-import { ApiOperation, ApiTags } from '@nestjs/swagger';
+import { ApiOperation, ApiQuery, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { AgentsService, TerminalSessionLauncher } from '@ever-works/agent/agents';
+import {
+    AgentsService,
+    TerminalSessionLauncher,
+    TerminalTranscriptService,
+    type TerminalTranscriptPage,
+} from '@ever-works/agent/agents';
 import { AgentRunRepository } from '@ever-works/agent/database';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
@@ -45,6 +51,10 @@ export class TerminalAttachController {
         // compiling, and an install with no job runtime answers 503 on
         // start instead of failing to boot the controller.
         @Optional() private readonly launcher?: TerminalSessionLauncher,
+        // Same appended-LAST + @Optional() rule as `launcher`: an
+        // install without the transcript module answers the replay route
+        // with an empty page rather than failing to boot the controller.
+        @Optional() private readonly transcripts?: TerminalTranscriptService,
     ) {}
 
     private async authorizeRun(userId: string, agentId: string, runId: string) {
@@ -150,6 +160,67 @@ export class TerminalAttachController {
                     `Terminal session could not be started for AgentRun ${runId}.`,
                 );
         }
+    }
+
+    /**
+     * Persisted transcript replay (streaming-terminal M9 / founder
+     * decision D1).
+     *
+     * The relay's scrollback is in-memory and byte-bounded: it dies with
+     * the replica and never covers a session whose tab was closed. This
+     * route serves the durable record instead, so the pane can rehydrate
+     * on attach and a FINISHED run still shows what it printed.
+     *
+     * Owner-scoped through the same `authorizeRun` helper every other
+     * route here uses (agent ownership + user-scoped run + agentId
+     * match; a cross-user runId 404s with no existence leak).
+     *
+     * Paginated and doubly capped by the service: `limit` is clamped to
+     * `TERMINAL_TRANSCRIPT_REPLAY_MAX_CHUNKS` and the page is cut at
+     * `TERMINAL_TRANSCRIPT_REPLAY_MAX_CHARS`, so a run that printed a
+     * gigabyte can never be replayed in one response. Callers page with
+     * `?fromSeq=<lastSeq + 1>` while `hasMore` is true.
+     */
+    @Get('transcript')
+    @ApiOperation({
+        summary:
+            'Replay this run’s persisted terminal transcript (M9). Owner-scoped, ' +
+            'paginated by frame sequence, and size-capped per page.',
+    })
+    @ApiQuery({ name: 'fromSeq', required: false, type: Number })
+    @ApiQuery({ name: 'limit', required: false, type: Number })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
+    async transcript(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) agentId: string,
+        @Param('runId', ParseUUIDPipe) runId: string,
+        @Query('fromSeq') fromSeq?: string,
+        @Query('limit') limit?: string,
+    ): Promise<TerminalTranscriptPage> {
+        await this.authorizeRun(auth.userId, agentId, runId);
+
+        if (!this.transcripts) {
+            return { runId, chunks: [], lastSeq: null, hasMore: false, total: 0 };
+        }
+
+        return this.transcripts.getTranscriptPage(runId, {
+            fromSeq: this.parseNonNegativeInt(fromSeq),
+            limit: this.parseNonNegativeInt(limit),
+        });
+    }
+
+    /**
+     * Query params arrive as strings. Anything that is not a
+     * non-negative integer is dropped so the service applies its own
+     * default rather than inheriting a `NaN`.
+     */
+    private parseNonNegativeInt(raw?: string): number | undefined {
+        if (typeof raw !== 'string' || raw.trim().length === 0) {
+            return undefined;
+        }
+        const parsed = Number.parseInt(raw, 10);
+        return Number.isSafeInteger(parsed) && parsed >= 0 ? parsed : undefined;
     }
 
     @Get()

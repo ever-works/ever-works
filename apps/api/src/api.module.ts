@@ -21,6 +21,7 @@ import { HealthModule } from './health/health.module';
 import { TriggerInternalModule } from './trigger/trigger-internal.module';
 import { GitHubAppModule, TwentyCrmModule } from './integrations';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
+import { BillingApiModule } from './billing/billing.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { BudgetsModule } from './budgets/budgets.module';
 import { ScreenshotModule } from './plugins-capabilities/screenshot/screenshot.module';
@@ -56,6 +57,8 @@ import { IngestModule } from './ingest/ingest.module';
 import { MeetingsApiModule } from './meetings/meetings.module';
 import { FleetApiModule } from './fleet/fleet.module';
 import { MergePolicyApiModule } from './merge-policy/merge-policy.module';
+import { DigestApiModule } from './digest/digest.module';
+import { PrReviewApiModule } from './pr-review/pr-review.module';
 import { TelemetryModule } from './telemetry/telemetry.module';
 import { UsersModule } from './users/users.module';
 import { ScopeModule } from './scope/scope.module';
@@ -210,6 +213,23 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // agent-side PolicyModule. Writes ride the existing Work / Agent /
         // organization PATCH endpoints.
         MergePolicyApiModule,
+        // Digest read (Wave 7) — GET /api/digest owner-scoped composed
+        // digest over the agent-side DigestModule. Cadence stays a
+        // profile preference; delivery stays on the digest-dispatcher
+        // cron. Exists so the `get_digest` chat tool has a REST operation
+        // the manifest-driven web tool registry can bind to.
+        DigestApiModule,
+        // AI PR review (Wave 7) — POST /api/pr-review owner-scoped
+        // trigger over the agent-side PrReviewModule, the third REST
+        // operation the web tool registry was missing. Refuses any
+        // repository not connected to one of the caller's own Works.
+        PrReviewApiModule,
+        // The money path (billing PRD B5) — /api/credits/checkout,
+        // /api/billing/{overview,invoices,auto-recharge} and the
+        // signature-verified /api/billing/webhook over the agent-side
+        // BillingService + BillingProvider seam. Additive beside the
+        // read-only credits surface in SubscriptionsModule.
+        BillingApiModule,
         TelemetryModule,
         FunnelAnalyticsBindingModule,
         UploadsModule,
