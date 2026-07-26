@@ -21,6 +21,8 @@ export * from './repositories/plugin-usage.repository';
 // Credits ledger + plan entitlements (pricing Wave 9 M1)
 export * from './repositories/credit-ledger.repository';
 export * from './repositories/plan-entitlement.repository';
+// Streaming-terminal M9 / D1 — append-only terminal transcript chunks.
+export * from './repositories/terminal-transcript-chunk.repository';
 export * from './repositories/work-budget.repository';
 export * from './repositories/work-budget-alert-state.repository';
 export * from './repositories/notification.repository';

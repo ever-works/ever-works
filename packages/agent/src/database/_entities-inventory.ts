@@ -120,6 +120,7 @@ import { Meeting } from '../entities/meeting.entity';
 import { CreditLedgerEntry } from '../entities/credit-ledger-entry.entity';
 import { PlanEntitlement } from '../entities/plan-entitlement.entity';
 import { FleetNode } from '../entities/fleet-node.entity';
+import { TerminalTranscriptChunk } from '../entities/terminal-transcript-chunk.entity';
 import {
     PluginEntity,
     UserPluginEntity,
@@ -276,4 +277,7 @@ export const ENTITIES = [
     // Fleet (Wave 12, slice 1) — enrolled execution nodes (desktop /
     // headless) with hashed credentials + heartbeat status.
     FleetNode,
+    // Streaming-terminal M9 / founder decision D1 — append-only,
+    // redacted, retention-capped terminal transcript chunks.
+    TerminalTranscriptChunk,
 ];

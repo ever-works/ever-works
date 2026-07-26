@@ -50,6 +50,7 @@ import {
     AgentRunSweeperService,
     AgentScheduleDispatcherService,
     RunDispatchGateService,
+    TerminalTranscriptService,
 } from '@ever-works/agent/agents';
 import {
     TaskChatService,
@@ -310,6 +311,13 @@ export class TriggerInternalController implements OnModuleInit {
         // LAST + @Optional() per the arity rule above.
         @Optional()
         private readonly eventSourcePullService?: EventSourcePullService,
+        // Streaming-terminal M9 / founder decision D1 — backs the
+        // `terminal-transcript-gc` cron: the worker proxy calls
+        // `sweepExpired()` over the internal RPC channel, landing here
+        // where the chunk repository + plan entitlements are wired.
+        // Appended LAST + @Optional() per the arity rule above.
+        @Optional()
+        private readonly terminalTranscriptService?: TerminalTranscriptService,
     ) {}
 
     onModuleInit() {
@@ -391,6 +399,9 @@ export class TriggerInternalController implements OnModuleInit {
             // Credits ledger (pricing Wave 9 M1) — `credits-daily-grant`
             // calls `dispatchDailyGrants()` here (allow-list auto-derived).
             CreditLedgerService: this.creditLedgerService,
+            // Streaming-terminal M9 / D1 — `terminal-transcript-gc` calls
+            // `sweepExpired()` here (allow-list auto-derived).
+            TerminalTranscriptService: this.terminalTranscriptService,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),

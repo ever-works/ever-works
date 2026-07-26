@@ -677,6 +677,89 @@ export const config = {
     },
 
     /**
+     * Streaming-terminal M9 / founder decision D1 — persisted terminal
+     * transcripts.
+     *
+     * Retention itself is NOT an env default: it is a plan-tier lever
+     * read from the `terminal-transcript-retention-days` entitlement
+     * (-1 forever / 0 keep-nothing / N days), seeded per plan by the
+     * `1784300000000` migration. The knobs here are operator safety
+     * valves around that lever — a kill switch, sizing caps, and the
+     * fallback for a plan code with no entitlement row.
+     */
+    terminal: {
+        transcript: {
+            /**
+             * Master switch. Default ON. Off = the publish path skips
+             * persistence entirely (the relay still fans out live).
+             */
+            isPersistenceEnabled(): boolean {
+                const raw = (process.env.TERMINAL_TRANSCRIPT_PERSISTENCE || '').toLowerCase();
+                return raw !== 'off' && raw !== 'false' && raw !== '0';
+            },
+            /**
+             * Retention for a plan CODE with no entitlement row. Default
+             * 0 — keep nothing. Fail-closed on purpose: an unrecognized
+             * plan must not silently start retaining terminal output.
+             */
+            getFallbackRetentionDays(): number {
+                const raw = parseInt(process.env.TERMINAL_TRANSCRIPT_RETENTION_DAYS || '0', 10);
+                return Number.isFinite(raw) && raw >= -1 ? raw : 0;
+            },
+            /** Per-run retention-resolution cache TTL (ms, default 60s). */
+            getRetentionCacheTtlMs(): number {
+                const raw = parseInt(
+                    process.env.TERMINAL_TRANSCRIPT_RETENTION_CACHE_TTL_MS || '60000',
+                    10,
+                );
+                return Number.isFinite(raw) && raw >= 0 ? raw : 60000;
+            },
+            /** Hard cap on a single stored chunk's text (chars, default 64 KiB). */
+            getMaxChunkChars(): number {
+                const raw = parseInt(
+                    process.env.TERMINAL_TRANSCRIPT_MAX_CHUNK_CHARS || '65536',
+                    10,
+                );
+                return Number.isFinite(raw) && raw > 0 ? raw : 65536;
+            },
+            /** Max chunks returned by one replay page (default 500). */
+            getReplayMaxChunks(): number {
+                const raw = parseInt(
+                    process.env.TERMINAL_TRANSCRIPT_REPLAY_MAX_CHUNKS || '500',
+                    10,
+                );
+                return Number.isFinite(raw) && raw > 0 ? raw : 500;
+            },
+            /** Max total chars one replay page may return (default 512 KiB). */
+            getReplayMaxChars(): number {
+                const raw = parseInt(
+                    process.env.TERMINAL_TRANSCRIPT_REPLAY_MAX_CHARS || '524288',
+                    10,
+                );
+                return Number.isFinite(raw) && raw > 0 ? raw : 524288;
+            },
+            /** Candidate runs scanned per retention-sweep page (default 200). */
+            getSweepBatchSize(): number {
+                const raw = parseInt(process.env.TERMINAL_TRANSCRIPT_SWEEP_BATCH || '200', 10);
+                return Number.isFinite(raw) && raw > 0 ? raw : 200;
+            },
+            /**
+             * Upper bound the sweeper scans back from. Any retention
+             * window is <= this, so the candidate scan uses it as the
+             * "definitely old enough to consider" cutoff. Default 3650
+             * days (10y).
+             */
+            getSweepHorizonDays(): number {
+                const raw = parseInt(
+                    process.env.TERMINAL_TRANSCRIPT_SWEEP_HORIZON_DAYS || '3650',
+                    10,
+                );
+                return Number.isFinite(raw) && raw > 0 ? raw : 3650;
+            },
+        },
+    },
+
+    /**
      * EW-643 Phase 3 — Knowledge Base operator knobs.
      *
      * Default-on for normalize so an upload of a `.mov` doesn't silently
