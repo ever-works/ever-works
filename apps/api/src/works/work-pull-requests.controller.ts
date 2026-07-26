@@ -32,6 +32,14 @@ export interface WorkRepoPullRequests {
     owner: string;
     repo: string;
     pullRequests: GitPullRequest[];
+    /**
+     * How many agent reviews this Work has recorded per PR number, keyed
+     * by the number as a string (JSON object keys). Absent numbers mean
+     * zero. Sourced from the ingest spine's `github.pr.review` envelopes
+     * — the platform's own record — so the list can show a truthful
+     * "reviewed" pill without one git call per PR.
+     */
+    reviewCounts: Record<string, number>;
     /** Present when this repo's listing failed (others still return). */
     error?: string;
 }
@@ -144,9 +152,14 @@ export class WorkPullRequestsController {
             workId: id,
         };
 
+        // ONE spine read for the whole Work, not one per PR — the review
+        // rows are already owner-scoped and Work-scoped in SQL.
+        const reviewRows = await this.loadReviewRows(auth.userId, id);
+
         const repos = await Promise.all(
             this.resolveRepos(work).map(
                 async ({ role, owner, repo }): Promise<WorkRepoPullRequests> => {
+                    const reviewCounts = this.countReviews(reviewRows, owner, repo);
                     try {
                         const pullRequests = await this.gitFacade.listPullRequests(
                             owner,
@@ -154,13 +167,14 @@ export class WorkPullRequestsController {
                             { state: 'open', perPage: 30 },
                             gitOptions,
                         );
-                        return { role, owner, repo, pullRequests };
+                        return { role, owner, repo, pullRequests, reviewCounts };
                     } catch (error) {
                         return {
                             role,
                             owner,
                             repo,
                             pullRequests: [],
+                            reviewCounts,
                             error: error instanceof Error ? error.message : String(error),
                         };
                     }
@@ -334,11 +348,58 @@ export class WorkPullRequestsController {
     }
 
     /**
-     * Agent reviews for this PR, read off the ingest spine. Filtering is
-     * owner-scoped in SQL and then narrowed to `github.pr.review`
-     * envelopes whose payload names this exact PR (the envelope payload
-     * is the only place the PR coordinates live).
+     * The Work's recent `github.pr.review` envelopes — the platform's own
+     * record of every review it has run. Owner- and Work-scoped in SQL;
+     * a spine failure degrades to "no review history" rather than
+     * failing the whole response.
      */
+    private async loadReviewRows(
+        userId: string,
+        workId: string,
+    ): Promise<Awaited<ReturnType<IngestedEventRepository['findRecentByWork']>>> {
+        try {
+            const rows = await this.events.findRecentByWork(userId, workId, 200);
+            return rows.filter((row) => row.kind === 'github.pr.review');
+        } catch {
+            return [];
+        }
+    }
+
+    /**
+     * Does this review row describe `owner/repo#prNumber`? The envelope
+     * payload is the only place the PR coordinates live.
+     */
+    private matchesPr(
+        payload: Record<string, unknown>,
+        owner: string,
+        repo: string,
+        prNumber: number,
+    ): boolean {
+        return (
+            String(payload.owner ?? '').toLowerCase() === owner.toLowerCase() &&
+            String(payload.repo ?? '').toLowerCase() === repo.toLowerCase() &&
+            Number(payload.prNumber) === prNumber
+        );
+    }
+
+    /** Reviews per PR number for one repo, for the list response's pill. */
+    private countReviews(
+        rows: Awaited<ReturnType<IngestedEventRepository['findRecentByWork']>>,
+        owner: string,
+        repo: string,
+    ): Record<string, number> {
+        const counts: Record<string, number> = {};
+        for (const row of rows) {
+            const payload = (row.payload ?? {}) as Record<string, unknown>;
+            const prNumber = Number(payload.prNumber);
+            if (!Number.isFinite(prNumber)) continue;
+            if (!this.matchesPr(payload, owner, repo, prNumber)) continue;
+            counts[String(prNumber)] = (counts[String(prNumber)] ?? 0) + 1;
+        }
+        return counts;
+    }
+
+    /** Agent reviews for ONE pull request, newest first. */
     private async loadReviews(
         userId: string,
         workId: string,
@@ -346,22 +407,16 @@ export class WorkPullRequestsController {
         repo: string,
         prNumber: number,
     ): Promise<WorkPullRequestReview[]> {
-        let rows: Awaited<ReturnType<IngestedEventRepository['findRecentByWork']>> = [];
-        try {
-            rows = await this.events.findRecentByWork(userId, workId, 200);
-        } catch {
-            return [];
-        }
+        const rows = await this.loadReviewRows(userId, workId);
         return rows
-            .filter((row) => {
-                if (row.kind !== 'github.pr.review') return false;
-                const payload = (row.payload ?? {}) as Record<string, unknown>;
-                return (
-                    String(payload.owner ?? '').toLowerCase() === owner.toLowerCase() &&
-                    String(payload.repo ?? '').toLowerCase() === repo.toLowerCase() &&
-                    Number(payload.prNumber) === prNumber
-                );
-            })
+            .filter((row) =>
+                this.matchesPr(
+                    (row.payload ?? {}) as Record<string, unknown>,
+                    owner,
+                    repo,
+                    prNumber,
+                ),
+            )
             .slice(0, PR_REVIEWS_MAX)
             .map((row) => {
                 const payload = (row.payload ?? {}) as Record<string, unknown>;

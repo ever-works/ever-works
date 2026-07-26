@@ -4815,8 +4815,8 @@
                     "closed": "Closed"
                 },
                 "pills": {
-                    "review": "Review",
-                    "viewing": "Viewing"
+                    "reviewed": "Reviewed ({count})",
+                    "notReviewed": "Not reviewed"
                 },
                 "detail": {
                     "loading": "Loading the diff…",

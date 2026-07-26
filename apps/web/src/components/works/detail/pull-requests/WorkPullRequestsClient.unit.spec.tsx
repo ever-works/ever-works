@@ -82,6 +82,29 @@ describe('WorkPullRequestsClient', () => {
         expect(external).toHaveAttribute('rel', expect.stringContaining('noopener'));
     });
 
+    it('drives the review pill from the recorded review count, NOT from selection', async () => {
+        const user = userEvent.setup();
+        render(<WorkPullRequestsClient workId="work-1" initialRepos={[REPO]} />);
+
+        // No recorded review → unreviewed, and it must STAY unreviewed
+        // when the row is expanded (the pill is not a selection indicator).
+        expect(screen.getByTestId('pr-review-pill-unreviewed')).toBeInTheDocument();
+        await user.click(screen.getByTestId('pull-request-open-7'));
+        await waitFor(() => expect(screen.getByTestId('pr-diff-panel')).toBeInTheDocument());
+        expect(screen.getByTestId('pr-review-pill-unreviewed')).toBeInTheDocument();
+    });
+
+    it('shows the reviewed pill when the spine recorded a review for that PR', () => {
+        render(
+            <WorkPullRequestsClient
+                workId="work-1"
+                initialRepos={[{ ...REPO, reviewCounts: { '7': 2 } }]}
+            />,
+        );
+        expect(screen.getByTestId('pr-review-pill-reviewed')).toHaveTextContent('2');
+        expect(screen.queryByTestId('pr-review-pill-unreviewed')).not.toBeInTheDocument();
+    });
+
     it('renders the empty state when no repo has an open PR', () => {
         render(
             <WorkPullRequestsClient

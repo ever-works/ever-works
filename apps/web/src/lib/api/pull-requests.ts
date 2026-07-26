@@ -36,6 +36,12 @@ export interface WorkRepoPullRequestsView {
     owner: string;
     repo: string;
     pullRequests: PullRequestView[];
+    /**
+     * Agent reviews recorded per PR number (key = the number as a
+     * string). Absent means zero — this is the platform's own record
+     * from the ingest spine, not a guess.
+     */
+    reviewCounts?: Record<string, number>;
     /** Present when this repo's listing failed (others still return). */
     error?: string;
 }

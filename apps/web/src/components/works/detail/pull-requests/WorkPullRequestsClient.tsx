@@ -169,6 +169,7 @@ export function WorkPullRequestsClient({
                                     prNumber: pr.number,
                                 };
                                 const isSelected = sameSelection(selected, selection);
+                                const reviewCount = repo.reviewCounts?.[String(pr.number)] ?? 0;
                                 return (
                                     <li key={pr.number} data-testid="pull-request-row">
                                         <div className="flex flex-wrap items-center gap-2 p-3">
@@ -193,14 +194,20 @@ export function WorkPullRequestsClient({
                                                 state={pr.state}
                                                 label={t(`states.${pr.state}`)}
                                             />
-                                            {/* Review state is the platform's own record; see
-                                                pull-request-pills.tsx on why no CI pill ships yet. */}
+                                            {/*
+                                             * Review state is the platform's OWN record (how many
+                                             * `github.pr.review` envelopes this Work has for this
+                                             * PR), never a stand-in for selection state. See
+                                             * pull-request-pills.tsx on why no CI pill ships yet.
+                                             */}
                                             <PullRequestReviewPill
-                                                reviewed={isSelected}
+                                                reviewed={reviewCount > 0}
                                                 label={
-                                                    isSelected
-                                                        ? t('pills.viewing')
-                                                        : t('pills.review')
+                                                    reviewCount > 0
+                                                        ? t('pills.reviewed', {
+                                                              count: reviewCount,
+                                                          })
+                                                        : t('pills.notReviewed')
                                                 }
                                             />
                                             <a

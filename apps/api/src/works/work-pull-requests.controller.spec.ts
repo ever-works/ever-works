@@ -128,6 +128,54 @@ describe('WorkPullRequestsController', () => {
             expect(result.repos[1].pullRequests).toEqual([]);
             expect(result.repos[2].pullRequests).toEqual([]);
         });
+
+        it('stamps real per-PR review counts from the spine, matched per repo', async () => {
+            events.findRecentByWork.mockResolvedValue([
+                {
+                    id: 'e1',
+                    kind: 'github.pr.review',
+                    occurredAt: new Date(),
+                    sourceUrl: null,
+                    payload: { owner: 'Octo', repo: 'ACME', prNumber: 7 },
+                },
+                {
+                    id: 'e2',
+                    kind: 'github.pr.review',
+                    occurredAt: new Date(),
+                    sourceUrl: null,
+                    payload: { owner: 'octo', repo: 'acme', prNumber: 7 },
+                },
+                // Another repo of the same Work — must not bleed across.
+                {
+                    id: 'e3',
+                    kind: 'github.pr.review',
+                    occurredAt: new Date(),
+                    sourceUrl: null,
+                    payload: { owner: 'octo', repo: 'acme-website', prNumber: 7 },
+                },
+                // Not a review — ignored.
+                {
+                    id: 'e4',
+                    kind: 'github.pr',
+                    occurredAt: new Date(),
+                    sourceUrl: null,
+                    payload: { owner: 'octo', repo: 'acme', prNumber: 7 },
+                },
+            ]);
+            const result = await controller.listPullRequests(auth, workId);
+            expect(result.repos[0].reviewCounts).toEqual({ '7': 2 });
+            expect(result.repos[1].reviewCounts).toEqual({ '7': 1 });
+            expect(result.repos[2].reviewCounts).toEqual({});
+            // ONE spine read for the whole Work, not one per repo or per PR.
+            expect(events.findRecentByWork).toHaveBeenCalledTimes(1);
+        });
+
+        it('still lists PRs when the review-count spine read fails', async () => {
+            events.findRecentByWork.mockRejectedValue(new Error('db down'));
+            const result = await controller.listPullRequests(auth, workId);
+            expect(result.repos[0].pullRequests).toEqual([PR]);
+            expect(result.repos[0].reviewCounts).toEqual({});
+        });
     });
 
     describe('getPullRequestDiff', () => {
