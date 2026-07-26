@@ -29,6 +29,29 @@ export const TASK_ACCEPTANCE_CHECK_KINDS: readonly TaskAcceptanceCheckKind[] = [
 ];
 
 /**
+ * Judgment level a check belongs to (judgment layer G2).
+ *
+ * - `L0` — a CHEAP, purely syntactic/structural pass (lint, format check,
+ *   `tsc --noEmit`, a schema validator). It is the only level that may run
+ *   BEFORE the model call, as a pre-check: its output is fed into the same
+ *   iterate loop as a red gate, so an obviously broken workspace is
+ *   described to the agent before a single token is spent.
+ * - `L1` — the normal acceptance check (build/test/custom). Runs after the
+ *   agent loop, exactly as it always has.
+ *
+ * Optional and defaulting to `L1`: every check authored before this field
+ * existed keeps its current behavior, and the pre-check pass is opt-in per
+ * check AND behind an operator switch.
+ */
+export type TaskCheckLevel = 'L0' | 'L1';
+
+/**
+ * Canonical list of check levels — one source of truth for DTO `@IsIn`
+ * validators and import sanitizers.
+ */
+export const TASK_CHECK_LEVELS: readonly TaskCheckLevel[] = ['L0', 'L1'];
+
+/**
  * One acceptance check: a named command whose exit code decides green/red.
  */
 export interface TaskAcceptanceCheck {
@@ -47,12 +70,35 @@ export interface TaskAcceptanceCheck {
 	/** Working directory relative to the checkout root; omitted = root. */
 	cwd?: string;
 	/**
+	 * Judgment level (G2). Omitted = `L1` — the post-run acceptance check
+	 * every existing check already is. Only `L0` checks are eligible for
+	 * the cheap pre-model-call pass.
+	 */
+	level?: TaskCheckLevel;
+	/**
 	 * Wall-clock budget in seconds. A check that exceeds it reports
 	 * `timeout` (distinct from `red`: the command was killed, not failed).
 	 */
 	timeoutSec?: number;
 	/** Required checks decide the gate; non-required ones only report. */
 	required: boolean;
+	/**
+	 * Environment variable NAMES (never values) the check is explicitly
+	 * granted from the platform process environment.
+	 *
+	 * A check command is user-authored input, so its subprocess runs with a
+	 * scrubbed environment built from a fixed allowlist (`PATH`, `HOME`,
+	 * locale/temp vars, …) — it does NOT inherit the platform's own
+	 * environment. This field is the opt-in escape hatch for a build that
+	 * genuinely needs one more variable: listing a name is a DELIBERATE
+	 * GRANT of that value to every command the check runs.
+	 *
+	 * Values are read from the parent environment at spawn time; a name
+	 * that is unset there is simply absent. Platform-owned configuration
+	 * (database/auth/trigger/plugin credentials) is never grantable — see
+	 * `buildCheckEnv` in `@ever-works/agent`. Optional, defaults to none.
+	 */
+	envPassthrough?: string[];
 	/**
 	 * `true` removes the check from the resolved list. On a Task entry
 	 * this is how an inherited Work default is suppressed without

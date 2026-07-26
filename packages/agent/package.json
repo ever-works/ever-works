@@ -149,6 +149,10 @@
             "types": "./dist/agents/index.d.ts",
             "default": "./dist/agents/index.js"
         },
+        "./campaigns": {
+            "types": "./dist/campaigns/index.d.ts",
+            "default": "./dist/campaigns/index.js"
+        },
         "./agent-approvals": {
             "types": "./dist/agent-approvals/index.d.ts",
             "default": "./dist/agent-approvals/index.js"
@@ -300,6 +304,7 @@
         "pdf-parse": "^1.1.1",
         "rrule": "^2.8.1",
         "semver": "^7.7.3",
+        "stripe": "^22.3.2",
         "superjson": "^1.13.3",
         "turndown": "^7.2.2",
         "typeorm": "^0.3.28",

@@ -25,7 +25,12 @@ import {
     type SourceRepository as ContractSourceRepository,
     type WorksConfigSnapshot as ContractWorksConfigSnapshot,
 } from '@ever-works/contracts/api';
-import type { TaskAcceptanceCheck, WorkChecksPolicy } from '@ever-works/contracts';
+import type {
+    MergePolicyOverride,
+    TaskAcceptanceCheck,
+    WorkChecksPolicy,
+    WorkExternalRefs,
+} from '@ever-works/contracts';
 import { APIResponse, ItemData, Category, Tag, Collection } from './types';
 import { CreateItemsGeneratorDto, ItemsGeneratorResponse } from './items-generator';
 
@@ -120,6 +125,15 @@ export interface UpdateWorkDto {
     checksPolicy?: WorkChecksPolicy;
     /** Default gate-attempt budget (1..5) for Tasks without their own. */
     maxGateAttempts?: number;
+    /** Merge-policy matrix (Wave 3, D4) — the Work-scoped PARTIAL override.
+     *  Omitted fields inherit organization → tenant → platform default;
+     *  `null` clears the Work override entirely. */
+    mergePolicy?: MergePolicyOverride | null;
+    /** Ingest routing claims: the external containers (chat channels,
+     *  tracker teams, doc databases, meetings) whose events belong to this
+     *  Work. `null` clears every claim. Rejected server-side when another
+     *  Work you own already claims one of the identifiers. */
+    externalRefs?: WorkExternalRefs | null;
 }
 
 /** Wave 2 M7 — Work-level worktree-per-Task isolation settings. */
@@ -302,6 +316,14 @@ export interface Work {
     checkDefaults?: TaskAcceptanceCheck[] | null;
     checksPolicy?: WorkChecksPolicy;
     maxGateAttempts?: number;
+    // Merge-policy matrix (Wave 3, D4). Absent/null means the Work
+    // declares nothing and inherits organization → tenant → default.
+    mergePolicy?: MergePolicyOverride | null;
+    // Ingest routing claims — which external containers (chat channels,
+    // tracker teams, doc databases, meetings) route their events to this
+    // Work. Absent/null means the Work claims nothing and only its
+    // repositories route events.
+    externalRefs?: WorkExternalRefs | null;
 }
 
 /** Wave 4 M3 — per-Work AgentRun summary counts

@@ -12,12 +12,16 @@ import { AgentRun } from '../entities/agent-run.entity';
 import { AgentRunLog } from '../entities/agent-run-log.entity';
 import { AgentBudget } from '../entities/agent-budget.entity';
 import { AgentMembership } from '../entities/agent-membership.entity';
+import { AgentEscalation } from '../entities/agent-escalation.entity';
+import { TaskReviewRejection } from '../entities/task-review-rejection.entity';
 import { AgentRepository } from '../database/repositories/agent.repository';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
 import { AgentRunLogRepository } from '../database/repositories/agent-run-log.repository';
 import { AgentBudgetRepository } from '../database/repositories/agent-budget.repository';
 import { AgentMembershipRepository } from '../database/repositories/agent-membership.repository';
 import { AgentAttachmentRepository } from '../database/repositories/attachment.repositories';
+import { AgentEscalationRepository } from '../database/repositories/agent-escalation.repository';
+import { TaskReviewRejectionRepository } from '../database/repositories/task-review-rejection.repository';
 import { AgentsService } from './agents.service';
 import { AgentTemplatesService } from './agent-templates.service';
 import { AgentFileService } from './agent-file.service';
@@ -28,10 +32,13 @@ import { PromptAssemblerService } from './prompt-assembler.service';
 import { AgentRunService } from './agent-run.service';
 import { RunDispatchGateService } from './run-dispatch-gate.service';
 import { RunSteeringService } from './run-steering.service';
+import { TerminalSessionLauncher } from './terminal-session-launcher.service';
 import { AgentToolService } from './agent-tool.service';
+import { AgentEscalationService } from './agent-escalation.service';
 import { VisionContextService } from '../services/vision-context.service';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { SkillsModule } from '../skills/skills.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { FacadesModule } from '../facades/facades.module';
 
 /**
@@ -53,6 +60,16 @@ import { FacadesModule } from '../facades/facades.module';
             AgentRunLog,
             AgentBudget,
             AgentMembership,
+            // Judgment layer G3 - structured escalation records.
+            AgentEscalation,
+            // Orchestration M9 - durable reviewer rejections replayed by
+            // RunSteeringService.resume. forFeature'd HERE (not in
+            // TasksModule) because the reader lives in this module; the
+            // entity is also registered in the DataSource ENTITIES array
+            // (`database/_entities-inventory.ts`) - this repo has no
+            // autoLoadEntities, so a forFeature'd-but-unregistered entity
+            // throws EntityMetadataNotFoundError on first query.
+            TaskReviewRejection,
             // Parent-existence validation for scoped Agents (IDOR fix): raw
             // repositories for the work/mission/idea a scoped Agent references.
             Work,
@@ -66,6 +83,10 @@ import { FacadesModule } from '../facades/facades.module';
             Organization,
         ]),
         ActivityLogModule,
+        // Wave 4 M6 - the sweeper notifies the owner when a run has been
+        // queued past the bound. @Optional() injection, so this import is
+        // what makes the attention surface actually fire in production.
+        NotificationsModule,
         // Phase 10 — AgentRunService resolves active skills via
         // SkillBindingRepository before assembling the prompt.
         SkillsModule,
@@ -83,6 +104,8 @@ import { FacadesModule } from '../facades/facades.module';
         AgentBudgetRepository,
         AgentMembershipRepository,
         AgentAttachmentRepository,
+        AgentEscalationRepository,
+        TaskReviewRejectionRepository,
         AgentsService,
         // Wave 10 — prebuilt agent-template activation (catalog data +
         // ordinary Agent rows; no new persistence concepts).
@@ -103,7 +126,14 @@ import { FacadesModule } from '../facades/facades.module';
         // Wave 4 M5 — steer / interrupt / resume. Reuses the gate for resume
         // admission and the existing cancel path for stop.
         RunSteeringService,
+        // Streaming terminal — the single dispatch choke point for the
+        // `terminal-session` job. The TERMINAL_SESSION_DISPATCHER it
+        // enqueues through is @Optional() and bound by the api-side
+        // @Global() AgentsModule, exactly like RunDispatchGateService's.
+        TerminalSessionLauncher,
         AgentToolService,
+        // Judgment layer G3 - the one place a give-up becomes a record.
+        AgentEscalationService,
     ],
     exports: [
         AgentRepository,
@@ -112,6 +142,8 @@ import { FacadesModule } from '../facades/facades.module';
         AgentBudgetRepository,
         AgentMembershipRepository,
         AgentAttachmentRepository,
+        AgentEscalationRepository,
+        TaskReviewRejectionRepository,
         AgentsService,
         AgentTemplatesService,
         AgentFileService,
@@ -122,7 +154,9 @@ import { FacadesModule } from '../facades/facades.module';
         AgentRunService,
         RunDispatchGateService,
         RunSteeringService,
+        TerminalSessionLauncher,
         AgentToolService,
+        AgentEscalationService,
     ],
 })
 export class AgentsModule {}

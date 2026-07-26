@@ -5,6 +5,8 @@ import type {
     AgentHeartbeatTrigger,
     AgentRunCanceller,
     AgentRunCancelOutcome,
+    TerminalSessionDispatcher,
+    TerminalSessionDispatchPayload,
 } from '@ever-works/agent/agents';
 import type { TriggerService } from '../trigger/trigger.service';
 import type {
@@ -16,6 +18,7 @@ import type {
 import type { AgentHeartbeatPayload } from '../tasks/trigger/agent-heartbeat.task';
 import type { AgentChatReplyPayload } from '../tasks/trigger/agent-chat-reply.task';
 import type { AgentTaskExecutePayload } from '../tasks/trigger/agent-task-execute.task';
+import type { TerminalSessionPayload } from '../tasks/trigger/terminal-session.task';
 
 /**
  * Loud-degradation gate (mirrors `TriggerService.ensureConfigured()`:
@@ -99,6 +102,43 @@ export const agentChatReplyTriggerAdapter: AgentChatReplyDispatcher = {
             { idempotencyKey: payload.dedupKey },
         );
         return { runId: handle.id };
+    },
+};
+
+/**
+ * Streaming-terminal — the missing dispatcher for the `terminal-session`
+ * task. The task has existed since M6 with no producer at all: nothing in
+ * the repo referenced its id outside its own definition and the barrel
+ * export, so the gateway, relay registry, attach tokens, plugin and web
+ * pane were all wired to a session that never launched. This is the
+ * producer; `TerminalSessionLauncher` is the only thing allowed to call it.
+ *
+ * `idempotencyKey` is the run id: the relay channel IS the run id, so two
+ * accepted sessions for one run would fight over the same scrollback and
+ * stdin. The launcher's DB CAS already refuses the common duplicate; this
+ * makes the runner refuse the racy one too (defence in depth across a
+ * multi-replica API, where two replicas can each win their own CAS only if
+ * the row write is lost — belt and braces, cheap).
+ */
+export const terminalSessionTriggerAdapter: TerminalSessionDispatcher = {
+    async enqueue(payload: TerminalSessionDispatchPayload) {
+        assertJobRuntimeConfigured();
+        const handle = await tasks.trigger<
+            typeof import('../tasks/trigger/terminal-session.task').terminalSessionTask
+        >(
+            'terminal-session',
+            {
+                runId: payload.runId,
+                userId: payload.userId,
+                agentId: payload.agentId,
+                command: payload.command,
+                cwd: payload.cwd,
+                env: payload.env,
+                persistent: payload.persistent,
+            } satisfies TerminalSessionPayload,
+            { idempotencyKey: `terminal-session:${payload.runId}` },
+        );
+        return { jobRunId: handle.id };
     },
 };
 

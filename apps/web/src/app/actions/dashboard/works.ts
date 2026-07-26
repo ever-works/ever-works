@@ -16,7 +16,17 @@ import {
     GitProviderConnectionInfo,
 } from '@/lib/api';
 import type { Work } from '@/lib/api/types-only';
-import type { TaskAcceptanceCheck, WorkChecksPolicy } from '@ever-works/contracts';
+import type {
+    MergePolicyOverride,
+    TaskAcceptanceCheck,
+    WorkChecksPolicy,
+    WorkExternalRefs,
+} from '@ever-works/contracts';
+import {
+    INGEST_WORK_HINT_EXTERNAL_ID_MAX_CHARS,
+    WORK_EXTERNAL_REFS_MAX_PER_KIND,
+    WORK_EXTERNAL_REF_KINDS,
+} from '@ever-works/contracts';
 // Security: server actions are reachable as POST endpoints via the
 // `Next-Action` header, so every exported action must independently verify
 // authentication at the Next.js layer before proxying to backend
@@ -1491,6 +1501,66 @@ export async function updateQualityGatesSettings(
     }
 }
 
+/**
+ * Merge-policy matrix (Wave 3, founder decision D4) — the Work-scoped
+ * slice. Saves flow through the same `PATCH /works/:id` UpdateWorkDto
+ * path as the sibling settings cards; this feature adds a field to an
+ * existing write path rather than a parallel one.
+ *
+ * The payload is a PARTIAL by contract: every field OMITTED inside the
+ * object inherits from the organization, then the tenant, then the
+ * platform default. `null` clears the Work override entirely. The zod
+ * schema below mirrors the API's `MergePolicyDto` constraints so an
+ * obviously-invalid payload never leaves the browser — the API still
+ * validates and sanitizes independently.
+ */
+export async function updateWorkMergePolicy(
+    workId: string,
+    mergePolicy: MergePolicyOverride | null,
+) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    const mergePolicySchema = z
+        .object({
+            allowAgentMerge: z.boolean().optional(),
+            requireGreenGate: z.boolean().optional(),
+            requireHumanApproval: z.boolean().optional(),
+            allowedMergeMethods: z
+                .array(z.enum(['merge', 'squash', 'rebase']))
+                .max(3)
+                .optional(),
+            protectedBranches: z.array(z.string().min(1).max(255)).max(50).optional(),
+        })
+        .strict()
+        .nullable();
+
+    try {
+        const validation = mergePolicySchema.safeParse(mergePolicy);
+        if (!validation.success) {
+            return {
+                success: false,
+                error: validation.error.errors[0].message,
+            };
+        }
+
+        const response = await workAPI.update(workId, { mergePolicy: validation.data });
+        revalidatePath(`/works/${workId}/settings`);
+
+        return {
+            success: response.status === 'success',
+        };
+    } catch (error) {
+        console.error('Failed to update merge policy:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to update merge policy',
+        };
+    }
+}
+
 export async function updateCommitterSettings(
     workId: string,
     settings: {
@@ -1515,6 +1585,137 @@ export async function updateCommitterSettings(
         return {
             success: false,
             error: error instanceof Error ? error.message : 'Failed to update committer settings',
+        };
+    }
+}
+
+/**
+ * Save the Work's ingest routing claims (`works.externalRefs`).
+ *
+ * Mirrors the server-side rules so a bad map never leaves the browser:
+ * only the known kinds, non-empty ids capped at
+ * `INGEST_WORK_HINT_EXTERNAL_ID_MAX_CHARS`, at most
+ * `WORK_EXTERNAL_REFS_MAX_PER_KIND` per kind. The API re-validates and
+ * additionally rejects a claim another Work of the same owner already
+ * holds (409) — that error message is surfaced verbatim.
+ */
+export async function updateWorkExternalRefs(
+    workId: string,
+    externalRefs: WorkExternalRefs | null,
+) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    const refsSchema = z
+        .object(
+            Object.fromEntries(
+                WORK_EXTERNAL_REF_KINDS.map((kind) => [
+                    kind,
+                    z
+                        .array(z.string().trim().min(1).max(INGEST_WORK_HINT_EXTERNAL_ID_MAX_CHARS))
+                        .max(WORK_EXTERNAL_REFS_MAX_PER_KIND)
+                        .optional(),
+                ]),
+            ) as Record<string, z.ZodTypeAny>,
+        )
+        .strict()
+        .nullable();
+
+    try {
+        const validation = refsSchema.safeParse(externalRefs);
+        if (!validation.success) {
+            return {
+                success: false,
+                error: validation.error.errors[0].message,
+            };
+        }
+
+        const response = await workAPI.update(workId, {
+            externalRefs: validation.data as WorkExternalRefs | null,
+        });
+        revalidatePath(`/works/${workId}/settings`);
+
+        return {
+            success: response.status === 'success',
+        };
+    } catch (error) {
+        console.error('Failed to update external references:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to update external references',
+        };
+    }
+}
+
+/** One artifact set provisioned by `POST /api/works/from-campaign-template`. */
+export interface CampaignActivationSummary {
+    work: { id: string; slug: string; name: string; kind: string };
+    goal: { id: string; title: string; metricId: string; targetValue: number };
+    agents: Array<{ id: string; name: string; templateSlug: string }>;
+    tasks: Array<{ id: string; slug: string; title: string; stageId: string }>;
+    pipeline: { id: string; applied: boolean; reason?: string };
+}
+
+const campaignBriefSchema = z.object({
+    name: z.string().trim().min(1).max(100),
+    objective: z.string().trim().min(1).max(500),
+    target: z
+        .object({
+            metricId: z.string().trim().max(64).optional(),
+            value: z.number().positive().optional(),
+            unit: z.string().trim().max(32).optional(),
+            window: z.enum(['day', 'week', 'month', 'total', 'point']).optional(),
+        })
+        .optional(),
+    channels: z.array(z.string().trim().min(1).max(40)).max(10).optional(),
+});
+
+/**
+ * Start a campaign — the ONLY path that mints a `campaign` Work.
+ *
+ * One call provisions the Work, a Goal capturing the objective, the
+ * prebuilt go-to-market Agents, Tasks for the first pipeline stages and
+ * the `gtm-pipeline` preference. The API runs it as a compensating
+ * transaction, so a failure here means nothing was left behind.
+ */
+export async function createCampaignWork(input: {
+    name: string;
+    objective: string;
+    target?: { metricId?: string; value?: number; unit?: string; window?: string };
+    channels?: string[];
+}) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    const validation = campaignBriefSchema.safeParse(input);
+    if (!validation.success) {
+        return { success: false as const, error: validation.error.errors[0].message };
+    }
+
+    try {
+        const response = await serverMutation<CampaignActivationSummary>({
+            endpoint: '/works/from-campaign-template',
+            data: {
+                name: sanitizeName(validation.data.name, 100),
+                objective: sanitizeDescription(validation.data.objective, 500),
+                target: validation.data.target,
+                channels: validation.data.channels,
+            },
+            method: 'POST',
+            wrapInData: false,
+        });
+
+        revalidatePath('/works');
+        return { success: true as const, campaign: response };
+    } catch (error) {
+        console.error('Failed to start campaign:', error);
+        return {
+            success: false as const,
+            error: error instanceof Error ? error.message : 'Failed to start campaign',
         };
     }
 }

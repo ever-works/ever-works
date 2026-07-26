@@ -17,6 +17,9 @@ export const BUNDLED_TENANT_JOB_RUNTIME_PROVIDERS = [
     'bullmq',
     'pgboss',
     'inngest',
+    // Desktop PRD M4 — the fleet runtime: the "queue" is the machines
+    // the owner enrolled in Fleet.
+    'node',
 ] as const;
 
 export enum AuthProvider {

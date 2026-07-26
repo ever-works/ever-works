@@ -87,6 +87,14 @@ const DOMAIN_KEYWORDS: Record<string, string[]> = {
     // feature (program DoD rule; the Mission-create outage is the
     // cautionary tale for omitting them).
     meetings: ['meeting', 'transcript', 'recording', 'standup', 'zoom', 'google meet'],
+    // Event ingest / digest / PR review — same DoD rule as Meetings
+    // above: the keyword slots ship WITH the REST operations that made
+    // these three tools registrable at all. Without a slot, `deriveDomain`
+    // drops them into the `works` catch-all, where the `isExplicit` guard
+    // keeps them out of core and only a `works` keyword can reach them.
+    events: ['event', 'ingest', 'ingested', 'feed', 'happened', 'came in'],
+    digest: ['digest', 'recap', 'catch up', 'catch-up', 'summary of', 'daily', 'weekly'],
+    prreview: ['pull request', 'pull-request', 'merge request', 'review', 'diff', 'changed files'],
     members: ['member', 'invite', 'invitation', 'team', 'collaborator', 'people'],
     apikeys: ['api key', 'api-key', 'apikey', 'token'],
     budgets: ['budget', 'usage', 'spend', 'spending', 'cost', 'billing'],
@@ -126,6 +134,9 @@ function deriveDomain(path: string): string {
     if (p.includes('/notification')) return 'notifications';
     if (p.includes('/api/email')) return 'email';
     if (p.includes('/api/meetings')) return 'meetings';
+    if (p.includes('/api/ingest')) return 'events';
+    if (p.includes('/api/digest')) return 'digest';
+    if (p.includes('/api/pr-review')) return 'prreview';
     if (p.includes('/members') || p.includes('/invitations')) return 'members';
     if (p.includes('/api-keys')) return 'apikeys';
     if (p.includes('/budgets') || p.includes('/usage')) return 'budgets';

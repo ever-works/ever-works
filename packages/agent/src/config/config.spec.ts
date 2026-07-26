@@ -787,6 +787,13 @@ describe('agent/config', () => {
                 'posthog',
                 'sentry',
                 'subscriptions',
+                // Streaming-terminal M9 / founder decision D1 - the
+                // `terminal.transcript.*` group (retention kill switch +
+                // sizing caps around the plan-tier entitlement). Pin was
+                // missed when that group landed; repaired here alongside
+                // the M6/M7 work that shares this file's config group.
+
+                'terminal',
                 'trigger',
                 'websiteTemplate',
             ]);

@@ -60,13 +60,27 @@ const sidebars: SidebarsConfig = {
 				'features/skills-catalog',
 				'features/agent-email',
 				'features/mission-templates',
+				// 2026-07 feature program — how agent work is isolated,
+				// verified, landed and steered. These four read as one
+				// chain (branch → checks → merge → live control), so they
+				// are listed together and before the money/ops pages.
+				'features/task-isolation',
+				'features/quality-gates',
+				'features/merge-policy',
+				'features/sessions-and-steering',
+				'features/memory-decisions',
 				'features/budgets-and-usage',
+				'features/credits-and-billing',
 				'features/knowledge-base',
 				'features/autonomous-operation',
 				'features/workers',
 				'features/store-builder',
 				'features/company-builder',
 				'features/desktop-app',
+				// Fleet is the registry the Desktop App enrolls into —
+				// keep it adjacent so the two read together.
+				'features/fleet',
+				'features/integrations',
 				'features/community-pr-processing',
 				'features/work-changelog',
 				'features/collections',

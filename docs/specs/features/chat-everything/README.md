@@ -66,6 +66,36 @@ A `CanvasProvider` + slide-over `CanvasOverlay` render artifacts produced by can
 | `run_report`     | Execute one of the 95 catalogued reports: fetch source data, aggregate, and render via render_chart/render_table into the canvas.                             |
 | `confirm_action` | Confirmation gate primitive: present a structured confirm card for any destructive/requiresConfirmation tool and block execution until the user approves.     |
 
+### 4.1 Tool naming convention
+
+**New tools are `snake_case`: an action verb plus a singular noun** —
+`get_digest`, `review_pull_request`, `list_recent_events`. This is the
+rule for anything added from here on, on both the web and the platform
+side.
+
+It is the majority convention already, which is why it wins: every entry
+in `apps/web/src/lib/ai/tools/generated/registry*.ts` follows it, and so
+do the newer platform-side domain tools (`list_meetings`,
+`get_meeting_summary`, `list_fleet_nodes`, `resolve_merge_policy`).
+
+Two families are camelCase and **are deliberately not renamed**:
+
+- the platform's original built-in agent tools — `searchWeb`,
+  `screenshot`, `extractContent`, `sendEmail`, `messageAgent`,
+  `notifyChannel`, `getActivity`, `getKbDocument`, `getSkillBody`,
+  `createTask`, `commentOnTask`, `transitionTask`;
+- the hand-written web tools in `apps/web/src/lib/ai/tools/*.tools.ts` —
+  `listWorks`, `createMission`, `createIdea`, `deployWork`,
+  `renderChart`, `runReport`, and the rest of `STATIC_TOOL_DOMAINS`.
+
+A tool name is part of a live contract with the model **and** appears in
+stored conversation histories, so renaming them breaks replay of past
+conversations and every prompt/spec/test that names them, for no
+user-visible gain. The split is therefore documented, not churned.
+Keyword slots in `apps/web/src/lib/ai/tools/tool-selection.ts` ship in
+the SAME change as the tool — a tool with no slot is gated out of every
+turn.
+
 ## 5. Operations inventory by domain
 
 Per-domain endpoint coverage. Full field-level detail (params, every excluded endpoint + reason) is in [`operations-inventory.json`](./operations-inventory.json).

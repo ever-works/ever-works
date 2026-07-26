@@ -55,6 +55,39 @@ const recordingEvent = (overrides: Partial<IngestedEvent> = {}): IngestedEvent =
         ...overrides,
     }) as IngestedEvent;
 
+/**
+ * Google Meet arrives through the google-workspace-connector's Drive
+ * sweep (a Meet transcript Google Doc), NOT a Meet-specific connector —
+ * same envelope shape, different kind.
+ */
+const meetRecordingEvent = (overrides: Partial<IngestedEvent> = {}): IngestedEvent =>
+    ({
+        id: 'row-2',
+        userId: 'user-1',
+        organizationId: null,
+        workId: 'work-9',
+        source: 'google-workspace-connector',
+        sourceEventId: 'doc-7:2026-07-24T10:30:00.000Z:transcript',
+        kind: 'google.meet-recording',
+        occurredAt: new Date('2026-07-24T10:30:00.000Z'),
+        actorName: null,
+        subjectType: 'meeting',
+        subjectExternalId: 'doc-7',
+        title: 'Weekly sync - 2026/07/24 - Transcript',
+        sourceUrl: 'https://docs.google.com/document/d/doc-7/edit',
+        payload: {
+            meetingExternalId: 'doc-7',
+            provider: 'google-meet',
+            topic: 'Weekly sync - 2026/07/24 - Transcript',
+            startTime: '2026-07-24T10:00:00.000Z',
+            transcriptText: 'Ada: Hello.\nBob: Hi.',
+        },
+        processedAt: null,
+        dedupeKey: 'k2',
+        createdAt: new Date('2026-07-24T11:00:00.000Z'),
+        ...overrides,
+    }) as IngestedEvent;
+
 describe('MeetingsService', () => {
     let repository: {
         createIfNew: jest.Mock;
@@ -319,6 +352,39 @@ describe('MeetingsService', () => {
                 recordingEvent({ subjectExternalId: null, payload: { topic: 'x' } }),
             );
             expect(repository.createIfNew).not.toHaveBeenCalled();
+        });
+
+        it('registers google.meet-recording alongside zoom.recording (Meet rides Google Workspace)', () => {
+            expect(MEETING_RECORDING_EVENT_KINDS).toContain('zoom.recording');
+            expect(MEETING_RECORDING_EVENT_KINDS).toContain('google.meet-recording');
+        });
+
+        it('turns a google.meet-recording envelope into a google-meet Meeting + transcript ingest', async () => {
+            await build().processRecordingEvent(meetRecordingEvent());
+
+            expect(repository.createIfNew).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    userId: 'user-1',
+                    workId: 'work-9',
+                    title: 'Weekly sync - 2026/07/24 - Transcript',
+                    // Source is derived from the envelope KIND, never hardcoded.
+                    source: 'google-meet',
+                    externalId: 'doc-7',
+                    sourceUrl: 'https://docs.google.com/document/d/doc-7/edit',
+                }),
+            );
+            expect(repository.attachTranscript).toHaveBeenCalledWith(
+                expect.any(String),
+                'Ada: Hello.\nBob: Hi.',
+            );
+        });
+
+        it('falls back to the import source for an unrecognized recording kind', async () => {
+            await build().processRecordingEvent(meetRecordingEvent({ kind: 'future.recording' }));
+
+            expect(repository.createIfNew).toHaveBeenCalledWith(
+                expect.objectContaining({ source: 'import' }),
+            );
         });
     });
 });

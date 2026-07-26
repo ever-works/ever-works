@@ -13,7 +13,10 @@ export type RuntimeId =
 	| 'job-runtime-pgboss'
 	| 'job-runtime-temporal'
 	| 'job-runtime-trigger'
-	| 'job-runtime-inngest';
+	| 'job-runtime-inngest'
+	// Desktop PRD M4 — the fleet runtime: work executes on the machines
+	// the owner enrolled in Fleet rather than on an external broker.
+	| 'job-runtime-node';
 
 /** Local services supervised by the desktop shell. */
 export type ServiceId = 'api' | 'web';

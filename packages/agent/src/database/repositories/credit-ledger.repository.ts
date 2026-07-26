@@ -144,6 +144,20 @@ export class CreditLedgerRepository {
         return this.repository.findOne({ where: { idempotencyKey } });
     }
 
+    /**
+     * Newest movement correlated to one external object, e.g. the PURCHASE
+     * row a payment produced (`refType='billing-payment'`, `refId={paymentId}`).
+     * Used by the refund path to size the reversing entry from what was
+     * actually granted rather than re-deriving it from a pack table that
+     * may have been repriced since.
+     */
+    async findLatestByRef(refType: string, refId: string): Promise<CreditLedgerEntry | null> {
+        return this.repository.findOne({
+            where: { refType, refId },
+            order: { createdAt: 'DESC' },
+        });
+    }
+
     async findForUser(
         userId: string,
         query: CreditLedgerQuery,

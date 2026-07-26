@@ -36,6 +36,7 @@
 		"clean": "rm -rf dist"
 	},
 	"dependencies": {
+		"@ever-works/contracts": "workspace:*",
 		"commander": "^14.0.2"
 	},
 	"devDependencies": {

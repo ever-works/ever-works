@@ -1,4 +1,4 @@
-import { Type } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
 import {
     ArrayMaxSize,
     IsArray,
@@ -16,12 +16,16 @@ import {
 import {
     KB_DECISION_STATUSES,
     KB_DOCUMENT_CLASSES,
+    KB_DOCUMENT_SOURCES,
     KB_DOCUMENT_STATUSES,
     KB_LOCK_MODES,
+    KB_REVIEW_STATES,
     KbDecisionStatus,
     KbDocumentClass,
+    KbDocumentSource,
     KbDocumentStatus,
     KbLockMode,
+    KbReviewState,
 } from '@ever-works/contracts';
 
 /** Max body size per spec D9 — 1 MB Markdown. */
@@ -126,10 +130,58 @@ export class LockKbDocumentDto {
     mode: KbLockMode;
 }
 
+/**
+ * Normalize a repeatable query-string facet to `string[]`.
+ *
+ * Accepts the three shapes Nest/Express hand us for one key: an array
+ * (`?class=a&class=b`), a comma-joined string (`?class=a,b`), or a
+ * single string (`?class=a`). Empty segments are dropped; anything
+ * else collapses to `[]`. Mirrors `toStringArray` in the org-memory
+ * controller so both Memory surfaces parse facets identically.
+ */
+function toFacetArray(value: unknown): string[] {
+    const raw = Array.isArray(value) ? value : [value];
+    return raw
+        .flatMap((v) => (typeof v === 'string' ? v.split(',') : []))
+        .map((v) => v.trim())
+        .filter((v) => v.length > 0);
+}
+
 export class KbDocumentQueryDto {
     @IsOptional()
     @IsIn(KB_DOCUMENT_CLASSES as unknown as readonly string[])
     class?: KbDocumentClass;
+
+    /**
+     * Memory facets — repeatable class filter behind the workbench type
+     * chips. Additive alongside the single-value `class` above (a caller
+     * passing both gets the intersection).
+     */
+    @IsOptional()
+    @Transform(({ value }) => toFacetArray(value))
+    @IsIn(KB_DOCUMENT_CLASSES as unknown as readonly string[], { each: true })
+    classes?: KbDocumentClass[];
+
+    /**
+     * Memory facets — repeatable provenance filter (`user` / `agent` /
+     * `imported` / `seeded`). The rendered BADGE is derived from this
+     * plus the ingest provenance (`deriveKbMemorySourceBadge`); the
+     * FILTER stays on the stored column so it is a plain indexed
+     * predicate rather than a scan.
+     */
+    @IsOptional()
+    @Transform(({ value }) => toFacetArray(value))
+    @IsIn(KB_DOCUMENT_SOURCES as unknown as readonly string[], { each: true })
+    sources?: KbDocumentSource[];
+
+    /**
+     * Memory facets — extend `q` from title+description to the document
+     * BODY. Opt-in so the plain tree list never pays for the wider scan.
+     */
+    @IsOptional()
+    @IsBoolean()
+    @Transform(({ value }) => value === true || value === 'true' || value === '1')
+    searchBody?: boolean;
 
     @IsOptional()
     @IsIn(KB_DOCUMENT_STATUSES as unknown as readonly string[])
@@ -149,6 +201,18 @@ export class KbDocumentQueryDto {
     @IsString()
     @Length(2, 8)
     language?: string;
+
+    /**
+     * Memory upgrades M8 — review-queue filter. `proposed` returns only
+     * the agent-authored / synthesized documents awaiting human review
+     * (the ones excluded from context injection); `accepted` returns the
+     * reviewed set, including pre-M7 rows whose column is still NULL.
+     * Additive: omitting it preserves the original "list everything"
+     * behaviour every existing caller relies on.
+     */
+    @IsOptional()
+    @IsIn(KB_REVIEW_STATES as unknown as readonly string[])
+    reviewState?: KbReviewState;
 
     @IsOptional()
     @IsString()

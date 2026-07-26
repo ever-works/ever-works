@@ -1,15 +1,22 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { cn } from '@/lib/utils/cn';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import type { Task, TaskStatus, TaskPriority } from '@/lib/api/tasks';
-import { transitionTaskAction } from '@/app/actions/tasks';
+import {
+    listTaskRunCandidatesAction,
+    runTasksBatchAction,
+    transitionTaskAction,
+} from '@/app/actions/tasks';
 import { useTaskRunPolling } from '@/lib/hooks/use-task-run-polling';
 import { TaskBranchChip } from './TaskBranchChip';
 import { TaskRunChip } from './TaskRunChip';
 import { GateChip } from './GateChip';
+import { TaskPrPill } from './TaskPrPill';
+import { TaskDiffSheet } from './TaskDiffSheet';
+import { RunWithAgentMenu } from './RunWithAgentMenu';
 import {
     Inbox,
     Circle,
@@ -19,10 +26,18 @@ import {
     CheckCircle2,
     XCircle,
     ChevronDown,
+    Play,
     type LucideIcon,
 } from 'lucide-react';
 
 const MAX_VISIBLE = 15;
+
+/**
+ * Board dispatch (kanban M4) — hard cap on the column "Run all" action,
+ * mirroring the API's `RUN_BATCH_MAX_TASKS`. The button labels itself
+ * with the real count so a 40-card column never silently runs 20.
+ */
+const RUN_ALL_MAX = 20;
 
 // ─── Column definitions ────────────────────────────────────────────────────
 
@@ -158,6 +173,8 @@ function TaskKanbanCard({
     error,
     onDragStart,
     onDragEnd,
+    pickerOpen,
+    onPickerOpenChange,
 }: {
     task: Task;
     col: ColumnDef;
@@ -165,15 +182,47 @@ function TaskKanbanCard({
     error: string | null;
     onDragStart?: () => void;
     onDragEnd?: () => void;
+    /** Board-driven picker state — set when a drag landed with no Agent. */
+    pickerOpen: boolean;
+    onPickerOpenChange: (open: boolean) => void;
 }) {
     const [menuOpen, setMenuOpen] = useState(false);
     const [pending, startTransition] = useTransition();
     const [dragging, setDragging] = useState(false);
+    // Kanban M6 — diff sheet, one per card, opened from the ± affordance.
+    const [diffOpen, setDiffOpen] = useState(false);
     const targets = NEXT_STATUS[task.status] ?? [];
+    const runButtonRef = useRef<HTMLDivElement | null>(null);
+    const changedFiles = task.run?.changedFilesCount ?? null;
 
     return (
         <div
             draggable
+            // Board dispatch (kanban M3) — the card is focusable so `r`
+            // has something to act on. `tabIndex={0}` + a role keeps it
+            // reachable by keyboard without turning the whole card into
+            // a button (it still holds links and its own menus).
+            tabIndex={0}
+            role="group"
+            aria-label={`${task.slug} — ${task.title}`}
+            data-testid="task-kanban-card"
+            onKeyDown={(e) => {
+                // `r` runs the focused card. Ignore it while a modifier
+                // is held (browser shortcuts) or while focus sits in a
+                // text field, and ignore repeats from a held key.
+                if (e.key !== 'r' && e.key !== 'R') return;
+                if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
+                // The diff sheet is a modal over this card — while it is
+                // open the board's shortcuts belong to the sheet.
+                if (diffOpen) return;
+                const target = e.target as HTMLElement | null;
+                const tag = target?.tagName;
+                if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return;
+                e.preventDefault();
+                runButtonRef.current
+                    ?.querySelector<HTMLButtonElement>('[data-testid="task-run-button"]')
+                    ?.click();
+            }}
             onDragStart={(e) => {
                 e.dataTransfer.setData('text/x-task-id', task.id);
                 e.dataTransfer.effectAllowed = 'move';
@@ -188,6 +237,7 @@ function TaskKanbanCard({
                 'group flex flex-col gap-2 p-3.5 rounded-lg border',
                 'bg-card dark:bg-card-primary-dark/70',
                 'transition-all duration-150 cursor-grab active:cursor-grabbing',
+                'focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50',
                 col.cardBorderClass,
                 dragging && 'opacity-50',
             )}
@@ -220,14 +270,34 @@ function TaskKanbanCard({
 
             {/* Wave 2 M7 — isolated-branch chip · Wave 2 run cockpit — run
                 chip · Wave 3 M6 — gate chip when the latest run carries a
-                gate verdict. */}
-            {(task.branchRef || task.run) && (
+                gate verdict · kanban M5 — PR review pill with the CI dot,
+                the one chip that answers "is this reviewable right now?".
+                */}
+            {(task.branchRef || task.run || task.prNumber != null) && (
                 <div className="flex flex-wrap gap-1">
                     {task.branchRef && <TaskBranchChip task={task} />}
+                    {task.prNumber != null && <TaskPrPill task={task} />}
                     {task.run && <TaskRunChip task={task} />}
                     {task.run?.gateStatus && <GateChip status={task.run.gateStatus} />}
                 </div>
             )}
+
+            {/* Kanban M6 — diff affordance. Rendered off the run's
+                `changedFilesCount` telemetry, or whenever the Task has a
+                branch/PR at all (a re-run may have reset the counter but
+                the change is still on the branch). */}
+            {(changedFiles != null || task.branchRef || task.prNumber != null) && (
+                <button
+                    type="button"
+                    onClick={() => setDiffOpen(true)}
+                    data-testid="task-diff-button"
+                    title="Preview the changes on this Task's branch"
+                    className="self-start text-[10px] font-mono text-text-muted hover:text-primary underline decoration-dotted"
+                >
+                    ± {changedFiles != null ? `${changedFiles} files` : 'diff'}
+                </button>
+            )}
+            <TaskDiffSheet taskId={task.id} open={diffOpen} onClose={() => setDiffOpen(false)} />
 
             {/* Labels */}
             {(task.labels ?? []).length > 0 && (
@@ -278,12 +348,25 @@ function TaskKanbanCard({
                 ) : (
                     <span />
                 )}
-                <span className="text-[10px] text-text-muted dark:text-text-muted-dark shrink-0 ml-2">
-                    {new Date(task.updatedAt).toLocaleDateString(undefined, {
-                        month: 'short',
-                        day: 'numeric',
-                    })}
-                </span>
+                <div className="flex items-center gap-2 shrink-0 ml-2">
+                    {/* Board dispatch (kanban M3) — run this Task without
+                        leaving the board. Also the target of the `r`
+                        shortcut and of the board's drag fallback. */}
+                    <div ref={runButtonRef}>
+                        <RunWithAgentMenu
+                            taskId={task.id}
+                            compact
+                            open={pickerOpen}
+                            onOpenChange={onPickerOpenChange}
+                        />
+                    </div>
+                    <span className="text-[10px] text-text-muted dark:text-text-muted-dark">
+                        {new Date(task.updatedAt).toLocaleDateString(undefined, {
+                            month: 'short',
+                            day: 'numeric',
+                        })}
+                    </span>
+                </div>
             </div>
 
             {error && (
@@ -303,6 +386,8 @@ function TaskKanbanColumn({
     errors,
     draggingTaskId,
     dropTargetStatus,
+    pickerTaskId,
+    onPickerTaskChange,
     onMove,
     onDragStart,
     onDragEnd,
@@ -315,6 +400,8 @@ function TaskKanbanColumn({
     errors: Record<string, string | null>;
     draggingTaskId: string | null;
     dropTargetStatus: TaskStatus | null;
+    pickerTaskId: string | null;
+    onPickerTaskChange: (taskId: string | null) => void;
     onMove: (taskId: string, to: TaskStatus) => void;
     onDragStart: (taskId: string) => void;
     onDragEnd: () => void;
@@ -323,12 +410,35 @@ function TaskKanbanColumn({
     onDrop: (e: React.DragEvent, status: TaskStatus) => void;
 }) {
     const [visibleCount, setVisibleCount] = useState(MAX_VISIBLE);
+    const [batchBusy, setBatchBusy] = useState(false);
+    const [batchSummary, setBatchSummary] = useState<string | null>(null);
     const Icon = col.icon;
 
     const visibleTasks = tasks.slice(0, visibleCount);
     const remaining = tasks.length - visibleCount;
     const hasMore = remaining > 0;
     const isDropActive = dropTargetStatus === col.key && draggingTaskId !== null;
+
+    // Board dispatch (kanban M4) — "Run all" is offered only where it
+    // means something: columns holding work that has not been handed to
+    // an agent yet. Running a done/cancelled column is not a feature.
+    const runAllEligible = col.key === 'todo' || col.key === 'backlog' || col.key === 'in_progress';
+    const runAllTargets = tasks.slice(0, RUN_ALL_MAX);
+
+    const handleRunAll = async () => {
+        if (runAllTargets.length === 0) return;
+        setBatchBusy(true);
+        setBatchSummary(null);
+        try {
+            const { results } = await runTasksBatchAction(
+                runAllTargets.map((task) => ({ taskId: task.id })),
+            );
+            const started = results.filter((row) => row.ok).length;
+            setBatchSummary(`${started}/${results.length} started`);
+        } finally {
+            setBatchBusy(false);
+        }
+    };
 
     return (
         <div className="flex flex-col min-w-[220px] w-full flex-1">
@@ -344,6 +454,23 @@ function TaskKanbanColumn({
                 <span className="text-xs font-semibold text-text dark:text-text-dark flex-1 truncate">
                     {col.label}
                 </span>
+                {runAllEligible && runAllTargets.length > 0 && (
+                    <button
+                        type="button"
+                        disabled={batchBusy}
+                        onClick={() => void handleRunAll()}
+                        data-testid="task-run-all-button"
+                        title={`Run ${runAllTargets.length} Task(s) in ${col.label}`}
+                        className="inline-flex items-center gap-1 text-[10px] text-text-muted hover:text-primary disabled:opacity-50"
+                    >
+                        {batchBusy ? (
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                        ) : (
+                            <Play className="w-3 h-3" />
+                        )}
+                        Run all
+                    </button>
+                )}
                 <span
                     className={cn(
                         'min-w-5 text-center text-[10px] font-semibold px-1.5 py-0.5 rounded-full',
@@ -353,6 +480,15 @@ function TaskKanbanColumn({
                     {tasks.length}
                 </span>
             </div>
+
+            {batchSummary && (
+                <p
+                    className="px-3 py-1 text-[10px] text-text-muted border-x border-slate-200/60 dark:border-white/8"
+                    role="status"
+                >
+                    {batchSummary}
+                </p>
+            )}
 
             {/* Card list — fixed height, scrollable */}
             <div
@@ -384,6 +520,8 @@ function TaskKanbanColumn({
                             error={errors[task.id] ?? null}
                             onDragStart={() => onDragStart(task.id)}
                             onDragEnd={onDragEnd}
+                            pickerOpen={pickerTaskId === task.id}
+                            onPickerOpenChange={(open) => onPickerTaskChange(open ? task.id : null)}
                         />
                     ))
                 )}
@@ -417,6 +555,10 @@ export function TasksKanbanView({ tasks: initialTasks }: { tasks: Task[] }) {
     const [errors, setErrors] = useState<Record<string, string | null>>({});
     const [draggingTaskId, setDraggingTaskId] = useState<string | null>(null);
     const [dropTargetStatus, setDropTargetStatus] = useState<TaskStatus | null>(null);
+    // Board dispatch (kanban M3) — at most ONE agent picker open at a
+    // time, owned here so a drag-into-In-Progress can open the picker on
+    // a card the user is not currently focused on.
+    const [pickerTaskId, setPickerTaskId] = useState<string | null>(null);
 
     // `useState(initialTasks)` only seeds on the first render, so any later
     // change to the `tasks` prop (filter swap, parent refetch) would never
@@ -440,6 +582,16 @@ export function TasksKanbanView({ tasks: initialTasks }: { tasks: Task[] }) {
                     run: fresh.run ?? null,
                     latestRunId: fresh.latestRunId ?? task.latestRunId,
                     latestRunStatus: fresh.latestRunStatus ?? task.latestRunStatus,
+                    // Kanban M5 — the CI dot rides the same poll. The
+                    // `task-pr-status-sync` cron owns the refresh; the
+                    // board just re-reads the cached verdict, so a check
+                    // going red reaches the card without its own request.
+                    prState: fresh.prState ?? task.prState,
+                    ciState: fresh.ciState ?? task.ciState,
+                    ciCheckedAt: fresh.ciCheckedAt ?? task.ciCheckedAt,
+                    prChecks: fresh.prChecks ?? task.prChecks,
+                    prNumber: fresh.prNumber ?? task.prNumber,
+                    prUrl: fresh.prUrl ?? task.prUrl,
                 };
             }),
         );
@@ -463,6 +615,17 @@ export function TasksKanbanView({ tasks: initialTasks }: { tasks: Task[] }) {
                 setTasks((prev) =>
                     prev.map((t) => (t.id === taskId ? { ...t, status: updated.status } : t)),
                 );
+                // Board dispatch (kanban M3) — a drag into In Progress
+                // fans out to the Task's AGENT ASSIGNEES. With none, the
+                // move used to be a silent no-op: the card changes column
+                // and nothing runs. Open the picker instead so the drag
+                // still ends in a running agent.
+                if (to === 'in_progress') {
+                    const candidates = await listTaskRunCandidatesAction(taskId).catch(() => []);
+                    if (!candidates.some((agent) => agent.source === 'assignee')) {
+                        setPickerTaskId(taskId);
+                    }
+                }
             } catch (err) {
                 setTasks((prev) =>
                     prev.map((t) => (t.id === taskId ? { ...t, status: before.status } : t)),
@@ -519,6 +682,8 @@ export function TasksKanbanView({ tasks: initialTasks }: { tasks: Task[] }) {
                         errors={errors}
                         draggingTaskId={draggingTaskId}
                         dropTargetStatus={dropTargetStatus}
+                        pickerTaskId={pickerTaskId}
+                        onPickerTaskChange={setPickerTaskId}
                         onMove={handleMove}
                         onDragStart={setDraggingTaskId}
                         onDragEnd={() => {

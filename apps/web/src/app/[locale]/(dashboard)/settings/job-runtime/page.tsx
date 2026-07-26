@@ -56,6 +56,7 @@ const BUNDLED_PROVIDERS: TenantJobRuntimeProviderId[] = [
     'bullmq',
     'pgboss',
     'inngest',
+    'node',
 ];
 
 export default async function JobRuntimeSettingsPage() {

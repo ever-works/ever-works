@@ -76,6 +76,16 @@ export function TaskRunChip({ task }: { task: Task }) {
                     {formatCompactTokens(run.totalTokens)}
                 </span>
             )}
+            {/* Cost telemetry (Wave 4 M7) - the board chip showed how much
+                the run THOUGHT but never how much it COST. Same
+                dollars-and-cents rendering as the Sessions list so the two
+                cockpits read identically, and no new i18n key: a currency
+                amount needs no translated label here. */}
+            {run.costCents != null && (
+                <span className="font-mono shrink-0" data-testid="task-run-chip-cost">
+                    ${(run.costCents / 100).toFixed(2)}
+                </span>
+            )}
         </span>
     );
 }

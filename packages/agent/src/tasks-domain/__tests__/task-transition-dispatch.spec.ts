@@ -261,11 +261,18 @@ describe('TaskTransitionService — Phase 15.3 agent dispatch hook', () => {
                 workId: 'work-1',
                 organizationId: 'org-1',
             } as Partial<Task>);
-            expect(gate.admit).toHaveBeenCalledWith({
-                userId: 'u1',
-                workId: 'work-1',
-                organizationId: 'org-1',
-            });
+            // The second argument is the `reserve` half of the admission:
+            // the gate runs the `createQueued` insert INSIDE its critical
+            // section so the count and the row that consumes the counted
+            // slot cannot be split by a parallel burst.
+            expect(gate.admit).toHaveBeenCalledWith(
+                {
+                    userId: 'u1',
+                    workId: 'work-1',
+                    organizationId: 'org-1',
+                },
+                expect.any(Function),
+            );
             expect(dispatcher.enqueue).toHaveBeenCalledTimes(1);
         });
 
@@ -336,5 +343,72 @@ describe('TaskTransitionService — Phase 15.3 agent dispatch hook', () => {
             expect.objectContaining({ runId: undefined }),
         );
         expect(runs.markDispatchFailed).not.toHaveBeenCalled();
+    });
+
+    /**
+     * Streaming terminal — the automatic session dispatch. The persistent
+     * gate itself lives in the launcher (see
+     * `agents/__tests__/terminal-session-launcher.service.spec.ts`); what is
+     * pinned here is that the fan-out ASKS with `requirePersistent: true`,
+     * for the run it just dispatched, and that a terminal hiccup can never
+     * contaminate the run's own dispatch bookkeeping.
+     */
+    describe('terminal session start on fan-out', () => {
+        function makeTerminalSvc(terminalSessions: { startForRun: jest.Mock }) {
+            return new TaskTransitionService(
+                tasks,
+                blocks,
+                approvers,
+                assignees,
+                runs,
+                dispatcher,
+                undefined,
+                undefined,
+                undefined,
+                undefined,
+                terminalSessions as never,
+            );
+        }
+
+        async function fanOut(svc: TaskTransitionService) {
+            const task = makeTask({ status: TaskStatus.TODO });
+            tasks.findById.mockResolvedValueOnce({ ...task, status: TaskStatus.IN_PROGRESS });
+            assignees.findAgentAssignees.mockResolvedValueOnce([
+                { assigneeType: 'agent', assigneeId: 'agent-a' },
+            ]);
+            await svc.transition(task, TaskStatus.IN_PROGRESS);
+            await new Promise((r) => setImmediate(r));
+        }
+
+        it('asks the starter for the dispatched run, gated on persistent', async () => {
+            const terminalSessions = {
+                startForRun: jest.fn().mockResolvedValue({ started: false }),
+            };
+            await fanOut(makeTerminalSvc(terminalSessions));
+
+            expect(terminalSessions.startForRun).toHaveBeenCalledTimes(1);
+            expect(terminalSessions.startForRun).toHaveBeenCalledWith({
+                userId: 'u1',
+                agentId: 'agent-a',
+                runId: 'r1',
+                requirePersistent: true,
+            });
+        });
+
+        it('never marks a live run dispatch-failed when starting its terminal throws', async () => {
+            const terminalSessions = {
+                startForRun: jest.fn().mockRejectedValue(new Error('terminal dispatch down')),
+            };
+            await fanOut(makeTerminalSvc(terminalSessions));
+
+            expect(dispatcher.enqueue).toHaveBeenCalledTimes(1);
+            expect(runs.markDispatchFailed).not.toHaveBeenCalled();
+        });
+
+        it('is a silent no-op when no starter is bound (installs without a job runtime)', async () => {
+            await fanOut(makeSvc());
+            expect(dispatcher.enqueue).toHaveBeenCalledTimes(1);
+            expect(runs.markDispatchFailed).not.toHaveBeenCalled();
+        });
     });
 });

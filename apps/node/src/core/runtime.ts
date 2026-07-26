@@ -1,6 +1,9 @@
 import { describeSelf, type CapabilityEnvironment, type CommandRunner } from './capabilities';
 import { FleetClient, type FetchLike } from './fleet-client';
+import { FleetJobClient } from './job-client';
 import { HeartbeatLoop, type Scheduler } from './heartbeat';
+import { WorkerLoop } from './worker-loop';
+import { runAcceptanceChecksJob } from './executors/acceptance-checks';
 import type { Logger } from './logger';
 import {
 	DEFAULT_HEARTBEAT_INTERVAL_MS,
@@ -94,6 +97,27 @@ export async function enrollNode(options: EnrollNodeOptions): Promise<NodeConfig
 export interface NodeRuntime {
 	client: FleetClient;
 	loop: HeartbeatLoop;
+	/**
+	 * The worker host, present when this node is configured to EXECUTE
+	 * work (`workerEnabled`). Absent means the node only reports liveness
+	 * and capabilities — the pre-M4 behaviour, preserved so a machine can
+	 * be enrolled purely for visibility.
+	 */
+	worker?: WorkerLoop;
+	jobClient?: FleetJobClient;
+}
+
+export interface CreateNodeRuntimeOptions {
+	/**
+	 * Run the lease → execute → report loop alongside the heartbeat.
+	 * Off by default: enrolling a machine and letting it run the owner's
+	 * commands are two different consents, and the second is opt-in.
+	 */
+	workerEnabled?: boolean;
+	/** Max jobs in flight on this node. */
+	concurrency?: number;
+	leaseTtlSec?: number;
+	idlePollMs?: number;
 }
 
 /**
@@ -101,14 +125,15 @@ export interface NodeRuntime {
  * description is re-detected on every beat, so installing Docker or Git on a
  * running node shows up in Fleet without a restart.
  */
-export function createNodeRuntime(config: NodeConfig, io: NodeIo): NodeRuntime {
+export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: CreateNodeRuntimeOptions = {}): NodeRuntime {
 	io.logger.protect(config.secret);
 
+	const userAgent = io.userAgent ?? `ever-works-node/${io.version}`;
 	const client = new FleetClient({
 		apiUrl: config.apiUrl,
 		fetchFn: io.fetchFn,
 		logger: io.logger,
-		userAgent: io.userAgent ?? `ever-works-node/${io.version}`
+		userAgent
 	});
 
 	const loopOptions = {
@@ -122,7 +147,34 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo): NodeRuntime {
 		...(io.now ? { now: io.now } : {})
 	};
 
-	return { client, loop: new HeartbeatLoop(loopOptions) };
+	const runtime: NodeRuntime = { client, loop: new HeartbeatLoop(loopOptions) };
+
+	if (options.workerEnabled) {
+		const jobClient = new FleetJobClient({
+			apiUrl: config.apiUrl,
+			nodeId: config.nodeId,
+			secret: config.secret,
+			fetchFn: io.fetchFn,
+			logger: io.logger,
+			userAgent
+		});
+		const worker = new WorkerLoop({
+			client: jobClient,
+			logger: io.logger,
+			...(options.concurrency !== undefined ? { concurrency: options.concurrency } : {}),
+			...(options.leaseTtlSec !== undefined ? { leaseTtlSec: options.leaseTtlSec } : {}),
+			...(options.idlePollMs !== undefined ? { idlePollMs: options.idlePollMs } : {}),
+			...(io.scheduler ? { scheduler: io.scheduler } : {})
+		});
+		// The v1 executor. Registering it HERE (not inside WorkerLoop) is
+		// the executor seam: a second job kind is one more `register` call
+		// against the same protocol — no new endpoint, no new credential.
+		worker.register('acceptance-checks', (job) => runAcceptanceChecksJob(job));
+		runtime.worker = worker;
+		runtime.jobClient = jobClient;
+	}
+
+	return runtime;
 }
 
 /** Process-signal abstraction so shutdown wiring is testable. */
