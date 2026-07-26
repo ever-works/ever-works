@@ -21,6 +21,10 @@ export * from './repositories/plugin-usage.repository';
 // Credits ledger + plan entitlements (pricing Wave 9 M1)
 export * from './repositories/credit-ledger.repository';
 export * from './repositories/plan-entitlement.repository';
+// Payment provider bridge (billing PRD §5.3(3)/(4)) — billing profiles
+// (customer + payment-method summary + auto-recharge) and the invoice mirror
+export * from './repositories/billing-profile.repository';
+export * from './repositories/invoice.repository';
 // Streaming-terminal M9 / D1 — append-only terminal transcript chunks.
 export * from './repositories/terminal-transcript-chunk.repository';
 export * from './repositories/work-budget.repository';
