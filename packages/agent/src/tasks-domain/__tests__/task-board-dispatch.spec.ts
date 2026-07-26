@@ -95,11 +95,18 @@ describe('TaskTransitionService.dispatchAgentRun — the one dispatch path', () 
 
     it('consults the dispatch gate, creates the queued run, mirrors it on the board and enqueues', async () => {
         const result = await makeSvc().dispatchAgentRun(makeTask({ workId: 'w1' }), 'agent-1');
-        expect(dispatchGate.admit).toHaveBeenCalledWith({
-            userId: 'u1',
-            workId: 'w1',
-            organizationId: null,
-        });
+        // The second argument is the `reserve` half of the admission: the
+        // gate runs the `createQueued` insert INSIDE its critical section
+        // so the count and the row that consumes the counted slot cannot
+        // be split by a parallel burst.
+        expect(dispatchGate.admit).toHaveBeenCalledWith(
+            {
+                userId: 'u1',
+                workId: 'w1',
+                organizationId: null,
+            },
+            expect.any(Function),
+        );
         expect(runs.createQueued).toHaveBeenCalledWith(
             expect.objectContaining({ agentId: 'agent-1', taskId: 't1', workId: 'w1' }),
         );
