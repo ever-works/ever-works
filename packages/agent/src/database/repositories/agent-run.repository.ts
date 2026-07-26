@@ -22,6 +22,21 @@ const NON_TERMINAL: AgentRunStatus[] = ['queued', 'running'];
 const QUEUED_ONLY: AgentRunStatus[] = ['queued'];
 
 /**
+ * State-aware sweeper (Wave 4 M6) — the two `agent_runs.attentionReason`
+ * tokens the platform raises. Short machine strings, never free text: the
+ * Sessions list filters on them and the i18n layer maps them to copy.
+ *
+ * - `queued-too-long` — the run never got capacity inside the bound. It
+ *   is still queued; nothing was reaped.
+ * - `stale-parked`    — a `running` run was checkpoint-and-parked because
+ *   its worker stopped reporting. Resumable.
+ */
+export const ATTENTION_REASON_QUEUED_TOO_LONG = 'queued-too-long' as const;
+export const ATTENTION_REASON_STALE_PARKED = 'stale-parked' as const;
+
+/** Prefix on the summary of a parked run — the user-facing cell text. */
+export const STALE_PARK_SUMMARY_PREFIX = 'stuck-parked' as const;
+/**
  * Namespace (`classid`) for every run-admission advisory lock, so this
  * subsystem can never collide with another feature's advisory locks in
  * the same Postgres database. Arbitrary but STABLE — changing it would
@@ -403,6 +418,115 @@ export class AgentRunRepository {
             await this.settleRunCost(runId);
         }
         return result.affected ?? 0;
+    }
+
+    /**
+     * State-aware sweeper (Wave 4 M6) — **checkpoint-and-park** a stale
+     * `running` run instead of hard-failing it.
+     *
+     * The worker is gone, but the CONVERSATION is not: `cliSessionId`
+     * still names a resumable pipeline session, so the honest terminal
+     * state is "we stopped the compute and kept the transcript", which is
+     * precisely what `terminalEndedReason='parked'` already means to
+     * `RunSteeringService.isResumable`. Hard-failing threw that away and
+     * left a red row nobody could act on.
+     *
+     * `completed` (not `failed`) is deliberate: the run produced whatever
+     * it produced and is offered back with a Resume button, so a red
+     * error row would be a lie about the work. `summary` carries the
+     * reason — the Sessions view renders it where a result would be.
+     *
+     * Same CAS shape as {@link markStuckFailed}: guarded on `running`, so
+     * a worker that finished in the gap keeps its own terminal write, and
+     * `affected` (never `runIds.length`) is returned.
+     */
+    async parkStaleRunning(runIds: string[], summary: string): Promise<number> {
+        if (runIds.length === 0) return 0;
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(AgentRun)
+            .set({
+                status: 'completed',
+                finishedAt: new Date(),
+                summary,
+                // The resume token. Without this pair the run is terminal
+                // and unrevivable — parking IS these two columns.
+                terminalState: 'ended',
+                terminalEndedReason: 'parked',
+                attentionReason: ATTENTION_REASON_STALE_PARKED,
+                attentionAt: new Date(),
+            })
+            .where('id IN (:...runIds)', { runIds })
+            // `running` only: a `queued` row never started, so there is no
+            // process to checkpoint and no conversation to keep.
+            .andWhere('status = :running', { running: 'running' })
+            .execute();
+        // Same settlement contract as markStuckFailed — every input id is
+        // terminal after this statement, settlement is idempotent.
+        for (const runId of runIds) {
+            await this.settleRunCost(runId);
+        }
+        return result.affected ?? 0;
+    }
+
+    /**
+     * State-aware sweeper (Wave 4 M6) — runs that have been `queued`
+     * longer than the bound and have NOT already been flagged.
+     *
+     * `attentionReason IS NULL` is the "not already flagged" predicate,
+     * which is also what keeps the notification one-per-run instead of
+     * one-per-tick: the flag write and the notification happen together,
+     * and a flagged row never comes back through this query.
+     */
+    async findQueuedTooLong(
+        cutoff: Date,
+        limit: number,
+    ): Promise<
+        Pick<
+            AgentRun,
+            'id' | 'agentId' | 'userId' | 'taskId' | 'workId' | 'queuedReason' | 'createdAt'
+        >[]
+    > {
+        return this.repository
+            .createQueryBuilder('run')
+            .select([
+                'run.id',
+                'run.agentId',
+                'run.userId',
+                'run.taskId',
+                'run.workId',
+                'run.queuedReason',
+                'run.createdAt',
+            ])
+            .where('run.status = :queued', { queued: 'queued' })
+            .andWhere('run.attentionReason IS NULL')
+            .andWhere('run.createdAt <= :cutoff', { cutoff })
+            .orderBy('run.createdAt', 'ASC')
+            .limit(limit)
+            .getMany();
+    }
+
+    /**
+     * Raise (or clear) the needs-attention flag on one run.
+     *
+     * Guarded on `attentionReason IS NULL` when RAISING so the flag — and
+     * therefore the notification the caller pairs with it — lands exactly
+     * once even if two sweeper ticks overlap. Clearing is unguarded: a
+     * resolved run must always be clearable.
+     */
+    async setAttention(runId: string, reason: string | null): Promise<boolean> {
+        if (reason === null) {
+            await this.repository.update(runId, { attentionReason: null, attentionAt: null });
+            return true;
+        }
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(AgentRun)
+            .set({ attentionReason: reason, attentionAt: new Date() })
+            .where('id = :id', { id: runId })
+            .andWhere('attentionReason IS NULL')
+            .execute();
+        return (result.affected ?? 0) > 0;
     }
 
     async createQueued(args: {
@@ -1096,6 +1220,15 @@ export class AgentRunRepository {
             agentId?: string;
             taskId?: string;
             triggerKind?: AgentRunTriggerKind;
+            /**
+             * Wave 4 M6/M7 — the needs-attention quick filter. `true`
+             * narrows to runs a human has to look at: the agent asked a
+             * question (`awaitingInput`) OR the platform raised a
+             * lifecycle flag (`attentionReason`). One filter, both
+             * sources — the UI must not have to know the difference to
+             * answer "what is waiting on me?".
+             */
+            attention?: boolean;
         },
         limit = 25,
         offset = 0,
@@ -1103,6 +1236,11 @@ export class AgentRunRepository {
         const qb = this.repository
             .createQueryBuilder('run')
             .where('run.userId = :userId', { userId });
+        if (filters.attention === true) {
+            qb.andWhere('(run.awaitingInput = :isAwaiting OR run.attentionReason IS NOT NULL)', {
+                isAwaiting: true,
+            });
+        }
         if (filters.status) {
             qb.andWhere('run.status = :status', { status: filters.status });
         }
@@ -1128,12 +1266,7 @@ export class AgentRunRepository {
      * `awaitingInput = :true` binds a real boolean so both drivers
      * compare their native representation.
      */
-    async summarizeForWork(workId: string): Promise<{
-        running: number;
-        queued: number;
-        awaiting: number;
-        failedLast24h: number;
-    }> {
+    async summarizeForWork(workId: string): Promise<WorkRunsSummary> {
         const cutoff = new Date(Date.now() - 24 * 60 * 60 * 1000);
         const raw = await this.repository
             .createQueryBuilder('run')
@@ -1147,19 +1280,74 @@ export class AgentRunRepository {
                 `SUM(CASE WHEN run.status = 'failed' AND run.finishedAt >= :cutoff THEN 1 ELSE 0 END)`,
                 'failedLast24h',
             )
+            // Wave 4 M6 — needs-attention count for the Work header chip.
+            // Counts the SAME union the Sessions `attention=1` filter does
+            // so the two surfaces can never disagree.
+            .addSelect(
+                `SUM(CASE WHEN (run.awaitingInput = :isAwaiting OR run.attentionReason IS NOT NULL) THEN 1 ELSE 0 END)`,
+                'needsAttention',
+            )
+            // Wave 4 M7 — per-Work spend rollup. `costCents` is stamped by
+            // run-cost settlement on every terminal transition, so summing
+            // it here is a per-Work spend total with no join to
+            // plugin_usage_events. COALESCE keeps pre-column rows at 0
+            // instead of poisoning the SUM with NULL.
+            .addSelect(`SUM(COALESCE(run.costCents, 0))`, 'costCentsTotal')
+            .addSelect(
+                `SUM(CASE WHEN run.createdAt >= :cutoff THEN COALESCE(run.costCents, 0) ELSE 0 END)`,
+                'costCentsLast24h',
+            )
+            .addSelect(`SUM(COALESCE(run.totalTokens, 0))`, 'totalTokens')
+            .addSelect(
+                `SUM(CASE WHEN run.createdAt >= :cutoff THEN COALESCE(run.totalTokens, 0) ELSE 0 END)`,
+                'totalTokensLast24h',
+            )
             .where('run.workId = :workId', { workId })
             .setParameters({ isAwaiting: true, cutoff })
-            .getRawOne<{
-                running: string | number | null;
-                queued: string | number | null;
-                awaiting: string | number | null;
-                failedLast24h: string | number | null;
-            }>();
+            .getRawOne<Record<string, string | number | null>>();
+        const num = (key: string) => Number(raw?.[key] ?? 0) || 0;
         return {
-            running: Number(raw?.running ?? 0),
-            queued: Number(raw?.queued ?? 0),
-            awaiting: Number(raw?.awaiting ?? 0),
-            failedLast24h: Number(raw?.failedLast24h ?? 0),
+            running: num('running'),
+            queued: num('queued'),
+            awaiting: num('awaiting'),
+            failedLast24h: num('failedLast24h'),
+            needsAttention: num('needsAttention'),
+            costCentsTotal: num('costCentsTotal'),
+            costCentsLast24h: num('costCentsLast24h'),
+            totalTokens: num('totalTokens'),
+            totalTokensLast24h: num('totalTokensLast24h'),
         };
     }
+}
+
+/**
+ * Per-Work run summary (Wave 4 M3 counts + M7 spend rollup).
+ *
+ * The four original counts keep their exact names and meanings — this is
+ * an ADDITIVE widening of the `GET /api/works/:id/runs-summary` payload,
+ * so an older client reading only the counts is unaffected.
+ *
+ * **No cache-read correction is applied**, and that is a deliberate,
+ * verified decision rather than an omission: the run cost rollup is
+ * settled from `plugin_usage_events.costCents`, and the token rollup from
+ * `AgentAiDispatchFacade`'s `usage` block, which reports exactly
+ * `{ promptTokens, completionTokens, totalTokens }`. Nothing on the
+ * dispatch path reports cached-read tokens separately, so there is no
+ * cached component to subtract — inventing one would be a fabricated
+ * correction. If the facade ever grows a cache-read field, the correction
+ * belongs at the accumulation site (`AgentRunRepository.addTokens`), not
+ * here, so every consumer inherits it at once.
+ */
+export interface WorkRunsSummary {
+    running: number;
+    queued: number;
+    awaiting: number;
+    failedLast24h: number;
+    /** `awaitingInput` OR a raised `attentionReason` — the M6 badge. */
+    needsAttention: number;
+    /** All-time settled spend across this Work's runs, in integer cents. */
+    costCentsTotal: number;
+    costCentsLast24h: number;
+    totalTokens: number;
+    totalTokensLast24h: number;
 }

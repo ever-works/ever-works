@@ -51,6 +51,8 @@ describe('TasksController — PR insights endpoints', () => {
             {} as never,
             {} as never,
             {} as never,
+            {} as never,
+            {} as never,
             { getForTask, getDiffForTask } as never,
         );
         return { controller, getForTask, getDiffForTask };

@@ -29,6 +29,29 @@ export const TASK_ACCEPTANCE_CHECK_KINDS: readonly TaskAcceptanceCheckKind[] = [
 ];
 
 /**
+ * Judgment level a check belongs to (judgment layer G2).
+ *
+ * - `L0` — a CHEAP, purely syntactic/structural pass (lint, format check,
+ *   `tsc --noEmit`, a schema validator). It is the only level that may run
+ *   BEFORE the model call, as a pre-check: its output is fed into the same
+ *   iterate loop as a red gate, so an obviously broken workspace is
+ *   described to the agent before a single token is spent.
+ * - `L1` — the normal acceptance check (build/test/custom). Runs after the
+ *   agent loop, exactly as it always has.
+ *
+ * Optional and defaulting to `L1`: every check authored before this field
+ * existed keeps its current behavior, and the pre-check pass is opt-in per
+ * check AND behind an operator switch.
+ */
+export type TaskCheckLevel = 'L0' | 'L1';
+
+/**
+ * Canonical list of check levels — one source of truth for DTO `@IsIn`
+ * validators and import sanitizers.
+ */
+export const TASK_CHECK_LEVELS: readonly TaskCheckLevel[] = ['L0', 'L1'];
+
+/**
  * One acceptance check: a named command whose exit code decides green/red.
  */
 export interface TaskAcceptanceCheck {
@@ -46,6 +69,12 @@ export interface TaskAcceptanceCheck {
 	command: string;
 	/** Working directory relative to the checkout root; omitted = root. */
 	cwd?: string;
+	/**
+	 * Judgment level (G2). Omitted = `L1` — the post-run acceptance check
+	 * every existing check already is. Only `L0` checks are eligible for
+	 * the cheap pre-model-call pass.
+	 */
+	level?: TaskCheckLevel;
 	/**
 	 * Wall-clock budget in seconds. A check that exceeds it reports
 	 * `timeout` (distinct from `red`: the command was killed, not failed).

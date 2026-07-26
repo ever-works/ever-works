@@ -45,10 +45,13 @@ export interface TaskRun {
     status: TaskRunStatus;
     currentActivity: string | null;
     totalTokens: number | null;
-    changedFilesCount: number | null;
-    /** Cost surfacing (orchestration M7) — settled run cost in cents;
-     *  null until the run reaches a terminal state. */
+    /**
+     * Cost telemetry (Wave 4 M7) - settled run cost in integer cents.
+     * Optional so a response from an older API (which does not send it)
+     * still type-checks; the chip simply renders no cost.
+     */
     costCents?: number | null;
+    changedFilesCount: number | null;
     startedAt: string | null;
     /** Quality gates (Wave 3 M6) — latest-run gate verdict for the board
      *  chip. `null`/absent = the run has no gate verdict. */

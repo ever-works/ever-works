@@ -74,6 +74,7 @@ import { Agent } from '../entities/agent.entity';
 import { AgentActionProposal } from '../entities/agent-action-proposal.entity';
 import { AgentRun } from '../entities/agent-run.entity';
 import { AgentRunLog } from '../entities/agent-run-log.entity';
+import { AgentEscalation } from '../entities/agent-escalation.entity';
 import { AgentBudget } from '../entities/agent-budget.entity';
 import { AgentMembership } from '../entities/agent-membership.entity';
 import { Team } from '../entities/team.entity';
@@ -84,6 +85,7 @@ import { SkillBinding } from '../entities/skill-binding.entity';
 import { Task } from '../entities/task.entity';
 import { TaskAssignee } from '../entities/task-assignee.entity';
 import { TaskReviewer } from '../entities/task-reviewer.entity';
+import { TaskReviewRejection } from '../entities/task-review-rejection.entity';
 import { TaskApprover } from '../entities/task-approver.entity';
 import { TaskBlock } from '../entities/task-block.entity';
 import { TaskRelation } from '../entities/task-relation.entity';
@@ -194,6 +196,8 @@ export const ENTITIES = [
     AgentActionProposal,
     AgentRun,
     AgentRunLog,
+    // Judgment layer G3 - structured escalation records.
+    AgentEscalation,
     AgentBudget,
     AgentMembership,
     AgentAttachment,
@@ -208,6 +212,8 @@ export const ENTITIES = [
     Task,
     TaskAssignee,
     TaskReviewer,
+    // Orchestration M9 - durable rejection feedback for resume.
+    TaskReviewRejection,
     TaskApprover,
     TaskBlock,
     TaskRelation,
@@ -300,5 +306,4 @@ export const ENTITIES = [
     // Fleet job runtime (Desktop PRD M4) — the lease-able work queue
     // whose workers are the enrolled nodes above.
     FleetJob,
-
 ];

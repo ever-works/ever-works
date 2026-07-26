@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { DatabaseModule } from '@ever-works/agent/database';
 import { EventIngestModule } from '@ever-works/agent/ingest';
 import { PrReviewModule } from '@ever-works/agent/pr-review';
+import { TasksDomainModule } from '@ever-works/agent/tasks-domain';
 import { AiConversationModule } from '../ai-conversation/ai-conversation.module';
 import { GitHubAppModule } from '../integrations/github-app/github-app.module';
 import { IngestController } from './ingest.controller';
@@ -45,7 +46,8 @@ import { GitHubWebhookDispatcherService } from './github/github-webhook-dispatch
  * user-plugin repository) come from the @Global agent PluginsModule
  * bootstrapped in api.module.ts; `OpenAiCompatService` (the platform
  * chat surface) comes from `AiConversationModule`; the Work-aware
- * reviewer comes from the agent-side `PrReviewModule`.
+ * reviewer comes from the agent-side `PrReviewModule`; the durable
+ * rejection recorder (orchestration M9) comes from `TasksDomainModule`.
  */
 @Module({
     imports: [
@@ -54,6 +56,7 @@ import { GitHubWebhookDispatcherService } from './github/github-webhook-dispatch
         AiConversationModule,
         PrReviewModule,
         GitHubAppModule,
+        TasksDomainModule,
     ],
     controllers: [
         IngestController,

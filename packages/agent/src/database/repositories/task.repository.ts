@@ -47,6 +47,24 @@ export class TaskRepository {
         return this.repository.findOne({ where: { slug } });
     }
 
+    /**
+     * Orchestration M9 — the Task an agent opened a given pull request
+     * for. `prNumber` is only unique WITHIN a repository, and a Work maps
+     * to one repository, so the (workId, prNumber) pair is the correct
+     * key — `prNumber` alone would collide across Works the moment two
+     * repos both have a PR #7.
+     *
+     * Newest first: a Task whose branch was recycled could in principle
+     * carry a stale number, and the most recently updated row is the one
+     * the reviewer was looking at.
+     */
+    async findByWorkAndPrNumber(workId: string, prNumber: number): Promise<Task | null> {
+        return this.repository.findOne({
+            where: { workId, prNumber },
+            order: { updatedAt: 'DESC' },
+        });
+    }
+
     async findByUserIdFiltered(
         userId: string,
         filter: ListTasksFilter = {},
