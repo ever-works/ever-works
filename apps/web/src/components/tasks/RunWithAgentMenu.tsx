@@ -13,7 +13,7 @@ import {
     RUN_ALREADY_IN_FLIGHT,
     RUN_NO_AGENT,
     type RunCandidateAgent,
-} from '@/lib/api/tasks';
+} from '@/lib/api/tasks.shared';
 
 /**
  * Board dispatch (kanban M3) — the "Run" affordance and its agent picker.
