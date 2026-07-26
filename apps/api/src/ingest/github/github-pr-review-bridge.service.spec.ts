@@ -1,18 +1,24 @@
-jest.mock('@ever-works/agent/ingest', () => ({ EventIngestService: class {} }));
+jest.mock('@ever-works/agent/ingest', () => ({
+    EventIngestService: class {},
+    IngestInstallBindingRepository: class {},
+}));
 jest.mock('@ever-works/agent/pr-review', () => ({ PrReviewService: class {} }));
 jest.mock('@ever-works/agent/plugins', () => ({
     PluginSettingsService: class {},
     UserPluginRepository: class {},
 }));
 
-import { GitHubPrReviewBridgeService } from './github-pr-review-bridge.service';
+import {
+    GitHubPrReviewBridgeService,
+    extractGitHubWorkspaceRef,
+} from './github-pr-review-bridge.service';
 
 /** Flush the fire-and-forget review promise chain. */
 function flush(): Promise<void> {
     return new Promise((resolve) => setImmediate(resolve));
 }
 
-const BINDING = { userId: 'user-1', webhookSecret: 'sec' };
+const BINDING = { userId: 'user-1', webhookSecret: 'sec', matchedBy: 'binding' as const };
 
 function prOpenedBody(overrides: Record<string, unknown> = {}) {
     return {
@@ -69,11 +75,16 @@ describe('GitHubPrReviewBridgeService', () => {
                 context: { work: false, kb: false, memory: false },
             }),
         };
+        const installBindings = {
+            findByWorkspace: jest.fn().mockResolvedValue(null),
+            record: jest.fn().mockResolvedValue(null),
+        };
         const service = new GitHubPrReviewBridgeService(
             userPluginRepository as any,
             pluginSettingsService as any,
             eventIngestService as any,
             prReviewService as any,
+            installBindings as any,
         );
         return {
             service,
@@ -81,11 +92,110 @@ describe('GitHubPrReviewBridgeService', () => {
             pluginSettingsService,
             eventIngestService,
             prReviewService,
+            installBindings,
         };
     }
 
+    /**
+     * Per-installation binding.
+     *
+     * The receiver used to resolve "the oldest enabled install
+     * platform-wide" and attribute EVERY inbound delivery to that one
+     * platform user — a multi-tenant data-isolation defect (a second
+     * customer's repository had its diffs reviewed under, and billed to,
+     * the first customer's account). These cases pin the replacement.
+     */
     describe('resolveBinding', () => {
-        it('returns the oldest enabled install with a webhookSecret', async () => {
+        function twoInstalls(overrides: { sharedSecret?: boolean } = {}) {
+            const ctx = createService();
+            ctx.userPluginRepository.findByPlugin.mockResolvedValue([
+                { userId: 'u-a', enabled: true, createdAt: new Date('2026-01-01') },
+                { userId: 'u-disabled', enabled: false, createdAt: new Date('2025-01-01') },
+                { userId: 'u-b', enabled: true, createdAt: new Date('2026-02-01') },
+            ]);
+            ctx.pluginSettingsService.getSettings.mockImplementation(
+                async (_pluginId: string, opts: { userId: string }) => ({
+                    webhookSecret: overrides.sharedSecret ? 'shared' : `sec-${opts.userId}`,
+                }),
+            );
+            return ctx;
+        }
+
+        it('routes each installation to its OWN owner when two installs exist', async () => {
+            const { service, installBindings } = twoInstalls();
+            installBindings.findByWorkspace.mockImplementation(
+                async (_provider: string, key: string) =>
+                    key === 'owner:octo'
+                        ? { userId: 'u-a' }
+                        : key === 'owner:acme'
+                          ? { userId: 'u-b' }
+                          : null,
+            );
+
+            await expect(
+                service.resolveBinding({ workspace: { keys: ['owner:octo'] } }),
+            ).resolves.toMatchObject({
+                status: 'resolved',
+                binding: { userId: 'u-a', webhookSecret: 'sec-u-a', matchedBy: 'binding' },
+            });
+            await expect(
+                service.resolveBinding({ workspace: { keys: ['owner:acme'] } }),
+            ).resolves.toMatchObject({
+                status: 'resolved',
+                binding: { userId: 'u-b', webhookSecret: 'sec-u-b', matchedBy: 'binding' },
+            });
+        });
+
+        it('prefers the installation id over the repository owner key', async () => {
+            const { service, installBindings } = twoInstalls();
+            installBindings.findByWorkspace.mockImplementation(
+                async (_provider: string, key: string) =>
+                    key === 'installation:99' ? { userId: 'u-b' } : { userId: 'u-a' },
+            );
+
+            const result = await service.resolveBinding({
+                workspace: { keys: ['installation:99', 'owner:octo'] },
+            });
+            expect(result).toMatchObject({ status: 'resolved', binding: { userId: 'u-b' } });
+        });
+
+        it('REFUSES an unknown installation instead of guessing an owner', async () => {
+            const { service } = twoInstalls();
+            await expect(
+                service.resolveBinding({ workspace: { keys: ['owner:stranger'] } }),
+            ).resolves.toEqual({ status: 'unresolved', reason: 'unknown-workspace' });
+        });
+
+        it('REFUSES when the bound install is disabled — never re-points at another tenant', async () => {
+            const { service, installBindings } = twoInstalls();
+            installBindings.findByWorkspace.mockResolvedValue({ userId: 'u-disabled' });
+            await expect(
+                service.resolveBinding({ workspace: { keys: ['owner:octo'] } }),
+            ).resolves.toEqual({ status: 'unresolved', reason: 'bound-install-unavailable' });
+        });
+
+        it('resolves by unique signature proof — each install has its own webhook secret', async () => {
+            const { service } = twoInstalls();
+            const result = await service.resolveBinding({
+                workspace: { keys: ['owner:stranger'] },
+                verifySignature: (secret) => secret === 'sec-u-b',
+            });
+            expect(result).toMatchObject({
+                status: 'resolved',
+                binding: { userId: 'u-b', matchedBy: 'signature' },
+            });
+        });
+
+        it('REFUSES when several installs share a webhook secret', async () => {
+            const { service } = twoInstalls({ sharedSecret: true });
+            const result = await service.resolveBinding({
+                workspace: { keys: ['owner:stranger'] },
+                verifySignature: () => true,
+            });
+            expect(result).toEqual({ status: 'unresolved', reason: 'ambiguous-install' });
+        });
+
+        it('legacy single-install path still works (and is flagged as the fallback)', async () => {
             const { service, userPluginRepository, pluginSettingsService } = createService();
             userPluginRepository.findByPlugin.mockResolvedValue([
                 { userId: 'u-newer', enabled: true, createdAt: new Date('2026-02-01') },
@@ -96,16 +206,98 @@ describe('GitHubPrReviewBridgeService', () => {
                 async (_pluginId: string, opts: { userId: string }) =>
                     opts.userId === 'u-older' ? { webhookSecret: 's3cr3t' } : {},
             );
-            const binding = await service.resolveBinding();
-            expect(binding).toEqual({ userId: 'u-older', webhookSecret: 's3cr3t' });
+
+            const result = await service.resolveBinding({
+                workspace: { keys: ['owner:octo'], label: 'octo' },
+            });
+            expect(result).toMatchObject({
+                status: 'resolved',
+                binding: {
+                    userId: 'u-older',
+                    webhookSecret: 's3cr3t',
+                    matchedBy: 'single-install',
+                },
+            });
         });
 
-        it('returns null when no enabled install carries a secret (fail-closed input)', async () => {
+        it('reports not-configured (fail-closed 401 upstream) when no install carries a secret', async () => {
             const { service, userPluginRepository } = createService();
             userPluginRepository.findByPlugin.mockResolvedValue([
                 { userId: 'u1', enabled: true, createdAt: new Date() },
             ]);
-            await expect(service.resolveBinding()).resolves.toBeNull();
+            await expect(service.resolveBinding()).resolves.toEqual({ status: 'not-configured' });
+        });
+    });
+
+    describe('recordBinding', () => {
+        it('persists the installation→user binding after a fallback match', async () => {
+            const { service, installBindings } = createService();
+            await service.recordBinding({
+                userId: 'u-older',
+                webhookSecret: 's',
+                matchedBy: 'single-install',
+                workspace: { keys: ['owner:octo'], label: 'octo' },
+            });
+            expect(installBindings.record).toHaveBeenCalledWith({
+                provider: 'github',
+                externalWorkspaceId: 'owner:octo',
+                userId: 'u-older',
+                pluginId: 'github',
+                externalWorkspaceName: 'octo',
+            });
+        });
+
+        it('is a no-op when the binding already came from the table', async () => {
+            const { service, installBindings } = createService();
+            await service.recordBinding({
+                userId: 'u-a',
+                webhookSecret: 's',
+                matchedBy: 'binding',
+                workspace: { keys: ['owner:octo'] },
+            });
+            expect(installBindings.record).not.toHaveBeenCalled();
+        });
+
+        it('swallows a repository failure (a verified webhook must not 500)', async () => {
+            const { service, installBindings } = createService();
+            installBindings.record.mockRejectedValue(new Error('db down'));
+            await expect(
+                service.recordBinding({
+                    userId: 'u-a',
+                    webhookSecret: 's',
+                    matchedBy: 'single-install',
+                    workspace: { keys: ['owner:octo'] },
+                }),
+            ).resolves.toBeUndefined();
+        });
+    });
+
+    describe('extractGitHubWorkspaceRef', () => {
+        it('prefers the App installation id, then the repository owner', () => {
+            expect(
+                extractGitHubWorkspaceRef({
+                    installation: { id: 99 },
+                    repository: { full_name: 'Octo/site' },
+                } as any),
+            ).toEqual({ keys: ['installation:99', 'owner:octo'], label: 'Octo' });
+        });
+
+        it('falls back to the repository owner for a user-configured webhook', () => {
+            expect(
+                extractGitHubWorkspaceRef({ repository: { full_name: 'octo/site' } } as any),
+            ).toEqual({ keys: ['owner:octo'], label: 'octo' });
+        });
+
+        it('falls back to the organization login (org-level webhook / ping)', () => {
+            expect(extractGitHubWorkspaceRef({ organization: { login: 'Acme' } } as any)).toEqual({
+                keys: ['owner:acme'],
+                label: 'Acme',
+            });
+        });
+
+        it('returns undefined when the delivery names no installation at all', () => {
+            expect(extractGitHubWorkspaceRef({ zen: 'x' } as any)).toBeUndefined();
+            expect(extractGitHubWorkspaceRef(undefined)).toBeUndefined();
         });
     });
 
@@ -174,6 +366,15 @@ describe('GitHubPrReviewBridgeService', () => {
             const [, envelopes] = eventIngestService.ingest.mock.calls[0];
             expect(envelopes[0].sourceEventId).toBe('pr:octo/site#7@def456');
         });
+
+        it('carries the repo workHint so the spine can route the event to a Work', async () => {
+            const { service, eventIngestService } = createService();
+            await service.handleEvent(BINDING, 'pull_request', prOpenedBody());
+            await flush();
+
+            const [, envelopes] = eventIngestService.ingest.mock.calls[0];
+            expect(envelopes[0].workHint).toEqual({ kind: 'repo', externalId: 'octo/site' });
+        });
     });
 
     describe('@ever-works mention loop', () => {
@@ -186,6 +387,7 @@ describe('GitHubPrReviewBridgeService', () => {
             expect(envelopes[0]).toMatchObject({
                 kind: 'github.mention',
                 sourceEventId: 'comment:octo/site:42',
+                workHint: { kind: 'repo', externalId: 'octo/site' },
             });
             expect(prReviewService.reviewPullRequest).toHaveBeenCalledWith({
                 userId: 'user-1',

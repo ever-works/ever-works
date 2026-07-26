@@ -1,6 +1,7 @@
 import { Type } from 'class-transformer';
 import {
     ArrayMaxSize,
+    ArrayNotEmpty,
     IsArray,
     IsBoolean,
     IsDateString,
@@ -16,6 +17,7 @@ import {
     ValidateNested,
 } from 'class-validator';
 import {
+    RUN_BATCH_MAX_TASKS,
     TaskPriority,
     TaskStatus,
     type TaskActorType,
@@ -282,4 +284,36 @@ export class PostTaskChatDto {
     @ValidateNested({ each: true })
     @Type(() => TaskChatAttachmentDto)
     attachments?: TaskChatAttachmentDto[];
+}
+
+// ── Board dispatch (kanban M3 / M4) ───────────────────────────────
+
+export class RunTaskDto {
+    /**
+     * Which Agent to run. Omit to let the server resolve it (the Task's
+     * assigned Agent, then the Work's default Agent) — an ambiguous or
+     * empty resolution comes back as a 400 carrying the candidate list,
+     * which is what the board's agent picker renders.
+     */
+    @IsOptional()
+    @IsUUID()
+    agentId?: string;
+}
+
+export class RunTaskBatchItemDto {
+    @IsUUID()
+    taskId: string;
+
+    @IsOptional()
+    @IsUUID()
+    agentId?: string;
+}
+
+export class RunTasksBatchDto {
+    @IsArray()
+    @ArrayNotEmpty()
+    @ArrayMaxSize(RUN_BATCH_MAX_TASKS)
+    @ValidateNested({ each: true })
+    @Type(() => RunTaskBatchItemDto)
+    items: RunTaskBatchItemDto[];
 }

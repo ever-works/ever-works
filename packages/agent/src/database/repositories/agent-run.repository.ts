@@ -101,6 +101,38 @@ export class AgentRunRepository {
     }
 
     /**
+     * Run telemetry — ACCUMULATE token usage onto `agent_runs.totalTokens`.
+     *
+     * Separate from {@link updateTelemetry} (which sets an absolute value)
+     * because the caller — `AgentRunService.runToolLoop` — only ever knows
+     * ONE round-trip's usage, and the same run's loop can be re-entered
+     * (the Wave 3 M5 red-gate iterate loop calls `execute()` again on the
+     * same run). Folding the delta in here keeps the counter monotonic
+     * across attempts without the loop needing to read the row itself.
+     *
+     * Read-modify-write rather than a raw `SET col = col + :delta`: the
+     * three supported drivers (postgres / better-sqlite3 / mysql) do not
+     * share an identifier-quoting style, and a single run's tool loop is
+     * the only writer of this column. NULL (pre-column rows, runs that
+     * never reported) is treated as 0.
+     *
+     * Best-effort by contract: a missing row is a no-op and a non-positive
+     * / non-finite delta writes nothing. Callers additionally guard —
+     * telemetry must never fail a run.
+     */
+    async addTokens(runId: string, delta: number): Promise<void> {
+        if (!Number.isFinite(delta) || delta <= 0) return;
+        const row = await this.repository.findOne({
+            where: { id: runId },
+            select: { id: true, totalTokens: true },
+        });
+        if (!row) return;
+        await this.repository.update(runId, {
+            totalTokens: (row.totalTokens ?? 0) + Math.trunc(delta),
+        });
+    }
+
+    /**
      * @internal Background workers and internal services that have already
      * verified agent ownership through another path (e.g. agent-run.service
      * receives an `Agent` entity from an ownership-checked query) may use
@@ -361,6 +393,15 @@ export class AgentRunRepository {
         /** Wave 4 M1 — pipeline plugin id when known at creation. */
         runnerKind?: string | null;
         organizationId?: string | null;
+        /**
+         * Streaming-terminal — this run wants a long-lived interactive
+         * session. Carried forward by `RunSteeringService.resume` so a
+         * resumed persistent run keeps its terminal, and settable by any
+         * caller that knows the run is interactive at creation time. The
+         * column already defaults false, so omitting it is unchanged
+         * behaviour for every existing call site.
+         */
+        persistent?: boolean;
     }): Promise<AgentRun> {
         const run = this.repository.create({
             agentId: args.agentId,
@@ -372,6 +413,7 @@ export class AgentRunRepository {
             workId: args.workId ?? null,
             queuedReason: args.queuedReason ?? null,
             runnerKind: args.runnerKind ?? null,
+            ...(args.persistent === true ? { persistent: true } : {}),
             // Only stamp when explicitly provided — the ambient scope
             // subscriber (EW-657) remains the default writer.
             ...(args.organizationId !== undefined ? { organizationId: args.organizationId } : {}),
@@ -592,6 +634,60 @@ export class AgentRunRepository {
         if (patch.lastFrameSeq !== undefined) update.lastFrameSeq = patch.lastFrameSeq;
         if (Object.keys(update).length === 0) return;
         await this.repository.update(runId, update);
+    }
+
+    /**
+     * Streaming-terminal — CAS claim of a run's terminal session slot.
+     *
+     * The whole point is the DUPLICATE-START refusal: two concurrent
+     * `POST …/terminal/start` calls (double-click, two tabs, a fan-out
+     * racing the button) must produce exactly ONE dispatched session. A
+     * read-then-write check cannot promise that, so the claim rides the
+     * same CAS shape as {@link markStarted}: the UPDATE only lands while
+     * no session is resident (`terminalState` NULL — never started — or
+     * `'ended'` — the previous one is over). The loser sees affected=0 and
+     * reports "already live" instead of enqueuing a second worker onto the
+     * same relay channel.
+     *
+     * `lastHeartbeatAt` is stamped here so the M6 sweeper's stale-terminal
+     * cutoff starts counting from the claim: a session whose worker never
+     * boots is reaped like any other heartbeat loss, rather than pinning
+     * the run at `starting` forever.
+     */
+    async casClaimTerminalSession(
+        runId: string,
+        opts: { persistent?: boolean } = {},
+    ): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(AgentRun)
+            .set({
+                terminalState: 'starting',
+                terminalEndedReason: null,
+                lastHeartbeatAt: new Date(),
+                ...(opts.persistent === true ? { persistent: true } : {}),
+            })
+            .where('id = :id', { id: runId })
+            .andWhere('(terminalState IS NULL OR terminalState = :endedState)', {
+                endedState: 'ended',
+            })
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Release a claim that never became a session (the enqueue threw).
+     * Guarded on `starting` so it can never close a session a worker has
+     * already picked up and moved to `attached`.
+     */
+    async releaseTerminalSessionClaim(runId: string, endedReason: string): Promise<void> {
+        await this.repository
+            .createQueryBuilder()
+            .update(AgentRun)
+            .set({ terminalState: 'ended', terminalEndedReason: endedReason })
+            .where('id = :id', { id: runId })
+            .andWhere('terminalState = :startingState', { startingState: 'starting' })
+            .execute();
     }
 
     /**

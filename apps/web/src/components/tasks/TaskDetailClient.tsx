@@ -21,6 +21,8 @@ import { TaskAttachmentsSection } from './TaskAttachmentsSection';
 import { TaskBranchSection } from './TaskBranchSection';
 import { TaskChecksSection } from './TaskChecksSection';
 import { TaskRunControls } from './TaskRunControls';
+import { RunWithAgentMenu } from './RunWithAgentMenu';
+import { TaskDecisionConflicts } from './TaskDecisionConflicts';
 
 // Status tones + dots mirror /tasks (TasksList) so colours stay
 // consistent across the list filter and the detail workflow buttons.
@@ -129,6 +131,10 @@ export function TaskDetailClient({
     const [descDraft, setDescDraft] = useState(task.description ?? '');
     const [pendingDesc, startDesc] = useTransition();
     const [descError, setDescError] = useState<string | null>(null);
+    // Re-litigation guard (memory upgrades M6). Bumped after a
+    // description save so the conflict check re-runs against the new
+    // intent — "created OR its description is edited".
+    const [conflictKey, setConflictKey] = useState(0);
 
     const handlePost = (e: React.FormEvent) => {
         e.preventDefault();
@@ -172,6 +178,7 @@ export function TaskDetailClient({
                     });
                     setDescription(updated.description ?? '');
                     setEditingDesc(false);
+                    setConflictKey((prev) => prev + 1);
                 } catch (err) {
                     setDescError(err instanceof Error ? err.message : t('saveDescriptionError'));
                 }
@@ -212,9 +219,16 @@ export function TaskDetailClient({
                         <div className="text-[11px] font-mono text-text-muted mb-1.5">
                             {task.slug}
                         </div>
-                        <h1 className="text-2xl font-semibold leading-tight text-text dark:text-text-dark">
-                            {task.title}
-                        </h1>
+                        <div className="flex items-start justify-between gap-3">
+                            <h1 className="text-2xl font-semibold leading-tight text-text dark:text-text-dark">
+                                {task.title}
+                            </h1>
+                            {/* Board dispatch (kanban M3) — run this Task
+                                from its detail page, through the same
+                                gated path the board and a status
+                                transition use. */}
+                            <RunWithAgentMenu taskId={task.id} className="shrink-0" />
+                        </div>
                         {/* JIRA-style workflow buttons — mirrors the status
                             pills on /tasks. Current status shows active in its
                             own colour; allowed transitions are clickable; the
@@ -266,6 +280,11 @@ export function TaskDetailClient({
                             </p>
                         )}
                     </div>
+
+                    {/* Re-litigation guard (memory upgrades M6) — settled
+                        decisions this Task appears to re-open. Renders
+                        nothing when there are none; never blocks. */}
+                    <TaskDecisionConflicts taskId={task.id} refreshKey={conflictKey} />
 
                     {/* Description — inline editable, saves via updateTaskAction. */}
                     <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5">

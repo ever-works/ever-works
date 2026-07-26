@@ -21,6 +21,7 @@ import {
     TaskChatService,
     TaskStatus,
     TaskPriority,
+    RUN_BATCH_MAX_TASKS,
     type TaskActorType,
     type ListTasksFilter,
 } from '@ever-works/agent/tasks-domain';
@@ -33,6 +34,9 @@ import { PluginUsageRepository } from '@ever-works/agent/database';
 // agents barrel re-exports services + module only).
 import { AgentRepository } from '@ever-works/agent/database';
 import { TaskWorkspaceService } from '@ever-works/agent/tasks-domain';
+// Re-litigation guard (memory upgrades M6) — provided + exported by
+// `KnowledgeBaseModule`, which the api-side TasksModule imports.
+import { DecisionConflictService } from '@ever-works/agent/services';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import {
@@ -44,6 +48,8 @@ import {
     AddReviewerDto,
     CreateTaskDto,
     PostTaskChatDto,
+    RunTaskDto,
+    RunTasksBatchDto,
     SetTaskRecurringDto,
     TransitionTaskDto,
     UpdateTaskDto,
@@ -81,6 +87,8 @@ export class TasksController {
         private readonly agents: AgentRepository,
         // Wave 2 M5/M6 — workspace conflict-resolve + discard actions.
         private readonly taskWorkspace: TaskWorkspaceService,
+        // Memory upgrades M6 — deterministic re-litigation guard.
+        private readonly decisionConflicts: DecisionConflictService,
     ) {}
 
     /**
@@ -177,11 +185,52 @@ export class TasksController {
         });
     }
 
+    // Declared BEFORE every `:id` route: `run-batch` is a single path
+    // segment, so a future `@Post(':id')` would otherwise shadow it.
+    @Post('run-batch')
+    @ApiOperation({
+        summary: `Run up to ${RUN_BATCH_MAX_TASKS} Tasks in one call. Per-item results — one Task failing (no agent, run already in flight) never fails the others.`,
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 20, ttl: 60_000 } })
+    async runBatch(@CurrentUser() auth: AuthenticatedUser, @Body() body: RunTasksBatchDto) {
+        if (!Array.isArray(body?.items)) {
+            throw new BadRequestException('items must be an array.');
+        }
+        return this.service.runTasksBatch(
+            auth.userId,
+            body.items.map((item) => ({ taskId: item.taskId, agentId: item.agentId ?? null })),
+        );
+    }
+
     @Get(':id')
     @ApiOperation({ summary: 'Get one Task.' })
     @HttpCode(HttpStatus.OK)
     async getOne(@CurrentUser() auth: AuthenticatedUser, @Param('id', ParseUUIDPipe) id: string) {
         return this.service.getOne(auth.userId, id);
+    }
+
+    @Get(':id/decision-conflicts')
+    @ApiOperation({
+        summary:
+            'Re-litigation guard — settled decisions this Task appears to re-open (advisory, never blocking).',
+        description:
+            "Deterministic term-overlap check (`term-overlap/v1`, no LLM) of the Task's title + description against the `class=decision, status=accepted` documents in the Task's Work Knowledge Base. Owner-scoped: a Task the caller does not own 404s, and every candidate read goes through the KB service's own view gate. Returns `{ conflicts, scanned, heuristic }`; an empty `conflicts` array is the normal case.",
+    })
+    @HttpCode(HttpStatus.OK)
+    async decisionConflictsForTask(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ) {
+        // Owner scope + existence: `getOne` throws NotFound for a Task
+        // the caller doesn't own (no 403 existence leak).
+        const task = await this.service.getOne(auth.userId, id);
+        return this.decisionConflicts.checkIntent({
+            workId: task.workId ?? null,
+            userId: auth.userId,
+            title: task.title,
+            description: task.description ?? null,
+        });
     }
 
     @Patch(':id')
@@ -252,6 +301,36 @@ export class TasksController {
             throw new BadRequestException(`Invalid target status: ${body?.to}`);
         }
         return this.service.transition(auth.userId, id, body.to, { force: body.force === true });
+    }
+
+    // ── Board dispatch (kanban M3 / M4) ───────────────────────────
+
+    @Get(':id/run-candidates')
+    @ApiOperation({
+        summary:
+            'Agents that can run this Task (assignees, then its own agent, then the Work default) — the board agent picker.',
+    })
+    @HttpCode(HttpStatus.OK)
+    async runCandidates(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ) {
+        return { data: await this.service.listRunCandidates(auth.userId, id) };
+    }
+
+    @Post(':id/run')
+    @ApiOperation({
+        summary:
+            'Run this Task now. Resolves the Agent (explicit agentId → assigned Agent → the Work default), then dispatches through the same gated path a status transition uses. 409 RUN_ALREADY_IN_FLIGHT when a run for that (task, agent) is still queued/running.',
+    })
+    @HttpCode(HttpStatus.ACCEPTED)
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
+    async run(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: RunTaskDto,
+    ) {
+        return this.service.runTask(auth.userId, id, { agentId: body?.agentId ?? null });
     }
 
     @Post(':id/resolve-conflicts')

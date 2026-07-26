@@ -1,8 +1,8 @@
-import { NotFoundException } from '@nestjs/common';
+import { ConflictException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { TerminalAttachController } from '../terminal-attach.controller';
 import { TerminalAttachService } from '../terminal-attach.service';
 import { TerminalRelayRegistry } from '../terminal-relay.registry';
-import type { AgentsService } from '@ever-works/agent/agents';
+import type { AgentsService, TerminalSessionLauncher } from '@ever-works/agent/agents';
 import type { AgentRunRepository } from '@ever-works/agent/database';
 import type { AuthenticatedUser } from '../../auth/types/auth.types';
 
@@ -64,5 +64,84 @@ describe('TerminalAttachController — run-scoped authorization', () => {
 
         runs.findByIdAndUser.mockResolvedValueOnce(null);
         await expect(controller.status(AUTH, AGENT, RUN)).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    /**
+     * `POST …/terminal/start` is the user action that finally produces a
+     * `terminal-session` job — before it, the whole terminal stack pointed at
+     * a session nothing ever launched.
+     */
+    describe('POST start', () => {
+        let launcher: { startForRun: jest.Mock };
+
+        function makeController(withLauncher = true) {
+            return new TerminalAttachController(
+                agents as unknown as AgentsService,
+                runs as unknown as AgentRunRepository,
+                new TerminalAttachService(),
+                new TerminalRelayRegistry(),
+                withLauncher ? (launcher as unknown as TerminalSessionLauncher) : undefined,
+            );
+        }
+
+        beforeEach(() => {
+            launcher = {
+                startForRun: jest
+                    .fn()
+                    .mockResolvedValue({ started: true, runId: RUN, jobRunId: 'job_1' }),
+            };
+        });
+
+        it('starts a session for the run owner and flags the run persistent', async () => {
+            const result = await makeController().start(AUTH, AGENT, RUN);
+
+            expect(agents.getOne).toHaveBeenCalledWith('user-1', AGENT);
+            expect(launcher.startForRun).toHaveBeenCalledWith({
+                userId: 'user-1',
+                agentId: AGENT,
+                runId: RUN,
+                markPersistent: true,
+            });
+            expect(result).toEqual({ started: true, runId: RUN, state: 'starting' });
+        });
+
+        it('404s (no existence leak) before the launcher is ever consulted', async () => {
+            runs.findByIdAndUser.mockResolvedValueOnce(null);
+            await expect(makeController().start(AUTH, AGENT, RUN)).rejects.toBeInstanceOf(
+                NotFoundException,
+            );
+            expect(launcher.startForRun).not.toHaveBeenCalled();
+        });
+
+        it('409s when a session is already live for the run', async () => {
+            launcher.startForRun.mockResolvedValueOnce({
+                started: false,
+                reason: 'session-already-live',
+            });
+            await expect(makeController().start(AUTH, AGENT, RUN)).rejects.toBeInstanceOf(
+                ConflictException,
+            );
+        });
+
+        it('409s when the run has already finished', async () => {
+            launcher.startForRun.mockResolvedValueOnce({ started: false, reason: 'run-not-live' });
+            await expect(makeController().start(AUTH, AGENT, RUN)).rejects.toBeInstanceOf(
+                ConflictException,
+            );
+        });
+
+        it('503s (not 500) when no job runtime is wired on this install', async () => {
+            await expect(makeController(false).start(AUTH, AGENT, RUN)).rejects.toBeInstanceOf(
+                ServiceUnavailableException,
+            );
+
+            launcher.startForRun.mockResolvedValueOnce({
+                started: false,
+                reason: 'dispatcher-unavailable',
+            });
+            await expect(makeController().start(AUTH, AGENT, RUN)).rejects.toBeInstanceOf(
+                ServiceUnavailableException,
+            );
+        });
     });
 });

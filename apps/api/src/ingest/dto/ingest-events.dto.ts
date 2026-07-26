@@ -2,6 +2,7 @@ import {
     ArrayMaxSize,
     ArrayNotEmpty,
     IsArray,
+    IsIn,
     IsISO8601,
     IsNotEmpty,
     IsObject,
@@ -16,7 +17,27 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { INGEST_EVENT_BATCH_MAX, INGEST_EVENT_PAYLOAD_MAX_BYTES } from '@ever-works/contracts';
+import {
+    INGEST_EVENT_BATCH_MAX,
+    INGEST_EVENT_PAYLOAD_MAX_BYTES,
+    INGEST_WORK_HINT_EXTERNAL_ID_MAX_CHARS,
+    INGEST_WORK_HINT_LABEL_MAX_CHARS,
+    type IngestedEventWorkHintKind,
+} from '@ever-works/contracts';
+
+/**
+ * Every hint kind the platform resolver understands. Kept as a literal
+ * tuple (rather than derived at runtime) so `IsIn` rejects an unknown
+ * kind at the edge, and `satisfies` makes adding a kind to the contract
+ * without teaching this DTO a compile error.
+ */
+const WORK_HINT_KINDS = [
+    'repo',
+    'chat-channel',
+    'tracker-team',
+    'doc-database',
+    'meeting',
+] as const satisfies readonly IngestedEventWorkHintKind[];
 
 /**
  * Event-ingest spine (Wave 6) — request shape for
@@ -76,6 +97,34 @@ export class IngestedEventSubjectDto {
     @IsString()
     @MaxLength(500)
     title?: string;
+}
+
+export class IngestedEventWorkHintDto {
+    @ApiProperty({
+        description: 'External container kind the platform resolves to a Work',
+        enum: WORK_HINT_KINDS,
+    })
+    @IsIn(WORK_HINT_KINDS)
+    kind: IngestedEventWorkHintKind;
+
+    @ApiProperty({
+        description:
+            'Stable id of the container in the source system (owner/repo, channel id, team key, database id, meeting id)',
+        maxLength: INGEST_WORK_HINT_EXTERNAL_ID_MAX_CHARS,
+    })
+    @IsString()
+    @IsNotEmpty()
+    @MaxLength(INGEST_WORK_HINT_EXTERNAL_ID_MAX_CHARS)
+    externalId: string;
+
+    @ApiPropertyOptional({
+        description: 'Human-readable label — diagnostics only, never matched on',
+        maxLength: INGEST_WORK_HINT_LABEL_MAX_CHARS,
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(INGEST_WORK_HINT_LABEL_MAX_CHARS)
+    label?: string;
 }
 
 export class IngestedEventEnvelopeDto {
@@ -143,6 +192,16 @@ export class IngestedEventEnvelopeDto {
     @IsOptional()
     @IsUUID()
     workId?: string;
+
+    @ApiPropertyOptional({
+        type: IngestedEventWorkHintDto,
+        description:
+            'External container this event belongs to. Resolved to a workId within the ingesting user’s own Works; unresolvable hints leave the event user-scoped. Ignored when workId is set.',
+    })
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => IngestedEventWorkHintDto)
+    workHint?: IngestedEventWorkHintDto;
 
     @ApiPropertyOptional({ description: 'Organization scope hint' })
     @IsOptional()

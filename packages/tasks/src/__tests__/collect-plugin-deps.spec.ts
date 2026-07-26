@@ -117,6 +117,65 @@ describe('collectPluginDependencies', () => {
         expect(result).toEqual(['axios@^1.0.0', 'date-fns@^3.0.0', 'lodash@^4.0.0']);
     });
 
+    it('collects optionalDependencies — a native prebuild must reach the worker image', () => {
+        fsMock.existsSync.mockReturnValue(true);
+        fsMock.readdirSync.mockReturnValue([{ name: 'pty-local', isDirectory: () => true }]);
+        fsMock.readFileSync.mockReturnValue(
+            JSON.stringify({
+                everworks: { plugin: { id: 'pty-local' } },
+                peerDependencies: { '@ever-works/plugin': 'workspace:*' },
+                optionalDependencies: {
+                    '@homebridge/node-pty-prebuilt-multiarch': '^0.13.1',
+                },
+            }),
+        );
+
+        const result = collectPluginDependencies();
+        expect(result).toEqual(['@homebridge/node-pty-prebuilt-multiarch@^0.13.1']);
+    });
+
+    it('applies the workspace: / @ever-works filters to optionalDependencies too', () => {
+        fsMock.existsSync.mockReturnValue(true);
+        fsMock.readdirSync.mockReturnValue([{ name: 'a', isDirectory: () => true }]);
+        fsMock.readFileSync.mockReturnValue(
+            JSON.stringify({
+                everworks: { plugin: { id: 'a' } },
+                optionalDependencies: {
+                    '@ever-works/contracts': '^1.0.0',
+                    '@some-vendor/sdk': 'workspace:^1.0.0',
+                    sharp: '^0.33.0',
+                },
+            }),
+        );
+
+        const result = collectPluginDependencies();
+        expect(result).toEqual(['sharp@^0.33.0']);
+    });
+
+    it('dedupes a package declared optional in one plugin and required in another', () => {
+        const pkgA = {
+            everworks: { plugin: { id: 'a' } },
+            optionalDependencies: { sharp: '^0.33.0' },
+        };
+        const pkgB = {
+            everworks: { plugin: { id: 'b' } },
+            dependencies: { sharp: '^0.33.0' },
+        };
+
+        fsMock.existsSync.mockReturnValue(true);
+        fsMock.readdirSync.mockReturnValue([
+            { name: 'a', isDirectory: () => true },
+            { name: 'b', isDirectory: () => true },
+        ]);
+        fsMock.readFileSync.mockImplementation((p: any) => {
+            const str = String(p).replace(/\\/g, '/');
+            if (str.endsWith('/a/package.json')) return JSON.stringify(pkgA);
+            return JSON.stringify(pkgB);
+        });
+
+        expect(collectPluginDependencies()).toEqual(['sharp@^0.33.0']);
+    });
+
     it('logs the dependency count via console.log', () => {
         fsMock.existsSync.mockReturnValue(true);
         fsMock.readdirSync.mockReturnValue([{ name: 'a', isDirectory: () => true }]);

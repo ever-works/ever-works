@@ -1,4 +1,5 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
+import { PortableDateColumn } from './_types';
 
 /**
  * Fleet (Wave 12, slice 1) — one machine registered to execute the
@@ -78,7 +79,10 @@ export class FleetNode {
     enrollmentTokenHash?: string | null;
 
     /** Server-stamped on every accepted heartbeat (never client-trusted). */
-    @Column({ type: 'timestamp', nullable: true })
+    // Portable date: better-sqlite3 (the e2e/CI driver) has no `timestamp`
+    // type, so a raw one makes TypeORM metadata validation throw
+    // DataTypeNotSupportedError and the API cannot boot there at all.
+    @PortableDateColumn({ nullable: true })
     lastHeartbeatAt?: Date | null;
 
     /** Capability tags ('terminal', 'workspace', 'docker', ...). */

@@ -151,4 +151,41 @@ describe('workbench KbTreePanel', () => {
             expect(screen.getByTestId('kb-workbench-row-d1-lock')).toBeTruthy();
         });
     });
+
+    // ─── Memory upgrades M8 — review-queue discoverability ────────────
+
+    it('links to the review queue route', async () => {
+        mockFetchOnce([doc({ id: 'd1' })]);
+        render(<KbTreePanel workId="work-1" />);
+        await waitFor(() => {
+            expect(screen.getByTestId('kb-workbench-review-link')).toBeTruthy();
+        });
+        expect(screen.getByTestId('kb-workbench-review-link').getAttribute('href')).toBe(
+            '/works/work-1/kb/review',
+        );
+    });
+
+    it('badges the count of documents awaiting review', async () => {
+        mockFetchOnce([
+            doc({ id: 'd1', reviewState: 'proposed', source: 'agent' }),
+            doc({ id: 'd2', reviewState: 'proposed', source: 'agent' }),
+            doc({ id: 'd3', reviewState: 'accepted' }),
+            // Pre-M7 rows carry a null column and must NOT count as work.
+            doc({ id: 'd4', reviewState: null }),
+        ]);
+        render(<KbTreePanel workId="work-1" />);
+        await waitFor(() => {
+            expect(screen.getByTestId('kb-workbench-review-badge')).toBeTruthy();
+        });
+        expect(screen.getByTestId('kb-workbench-review-badge').textContent).toBe('2');
+    });
+
+    it('hides the badge when nothing is awaiting review', async () => {
+        mockFetchOnce([doc({ id: 'd1', reviewState: 'accepted' }), doc({ id: 'd2' })]);
+        render(<KbTreePanel workId="work-1" />);
+        await waitFor(() => {
+            expect(screen.getByTestId('kb-workbench-review-link')).toBeTruthy();
+        });
+        expect(screen.queryByTestId('kb-workbench-review-badge')).toBeNull();
+    });
 });

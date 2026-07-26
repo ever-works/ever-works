@@ -2,15 +2,19 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import type { TaskAcceptanceCheck } from '@ever-works/contracts';
+import type { DecisionConflictReportDto, TaskAcceptanceCheck } from '@ever-works/contracts';
 import {
     tasksAPI,
     type ListTasksQuery,
+    type RunBatchItemResult,
+    type RunCandidateAgent,
+    type RunTaskResult,
     type Task,
     type TaskChatMessage,
     type TaskPriority,
     type TaskStatus,
 } from '@/lib/api/tasks';
+import { ApiResponseError } from '@/lib/api/server-api';
 import { getAuthFromCookie } from '@/lib/auth';
 import { ROUTES } from '@/lib/constants';
 
@@ -108,6 +112,141 @@ export async function listTasksWithRunsAction(
         includeRun: true,
     });
     return result.data;
+}
+
+// ── Board dispatch (kanban M3 / M4) ───────────────────────────────
+
+/**
+ * Result of a board "Run".
+ *
+ * A DISCRIMINATED UNION rather than a thrown error on purpose: Next
+ * redacts thrown Server-Action messages in production, so a UI that
+ * branched on `err.message` would work in dev and silently do nothing in
+ * prod. Every outcome the board reacts to — pick an agent, point at the
+ * live run, report a park — travels in the return value.
+ */
+export type RunTaskActionResult =
+    | { ok: true; run: RunTaskResult }
+    | {
+          ok: false;
+          /** Machine code; `RUN_*` for the handled cases, `RUN_FAILED` otherwise. */
+          code: string;
+          message: string;
+          /** Present on RUN_AGENT_AMBIGUOUS / RUN_NO_AGENT — feeds the picker. */
+          candidates?: RunCandidateAgent[];
+          /** Present on RUN_ALREADY_IN_FLIGHT. */
+          runId?: string;
+      };
+
+function toRunFailure(err: unknown): RunTaskActionResult {
+    if (err instanceof ApiResponseError) {
+        const details = (err.details ?? {}) as {
+            candidates?: RunCandidateAgent[];
+            runId?: string;
+        };
+        return {
+            ok: false,
+            code: err.code ?? 'RUN_FAILED',
+            message: err.message,
+            ...(Array.isArray(details.candidates) ? { candidates: details.candidates } : {}),
+            ...(typeof details.runId === 'string' ? { runId: details.runId } : {}),
+        };
+    }
+    return {
+        ok: false,
+        code: 'RUN_FAILED',
+        message: err instanceof Error ? err.message : String(err),
+    };
+}
+
+/**
+ * Board dispatch (kanban M3) — run a Task now. `agentId` omitted lets
+ * the server resolve it; an ambiguous or empty resolution comes back as
+ * `RUN_AGENT_AMBIGUOUS` / `RUN_NO_AGENT` with the candidate list, which
+ * is what opens the agent picker.
+ */
+export async function runTaskAction(
+    id: string,
+    agentId?: string | null,
+): Promise<RunTaskActionResult> {
+    // Security: verify session server-side before mutating data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
+    try {
+        const run = await tasksAPI.run(id, agentId ?? null);
+        revalidatePath('/tasks');
+        revalidatePath(`/tasks/${id}`);
+        return { ok: true, run };
+    } catch (err) {
+        return toRunFailure(err);
+    }
+}
+
+/** Board dispatch — the agent picker's option list for one Task. */
+export async function listTaskRunCandidatesAction(id: string): Promise<RunCandidateAgent[]> {
+    // Security: verify session server-side before reading data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
+    const result = await tasksAPI.listRunCandidates(id);
+    return result.data ?? [];
+}
+
+/**
+ * Board dispatch (kanban M4) — the column "Run all" affordance. Per-item
+ * results: one Task without an agent never stops the rest of the column.
+ */
+export async function runTasksBatchAction(
+    items: { taskId: string; agentId?: string | null }[],
+): Promise<{ results: RunBatchItemResult[] }> {
+    // Security: verify session server-side before mutating data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
+    if (items.length === 0) return { results: [] };
+    try {
+        const result = await tasksAPI.runBatch(items);
+        revalidatePath('/tasks');
+        return result;
+    } catch (err) {
+        // A whole-request failure (validation, auth, transport) is
+        // reported per item so the caller has exactly one result shape.
+        const failure = toRunFailure(err);
+        return {
+            results: items.map((item) => ({
+                taskId: item.taskId,
+                ok: false as const,
+                error: {
+                    code: failure.ok ? 'RUN_FAILED' : failure.code,
+                    message: failure.ok ? '' : failure.message,
+                },
+            })),
+        };
+    }
+}
+
+/**
+ * Re-litigation guard (memory upgrades M6) — fetch the settled decisions
+ * this Task appears to re-open.
+ *
+ * Read-only, so no `revalidatePath`. Deliberately NEVER throws: the guard
+ * is advisory and a failure to compute it must not degrade the Task
+ * surface, so a failed read degrades to "no conflicts".
+ */
+export async function getTaskDecisionConflictsAction(
+    id: string,
+): Promise<DecisionConflictReportDto> {
+    // Security: verify session server-side before reading data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
+    try {
+        return await tasksAPI.decisionConflicts(id);
+    } catch (error) {
+        console.error('[tasks] decision-conflict check failed:', error);
+        return { conflicts: [], scanned: 0, heuristic: 'unavailable' };
+    }
 }
 
 /**

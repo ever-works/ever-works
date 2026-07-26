@@ -229,6 +229,15 @@ export class TaskWorkspaceService {
         agentCanOpenPullRequests: boolean;
         workspace: ProvisionedTaskWorkspace;
         /**
+         * Run telemetry — the AgentRun this finalize belongs to. When
+         * supplied, the workspace's changed-file count is stamped onto
+         * `agent_runs.changedFilesCount` so the Sessions cockpit and the
+         * board run chip can show it. Optional (and best-effort) so
+         * callers that have no run context — and every existing unit
+         * test — keep working unchanged.
+         */
+        runId?: string;
+        /**
          * Wave 3 M3 — optional note that a green quality gate preceded this
          * finalize; surfaces on the PR body. The gate DECISION stays in the
          * worker step (a red gate never reaches finalizeRun at all) — this
@@ -281,6 +290,11 @@ export class TaskWorkspaceService {
             { commitMessage: `feat(task): ${task.slug} agent run output`, push: true },
             facadeOptions,
         );
+        // Run telemetry — stamp the changed-file count as soon as the
+        // workspace reports it, BEFORE the empty/conflict/PR branches, so
+        // every finalize outcome (including "no changes") leaves an
+        // honest counter behind.
+        await this.stampChangedFiles(input.runId, finalize.changedFiles);
         if (finalize.empty) {
             this.logger.log(`Task ${task.id} run produced no changes — nothing to push.`);
             return { outcome: 'no-changes' };
@@ -619,6 +633,37 @@ export class TaskWorkspaceService {
         } catch (error) {
             this.logger.warn(
                 `Task ${args.task.id} merge activity log failed (continuing): ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+    }
+
+    /**
+     * Run telemetry — write `agent_runs.changedFilesCount` from the
+     * workspace provider's finalize report.
+     *
+     * Best-effort BY CONTRACT, on three separate axes:
+     *   - no `runId` (caller has no run context)   → no write;
+     *   - provider omitted `changedFiles`          → no write, so a
+     *     provider that cannot diff never stamps a misleading 0;
+     *   - the update itself threw                  → logged, swallowed.
+     * A telemetry counter must never fail a finalize that already
+     * pushed a branch or opened a real pull request.
+     */
+    private async stampChangedFiles(
+        runId: string | undefined,
+        changedFiles: number | undefined,
+    ): Promise<void> {
+        if (!runId) return;
+        if (typeof changedFiles !== 'number' || !Number.isFinite(changedFiles)) return;
+        try {
+            await this.runs.updateTelemetry(runId, {
+                changedFilesCount: Math.max(0, Math.trunc(changedFiles)),
+            });
+        } catch (error) {
+            this.logger.warn(
+                `changedFilesCount telemetry write failed for run ${runId} (ignored): ${
                     error instanceof Error ? error.message : String(error)
                 }`,
             );
