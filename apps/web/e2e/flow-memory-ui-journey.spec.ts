@@ -1,4 +1,4 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect, type Locator, type Page } from '@playwright/test';
 import { loadSeededTestUser } from './helpers/seeded-test-user';
 import { API_BASE } from './helpers/api';
 
@@ -208,6 +208,56 @@ function requireSeed(): void {
     test.skip(!seedOk, `memory seed unavailable: ${seedError || 'setup did not run'}`);
 }
 
+/**
+ * PRE-HYDRATION SWALLOWED CLICK — why the two helpers below exist.
+ *
+ * `/memory` is a server component: the `MemoryShell` markup (chips, the
+ * Consolidate button, the seeded rows) is in the SSR HTML, so it is
+ * visible AND passes Playwright's actionability checks well before React
+ * has hydrated and attached `onClick`. A click that lands in that window
+ * is silently dropped — the chip's `aria-pressed` never flips, the
+ * Consolidate POST is never issued, and the test times out on a state
+ * that can no longer arrive. Under `fullyParallel` workers this is a
+ * per-run coin flip, which is exactly how it presented (sibling chip
+ * tests green, these two red).
+ *
+ * The suite's established remedy is the retry-to-act pattern already
+ * documented in `helpers/nav.ts`: re-issue the click until the state a
+ * real user would see actually appears. Both helpers are state-driven
+ * (they only click when the target state is still absent), so a click
+ * that *did* land is never undone by a retry.
+ */
+
+/** Drive a filter chip to `pressed`, riding out a swallowed first click. */
+async function setChipPressed(chip: Locator, pressed: boolean, timeout = 30_000): Promise<void> {
+    const want = String(pressed);
+    await expect(chip).toBeVisible({ timeout: 15_000 });
+    await expect(async () => {
+        if ((await chip.getAttribute('aria-pressed')) !== want) {
+            await chip.click({ timeout: 5_000 }).catch(() => undefined);
+        }
+        await expect(chip).toHaveAttribute('aria-pressed', want, { timeout: 3_000 });
+    }).toPass({ timeout });
+}
+
+/** Click `control` until `expected` becomes visible (same hydration race). */
+async function clickUntilVisible(
+    control: Locator,
+    expected: Locator,
+    timeout = 45_000,
+): Promise<void> {
+    await expect(control).toBeVisible({ timeout: 15_000 });
+    await expect(async () => {
+        if (!(await expected.isVisible().catch(() => false))) {
+            // The button disables itself while the POST is in flight, so a
+            // retry issued mid-request simply fails actionability and is
+            // swallowed here — it can never double-submit.
+            await control.click({ timeout: 5_000 }).catch(() => undefined);
+        }
+        await expect(expected).toBeVisible({ timeout: 5_000 });
+    }).toPass({ timeout });
+}
+
 test.describe('Org Memory UI — page chrome (/memory)', () => {
     test('lands on /memory authenticated and mounts the memory shell', async ({ page }) => {
         test.setTimeout(60_000);
@@ -323,8 +373,7 @@ test.describe('Org Memory UI — seeded documents & facets', () => {
 
         const legalChip = page.getByTestId('memory-filter-chip-type:legal');
         await expect(legalChip).toHaveAttribute('aria-pressed', 'false');
-        await legalChip.click();
-        await expect(legalChip).toHaveAttribute('aria-pressed', 'true');
+        await setChipPressed(legalChip, true);
 
         // Feed now shows only legal docs: the brand row drops out, the
         // seeded legal row stays.
@@ -342,8 +391,8 @@ test.describe('Org Memory UI — seeded documents & facets', () => {
         const legalRow = page.getByTestId(`memory-doc-${legalDoc.id}`);
         await expect(brandRow).toBeVisible({ timeout: 15_000 });
 
-        await page.getByTestId('memory-filter-chip-type:brand').click();
-        await page.getByTestId('memory-filter-chip-type:personas').click();
+        await setChipPressed(page.getByTestId('memory-filter-chip-type:brand'), true);
+        await setChipPressed(page.getByTestId('memory-filter-chip-type:personas'), true);
 
         // brand OR personas → both seeded rows visible, the legal row hidden.
         await expect(brandRow).toBeVisible({ timeout: 15_000 });
@@ -352,7 +401,7 @@ test.describe('Org Memory UI — seeded documents & facets', () => {
     });
 
     test('"Clear all" restores the full feed and un-presses the chips', async ({ page }) => {
-        test.setTimeout(60_000);
+        test.setTimeout(90_000);
         requireSeed();
         await gotoMemory(page);
 
@@ -360,22 +409,28 @@ test.describe('Org Memory UI — seeded documents & facets', () => {
         const legalRow = page.getByTestId(`memory-doc-${legalDoc.id}`);
         await expect(brandRow).toBeVisible({ timeout: 15_000 });
 
+        // Arrange: a live filter, so "Clear all" has something to clear.
         const legalChip = page.getByTestId('memory-filter-chip-type:legal');
-        await legalChip.click();
-        await expect(legalChip).toHaveAttribute('aria-pressed', 'true');
+        await setChipPressed(legalChip, true);
         await expect(brandRow).toBeHidden({ timeout: 15_000 });
 
+        // The shell renders "Clear all" only while a filter/query is active
+        // (`hasActiveFilters`), so it unmounts the moment it does its job.
         const clearAll = page.getByRole('button', { name: /Clear all/i });
         await expect(clearAll).toBeVisible();
-        await clearAll.click();
+        await expect(async () => {
+            if (await clearAll.isVisible().catch(() => false)) {
+                await clearAll.click({ timeout: 5_000 }).catch(() => undefined);
+            }
+            await expect(legalChip).toHaveAttribute('aria-pressed', 'false', { timeout: 3_000 });
+        }).toPass({ timeout: 30_000 });
 
-        // Filters cleared: the chip un-presses and the brand row comes back.
-        await expect(page.getByTestId('memory-filter-chip-type:legal')).toHaveAttribute(
-            'aria-pressed',
-            'false',
-        );
+        // Filters cleared: the feed is whole again — the brand row the filter
+        // had excluded is back, alongside the legal row that survived it…
         await expect(brandRow).toBeVisible({ timeout: 15_000 });
         await expect(legalRow).toBeVisible();
+        // …and the affordance itself is gone, since nothing is filtered now.
+        await expect(clearAll).toBeHidden();
     });
 });
 
@@ -420,20 +475,25 @@ test.describe('Org Memory UI — search', () => {
 
 test.describe('Org Memory UI — consolidation', () => {
     test('Consolidate opens the dry-run confirm panel and Cancel closes it', async ({ page }) => {
-        test.setTimeout(60_000);
+        test.setTimeout(90_000);
         requireSeed();
         await gotoMemory(page);
         await expect(page.getByTestId(`memory-doc-${brandDoc.id}`)).toBeVisible({
             timeout: 15_000,
         });
 
-        await page.getByTestId('memory-consolidate-button').click();
-
         // The dry-run report opens the confirm surface (env-adaptive fallback:
-        // a transient failure would show the error banner instead).
+        // a transient failure would show the error banner instead). One of the
+        // two ALWAYS lands — `runConsolidation` sets `consolidateFailed` on a
+        // non-ok response and in its catch — so waiting on the pair is the
+        // honest assertion, and a click that produces neither only ever means
+        // the click itself was dropped pre-hydration.
         const panel = page.getByTestId('memory-consolidate-panel');
         const errorBanner = page.getByTestId('memory-consolidate-error');
-        await expect(panel.or(errorBanner).first()).toBeVisible({ timeout: 20_000 });
+        await clickUntilVisible(
+            page.getByTestId('memory-consolidate-button'),
+            panel.or(errorBanner).first(),
+        );
 
         if (await panel.isVisible().catch(() => false)) {
             await expect(panel).toContainText('Consolidate memory');
@@ -456,11 +516,12 @@ test.describe('Org Memory UI — consolidation', () => {
             timeout: 15_000,
         });
 
-        await page.getByTestId('memory-consolidate-button').click();
-
         const panel = page.getByTestId('memory-consolidate-panel');
         const errorBanner = page.getByTestId('memory-consolidate-error');
-        await expect(panel.or(errorBanner).first()).toBeVisible({ timeout: 20_000 });
+        await clickUntilVisible(
+            page.getByTestId('memory-consolidate-button'),
+            panel.or(errorBanner).first(),
+        );
 
         // If the dry-run failed to open the panel (env), don't proceed to Apply.
         if (!(await panel.isVisible().catch(() => false))) {

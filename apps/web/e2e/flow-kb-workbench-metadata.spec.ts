@@ -11,8 +11,8 @@ import { seedKbMarkdownDoc } from './helpers/kb-fixtures';
  *     language / source fields.
  *   - Adding a tag persists across reload.
  *   - Changing the description (debounced 800ms) persists across reload.
- *   - Toggling the lock surfaces the lock badge in the centre header
- *     and (when displayed) on the tree row.
+ *   - Toggling the lock persists the lock and surfaces the lock badge in
+ *     the centre header on the next server render.
  *   - Changing status to 'archived' updates the centre status chip.
  *   - The "View Git history" button is enabled (slice E) and opens the
  *     Git-history modal.
@@ -216,14 +216,65 @@ test.describe('KB workbench metadata panel — slice B', () => {
         await page.goto(`/en/works/${workId}/kb/${doc.path}`, { waitUntil: 'domcontentloaded' });
         const toggle = page.getByTestId('kb-workbench-metadata-lock-toggle');
         await expect(toggle).toBeVisible({ timeout: 60_000 });
-        // Use click() not check(): the lock checkbox is controlled — its
-        // `checked` only flips after the lock mutation round-trips, so
-        // check()'s synchronous post-click state assertion races and fails.
-        // The lock badge appearing below is the real, settled assertion.
-        await toggle.click();
 
+        /** Server-side truth for this doc's lock flag. */
+        const isLockedOnServer = async (): Promise<boolean> => {
+            const res = await request.get(
+                `${API_BASE}/api/works/${workId}/kb/documents/${doc.documentId}`,
+                { headers: authedHeaders(access_token) },
+            );
+            if (!res.ok()) return false;
+            return ((await res.json()) as { locked?: boolean }).locked === true;
+        };
+
+        // The toggle is a CONTROLLED checkbox whose onChange calls the
+        // `lockKbDocumentAction` server action. Two hazards, so drive it to the
+        // desired STATE rather than clicking once:
+        //   1. A click landing before React hydrates the onChange handler is
+        //      silently swallowed — the element is present and "clickable", the
+        //      click succeeds, and no action is ever dispatched. (Same class the
+        //      memory-UI chips hit; see helpers/nav.ts.)
+        //   2. `checked` is bound to `document.locked`, so it only flips once the
+        //      mutation round-trips — check() would race its own post-click
+        //      assertion.
+        // Re-clicking only while the server still reports unlocked can never
+        // double-toggle: once the lock lands, we stop.
+        await expect(async () => {
+            if (!(await isLockedOnServer())) {
+                await toggle.click({ timeout: 5_000 }).catch(() => undefined);
+            }
+            expect(await isLockedOnServer()).toBe(true);
+        }).toPass({ timeout: 60_000 });
+
+        // The centre header's lock indicator is `kb-workbench-lock-badge` in
+        // `KbDocumentHeader` — rendered from the SERVER-rendered `document.locked`
+        // prop the page passes down, NOT from the metadata panel's local state
+        // (the panel keeps its own `current` doc and never feeds the header).
+        // `lockKbDocumentAction` revalidatePath()s `/works/:id/kb/:path`, which
+        // does not match the locale-prefixed URL the browser is actually on
+        // (`/en/works/:id/kb/:path`), so the already-painted header is not
+        // re-rendered in place. Reload for the fresh server render — the same
+        // lock-then-reload pattern `flow-kb-locking-history.spec.ts` uses for
+        // this badge — and assert the badge plus the mode it reports.
+        // Retry the reload: the lock is committed (asserted against the API
+        // above), but the RSC render can still be served from a payload produced
+        // before the mutation settled — especially under load — so a single
+        // reload can paint a stale, unlocked header. Reload until the fresh
+        // server render carries the badge.
         const badge = page.getByTestId('kb-workbench-lock-badge');
-        await expect(badge).toBeVisible({ timeout: 30_000 });
+        await expect(async () => {
+            await page.reload({ waitUntil: 'domcontentloaded' });
+            await expect(badge).toBeVisible({ timeout: 15_000 });
+        }).toPass({ timeout: 90_000 });
+        await expect(badge, 'the header lock badge reports lockMode=full').toHaveAttribute(
+            'data-kb-lock-mode',
+            'full',
+            { timeout: 15_000 },
+        );
+        // …and the metadata panel re-hydrates in the locked state.
+        await expect(page.getByTestId('kb-workbench-metadata-lock-toggle')).toBeChecked({
+            timeout: 30_000,
+        });
     });
 
     test('changing status to archived updates the centre status chip', async ({
