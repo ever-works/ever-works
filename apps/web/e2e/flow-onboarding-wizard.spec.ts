@@ -100,6 +100,13 @@ function computeStepIds(state: Pick<WizardStateV2, 'ai' | 'storage' | 'deploy'>)
     if (state.deploy.choice === 'vercel' || state.deploy.choice === 'k8s') {
         ids.push(`deploy-config:${state.deploy.choice}`);
     }
+    // Wave 11 added two always-shown, always-skippable steps between the
+    // provider choices and the catalog: `profile` ("what do you do" — roles +
+    // team size) and `communication` (connect chat workspaces). Mirrors
+    // computeStepList() in src/components/onboarding/useOnboardingFlow.ts —
+    // keep this in lockstep with it or the derived x/N badge assertions drift.
+    ids.push('profile');
+    ids.push('communication');
     ids.push('plugins-catalog', 'create-work');
     return ids;
 }
@@ -164,6 +171,8 @@ test.describe('Onboarding wizard — catalog-driven multi-step flow', () => {
             'storage-choice',
             'db-choice',
             'deploy-choice',
+            'profile',
+            'communication',
             'plugins-catalog',
             'create-work',
         ]);
@@ -207,11 +216,11 @@ test.describe('Onboarding wizard — catalog-driven multi-step flow', () => {
         expect(afterAi.state.storage.choice).toBe('ever-works-git');
         expect(afterAi.state.deploy.choice).toBe('ever-works');
 
-        // The derived step list now includes an ai-config step → 8 steps
-        // (7 base steps + the inserted ai-config sub-step).
+        // The derived step list now includes an ai-config step → 10 steps
+        // (the 9 base steps + the inserted ai-config sub-step).
         const stepsAfterAi = computeStepIds(afterAi.state);
         expect(stepsAfterAi).toContain(`ai-config:${byokAi}`);
-        expect(stepsAfterAi).toHaveLength(8);
+        expect(stepsAfterAi).toHaveLength(10);
 
         // Step — pick a non-default storage + deploy that each add a config
         // sub-step, advance lastStep, and skip the plugins step.
@@ -231,7 +240,9 @@ test.describe('Onboarding wizard — catalog-driven multi-step flow', () => {
         expect(afterStorageDeploy.state.ai.choice).toBe(byokAi);
 
         // Now all three config-bearing buckets are non-default → the full
-        // 10-step flow (9 previously, +1 for the always-present db-choice).
+        // full 12-step flow: 9 base steps (welcome, ai-choice, storage-choice,
+        // db-choice, deploy-choice, profile, communication, plugins-catalog,
+        // create-work) + the 3 config sub-steps the non-default choices insert.
         const fullSteps = computeStepIds(afterStorageDeploy.state);
         expect(fullSteps).toEqual([
             'welcome',
@@ -242,6 +253,8 @@ test.describe('Onboarding wizard — catalog-driven multi-step flow', () => {
             'db-choice',
             'deploy-choice',
             'deploy-config:vercel',
+            'profile',
+            'communication',
             'plugins-catalog',
             'create-work',
         ]);
@@ -393,11 +406,12 @@ test.describe('Onboarding wizard — dismiss + complete lifecycle', () => {
         expect(showBadge).toBe(true);
 
         // Badge label maths: currentStep = min(lastStep + 1, totalSteps),
-        // totalSteps = derived step count. All defaults → 7 steps, lastStep 4
-        // → badge reads "5/7".
+        // totalSteps = derived step count. All defaults → 9 steps (welcome,
+        // ai-choice, storage-choice, db-choice, deploy-choice, profile,
+        // communication, plugins-catalog, create-work), lastStep 4 → "5/9".
         const totalSteps = computeStepIds(after.state).length;
         const currentStep = Math.min(after.state.lastStep + 1, totalSteps);
-        expect(totalSteps).toBe(7);
+        expect(totalSteps).toBe(9);
         expect(currentStep).toBe(5);
     });
 
