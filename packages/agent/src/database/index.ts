@@ -38,6 +38,7 @@ export * from './repositories/work-knowledge-document.repository';
 export * from './repositories/work-knowledge-upload.repository';
 export * from './repositories/work-knowledge-tag.repository';
 export * from './repositories/work-knowledge-citation.repository';
+export * from './repositories/kb-retrieval-log.repository';
 export * from './repositories/work-knowledge-chunk.repository';
 export * from './repositories/work-knowledge-chunk-coordinate.repository';
 // Agents/Skills/Tasks PR #1017 — Phase 6. Export Agent repositories

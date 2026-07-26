@@ -6,7 +6,7 @@ import {
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from 'typeorm';
-import type { MergePolicyOverride } from '@ever-works/contracts';
+import type { KbMemoryConsolidationSettings, MergePolicyOverride } from '@ever-works/contracts';
 import { PortableDateColumn } from './_types';
 
 /**
@@ -175,6 +175,26 @@ export class Organization {
      */
     @Column('simple-json', { nullable: true })
     mergePolicy?: MergePolicyOverride | null;
+
+    /**
+     * Memory consolidation cadence (memory upgrades M9) — the per-org
+     * opt-in the `memory-consolidation-tick` cron reads.
+     *
+     * NULL / `{ enabled: false }` ⇒ the tick skips this organization
+     * entirely, which is the default for every existing row (no
+     * backfill, no behaviour change). When enabled, `cadence` picks the
+     * interval and `mode` decides whether the pass may persist anything
+     * — `dry-run` (the default) writes NOTHING, `propose` runs the
+     * existing consolidation service with `apply: true`, whose own
+     * invariants land synthesized documents as `proposed` (excluded from
+     * context injection until a human accepts them) and mark duplicates
+     * superseded rather than deleting them.
+     *
+     * Read through `MemoryConsolidationScheduleService` — never inspect
+     * this column directly to decide whether a pass may run.
+     */
+    @Column('simple-json', { nullable: true, name: 'memory_consolidation' })
+    memoryConsolidation?: KbMemoryConsolidationSettings | null;
 
     @CreateDateColumn()
     createdAt: Date;

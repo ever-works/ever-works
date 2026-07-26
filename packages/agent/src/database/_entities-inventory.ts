@@ -61,6 +61,7 @@ import { WorkKnowledgeDocument } from '../entities/work-knowledge-document.entit
 import { WorkKnowledgeUpload } from '../entities/work-knowledge-upload.entity';
 import { WorkKnowledgeTag } from '../entities/work-knowledge-tag.entity';
 import { WorkKnowledgeCitation } from '../entities/work-knowledge-citation.entity';
+import { KbRetrievalLog } from '../entities/kb-retrieval-log.entity';
 import { WorkKnowledgeChunk } from '../entities/work-knowledge-chunk.entity';
 import { WorkKnowledgeChunkCoordinate } from '../entities/work-knowledge-chunk-coordinate.entity';
 import { Mission } from '../entities/mission.entity';
@@ -222,6 +223,10 @@ export const ENTITIES = [
     WorkKnowledgeCitation,
     WorkKnowledgeChunk,
     WorkKnowledgeChunkCoordinate,
+    // Memory eval loop (memory upgrades M10) — append-only retrieval log
+    // joined against citation rows to compute the recall-hit rate and
+    // the zero-result gap topics that feed consolidation synthesis.
+    KbRetrievalLog,
     // Plugin entities
     PluginEntity,
     UserPluginEntity,

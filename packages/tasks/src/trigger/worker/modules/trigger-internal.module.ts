@@ -3,6 +3,7 @@ import {
     AnonymousUserCleanupService,
     DeployReadyPollerService,
     KnowledgeBaseReconcileService,
+    MemoryConsolidationScheduleService,
     WorkScheduleDispatcherService,
     WorkScheduleService,
 } from '@ever-works/agent/services';
@@ -295,6 +296,17 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
                 createRemoteProxy(apiClient, 'CreditLedgerService'),
             inject: [TriggerInternalApiClient],
         },
+        // Memory consolidation cadence (memory upgrades M9) — the
+        // memory-consolidation-tick cron calls `dispatchDue()` on this
+        // proxy, which RPCs to the live API where the org/tenant
+        // repositories, the AI facade and the notification producer are
+        // wired. Same shape as DigestService above.
+        {
+            provide: MemoryConsolidationScheduleService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'MemoryConsolidationScheduleService'),
+            inject: [TriggerInternalApiClient],
+        },
     ],
     exports: [
         TriggerInternalApiClient,
@@ -326,6 +338,7 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         EventSourcePullService,
         DigestService,
         CreditLedgerService,
+        MemoryConsolidationScheduleService,
     ],
 })
 export class TriggerInternalModule {}

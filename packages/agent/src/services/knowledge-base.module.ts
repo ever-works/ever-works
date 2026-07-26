@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
+import { NotificationsModule } from '../notifications/notifications.module';
 import { DatabaseModule } from '../database/database.module';
 import { FacadesModule } from '../facades/facades.module';
 import { WorkKnowledgeChunkCoordinate } from '../entities/work-knowledge-chunk-coordinate.entity';
@@ -9,14 +10,18 @@ import { WorkKnowledgeCitation } from '../entities/work-knowledge-citation.entit
 import { WorkKnowledgeDocument } from '../entities/work-knowledge-document.entity';
 import { WorkKnowledgeTag } from '../entities/work-knowledge-tag.entity';
 import { WorkKnowledgeUpload } from '../entities/work-knowledge-upload.entity';
+import { KbRetrievalLog } from '../entities/kb-retrieval-log.entity';
 import { WorkKnowledgeDocumentRepository } from '../database/repositories/work-knowledge-document.repository';
 import { WorkKnowledgeUploadRepository } from '../database/repositories/work-knowledge-upload.repository';
 import { WorkKnowledgeTagRepository } from '../database/repositories/work-knowledge-tag.repository';
 import { WorkKnowledgeCitationRepository } from '../database/repositories/work-knowledge-citation.repository';
 import { WorkKnowledgeChunkRepository } from '../database/repositories/work-knowledge-chunk.repository';
 import { WorkKnowledgeChunkCoordinateRepository } from '../database/repositories/work-knowledge-chunk-coordinate.repository';
+import { KbRetrievalLogRepository } from '../database/repositories/kb-retrieval-log.repository';
 import { KnowledgeBaseService } from './knowledge-base.service';
 import { MemoryConsolidationService } from './memory-consolidation.service';
+import { MemoryConsolidationScheduleService } from './memory-consolidation-schedule.service';
+import { MemoryHealthService } from './memory-health.service';
 import { KnowledgeBaseGitMirrorService } from './knowledge-base-git-mirror.service';
 import { KnowledgeBaseBufferExtractorService } from './knowledge-base-buffer-extractor.service';
 import { KnowledgeBaseMediaNormalizeService } from './knowledge-base-media-normalize.service';
@@ -73,6 +78,15 @@ import { WorkOwnershipService } from './work-ownership.service';
         DatabaseModule,
         FacadesModule,
         ActivityLogModule,
+        // Memory upgrades M9 — `MemoryConsolidationScheduleService`
+        // injects `@Optional() NotificationService` to announce the
+        // scheduled report. NestJS DI only walks a module's OWN imports
+        // (the same walkback trap that broke the API boot for
+        // `KnowledgeBaseGitMirrorService` — see above), so without this
+        // import the cadence would run silently and never notify anyone.
+        // `NotificationsModule` imports only `DatabaseModule`, so there
+        // is no cycle.
+        NotificationsModule,
         TypeOrmModule.forFeature([
             WorkKnowledgeDocument,
             WorkKnowledgeUpload,
@@ -80,6 +94,8 @@ import { WorkOwnershipService } from './work-ownership.service';
             WorkKnowledgeCitation,
             WorkKnowledgeChunk,
             WorkKnowledgeChunkCoordinate,
+            // Memory upgrades M10 — the append-only retrieval log.
+            KbRetrievalLog,
         ]),
     ],
     providers: [
@@ -90,6 +106,7 @@ import { WorkOwnershipService } from './work-ownership.service';
         WorkKnowledgeCitationRepository,
         WorkKnowledgeChunkRepository,
         WorkKnowledgeChunkCoordinateRepository,
+        KbRetrievalLogRepository,
         KnowledgeBaseService,
         // Memory Consolidation — org-wide curation pass over the same
         // KB tables (POST /api/memory/consolidate). Depends on
@@ -97,6 +114,15 @@ import { WorkOwnershipService } from './work-ownership.service';
         // plus the optional WorkRepository (DatabaseModule) and
         // AiFacadeService (FacadesModule), both already imported above.
         MemoryConsolidationService,
+        // Memory eval loop (M10) — health metrics over the retrieval log
+        // + citation rows. Deps are all in this module / DatabaseModule.
+        MemoryHealthService,
+        // Consolidation cadence (M9) — the `memory-consolidation-tick`
+        // cron resolves this over the internal RPC channel. Needs the
+        // Organization + Tenant repositories (DatabaseModule, imported
+        // above) and the optional NotificationService, which the API's
+        // NotificationsModule provides in the application graph.
+        MemoryConsolidationScheduleService,
         KnowledgeBaseGitMirrorService,
         KnowledgeBaseBufferExtractorService,
         KnowledgeBaseMediaNormalizeService,
@@ -126,8 +152,11 @@ import { WorkOwnershipService } from './work-ownership.service';
         WorkKnowledgeCitationRepository,
         WorkKnowledgeChunkRepository,
         WorkKnowledgeChunkCoordinateRepository,
+        KbRetrievalLogRepository,
         KnowledgeBaseService,
         MemoryConsolidationService,
+        MemoryHealthService,
+        MemoryConsolidationScheduleService,
         KnowledgeBaseGitMirrorService,
         KnowledgeBaseBufferExtractorService,
         KnowledgeBaseMediaNormalizeService,
