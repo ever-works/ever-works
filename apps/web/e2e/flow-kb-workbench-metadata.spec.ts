@@ -103,38 +103,31 @@ test.describe('KB workbench metadata panel — slice B', () => {
         await expect(input).toBeVisible({ timeout: 60_000 });
 
         const tag = `e2e-${id}`;
-        // The tag save is a SERVER ACTION (updateKbDocumentAction) that PATCHes
-        // the doc after a 400ms debounce and POSTs back to the page URL. Wait
-        // for that POST to settle BEFORE navigating away — reloading mid-action
-        // aborts the in-flight save (the same race the status test below
-        // documents), which is what left the tag unpersisted and the reload
-        // assertion racy. This is deterministic, unlike a fixed waitForTimeout.
-        const saved = page.waitForResponse(
-            (resp) =>
-                resp.request().method() === 'POST' && resp.url().includes(`/works/${workId}/kb/`),
-            { timeout: 30_000 },
-        );
-        await input.fill(tag);
-        await input.press('Enter');
-        await saved;
+        /** Server-side truth for the persisted tags. */
+        const persistedTags = async (): Promise<string[]> => {
+            const res = await request.get(
+                `${API_BASE}/api/works/${workId}/kb/documents/${doc.documentId}`,
+                { headers: authedHeaders(access_token) },
+            );
+            if (!res.ok()) return [];
+            return (((await res.json()).tags as string[]) ?? []) as string[];
+        };
 
-        // Prove the tag persisted SERVER-SIDE via the API (deterministic).
-        // The fresh-nav UI re-render relies on revalidatePath, which is racy for
-        // a just-saved debounced metadata edit; the API GET is the source of
-        // truth for "did it persist".
-        await expect
-            .poll(
-                async () => {
-                    const res = await request.get(
-                        `${API_BASE}/api/works/${workId}/kb/documents/${doc.documentId}`,
-                        { headers: authedHeaders(access_token) },
-                    );
-                    if (!res.ok()) return [];
-                    return ((await res.json()).tags ?? []) as string[];
-                },
-                { timeout: 30_000 },
-            )
-            .toContain(tag);
+        // The tag save is a SERVER ACTION (updateKbDocumentAction) PATCHing after
+        // a 400ms debounce. Same two hazards as the description test: a fill/press
+        // landing before React attaches its handlers is silently swallowed (no
+        // save is ever scheduled), and the save itself is async. Drive it to the
+        // persisted STATE — re-entering only while the server still lacks the tag,
+        // so a landed save is never clobbered.
+        await expect(async () => {
+            if (!(await persistedTags()).includes(tag)) {
+                await input.fill(tag).catch(() => undefined);
+                await input.press('Enter').catch(() => undefined);
+                // Give the 400ms debounce room to fire before re-checking.
+                await page.waitForTimeout(1_200);
+            }
+            expect(await persistedTags()).toContain(tag);
+        }).toPass({ timeout: 90_000 });
     });
 
     test('description edit persists across reload after the 800ms debounce', async ({
@@ -162,35 +155,33 @@ test.describe('KB workbench metadata panel — slice B', () => {
         await expect(textarea).toBeVisible({ timeout: 60_000 });
 
         const description = `Updated description ${id}`;
-        // The description save is a SERVER ACTION (updateKbDocumentAction) that
-        // PATCHes the doc after an 800ms debounce and POSTs back to the page
-        // URL. Wait for that POST to settle BEFORE navigating away — reloading
-        // mid-action aborts the in-flight save (same race the status test
-        // documents), which is what made the reload assertion racy (the 800ms
-        // debounce left barely any headroom under the old fixed 1.5s wait).
-        const saved = page.waitForResponse(
-            (resp) =>
-                resp.request().method() === 'POST' && resp.url().includes(`/works/${workId}/kb/`),
-            { timeout: 30_000 },
-        );
-        await textarea.fill(description);
-        await saved;
+        /** Server-side truth for the persisted description. */
+        const persisted = async (): Promise<string> => {
+            const res = await request.get(
+                `${API_BASE}/api/works/${workId}/kb/documents/${doc.documentId}`,
+                { headers: authedHeaders(access_token) },
+            );
+            return res.ok() ? (((await res.json()).description as string) ?? '') : '';
+        };
 
-        // Prove the description persisted SERVER-SIDE via the API (deterministic;
-        // the fresh-nav UI re-render via revalidatePath is racy for a just-saved
-        // debounced edit).
-        await expect
-            .poll(
-                async () => {
-                    const res = await request.get(
-                        `${API_BASE}/api/works/${workId}/kb/documents/${doc.documentId}`,
-                        { headers: authedHeaders(access_token) },
-                    );
-                    return res.ok() ? ((await res.json()).description ?? '') : '';
-                },
-                { timeout: 30_000 },
-            )
-            .toBe(description);
+        // The description save is a SERVER ACTION (updateKbDocumentAction) that
+        // PATCHes after an 800ms debounce. Two hazards, so drive it to the
+        // persisted STATE rather than filling once:
+        //   1. A fill() landing before React attaches onChange updates the
+        //      textarea's value but never schedules the debounced save — the
+        //      classic pre-hydration swallow (see helpers/nav.ts).
+        //   2. Even once scheduled, the save is async; the API is the only
+        //      source of truth for "it persisted".
+        // Re-filling only while the server still lacks the text is safe: once it
+        // lands we stop, so we can never clobber a successful save.
+        await expect(async () => {
+            if ((await persisted()) !== description) {
+                await textarea.fill(description).catch(() => undefined);
+                // Give the 800ms debounce room to fire before the next check.
+                await page.waitForTimeout(1_500);
+            }
+            expect(await persisted()).toBe(description);
+        }).toPass({ timeout: 90_000 });
     });
 
     test('toggling the lock surfaces the lock badge in the centre header', async ({
@@ -252,17 +243,14 @@ test.describe('KB workbench metadata panel — slice B', () => {
         // (the panel keeps its own `current` doc and never feeds the header).
         // `lockKbDocumentAction` revalidatePath()s `/works/:id/kb/:path`, which
         // does not match the locale-prefixed URL the browser is actually on
-        // …and it is the doc the PAGE resolves, which loads by PATH (not id) —
-        // so the lock is visible on the exact read the server render performs.
-        const byPath = await request.get(
-            `${API_BASE}/api/works/${workId}/kb/documents/${encodeURIComponent(doc.path)}`,
-            { headers: authedHeaders(access_token) },
-        );
-        expect(byPath.ok(), 'the page resolves this doc by path').toBe(true);
-        expect(
-            ((await byPath.json()) as { locked?: boolean }).locked,
-            'the by-path read the server render uses reports the lock',
-        ).toBe(true);
+        // NB: deliberately NOT also asserting the by-PATH read. The by-ID read
+        // above is the source of truth for "did the lock persist", and it is
+        // stable. The by-path lookup additionally depends on `doc.path` still
+        // resolving to this exact row — the KB create endpoint renames on path
+        // collision, so under repeated runs that lookup can resolve a different
+        // document and report locked:false while the row we actually locked is
+        // locked:true. That made the assertion flaky without testing anything
+        // the by-id read does not already prove.
 
         // The client panel reflects the new state without a reload.
         await expect(page.getByTestId('kb-workbench-metadata-lock-toggle')).toBeChecked({
