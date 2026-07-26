@@ -193,13 +193,11 @@ describe('StripeBillingProvider — checkout', () => {
     it('reports a declined charge as failed instead of throwing', async () => {
         const client = fakeClient({
             paymentIntents: {
-                create: jest
-                    .fn()
-                    .mockRejectedValue(
-                        Object.assign(new Error('Your card was declined'), {
-                            code: 'card_declined',
-                        }),
-                    ),
+                create: jest.fn().mockRejectedValue(
+                    Object.assign(new Error('Your card was declined'), {
+                        code: 'card_declined',
+                    }),
+                ),
             },
         });
         const { provider } = build(client);
