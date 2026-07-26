@@ -39,6 +39,16 @@ export interface CreateIngestedEventData {
     payload: Record<string, unknown>;
 }
 
+/** Filters for the owner-scoped recent-events page (chat tool + Work feed). */
+export interface ListRecentEventsFilter {
+    /** Narrow to one Work — the per-Work Activities feed. */
+    workId?: string;
+    /** Narrow to one producing plugin id. */
+    source?: string;
+    /** Page size; clamped to 1..200. */
+    limit?: number;
+}
+
 /**
  * Feature-owned repository (provided by `EventIngestModule`, not
  * `DatabaseModule` — same split as `WorkProposalRepository`).
@@ -95,13 +105,40 @@ export class IngestedEventRepository {
         await this.repository.update(id, { processedAt });
     }
 
-    /** Owner-scoped recent events (chat tool + future feed surfaces). */
-    async findRecentByUser(userId: string, limit = 20): Promise<IngestedEvent[]> {
-        return this.repository.find({
-            where: { userId },
-            order: { occurredAt: 'DESC' },
-            take: limit,
-        });
+    /**
+     * Owner-scoped recent events (chat tool + Work feed surfaces).
+     *
+     * `filter.workId` narrows to a single Work — the per-Work Activities
+     * feed. It is applied ON TOP of the owner scope, never instead of
+     * it, so passing another tenant's Work id yields an empty page
+     * rather than their events. `filter.source` narrows to one connector.
+     */
+    async findRecentByUser(
+        userId: string,
+        limitOrFilter: number | ListRecentEventsFilter = 20,
+    ): Promise<IngestedEvent[]> {
+        const filter: ListRecentEventsFilter =
+            typeof limitOrFilter === 'number' ? { limit: limitOrFilter } : limitOrFilter;
+        const limit = Math.min(Math.max(filter.limit ?? 20, 1), 200);
+        const qb = this.repository
+            .createQueryBuilder('event')
+            .where('event.userId = :userId', { userId });
+        if (filter.workId) {
+            qb.andWhere('event.workId = :workId', { workId: filter.workId });
+        }
+        if (filter.source) {
+            qb.andWhere('event.source = :source', { source: filter.source });
+        }
+        return qb.orderBy('event.occurredAt', 'DESC').take(limit).getMany();
+    }
+
+    /**
+     * Per-Work feed page — owner-scoped by construction. Thin alias so
+     * feed callers read as what they are and can never forget the owner
+     * argument.
+     */
+    async findRecentByWork(userId: string, workId: string, limit = 20): Promise<IngestedEvent[]> {
+        return this.findRecentByUser(userId, { workId, limit });
     }
 
     async findById(id: string): Promise<IngestedEvent | null> {

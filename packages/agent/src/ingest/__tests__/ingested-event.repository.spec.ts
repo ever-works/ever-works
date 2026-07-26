@@ -29,22 +29,33 @@ describe('IngestedEventRepository', () => {
         payload: { text: 'hello' },
     };
 
+    /* eslint-disable @typescript-eslint/no-explicit-any */
+    let qb: any;
     let typeormRepo: {
         findOne: jest.Mock;
         create: jest.Mock;
         save: jest.Mock;
         find: jest.Mock;
         update: jest.Mock;
+        createQueryBuilder: jest.Mock;
     };
     let repository: IngestedEventRepository;
 
     beforeEach(() => {
+        qb = {
+            where: jest.fn(() => qb),
+            andWhere: jest.fn(() => qb),
+            orderBy: jest.fn(() => qb),
+            take: jest.fn(() => qb),
+            getMany: jest.fn(async () => []),
+        };
         typeormRepo = {
             findOne: jest.fn(),
             create: jest.fn((data) => data),
             save: jest.fn(async (data) => ({ id: 'row-1', ...data })),
             find: jest.fn(async () => []),
             update: jest.fn(async () => undefined),
+            createQueryBuilder: jest.fn(() => qb),
         };
         repository = new IngestedEventRepository(typeormRepo as never);
     });
@@ -108,5 +119,51 @@ describe('IngestedEventRepository', () => {
         await repository.markProcessed('row-1', at);
 
         expect(typeormRepo.update).toHaveBeenCalledWith('row-1', { processedAt: at });
+    });
+
+    // ── `workId` routing — the per-Work activity feed query ──────────
+
+    it('findRecentByUser scopes to the owner and applies no extra filter by default', async () => {
+        await repository.findRecentByUser('user-1');
+
+        expect(qb.where).toHaveBeenCalledWith('event.userId = :userId', { userId: 'user-1' });
+        expect(qb.andWhere).not.toHaveBeenCalled();
+        expect(qb.take).toHaveBeenCalledWith(20);
+    });
+
+    it('findRecentByUser keeps accepting a bare limit (the pre-filter call shape)', async () => {
+        await repository.findRecentByUser('user-1', 5);
+        expect(qb.take).toHaveBeenCalledWith(5);
+    });
+
+    it('findRecentByUser pushes the workId and source filters into SQL', async () => {
+        await repository.findRecentByUser('user-1', {
+            workId: 'work-1',
+            source: 'slack-connector',
+            limit: 10,
+        });
+
+        expect(qb.andWhere).toHaveBeenCalledWith('event.workId = :workId', { workId: 'work-1' });
+        expect(qb.andWhere).toHaveBeenCalledWith('event.source = :source', {
+            source: 'slack-connector',
+        });
+        expect(qb.take).toHaveBeenCalledWith(10);
+    });
+
+    it('findRecentByWork applies the owner scope FIRST — another tenant Work returns an empty page, never their rows', async () => {
+        await repository.findRecentByWork('user-1', 'not-my-work');
+
+        expect(qb.where).toHaveBeenCalledWith('event.userId = :userId', { userId: 'user-1' });
+        expect(qb.andWhere).toHaveBeenCalledWith('event.workId = :workId', {
+            workId: 'not-my-work',
+        });
+    });
+
+    it('findRecentByUser clamps the page size to 1..200', async () => {
+        await repository.findRecentByUser('user-1', { limit: 5000 });
+        expect(qb.take).toHaveBeenLastCalledWith(200);
+
+        await repository.findRecentByUser('user-1', { limit: -1 });
+        expect(qb.take).toHaveBeenLastCalledWith(1);
     });
 });

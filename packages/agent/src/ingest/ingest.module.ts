@@ -2,13 +2,16 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { IngestedEvent } from '../entities/ingested-event.entity';
 import { IngestCursor } from '../entities/ingest-cursor.entity';
+import { Work } from '../entities/work.entity';
 import { IngestInstallBinding } from '../entities/ingest-install-binding.entity';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { FacadesModule } from '../facades/facades.module';
+import { WorkRepository } from '../database/repositories/work.repository';
 import { IngestedEventRepository } from './ingested-event.repository';
 import { EventIngestService } from './event-ingest.service';
 import { IngestCursorRepository } from './ingest-cursor.repository';
 import { EventSourcePullService } from './event-source-pull.service';
+import { WorkHintResolverService } from './work-hint-resolver.service';
 import { IngestInstallBindingRepository } from './ingest-install-binding.repository';
 
 /**
@@ -37,6 +40,11 @@ import { IngestInstallBindingRepository } from './ingest-install-binding.reposit
  */
 @Module({
     imports: [
+        // `Work` backs the `workHint` → `workId` resolver. It MUST also
+        // be present in the DataSource ENTITIES array (it already is) —
+        // a forFeature'd-but-unregistered entity throws
+        // EntityMetadataNotFoundError on first query.
+        TypeOrmModule.forFeature([IngestedEvent, IngestCursor, Work]),
         TypeOrmModule.forFeature([IngestedEvent, IngestCursor, IngestInstallBinding]),
         // Processor 1 — Activity-log rows with sourceUrl provenance.
         ActivityLogModule,
@@ -49,6 +57,8 @@ import { IngestInstallBindingRepository } from './ingest-install-binding.reposit
         EventIngestService,
         IngestCursorRepository,
         EventSourcePullService,
+        WorkRepository,
+        WorkHintResolverService,
         IngestInstallBindingRepository,
     ],
     exports: [
@@ -56,6 +66,8 @@ import { IngestInstallBindingRepository } from './ingest-install-binding.reposit
         EventIngestService,
         IngestCursorRepository,
         EventSourcePullService,
+        WorkRepository,
+        WorkHintResolverService,
         IngestInstallBindingRepository,
     ],
 })

@@ -73,4 +73,36 @@ describe('IngestEventsDto', () => {
         expect(errors).toHaveLength(1);
         expect(JSON.stringify(errors)).toContain('workId');
     });
+
+    it('accepts a well-formed workHint', async () => {
+        const errors = await validate(
+            build([
+                validEnvelope({
+                    workHint: { kind: 'chat-channel', externalId: 'C0123456789', label: 'general' },
+                }),
+            ]),
+        );
+        expect(errors).toHaveLength(0);
+    });
+
+    it('rejects a workHint of an unknown kind (the resolver must understand every kind it routes)', async () => {
+        const errors = await validate(
+            build([validEnvelope({ workHint: { kind: 'whatever', externalId: 'x' } })]),
+        );
+        expect(errors).toHaveLength(1);
+        expect(JSON.stringify(errors)).toContain('kind');
+    });
+
+    it('rejects a workHint with an empty or over-long externalId', async () => {
+        const empty = await validate(
+            build([validEnvelope({ workHint: { kind: 'repo', externalId: '' } })]),
+        );
+        expect(empty).toHaveLength(1);
+
+        const tooLong = await validate(
+            build([validEnvelope({ workHint: { kind: 'repo', externalId: 'x'.repeat(201) } })]),
+        );
+        expect(tooLong).toHaveLength(1);
+        expect(JSON.stringify(tooLong)).toContain('externalId');
+    });
 });

@@ -343,6 +343,14 @@ describe('SlackChatBridgeService', () => {
             ).toBeNull();
             expect(service.toEnvelope({ type: 'url_verification' } as any)).toBeNull();
         });
+
+        it('carries the chat-channel workHint so the spine can route the event to a Work', () => {
+            const { service } = createService();
+            expect(service.toEnvelope(mentionBody() as any)?.workHint).toEqual({
+                kind: 'chat-channel',
+                externalId: 'C1',
+            });
+        });
     });
 
     describe('handleEventCallback', () => {

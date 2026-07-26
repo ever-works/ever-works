@@ -473,6 +473,7 @@ export class NotionConnectorPlugin implements IConnectorPlugin, IEventSourcePlug
 		const createdMs = Date.parse(page.created_time ?? '');
 		const changeType = Number.isFinite(createdMs) && createdMs >= Date.parse(since) ? 'created' : 'edited';
 		const title = extractPageTitle(page);
+		const resolvedDatabaseId = databaseId ?? page.parent?.database_id;
 
 		return {
 			id: randomUUID(),
@@ -485,6 +486,18 @@ export class NotionConnectorPlugin implements IConnectorPlugin, IEventSourcePlug
 				externalId: page.id,
 				...(title ? { title } : {})
 			},
+			// Work routing: the owning database is the container. Pages
+			// outside any database (workspace-root pages) carry no hint
+			// and stay user-scoped.
+			...(resolvedDatabaseId
+				? {
+						workHint: {
+							kind: 'doc-database' as const,
+							externalId: resolvedDatabaseId,
+							...(title ? { label: title } : {})
+						}
+					}
+				: {}),
 			...(page.url ? { sourceUrl: page.url } : {}),
 			payload: {
 				pageId: page.id,
@@ -492,11 +505,7 @@ export class NotionConnectorPlugin implements IConnectorPlugin, IEventSourcePlug
 				changeType,
 				...(page.created_time ? { createdTime: page.created_time } : {}),
 				lastEditedTime: occurredAt,
-				...(databaseId
-					? { databaseId }
-					: page.parent?.database_id
-						? { databaseId: page.parent.database_id }
-						: {})
+				...(resolvedDatabaseId ? { databaseId: resolvedDatabaseId } : {})
 			}
 		};
 	}
