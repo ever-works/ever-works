@@ -111,6 +111,9 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                     // Credits ledger + plan entitlements (pricing Wave 9 M1)
                     'CreditLedgerService',
                     'InsufficientCreditsError',
+                    // Transcript retention sentinels (#1877).
+                    'RETENTION_FOREVER',
+                    'RETENTION_NONE',
                     'EntitlementsService',
                     'ENTITLEMENT_KEYS',
                     // Run-cost settlement (pricing Wave 9 M2)
