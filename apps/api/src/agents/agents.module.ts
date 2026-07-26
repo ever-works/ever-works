@@ -11,7 +11,11 @@ import {
     AGENT_GIT_FACADE,
     AGENT_EMAIL_FACADE,
     AGENT_NOTIFY_CHANNEL_FACADE,
+    AGENT_DOMAIN_TOOL_SOURCES,
     RunSteeringService,
+    type AgentDomainToolSources,
+    TERMINAL_SESSION_DISPATCHER,
+    TerminalSessionLauncher,
     type AgentRunChatBackPoster,
     type AgentRunTaskFinisher,
     type AgentPluginToolsFacade,
@@ -36,6 +40,7 @@ import {
 import {
     agentHeartbeatTriggerAdapter,
     createAgentRunCancellerAdapter,
+    terminalSessionTriggerAdapter,
     TriggerModule as TasksTriggerModule,
     TriggerService,
 } from '@ever-works/trigger-tasks';
@@ -53,8 +58,24 @@ import {
     TaskChatService,
     TasksService,
     TaskStatus,
+    TaskAssigneeRepository,
+    TaskReviewerRepository,
+    TaskApproverRepository,
     RUN_STEERING_PORT,
+    TERMINAL_SESSION_STARTER,
 } from '@ever-works/agent/tasks-domain';
+// Domain chat-tool sources (AGENT_DOMAIN_TOOL_SOURCES binding below).
+// Each module contributes the ONE service/repository its descriptor
+// factory needs; the descriptors themselves are assembled inside
+// `AgentToolService.resolveAllowedTools` — the tool loop's single
+// assembly point.
+import { EventIngestModule, IngestedEventRepository } from '@ever-works/agent/ingest';
+import { DigestModule, DigestService } from '@ever-works/agent/digest';
+import { MeetingsModule, MeetingRepository } from '@ever-works/agent/meetings';
+import { FleetModule, FleetService } from '@ever-works/agent/fleet';
+import { PrReviewModule, PrReviewService } from '@ever-works/agent/pr-review';
+import { PolicyModule, MergePolicyService } from '@ever-works/agent/policy';
+import { WorkOwnershipService } from '@ever-works/agent/services';
 import {
     FacadesModule,
     SearchFacadeService,
@@ -131,10 +152,24 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
         // Provides TriggerService, which backs the AGENT_RUN_CANCELLER factory
         // below. Same alias works.module.ts / webhooks.module.ts already use.
         TasksTriggerModule,
+        // Domain chat tools — the services the AGENT_DOMAIN_TOOL_SOURCES
+        // binding hands to `AgentToolService`. None of these modules
+        // imports anything api-side, so no cycle is introduced.
+        EventIngestModule,
+        DigestModule,
+        MeetingsModule,
+        FleetModule,
+        PrReviewModule,
+        PolicyModule,
     ],
     controllers: [AgentsController, AgentTemplatesController],
     providers: [
         AgentTemplateCatalogService,
+        // Security: provided LOCALLY (not exported) so the merge-policy
+        // chat tool's owner check runs the same `ensureAccess` gate the
+        // HTTP surface does. Its deps (WorkRepository / WorkMemberRepository)
+        // come from the DatabaseModule import above.
+        WorkOwnershipService,
         { provide: AGENT_HEARTBEAT_TRIGGER, useValue: agentHeartbeatTriggerAdapter },
         {
             provide: AGENT_RUN_CANCELLER,
@@ -182,6 +217,19 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
         // TasksDomainModule, and neither package gains a runtime import of
         // the other.
         { provide: RUN_STEERING_PORT, useExisting: RunSteeringService },
+        // Streaming terminal — the two halves of the session dispatch.
+        //
+        // TERMINAL_SESSION_DISPATCHER is the job-runtime producer for the
+        // `terminal-session` task (which shipped with NO producer at all,
+        // so no session was ever started). TERMINAL_SESSION_STARTER is the
+        // port `TaskTransitionService` reaches for after a successful
+        // fan-out; it points at the same launcher so the ownership check,
+        // the CAS duplicate refusal and the persistent gate are stated
+        // exactly once. Same @Global() token posture as RUN_STEERING_PORT:
+        // implementation in the imported agent-side AgentsModule, consumer
+        // in TasksDomainModule, neither package importing the other.
+        { provide: TERMINAL_SESSION_DISPATCHER, useValue: terminalSessionTriggerAdapter },
+        { provide: TERMINAL_SESSION_STARTER, useExisting: TerminalSessionLauncher },
         // Notifications v2 (EW-670) — INBOUND_EMAIL_TASK_SPAWNER binding.
         // The inbound-email dispatcher's `task-spawn` mode delegates here:
         // create a Task from the inbound email (scoped to the address
@@ -632,6 +680,87 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                 },
             }),
         },
+        // Domain chat tools — AGENT_DOMAIN_TOOL_SOURCES binding.
+        //
+        // Six descriptor factories shipped with their domains (Waves 3,
+        // 6, 7, 8, 12) but nothing ever handed them their services, so
+        // no agent run could call them. This is the binding that closes
+        // that gap: it carries ONLY the backing services, and
+        // `AgentToolService.resolveAllowedTools` builds + permission-gates
+        // the descriptors — the single tool-assembly point the run loop
+        // already reads from. Same @Global() token posture as the facade
+        // bindings above, so the @Optional() injection in the agent-side
+        // AgentsModule actually resolves in production.
+        {
+            provide: AGENT_DOMAIN_TOOL_SOURCES,
+            inject: [
+                TasksService,
+                TaskChatService,
+                TaskAssigneeRepository,
+                TaskReviewerRepository,
+                TaskApproverRepository,
+                IngestedEventRepository,
+                DigestService,
+                MeetingRepository,
+                FleetService,
+                PrReviewService,
+                MergePolicyService,
+                WorkOwnershipService,
+                AgentRepository,
+            ],
+            useFactory: (
+                tasksService: TasksService,
+                chatService: TaskChatService,
+                assignees: TaskAssigneeRepository,
+                reviewers: TaskReviewerRepository,
+                approvers: TaskApproverRepository,
+                ingestedEvents: IngestedEventRepository,
+                digest: DigestService,
+                meetings: MeetingRepository,
+                fleet: FleetService,
+                prReview: PrReviewService,
+                mergePolicy: MergePolicyService,
+                workOwnership: WorkOwnershipService,
+                agents: AgentRepository,
+            ): AgentDomainToolSources => ({
+                // All three membership repositories are bound: the
+                // commentOnTask gate is fail-closed and DENIES every call
+                // when any of them is missing.
+                tasks: { tasksService, chatService, assignees, reviewers, approvers },
+                ingest: { repository: ingestedEvents },
+                digest: { digestService: digest },
+                meetings: { repository: meetings },
+                fleet: { service: fleet },
+                prReview: { prReviewService: prReview },
+                mergePolicy: {
+                    service: mergePolicy,
+                    // Security: the model supplies workId/agentId, so both
+                    // are owner-checked BEFORE any resolution runs —
+                    // otherwise the tool is a cross-tenant policy oracle.
+                    // Mirrors `MergePolicyController.resolve` exactly;
+                    // returning null (rather than throwing) lets the tool
+                    // answer "not found or not accessible" with no
+                    // existence leak.
+                    async authorize(userId, input) {
+                        if (input.workId) {
+                            try {
+                                await workOwnership.ensureAccess(input.workId, userId);
+                            } catch {
+                                return null;
+                            }
+                        }
+                        if (input.agentId) {
+                            const agent = await agents.findByIdAndUser(input.agentId, userId);
+                            if (!agent) return null;
+                        }
+                        return {
+                            workId: input.workId ?? null,
+                            agentId: input.agentId ?? null,
+                        };
+                    },
+                },
+            }),
+        },
     ],
     exports: [
         AGENT_HEARTBEAT_TRIGGER,
@@ -642,8 +771,11 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
         AGENT_GIT_FACADE,
         AGENT_EMAIL_FACADE,
         AGENT_NOTIFY_CHANNEL_FACADE,
+        AGENT_DOMAIN_TOOL_SOURCES,
         INBOUND_EMAIL_TASK_SPAWNER,
         RUN_STEERING_PORT,
+        TERMINAL_SESSION_DISPATCHER,
+        TERMINAL_SESSION_STARTER,
     ],
 })
 export class AgentsModule {}

@@ -187,11 +187,20 @@ describe('WorksTemplateCatalogService', () => {
         await expect(svc.list()).resolves.toEqual([]);
     });
 
-    it('does not cache an empty (failed) result', async () => {
+    it('caches an empty (failed) result only BRIEFLY, never for the full TTL', async () => {
+        // Not caching failures at all meant every later request re-paid the whole
+        // external fetch timeout, so a rate-limiting upstream stalled every
+        // catalog-touching request instead of degrading to the built-in list. The
+        // failure is remembered briefly instead — short enough to recover within
+        // seconds, long enough to bound the blast radius.
         const { svc, cache } = make(
             jest.fn(async () => ({ ok: false, status: 503 }) as unknown as Response),
         );
         await svc.list();
-        expect(cache.set).not.toHaveBeenCalled();
+        expect(cache.set).toHaveBeenCalledTimes(1);
+        const [, value, ttl] = (cache.set as jest.Mock).mock.calls[0];
+        expect(value).toEqual([]);
+        expect(ttl).toBeGreaterThan(0);
+        expect(ttl).toBeLessThanOrEqual(60 * 1000);
     });
 });

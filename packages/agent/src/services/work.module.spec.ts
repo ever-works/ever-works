@@ -47,6 +47,7 @@ jest.mock('./work-ownership.service', () => ({ WorkOwnershipService: class {} })
 jest.mock('./work-query.service', () => ({ WorkQueryService: class {} }));
 jest.mock('./work-lifecycle.service', () => ({ WorkLifecycleService: class {} }));
 jest.mock('./work-generation.service', () => ({ WorkGenerationService: class {} }));
+jest.mock('./work-memory.service', () => ({ WorkMemoryService: class {} }));
 jest.mock('./work-schedule.service', () => ({ WorkScheduleService: class {} }));
 jest.mock('./work-schedule-dispatcher.service', () => ({
     WorkScheduleDispatcherService: class {},
@@ -281,9 +282,10 @@ describe('WorkModule', () => {
             // Pinned: WorksConfigSyncListener is NOT exported (Nest doesn't
             // export listeners, they're internal) and SettingsSchemaValidatorService
             // is NOT exported (consumers go through PluginOperationsService).
-            // PluginOperationsService IS a provider but NOT exported either —
-            // current behaviour pinned (downstream services that need it would
-            // import the plugins module directly).
+            // PluginOperationsService IS now exported (campaign activation pins
+            // the Work's pipeline provider through it from CampaignsModule);
+            // the global PluginsModule does not export it, so WorkModule is the
+            // single reachable instance.
             for (const provider of providers) {
                 // Skip non-class providers (the EVER_WORKS_DEPLOY_QUOTA_COUNTER
                 // factory is an object, not a class).
@@ -293,7 +295,6 @@ describe('WorkModule', () => {
                 if (
                     provider === WorksConfigSyncListener ||
                     provider === SettingsSchemaValidatorService ||
-                    provider === PluginOperationsService ||
                     provider === EverWorksDeployQuotaService ||
                     provider === EverWorksGitProvider ||
                     provider === EverWorksK8sDeployProvider ||
@@ -319,7 +320,7 @@ describe('WorkModule', () => {
             expect(exports).toContain(TemplateCatalogModule);
         });
 
-        it('keeps the exports list at the documented 33-entry shape (30 services + 3 re-exported modules)', () => {
+        it('keeps the exports list at the documented 35-entry shape (32 services + 3 re-exported modules)', () => {
             // Bumped to 28 with the PlatformSyncSecretService resurrection for
             // EW-120 dual-mode (pull/push/disabled) Activity Feed sync.
             // Bumped to 29 with AnonymousUserCleanupService for EW-617 G2
@@ -332,7 +333,9 @@ describe('WorkModule', () => {
             // DATABASE_URL surface (#1315).
             // Bumped to 34 with WorkMemoryService (scheduled-run learnings
             // written into shared Memory).
-            expect(meta('exports')).toHaveLength(34);
+            // Bumped to 35 with PluginOperationsService, now exported so
+            // CampaignsModule can pin `gtm-pipeline` on a campaign Work.
+            expect(meta('exports')).toHaveLength(35);
         });
 
         it('does NOT re-export DatabaseModule (callers must import it explicitly when they need entities/repositories)', () => {

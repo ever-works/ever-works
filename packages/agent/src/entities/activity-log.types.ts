@@ -189,6 +189,17 @@ export enum ActivityActionType {
     TASK_COMMENTED = 'task_commented',
     TASK_COMPLETED = 'task_completed',
     TASK_RECURRENCE_FIRED = 'task_recurrence_fired',
+    // Merge-policy matrix (Wave 3, D4) — the agent-merge path in
+    // `TaskWorkspaceService.finalizeRun`. Both are additive members
+    // (activity_log.actionType is a plain varchar, so no migration):
+    //   - TASK_MERGED       the agent landed the Task's pull request; the
+    //                       `details` block carries prNumber / mergeMethod /
+    //                       policySource so "who allowed this?" is answerable.
+    //   - TASK_MERGE_REFUSED the effective policy refused; `details` carries
+    //                       the stable `refusalCode` + human `reason`. A
+    //                       refusal is RECORDED, never swallowed.
+    TASK_MERGED = 'task_merged',
+    TASK_MERGE_REFUSED = 'task_merge_refused',
 
     // Missions / Ideas (Schedules P2 — automated tick + idea-generation
     // activity coverage). Both are additive members so no storage / API

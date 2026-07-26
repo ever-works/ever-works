@@ -210,4 +210,92 @@ describe('PtyLocalPlugin', () => {
 		expect(probe.ok).toBe(true);
 		expect(probe.detail).toMatch(/PTY|pipe floor/i);
 	});
+
+	/**
+	 * The node-pty prebuild is declared `optionalDependencies` precisely so a
+	 * platform without a binary still installs. That contract only holds if a
+	 * MISSING (or broken) addon degrades to the pipe floor instead of failing
+	 * the session — these three lock that in so a future dependency move can
+	 * never quietly turn "no PTY" into "no terminal".
+	 */
+	describe('graceful degradation when the node-pty prebuild is unavailable', () => {
+		it('spawns through the pipe floor when the addon cannot be loaded', async () => {
+			const plugin = new PtyLocalPlugin();
+			// Simulate the addon being absent from this runtime.
+			(plugin as unknown as { tryLoadPty: () => null }).tryLoadPty = () => null;
+			const h = makeTransport();
+
+			const handle = await plugin.spawn(
+				{
+					runId: '2f9d1f2a-9c7e-4b1a-8f0d-0a1b2c3d4e5f',
+					command: [NODE, '-e', 'process.stdout.write("floor-ok")'],
+					cwd: process.cwd(),
+					env: {}
+				},
+				h.transport
+			);
+
+			expect(handle.isPty).toBe(false);
+			const outcome = await handle.exited;
+			expect(outcome.reason).toBe('completed');
+			expect(decodeStdout(h.published)).toContain('floor-ok');
+		});
+
+		it('degrades to the pipe floor when a PRESENT prebuild throws on spawn', async () => {
+			const plugin = new PtyLocalPlugin();
+			const warnings: string[] = [];
+			await plugin.onLoad({
+				logger: {
+					log: () => {},
+					warn: (m: string) => warnings.push(String(m)),
+					error: () => {},
+					debug: () => {}
+				}
+			} as never);
+			// A JS library installed without its native binary: present, but
+			// every spawn throws. Must degrade, never fail the session.
+			(plugin as unknown as { tryLoadPty: () => unknown }).tryLoadPty = () => ({
+				spawn: () => {
+					throw new Error('node-pty native binding missing');
+				}
+			});
+			const h = makeTransport();
+
+			const handle = await plugin.spawn(
+				{
+					runId: '2f9d1f2a-9c7e-4b1a-8f0d-0a1b2c3d4e5f',
+					command: [NODE, '-e', 'process.stdout.write("degraded")'],
+					cwd: process.cwd(),
+					env: {}
+				},
+				h.transport
+			);
+
+			expect(handle.isPty).toBe(false);
+			await handle.exited;
+			expect(decodeStdout(h.published)).toContain('degraded');
+			expect(warnings.join('\n')).toMatch(/pipe floor/i);
+		});
+
+		it('onLoad succeeds and reports pipe-floor mode with no addon present', async () => {
+			const plugin = new PtyLocalPlugin();
+			(plugin as unknown as { tryLoadPty: () => null }).tryLoadPty = () => null;
+			const logs: string[] = [];
+
+			await expect(
+				plugin.onLoad({
+					logger: {
+						log: (m: string) => logs.push(String(m)),
+						warn: () => {},
+						error: () => {},
+						debug: () => {}
+					}
+				} as never)
+			).resolves.toBeUndefined();
+
+			expect(logs.join('\n')).toContain('pipe-floor');
+			const health = await plugin.healthCheck();
+			expect(health.status).toBe('healthy');
+		});
+	});
 });

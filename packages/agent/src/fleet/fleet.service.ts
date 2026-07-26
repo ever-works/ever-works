@@ -1,4 +1,4 @@
-import { createHash, randomBytes, timingSafeEqual } from 'crypto';
+import { randomBytes } from 'crypto';
 import {
     BadRequestException,
     Injectable,
@@ -7,10 +7,18 @@ import {
     Optional,
 } from '@nestjs/common';
 import type { IPlugin } from '@ever-works/plugin';
+import type { FleetNodeLoadView } from '@ever-works/contracts';
 import { FleetNode, FleetNodeKind, FleetNodeStatus } from '../entities/fleet-node.entity';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { FleetNodeRepository } from './fleet-node.repository';
+import {
+    CREDENTIAL_MAX_LENGTH,
+    CREDENTIAL_MIN_LENGTH,
+    constantTimeEquals,
+    sha256Hex,
+    UUID_RE,
+} from './fleet-node-credential';
 
 /** One-time enrollment tokens expire 15 minutes after issue. */
 export const FLEET_ENROLLMENT_TOKEN_TTL_MS = 15 * 60_000;
@@ -24,10 +32,6 @@ export const FLEET_ENROLLABLE_KINDS: readonly FleetNodeKind[] = ['desktop-node',
 /** Caps on the node self-description (defensive, DTOs cap the edge too). */
 export const FLEET_MAX_CAPABILITY_TAGS = 16;
 export const FLEET_MAX_CAPABILITY_TAG_LENGTH = 32;
-
-const CREDENTIAL_MIN_LENGTH = 16;
-const CREDENTIAL_MAX_LENGTH = 256;
-const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 
 /**
  * Sentinel `DeployFacadeService.getTokenFromSettings` returns for
@@ -55,6 +59,13 @@ export interface FleetNodeView {
      * configured clusters, which are surfaced live and never stored.
      */
     persisted: boolean;
+    /**
+     * Live execution load (Desktop PRD §4.1 "current load (running
+     * Tasks)"). Populated by the API edge from `FleetJobService`;
+     * `null`/absent means idle. Cluster-sourced rows never carry it —
+     * the platform does not lease work onto them.
+     */
+    load?: FleetNodeLoadView | null;
 }
 
 export interface CreateEnrollmentTokenInput {
@@ -95,7 +106,9 @@ interface ClusterNodeSummary {
 /**
  * Fleet (Wave 12, slice 1) — node registry + enrollment + heartbeat.
  *
- * Security posture mirrors `terminal-attach.service.ts`:
+ * Security posture mirrors `terminal-attach.service.ts` and is shared
+ * verbatim with the job-lease protocol through `fleet-node-credential.ts`
+ * (ONE definition of "verified" across enroll / heartbeat / lease):
  *   - credentials are random 32-byte values, stored ONLY as sha256 hex;
  *   - verification is constant-time (`timingSafeEqual` behind an
  *     explicit length guard) and NEVER throws — every invalid path
@@ -403,25 +416,6 @@ export class FleetService {
             persisted: true,
         };
     }
-}
-
-function sha256Hex(value: string): string {
-    return createHash('sha256').update(value, 'utf8').digest('hex');
-}
-
-/**
- * Constant-time equality with the terminal-attach posture: explicit
- * length guard BEFORE `timingSafeEqual` (which throws on mismatched
- * lengths), null-safe, and never throws.
- */
-function constantTimeEquals(stored: string | null | undefined, computed: string): boolean {
-    if (typeof stored !== 'string' || stored.length === 0) return false;
-    const storedBuf = Buffer.from(stored, 'utf8');
-    const computedBuf = Buffer.from(computed, 'utf8');
-    const lengthsMatch = storedBuf.length === computedBuf.length;
-    const comparisonBuf = lengthsMatch ? computedBuf : Buffer.alloc(storedBuf.length);
-    const bytesMatch = timingSafeEqual(storedBuf, comparisonBuf);
-    return lengthsMatch && bytesMatch;
 }
 
 function sanitizeText(value: unknown, maxLength: number): string | null {

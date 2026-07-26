@@ -370,6 +370,7 @@ describe('TenantJobRuntimeController', () => {
                 'bullmq',
                 'pgboss',
                 'inngest',
+                'node',
             ]);
         });
 
@@ -535,6 +536,7 @@ describe('TenantJobRuntimeController', () => {
                 'bullmq',
                 'pgboss',
                 'inngest',
+                'node',
             ]);
         });
     });

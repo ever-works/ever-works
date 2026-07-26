@@ -12,6 +12,13 @@ export * from './agent-run.service';
 export * from './run-dispatch-gate.service';
 export * from './run-steering.service';
 export * from './run-credits-precheck';
+export * from './terminal-session-dispatcher';
+export * from './terminal-session-launcher.service';
+// Streaming-terminal M9 / founder decision D1 — persisted, redacted,
+// retention-capped transcripts + the replay surface.
+export * from './terminal-transcript-redaction';
+export * from './terminal-transcript.service';
+export * from './terminal-transcript.module';
 export * from './agent-run-canceller';
 export * from './agent-run-abort';
 export * from './agent-run-sweeper.service';
@@ -23,6 +30,7 @@ export * from './agent-notify-channel-facade';
 export * from './agent-plugin-tools-facade';
 export * from './agent-tools-skill';
 export * from './agent-tool.service';
+export * from './agent-domain-tool-sources';
 export * from './budget-period';
 export * from './guardrails';
 export * from './heartbeat-cron';
@@ -56,10 +64,23 @@ export {
 // reaches for directly (run-history pagination, cancel, skill rollup,
 // budget rollup). Mirrors the same pattern as `AgentFileService` etc.
 export { AgentRepository } from '../database/repositories/agent.repository';
-export { AgentRunRepository } from '../database/repositories/agent-run.repository';
+export {
+    AgentRunRepository,
+    ATTENTION_REASON_QUEUED_TOO_LONG,
+    ATTENTION_REASON_STALE_PARKED,
+    STALE_PARK_SUMMARY_PREFIX,
+    type WorkRunsSummary,
+} from '../database/repositories/agent-run.repository';
 export { AgentRunLogRepository } from '../database/repositories/agent-run-log.repository';
 export { SkillBindingRepository } from '../database/repositories/skill-binding.repository';
 export { PluginUsageRepository } from '../database/repositories/plugin-usage.repository';
 // FU-14 — re-export WorkRepository for the AGENT_GIT_FACADE binding
 // (it resolves the Work's git config + owner/repo before the commit).
 export { WorkRepository } from '../database/repositories/work.repository';
+// Judgment layer G3 - escalation records.
+export * from './agent-escalation.service';
+export {
+    AgentEscalationRepository,
+    type RecordEscalationInput,
+} from '../database/repositories/agent-escalation.repository';
+export { AgentEscalation } from '../entities/agent-escalation.entity';

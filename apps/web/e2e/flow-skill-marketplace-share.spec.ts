@@ -605,9 +605,12 @@ test.describe('Skill marketplace / share / visibility', () => {
         }).toPass({ timeout: 30_000 });
 
         // "Custom" — the hand-authored skill + the "New Skill" create CTA.
+        // The CTA is a `<Button href="/skills/new">`, which renders through the
+        // shared Button's link branch as a next-intl `<a>` — its ARIA role is
+        // `link`, NOT `button` (an href-bearing Button is never a <button>).
         await expect(async () => {
             await customTab.first().click();
-            await expect(page.getByRole('button', { name: /new skill/i }).first()).toBeVisible({
+            await expect(page.getByRole('link', { name: /new skill/i }).first()).toBeVisible({
                 timeout: 10_000,
             });
         }).toPass({ timeout: 30_000 });

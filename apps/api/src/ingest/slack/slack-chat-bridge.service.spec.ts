@@ -1,4 +1,7 @@
-jest.mock('@ever-works/agent/ingest', () => ({ EventIngestService: class {} }));
+jest.mock('@ever-works/agent/ingest', () => ({
+    EventIngestService: class {},
+    IngestInstallBindingRepository: class {},
+}));
 jest.mock('@ever-works/agent/plugins', () => ({
     PluginRegistryService: class {},
     PluginSettingsService: class {},
@@ -8,7 +11,7 @@ jest.mock('../../ai-conversation/openai-compat.service', () => ({
     OpenAiCompatService: class {},
 }));
 
-import { SlackChatBridgeService } from './slack-chat-bridge.service';
+import { SlackChatBridgeService, extractSlackWorkspaceRef } from './slack-chat-bridge.service';
 
 /** Flush the fire-and-forget bridge promise chain. */
 function flush(): Promise<void> {
@@ -19,6 +22,7 @@ const BINDING = {
     userId: 'user-1',
     signingSecret: 'sec',
     settings: { botToken: 'xoxb-test' },
+    matchedBy: 'binding' as const,
 };
 
 function mentionBody(overrides: Record<string, unknown> = {}) {
@@ -58,12 +62,17 @@ describe('SlackChatBridgeService', () => {
                 choices: [{ index: 0, message: { role: 'assistant', content: 'All green.' } }],
             }),
         };
+        const installBindings = {
+            findByWorkspace: jest.fn().mockResolvedValue(null),
+            record: jest.fn().mockResolvedValue(null),
+        };
         const service = new SlackChatBridgeService(
             userPluginRepository as any,
             pluginSettingsService as any,
             pluginRegistry as any,
             eventIngestService as any,
             openAiCompatService as any,
+            installBindings as any,
         );
         return {
             service,
@@ -72,27 +81,140 @@ describe('SlackChatBridgeService', () => {
             pluginRegistry,
             eventIngestService,
             openAiCompatService,
+            installBindings,
             slackPlugin,
         };
     }
 
+    /**
+     * Per-workspace binding.
+     *
+     * The receiver used to resolve "the oldest enabled install
+     * platform-wide" and attribute EVERY inbound event to that one
+     * platform user — a multi-tenant data-isolation defect. These cases
+     * pin the replacement: exact binding → single-install fallback →
+     * signature proof → refuse, and NEVER a fallback to another tenant.
+     */
     describe('resolveBinding', () => {
-        it('binds to the OLDEST enabled install whose settings carry a signing secret', async () => {
+        /** Two configured installs with distinct owners. */
+        function twoInstalls(overrides: { sharedSecret?: boolean } = {}) {
+            const ctx = createService();
+            ctx.userPluginRepository.findByPlugin.mockResolvedValue([
+                { userId: 'u-a', enabled: true, createdAt: new Date('2026-01-15') },
+                { userId: 'u-disabled', enabled: false, createdAt: new Date('2026-01-01') },
+                { userId: 'u-b', enabled: true, createdAt: new Date('2026-02-01') },
+            ]);
+            ctx.pluginSettingsService.getSettings.mockImplementation(
+                async (_pluginId: string, options: { userId: string }) => ({
+                    botToken: `xoxb-${options.userId}`,
+                    signingSecret: overrides.sharedSecret ? 'app-secret' : `sec-${options.userId}`,
+                }),
+            );
+            return ctx;
+        }
+
+        it('routes each workspace to its OWN owner when two installs exist', async () => {
+            const { service, installBindings } = twoInstalls();
+            installBindings.findByWorkspace.mockImplementation(
+                async (_provider: string, teamId: string) =>
+                    teamId === 'T-AAA'
+                        ? { userId: 'u-a', externalEnterpriseId: null }
+                        : teamId === 'T-BBB'
+                          ? { userId: 'u-b', externalEnterpriseId: null }
+                          : null,
+            );
+
+            const a = await service.resolveBinding({ workspace: { teamId: 'T-AAA' } });
+            expect(a).toMatchObject({
+                status: 'resolved',
+                binding: { userId: 'u-a', signingSecret: 'sec-u-a', matchedBy: 'binding' },
+            });
+
+            const b = await service.resolveBinding({ workspace: { teamId: 'T-BBB' } });
+            expect(b).toMatchObject({
+                status: 'resolved',
+                binding: { userId: 'u-b', signingSecret: 'sec-u-b', matchedBy: 'binding' },
+            });
+        });
+
+        it('REFUSES an unknown workspace instead of guessing an owner', async () => {
+            const { service } = twoInstalls({ sharedSecret: true });
+
+            const result = await service.resolveBinding({
+                workspace: { teamId: 'T-STRANGER' },
+                // Both installs share the app-level signing secret, so the
+                // signature cannot disambiguate them either.
+                verifySignature: () => true,
+            });
+
+            expect(result).toEqual({ status: 'unresolved', reason: 'ambiguous-install' });
+        });
+
+        it('REFUSES when nothing is bound and no signature proof is available', async () => {
+            const { service } = twoInstalls();
+            const result = await service.resolveBinding({ workspace: { teamId: 'T-STRANGER' } });
+            expect(result).toEqual({ status: 'unresolved', reason: 'unknown-workspace' });
+        });
+
+        it('REFUSES when the bound install is disabled — never re-points at another tenant', async () => {
+            const { service, installBindings } = twoInstalls();
+            installBindings.findByWorkspace.mockResolvedValue({
+                userId: 'u-disabled',
+                externalEnterpriseId: null,
+            });
+
+            const result = await service.resolveBinding({ workspace: { teamId: 'T-AAA' } });
+            expect(result).toEqual({ status: 'unresolved', reason: 'bound-install-unavailable' });
+        });
+
+        it('REFUSES when the binding names a different Slack enterprise', async () => {
+            const { service, installBindings } = twoInstalls();
+            installBindings.findByWorkspace.mockResolvedValue({
+                userId: 'u-a',
+                externalEnterpriseId: 'E-ONE',
+            });
+
+            const result = await service.resolveBinding({
+                workspace: { teamId: 'T-AAA', enterpriseId: 'E-TWO' },
+            });
+            expect(result).toEqual({ status: 'unresolved', reason: 'enterprise-mismatch' });
+        });
+
+        it('resolves by unique signature proof when the installs use different secrets', async () => {
+            const { service } = twoInstalls();
+            const result = await service.resolveBinding({
+                workspace: { teamId: 'T-STRANGER' },
+                verifySignature: (secret) => secret === 'sec-u-b',
+            });
+            expect(result).toMatchObject({
+                status: 'resolved',
+                binding: { userId: 'u-b', matchedBy: 'signature' },
+            });
+        });
+
+        it('legacy single-install path still works (and is flagged as the fallback)', async () => {
             const { service, userPluginRepository, pluginSettingsService } = createService();
             userPluginRepository.findByPlugin.mockResolvedValue([
-                { userId: 'u-newer', enabled: true, createdAt: new Date('2026-02-01') },
                 { userId: 'u-disabled', enabled: false, createdAt: new Date('2026-01-01') },
-                { userId: 'u-oldest', enabled: true, createdAt: new Date('2026-01-15') },
+                { userId: 'u-only', enabled: true, createdAt: new Date('2026-01-15') },
             ]);
             pluginSettingsService.getSettings.mockImplementation(
                 async (_pluginId: string, options: { userId: string }) =>
-                    options.userId === 'u-oldest'
+                    options.userId === 'u-only'
                         ? { signingSecret: 'shhh', botToken: 'xoxb' }
                         : { botToken: 'xoxb' },
             );
 
-            const binding = await service.resolveBinding();
-            expect(binding).toMatchObject({ userId: 'u-oldest', signingSecret: 'shhh' });
+            const result = await service.resolveBinding({ workspace: { teamId: 'T-AAA' } });
+            expect(result).toMatchObject({
+                status: 'resolved',
+                binding: {
+                    userId: 'u-only',
+                    signingSecret: 'shhh',
+                    matchedBy: 'single-install',
+                    workspace: { teamId: 'T-AAA' },
+                },
+            });
             // Disabled installs are never consulted.
             const consulted = pluginSettingsService.getSettings.mock.calls.map(
                 (c: any[]) => c[1].userId,
@@ -105,12 +227,85 @@ describe('SlackChatBridgeService', () => {
             );
         });
 
-        it('returns null (fail-closed) when no enabled install has a signing secret', async () => {
+        it('reports not-configured (fail-closed 401 upstream) when no install has a signing secret', async () => {
             const { service, userPluginRepository } = createService();
             userPluginRepository.findByPlugin.mockResolvedValue([
                 { userId: 'u1', enabled: true, createdAt: new Date('2026-01-01') },
             ]);
-            expect(await service.resolveBinding()).toBeNull();
+            expect(await service.resolveBinding()).toEqual({ status: 'not-configured' });
+        });
+    });
+
+    describe('recordBinding', () => {
+        it('persists the workspace→user binding after a fallback match', async () => {
+            const { service, installBindings } = createService();
+            await service.recordBinding({
+                userId: 'u-only',
+                signingSecret: 's',
+                settings: {},
+                matchedBy: 'single-install',
+                workspace: { teamId: 'T-AAA', enterpriseId: 'E-ONE' },
+            });
+            expect(installBindings.record).toHaveBeenCalledWith({
+                provider: 'slack',
+                externalWorkspaceId: 'T-AAA',
+                externalEnterpriseId: 'E-ONE',
+                userId: 'u-only',
+                pluginId: 'slack-connector',
+            });
+        });
+
+        it('is a no-op when the binding already came from the table, or carries no workspace', async () => {
+            const { service, installBindings } = createService();
+            await service.recordBinding({
+                userId: 'u-a',
+                signingSecret: 's',
+                settings: {},
+                matchedBy: 'binding',
+                workspace: { teamId: 'T-AAA' },
+            });
+            await service.recordBinding({
+                userId: 'u-a',
+                signingSecret: 's',
+                settings: {},
+                matchedBy: 'single-install',
+            });
+            expect(installBindings.record).not.toHaveBeenCalled();
+        });
+
+        it('swallows a repository failure (a verified webhook must not 500)', async () => {
+            const { service, installBindings } = createService();
+            installBindings.record.mockRejectedValue(new Error('db down'));
+            await expect(
+                service.recordBinding({
+                    userId: 'u-a',
+                    signingSecret: 's',
+                    settings: {},
+                    matchedBy: 'single-install',
+                    workspace: { teamId: 'T-AAA' },
+                }),
+            ).resolves.toBeUndefined();
+        });
+    });
+
+    describe('extractSlackWorkspaceRef', () => {
+        it('reads team_id and enterprise_id off the delivery', () => {
+            expect(extractSlackWorkspaceRef({ team_id: 'T1', enterprise_id: 'E1' } as any)).toEqual(
+                { teamId: 'T1', enterpriseId: 'E1' },
+            );
+        });
+
+        it('falls back to the authorizations entry (Enterprise Grid deliveries)', () => {
+            expect(
+                extractSlackWorkspaceRef({
+                    authorizations: [{ team_id: 'T2', enterprise_id: 'E2' }],
+                } as any),
+            ).toEqual({ teamId: 'T2', enterpriseId: 'E2' });
+        });
+
+        it('returns undefined when the delivery names no workspace (e.g. the handshake)', () => {
+            expect(extractSlackWorkspaceRef({ type: 'url_verification' } as any)).toBeUndefined();
+            expect(extractSlackWorkspaceRef(undefined)).toBeUndefined();
         });
     });
 
@@ -147,6 +342,14 @@ describe('SlackChatBridgeService', () => {
                 } as any),
             ).toBeNull();
             expect(service.toEnvelope({ type: 'url_verification' } as any)).toBeNull();
+        });
+
+        it('carries the chat-channel workHint so the spine can route the event to a Work', () => {
+            const { service } = createService();
+            expect(service.toEnvelope(mentionBody() as any)?.workHint).toEqual({
+                kind: 'chat-channel',
+                externalId: 'C1',
+            });
         });
     });
 

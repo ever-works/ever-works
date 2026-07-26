@@ -37,6 +37,7 @@ describe('FleetController', () => {
         enroll: jest.Mock;
         heartbeat: jest.Mock;
     };
+    let jobs: { loadByNodeForUser: jest.Mock };
     let controller: FleetController;
 
     beforeEach(() => {
@@ -53,13 +54,47 @@ describe('FleetController', () => {
             enroll: jest.fn(async () => null),
             heartbeat: jest.fn(async () => null),
         };
-        controller = new FleetController(service as never);
+        jobs = { loadByNodeForUser: jest.fn(async () => ({})) };
+        controller = new FleetController(service as never, jobs as never);
     });
 
     it('list is owner-scoped to the authenticated user', async () => {
         const result = await controller.list(auth);
         expect(service.listForUser).toHaveBeenCalledWith('user-1');
-        expect(result).toEqual([nodeView]);
+        expect(jobs.loadByNodeForUser).toHaveBeenCalledWith('user-1');
+        expect(result).toEqual([{ ...nodeView, load: null }]);
+    });
+
+    it('merges live execution load into each enrolled node', async () => {
+        const load = { activeJobCount: 2, currentJobKind: 'acceptance-checks', currentJobId: 'j1' };
+        jobs.loadByNodeForUser.mockResolvedValue({ [nodeView.id]: load });
+
+        const result = await controller.list(auth);
+        expect(result[0].load).toEqual(load);
+    });
+
+    it('degrades to the plain node list when the load lookup fails', async () => {
+        // The node list is the page's whole reason to exist — a job-runtime
+        // hiccup must never be able to take it down.
+        jobs.loadByNodeForUser.mockRejectedValue(new Error('fleet_jobs unavailable'));
+
+        const result = await controller.list(auth);
+        expect(result).toEqual([{ ...nodeView, load: null }]);
+    });
+
+    it('never attaches load to a cluster-sourced row — nothing is leased onto those', async () => {
+        const clusterNode = { ...nodeView, id: 'k8s:worker-1', persisted: false };
+        service.listForUser.mockResolvedValue([clusterNode]);
+        jobs.loadByNodeForUser.mockResolvedValue({
+            'k8s:worker-1': {
+                activeJobCount: 9,
+                currentJobKind: 'acceptance-checks',
+                currentJobId: 'x',
+            },
+        });
+
+        const result = await controller.list(auth);
+        expect(result[0].load).toBeNull();
     });
 
     it('createEnrollmentToken forwards the owner scope and body', async () => {

@@ -16,7 +16,14 @@ import { serverFetch, serverMutation } from './server-api';
  * routes into the encrypted secrets store.
  */
 
-export type TenantJobRuntimeProviderId = 'trigger' | 'temporal' | 'bullmq' | 'pgboss' | 'inngest';
+export type TenantJobRuntimeProviderId =
+    | 'trigger'
+    | 'temporal'
+    | 'bullmq'
+    | 'pgboss'
+    | 'inngest'
+    // Desktop PRD M4 — the fleet runtime (job-runtime-node).
+    | 'node';
 
 export type TenantJobRuntimeMode = 'inherit' | 'byo' | 'override';
 

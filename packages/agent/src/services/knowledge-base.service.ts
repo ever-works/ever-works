@@ -56,6 +56,7 @@ import { KB_NORMALIZE_MEDIA_DISPATCHER, type KbNormalizeMediaDispatcher } from '
 import { RuntimeBindingStamperService } from '../tasks';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { OrganizationRepository } from '../database/repositories/organization.repository';
+import { KbRetrievalLogRepository } from '../database/repositories/kb-retrieval-log.repository';
 import { sanitizeDescription } from '../utils/sanitize.util';
 import type {
     CitationDto,
@@ -63,6 +64,7 @@ import type {
     KbDocumentClass as KbDocumentClassContract,
     KbDocumentDto,
     KbDocumentHistoryResult,
+    KbRetrievalTrail,
     KbTagDto,
 } from '@ever-works/contracts';
 
@@ -130,10 +132,33 @@ interface UpdateDocumentInput {
 
 interface ListOptions {
     class?: KbDocumentClass;
+    /**
+     * Memory facets — multi-value class filter, driving the workbench's
+     * type chips (`?class=decision&class=output`). Additive: the
+     * single-value `class` above still works, and when both are present
+     * both predicates apply.
+     */
+    classes?: KbDocumentClass[];
+    /** Memory facets — multi-value source filter (provenance chips). */
+    sources?: KbDocumentSource[];
+    /**
+     * Memory facets — extend `q` from title+description to the document
+     * BODY. Opt-in: the tree/list callers that don't need it must not
+     * pay for the wider scan.
+     */
+    searchBody?: boolean;
     status?: KbDocumentStatus;
     tag?: string;
     locked?: boolean;
     language?: string;
+    /**
+     * Memory upgrades M8 — review-state filter. `proposed` is the review
+     * queue's list call (agent-authored / synthesized documents that are
+     * excluded from context injection until a human accepts them);
+     * `accepted` returns the reviewed set including pre-M7 rows whose
+     * column is still NULL. Omit for the historical "everything" list.
+     */
+    reviewState?: KbReviewState;
     q?: string;
     limit?: number;
     offset?: number;
@@ -399,6 +424,13 @@ export class KnowledgeBaseService {
         // dispatchers still get stamped via WorkRepository above).
         @Optional()
         private readonly organizationRepository?: OrganizationRepository,
+        // Memory upgrades M10 — the append-only retrieval log behind the
+        // health metrics + the "Ask why" trail. Optional and appended
+        // LAST so every existing test module and every deployment that
+        // predates the table keeps constructing: when absent, retrieval
+        // logging is a silent no-op and the trail comes back empty.
+        @Optional()
+        private readonly retrievalLogRepository?: KbRetrievalLogRepository,
     ) {}
 
     /**
@@ -668,11 +700,13 @@ export class KnowledgeBaseService {
         if (trimmedQ.length === 0) {
             const { items, total } = await this.documentRepository.list({
                 workId,
-                classes: opts.class ? [opts.class] : undefined,
+                classes: mergeClassFilters(opts),
                 statuses: opts.status ? [opts.status] : undefined,
+                sources: opts.sources,
                 tag: opts.tag,
                 locked: opts.locked,
                 language: opts.language,
+                reviewState: opts.reviewState,
                 q: undefined,
                 limit: opts.limit,
                 offset: opts.offset,
@@ -691,12 +725,15 @@ export class KnowledgeBaseService {
         const [lexicalRes, semanticChunks] = await Promise.all([
             this.documentRepository.list({
                 workId,
-                classes: opts.class ? [opts.class] : undefined,
+                classes: mergeClassFilters(opts),
                 statuses: opts.status ? [opts.status] : undefined,
+                sources: opts.sources,
                 tag: opts.tag,
                 locked: opts.locked,
                 language: opts.language,
+                reviewState: opts.reviewState,
                 q: trimmedQ,
+                searchBody: opts.searchBody,
                 limit: fusionLimit,
                 offset: 0,
             }),
@@ -748,8 +785,44 @@ export class KnowledgeBaseService {
             if (fetched) materialized.push(fetched);
         }
 
-        const sliced = materialized.slice(requestedOffset, requestedOffset + requestedLimit);
-        return { items: sliced.map((d) => this.toDto(d)), total: materialized.length };
+        // Memory upgrades M8 — the semantic leg of the blend is a
+        // chunk-level k-NN with no metadata predicate, so a doc that the
+        // lexical (filtered) leg excluded can still enter via the
+        // semantic ranking. Re-apply the review-state predicate on the
+        // merged list so `reviewState=proposed` never leaks an accepted
+        // document into the review queue (and vice versa).
+        //
+        // Memory facets — the same leak applies to the class / source
+        // chips, so every metadata predicate the lexical leg applied is
+        // re-asserted here. Without this, searching with a `decision`
+        // chip active would surface non-decision documents through the
+        // semantic leg.
+        const classFilter = mergeClassFilters(opts);
+        const filtered = materialized.filter((d) => {
+            if (opts.reviewState && !this.matchesReviewState(d, opts.reviewState)) return false;
+            if (classFilter && !classFilter.includes(d.kbDocumentClass)) return false;
+            if (opts.sources && opts.sources.length > 0 && !opts.sources.includes(d.source)) {
+                return false;
+            }
+            return true;
+        });
+
+        const sliced = filtered.slice(requestedOffset, requestedOffset + requestedLimit);
+        return { items: sliced.map((d) => this.toDto(d)), total: filtered.length };
+    }
+
+    /**
+     * Memory upgrades M8 — in-memory mirror of the repository's
+     * review-state predicate. `null` reads as `accepted` because M7
+     * never backfilled the column.
+     */
+    private matchesReviewState(
+        doc: Pick<WorkKnowledgeDocument, 'reviewState'>,
+        wanted: KbReviewState | undefined,
+    ): boolean {
+        if (!wanted) return true;
+        if (wanted === KbReviewState.PROPOSED) return doc.reviewState === KbReviewState.PROPOSED;
+        return doc.reviewState !== KbReviewState.PROPOSED;
     }
 
     async getDocument(
@@ -877,7 +950,7 @@ export class KnowledgeBaseService {
      */
     async resolveContext(
         workId: string,
-        opts: { query?: string; limit?: number } = {},
+        opts: { query?: string; limit?: number; consumerKind?: string } = {},
     ): Promise<KbContextBundle> {
         const alwaysInjected = await this.fetchAlwaysInjectedDocs(workId);
 
@@ -895,7 +968,113 @@ export class KnowledgeBaseService {
                 ? await this.fetchQueryRetrievedDocs(workId, trimmedQuery, opts.limit ?? 8)
                 : [];
 
+        // Memory upgrades M10 — record what we just injected, for which
+        // question. Fire-and-forget by construction: `logRetrieval`
+        // swallows everything, so the eval loop can never slow down or
+        // fail a prompt assembly.
+        void this.logRetrieval(workId, {
+            query: trimmedQuery.length > 0 ? trimmedQuery : null,
+            documents: [...alwaysInjected, ...decisions, ...queryRetrieved],
+            consumerKind: opts.consumerKind ?? null,
+        });
+
         return buildKbContextBundle(alwaysInjected, queryRetrieved, decisions);
+    }
+
+    /**
+     * Append one row to the KB retrieval log (memory upgrades M10) — the
+     * supply half of the recall-hit rate, and the ONLY place zero-result
+     * queries are captured (they are what the gap-fed synthesis prompt
+     * consumes in M11).
+     *
+     * Best-effort in the strongest sense: no await in the caller, every
+     * error swallowed to `debug`, and a no-op when the repository isn't
+     * wired (isolated unit tests, deployments without the table yet) or
+     * when `KB_RETRIEVAL_LOG_ENABLED=false` turns the telemetry off.
+     * A memory system that can be slowed down by its own metrics is
+     * worse than one with no metrics.
+     */
+    private async logRetrieval(
+        workId: string,
+        payload: {
+            query: string | null;
+            documents: KbDocumentBodyDto[];
+            consumerKind: string | null;
+        },
+    ): Promise<void> {
+        if (!this.retrievalLogRepository) return;
+        if (process.env.KB_RETRIEVAL_LOG_ENABLED === 'false') return;
+        try {
+            const documentIds = payload.documents.map((doc) => doc.id);
+            await this.retrievalLogRepository.record({
+                workId,
+                // The org scope rides along from the documents so the
+                // health aggregate never has to join `works`. Null for a
+                // personal Work, or when the bundle came back empty.
+                organizationId: payload.documents.find((doc) => doc.organizationId)?.organizationId,
+                queryText: payload.query,
+                resultCount: documentIds.length,
+                documentIds,
+                consumerKind: payload.consumerKind,
+            });
+        } catch (error) {
+            this.logger.debug(
+                `KB retrieval log write skipped for work=${workId}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+    }
+
+    /**
+     * Memory upgrades M11 — "Ask why" for one document: the
+     * DETERMINISTIC retrieval trail that put it in front of a model.
+     *
+     * No LLM, no synthesis, no ranking heuristics — just the recorded
+     * facts: which questions pulled this document in, when, how many
+     * documents came back alongside it, and how often it was cited
+     * afterwards. Same read gate as every other per-document route
+     * (`ensureCanView`), so it can never become an existence oracle.
+     */
+    async getRetrievalTrail(
+        workId: string,
+        userId: string,
+        docId: string,
+        opts: { windowDays?: number; limit?: number; now?: Date } = {},
+    ): Promise<KbRetrievalTrail> {
+        await this.ownershipService.ensureCanView(workId, userId);
+
+        const now = opts.now ?? new Date();
+        const windowDays = Math.min(Math.max(Math.trunc(opts.windowDays ?? 90), 1), 365);
+        const limit = Math.min(Math.max(Math.trunc(opts.limit ?? 20), 1), 100);
+        const since = new Date(now.getTime() - windowDays * 86_400_000);
+
+        // Resolve the document first so an unknown / cross-Work id 404s
+        // through the same path as every other document read.
+        const doc = await this.documentRepository.findByWorkOrPath(workId, docId);
+        if (!doc) {
+            throw new NotFoundException(`KB document ${docId} not found`);
+        }
+
+        const rows = this.retrievalLogRepository
+            ? await this.retrievalLogRepository.listForWorkSince(workId, since)
+            : [];
+        const matching = rows.filter((row) => (row.documentIds ?? []).includes(doc.id));
+
+        const citations = await this.citationRepository.countForDocument(doc.id);
+
+        return {
+            documentId: doc.id,
+            entries: matching.slice(0, limit).map((row) => ({
+                at: row.createdAt.toISOString(),
+                query: row.queryText ?? null,
+                resultCount: row.resultCount,
+                consumerKind: row.consumerKind ?? null,
+            })),
+            totalRetrievals: matching.length,
+            citations,
+            windowDays,
+        };
     }
 
     /**
@@ -1324,6 +1503,11 @@ export class KnowledgeBaseService {
         if (!updated) {
             throw new NotFoundException(`KB document not found after transition: ${docId}`);
         }
+        // M12 — the mirror now carries `decision_status` / `review_state`
+        // in the sidecar, so a status transition MUST re-mirror. Without
+        // this the two fields only reached Git incidentally, whenever some
+        // unrelated body/title edit happened to trigger a mirror next.
+        await this.enqueueMirror(workId, docId, 'upsert', updated.path, updated.kbDocumentClass);
         return this.toBodyDto(updated);
     }
 
@@ -1366,6 +1550,8 @@ export class KnowledgeBaseService {
         if (!updated) {
             throw new NotFoundException(`KB document not found after accept: ${docId}`);
         }
+        // M12 — see transitionDecisionStatus: review state is mirrored now.
+        await this.enqueueMirror(workId, docId, 'upsert', updated.path, updated.kbDocumentClass);
         return this.toBodyDto(updated);
     }
 
@@ -1409,6 +1595,9 @@ export class KnowledgeBaseService {
         if (!updated) {
             throw new NotFoundException(`KB document not found after archive: ${docId}`);
         }
+        // M12 — see transitionDecisionStatus: the sidecar's `status` and
+        // `review_state` both move on an archive.
+        await this.enqueueMirror(workId, docId, 'upsert', updated.path, updated.kbDocumentClass);
         return this.toBodyDto(updated);
     }
 
@@ -2990,6 +3179,28 @@ export class KnowledgeBaseService {
             assets: [],
         };
     }
+}
+
+/**
+ * Memory facets — collapse the single-value `class` and the multi-value
+ * `classes` filters into one list for the repository.
+ *
+ * When BOTH are supplied the intersection wins (the narrower answer is
+ * always the safe one for a filter). Returns `undefined` — not `[]` —
+ * when no class filter was requested, because an empty array would make
+ * the repository emit `IN ()` and match nothing.
+ */
+function mergeClassFilters(opts: {
+    class?: KbDocumentClass;
+    classes?: KbDocumentClass[];
+}): KbDocumentClass[] | undefined {
+    const multi = opts.classes && opts.classes.length > 0 ? opts.classes : undefined;
+    if (opts.class && multi) {
+        const intersection = multi.filter((cls) => cls === opts.class);
+        return intersection.length > 0 ? intersection : [opts.class];
+    }
+    if (opts.class) return [opts.class];
+    return multi;
 }
 
 function toTagDto(tag: WorkKnowledgeTag): KbTagDto {

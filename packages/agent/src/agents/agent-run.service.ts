@@ -549,6 +549,28 @@ export class AgentRunService {
      * cap-hit (loop ran out without a stop) — the caller marks the
      * run failed and skips side effects.
      */
+    /**
+     * Run telemetry — fold one model round-trip's token usage into
+     * `agent_runs.totalTokens`.
+     *
+     * Best-effort BY CONTRACT and defensive on BOTH failure shapes: a
+     * rejected promise AND a repository that does not implement the
+     * method at all (older RPC proxies, partial unit-test doubles) —
+     * the latter throws synchronously, which a bare `.catch()` would
+     * not absorb. A telemetry counter must never fail a run.
+     */
+    private async addRunTokens(runId: string, delta: number): Promise<void> {
+        try {
+            await this.runs.addTokens(runId, delta);
+        } catch (err) {
+            this.logger.warn(
+                `Run ${runId}: token telemetry write failed (ignored): ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+        }
+    }
+
     private async runToolLoop(
         context: AgentRunContext,
         agent: Agent,
@@ -698,6 +720,26 @@ export class AgentRunService {
                 lastFinishReason = round.finishReason;
                 lastRoundHadToolCalls = round.toolCalls.length > 0;
                 assistantText = round.text;
+
+                // Run telemetry — fold this round's usage into
+                // `agent_runs.totalTokens`. Written INCREMENTALLY (once
+                // per model round-trip) rather than once at settlement,
+                // because the Sessions cockpit and the board run chip
+                // read this column WHILE the run is open: a
+                // settlement-time write would leave both blank for the
+                // entire life of the run and only fill in after it went
+                // terminal — precisely when nobody is watching it.
+                //
+                // `totalTokens` is preferred; providers that only report
+                // the split are summed. Best-effort: see addRunTokens.
+                const roundTokens =
+                    round.usage?.totalTokens ??
+                    (round.usage
+                        ? (round.usage.promptTokens ?? 0) + (round.usage.completionTokens ?? 0)
+                        : 0);
+                if (roundTokens > 0) {
+                    await this.addRunTokens(context.runId, roundTokens);
+                }
 
                 await this.runLogs
                     .append({

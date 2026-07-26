@@ -8,11 +8,12 @@ import { FacadesModule } from '@ever-works/agent/facades';
 import { MissionsModule } from '@ever-works/agent/missions';
 import { WorkAgentModule } from '@ever-works/agent/work-agent';
 import { GoalsModule } from '@ever-works/agent/goals';
-import { AgentsModule } from '@ever-works/agent/agents';
+import { AgentsModule, TerminalTranscriptModule } from '@ever-works/agent/agents';
 import { TasksDomainModule } from '@ever-works/agent/tasks-domain';
 import { EventIngestModule } from '@ever-works/agent/ingest';
 import { DigestModule } from '@ever-works/agent/digest';
 import { SubscriptionsModule as AgentSubscriptionsModule } from '@ever-works/agent/subscriptions';
+import { FleetModule as AgentFleetModule } from '@ever-works/agent/fleet';
 import { WorkProposalsModule } from '../work-proposals/work-proposals.module';
 import { DataSyncModule } from '../data-sync/data-sync.module';
 import { TenantJobRuntimeModule } from '../account/tenant-job-runtime/tenant-job-runtime.module';
@@ -88,6 +89,20 @@ import { OrganizationsModule } from '../organizations/organizations.module';
         // cron task (in packages/tasks) can drive `dispatchDailyGrants()`
         // over the internal RPC channel once a day.
         AgentSubscriptionsModule,
+        // Streaming-terminal M9 / founder decision D1 — exposes
+        // TerminalTranscriptService through the remote-proxy controller
+        // so the terminal-transcript-gc cron task (in packages/tasks)
+        // can drive `sweepExpired()` over the internal RPC channel each
+        // night, pruning each run's transcript to its plan-tier window.
+        TerminalTranscriptModule,
+
+        // Fleet job runtime (Desktop PRD M4) — exposes FleetJobService
+        // through the remote-proxy controller so the
+        // fleet-job-lease-sweeper cron task (in packages/tasks) can drive
+        // `reclaimExpired()` over the internal RPC channel. Reclaim also
+        // runs inline on every node lease poll; the cron is what makes a
+        // fleet whose nodes ALL died still converge.
+        AgentFleetModule,
     ],
     controllers: [TriggerInternalController],
 })

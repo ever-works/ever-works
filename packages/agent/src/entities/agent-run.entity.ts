@@ -178,7 +178,12 @@ export class AgentRun {
     cliSessionId?: string | null;
 
     /** Sweeper input: stale heartbeat + live terminalState ⇒ crashed. */
-    @Column({ type: 'timestamp', nullable: true })
+    // MUST be @PortableDateColumn, not a raw `type: 'timestamp'` column: the
+    // e2e stack (and CI) runs better-sqlite3, which has no `timestamp` type, so
+    // a raw timestamp makes TypeORM's metadata validation throw
+    // `DataTypeNotSupportedError` and the API cannot boot AT ALL there. The
+    // sibling startedAt/finishedAt columns use the same decorator.
+    @PortableDateColumn({ nullable: true })
     lastHeartbeatAt?: Date | null;
 
     /** Highest published stdout seq (transcript/replay bookkeeping). */
@@ -248,6 +253,25 @@ export class AgentRun {
      */
     @Column({ type: 'varchar', length: 64, nullable: true })
     queuedReason?: string | null;
+
+    /**
+     * State-aware sweeper (Wave 4 M6) — why this run needs a HUMAN, as a
+     * short machine token (`queued-too-long`, `stale-parked`). NULL = the
+     * run is fine, which is every pre-existing row and the overwhelming
+     * majority of live ones.
+     *
+     * Distinct from `awaitingInput` on purpose: `awaitingInput` means the
+     * AGENT asked a question, this means the PLATFORM noticed something
+     * wrong with the run's lifecycle. The Sessions list filters on
+     * "either" (`attention=1`), so the two never have to be merged into a
+     * single overloaded flag.
+     */
+    @Column({ type: 'varchar', length: 32, nullable: true })
+    attentionReason?: string | null;
+
+    /** When {@link attentionReason} was raised. NULL whenever it is NULL. */
+    @PortableDateColumn({ nullable: true })
+    attentionAt?: Date | null;
 
     /**
      * Which pipeline plugin id executes this run (claude-code, codex,

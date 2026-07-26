@@ -1,5 +1,9 @@
 import 'server-only';
-import type { GateStatus, TaskAcceptanceCheck } from '@ever-works/contracts';
+import type {
+    DecisionConflictReportDto,
+    GateStatus,
+    TaskAcceptanceCheck,
+} from '@ever-works/contracts';
 import { ApiResponseError, serverFetch, serverMutation } from './server-api';
 
 export type TaskStatus =
@@ -41,12 +45,102 @@ export interface TaskRun {
     status: TaskRunStatus;
     currentActivity: string | null;
     totalTokens: number | null;
+    /**
+     * Cost telemetry (Wave 4 M7) - settled run cost in integer cents.
+     * Optional so a response from an older API (which does not send it)
+     * still type-checks; the chip simply renders no cost.
+     */
+    costCents?: number | null;
     changedFilesCount: number | null;
     startedAt: string | null;
     /** Quality gates (Wave 3 M6) — latest-run gate verdict for the board
      *  chip. `null`/absent = the run has no gate verdict. */
     gateStatus?: GateStatus | null;
 }
+
+// ── PR insights (kanban M5 / M6) ──────────────────────────────────
+
+/** Rolled-up CI verdict for the PR head, as the board's dot renders it. */
+export type TaskCiState = 'passing' | 'failing' | 'pending' | 'unknown';
+
+/** PR lifecycle as last observed from the git provider. */
+export type TaskPrState = 'open' | 'draft' | 'closed' | 'merged';
+
+/** One CI check on the PR head. All strings are PLAIN TEXT by contract. */
+export interface TaskPrCheck {
+    name: string;
+    status: string;
+    conclusion?: string | null;
+    detailsUrl?: string;
+}
+
+export interface TaskPrStatus {
+    taskId: string;
+    prNumber: number | null;
+    prUrl: string | null;
+    prState: TaskPrState | null;
+    ciState: TaskCiState | null;
+    ciCheckedAt: string | null;
+    checks: TaskPrCheck[];
+    /** True when this came from the server cache with no provider call. */
+    cached: boolean;
+}
+
+export interface TaskDiffFile {
+    path: string;
+    status: string;
+    additions: number;
+    deletions: number;
+    patch?: string;
+    /** The server dropped this file's patch to honour the byte budget. */
+    patchOmitted?: boolean;
+}
+
+export interface TaskDiff {
+    taskId: string;
+    source: 'pull-request' | 'compare';
+    prNumber: number | null;
+    prUrl: string | null;
+    branchRef: string | null;
+    baseRef: string | null;
+    diff: {
+        files: TaskDiffFile[];
+        truncated: boolean;
+        totalFiles: number;
+        totalAdditions: number;
+        totalDeletions: number;
+        patchBytes: number;
+    };
+}
+
+// ── Board dispatch (kanban M3 / M4) ───────────────────────────────
+
+// The dispatch sentinels and the picker row shape are consumed by a
+// `'use client'` component, so they live in a `server-only`-free module
+// (`tasks.shared.ts`). Re-exported here so server-side callers keep one
+// import site.
+export {
+    RUN_ALREADY_IN_FLIGHT,
+    RUN_AGENT_AMBIGUOUS,
+    RUN_NO_AGENT,
+    RUN_AGENT_NOT_FOUND,
+    type RunCandidateAgent,
+} from './tasks.shared';
+import type { RunCandidateAgent } from './tasks.shared';
+
+export interface RunTaskResult {
+    taskId: string;
+    agentId: string;
+    runId: string | null;
+    dispatched: boolean;
+    parked: boolean;
+    queuedReason?: string;
+    error?: string;
+}
+
+export type RunBatchItemResult =
+    | { taskId: string; ok: true; run: RunTaskResult }
+    | { taskId: string; ok: false; error: { code: string; message: string } };
 
 export interface Task {
     id: string;
@@ -84,6 +178,12 @@ export interface Task {
     prNumber: number | null;
     prUrl: string | null;
     conflictPaths: string[] | null;
+    // PR insights (kanban M5) — cached PR/CI verdict, refreshed by the
+    // `task-pr-status-sync` cron. All null until the Task opens a PR.
+    prState?: TaskPrState | null;
+    ciState?: TaskCiState | null;
+    ciCheckedAt?: string | null;
+    prChecks?: TaskPrCheck[] | null;
     // Kanban run cockpit (Wave 2) — latest-run denorm columns + the
     // opt-in `run` embed (present only on `includeRun=true` responses).
     latestRunId?: string | null;
@@ -228,6 +328,82 @@ export const tasksAPI = {
         return serverMutation<{ ok: true }>({
             endpoint: `/tasks/${id}/discard-branch`,
             data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    // ── Board dispatch (kanban M3 / M4) ───────────────────────────
+
+    /** Agents the board's picker offers for this Task. */
+    async listRunCandidates(id: string) {
+        return serverFetch<{ data: RunCandidateAgent[] }>(`/tasks/${id}/run-candidates`, {
+            method: 'GET',
+        });
+    },
+
+    /**
+     * PR insights (kanban M5) — cached PR state + CI verdict for this
+     * Task's pull request. The server owns the refresh throttle, so the
+     * client may call this as often as it likes.
+     */
+    async prStatus(id: string, opts: { refresh?: boolean } = {}) {
+        return serverFetch<TaskPrStatus>(
+            `/tasks/${id}/pr-status${opts.refresh ? '?refresh=true' : ''}`,
+            { method: 'GET' },
+        );
+    },
+
+    /**
+     * PR insights (kanban M6) — capped diff for this Task's PR (or its
+     * pushed branch). `maxFiles`/`maxBytes` may only narrow the platform
+     * caps; the API clamps anything larger.
+     */
+    async diff(id: string, opts: { maxFiles?: number; maxBytes?: number } = {}) {
+        const params = new URLSearchParams();
+        if (opts.maxFiles !== undefined) params.set('maxFiles', String(opts.maxFiles));
+        if (opts.maxBytes !== undefined) params.set('maxBytes', String(opts.maxBytes));
+        const query = params.toString();
+        return serverFetch<TaskDiff>(`/tasks/${id}/diff${query ? `?${query}` : ''}`, {
+            method: 'GET',
+        });
+    },
+    /**
+     * Re-litigation guard (memory upgrades M6) — settled decisions this
+     * Task appears to re-open. Deterministic term-overlap check on the
+     * API side; advisory only, never blocking. Returns
+     * `{ conflicts, scanned, heuristic }`.
+     */
+    async decisionConflicts(id: string) {
+        return serverFetch<DecisionConflictReportDto>(`/tasks/${id}/decision-conflicts`, {
+            method: 'GET',
+        });
+    },
+
+    /**
+     * Run the Task now. `agentId` omitted lets the server resolve it;
+     * an ambiguous / empty resolution answers 400 with a `code` +
+     * `candidates` body the caller turns into the picker.
+     */
+    async run(id: string, agentId?: string | null) {
+        return serverMutation<RunTaskResult>({
+            endpoint: `/tasks/${id}/run`,
+            data: agentId ? { agentId } : {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /** Run several Tasks at once — per-item results, never all-or-nothing. */
+    async runBatch(items: { taskId: string; agentId?: string | null }[]) {
+        return serverMutation<{ results: RunBatchItemResult[] }>({
+            endpoint: `/tasks/run-batch`,
+            data: {
+                items: items.map((item) => ({
+                    taskId: item.taskId,
+                    ...(item.agentId ? { agentId: item.agentId } : {}),
+                })),
+            },
             method: 'POST',
             wrapInData: false,
         });

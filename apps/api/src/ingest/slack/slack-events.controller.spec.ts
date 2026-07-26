@@ -1,6 +1,9 @@
 import { BadRequestException, UnauthorizedException } from '@nestjs/common';
 
-jest.mock('@ever-works/agent/ingest', () => ({ EventIngestService: class {} }));
+jest.mock('@ever-works/agent/ingest', () => ({
+    EventIngestService: class {},
+    IngestInstallBindingRepository: class {},
+}));
 jest.mock('@ever-works/agent/plugins', () => ({
     PluginRegistryService: class {},
     PluginSettingsService: class {},
@@ -21,12 +24,14 @@ const BINDING = {
     userId: 'user-1',
     signingSecret: SECRET,
     settings: { botToken: 'xoxb-test' },
+    matchedBy: 'binding' as const,
 };
 
 describe('SlackEventsController (POST /api/ingest/slack/events)', () => {
     function createController() {
         const bridge = {
-            resolveBinding: jest.fn().mockResolvedValue(BINDING),
+            resolveBinding: jest.fn().mockResolvedValue({ status: 'resolved', binding: BINDING }),
+            recordBinding: jest.fn().mockResolvedValue(undefined),
             handleEventCallback: jest.fn().mockResolvedValue({ ingested: null }),
         };
         const controller = new SlackEventsController(bridge as any);
@@ -51,7 +56,7 @@ describe('SlackEventsController (POST /api/ingest/slack/events)', () => {
 
     it('fails closed with 401 when no binding is configured — even for url_verification', async () => {
         const { controller, bridge } = createController();
-        bridge.resolveBinding.mockResolvedValue(null);
+        bridge.resolveBinding.mockResolvedValue({ status: 'not-configured' });
         const { req, timestamp, signature } = signedRequest({
             type: 'url_verification',
             challenge: 'abc',
@@ -123,5 +128,70 @@ describe('SlackEventsController (POST /api/ingest/slack/events)', () => {
         const result = await controller.receiveEvents(req as any, signature, timestamp);
         expect(result).toEqual({ ok: true });
         expect(bridge.handleEventCallback).not.toHaveBeenCalled();
+    });
+
+    /**
+     * Per-workspace routing: the delivery's `team_id` selects WHICH
+     * install's signing secret verifies it, and an unresolvable workspace
+     * is a clean no-op rather than a guess or a 500.
+     */
+    describe('per-workspace binding', () => {
+        it('passes the delivery workspace + a signature probe to the resolver', async () => {
+            const { controller, bridge } = createController();
+            const { req, timestamp, signature } = signedRequest({
+                type: 'event_callback',
+                team_id: 'T-AAA',
+                enterprise_id: 'E-ONE',
+                event: { type: 'message', channel: 'C1', ts: '1.0' },
+            });
+
+            await controller.receiveEvents(req as any, signature, timestamp);
+
+            const lookup = bridge.resolveBinding.mock.calls[0][0];
+            expect(lookup.workspace).toEqual({ teamId: 'T-AAA', enterpriseId: 'E-ONE' });
+            // The probe must accept the real secret and reject any other.
+            expect(lookup.verifySignature(SECRET)).toBe(true);
+            expect(lookup.verifySignature('someone-elses-secret')).toBe(false);
+        });
+
+        it('refuses an unresolvable workspace as a 200 no-op — never a 500, never a guess', async () => {
+            const { controller, bridge } = createController();
+            bridge.resolveBinding.mockResolvedValue({
+                status: 'unresolved',
+                reason: 'unknown-workspace',
+            });
+            const { req, timestamp, signature } = signedRequest({
+                type: 'event_callback',
+                team_id: 'T-STRANGER',
+                event: { type: 'app_mention', channel: 'C1', ts: '1.0' },
+            });
+
+            const result = await controller.receiveEvents(req as any, signature, timestamp);
+
+            expect(result).toEqual({ ok: true, ignored: 'unknown-workspace' });
+            expect(bridge.handleEventCallback).not.toHaveBeenCalled();
+            expect(bridge.recordBinding).not.toHaveBeenCalled();
+        });
+
+        it('records the binding only after the signature verified', async () => {
+            const { controller, bridge } = createController();
+            const body = {
+                type: 'event_callback',
+                team_id: 'T-AAA',
+                event: { type: 'message', channel: 'C1', ts: '1.0' },
+            };
+
+            // Bad signature → 401 and nothing recorded.
+            const bad = signedRequest(body);
+            await expect(
+                controller.receiveEvents(bad.req as any, 'v0=deadbeef', bad.timestamp),
+            ).rejects.toThrow(UnauthorizedException);
+            expect(bridge.recordBinding).not.toHaveBeenCalled();
+
+            // Good signature → recorded.
+            const good = signedRequest(body);
+            await controller.receiveEvents(good.req as any, good.signature, good.timestamp);
+            expect(bridge.recordBinding).toHaveBeenCalledWith(BINDING);
+        });
     });
 });

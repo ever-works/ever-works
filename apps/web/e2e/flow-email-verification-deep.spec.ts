@@ -5,6 +5,7 @@ import {
     isMailhogAvailable,
     waitForMessageTo,
     extractLinkFromBody,
+    listMessages,
     type MailhogMessage,
 } from './helpers/mailhog';
 
@@ -145,18 +146,83 @@ function extractVerificationToken(message: MailhogMessage): string | null {
  * delivered. Returns null when delivery failed (the common e2e case — SMTP
  * 'Missing credentials for PLAIN'). Never throws on a missing mail.
  */
+/** Ids currently sitting in the box for `recipient` (empty when MailHog is down). */
+async function messageIdsFor(request: APIRequestContext, recipient: string): Promise<Set<string>> {
+    const lower = recipient.toLowerCase();
+    const messages = await listMessages(request).catch(() => []);
+    return new Set(
+        messages
+            .filter((m) => m.To?.some((t) => `${t.Mailbox}@${t.Domain}`.toLowerCase() === lower))
+            .map((m) => m.ID),
+    );
+}
+
+/**
+ * Send a verification mail and read the token OUT OF THAT MESSAGE.
+ *
+ * Registration already mails this address, and send-verification ROTATES the
+ * stored token hash — so a recipient-only match can hand back the OLDER message
+ * whose token the send just invalidated, producing a stale token that fails
+ * verify-email with a 400. (waitForMessageTo documents this hazard and expects
+ * callers to disambiguate.) We therefore snapshot the box before sending and
+ * wait for an id that was not already there.
+ */
+/**
+ * Ask the oracle which of this user's delivered tokens is CURRENT.
+ *
+ * Correlating "the newest mail" with "the latest send" is unreliable: the box
+ * also holds the registration mail, and under CI SMTP lag an EARLIER send's
+ * message can land AFTER a later one — so both "first unseen message" and
+ * "newest message" can hand back a token that a subsequent send already rotated
+ * away. validate-email-token is the ground truth: exactly one token matches the
+ * stored hash at any moment, so we simply ask which one does.
+ */
+async function currentVerificationToken(
+    request: APIRequestContext,
+    email: string,
+): Promise<string | null> {
+    const lower = email.toLowerCase();
+    const messages = await listMessages(request).catch(() => []);
+    const mine = messages.filter((m) =>
+        m.To?.some((t) => `${t.Mailbox}@${t.Domain}`.toLowerCase() === lower),
+    );
+    for (const message of mine) {
+        const candidate = extractVerificationToken(message);
+        if (!candidate) continue;
+        const res = await request.get(
+            `${API_BASE}/api/auth/validate-email-token?token=${candidate}`,
+        );
+        if (res.ok() && (await res.json()).valid === true) return candidate;
+    }
+    return null;
+}
+
+/**
+ * Send a verification mail and return the token that is CURRENT afterwards,
+ * polling until it differs from `previous` (the send rotates the stored hash, so
+ * the current token necessarily changes once the new mail lands).
+ */
 async function sendAndReadToken(
     request: APIRequestContext,
     user: { email: string; token: string },
+    previous: string | null = null,
 ): Promise<string | null> {
+    const mailUp = await isMailhogAvailable(request);
+
     const send = await request.post(`${API_BASE}/api/auth/send-verification`, {
         headers: authedHeaders(user.token),
     });
     expect(send.status(), 'send-verification for unverified user → 200').toBe(200);
     expect((await send.json()).message).toBe(SEND_VERIFICATION_MSG);
-    if (!(await isMailhogAvailable(request))) return null;
-    const mail = await waitForMessageTo(request, user.email, { timeoutMs: 8000 });
-    return mail ? extractVerificationToken(mail) : null;
+    if (!mailUp) return null;
+
+    const deadline = Date.now() + 25_000;
+    while (Date.now() < deadline) {
+        const current = await currentVerificationToken(request, user.email);
+        if (current && current !== previous) return current;
+        await new Promise((r) => setTimeout(r, 400));
+    }
+    return null;
 }
 
 /** Read `emailVerified` off the live DB row for a bearer (undefined on non-200). */
@@ -178,36 +244,24 @@ test.describe('Flow: email-verification deep (oracle / send / web-route)', () =>
         const u = await freshUser(request);
         expect(await freshVerified(request, u.token), 'fresh user starts unverified').toBe(false);
 
-        const mailUp = await isMailhogAvailable(request);
+        // Both resends read their token via sendAndReadToken, which snapshots the
+        // inbox and waits for a genuinely NEW message. Matching on recipient alone
+        // (as a plain waitForMessageTo does) can hand back the REGISTRATION mail or
+        // the previous resend's mail when SMTP delivery lags — and since every send
+        // ROTATES the stored hash, that yields an already-invalidated token and the
+        // "newest token validates" assertion below fails for a purely timing reason.
+        const creds = { email: u.email, token: u.token };
 
         // STEP 1 — first authed resend mints token #1 (writes sha256(token1) + 24h expiry).
-        const resend1 = await request.post(`${API_BASE}/api/auth/send-verification`, {
-            headers: authedHeaders(u.token),
-        });
-        expect(resend1.status(), 'first resend → 200').toBe(200);
-        expect((await resend1.json()).message).toBe(SEND_VERIFICATION_MSG);
-        const mail1 = mailUp ? await waitForMessageTo(request, u.email, { timeoutMs: 8000 }) : null;
-        const token1 = mail1 ? extractVerificationToken(mail1) : null;
+        const token1 = await sendAndReadToken(request, creds);
 
         // STEP 2 — a SECOND resend OVERWRITES the column with sha256(token2): the
-        // envelope is identical (idempotent to the caller) but the stored hash differs.
-        const resend2 = await request.post(`${API_BASE}/api/auth/send-verification`, {
-            headers: authedHeaders(u.token),
-        });
-        expect(resend2.status(), 'second resend → 200 (idempotent envelope)').toBe(200);
-        expect((await resend2.json()).message).toBe(SEND_VERIFICATION_MSG);
-        const mail2 = mailUp ? await waitForMessageTo(request, u.email, { timeoutMs: 8000 }) : null;
-        const token2 = mail2 ? extractVerificationToken(mail2) : null;
+        // envelope is identical (idempotent to the caller) but the stored hash
+        // differs. Pass token1 so we wait for the CURRENT token to actually change
+        // rather than racing MailHog's delivery order.
+        const token2 = await sendAndReadToken(request, creds, token1);
 
-        // STEP 3 — a THIRD resend never deadlocks / never 5xxes (send carries no
-        // per-route @Throttle, so it's a clean 200; tolerate a 429 defensively).
-        const resend3 = await request.post(`${API_BASE}/api/auth/send-verification`, {
-            headers: authedHeaders(u.token),
-        });
-        expect(resend3.status(), 'third resend < 500').toBeLessThan(500);
-        expect([200, 429]).toContain(resend3.status());
-
-        // STEP 4 — the REAL rotation proof, reachable only when mail delivered two
+        // STEP 3 — the REAL rotation proof, reachable only when mail delivered two
         // distinct tokens: the PRIOR token must no longer validate/verify (its hash
         // was overwritten); the LATEST token validates. This is the genuine
         // single-use-per-rotation guarantee neither sibling exercises.
@@ -245,6 +299,17 @@ test.describe('Flow: email-verification deep (oracle / send / web-route)', () =>
                 false,
             );
         }
+
+        // STEP 4 — a THIRD resend never deadlocks / never 5xxes (send carries no
+        // per-route @Throttle, so it's a clean 200; tolerate a 429 defensively).
+        // Deliberately LAST: every resend rotates the stored hash again, so issuing
+        // it BEFORE the proof above invalidated token2 — "newest token validates"
+        // then failed the moment that third rotation actually landed.
+        const resend3 = await request.post(`${API_BASE}/api/auth/send-verification`, {
+            headers: authedHeaders(u.token),
+        });
+        expect(resend3.status(), 'third resend < 500').toBeLessThan(500);
+        expect([200, 429]).toContain(resend3.status());
     });
 
     test('once verified, send-verification 400s "Email already verified" and verify-replay is rejected; mail-absent the resend stays available + cross-account state is isolated', async ({

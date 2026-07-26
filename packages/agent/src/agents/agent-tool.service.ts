@@ -31,6 +31,23 @@ import {
     type AgentNotifyChannelFacade,
     type AgentNotifyChannelResult,
 } from './agent-notify-channel-facade';
+import {
+    AGENT_DOMAIN_TOOL_SOURCES,
+    type AgentDomainToolSources,
+} from './agent-domain-tool-sources';
+// Domain chat-tool factories. VALUE imports on purpose — every one of
+// these modules imports its own domain only with `import type`, so
+// pulling the factory functions in here adds ZERO runtime graph to the
+// `agents/` subpath (that was the whole point of siting them next to
+// their domains). The services they need arrive through the
+// AGENT_DOMAIN_TOOL_SOURCES token instead.
+import { buildAgentTaskTools, type TaskToolDescriptor } from '../tasks-domain/agent-task-tools';
+import { buildIngestEventTools } from '../ingest/agent-ingest-tools';
+import { buildDigestTools } from '../digest/agent-digest-tools';
+import { buildMeetingTools } from '../meetings/agent-meeting-tools';
+import { buildFleetTools } from '../fleet/agent-fleet-tools';
+import { buildPrReviewTools } from '../pr-review/agent-pr-review-tools';
+import { buildMergePolicyTools } from '../policy/agent-merge-policy-tools';
 // Security: lexical SSRF guard reused by the model-controlled URL tools
 // (screenshot / extractContent). Blocks non-HTTP(S) schemes, literal
 // private/loopback/link-local IPs, and cloud-metadata hostnames before
@@ -132,6 +149,15 @@ export class AgentToolService {
         @Optional()
         @Inject(AGENT_NOTIFY_CHANNEL_FACADE)
         private readonly notifyChannelFacade?: AgentNotifyChannelFacade,
+        // Domain chat tools (tasks / ingest / digest / meetings / fleet /
+        // pr-review / merge-policy). Token-injected for the same
+        // circular-dep reason as the facades above — this bundle carries
+        // ONLY the backing services; the descriptors themselves are
+        // assembled below, in `resolveAllowedTools`, so the tool loop
+        // keeps exactly one assembly point.
+        @Optional()
+        @Inject(AGENT_DOMAIN_TOOL_SOURCES)
+        private readonly domainToolSources?: AgentDomainToolSources,
     ) {}
 
     /**
@@ -253,7 +279,131 @@ export class AgentToolService {
         tools.push(this.buildGetActivityTool(agent));
         tools.push(this.buildGetKbDocumentTool(agent));
 
+        // Domain chat tools — the per-entity surfaces the program's DoD
+        // requires every new entity to ship with. Appended LAST so the
+        // built-in tool ordering (and every existing index-based
+        // assertion) is unchanged.
+        tools.push(...this.buildDomainTools(agent));
+
         return tools;
+    }
+
+    /**
+     * Build the domain chat tools for one Agent from the injected
+     * `AGENT_DOMAIN_TOOL_SOURCES` bundle.
+     *
+     * Scoping rules — identical posture to the built-in tools above:
+     *
+     *  - EVERY tool is owner-scoped to `agent.userId`; the factories only
+     *    ever read/write rows for that user (cross-user ids resolve to a
+     *    "not found" with no existence leak).
+     *  - `createTask` / `transitionTask` are gated on
+     *    `permissions.canAssignTasks` INSIDE `buildAgentTaskTools`;
+     *    `commentOnTask` is gated fail-closed on Task membership.
+     *  - `review_pull_request` is gated on `permissions.canCallExternalTools`
+     *    here: it fetches a diff from, and posts a comment to, a remote
+     *    git host — the same "outbound network call" risk class as
+     *    searchWeb / screenshot / extractContent / sendEmail.
+     *  - The remaining tools are READ-ONLY owner-scoped lookups over the
+     *    user's own rows (same risk class as the getActivity /
+     *    getKbDocument reads), so they carry no extra permission flag.
+     *
+     * A failing factory must never take down tool resolution — a broken
+     * domain simply contributes no tools.
+     *
+     * ## Naming
+     *
+     * NEW tools are `snake_case` (action verb + singular noun) — the
+     * convention every domain tool here already follows and the one the
+     * whole web manifest uses. The built-in tools above are camelCase and
+     * stay that way: a tool name is part of a live model contract and is
+     * recorded in stored conversation histories, so renaming them breaks
+     * replay for no user-visible gain. Documented, not churned — see
+     * `docs/specs/features/chat-everything/README.md` §4.1.
+     */
+    private buildDomainTools(agent: Agent): AgentToolDescriptor[] {
+        const sources = this.domainToolSources;
+        if (!sources) return [];
+
+        const out: AgentToolDescriptor[] = [];
+        const add = (domain: string, build: () => TaskToolDescriptor[]): void => {
+            try {
+                out.push(...(build() as AgentToolDescriptor[]));
+            } catch (err) {
+                this.logger.warn(
+                    `Agent ${agent.id}: ${domain} chat tools could not be assembled (skipped): ${
+                        err instanceof Error ? err.message : String(err)
+                    }`,
+                );
+            }
+        };
+
+        if (sources.tasks) {
+            const tasks = sources.tasks;
+            add('tasks', () =>
+                buildAgentTaskTools({
+                    agent,
+                    tasksService: tasks.tasksService,
+                    chatService: tasks.chatService,
+                    assignees: tasks.assignees,
+                    reviewers: tasks.reviewers,
+                    approvers: tasks.approvers,
+                }),
+            );
+        }
+
+        if (sources.ingest) {
+            const ingest = sources.ingest;
+            add('ingest', () =>
+                buildIngestEventTools({ userId: agent.userId, repository: ingest.repository }),
+            );
+        }
+
+        if (sources.digest) {
+            const digest = sources.digest;
+            add('digest', () =>
+                buildDigestTools({ userId: agent.userId, digestService: digest.digestService }),
+            );
+        }
+
+        if (sources.meetings) {
+            const meetings = sources.meetings;
+            add('meetings', () =>
+                buildMeetingTools({ userId: agent.userId, repository: meetings.repository }),
+            );
+        }
+
+        if (sources.fleet) {
+            const fleet = sources.fleet;
+            add('fleet', () => buildFleetTools({ userId: agent.userId, service: fleet.service }));
+        }
+
+        // Outbound network call + a comment posted on someone's PR —
+        // gated exactly like the other external-tool surfaces.
+        if (agent.permissions?.canCallExternalTools && sources.prReview) {
+            const prReview = sources.prReview;
+            add('pr-review', () =>
+                buildPrReviewTools({
+                    userId: agent.userId,
+                    prReviewService: prReview.prReviewService,
+                }),
+            );
+        }
+
+        if (sources.mergePolicy) {
+            const mergePolicy = sources.mergePolicy;
+            add('merge-policy', () =>
+                buildMergePolicyTools({
+                    userId: agent.userId,
+                    service: mergePolicy.service,
+                    // Owner check runs per invocation against THIS agent's
+                    // owner — never the model-supplied id alone.
+                    authorize: (input) => mergePolicy.authorize(agent.userId, input),
+                }),
+            );
+        }
+
+        return out;
     }
 
     // ── tool builders ─────────────────────────────────────────────

@@ -1,3 +1,4 @@
+import type { TaskAcceptanceCheck } from '@ever-works/contracts';
 import type { AgentExportEnvelope } from '../agents/agent-export.service';
 
 /**
@@ -93,10 +94,42 @@ export interface ExportedTask {
     reviewers: Array<{ type: 'user' | 'agent'; identifier: string }>;
     approvers: Array<{ type: 'user' | 'agent'; identifier: string }>;
     requireAllApprovers: boolean;
+    /**
+     * Per-Task override of the Work's isolation setting: `'on' | 'off'`,
+     * `null` = inherit. A user-authored setting, so it round-trips;
+     * drop-if-unrecognized on import.
+     */
+    isolationMode?: string | null;
+    /**
+     * Task-level acceptance checks (quality gates). `null` = inherit the
+     * Work's `checkDefaults`. Arrays only ever import as arrays.
+     */
+    acceptanceChecks?: TaskAcceptanceCheck[] | null;
+    /**
+     * Task-level gate-attempt budget. `null` = inherit the Work's value.
+     * Out-of-range values are dropped on import, never clamped — clamping
+     * would launder a bogus payload value into a legitimate-looking setting.
+     */
+    maxGateAttempts?: number | null;
     createdAt: string;
     startedAt?: string | null;
     completedAt?: string | null;
     chat?: ExportedTaskChatMessage[];
+    // NOTE — the Task BRANCH columns (`branchRef`, `branchState`,
+    // `baseSha`, `prNumber`, `prUrl`, `conflictPaths`), the PR-status
+    // cache (`prState`, `ciState`, `ciCheckedAt`, `prChecks` — kanban M5)
+    // and the latest-run denorm (`latestRunId`, `latestRunStatus`) are
+    // DELIBERATELY absent,
+    // and that omission is correct rather than the usual "new column
+    // forgotten in the transfer whitelist" bug. They are not settings —
+    // they are live runtime state naming a git ref, a base commit and a
+    // pull request inside the EXPORTING account's repository, plus a
+    // pointer to an AgentRun row that is not part of this envelope.
+    // Replaying them would give the imported Task a branch/PR/run identity
+    // it does not own, so the importer's isolation flow would resume
+    // against someone else's branch instead of provisioning its own. An
+    // imported Task therefore starts with clean branch state and engages
+    // isolation from scratch on its first run.
 }
 
 /**

@@ -39,13 +39,15 @@ async function errorsFor(over: Partial<Record<string, unknown>> = {}) {
 }
 
 describe('TENANT_JOB_RUNTIME_PROVIDER_IDS — floor-level enum (EW-685 contract)', () => {
-    it('ships exactly five provider ids in stable order (regression guard)', () => {
+    it('ships exactly six provider ids in stable order (regression guard)', () => {
         expect(TENANT_JOB_RUNTIME_PROVIDER_IDS).toEqual([
             'trigger',
             'temporal',
             'bullmq',
             'pgboss',
             'inngest',
+            // Desktop PRD M4 — the fleet runtime (job-runtime-node).
+            'node',
         ]);
     });
 
@@ -231,6 +233,7 @@ describe('UpsertTenantJobRuntimeConfigDto — type exports stay aligned with the
             'bullmq',
             'pgboss',
             'inngest',
+            'node',
         ];
         for (const id of literals) {
             expect(TENANT_JOB_RUNTIME_PROVIDER_IDS).toContain(id);

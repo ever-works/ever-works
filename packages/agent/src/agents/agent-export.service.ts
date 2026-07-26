@@ -117,6 +117,14 @@ export interface AgentExportEnvelope {
         aiProviderId: string | null;
         modelId: string | null;
         maxSkillContextTokens: number;
+        /**
+         * Memory-recall injection toggle. Optional so pre-recall envelopes
+         * keep importing; absent = leave the target Agent's own setting
+         * alone. A deliberate `false` must survive an export/import round
+         * trip — omitting it would silently re-enable recall on the
+         * imported Agent. Applied only when it really is a boolean.
+         */
+        memoryRecallEnabled?: boolean;
     };
     runtime: {
         permissions: AgentPermissions;
@@ -262,6 +270,9 @@ export class AgentExportService {
                 aiProviderId: agent.aiProviderId ?? null,
                 modelId: agent.modelId ?? null,
                 maxSkillContextTokens: agent.maxSkillContextTokens,
+                ...(typeof agent.memoryRecallEnabled === 'boolean'
+                    ? { memoryRecallEnabled: agent.memoryRecallEnabled }
+                    : {}),
             },
             runtime: {
                 permissions: agent.permissions ?? AGENT_PERMISSIONS_DEFAULT,
@@ -451,6 +462,11 @@ export class AgentExportService {
             aiProviderId: envelope.model.aiProviderId,
             modelId: envelope.model.modelId,
             maxSkillContextTokens: envelope.model.maxSkillContextTokens,
+            // Recall toggle: apply only an explicit boolean (notably
+            // `false`); absent in pre-recall envelopes → the column default.
+            ...(typeof envelope.model.memoryRecallEnabled === 'boolean'
+                ? { memoryRecallEnabled: envelope.model.memoryRecallEnabled }
+                : {}),
             status: AgentStatus.DRAFT, // imported Agents always start in DRAFT — user vets before activating
             permissions,
             targets: envelope.runtime.targets,
@@ -614,6 +630,12 @@ export class AgentExportService {
             aiProviderId: envelope.model.aiProviderId,
             modelId: envelope.model.modelId,
             maxSkillContextTokens: envelope.model.maxSkillContextTokens,
+            // Recall toggle on the overwrite path too — explicit boolean
+            // only, so an old envelope can't silently re-enable recall on
+            // an existing Agent that deliberately turned it off.
+            ...(typeof envelope.model.memoryRecallEnabled === 'boolean'
+                ? { memoryRecallEnabled: envelope.model.memoryRecallEnabled }
+                : {}),
             // Security (D9): clamp imported permissions to least-privilege
             // on the overwrite path too — the envelope is attacker-editable,
             // so an overwrite import must NOT silently elevate an existing

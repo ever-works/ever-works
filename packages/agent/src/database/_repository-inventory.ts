@@ -34,6 +34,7 @@ import { ActivityLogRepository } from './repositories/activity-log.repository';
 import { AgentEmailAssignmentRepository } from './repositories/agent-email-assignment.repository';
 import { ApiKeyRepository } from './repositories/api-key.repository';
 import { AuthAccountRepository } from './repositories/auth-account.repository';
+import { BillingProfileRepository } from './repositories/billing-profile.repository';
 import { ConversationRepository } from './repositories/conversation.repository';
 import { CreditLedgerRepository } from './repositories/credit-ledger.repository';
 import { EmailConversationRepository } from './repositories/email-conversation.repository';
@@ -41,6 +42,7 @@ import { EmailMessageRepository } from './repositories/email-message.repository'
 import { GitHubAppInstallationRepoRepository } from './repositories/github-app-installation-repository.repository';
 import { GitHubAppInstallationRepository } from './repositories/github-app-installation.repository';
 import { GitHubAppUserLinkRepository } from './repositories/github-app-user-link.repository';
+import { InvoiceRepository } from './repositories/invoice.repository';
 import { NotificationChannelDeliveryLogRepository } from './repositories/notification-channel-delivery-log.repository';
 import { NotificationChannelRepository } from './repositories/notification-channel.repository';
 import { NotificationEventTypeRepository } from './repositories/notification-event-type.repository';
@@ -82,6 +84,7 @@ export const REPOSITORY_PROVIDERS: ReadonlyArray<Type<unknown>> = [
     AgentEmailAssignmentRepository,
     ApiKeyRepository,
     AuthAccountRepository,
+    BillingProfileRepository,
     ConversationRepository,
     CreditLedgerRepository,
     EmailConversationRepository,
@@ -89,6 +92,7 @@ export const REPOSITORY_PROVIDERS: ReadonlyArray<Type<unknown>> = [
     GitHubAppInstallationRepoRepository,
     GitHubAppInstallationRepository,
     GitHubAppUserLinkRepository,
+    InvoiceRepository,
     NotificationChannelDeliveryLogRepository,
     NotificationChannelRepository,
     NotificationEventTypeRepository,

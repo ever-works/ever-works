@@ -47,7 +47,7 @@ describe('providerIconMap', () => {
     it('returns an entry for every known provider id', () => {
         const map = providerIconMap();
         expect(Object.keys(map).sort()).toEqual(
-            ['bullmq', 'inngest', 'pgboss', 'temporal', 'trigger'].sort(),
+            ['bullmq', 'inngest', 'node', 'pgboss', 'temporal', 'trigger'].sort(),
         );
     });
 

@@ -65,8 +65,15 @@ import type { IPlugin } from '../plugin.interface.js';
  * `@ever-works/plugin`. The selector env var `EVER_WORKS_JOB_RUNTIME`
  * accepts these and only these values; unknown values fall back to
  * `trigger` (the default).
+ *
+ * `node` (Desktop PRD §6.2 / M4) is the fleet runtime: its "queue" is
+ * the set of machines the owner enrolled in Fleet. Enqueue writes a
+ * lease-able `fleet_jobs` row, enrolled nodes poll for work over the
+ * same outbound-only channel enrollment/heartbeat already use, and
+ * results come back the same way. It is a pull-model provider like
+ * BullMQ/pg-boss/Temporal, so it implements `startWorkerHost`.
  */
-export type JobRuntimeId = 'trigger' | 'temporal' | 'bullmq' | 'pgboss' | 'inngest';
+export type JobRuntimeId = 'trigger' | 'temporal' | 'bullmq' | 'pgboss' | 'inngest' | 'node';
 
 /**
  * Run lifecycle states observable via `getRunStatus(runId)`. Providers

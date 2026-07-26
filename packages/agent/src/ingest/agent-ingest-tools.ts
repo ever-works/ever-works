@@ -19,6 +19,12 @@ import type { IngestedEventRepository } from './ingested-event.repository';
 export interface ListRecentEventsArgs {
     /** Optional producing plugin id filter, e.g. `slack-connector`. */
     source?: string;
+    /**
+     * Optional Work filter — "what happened on this Work" (the per-Work
+     * Activities feed). Applied on top of the owner scope, so an id the
+     * caller does not own simply returns nothing.
+     */
+    workId?: string;
     /** Max rows (default 20, capped at 50). */
     limit?: number;
 }
@@ -53,6 +59,11 @@ export function buildIngestEventTools(args: {
                     type: 'string',
                     description: 'Optional plugin id to filter by (e.g. a connector id).',
                 },
+                workId: {
+                    type: 'string',
+                    description:
+                        'Optional Work id — return only events routed to that Work (per-Work activity feed).',
+                },
                 limit: {
                     type: 'integer',
                     description: 'Max events to return (default 20, capped at 50).',
@@ -64,14 +75,15 @@ export function buildIngestEventTools(args: {
             const a = (raw ?? {}) as ListRecentEventsArgs;
             const limit = Math.min(Math.max(Number(a.limit) || 20, 1), 50);
             try {
-                // Owner-scoped read; over-fetch when a source filter is
-                // applied so the filter does not starve the page.
-                const rows = await args.repository.findRecentByUser(
-                    args.userId,
-                    a.source ? limit * 3 : limit,
-                );
-                const filtered = a.source ? rows.filter((row) => row.source === a.source) : rows;
-                const events: RecentEventSummary[] = filtered.slice(0, limit).map((row) => ({
+                // Owner-scoped read. The source + workId filters are
+                // pushed into SQL so the page is never starved by rows
+                // the caller did not ask for.
+                const rows = await args.repository.findRecentByUser(args.userId, {
+                    limit,
+                    ...(a.source ? { source: a.source } : {}),
+                    ...(a.workId ? { workId: a.workId } : {}),
+                });
+                const events: RecentEventSummary[] = rows.slice(0, limit).map((row) => ({
                     id: row.id,
                     source: row.source,
                     kind: row.kind,

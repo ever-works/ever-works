@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
+import { sanitizeMergePolicyOverride, type MergePolicyOverride } from '@ever-works/contracts';
 import { Tenant } from '../../entities/tenant.entity';
 
 /**
@@ -47,5 +48,40 @@ export class TenantRepository {
 
     async save(tenant: Tenant): Promise<Tenant> {
         return this.repository.save(tenant);
+    }
+
+    /**
+     * Merge-policy matrix (Wave 3, D4) — the TENANT write path.
+     *
+     * INTERNAL-ONLY BY CONTRACT. Tenants are not a user-facing entity: they
+     * are lazily created, never listed, and never rendered, so this is the
+     * one column on the row an operator has any reason to set. Its only
+     * caller is `OperatorTenantMergePolicyController`, which sits behind
+     * `IsPlatformAdminGuard` (`User.isPlatformAdmin === true`) exactly like
+     * the sibling operator surfaces. There is deliberately no tenant-self
+     * PATCH: a tenant-scoped policy is the operator's CEILING over every
+     * organization beneath it, and a ceiling anyone underneath can raise is
+     * not a ceiling.
+     *
+     * Storage shape matches the other three scopes: a sanitized PARTIAL
+     * (drop-if-unrecognized, never coerce), and an override that sanitizes
+     * down to `{}` is stored as NULL so "inherit" has exactly one
+     * representation at rest.
+     *
+     * @returns the updated row, or `null` when no such tenant exists.
+     */
+    async updateMergePolicy(
+        tenantId: string,
+        mergePolicy: MergePolicyOverride | null,
+    ): Promise<Tenant | null> {
+        const existing = await this.repository.findOne({ where: { id: tenantId } });
+        if (!existing) return null;
+        let next: MergePolicyOverride | null = null;
+        if (mergePolicy) {
+            const sanitized = sanitizeMergePolicyOverride(mergePolicy);
+            next = Object.keys(sanitized).length > 0 ? sanitized : null;
+        }
+        await this.repository.update(tenantId, { mergePolicy: next });
+        return this.repository.findOne({ where: { id: tenantId } });
     }
 }

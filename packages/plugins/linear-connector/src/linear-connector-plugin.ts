@@ -47,6 +47,21 @@ function truncateText(text: string): string {
 	return text.length > LINEAR_EVENT_TEXT_MAX_CHARS ? text.slice(0, LINEAR_EVENT_TEXT_MAX_CHARS) : text;
 }
 
+/**
+ * Team key out of an issue identifier (`ENG-123` → `ENG`).
+ *
+ * The issue/comment nodes this connector pulls carry the identifier but
+ * not the team object, and resolving the team would cost one lazy fetch
+ * per node. The identifier prefix IS the team key by Linear's own
+ * construction, so it is both free and exact. Returns undefined for
+ * anything that is not `<KEY>-<number>`.
+ */
+function teamKeyFromIdentifier(identifier: string | undefined): string | undefined {
+	if (!identifier) return undefined;
+	const match = /^([A-Za-z0-9]+)-\d+$/.exec(identifier.trim());
+	return match ? match[1] : undefined;
+}
+
 /** Parse the team filter list: comma/space separated ids → array. */
 function resolveTeamIds(settings: PluginSettings | undefined): string[] {
 	const raw = settings?.teamIds;
@@ -410,6 +425,7 @@ export class LinearConnectorPlugin implements IConnectorPlugin, IEventSourcePlug
 		const updatedAt = toIso(issue.updatedAt ?? issue.createdAt);
 		const createdAt = toIso(issue.createdAt);
 		const changeType = Date.parse(createdAt) >= Date.parse(since) ? 'created' : 'updated';
+		const teamKey = teamKeyFromIdentifier(issue.identifier);
 		return {
 			id: randomUUID(),
 			source: this.id,
@@ -421,6 +437,10 @@ export class LinearConnectorPlugin implements IConnectorPlugin, IEventSourcePlug
 				externalId: issue.id,
 				...(issue.title ? { title: issue.title } : {})
 			},
+			// Work routing: the team is the container an Ever Works Work
+			// maps onto. Issues with an unparseable identifier carry no
+			// hint and stay user-scoped.
+			...(teamKey ? { workHint: { kind: 'tracker-team' as const, externalId: teamKey } } : {}),
 			...(issue.url ? { sourceUrl: issue.url } : {}),
 			payload: {
 				issueId: issue.id,
@@ -449,6 +469,7 @@ export class LinearConnectorPlugin implements IConnectorPlugin, IEventSourcePlug
 			issue = undefined;
 		}
 		const sourceUrl = comment.url ?? issue?.url;
+		const teamKey = teamKeyFromIdentifier(issue?.identifier);
 		return {
 			id: randomUUID(),
 			source: this.id,
@@ -460,6 +481,9 @@ export class LinearConnectorPlugin implements IConnectorPlugin, IEventSourcePlug
 				externalId: issue?.id ?? 'unknown',
 				...(issue?.title ? { title: issue.title } : {})
 			},
+			// Same team-as-container routing as issues; the parent-issue
+			// fetch is best-effort, so a failed one simply means no hint.
+			...(teamKey ? { workHint: { kind: 'tracker-team' as const, externalId: teamKey } } : {}),
 			...(sourceUrl ? { sourceUrl } : {}),
 			payload: {
 				commentId: comment.id,

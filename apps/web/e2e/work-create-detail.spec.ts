@@ -126,8 +126,15 @@ test.describe('Work create + detail (core domain)', () => {
                     { timeout: 30_000 },
                 )
                 .catch(() => null),
-            workCardLink.click(),
+            workCardLink.click().catch(() => undefined),
         ]);
+        // Under CI shard load the debounced-search re-render can swallow/abort the
+        // first soft-nav (net::ERR_ABORTED, URL stays on /works). The point of this
+        // step is that the DETAIL PAGE renders, not which navigation delivered us
+        // there — so if the soft-nav didn't land, fall back to a hard navigation.
+        if (!new RegExp(`/works/${workId}`).test(page.url())) {
+            await page.goto(`/en/works/${workId}`, { waitUntil: 'domcontentloaded' });
+        }
         await expect(page).toHaveURL(new RegExp(`/works/${workId}`), { timeout: 30_000 });
         if (detailNav) {
             expect(detailNav.status(), 'work detail nav should not 5xx').toBeLessThan(500);

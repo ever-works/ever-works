@@ -3,6 +3,7 @@ import { getTranslations } from 'next-intl/server';
 import { notFound } from 'next/navigation';
 import { workAPI } from '@/lib/api';
 import { ActivityFeedClient } from '@/components/works/detail/activity/ActivityFeedClient';
+import { IngestedEventsPanel } from '@/components/works/detail/activity/IngestedEventsPanel';
 import type { FeedCategory } from '@/lib/api/works/activity-feed.types';
 import { FEED_CATEGORIES } from '@/lib/api/works/activity-feed.types';
 import {
@@ -45,10 +46,19 @@ export default async function WorkActivityPage({ params, searchParams }: Params)
     }
 
     return (
-        <ActivityFeedClient
-            workId={id}
-            initialCategory={parseCategory(category)}
-            initialStatus={parseStatus(status)}
-        />
+        <div className="space-y-8">
+            <ActivityFeedClient
+                workId={id}
+                initialCategory={parseCategory(category)}
+                initialStatus={parseStatus(status)}
+            />
+            {/*
+             * Wave 8 feature j — external activity from the connectors
+             * (commits/PRs, tracker issues, docs, chat, meetings) for THIS
+             * Work, filtered by source. Additive: the platform activity
+             * feed above is untouched.
+             */}
+            <IngestedEventsPanel workId={id} />
+        </div>
     );
 }

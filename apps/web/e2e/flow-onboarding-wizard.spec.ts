@@ -14,7 +14,7 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *   - POST  /api/onboarding/complete → sets completedAt (idempotent, 200)
  *   - POST  /api/onboarding/dismiss  → sets dismissedAt (idempotent, 200)
  *   - POST  /api/onboarding/telemetry→ 204 for allow-listed events, 400 else
- *   - GET   /api/onboarding/catalog  → { ai[6], storage[4], deploy[3], plugins[] }
+ *   - GET   /api/onboarding/catalog  → { ai[6], storage[4], db[2], deploy[3], plugins[] }
  *
  * The "step list derives from choices" assertion mirrors the product's own
  * `computeStepList` (apps/web/src/components/onboarding/useOnboardingFlow.ts):
@@ -34,6 +34,7 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
 
 type AiChoice = 'ever-works' | 'openrouter' | 'claude-code' | 'codex' | 'gemini' | 'grok';
 type StorageChoice = 'ever-works-git' | 'user-github' | 'user-gitlab' | 'user-git';
+type DbChoice = 'ever-works-db' | 'custom';
 type DeployChoice = 'ever-works' | 'vercel' | 'k8s';
 
 interface WizardStateV2 {
@@ -41,6 +42,7 @@ interface WizardStateV2 {
     lastStep: number;
     ai: { choice: AiChoice };
     storage: { choice: StorageChoice };
+    db: { choice: DbChoice };
     deploy: { choice: DeployChoice };
     skippedSteps: string[];
     pluginsReviewed: boolean;
@@ -65,6 +67,7 @@ interface CatalogCard {
 interface CatalogResponse {
     ai: CatalogCard[];
     storage: CatalogCard[];
+    db: CatalogCard[];
     deploy: CatalogCard[];
     plugins: Array<{
         pluginId: string;
@@ -79,16 +82,20 @@ interface CatalogResponse {
 
 /**
  * Mirror of `computeStepList` in useOnboardingFlow.ts. Base flow is always
- * welcome → ai-choice → storage-choice → deploy-choice → plugins-catalog →
- * create-work (6 steps). Per-provider config steps are inserted ONLY for a
- * non-default choice in that bucket. With all defaults that is exactly 6
- * steps; with all BYOK + a self-hosted deploy it is 9.
+ * welcome → ai-choice → storage-choice → db-choice → deploy-choice →
+ * plugins-catalog → create-work (7 steps). Per-provider config steps are
+ * inserted ONLY for a non-default choice in the ai/storage/deploy buckets.
+ * The db bucket adds a bare db-choice step with NO config sub-step (even for
+ * the non-default `custom` choice — its connection details are entered on the
+ * Deploy page after creation, not in the wizard). With all defaults that is
+ * exactly 7 steps; with all BYOK + a self-hosted deploy it is 10.
  */
 function computeStepIds(state: Pick<WizardStateV2, 'ai' | 'storage' | 'deploy'>): string[] {
     const ids: string[] = ['welcome', 'ai-choice'];
     if (state.ai.choice !== 'ever-works') ids.push(`ai-config:${state.ai.choice}`);
     ids.push('storage-choice');
     if (state.storage.choice === 'user-github') ids.push(`storage-config:${state.storage.choice}`);
+    ids.push('db-choice');
     ids.push('deploy-choice');
     if (state.deploy.choice === 'vercel' || state.deploy.choice === 'k8s') {
         ids.push(`deploy-config:${state.deploy.choice}`);
@@ -143,16 +150,19 @@ test.describe('Onboarding wizard — catalog-driven multi-step flow', () => {
         expect(pristine.state.lastStep).toBe(0);
         expect(pristine.state.ai.choice).toBe('ever-works');
         expect(pristine.state.storage.choice).toBe('ever-works-git');
+        expect(pristine.state.db.choice).toBe('ever-works-db');
         expect(pristine.state.deploy.choice).toBe('ever-works');
         expect(pristine.state.skippedSteps).toEqual([]);
         expect(pristine.state.pluginsReviewed).toBe(false);
 
-        // With all defaults the wizard renders exactly the 6 base steps —
-        // no config sub-steps because every bucket is the Ever Works default.
+        // With all defaults the wizard renders exactly the 7 base steps —
+        // no config sub-steps because every ai/storage/deploy bucket is the
+        // Ever Works default, and db-choice is always a bare step.
         expect(computeStepIds(pristine.state)).toEqual([
             'welcome',
             'ai-choice',
             'storage-choice',
+            'db-choice',
             'deploy-choice',
             'plugins-catalog',
             'create-work',
@@ -165,6 +175,7 @@ test.describe('Onboarding wizard — catalog-driven multi-step flow', () => {
         const catalog = (await catalogRes.json()) as CatalogResponse;
         expect(catalog.ai).toHaveLength(6);
         expect(catalog.storage).toHaveLength(4);
+        expect(catalog.db).toHaveLength(2);
         expect(catalog.deploy).toHaveLength(3);
         // Each bucket has exactly one default; AI's default is Ever Works.
         expect(catalog.ai.filter((c) => c.default).map((c) => c.choice)).toEqual(['ever-works']);
@@ -196,10 +207,11 @@ test.describe('Onboarding wizard — catalog-driven multi-step flow', () => {
         expect(afterAi.state.storage.choice).toBe('ever-works-git');
         expect(afterAi.state.deploy.choice).toBe('ever-works');
 
-        // The derived step list now includes an ai-config step → 7 steps.
+        // The derived step list now includes an ai-config step → 8 steps
+        // (7 base steps + the inserted ai-config sub-step).
         const stepsAfterAi = computeStepIds(afterAi.state);
         expect(stepsAfterAi).toContain(`ai-config:${byokAi}`);
-        expect(stepsAfterAi).toHaveLength(7);
+        expect(stepsAfterAi).toHaveLength(8);
 
         // Step — pick a non-default storage + deploy that each add a config
         // sub-step, advance lastStep, and skip the plugins step.
@@ -218,7 +230,8 @@ test.describe('Onboarding wizard — catalog-driven multi-step flow', () => {
         // AI choice from the earlier patch survived (true deep-merge, not replace).
         expect(afterStorageDeploy.state.ai.choice).toBe(byokAi);
 
-        // Now all three buckets are non-default → the full 9-step flow.
+        // Now all three config-bearing buckets are non-default → the full
+        // 10-step flow (9 previously, +1 for the always-present db-choice).
         const fullSteps = computeStepIds(afterStorageDeploy.state);
         expect(fullSteps).toEqual([
             'welcome',
@@ -226,6 +239,7 @@ test.describe('Onboarding wizard — catalog-driven multi-step flow', () => {
             `ai-config:${byokAi}`,
             'storage-choice',
             'storage-config:user-github',
+            'db-choice',
             'deploy-choice',
             'deploy-config:vercel',
             'plugins-catalog',
@@ -379,11 +393,11 @@ test.describe('Onboarding wizard — dismiss + complete lifecycle', () => {
         expect(showBadge).toBe(true);
 
         // Badge label maths: currentStep = min(lastStep + 1, totalSteps),
-        // totalSteps = derived step count. All defaults → 6 steps, lastStep 4
-        // → badge reads "5/6".
+        // totalSteps = derived step count. All defaults → 7 steps, lastStep 4
+        // → badge reads "5/7".
         const totalSteps = computeStepIds(after.state).length;
         const currentStep = Math.min(after.state.lastStep + 1, totalSteps);
-        expect(totalSteps).toBe(6);
+        expect(totalSteps).toBe(7);
         expect(currentStep).toBe(5);
     });
 

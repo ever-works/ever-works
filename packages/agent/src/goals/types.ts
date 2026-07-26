@@ -1,8 +1,11 @@
 import type {
     Goal,
     GoalComparator,
+    GoalConstraint,
+    GoalCriterion,
     GoalMetricSource,
     GoalOutcome,
+    GoalResolvedScore,
     GoalStatus,
     GoalWindow,
 } from '../entities/goal.entity';
@@ -42,6 +45,12 @@ export interface GoalDto {
     nextCheckAt: Date | null;
     status: GoalStatus;
     outcome: GoalOutcome | null;
+    // Judgment layer G1 - additive. `null` on every single-metric Goal,
+    // which is what an existing client already renders (absent field ->
+    // absent section), so widening the DTO breaks nothing.
+    criteria: GoalCriterion[] | null;
+    constraints: GoalConstraint[] | null;
+    resolvedScore: GoalResolvedScore | null;
     createdAt: Date;
     updatedAt: Date;
 }
@@ -64,6 +73,9 @@ export function toGoalDto(goal: Goal): GoalDto {
         nextCheckAt: goal.nextCheckAt ?? null,
         status: goal.status,
         outcome: goal.outcome ?? null,
+        criteria: goal.criteria ?? null,
+        constraints: goal.constraints ?? null,
+        resolvedScore: goal.resolvedScore ?? null,
         createdAt: goal.createdAt,
         updatedAt: goal.updatedAt,
     };
@@ -128,6 +140,10 @@ export interface CreateGoalInput {
     baselineValue?: number | null;
     deadline?: Date | null;
     checkFrequencyMinutes?: number;
+    /** Judgment layer G1 - weighted criteria. Omitted = single-metric Goal. */
+    criteria?: GoalCriterion[] | null;
+    /** Judgment layer G1 - constraints that must hold. */
+    constraints?: GoalConstraint[] | null;
 }
 
 /**
@@ -148,6 +164,9 @@ export interface UpdateGoalInput {
     deadline?: Date | null;
     checkFrequencyMinutes?: number;
     outcome?: GoalOutcome | null;
+    /** `null` explicitly clears the weighted path (back to single-metric). */
+    criteria?: GoalCriterion[] | null;
+    constraints?: GoalConstraint[] | null;
 }
 
 export interface ListGoalsFilter {
@@ -162,6 +181,12 @@ export interface GoalEvaluationEntry {
     outcome: 'evaluated' | 'achieved' | 'missed' | 'skipped' | 'failed';
     value?: number;
     message?: string;
+    /**
+     * Judgment layer G1 - resolved weighted score (0..1). Present ONLY
+     * for Goals that declare criteria; a single-metric Goal reports
+     * `value` and no score, exactly as it always has.
+     */
+    score?: number;
 }
 
 /** Structured summary returned by `GoalEvaluationService.evaluateDue`. */

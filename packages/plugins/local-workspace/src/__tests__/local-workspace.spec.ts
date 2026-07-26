@@ -174,6 +174,8 @@ describe('finalize', () => {
 		const fin = await plugin.finalize(handle, { commitMessage: 'agent: nothing', push: true });
 		expect(fin.empty).toBe(true);
 		expect(fin.pushed).toBe(false);
+		// Run telemetry — an empty run honestly reports zero changed files.
+		expect(fin.changedFiles).toBe(0);
 	});
 
 	it('commits and pushes changes to the task branch, never the base', async () => {
@@ -183,6 +185,9 @@ describe('finalize', () => {
 		const fin = await plugin.finalize(handle, { commitMessage: 'agent: feature', push: true });
 		expect(fin.pushed).toBe(true);
 		expect(fin.headSha).not.toBe(handle.baseSha);
+		// Run telemetry — the branch's file footprint vs the base it was
+		// cut from, which is what `agent_runs.changedFilesCount` shows.
+		expect(fin.changedFiles).toBe(1);
 
 		// Remote task branch has the commit; remote main is untouched.
 		const remoteBranch = git(originDir, 'rev-parse', 'refs/heads/task/push-77778888');

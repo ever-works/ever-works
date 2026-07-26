@@ -31,7 +31,7 @@ import { IsBoolean, IsIn, IsOptional, IsString, MaxLength, ValidateIf } from 'cl
 
 /**
  * Allowed `providerId` values. Mirrors the EW-685 contract enumeration
- * (`'trigger' | 'temporal' | 'bullmq' | 'pgboss' | 'inngest'`) and the
+ * (`'trigger' | 'temporal' | 'bullmq' | 'pgboss' | 'inngest' | 'node'`) and the
  * availability matrix in
  * [`providers.md`](../../../../../docs/specs/features/tenant-job-runtime-overlay/providers.md).
  * Kept here as a module-local literal tuple (rather than imported from
@@ -45,6 +45,7 @@ export const TENANT_JOB_RUNTIME_PROVIDER_IDS = [
     'bullmq',
     'pgboss',
     'inngest',
+    'node',
 ] as const;
 
 export type TenantJobRuntimeProviderId = (typeof TENANT_JOB_RUNTIME_PROVIDER_IDS)[number];

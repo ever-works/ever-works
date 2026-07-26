@@ -1,9 +1,33 @@
+/**
+ * Mirrors `ExportedProfile` in
+ * `packages/agent/src/account-transfer/types.ts`. The onboarding answers
+ * and account preferences are user-authored settings that must survive an
+ * export/import round trip; every field is optional so pre-sweep payloads
+ * still parse.
+ */
+export interface ExportedProfile {
+    username: string;
+    email: string;
+    avatar?: string;
+    onboarding?: {
+        roles?: string[];
+        teamSize?: string;
+    };
+    preferences?: {
+        digestFrequency?: string;
+        emailAgentAlerts?: boolean;
+        emailTaskNotifications?: boolean;
+        emailBudgetAlerts?: boolean;
+        userResearchOptOut?: boolean;
+    };
+}
+
 export interface AccountExportPayload {
     version: number;
     exportedAt: string;
     includesSecrets: boolean;
     data: {
-        profile: { username: string; email: string; avatar?: string };
+        profile: ExportedProfile;
         works: any[];
         userPlugins: any[];
     };
@@ -21,7 +45,7 @@ export interface ImportPreview {
     version: number;
     includesSecrets: boolean;
     hasMaskedSecrets: boolean;
-    profile: { username: string; email: string; avatar?: string };
+    profile: ExportedProfile;
     workCount: number;
     totalItemCount: number;
     userPluginCount: number;
@@ -41,6 +65,8 @@ export interface ImportResult {
     worksUpdated: number;
     worksSkipped: number;
     userPluginsImported: number;
+    /** True when the payload's onboarding answers / preferences were applied. */
+    profileImported?: boolean;
     errors: string[];
     warnings: string[];
 }

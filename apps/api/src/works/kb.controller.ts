@@ -44,8 +44,10 @@ import { AuthenticatedUser } from '@src/auth/types/auth.types';
 import type {
     KbDecisionStatus,
     KbDocumentClass,
+    KbDocumentSource,
     KbDocumentStatus,
     KbLockMode,
+    KbReviewState,
     KbUploadExtractionStatus,
 } from '@ever-works/agent/entities';
 
@@ -91,6 +93,34 @@ export class KbController {
     @ApiQuery({ name: 'status', required: false })
     @ApiQuery({ name: 'tag', required: false })
     @ApiQuery({ name: 'locked', required: false })
+    @ApiQuery({
+        name: 'reviewState',
+        required: false,
+        enum: ['proposed', 'accepted'],
+        description:
+            'Memory upgrades M8 — review-queue filter. `proposed` lists only agent-authored / synthesized documents awaiting human review (excluded from context injection until accepted); `accepted` lists the reviewed set including pre-M7 rows whose column is NULL. Omit to list everything.',
+    })
+    @ApiQuery({
+        name: 'class',
+        required: false,
+        isArray: true,
+        description:
+            'Memory facets — repeatable class filter behind the workbench type chips (`?class=decision&class=output`). A single value keeps the original single-class behaviour.',
+    })
+    @ApiQuery({
+        name: 'source',
+        required: false,
+        isArray: true,
+        enum: ['user', 'agent', 'imported', 'seeded'],
+        description:
+            'Memory facets — repeatable provenance filter. The rendered badge (human / agent / synthesized / connector) is DERIVED from this plus the ingest provenance; the filter itself stays on the stored column.',
+    })
+    @ApiQuery({
+        name: 'searchBody',
+        required: false,
+        description:
+            'Memory facets — when true, `q` also matches the document body, not just title + description.',
+    })
     @ApiQuery({ name: 'q', required: false })
     @ApiQuery({ name: 'limit', required: false })
     @ApiQuery({ name: 'offset', required: false })
@@ -109,10 +139,17 @@ export class KbController {
     ) {
         return this.kb.listDocuments(workId, auth.userId, {
             class: query.class as KbDocumentClass | undefined,
+            // Memory facets — repeatable `?class=` / `?source=` chips.
+            // Express folds a repeated key into an array, which the DTO
+            // normalizes; a single `?class=x` still lands on `class`.
+            classes: query.classes as KbDocumentClass[] | undefined,
+            sources: query.sources as KbDocumentSource[] | undefined,
+            searchBody: query.searchBody,
             status: query.status as KbDocumentStatus | undefined,
             tag: query.tag,
             locked: query.locked,
             language: query.language,
+            reviewState: query.reviewState as KbReviewState | undefined,
             q: query.q,
             limit: query.limit,
             offset: query.offset,
@@ -328,6 +365,38 @@ export class KbController {
         @Param('docId', new ParseUUIDPipe()) docId: string,
     ) {
         return this.kb.listCitationsForDocument(workId, docId, auth.userId);
+    }
+
+    @Get('works/:id/kb/documents/:docId/retrieval-trail')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: '“Ask why” — the deterministic retrieval trail for a KB document',
+        description:
+            'Memory upgrades M11. Returns the recorded facts about how this document reached a model: which questions retrieved it, when, how many documents came back alongside it, and how many citation rows exist against it. No LLM, no synthesis, no inference — a read of the append-only retrieval log, owner-scoped through the same gate as every other per-document route.',
+    })
+    @ApiQuery({
+        name: 'windowDays',
+        required: false,
+        description: 'Rolling window in days (default 90, clamped 1…365).',
+    })
+    @ApiQuery({
+        name: 'limit',
+        required: false,
+        description: 'Max trail entries returned (default 20, clamped 1…100).',
+    })
+    @ApiResponse({ status: 200, description: 'Retrieval trail for the document' })
+    @ApiResponse({ status: 404, description: 'Document not found' })
+    async getRetrievalTrail(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', new ParseUUIDPipe()) workId: string,
+        @Param('docId', new ParseUUIDPipe()) docId: string,
+        @Query('windowDays') windowDays?: string,
+        @Query('limit') limit?: string,
+    ) {
+        return this.kb.getRetrievalTrail(workId, auth.userId, docId, {
+            windowDays: windowDays && /^\d+$/.test(windowDays) ? Number(windowDays) : undefined,
+            limit: limit && /^\d+$/.test(limit) ? Number(limit) : undefined,
+        });
     }
 
     // ─── Tags ──────────────────────────────────────────────────────────

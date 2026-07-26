@@ -106,6 +106,24 @@ describe('AgentExportService', () => {
                 expect.objectContaining({ actionType: ActivityActionType.AGENT_EXPORTED }),
             );
         });
+
+        // Account-transfer whitelist sweep: `memoryRecallEnabled` is a
+        // user-authored Agent setting and previously did NOT round-trip, so
+        // an export/import silently re-enabled recall on an Agent whose
+        // owner had deliberately turned it off.
+        it('carries memoryRecallEnabled, including a deliberate false', async () => {
+            agents.findByIdAndUser.mockResolvedValueOnce(
+                makeAgent({ memoryRecallEnabled: false } as any),
+            );
+            const env = await svc.exportOne('u1', 'src-a');
+            expect(env.model.memoryRecallEnabled).toBe(false);
+        });
+
+        it('omits memoryRecallEnabled when the column is absent (legacy row)', async () => {
+            agents.findByIdAndUser.mockResolvedValueOnce(makeAgent());
+            const env = await svc.exportOne('u1', 'src-a');
+            expect('memoryRecallEnabled' in env.model).toBe(false);
+        });
     });
 
     describe('importOne', () => {
@@ -183,6 +201,48 @@ describe('AgentExportService', () => {
             expect(activity.log).toHaveBeenCalledWith(
                 expect.objectContaining({ actionType: ActivityActionType.AGENT_IMPORTED }),
             );
+        });
+
+        // Whitelist sweep — BOTH import paths must honour an explicit
+        // boolean and must leave the setting alone when it is absent.
+        it('applies an explicit memoryRecallEnabled:false on create', async () => {
+            agents.findByUserIdAndSlug.mockResolvedValue(null);
+            agents.create.mockResolvedValueOnce(makeAgent({ id: 'new-a' }));
+            const env = baseEnvelope();
+            env.model.memoryRecallEnabled = false;
+
+            await svc.importOne('u1', env);
+            expect(agents.create).toHaveBeenCalledWith(
+                expect.objectContaining({ memoryRecallEnabled: false }),
+            );
+        });
+
+        it('omits memoryRecallEnabled on create for a pre-recall envelope', async () => {
+            agents.findByUserIdAndSlug.mockResolvedValue(null);
+            agents.create.mockResolvedValueOnce(makeAgent({ id: 'new-a' }));
+
+            await svc.importOne('u1', baseEnvelope());
+            expect('memoryRecallEnabled' in agents.create.mock.calls[0][0]).toBe(false);
+        });
+
+        it('applies memoryRecallEnabled on the overwrite path, and omits it when absent', async () => {
+            const existing = makeAgent({ id: 'existing-ceo' });
+            agents.findByUserIdAndSlug.mockResolvedValueOnce(existing);
+            agents.findById.mockResolvedValueOnce(existing);
+            const env = baseEnvelope();
+            env.model.memoryRecallEnabled = false;
+
+            await svc.importOne('u1', env, { onConflict: 'overwrite' });
+            expect(agents.updateById).toHaveBeenCalledWith(
+                'existing-ceo',
+                expect.objectContaining({ memoryRecallEnabled: false }),
+            );
+
+            agents.updateById.mockClear();
+            agents.findByUserIdAndSlug.mockResolvedValueOnce(existing);
+            agents.findById.mockResolvedValueOnce(existing);
+            await svc.importOne('u1', baseEnvelope(), { onConflict: 'overwrite' });
+            expect('memoryRecallEnabled' in agents.updateById.mock.calls[0][1]).toBe(false);
         });
 
         it('conflict skip — throws ConflictException', async () => {

@@ -7,11 +7,13 @@ import { AlertCircle, CreditCard, FileText, RefreshCw, Wallet, Zap, Check } from
 import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
-import { changePlanAction } from '@/app/actions/dashboard/billing';
+import {
+    changePlanAction,
+    startCreditCheckoutAction,
+    updateAutoRechargeAction,
+} from '@/app/actions/dashboard/billing';
 import {
     CREDIT_LEDGER_KINDS,
-    CREDIT_TOPUP_PRESETS_CENTS,
-    creditsForTopupCents,
     formatCreditsAsDollars,
     formatMonthlyPrice,
     formatSignedCredits,
@@ -24,6 +26,16 @@ import {
     type SubscriptionPlanListItem,
     type SubscriptionPlanSummary,
 } from '@/lib/api/credits.shared';
+import {
+    canBuyCredits,
+    canConfigureAutoRecharge,
+    formatCardExpiry,
+    formatPaymentMethod,
+    invoiceStatusTone,
+    packBonusPercent,
+    type BillingOverview,
+    type InvoiceListPage,
+} from '@/lib/api/billing.shared';
 
 interface BillingSettingsProps {
     paymentsEnabled: boolean;
@@ -31,6 +43,9 @@ interface BillingSettingsProps {
     initialPlans: SubscriptionPlanList | null;
     initialBalance: CreditsBalance | null;
     initialLedger: CreditsLedgerPage | null;
+    /** Money path (billing PRD B5). Null ⇒ the overview call failed. */
+    initialOverview: BillingOverview | null;
+    initialInvoices: InvoiceListPage | null;
 }
 
 const LEDGER_PAGE_SIZE = 10;
@@ -85,6 +100,8 @@ export function BillingSettings({
     initialPlans,
     initialBalance,
     initialLedger,
+    initialOverview,
+    initialInvoices,
 }: BillingSettingsProps) {
     const t = useTranslations('dashboard.settings.billing');
     const [isPending, startTransition] = useTransition();
@@ -94,16 +111,75 @@ export function BillingSettings({
     const plans = initialPlans?.plans ?? [];
     const currentPlan =
         plans.find((p) => p.isCurrent) ?? plans.find((p) => p.code === currentPlanCode) ?? null;
-    const balanceCredits = initialBalance?.balanceCredits ?? null;
+    const balanceCredits =
+        initialOverview?.balanceCredits ?? initialBalance?.balanceCredits ?? null;
 
-    // ── Buy-credits selection (flag-gated; checkout seam lands later) ──
-    const [selectedTopupCents, setSelectedTopupCents] = useState<number | null>(null);
-    const [customAmount, setCustomAmount] = useState('');
-    const customCents = (() => {
-        const dollars = Number(customAmount);
-        return Number.isFinite(dollars) && dollars > 0 ? Math.round(dollars * 100) : null;
-    })();
-    const effectiveTopupCents = customCents ?? selectedTopupCents;
+    // ── The money path ────────────────────────────────────────────────
+    // Two independent gates: PAYMENTS_ENABLED (the deployment's master
+    // switch, default OFF) AND providerConfigured (real provider keys are
+    // wired). Both must be true before any money control goes live.
+    const overview = initialOverview;
+    const packs = overview?.packs ?? [];
+    const buyEnabled = canBuyCredits(overview, paymentsEnabled);
+    const autoRechargeEnabledUi = canConfigureAutoRecharge(overview, paymentsEnabled);
+
+    const [selectedPackId, setSelectedPackId] = useState<string | null>(packs[0]?.id ?? null);
+    const [checkoutPending, setCheckoutPending] = useState(false);
+
+    const [autoRechargeOn, setAutoRechargeOn] = useState(overview?.autoRecharge.enabled ?? false);
+    const [autoRechargeThreshold, setAutoRechargeThreshold] = useState(
+        overview?.autoRecharge.thresholdCredits != null
+            ? String(overview.autoRecharge.thresholdCredits)
+            : '',
+    );
+    const [autoRechargePackId, setAutoRechargePackId] = useState(
+        overview?.autoRecharge.packId ?? packs[0]?.id ?? '',
+    );
+    const [autoRechargeSaving, setAutoRechargeSaving] = useState(false);
+
+    const invoices = initialInvoices?.invoices ?? [];
+    const paymentMethodLabel = formatPaymentMethod(overview?.paymentMethod ?? null);
+    const paymentMethodExpiry = formatCardExpiry(overview?.paymentMethod ?? null);
+
+    const handleBuyCredits = useCallback(async () => {
+        if (!selectedPackId) {
+            return;
+        }
+        setCheckoutPending(true);
+        try {
+            // Only a PACK ID crosses the wire — the server prices it.
+            const result = await startCreditCheckoutAction(selectedPackId);
+            if (result.success && result.url) {
+                window.location.assign(result.url);
+                return;
+            }
+            toast.error(result.error ?? t('credits.checkoutError'));
+        } finally {
+            setCheckoutPending(false);
+        }
+    }, [selectedPackId, t]);
+
+    const handleSaveAutoRecharge = useCallback(async () => {
+        setAutoRechargeSaving(true);
+        try {
+            const threshold = Number(autoRechargeThreshold);
+            const result = await updateAutoRechargeAction({
+                enabled: autoRechargeOn,
+                thresholdCredits:
+                    Number.isFinite(threshold) && threshold >= 0
+                        ? Math.round(threshold)
+                        : undefined,
+                packId: autoRechargePackId || undefined,
+            });
+            if (result.success) {
+                toast.success(t('autoRecharge.saved'));
+            } else {
+                toast.error(result.error ?? t('autoRecharge.saveError'));
+            }
+        } finally {
+            setAutoRechargeSaving(false);
+        }
+    }, [autoRechargeOn, autoRechargeThreshold, autoRechargePackId, t]);
 
     // ── Ledger paging + kind filter (client refetch via web proxy) ──
     const [ledger, setLedger] = useState<CreditsLedgerPage | null>(initialLedger);
@@ -322,52 +398,52 @@ export function BillingSettings({
                     </span>
                 </div>
 
-                {paymentsEnabled ? (
+                {buyEnabled ? (
                     <div className="space-y-3">
-                        <div className="flex flex-wrap gap-2">
-                            {CREDIT_TOPUP_PRESETS_CENTS.map((cents) => (
-                                <Button
-                                    key={cents}
-                                    variant={
-                                        selectedTopupCents === cents && !customCents
-                                            ? 'primary'
-                                            : 'secondary'
-                                    }
-                                    className="text-xs"
-                                    data-testid={`billing-topup-${cents}`}
-                                    onClick={() => {
-                                        setSelectedTopupCents(cents);
-                                        setCustomAmount('');
-                                    }}
-                                >
-                                    {formatCreditsAsDollars(cents)}
-                                </Button>
-                            ))}
-                            <input
-                                type="number"
-                                min="1"
-                                inputMode="decimal"
-                                placeholder={t('credits.customAmount')}
-                                value={customAmount}
-                                data-testid="billing-topup-custom"
-                                onChange={(e) => setCustomAmount(e.target.value)}
-                                className="w-32 rounded-md border border-border dark:border-border-dark bg-transparent px-3 py-1.5 text-xs text-text dark:text-text-dark"
-                            />
+                        <div className="grid gap-3 sm:grid-cols-3">
+                            {packs.map((pack) => {
+                                const bonus = packBonusPercent(pack);
+                                return (
+                                    <button
+                                        key={pack.id}
+                                        type="button"
+                                        data-testid={`billing-pack-${pack.id}`}
+                                        aria-pressed={selectedPackId === pack.id}
+                                        onClick={() => setSelectedPackId(pack.id)}
+                                        className={cn(
+                                            'rounded-lg border p-3 text-left transition-colors',
+                                            selectedPackId === pack.id
+                                                ? 'border-primary/60 bg-primary/5'
+                                                : 'border-border dark:border-border-dark hover:border-primary/40',
+                                        )}
+                                    >
+                                        <p className="text-sm font-semibold text-text dark:text-text-dark">
+                                            {pack.credits.toLocaleString('en-US')}
+                                        </p>
+                                        <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                                            {t('credits.packPrice', {
+                                                price: formatCreditsAsDollars(
+                                                    pack.priceCents,
+                                                    pack.currency,
+                                                ),
+                                            })}
+                                        </p>
+                                        {bonus > 0 ? (
+                                            <span className="mt-1 inline-flex rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2 py-0.5 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
+                                                {t('credits.packBonus', { percent: bonus })}
+                                            </span>
+                                        ) : null}
+                                    </button>
+                                );
+                            })}
                         </div>
-                        {effectiveTopupCents ? (
-                            <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                {t('credits.presetCredits', {
-                                    credits:
-                                        creditsForTopupCents(effectiveTopupCents).toLocaleString(
-                                            'en-US',
-                                        ),
-                                })}
-                            </p>
-                        ) : null}
-                        {/* Checkout stays disabled until the provider checkout
-                            seam (PRD §5.2) exists on the API. */}
-                        <Button disabled className="text-xs" title={t('credits.comingSoon')}>
-                            {t('credits.buy')}
+                        <Button
+                            className="text-xs"
+                            data-testid="billing-buy-button"
+                            disabled={!selectedPackId || checkoutPending}
+                            onClick={() => void handleBuyCredits()}
+                        >
+                            {checkoutPending ? t('credits.redirecting') : t('credits.buy')}
                         </Button>
                     </div>
                 ) : (
@@ -385,35 +461,196 @@ export function BillingSettings({
                 )}
             </SectionCard>
 
-            {/* ── Payment method + auto-recharge (flag-gated, PRD §3.3/§3.4) ── */}
+            {/* ── Payment method + auto-recharge (PRD §3.3/§3.4) ────── */}
             <div className="grid gap-4 sm:grid-cols-2">
                 <SectionCard
                     icon={CreditCard}
                     title={t('paymentMethod.title')}
                     testId="billing-payment-method"
                 >
-                    <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                        {paymentsEnabled ? t('paymentMethod.empty') : t('paymentMethod.comingSoon')}
-                    </p>
+                    {!buyEnabled ? (
+                        <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                            {t('paymentMethod.comingSoon')}
+                        </p>
+                    ) : paymentMethodLabel ? (
+                        <div data-testid="billing-payment-method-summary">
+                            <p className="text-sm font-medium text-text dark:text-text-dark">
+                                {paymentMethodLabel}
+                            </p>
+                            {paymentMethodExpiry ? (
+                                <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                                    {t('paymentMethod.expires', { expiry: paymentMethodExpiry })}
+                                </p>
+                            ) : null}
+                            <p className="mt-2 text-xs text-text-muted dark:text-text-muted-dark">
+                                {t('paymentMethod.managedAtCheckout')}
+                            </p>
+                        </div>
+                    ) : (
+                        <div data-testid="billing-payment-method-empty">
+                            <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                                {t('paymentMethod.empty')}
+                            </p>
+                            <p className="mt-1 text-xs text-text-muted dark:text-text-muted-dark">
+                                {t('paymentMethod.addAtCheckout')}
+                            </p>
+                        </div>
+                    )}
                 </SectionCard>
+
                 <SectionCard
                     icon={RefreshCw}
                     title={t('autoRecharge.title')}
                     testId="billing-auto-recharge"
                 >
-                    <p className="text-sm text-text-muted dark:text-text-muted-dark">
-                        {paymentsEnabled
-                            ? t('autoRecharge.description')
-                            : t('autoRecharge.comingSoon')}
-                    </p>
+                    {!autoRechargeEnabledUi ? (
+                        <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                            {buyEnabled
+                                ? t('autoRecharge.needsPaymentMethod')
+                                : t('autoRecharge.comingSoon')}
+                        </p>
+                    ) : (
+                        <div className="space-y-3">
+                            <label className="flex items-center gap-2 text-sm text-text dark:text-text-dark">
+                                <input
+                                    type="checkbox"
+                                    checked={autoRechargeOn}
+                                    data-testid="billing-auto-recharge-toggle"
+                                    onChange={(e) => setAutoRechargeOn(e.target.checked)}
+                                    className="rounded border-border dark:border-border-dark"
+                                />
+                                {t('autoRecharge.description')}
+                            </label>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <input
+                                    type="number"
+                                    min="0"
+                                    inputMode="numeric"
+                                    placeholder={t('autoRecharge.thresholdPlaceholder')}
+                                    value={autoRechargeThreshold}
+                                    disabled={!autoRechargeOn}
+                                    data-testid="billing-auto-recharge-threshold"
+                                    onChange={(e) => setAutoRechargeThreshold(e.target.value)}
+                                    className="w-32 rounded-md border border-border dark:border-border-dark bg-transparent px-3 py-1.5 text-xs text-text dark:text-text-dark disabled:opacity-50"
+                                />
+                                <Select
+                                    value={autoRechargePackId}
+                                    onValueChange={(value: string) => setAutoRechargePackId(value)}
+                                >
+                                    {packs.map((pack) => (
+                                        <option key={pack.id} value={pack.id}>
+                                            {pack.credits.toLocaleString('en-US')} —{' '}
+                                            {formatCreditsAsDollars(pack.priceCents, pack.currency)}
+                                        </option>
+                                    ))}
+                                </Select>
+                            </div>
+                            {overview && overview.autoRecharge.failureCount > 0 ? (
+                                <p
+                                    className="text-xs text-danger"
+                                    data-testid="billing-auto-recharge-failures"
+                                >
+                                    {t('autoRecharge.failures', {
+                                        count: overview.autoRecharge.failureCount,
+                                    })}
+                                </p>
+                            ) : null}
+                            <Button
+                                variant="secondary"
+                                className="text-xs"
+                                disabled={autoRechargeSaving}
+                                data-testid="billing-auto-recharge-save"
+                                onClick={() => void handleSaveAutoRecharge()}
+                            >
+                                {t('autoRecharge.save')}
+                            </Button>
+                        </div>
+                    )}
                 </SectionCard>
             </div>
 
-            {/* ── Invoice history (PRD §3.5 — empty until the provider mirror lands) ── */}
+            {/* ── Invoice history (PRD §3.5) — fed by the webhook mirror ── */}
             <SectionCard icon={FileText} title={t('invoices.title')} testId="billing-invoices">
-                <p className="text-sm text-text-muted dark:text-text-muted-dark py-4 text-center">
-                    {t('invoices.empty')}
-                </p>
+                {invoices.length === 0 ? (
+                    <p
+                        className="text-sm text-text-muted dark:text-text-muted-dark py-4 text-center"
+                        data-testid="billing-invoices-empty"
+                    >
+                        {t('invoices.empty')}
+                    </p>
+                ) : (
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm" data-testid="billing-invoices-table">
+                            <thead>
+                                <tr className="text-left text-xs text-text-muted dark:text-text-muted-dark border-b border-border dark:border-border-dark">
+                                    <th className="py-2 pr-4 font-medium">
+                                        {t('invoices.colNumber')}
+                                    </th>
+                                    <th className="py-2 pr-4 font-medium">
+                                        {t('invoices.colDate')}
+                                    </th>
+                                    <th className="py-2 pr-4 font-medium">
+                                        {t('invoices.colStatus')}
+                                    </th>
+                                    <th className="py-2 pr-4 font-medium text-right">
+                                        {t('invoices.colTotal')}
+                                    </th>
+                                    <th className="py-2 font-medium text-right" />
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {invoices.map((invoice) => (
+                                    <tr
+                                        key={invoice.id}
+                                        data-testid="billing-invoice-row"
+                                        className="border-b border-border/60 dark:border-border-dark/60 last:border-0"
+                                    >
+                                        <td className="py-2 pr-4 text-text dark:text-text-dark">
+                                            {invoice.number ?? '—'}
+                                        </td>
+                                        <td className="py-2 pr-4 whitespace-nowrap text-text-muted dark:text-text-muted-dark">
+                                            {new Date(invoice.issuedAt).toLocaleDateString(
+                                                undefined,
+                                                { year: 'numeric', month: 'short', day: 'numeric' },
+                                            )}
+                                        </td>
+                                        <td className="py-2 pr-4">
+                                            <span
+                                                className={cn(
+                                                    'inline-flex rounded-full px-2 py-0.5 text-xs font-medium',
+                                                    KIND_TONE_CLASSES[
+                                                        invoiceStatusTone(invoice.status)
+                                                    ],
+                                                )}
+                                            >
+                                                {t(`invoices.statuses.${invoice.status}`)}
+                                            </span>
+                                        </td>
+                                        <td className="py-2 pr-4 text-right whitespace-nowrap text-text dark:text-text-dark">
+                                            {formatCreditsAsDollars(
+                                                invoice.totalCents,
+                                                invoice.currency,
+                                            )}
+                                        </td>
+                                        <td className="py-2 text-right">
+                                            {invoice.hostedUrl ? (
+                                                <a
+                                                    href={invoice.hostedUrl}
+                                                    target="_blank"
+                                                    rel="noopener noreferrer"
+                                                    className="text-xs text-primary hover:underline"
+                                                    data-testid="billing-invoice-link"
+                                                >
+                                                    {t('invoices.view')}
+                                                </a>
+                                            ) : null}
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
+                    </div>
+                )}
             </SectionCard>
 
             {/* ── Credits ledger (PRD §3.6) ─────────────────────────── */}
