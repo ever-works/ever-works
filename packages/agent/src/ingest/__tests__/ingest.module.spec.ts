@@ -19,6 +19,9 @@ jest.mock('../../entities/ingested-event.entity', () => ({
 jest.mock('../../entities/ingest-cursor.entity', () => ({
     IngestCursor: class IngestCursor {},
 }));
+jest.mock('../../entities/ingest-install-binding.entity', () => ({
+    IngestInstallBinding: class IngestInstallBinding {},
+}));
 jest.mock('../../activity-log/activity-log.module', () => ({
     ActivityLogModule: class ActivityLogModule {},
 }));
@@ -37,31 +40,26 @@ jest.mock('../ingest-cursor.repository', () => ({
 jest.mock('../event-source-pull.service', () => ({
     EventSourcePullService: class EventSourcePullService {},
 }));
-jest.mock('../../entities/work.entity', () => ({
-    Work: class Work {},
-}));
-jest.mock('../../database/repositories/work.repository', () => ({
-    WorkRepository: class WorkRepository {},
-}));
-jest.mock('../work-hint-resolver.service', () => ({
-    WorkHintResolverService: class WorkHintResolverService {},
+jest.mock('../ingest-install-binding.repository', () => ({
+    IngestInstallBindingRepository: class IngestInstallBindingRepository {},
 }));
 
 import 'reflect-metadata';
+import { WorkRepository } from '../../database/repositories/work.repository';
+import { WorkHintResolverService } from '../work-hint-resolver.service';
 import { EventIngestModule } from '../ingest.module';
 import { IngestedEventRepository } from '../ingested-event.repository';
 import { EventIngestService } from '../event-ingest.service';
 import { IngestCursorRepository } from '../ingest-cursor.repository';
 import { EventSourcePullService } from '../event-source-pull.service';
-import { WorkRepository } from '../../database/repositories/work.repository';
-import { WorkHintResolverService } from '../work-hint-resolver.service';
+import { IngestInstallBindingRepository } from '../ingest-install-binding.repository';
 import { ActivityLogModule } from '../../activity-log/activity-log.module';
 import { FacadesModule } from '../../facades/facades.module';
 
 describe('EventIngestModule', () => {
     const meta = (key: string): unknown[] => Reflect.getMetadata(key, EventIngestModule) ?? [];
 
-    it('provides the repositories, the ingest service, the pull service and the workId router', () => {
+    it('provides the repositories, the ingest service and the pull service', () => {
         expect(meta('providers')).toEqual([
             IngestedEventRepository,
             EventIngestService,
@@ -69,10 +67,11 @@ describe('EventIngestModule', () => {
             EventSourcePullService,
             WorkRepository,
             WorkHintResolverService,
+            IngestInstallBindingRepository,
         ]);
     });
 
-    it('exports every provider for the API surface + trigger-internal RPC wiring', () => {
+    it('exports all five for the API surface + trigger-internal RPC wiring', () => {
         expect(meta('exports')).toEqual([
             IngestedEventRepository,
             EventIngestService,
@@ -80,6 +79,7 @@ describe('EventIngestModule', () => {
             EventSourcePullService,
             WorkRepository,
             WorkHintResolverService,
+            IngestInstallBindingRepository,
         ]);
     });
 
@@ -87,7 +87,9 @@ describe('EventIngestModule', () => {
         const imports = meta('imports');
         expect(imports).toContain(ActivityLogModule);
         expect(imports).toContain(FacadesModule);
-        expect(imports).toHaveLength(3);
+        // Two forFeature() calls now: the ingest entities plus Work, which the
+        // workId-routing resolver reads. Both render as TypeOrmFeatureStub.
+        expect(imports).toHaveLength(4);
     });
 });
 
@@ -101,7 +103,7 @@ describe('ingest barrel', () => {
         expect(barrel.IngestedEventRepository).toBe(IngestedEventRepository);
         expect(barrel.EventSourcePullService).toBe(EventSourcePullService);
         expect(barrel.IngestCursorRepository).toBe(IngestCursorRepository);
+        expect(barrel.IngestInstallBindingRepository).toBe(IngestInstallBindingRepository);
         expect(typeof barrel.buildIngestEventTools).toBe('function');
-        expect(barrel.WorkHintResolverService).toBe(WorkHintResolverService);
     });
 });

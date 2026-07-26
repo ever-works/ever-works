@@ -8,6 +8,7 @@ import type {
     WorkChecksPolicy,
 } from '@ever-works/contracts';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
+import { buildCheckEnv } from './check-env';
 
 /** Wall-clock budget applied when a check declares no `timeoutSec`. */
 export const DEFAULT_CHECK_TIMEOUT_SEC = 600;
@@ -143,6 +144,12 @@ export class TaskGateRunnerService {
      * the platform shell. This adds no privilege beyond the status quo:
      * pipeline agents already run arbitrary commands in the same checkout,
      * and only Work members with settings/Task-edit rights author checks.
+     *
+     * The child env is SCRUBBED (`buildCheckEnv`), never inherited: the
+     * command is user-authored, so `env`/`printenv` in a check must not be
+     * able to read the platform's database, auth, Trigger or plugin
+     * credentials. A check that genuinely needs one more variable names it
+     * in `envPassthrough`.
      */
     private executeCheck(check: TaskAcceptanceCheck, rootCwd: string): Promise<TaskCheckResult> {
         const cwd = check.cwd ? join(rootCwd, check.cwd) : rootCwd;
@@ -175,7 +182,12 @@ export class TaskGateRunnerService {
 
             let child: ReturnType<typeof spawn>;
             try {
-                child = spawn(check.command, { cwd, shell: true, windowsHide: true });
+                child = spawn(check.command, {
+                    cwd,
+                    shell: true,
+                    windowsHide: true,
+                    env: buildCheckEnv({ passthrough: check.envPassthrough }),
+                });
             } catch (error) {
                 tail = error instanceof Error ? error.message : String(error);
                 finish('error', null);

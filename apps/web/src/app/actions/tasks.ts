@@ -2,7 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
-import type { TaskAcceptanceCheck } from '@ever-works/contracts';
+import type { DecisionConflictReportDto, TaskAcceptanceCheck } from '@ever-works/contracts';
 import {
     tasksAPI,
     type ListTasksQuery,
@@ -223,6 +223,29 @@ export async function runTasksBatchAction(
                 },
             })),
         };
+    }
+}
+
+/**
+ * Re-litigation guard (memory upgrades M6) — fetch the settled decisions
+ * this Task appears to re-open.
+ *
+ * Read-only, so no `revalidatePath`. Deliberately NEVER throws: the guard
+ * is advisory and a failure to compute it must not degrade the Task
+ * surface, so a failed read degrades to "no conflicts".
+ */
+export async function getTaskDecisionConflictsAction(
+    id: string,
+): Promise<DecisionConflictReportDto> {
+    // Security: verify session server-side before reading data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
+    try {
+        return await tasksAPI.decisionConflicts(id);
+    } catch (error) {
+        console.error('[tasks] decision-conflict check failed:', error);
+        return { conflicts: [], scanned: 0, heuristic: 'unavailable' };
     }
 }
 

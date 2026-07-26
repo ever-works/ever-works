@@ -18,10 +18,12 @@ import {
     KB_DOCUMENT_CLASSES,
     KB_DOCUMENT_STATUSES,
     KB_LOCK_MODES,
+    KB_REVIEW_STATES,
     KbDecisionStatus,
     KbDocumentClass,
     KbDocumentStatus,
     KbLockMode,
+    KbReviewState,
 } from '@ever-works/contracts';
 
 /** Max body size per spec D9 — 1 MB Markdown. */
@@ -149,6 +151,18 @@ export class KbDocumentQueryDto {
     @IsString()
     @Length(2, 8)
     language?: string;
+
+    /**
+     * Memory upgrades M8 — review-queue filter. `proposed` returns only
+     * the agent-authored / synthesized documents awaiting human review
+     * (the ones excluded from context injection); `accepted` returns the
+     * reviewed set, including pre-M7 rows whose column is still NULL.
+     * Additive: omitting it preserves the original "list everything"
+     * behaviour every existing caller relies on.
+     */
+    @IsOptional()
+    @IsIn(KB_REVIEW_STATES as unknown as readonly string[])
+    reviewState?: KbReviewState;
 
     @IsOptional()
     @IsString()

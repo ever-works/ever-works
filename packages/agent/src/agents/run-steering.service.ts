@@ -20,6 +20,7 @@ import type {
     RunSteeringPort,
 } from '../tasks-domain/run-steering-port';
 import { RunDispatchGateService } from './run-dispatch-gate.service';
+import { TerminalSessionLauncher } from './terminal-session-launcher.service';
 
 /**
  * `terminalEndedReason` values that make a finished run resumable: the
@@ -98,6 +99,9 @@ export class RunSteeringService implements RunSteeringPort {
         // Resume goes through the same concurrency choke point as every
         // other dispatch path — a resumed run is a run.
         @Optional() private readonly dispatchGate?: RunDispatchGateService,
+        // A resumed persistent run wants its terminal back. Appended last +
+        // @Optional() so existing positional test constructions keep working.
+        @Optional() private readonly terminalLauncher?: TerminalSessionLauncher,
     ) {}
 
     /** A run that can still receive injected input. */
@@ -219,6 +223,11 @@ export class RunSteeringService implements RunSteeringPort {
             organizationId: run.organizationId ?? null,
             runnerKind: run.runnerKind ?? null,
             queuedReason: admission.admitted ? null : (admission.queuedReason ?? null),
+            // Streaming terminal — the conversation lifetime survives the
+            // process lifetime, and so does the SHAPE of the session. A
+            // resumed persistent run still wants an interactive terminal,
+            // which is what the fan-out's `requirePersistent` gate reads.
+            persistent: run.persistent === true,
         });
 
         // The conversation lifetime survives the process lifetime: hand the
@@ -274,6 +283,33 @@ export class RunSteeringService implements RunSteeringPort {
             hasMessage: Boolean(trimmed),
             queued: !admission.admitted,
         });
+        // Streaming terminal: the fan-out path gates on `requirePersistent`,
+        // but resume dispatches `agent-task-execute` directly, so without this
+        // a resumed persistent run comes back with no session attached.
+        // Best-effort — a terminal is an affordance, never a reason to fail a
+        // resume that already dispatched.
+        if (admission.admitted && run.persistent === true && this.terminalLauncher) {
+            try {
+                const outcome = await this.terminalLauncher.startForRun({
+                    runId: next.id,
+                    agentId: run.agentId,
+                    userId,
+                    requirePersistent: true,
+                });
+                if (outcome.started === false) {
+                    this.logger.warn(
+                        `Run ${next.id}: terminal not restarted on resume (${outcome.reason}).`,
+                    );
+                }
+            } catch (err) {
+                this.logger.warn(
+                    `Run ${next.id}: terminal relaunch failed on resume: ${
+                        err instanceof Error ? err.message : String(err)
+                    }`,
+                );
+            }
+        }
+
         this.logger.log(`Run ${run.id}: resumed as ${next.id} by user ${userId}.`);
 
         return {

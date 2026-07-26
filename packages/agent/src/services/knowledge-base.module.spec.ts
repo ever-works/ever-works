@@ -61,6 +61,7 @@ jest.mock('./knowledge-base-git-mirror.service', () => ({
 jest.mock('./knowledge-base-buffer-extractor.service', () => ({
     KnowledgeBaseBufferExtractorService: class {},
 }));
+jest.mock('./decision-conflict.service', () => ({ DecisionConflictService: class {} }));
 jest.mock('./kb-mention-resolver.service', () => ({ KbMentionResolverService: class {} }));
 jest.mock('./kb-agent-tools.service', () => ({ KbAgentToolsService: class {} }));
 jest.mock('./kb-tools-facade.adapter', () => ({ KbToolsFacadeAdapter: class {} }));
@@ -71,9 +72,12 @@ import { KnowledgeBaseModule } from './knowledge-base.module';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { DatabaseModule } from '../database/database.module';
 import { FacadesModule } from '../facades/facades.module';
+import { DecisionConflictService } from './decision-conflict.service';
 
 describe('KnowledgeBaseModule — static metadata', () => {
     const imports = Reflect.getMetadata('imports', KnowledgeBaseModule) as unknown[];
+    const providers = Reflect.getMetadata('providers', KnowledgeBaseModule) as unknown[];
+    const exports_ = Reflect.getMetadata('exports', KnowledgeBaseModule) as unknown[];
 
     it('declares its expected non-TypeORM imports', () => {
         // The TypeORM forFeature import is a dynamic shell from the
@@ -93,5 +97,17 @@ describe('KnowledgeBaseModule — static metadata', () => {
         // retry) that poll the activity-log endpoint for KB rows time
         // out after 30s. Lock this import in.
         expect(imports).toContain(ActivityLogModule);
+    });
+
+    it('provides AND exports DecisionConflictService (memory upgrades M6)', () => {
+        // The api-side `TasksModule` imports this module purely so
+        // `TasksController` can inject `DecisionConflictService` for
+        // `GET /api/tasks/:id/decision-conflicts`. A provider that is not
+        // ALSO in `exports` is invisible to the importing module, and
+        // NestJS fails the whole API boot with an
+        // `UnknownDependenciesException` — a class of break that neither
+        // tsc nor the unit suite would otherwise catch.
+        expect(providers).toContain(DecisionConflictService);
+        expect(exports_).toContain(DecisionConflictService);
     });
 });

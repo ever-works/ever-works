@@ -263,4 +263,113 @@ describe('TaskGateRunnerService.runChecks', () => {
             expect(outcome.results[0].status).toBe('red');
         });
     });
+
+    /**
+     * Environment scrubbing, observed in a REAL child process: the check
+     * command is user-authored, so `env`/`printenv` inside it must not be
+     * able to read the platform's secrets.
+     *
+     * The probes print KEY NAMES plus one sentinel value rather than the
+     * whole `JSON.stringify(process.env)`: `logTail` keeps only the last
+     * ~4KB, and a Windows `PATH` alone can fill that — an absence assertion
+     * over a truncated dump would be worthless.
+     */
+    describe('subprocess environment is scrubbed, never inherited', () => {
+        const SECRET_VALUE = 'ew-gate-secret-do-not-leak';
+        const GRANT_VALUE = 'ew-gate-granted-value';
+        let restoreEnv: NodeJS.ProcessEnv;
+
+        const PRINT_ENV =
+            "node -e \"console.log('KEYS=' + Object.keys(process.env).sort().join(','))" +
+            "; console.log('SENTINEL=' + String(process.env.EW_GATE_TEST_SECRET))" +
+            "; console.log('GRANT=' + String(process.env.EW_GATE_TEST_GRANT))" +
+            "; console.log('DBURL=' + String(process.env.DATABASE_URL))" +
+            "; console.log('ENCKEY=' + String(process.env.PLATFORM_ENCRYPTION_KEY))" +
+            "; console.log('HASPATH=' + (process.env.PATH ? 'yes' : 'no'))" +
+            "; console.log('CI=' + String(process.env.CI))\"";
+
+        beforeEach(() => {
+            restoreEnv = { ...process.env };
+            process.env.EW_GATE_TEST_SECRET = SECRET_VALUE;
+            process.env.EW_GATE_TEST_GRANT = GRANT_VALUE;
+            process.env.DATABASE_URL = `postgres://u:${SECRET_VALUE}@db/ever`;
+            process.env.PLATFORM_ENCRYPTION_KEY = SECRET_VALUE;
+        });
+
+        afterEach(() => {
+            process.env = restoreEnv;
+        });
+
+        const probe = async (overrides: Partial<TaskAcceptanceCheck> = {}) => {
+            const outcome = await runner.runChecks({
+                checks: [check({ id: 'env-probe', command: PRINT_ENV, ...overrides })],
+                cwd: process.cwd(),
+                runId: RUN_ID,
+            });
+            expect(outcome.results[0].status).toBe('green');
+            return outcome.results[0].logTail ?? '';
+        };
+
+        it('a platform secret in the parent env is invisible to the check', async () => {
+            const tail = await probe();
+            expect(tail).toContain('SENTINEL=undefined');
+            expect(tail).toContain('ENCKEY=undefined');
+            expect(tail).toContain('DBURL=undefined');
+            // …and the secret VALUE appears nowhere, under any name.
+            expect(tail).not.toContain(SECRET_VALUE);
+        });
+
+        it('the platform secret NAMES are absent from the child key list', async () => {
+            const keys = (/KEYS=(.*)/.exec(await probe())?.[1] ?? '').split(',');
+            expect(keys).not.toContain('EW_GATE_TEST_SECRET');
+            expect(keys).not.toContain('PLATFORM_ENCRYPTION_KEY');
+            expect(keys).not.toContain('DATABASE_URL');
+        });
+
+        it('PATH survives the scrub, so the check can resolve its commands', async () => {
+            const tail = await probe();
+            // The probe itself is proof: `node` resolved through PATH.
+            expect(tail).toContain('HASPATH=yes');
+        });
+
+        it('runs non-interactive (CI is set) so watch modes cannot hang the gate', async () => {
+            expect(await probe()).not.toContain('CI=undefined');
+        });
+
+        it('an explicit envPassthrough grant reaches the subprocess', async () => {
+            const tail = await probe({ envPassthrough: ['EW_GATE_TEST_GRANT'] });
+            expect(tail).toContain(`GRANT=${GRANT_VALUE}`);
+        });
+
+        it('without the grant the same variable is absent (opt-in, not opt-out)', async () => {
+            expect(await probe()).toContain('GRANT=undefined');
+        });
+
+        it('platform-owned configuration stays refused even when explicitly granted', async () => {
+            const tail = await probe({
+                envPassthrough: ['PLATFORM_ENCRYPTION_KEY', 'DATABASE_URL'],
+            });
+            expect(tail).toContain('ENCKEY=undefined');
+            expect(tail).toContain('DBURL=undefined');
+            expect(tail).not.toContain(SECRET_VALUE);
+        });
+
+        it('a check that greps its own environment finds no platform secret', async () => {
+            const outcome = await runner.runChecks({
+                checks: [
+                    check({
+                        id: 'exfiltrate',
+                        // The attack from the report, verbatim in spirit:
+                        // dump the environment and look for the secret.
+                        command:
+                            "node -e \"var hit = JSON.stringify(process.env).indexOf('ew-gate-secret-do-not-leak'); console.log('HIT=' + hit); process.exit(hit === -1 ? 0 : 9)\"",
+                    }),
+                ],
+                cwd: process.cwd(),
+                runId: RUN_ID,
+            });
+            expect(outcome.results[0]).toMatchObject({ status: 'green', exitCode: 0 });
+            expect(outcome.results[0].logTail).toContain('HIT=-1');
+        });
+    });
 });

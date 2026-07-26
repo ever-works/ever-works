@@ -1,5 +1,9 @@
 import 'server-only';
-import type { GateStatus, TaskAcceptanceCheck } from '@ever-works/contracts';
+import type {
+    DecisionConflictReportDto,
+    GateStatus,
+    TaskAcceptanceCheck,
+} from '@ever-works/contracts';
 import { ApiResponseError, serverFetch, serverMutation } from './server-api';
 
 export type TaskStatus =
@@ -273,6 +277,14 @@ export const tasksAPI = {
     /** Agents the board's picker offers for this Task. */
     async listRunCandidates(id: string) {
         return serverFetch<{ data: RunCandidateAgent[] }>(`/tasks/${id}/run-candidates`, {
+    /**
+     * Re-litigation guard (memory upgrades M6) — settled decisions this
+     * Task appears to re-open. Deterministic term-overlap check on the
+     * API side; advisory only, never blocking. Returns
+     * `{ conflicts, scanned, heuristic }`.
+     */
+    async decisionConflicts(id: string) {
+        return serverFetch<DecisionConflictReportDto>(`/tasks/${id}/decision-conflicts`, {
             method: 'GET',
         });
     },

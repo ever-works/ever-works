@@ -23,6 +23,7 @@ import { KnowledgeBaseMediaNormalizeService } from './knowledge-base-media-norma
 import { KnowledgeBaseTranscribeService } from './knowledge-base-transcribe.service';
 import { KnowledgeBaseReembedService } from './knowledge-base-reembed.service';
 import { KnowledgeBaseReconcileService } from './knowledge-base-reconcile.service';
+import { DecisionConflictService } from './decision-conflict.service';
 import { KbMentionResolverService } from './kb-mention-resolver.service';
 import { KbAgentToolsService } from './kb-agent-tools.service';
 import { KbToolsFacadeAdapter } from './kb-tools-facade.adapter';
@@ -109,6 +110,11 @@ import { WorkOwnershipService } from './work-ownership.service';
         // `WorkKnowledgeUploadRepository` below, and `KB_STORAGE_PLUGIN`
         // from the `@Global()` `KbStorageModule` in apps/api.
         KnowledgeBaseReconcileService,
+        // Re-litigation guard (memory upgrades M6) — deterministic
+        // conflict check of a Task's intent against the Work's accepted
+        // decisions. Depends only on `KnowledgeBaseService` (above), so
+        // it adds no new module imports.
+        DecisionConflictService,
         KbMentionResolverService,
         KbAgentToolsService,
         KbToolsFacadeAdapter,
@@ -128,6 +134,7 @@ import { WorkOwnershipService } from './work-ownership.service';
         KnowledgeBaseTranscribeService,
         KnowledgeBaseReembedService,
         KnowledgeBaseReconcileService,
+        DecisionConflictService,
         KbMentionResolverService,
         KbAgentToolsService,
         KbToolsFacadeAdapter,

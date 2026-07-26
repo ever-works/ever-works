@@ -11,6 +11,9 @@ import { GitFacadeService } from '../facades/git.facade';
 import { DataRepository } from '../generators/data-generator/data-repository';
 import type {
     AccountExportPayload,
+    ExportedProfile,
+    ExportedOnboardingProfile,
+    ExportedUserPreferences,
     ExportedWork,
     ExportedAdvancedPrompts,
     ExportedSchedule,
@@ -118,11 +121,7 @@ export class AccountExportService {
             exportedAt: new Date().toISOString(),
             includesSecrets: includeSecrets,
             data: {
-                profile: {
-                    username: user.username,
-                    email: user.email,
-                    avatar: user.avatar || undefined,
-                },
+                profile: this.exportProfile(user),
                 works: exportedWorks,
                 userPlugins: exportedUserPlugins,
                 ...(tailAgents ? { agents: tailAgents } : {}),
@@ -130,6 +129,63 @@ export class AccountExportService {
                 ...(tailTasks ? { tasks: tailTasks } : {}),
             },
         };
+    }
+
+    /**
+     * Serialize the account-level profile. Onboarding answers and account
+     * preferences are user-authored settings, so they must round-trip —
+     * without them an export/import silently resets the "What do you do"
+     * answers (and every suggestion surface built on them) plus the digest
+     * cadence and the notification/privacy opt-outs.
+     *
+     * Explicit `false` booleans are serialized (an opt-OUT is exactly the
+     * value that must survive); only genuinely absent values are omitted so
+     * the importing account keeps its own.
+     */
+    private exportProfile(user: any): ExportedProfile {
+        const profile: ExportedProfile = {
+            username: user.username,
+            email: user.email,
+            avatar: user.avatar || undefined,
+        };
+
+        const answers = user.onboardingState?.profile;
+        if (answers && typeof answers === 'object') {
+            const onboarding: ExportedOnboardingProfile = {};
+            if (Array.isArray(answers.roles)) {
+                onboarding.roles = answers.roles.filter(
+                    (role: unknown): role is string => typeof role === 'string',
+                );
+            }
+            if (typeof answers.teamSize === 'string' && answers.teamSize.length > 0) {
+                onboarding.teamSize = answers.teamSize;
+            }
+            if (Object.keys(onboarding).length > 0) {
+                profile.onboarding = onboarding;
+            }
+        }
+
+        const preferences: ExportedUserPreferences = {};
+        if (typeof user.digestFrequency === 'string' && user.digestFrequency.length > 0) {
+            preferences.digestFrequency = user.digestFrequency;
+        }
+        if (typeof user.emailAgentAlerts === 'boolean') {
+            preferences.emailAgentAlerts = user.emailAgentAlerts;
+        }
+        if (typeof user.emailTaskNotifications === 'boolean') {
+            preferences.emailTaskNotifications = user.emailTaskNotifications;
+        }
+        if (typeof user.emailBudgetAlerts === 'boolean') {
+            preferences.emailBudgetAlerts = user.emailBudgetAlerts;
+        }
+        if (typeof user.userResearchOptOut === 'boolean') {
+            preferences.userResearchOptOut = user.userResearchOptOut;
+        }
+        if (Object.keys(preferences).length > 0) {
+            profile.preferences = preferences;
+        }
+
+        return profile;
     }
 
     private async exportWork(

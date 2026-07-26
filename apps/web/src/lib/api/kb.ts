@@ -2,6 +2,7 @@ import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
 import type {
     CreateKbDocumentInput,
+    KbDecisionStatus,
     KbDocumentBodyDto,
     KbDocumentDto,
     KbDocumentHistoryResult,
@@ -41,6 +42,9 @@ export const kbAPI = {
         if (opts.tag && !Array.isArray(opts.tag)) params.append('tag', opts.tag);
         if (typeof opts.locked === 'boolean') params.append('locked', String(opts.locked));
         if (opts.language) params.append('language', opts.language);
+        // Memory upgrades M8 — review-queue filter (`proposed` = the
+        // agent-authored docs excluded from injection until accepted).
+        if (opts.reviewState) params.append('reviewState', opts.reviewState);
         if (opts.q) params.append('q', opts.q);
         if (typeof opts.limit === 'number') params.append('limit', String(opts.limit));
         if (opts.cursor) params.append('offset', opts.cursor);
@@ -253,6 +257,60 @@ export const kbAPI = {
         return serverFetch<KbDocumentHistoryResult>(
             `/works/${workId}/kb/documents/${encodeURIComponent(docId)}/history${query}`,
         );
+    },
+
+    /**
+     * `POST /api/works/:id/kb/documents/:docId/accept` — memory upgrades
+     * M7 review action. Flips `reviewState` to `accepted` so the document
+     * starts feeding agent context; a decision-class doc still in
+     * `proposed` decision status is accepted as current in the same call.
+     * Idempotent.
+     */
+    acceptDocument: async (workId: string, docId: string): Promise<KbDocumentDto> => {
+        return serverMutation<KbDocumentDto>({
+            endpoint: `/works/${workId}/kb/documents/${encodeURIComponent(docId)}/accept`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * `POST /api/works/:id/kb/documents/:docId/archive` — memory upgrades
+     * M7 review action. Status-flip to `archived` (kept readable, dropped
+     * from default listings + injection) — never a physical delete.
+     * Idempotent.
+     */
+    archiveDocument: async (workId: string, docId: string): Promise<KbDocumentDto> => {
+        return serverMutation<KbDocumentDto>({
+            endpoint: `/works/${workId}/kb/documents/${encodeURIComponent(docId)}/archive`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * `POST /api/works/:id/kb/documents/:docId/decision-status` — memory
+     * upgrades M4 decision status machine. The review queue's
+     * "Supersede" action uses it with `status: 'superseded'` plus the
+     * surviving decision's id, which records the chain on BOTH documents.
+     */
+    transitionDecisionStatus: async (
+        workId: string,
+        docId: string,
+        input: {
+            status: KbDecisionStatus;
+            supersededByDocId?: string;
+            rationale?: string;
+        },
+    ): Promise<KbDocumentDto> => {
+        return serverMutation<KbDocumentDto>({
+            endpoint: `/works/${workId}/kb/documents/${encodeURIComponent(docId)}/decision-status`,
+            data: input as unknown as Record<string, unknown>,
+            method: 'POST',
+            wrapInData: false,
+        });
     },
 
     /**

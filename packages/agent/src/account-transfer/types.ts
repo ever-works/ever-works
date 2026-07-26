@@ -7,10 +7,64 @@ import type { TaskAcceptanceCheck, WorkExternalRefs } from '@ever-works/contract
 
 // ─── Export Types ────────────────────────────────────────────────
 
+/**
+ * The "What do you do" onboarding answers (`users.onboardingState.profile`).
+ * Values are plain strings — never the narrowed id unions — so a payload
+ * written by a newer build still parses here; both import paths validate
+ * against `ROLE_OPTIONS` / `TEAM_SIZE_OPTIONS` and DROP unrecognised
+ * values (never default them).
+ */
+export interface ExportedOnboardingProfile {
+    roles?: string[];
+    teamSize?: string;
+}
+
+/**
+ * Account-level preferences the user authored explicitly. Every field is
+ * optional so pre-preferences payloads keep importing; absent = leave the
+ * importing account's own value alone.
+ *
+ * `digestFrequency` is an enum on the wire and is drop-if-unrecognized on
+ * both import paths; the booleans are applied only when they really are
+ * booleans (a deliberate `false` — e.g. an email opt-out — must survive the
+ * round-trip, so these can never be collapsed to "truthy means set").
+ */
+export interface ExportedUserPreferences {
+    /** 'off' | 'daily' | 'weekly' — drop-if-unrecognized on import. */
+    digestFrequency?: string;
+    emailAgentAlerts?: boolean;
+    emailTaskNotifications?: boolean;
+    emailBudgetAlerts?: boolean;
+    /** Privacy opt-out — a deliberate `true` must survive the round-trip. */
+    userResearchOptOut?: boolean;
+}
+
 export interface ExportedProfile {
     username: string;
     email: string;
     avatar?: string;
+    /** Onboarding "What do you do" answers (roles + team size). */
+    onboarding?: ExportedOnboardingProfile;
+    /** Digest cadence + notification/privacy opt-ins. */
+    preferences?: ExportedUserPreferences;
+    // NOTE — the following user columns are DELIBERATELY absent from this
+    // envelope, and their omission is correct behaviour, not the usual
+    // "new column forgotten in the transfer whitelist" bug:
+    //   * `isPlatformAdmin` — the envelope is an attacker-editable JSON
+    //     file; carrying an admin flag across accounts would be a
+    //     straight privilege escalation on import (same reasoning that
+    //     clamps `AgentExportEnvelope.runtime.permissions` and omits
+    //     `works.mergePolicy`, below).
+    //   * Credits ledger + plan entitlements — money. Balances are earned
+    //     or bought in ONE account and must never be minted by importing
+    //     a JSON file into another.
+    //   * Fleet nodes — machine identity. A node row is a hashed
+    //     credential bound to a physical machine that enrolled against
+    //     THIS deployment; re-materialising it elsewhere would hand the
+    //     importer a registration it never performed.
+    //   * `tenantId` / `organizationId` / `defaultPlanId` — scope and
+    //     billing pointers that only mean anything inside the exporting
+    //     deployment. The importing account resolves its own.
 }
 
 export interface ExportedWorkMember {
@@ -278,6 +332,12 @@ export interface ImportResult {
     worksUpdated: number;
     worksSkipped: number;
     userPluginsImported: number;
+    /**
+     * True when the payload's account-level profile (onboarding answers /
+     * preferences) wrote at least one column. Optional so pre-existing
+     * callers constructing an `ImportResult` literal keep compiling.
+     */
+    profileImported?: boolean;
     errors: string[];
     warnings: string[];
 }

@@ -1,5 +1,7 @@
 import { Type } from 'class-transformer';
 import {
+    ArrayMaxSize,
+    IsArray,
     IsBoolean,
     IsIn,
     IsInt,
@@ -17,6 +19,7 @@ import {
     type TaskAcceptanceCheck,
     type TaskAcceptanceCheckKind,
 } from '@ever-works/contracts';
+import { ENV_NAME_PATTERN, MAX_ENV_PASSTHROUGH } from '../tasks-domain/check-env';
 
 /**
  * Slug-safe check id: lowercase alphanumeric start, then up to 40 more of
@@ -101,4 +104,21 @@ export class AcceptanceCheckDto implements TaskAcceptanceCheck {
     @IsOptional()
     @IsBoolean()
     disabled?: boolean;
+
+    @ApiPropertyOptional({
+        description:
+            'Environment variable NAMES (never values) granted to this check. Checks run with a scrubbed environment; listing a name is a deliberate grant of that value. Platform-owned configuration (database/auth/trigger/plugin credentials) is never granted, even when listed.',
+        type: [String],
+        maxItems: MAX_ENV_PASSTHROUGH,
+    })
+    @IsOptional()
+    @IsArray()
+    @ArrayMaxSize(MAX_ENV_PASSTHROUGH)
+    @IsString({ each: true })
+    @Matches(ENV_NAME_PATTERN, {
+        each: true,
+        message:
+            'envPassthrough entries must be environment variable NAMES: [A-Za-z_][A-Za-z0-9_]* (values are read from the platform environment).',
+    })
+    envPassthrough?: string[];
 }
