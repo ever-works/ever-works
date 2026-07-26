@@ -30,6 +30,7 @@ import { ActivityActionType, ActivityStatus } from '../entities/activity-log.typ
 import { assertNoSecrets } from '../utils/secret-scan';
 import { computeNextOccurrence, validateRecurrenceRule } from './recurrence';
 import { AgentRepository } from '../database/repositories/agent.repository';
+import type { Agent } from '../entities/agent.entity';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
 import type { AgentRunStatus } from '../entities/agent-run.entity';
 import { TaskNotificationService } from './task-notification.service';
@@ -102,7 +103,7 @@ export type TaskOwnerKey = (typeof TASK_OWNER_KEYS)[number];
  * Kanban run cockpit (Wave 2 M2) — compact latest-run embed attached to
  * list rows when the caller passes `includeRun=true`. Deliberately a
  * projection, not the AgentRun entity: the board chip needs exactly
- * these six fields and nothing sensitive (no errorMessage/summary/
+ * these fields and nothing sensitive (no errorMessage/summary/
  * workspaceMeta) should ride along on every list response.
  */
 export interface TaskRunEmbed {
@@ -110,6 +111,14 @@ export interface TaskRunEmbed {
     status: AgentRunStatus;
     currentActivity: string | null;
     totalTokens: number | null;
+    /**
+     * Cost telemetry (Wave 4 M7) - settled cost for this run in integer
+     * cents. Sibling of `totalTokens`, which the board chip already
+     * rendered; without it the cockpit could show how much the run
+     * THOUGHT and not how much it COST. `null` for a run that has not
+     * settled (or predates the column).
+     */
+    costCents: number | null;
     changedFilesCount: number | null;
     startedAt: Date | null;
     /** Quality gates (Wave 3 M6) — latest-run gate verdict for the board
@@ -118,6 +127,61 @@ export interface TaskRunEmbed {
 }
 
 export type TaskWithRun = Task & { run?: TaskRunEmbed | null };
+
+// ── Board dispatch (kanban M3 / M4) ───────────────────────────────
+
+/**
+ * Stable machine codes on the board-dispatch failures. The board keys
+ * its behaviour off these, never off the message: `RUN_AGENT_AMBIGUOUS`
+ * and `RUN_NO_AGENT` open the agent picker, `RUN_ALREADY_IN_FLIGHT`
+ * points at the live run instead.
+ */
+export const RUN_ALREADY_IN_FLIGHT = 'RUN_ALREADY_IN_FLIGHT' as const;
+export const RUN_AGENT_AMBIGUOUS = 'RUN_AGENT_AMBIGUOUS' as const;
+export const RUN_NO_AGENT = 'RUN_NO_AGENT' as const;
+export const RUN_AGENT_NOT_FOUND = 'RUN_AGENT_NOT_FOUND' as const;
+
+/** Hard cap on `runTasksBatch` — a board action, not a bulk job runner. */
+export const RUN_BATCH_MAX_TASKS = 20;
+
+/** One row of the board's agent picker. */
+export interface RunCandidateAgent {
+    id: string;
+    name: string;
+    slug?: string;
+    status?: string;
+    /** Why this Agent is offered — drives the picker's grouping/labels. */
+    source: 'assignee' | 'task' | 'work-default';
+}
+
+export interface RunTaskResult {
+    taskId: string;
+    agentId: string;
+    runId: string | null;
+    dispatched: boolean;
+    parked: boolean;
+    queuedReason?: string;
+    error?: string;
+}
+
+export type RunBatchItemResult =
+    | { taskId: string; ok: true; run: RunTaskResult }
+    | { taskId: string; ok: false; error: { code: string; message: string } };
+
+/**
+ * Pull the machine code out of a thrown Nest exception whose response
+ * body we shaped ourselves; anything else reports as `RUN_FAILED`. Used
+ * only by the batch path, where per-item failures are DATA rather than
+ * an aborted request.
+ */
+function extractErrorCode(err: unknown): string {
+    const response = (err as { getResponse?: () => unknown })?.getResponse?.();
+    if (response && typeof response === 'object') {
+        const code = (response as { code?: unknown }).code;
+        if (typeof code === 'string') return code;
+    }
+    return 'RUN_FAILED';
+}
 
 @Injectable()
 export class TasksService {
@@ -226,6 +290,7 @@ export class TasksService {
                         status: run.status,
                         currentActivity: run.currentActivity ?? null,
                         totalTokens: run.totalTokens ?? null,
+                        costCents: run.costCents ?? null,
                         changedFilesCount: run.changedFilesCount ?? null,
                         startedAt: run.startedAt ?? null,
                         gateStatus: run.gateStatus ?? null,
@@ -541,6 +606,212 @@ export class TasksService {
             recurrenceMaxOccurrences: null,
         });
         return (await this.tasks.findById(id)) as Task;
+    }
+
+    // ── Board dispatch (kanban M3/M4) ─────────────────────────────
+
+    /**
+     * Agents that could run this Task, most-specific first:
+     *
+     *   1. its Agent assignees (the fan-out set a drag-to-in-progress
+     *      would dispatch), then
+     *   2. its own `agentId` column, then
+     *   3. the Works's Work-scoped Agents — "the Work's default agent".
+     *
+     * Deduped by id, owner-scoped throughout, never throws (a lookup
+     * failure degrades to the candidates gathered so far, so the picker
+     * still opens with whatever is knowable).
+     */
+    async listRunCandidates(userId: string, taskId: string): Promise<RunCandidateAgent[]> {
+        const task = await this.getOne(userId, taskId);
+        const out = new Map<string, RunCandidateAgent>();
+
+        const push = (id: string, source: RunCandidateAgent['source'], agent?: Agent | null) => {
+            if (!id || out.has(id)) return;
+            out.set(id, {
+                id,
+                name: agent?.name ?? agent?.slug ?? id,
+                ...(agent?.slug ? { slug: agent.slug } : {}),
+                ...(agent?.status ? { status: agent.status } : {}),
+                source,
+            });
+        };
+
+        try {
+            const assigned = await this.assignees.findAgentAssignees(taskId);
+            for (const row of assigned) {
+                const agent = this.agents
+                    ? await this.agents.findByIdAndUser(row.assigneeId, userId).catch(() => null)
+                    : null;
+                // An assignee row whose Agent is gone (or belongs to
+                // someone else) is not a candidate — the picker must
+                // never offer something dispatch would reject.
+                if (agent) push(row.assigneeId, 'assignee', agent);
+            }
+        } catch (err) {
+            this.logger.warn(`Run candidates: assignee lookup failed for task ${taskId}: ${err}`);
+        }
+
+        if (task.agentId && this.agents) {
+            const agent = await this.agents.findByIdAndUser(task.agentId, userId).catch(() => null);
+            if (agent) push(task.agentId, 'task', agent);
+        }
+
+        if (task.workId && this.agents) {
+            try {
+                const { rows } = await this.agents.findByUserIdScoped(userId, {
+                    workId: task.workId,
+                    limit: 25,
+                });
+                for (const agent of rows) push(agent.id, 'work-default', agent);
+            } catch (err) {
+                this.logger.warn(`Run candidates: Work-agent lookup failed for ${taskId}: ${err}`);
+            }
+        }
+
+        return [...out.values()];
+    }
+
+    /**
+     * Board dispatch (kanban M3) — run this Task now.
+     *
+     * Resolution order is `agentId` (explicit) → the Task's assigned
+     * Agent → the Work's default Agent, and an AMBIGUOUS or EMPTY
+     * resolution is a 400 carrying the candidate list, which is exactly
+     * what the board's agent picker renders. Dispatch itself goes
+     * through `TaskTransitionService.dispatchAgentRun` — the same path
+     * the drag-to-in-progress fan-out uses — so the concurrency valve,
+     * the credits precheck and the board denorm all apply unchanged.
+     *
+     * 409 `RUN_ALREADY_IN_FLIGHT` when this (Task, Agent) pair already
+     * has a queued/running run: the answer to "run it again" while it is
+     * still running is to steer the live run, never to race a second one.
+     */
+    async runTask(
+        userId: string,
+        taskId: string,
+        opts: { agentId?: string | null } = {},
+    ): Promise<RunTaskResult> {
+        const task = await this.getOne(userId, taskId);
+        const agentId = await this.resolveRunAgentId(userId, taskId, opts.agentId ?? null);
+
+        if (this.agentRuns) {
+            const inFlight = await this.agentRuns
+                .findInFlightForTaskAgent(taskId, agentId)
+                .catch(() => null);
+            if (inFlight) {
+                throw new ConflictException({
+                    code: RUN_ALREADY_IN_FLIGHT,
+                    message:
+                        'This Task already has a run in flight for that Agent. Steer or cancel it before starting another.',
+                    runId: inFlight.id,
+                    agentId,
+                    status: inFlight.status,
+                });
+            }
+        }
+
+        // Board dispatch is an explicit, human "go" — discriminate the
+        // dedup key by time so it can never collide with the generation
+        // key a status transition would use for the same pair.
+        const dispatch = await this.transitions.dispatchAgentRun(task, agentId, {
+            dedupKey: `${taskId}:${agentId}:manual:${Date.now()}`,
+        });
+
+        await this.logActivity({
+            userId,
+            taskId,
+            actionType: ActivityActionType.TASK_TRANSITIONED,
+            details: {
+                action: 'run',
+                agentId,
+                runId: dispatch.runId,
+                dispatched: dispatch.dispatched,
+                parked: dispatch.parked,
+            },
+        });
+
+        return { taskId, agentId, ...dispatch };
+    }
+
+    /**
+     * Board dispatch (kanban M4) — run up to
+     * {@link RUN_BATCH_MAX_TASKS} Tasks in one call, each independently.
+     *
+     * Per-item results, never all-or-nothing: a Task with no agent, one
+     * already running, and one that dispatches cleanly must all report
+     * their own outcome. Nothing here bypasses `runTask`, so the
+     * conflict rule and the dispatch gate hold identically per item.
+     */
+    async runTasksBatch(
+        userId: string,
+        items: { taskId: string; agentId?: string | null }[],
+    ): Promise<{ results: RunBatchItemResult[] }> {
+        if (!Array.isArray(items) || items.length === 0) {
+            throw new BadRequestException('At least one task is required.');
+        }
+        if (items.length > RUN_BATCH_MAX_TASKS) {
+            throw new BadRequestException(
+                `At most ${RUN_BATCH_MAX_TASKS} tasks can be run in one batch (received ${items.length}).`,
+            );
+        }
+        const results: RunBatchItemResult[] = [];
+        for (const item of items) {
+            try {
+                const run = await this.runTask(userId, item.taskId, { agentId: item.agentId });
+                results.push({ taskId: item.taskId, ok: true, run });
+            } catch (err) {
+                results.push({
+                    taskId: item.taskId,
+                    ok: false,
+                    error: {
+                        code: extractErrorCode(err),
+                        message: err instanceof Error ? err.message : String(err),
+                    },
+                });
+            }
+        }
+        return { results };
+    }
+
+    /** Explicit → assignee → Work default, with the picker-shaped 400s. */
+    private async resolveRunAgentId(
+        userId: string,
+        taskId: string,
+        explicitAgentId: string | null,
+    ): Promise<string> {
+        if (explicitAgentId) {
+            if (!this.agents) {
+                throw new BadRequestException('Agent repository not wired in this context.');
+            }
+            const agent = await this.agents.findByIdAndUser(explicitAgentId, userId);
+            if (!agent) {
+                // 400 (not 404) and no existence leak: from the caller's
+                // side an id they do not own and an id that never existed
+                // are the same unusable input.
+                throw new BadRequestException({
+                    code: RUN_AGENT_NOT_FOUND,
+                    message: `Agent ${explicitAgentId} not found.`,
+                });
+            }
+            return explicitAgentId;
+        }
+
+        const candidates = await this.listRunCandidates(userId, taskId);
+        if (candidates.length === 1) return candidates[0].id;
+        if (candidates.length === 0) {
+            throw new BadRequestException({
+                code: RUN_NO_AGENT,
+                message:
+                    'This Task has no Agent assigned and its Work has no Agent to fall back on. Assign an Agent, or pass agentId.',
+                candidates,
+            });
+        }
+        throw new BadRequestException({
+            code: RUN_AGENT_AMBIGUOUS,
+            message: `This Task has ${candidates.length} possible Agents — pass agentId to choose one.`,
+            candidates,
+        });
     }
 
     async transition(

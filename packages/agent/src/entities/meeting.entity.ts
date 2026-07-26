@@ -1,4 +1,5 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
+import { PortableDateColumn } from './_types';
 
 /**
  * Meetings v1 (Wave 8, feature a) — one captured meeting, org-wide or
@@ -63,10 +64,16 @@ export class Meeting {
     @Column({ type: 'varchar', length: 500 })
     title: string;
 
-    @Column({ type: 'timestamp' })
+    // Portable date: better-sqlite3 (the e2e/CI driver) has no `timestamp`
+    // type, so a raw one makes TypeORM metadata validation throw
+    // DataTypeNotSupportedError and the API cannot boot there at all.
+    @PortableDateColumn()
     startedAt: Date;
 
-    @Column({ type: 'timestamp', nullable: true })
+    // Portable date: better-sqlite3 (the e2e/CI driver) has no `timestamp`
+    // type, so a raw one makes TypeORM metadata validation throw
+    // DataTypeNotSupportedError and the API cannot boot there at all.
+    @PortableDateColumn({ nullable: true })
     endedAt?: Date | null;
 
     /** Producing surface: 'zoom' | 'google-meet' | 'manual' | 'import'. */

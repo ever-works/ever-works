@@ -8,7 +8,17 @@ export * from './kb-org-overlay-fanout.task';
 export * from './kb-reconcile.task';
 export * from './agent-run-sweeper.task';
 export * from './terminal-session.task';
+// Streaming-terminal M9 / D1 — nightly plan-tier retention sweep over
+// persisted terminal transcripts.
+export * from './terminal-transcript-gc.task';
 export * from './task-branch-gc.task';
+// Kanban run cockpit (plan 04 M5/M7) — refresh open-PR status + CI for
+// the board review pill, and land Tasks whose PR merged.
+export * from './task-pr-status-sync.task';
+// Desktop PRD M4 — return lapsed fleet-job leases to the pool so a
+// fleet whose nodes ALL died still converges (inline reclaim on the
+// lease path covers every other case).
+export * from './fleet-job-lease-sweeper.task';
 export * from './user-research-rerun-dispatcher.task';
 export * from './mission-tick.task';
 // PR-4 — Idea → Work build executor (flag-gated, dry-run by default).
@@ -30,3 +40,6 @@ export * from './webhook-delivery.task';
 export * from './run-plugin-operation.task';
 // Pricing Wave 9 M1 — daily free-credit grant (idempotent per user/day).
 export * from './credits-daily-grant.task';
+// Memory upgrades M9 — scheduled consolidation pass (opt-in per org,
+// dry-run by default, never auto-applied).
+export * from './memory-consolidation-tick.task';

@@ -3,6 +3,7 @@ import {
     AnonymousUserCleanupService,
     DeployReadyPollerService,
     KnowledgeBaseReconcileService,
+    MemoryConsolidationScheduleService,
     WorkScheduleDispatcherService,
     WorkScheduleService,
 } from '@ever-works/agent/services';
@@ -10,15 +11,19 @@ import { MissionTickService } from '@ever-works/agent/missions';
 import { IdeaBuildExecutorService } from '@ever-works/agent/work-agent';
 import { GoalEvaluationService } from '@ever-works/agent/goals';
 import {
+    AgentEscalationService,
     AgentRunService,
     AgentRunSweeperService,
     AgentScheduleDispatcherService,
     RunDispatchGateService,
+    TerminalTranscriptService,
 } from '@ever-works/agent/agents';
 import {
     TaskChatService,
     TaskGateRunnerService,
+    TaskPrStatusService,
     TaskRecurrenceDispatcherService,
+    TaskReviewRejectionService,
     TaskRunDenormService,
     TasksService,
     TaskWorkspaceService,
@@ -28,6 +33,7 @@ import { NotificationChannelFacadeService } from '@ever-works/agent/facades';
 import { EventIngestService, EventSourcePullService } from '@ever-works/agent/ingest';
 import { DigestService } from '@ever-works/agent/digest';
 import { CreditLedgerService } from '@ever-works/agent/subscriptions';
+import { FleetJobService } from '@ever-works/agent/fleet';
 import { TriggerInternalApiClient } from '../services/trigger-internal-api.client';
 import { createRemoteProxy } from '../remote-proxy';
 
@@ -122,6 +128,23 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
                 createRemoteProxy(apiClient, 'AgentRunService'),
             inject: [TriggerInternalApiClient],
         },
+        // Judgment layer G3 - `agent-task-execute` files an escalation
+        // here when the gate is exhausted (or the budget stopped the
+        // iterate loop).
+        {
+            provide: AgentEscalationService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'AgentEscalationService'),
+            inject: [TriggerInternalApiClient],
+        },
+        // Orchestration M9 - `agent-task-execute` persists the machine
+        // gate feedback here so a LATER resume can replay it.
+        {
+            provide: TaskReviewRejectionService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'TaskReviewRejectionService'),
+            inject: [TriggerInternalApiClient],
+        },
         {
             provide: AgentRepository,
             useFactory: (apiClient: TriggerInternalApiClient) =>
@@ -171,6 +194,16 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
             useFactory: (apiClient) => createRemoteProxy(apiClient, 'TaskWorkspaceService'),
             inject: [TriggerInternalApiClient],
         },
+        // Fleet job runtime (Desktop PRD M4) — the fleet-job-lease-sweeper
+        // cron calls reclaimExpired() over the internal RPC channel. The
+        // real service (repositories + the fleet entities) lives API-side,
+        // same shape as TaskWorkspaceService.
+        {
+            provide: FleetJobService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'FleetJobService'),
+            inject: [TriggerInternalApiClient],
+        },
         // Wave 3 M2/M3 — quality gates. The acceptance-check runner lives
         // API-side (same filesystem as the provisioned workspace — see the
         // TaskWorkspaceService note above); agent-task-execute calls
@@ -207,6 +240,17 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
             provide: TaskChatService,
             useFactory: (apiClient: TriggerInternalApiClient) =>
                 createRemoteProxy(apiClient, 'TaskChatService'),
+            inject: [TriggerInternalApiClient],
+        },
+        // Kanban run cockpit (plan 04 M5/M7) — the task-pr-status-sync
+        // cron calls syncDuePrStatuses() over the internal RPC channel.
+        // The real service needs the git facade (provider plugins are
+        // only loaded in the API process), same shape as
+        // TaskWorkspaceService.
+        {
+            provide: TaskPrStatusService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'TaskPrStatusService'),
             inject: [TriggerInternalApiClient],
         },
         // Notifications v2 (EW-663) — the notification-channel-delivery
@@ -284,6 +328,28 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
                 createRemoteProxy(apiClient, 'CreditLedgerService'),
             inject: [TriggerInternalApiClient],
         },
+        // Memory consolidation cadence (memory upgrades M9) — the
+        // memory-consolidation-tick cron calls `dispatchDue()` on this
+        // proxy, which RPCs to the live API where the org/tenant
+        // repositories, the AI facade and the notification producer are
+        // wired. Same shape as DigestService above.
+        {
+            provide: MemoryConsolidationScheduleService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'MemoryConsolidationScheduleService'),
+            inject: [TriggerInternalApiClient],
+        },
+        // Terminal transcripts (streaming-terminal M9 / founder decision
+        // D1) — the terminal-transcript-gc cron calls `sweepExpired()` on
+        // this proxy, which RPCs to the live API where the chunk
+        // repository and the plan-entitlement lever are wired. Same shape
+        // as CreditLedgerService above.
+        {
+            provide: TerminalTranscriptService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'TerminalTranscriptService'),
+            inject: [TriggerInternalApiClient],
+        },
     ],
     exports: [
         TriggerInternalApiClient,
@@ -297,6 +363,8 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         AgentScheduleDispatcherService,
         AgentRunSweeperService,
         AgentRunService,
+        AgentEscalationService,
+        TaskReviewRejectionService,
         AgentRepository,
         AgentRunRepository,
         RunDispatchGateService,
@@ -305,6 +373,7 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         TaskChatService,
         TaskRunDenormService,
         TaskWorkspaceService,
+        FleetJobService,
         TaskGateRunnerService,
         WorkRepository,
         NotificationChannelFacadeService,
@@ -314,6 +383,8 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         EventSourcePullService,
         DigestService,
         CreditLedgerService,
+        MemoryConsolidationScheduleService,
+        TerminalTranscriptService,
     ],
 })
 export class TriggerInternalModule {}

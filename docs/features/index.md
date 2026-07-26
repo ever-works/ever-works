@@ -35,12 +35,20 @@ This section covers the individual capabilities that make that possible, beyond 
 | [Store Builder](./store-builder)         | _(Coming soon)_ eCommerce storefronts an AI team researches, stocks, writes, and optimizes                       |
 | [Company Builder](./company-builder)     | _(Coming soon)_ Register and run a whole company, staffed by AI Agents, on top of the platform                   |
 | [Desktop App](./desktop-app)             | _(Coming soon)_ Run the full stack locally as a single application                                               |
+| [Fleet](./fleet)                         | The registry of machines that are yours — enroll a node, watch it heartbeat, drain it when you want it quiet     |
 
 ## Operating a Work
 
 | Feature                                              | Description                                                                                                  |
 | ---------------------------------------------------- | ------------------------------------------------------------------------------------------------------------ |
+| [Task Isolation](./task-isolation)                   | A branch and a private checkout per Task, so parallel Agents never overwrite each other                      |
+| [Quality Gates](./quality-gates)                     | Acceptance checks that decide whether an Agent's work is done — red sends it back instead of to you          |
+| [Merge Policy](./merge-policy)                       | Whether an Agent may land its own pull request, configurable per tenant / org / Work / Agent                 |
+| [Sessions & Steering](./sessions-and-steering)       | Watch every agent run, and talk to one that is already in flight — steer, interrupt, resume                  |
+| [Decisions & Review](./memory-decisions)             | First-class decision documents plus a review queue that keeps agent-authored memory out of context           |
 | [Budgets & Usage](./budgets-and-usage)               | Per-Mission / per-Idea / per-Work / per-Agent / account-wide caps that gate AI spend before the bill arrives |
+| [Credits & Billing](./credits-and-billing)           | The credits ledger, the balance it sums to, and the plan / usage surfaces that read it                       |
+| [Integrations](./integrations)                       | Slack, GitHub PR review, native connectors and Meetings — outside activity as one normalized event stream    |
 | [Scheduled Updates](./scheduled-updates)             | Re-run the AI generation pipeline on a recurring cadence to keep content fresh                               |
 | [Generation Cancellation](./generation-cancellation) | Cancel an in-flight generation and roll back to a clean state from the dashboard or API                      |
 | [Community PR Processing](./community-pr-processing) | Automatically process community-submitted GitHub PRs to extract work items using AI                          |

@@ -66,9 +66,16 @@ export const config = {
          * lands the log emitter). Lowercased + trimmed for resilience to
          * deploy-manifest typos (`Trigger ` → `trigger`).
          */
-        getActiveProviderId(): 'trigger' | 'temporal' | 'bullmq' | 'pgboss' | 'inngest' {
+        getActiveProviderId(): 'trigger' | 'temporal' | 'bullmq' | 'pgboss' | 'inngest' | 'node' {
             const raw = (process.env.EVER_WORKS_JOB_RUNTIME ?? '').trim().toLowerCase();
-            if (raw === 'temporal' || raw === 'bullmq' || raw === 'pgboss' || raw === 'inngest') {
+            if (
+                raw === 'temporal' ||
+                raw === 'bullmq' ||
+                raw === 'pgboss' ||
+                raw === 'inngest' ||
+                // Desktop PRD M4 — the fleet runtime (job-runtime-node).
+                raw === 'node'
+            ) {
                 return raw;
             }
             return 'trigger';
@@ -640,6 +647,92 @@ export const config = {
             return Number.isFinite(raw) && raw > 0 ? raw : 200;
         },
         /**
+         * State-aware sweeper (Wave 4 M6) — park a stale RUNNING run
+         * instead of hard-failing it. Default ON.
+         *
+         * A `running` row past the cutoff means the worker died, not that
+         * the work was wrong: the conversation (`cliSessionId`) is still
+         * valid and `RunSteeringService.resume` can revive it. Parking
+         * writes `terminalEndedReason='parked'`, which is exactly the
+         * token `RESUMABLE_ENDED_REASONS` already recognises — so a
+         * parked run gets a Resume button instead of a red error row.
+         *
+         * Set `AGENT_RUN_STALE_PARK_ENABLED=false` to fall back to the
+         * pre-M6 behavior (every stale row hard-fails). A rollback valve,
+         * not a product knob. `queued` rows are unaffected by this switch:
+         * a queued row never started, so there is no conversation to park
+         * — see {@link getRunQueuedTooLongMinutes}.
+         */
+        getRunStaleParkEnabled() {
+            return process.env.AGENT_RUN_STALE_PARK_ENABLED !== 'false';
+        },
+        /**
+         * How long a run may sit `queued` before it is surfaced as needing
+         * a human. Default 60 minutes.
+         *
+         * This is a NOTICE threshold, never a reap threshold: crossing it
+         * stamps `attentionReason='queued-too-long'`, notifies the owner
+         * once, and leaves the row exactly where it is. The plan is
+         * explicit — "`queued` older than a bound → surface, don't
+         * silently drop".
+         *
+         * Deliberately much shorter than the stuck cutoff (hours): a run
+         * that cannot get capacity for an hour is a capacity problem
+         * somebody should see, whereas the stuck cutoff protects a
+         * legitimately long-running worker from being killed.
+         *
+         * `0` (or negative) disables queued-too-long surfacing entirely.
+         */
+        getRunQueuedTooLongMinutes() {
+            const raw = parseInt(process.env.AGENT_RUN_QUEUED_TOO_LONG_MINUTES || '60', 10);
+            return Number.isFinite(raw) ? raw : 60;
+        },
+        /**
+         * Rows flagged per tick by the queued-too-long scan. Bounded for
+         * the same reason as {@link getRunStuckSweepBatch}: a saturated
+         * org is precisely when this runs, and each flagged row also emits
+         * a notification.
+         */
+        getRunQueuedAttentionBatch() {
+            const raw = parseInt(process.env.AGENT_RUN_QUEUED_ATTENTION_BATCH || '50', 10);
+            return Number.isFinite(raw) && raw > 0 ? raw : 50;
+        },
+        /**
+         * Judgment layer G2 — run the cheap L0 pre-check before spending a
+         * model call. Default **off**.
+         *
+         * Off by default because it changes what the agent sees on its
+         * FIRST turn: a Work whose L0 command is misconfigured would start
+         * every run by describing a failure that is not the agent's to
+         * fix. Operators turn it on once their `level: 'L0'` checks are
+         * trustworthy. When off — or when the Work declares no L0 check —
+         * the run is byte-for-byte what it is today.
+         */
+        isGateL0PreCheckEnabled() {
+            return (process.env.AGENT_GATE_L0_PRECHECK || 'off').toLowerCase() === 'on';
+        },
+        /**
+         * Wall-clock ceiling for the WHOLE L0 pre-check pass, in seconds.
+         * Default 120.
+         *
+         * A pre-check exists to be cheap; if it is not cheap it is a
+         * regression, not a feature. Applied per check on top of the
+         * check's own `timeoutSec`, so a pre-check can never approach the
+         * post-run gate's 30-minute ceiling.
+         */
+        getGateL0PreCheckTimeoutSec() {
+            const raw = parseInt(process.env.AGENT_GATE_L0_PRECHECK_TIMEOUT_SEC || '120', 10);
+            return Number.isFinite(raw) && raw > 0 ? raw : 120;
+        },
+        /**
+         * Judgment layer G3 — kill switch for structured escalation
+         * records. Default ON: when an agent gives up, a human needs a
+         * card saying so. Off falls back to log-lines-only.
+         */
+        isEscalationLoggingEnabled() {
+            return process.env.AGENT_ESCALATION_LOGGING_ENABLED !== 'false';
+        },
+        /**
          * Run orchestration (Wave 4 M2) — concurrency safety valves for
          * `RunDispatchGateService`. These are operator knobs, NOT product
          * limits: defaults are deliberately generous (10 in-flight runs
@@ -673,6 +766,89 @@ export const config = {
          */
         isMergePolicyEnforcementEnabled() {
             return (process.env.AGENT_MERGE_POLICY_ENFORCEMENT || 'on').toLowerCase() !== 'off';
+        },
+    },
+
+    /**
+     * Streaming-terminal M9 / founder decision D1 — persisted terminal
+     * transcripts.
+     *
+     * Retention itself is NOT an env default: it is a plan-tier lever
+     * read from the `terminal-transcript-retention-days` entitlement
+     * (-1 forever / 0 keep-nothing / N days), seeded per plan by the
+     * `1784300000000` migration. The knobs here are operator safety
+     * valves around that lever — a kill switch, sizing caps, and the
+     * fallback for a plan code with no entitlement row.
+     */
+    terminal: {
+        transcript: {
+            /**
+             * Master switch. Default ON. Off = the publish path skips
+             * persistence entirely (the relay still fans out live).
+             */
+            isPersistenceEnabled(): boolean {
+                const raw = (process.env.TERMINAL_TRANSCRIPT_PERSISTENCE || '').toLowerCase();
+                return raw !== 'off' && raw !== 'false' && raw !== '0';
+            },
+            /**
+             * Retention for a plan CODE with no entitlement row. Default
+             * 0 — keep nothing. Fail-closed on purpose: an unrecognized
+             * plan must not silently start retaining terminal output.
+             */
+            getFallbackRetentionDays(): number {
+                const raw = parseInt(process.env.TERMINAL_TRANSCRIPT_RETENTION_DAYS || '0', 10);
+                return Number.isFinite(raw) && raw >= -1 ? raw : 0;
+            },
+            /** Per-run retention-resolution cache TTL (ms, default 60s). */
+            getRetentionCacheTtlMs(): number {
+                const raw = parseInt(
+                    process.env.TERMINAL_TRANSCRIPT_RETENTION_CACHE_TTL_MS || '60000',
+                    10,
+                );
+                return Number.isFinite(raw) && raw >= 0 ? raw : 60000;
+            },
+            /** Hard cap on a single stored chunk's text (chars, default 64 KiB). */
+            getMaxChunkChars(): number {
+                const raw = parseInt(
+                    process.env.TERMINAL_TRANSCRIPT_MAX_CHUNK_CHARS || '65536',
+                    10,
+                );
+                return Number.isFinite(raw) && raw > 0 ? raw : 65536;
+            },
+            /** Max chunks returned by one replay page (default 500). */
+            getReplayMaxChunks(): number {
+                const raw = parseInt(
+                    process.env.TERMINAL_TRANSCRIPT_REPLAY_MAX_CHUNKS || '500',
+                    10,
+                );
+                return Number.isFinite(raw) && raw > 0 ? raw : 500;
+            },
+            /** Max total chars one replay page may return (default 512 KiB). */
+            getReplayMaxChars(): number {
+                const raw = parseInt(
+                    process.env.TERMINAL_TRANSCRIPT_REPLAY_MAX_CHARS || '524288',
+                    10,
+                );
+                return Number.isFinite(raw) && raw > 0 ? raw : 524288;
+            },
+            /** Candidate runs scanned per retention-sweep page (default 200). */
+            getSweepBatchSize(): number {
+                const raw = parseInt(process.env.TERMINAL_TRANSCRIPT_SWEEP_BATCH || '200', 10);
+                return Number.isFinite(raw) && raw > 0 ? raw : 200;
+            },
+            /**
+             * Upper bound the sweeper scans back from. Any retention
+             * window is <= this, so the candidate scan uses it as the
+             * "definitely old enough to consider" cutoff. Default 3650
+             * days (10y).
+             */
+            getSweepHorizonDays(): number {
+                const raw = parseInt(
+                    process.env.TERMINAL_TRANSCRIPT_SWEEP_HORIZON_DAYS || '3650',
+                    10,
+                );
+                return Number.isFinite(raw) && raw > 0 ? raw : 3650;
+            },
         },
     },
 

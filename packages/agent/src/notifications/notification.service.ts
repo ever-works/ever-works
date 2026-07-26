@@ -444,6 +444,106 @@ export class NotificationService {
         });
     }
 
+    /**
+     * State-aware sweeper (Wave 4 M6) — a run has been queued past the
+     * configured bound and nobody knows.
+     *
+     * This is the plan's `agent_run.queued_too_long` attention event. It
+     * is a WARNING, not an error: nothing was reaped, the run is still
+     * queued, and the notification exists so a capacity problem is seen
+     * instead of inferred from a board that stopped moving.
+     *
+     * Deduplicated per RUN, not per user: two stuck runs are two separate
+     * facts. The sweeper additionally CAS-guards its flag write, so this
+     * producer is reached at most once per run even across replicas.
+     */
+    async notifyAgentRunQueuedTooLong(args: {
+        userId: string;
+        runId: string;
+        taskId?: string | null;
+        waitedMinutes: number;
+        queuedReason?: string | null;
+    }): Promise<void> {
+        // `queuedReason` is a machine token written by the platform, but
+        // it is rendered inside the message, so it goes through the same
+        // label sanitizer as every other interpolated value.
+        const reasonSuffix = args.queuedReason
+            ? ` (waiting on: ${this.sanitizeLabel(args.queuedReason)})`
+            : '';
+        const message =
+            `An agent run has been queued for ${args.waitedMinutes} minutes without ` +
+            `starting${reasonSuffix}. It has NOT been cancelled.`;
+        const actionUrl = '/agents/sessions?attention=1';
+        await this.create({
+            userId: args.userId,
+            type: NotificationType.WARNING,
+            category: NotificationCategory.AGENT,
+            title: 'Agent run queued too long',
+            message,
+            actionUrl,
+            actionLabel: 'View sessions',
+            metadata: {
+                runId: args.runId,
+                taskId: args.taskId ?? null,
+                waitedMinutes: args.waitedMinutes,
+                queuedReason: args.queuedReason ?? null,
+            },
+            deduplicationKey: `agent_run_queued_too_long_${args.runId}`,
+        });
+        await this.dispatchFanout({
+            userId: args.userId,
+            eventKey: 'agent_run_queued_too_long',
+            title: 'Agent run queued too long',
+            message,
+            actionUrl,
+            actionLabel: 'View sessions',
+            urgent: false,
+        });
+    }
+
+    /**
+     * Judgment layer G3 — an agent gave up and a human has to decide.
+     *
+     * One notification per escalation record (the escalation store is
+     * itself idempotent per `dedupKey`, and this dedup key mirrors it), so
+     * a retried worker cannot spam the owner.
+     */
+    async notifyAgentEscalation(args: {
+        userId: string;
+        escalationId: string;
+        reasonCode: string;
+        summary: string;
+        taskId?: string | null;
+    }): Promise<void> {
+        const safeSummary = sanitizeDescription(args.summary, 300);
+        const actionUrl = args.taskId ? `/tasks/${args.taskId}` : '/agents/sessions?attention=1';
+        await this.create({
+            userId: args.userId,
+            type: NotificationType.WARNING,
+            category: NotificationCategory.AGENT,
+            title: 'Agent needs a decision',
+            message: safeSummary,
+            actionUrl,
+            actionLabel: 'Review',
+            isPersistent: true,
+            metadata: {
+                escalationId: args.escalationId,
+                reasonCode: args.reasonCode,
+                taskId: args.taskId ?? null,
+            },
+            deduplicationKey: `agent_escalation_${args.escalationId}`,
+        });
+        await this.dispatchFanout({
+            userId: args.userId,
+            eventKey: 'agent_run_escalated',
+            title: 'Agent needs a decision',
+            message: safeSummary,
+            actionUrl,
+            actionLabel: 'Review',
+            urgent: false,
+        });
+    }
+
     async notifyGitAuthExpired(userId: string, provider: string): Promise<void> {
         await this.create({
             userId,
@@ -509,6 +609,57 @@ export class NotificationService {
             message: safeMessage,
             actionUrl: '/activity',
             actionLabel: 'View activity',
+            urgent: false,
+        });
+    }
+
+    /**
+     * Memory consolidation cadence (memory upgrades M9) — in-app row +
+     * notifications-v2 channel fanout announcing that a scheduled
+     * consolidation pass produced something to review.
+     *
+     * Deliberately reuses the generic producer path (no new category, no
+     * new transport): the message is the deterministic
+     * "N promoted / M synthesized / K superseded" line and the action
+     * link lands on the Memory page where Apply / the review queue live.
+     * Dedup key is per-org+day, so a re-run of the same cron window
+     * updates nothing instead of stacking duplicates.
+     */
+    async notifyMemoryConsolidation(args: {
+        userId: string;
+        organizationId: string;
+        title: string;
+        message: string;
+        /** `dry-run` (preview only) or `propose` (documents landed for review). */
+        mode: 'dry-run' | 'propose';
+        metadata?: Record<string, unknown>;
+        deduplicationKey?: string;
+    }): Promise<void> {
+        const safeMessage = sanitizeDescription(args.message, 500);
+        const actionUrl = '/memory';
+        await this.create({
+            userId: args.userId,
+            type: NotificationType.INFO,
+            category: NotificationCategory.SYSTEM,
+            title: this.sanitizeLabel(args.title),
+            message: safeMessage,
+            actionUrl,
+            actionLabel: 'Review memory',
+            metadata: {
+                organizationId: args.organizationId,
+                mode: args.mode,
+                ...(args.metadata ?? {}),
+            },
+            deduplicationKey:
+                args.deduplicationKey ?? `memory_consolidation_${args.organizationId}`,
+        });
+        await this.dispatchFanout({
+            userId: args.userId,
+            eventKey: 'memory_consolidation_ready',
+            title: args.title,
+            message: safeMessage,
+            actionUrl,
+            actionLabel: 'Review memory',
             urgent: false,
         });
     }

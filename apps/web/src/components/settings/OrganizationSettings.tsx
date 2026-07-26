@@ -3,10 +3,12 @@
 import { useCallback, useEffect, useMemo, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import type { OrganizationResponse } from '@ever-works/contracts/api';
+import type { MergePolicyOverride } from '@ever-works/contracts';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { ShowDateTime } from '@/components/ui/show-datetime';
+import { MergePolicyCard } from '@/components/policy/MergePolicyCard';
 import { useOrganizations } from '@/lib/hooks/use-organizations';
 
 /**
@@ -129,6 +131,42 @@ export function OrganizationSettings() {
         });
     }, [selectedOrg, vision, mutate, t]);
 
+    /**
+     * Merge-policy matrix (Wave 3, D4) — the organization slice rides the
+     * same `PATCH /api/organizations/:id` proxy as the vision field above,
+     * so it inherits that route's same-Tenant check unchanged. `mutate()`
+     * refreshes the shared org store so `storedOverride` (which drives
+     * reset-to-inherit) reflects the row rather than the last click.
+     */
+    const saveMergePolicy = useCallback(
+        async (next: MergePolicyOverride | null) => {
+            if (!selectedOrg) return { success: false, error: t('errors.generic') };
+            try {
+                const res = await fetch(
+                    `/api/organizations/${encodeURIComponent(selectedOrg.id)}`,
+                    {
+                        method: 'PATCH',
+                        credentials: 'include',
+                        cache: 'no-store',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ mergePolicy: next }),
+                    },
+                );
+                if (!res.ok) return { success: false, error: t('errors.generic') };
+                try {
+                    await mutate();
+                } catch {
+                    // The PATCH landed — a stale switcher must not read as
+                    // a failed save (same posture as the vision path).
+                }
+                return { success: true };
+            } catch {
+                return { success: false, error: t('errors.generic') };
+            }
+        },
+        [selectedOrg, mutate, t],
+    );
+
     const visionUpdatedAt = savedState?.visionUpdatedAt ?? null;
 
     return (
@@ -213,6 +251,22 @@ export function OrganizationSettings() {
                             </span>
                         )}
                     </div>
+
+                    {/* Merge-policy matrix (Wave 3, D4) — the organization
+                        scope. This is the level most operators will actually
+                        use: it covers every Work and Agent underneath, and
+                        each of those can still override a single field. */}
+                    {selectedOrg ? (
+                        <MergePolicyCard
+                            scope="organization"
+                            organizationId={selectedOrg.id}
+                            storedOverride={selectedOrg.mergePolicy ?? null}
+                            onSave={saveMergePolicy}
+                            title={t('mergePolicy.title')}
+                            subtitle={t('mergePolicy.subtitle')}
+                            testIdPrefix="organization-merge-policy"
+                        />
+                    ) : null}
                 </div>
             )}
         </div>

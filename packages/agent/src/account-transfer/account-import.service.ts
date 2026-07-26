@@ -23,7 +23,21 @@ import type {
 import { containsMaskedSecrets, MASKED_SECRET_PREFIX } from './types';
 import { sanitizePrompt } from '../utils/sanitize.util';
 import { normalizeCreateWorkKind, type Work, type WorkKind } from '../entities/work.entity';
-import { WORK_CHECKS_POLICIES, WORK_KINDS, type WorkChecksPolicy } from '@ever-works/contracts';
+import {
+    WORK_CHECKS_POLICIES,
+    WORK_EXTERNAL_REF_KINDS,
+    WORK_EXTERNAL_REFS_MAX_PER_KIND,
+    WORK_KINDS,
+    type WorkChecksPolicy,
+    type WorkExternalRefs,
+} from '@ever-works/contracts';
+import type { User } from '../entities/user.entity';
+import {
+    ONBOARDING_DEFAULT_STATE,
+    ROLE_OPTIONS,
+    TEAM_SIZE_OPTIONS,
+    type OnboardingWizardStateV2,
+} from '@ever-works/contracts/api';
 
 /**
  * Canonical slug shape (matches the work/item DTO `@Matches` rule and
@@ -74,6 +88,72 @@ function normalizeImportedMaxGateAttempts(value: unknown): number | undefined {
     return typeof value === 'number' && Number.isInteger(value) && value >= 1 && value <= 5
         ? value
         : undefined;
+}
+
+/** Cadences accepted for `users.digestFrequency` (drop-if-unrecognized). */
+const DIGEST_FREQUENCIES: readonly string[] = ['off', 'daily', 'weekly'];
+
+const ROLE_IDS: readonly string[] = ROLE_OPTIONS.map((option) => option.id);
+const TEAM_SIZE_IDS: readonly string[] = TEAM_SIZE_OPTIONS.map((option) => option.id);
+
+/**
+ * Onboarding roles from an untrusted payload. Arrays only ever import as
+ * arrays; entries outside `ROLE_OPTIONS` are DROPPED (never defaulted, never
+ * stored verbatim) so a hand-edited export can't plant unknown ids into the
+ * suggestion surfaces that read this list. An array that survives filtering
+ * with zero entries is still meaningful — it means "the user cleared their
+ * answers" — so it is kept; a non-array is treated as absent.
+ */
+function normalizeImportedRoles(value: unknown): string[] | undefined {
+    if (!Array.isArray(value)) return undefined;
+    const seen = new Set<string>();
+    for (const entry of value) {
+        if (typeof entry === 'string' && ROLE_IDS.includes(entry)) seen.add(entry);
+    }
+    return [...seen];
+}
+
+/** Team size: a single known id, or absent. Drop-if-unrecognized. */
+function normalizeImportedTeamSize(value: unknown): string | undefined {
+    return typeof value === 'string' && TEAM_SIZE_IDS.includes(value) ? value : undefined;
+}
+
+/** Digest cadence: a single known value, or absent. Drop-if-unrecognized. */
+function normalizeImportedDigestFrequency(value: unknown): 'off' | 'daily' | 'weekly' | undefined {
+    return typeof value === 'string' && DIGEST_FREQUENCIES.includes(value)
+        ? (value as 'off' | 'daily' | 'weekly')
+        : undefined;
+}
+
+/**
+ * Ingest routing claims: keep only the KNOWN hint kinds, and under each
+ * only non-empty strings, deduped and capped. Same drop-if-unrecognized
+ * posture as the rest — an unknown key in a hand-edited payload must not
+ * survive into a column the resolver iterates. Returns undefined when
+ * nothing survives, so the caller leaves the existing value untouched.
+ */
+function normalizeImportedExternalRefs(value: unknown): WorkExternalRefs | undefined {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) return undefined;
+    const source = value as Record<string, unknown>;
+    const out: WorkExternalRefs = {};
+    let kept = 0;
+    for (const kind of WORK_EXTERNAL_REF_KINDS) {
+        const raw = source[kind];
+        if (!Array.isArray(raw)) continue;
+        const ids = Array.from(
+            new Set(
+                raw
+                    .filter((entry): entry is string => typeof entry === 'string')
+                    .map((entry) => entry.trim())
+                    .filter((entry) => entry.length > 0 && entry.length <= 200),
+            ),
+        ).slice(0, WORK_EXTERNAL_REFS_MAX_PER_KIND);
+        if (ids.length > 0) {
+            out[kind] = ids;
+            kept += ids.length;
+        }
+    }
+    return kept > 0 ? out : undefined;
 }
 
 /**
@@ -401,6 +481,23 @@ export class AccountImportService {
         await queryRunner.startTransaction();
 
         try {
+            // Import the account-level profile (onboarding answers +
+            // preferences) BEFORE the works, so a failure there still
+            // rolls back with everything else in the same transaction.
+            try {
+                result.profileImported = await this.importProfile(
+                    userId,
+                    user,
+                    payload.data?.profile,
+                );
+            } catch (error) {
+                result.warnings.push(
+                    `Failed to import profile settings: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+            }
+
             // Import works
             for (const dir of payload.data.works) {
                 try {
@@ -470,6 +567,90 @@ export class AccountImportService {
         }
 
         return result;
+    }
+
+    /**
+     * Apply the account-level profile from an imported payload: the
+     * onboarding "What do you do" answers and the account preferences.
+     *
+     * Posture (identical to every other imported field): the payload is
+     * attacker-editable JSON, so enum values are DROP-if-unrecognized
+     * rather than default-if-unrecognized, arrays only apply when they
+     * really are arrays, and an absent field leaves the importing
+     * account's own value untouched. Identity columns (`username`,
+     * `email`, `avatar`) are deliberately NOT applied — they identify the
+     * importing account, not the exporting one.
+     *
+     * The onboarding answers are deep-merged into the existing wizard
+     * state so importing a profile never wipes the importer's own AI /
+     * storage / deploy choices or step progress.
+     *
+     * Returns true when at least one column was written.
+     */
+    private async importProfile(userId: string, user: any, profile: unknown): Promise<boolean> {
+        if (!profile || typeof profile !== 'object' || Array.isArray(profile)) {
+            return false;
+        }
+        const source = profile as {
+            onboarding?: unknown;
+            preferences?: unknown;
+        };
+        const update: Partial<User> = {};
+
+        const onboarding =
+            source.onboarding && typeof source.onboarding === 'object'
+                ? (source.onboarding as { roles?: unknown; teamSize?: unknown })
+                : null;
+        if (onboarding) {
+            const roles = normalizeImportedRoles(onboarding.roles);
+            const teamSize = normalizeImportedTeamSize(onboarding.teamSize);
+            if (roles !== undefined || teamSize !== undefined) {
+                const current: OnboardingWizardStateV2 =
+                    user.onboardingState && typeof user.onboardingState === 'object'
+                        ? (user.onboardingState as OnboardingWizardStateV2)
+                        : ONBOARDING_DEFAULT_STATE;
+                update.onboardingState = {
+                    ...current,
+                    profile: {
+                        ...(current.profile ?? {}),
+                        ...(roles !== undefined ? { roles } : {}),
+                        ...(teamSize !== undefined ? { teamSize } : {}),
+                    },
+                };
+            }
+        }
+
+        const preferences =
+            source.preferences && typeof source.preferences === 'object'
+                ? (source.preferences as Record<string, unknown>)
+                : null;
+        if (preferences) {
+            const digestFrequency = normalizeImportedDigestFrequency(preferences.digestFrequency);
+            if (digestFrequency !== undefined) {
+                update.digestFrequency = digestFrequency;
+            }
+            // Explicit booleans only — a deliberate `false` (an opt-out) is
+            // exactly the value that has to survive the round-trip, so these
+            // can never be written through a truthiness check.
+            if (typeof preferences.emailAgentAlerts === 'boolean') {
+                update.emailAgentAlerts = preferences.emailAgentAlerts;
+            }
+            if (typeof preferences.emailTaskNotifications === 'boolean') {
+                update.emailTaskNotifications = preferences.emailTaskNotifications;
+            }
+            if (typeof preferences.emailBudgetAlerts === 'boolean') {
+                update.emailBudgetAlerts = preferences.emailBudgetAlerts;
+            }
+            if (typeof preferences.userResearchOptOut === 'boolean') {
+                update.userResearchOptOut = preferences.userResearchOptOut;
+            }
+        }
+
+        if (Object.keys(update).length === 0) {
+            return false;
+        }
+        await this.userRepository.update(userId, update);
+        return true;
     }
 
     private async importWork(
@@ -579,6 +760,12 @@ export class AccountImportService {
                 if (typeof dir.memoryRecallEnabled === 'boolean') {
                     updateData.memoryRecallEnabled = dir.memoryRecallEnabled;
                 }
+                // Ingest routing claims — sanitized to known kinds only;
+                // absent/empty leaves the existing Work's claims alone.
+                const importedExternalRefs = normalizeImportedExternalRefs(dir.externalRefs);
+                if (importedExternalRefs) {
+                    updateData.externalRefs = importedExternalRefs;
+                }
                 // Quality-gate fields: arrays only ever import as arrays;
                 // enum/int values are drop-if-unrecognized (see the
                 // normalizeImported* helpers above). Absent → existing
@@ -651,6 +838,10 @@ export class AccountImportService {
         }
         if (typeof dir.memoryRecallEnabled === 'boolean') {
             createData.memoryRecallEnabled = dir.memoryRecallEnabled;
+        }
+        const importedExternalRefs = normalizeImportedExternalRefs(dir.externalRefs);
+        if (importedExternalRefs) {
+            createData.externalRefs = importedExternalRefs;
         }
         if (
             typeof dir.taskIsolationBaseBranch === 'string' &&

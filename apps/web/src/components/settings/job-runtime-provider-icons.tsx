@@ -129,6 +129,22 @@ function InngestIcon({ size, className, title }: GlyphProps) {
     );
 }
 
+// Fleet node — emerald; three linked machines (the queue IS the fleet).
+function FleetNodeIcon({ size, className, title }: GlyphProps) {
+    return (
+        <Badge color="#047857" size={size} className={className} title={title ?? 'Fleet nodes'}>
+            <g fill="none" stroke="#FFFFFF" strokeWidth="1.3" strokeLinecap="round">
+                <path d="M10 6.6v3.2M10 9.8L6.6 13M10 9.8L13.4 13" />
+            </g>
+            <g fill="#FFFFFF">
+                <circle cx="10" cy="5.6" r="1.7" />
+                <circle cx="6" cy="13.6" r="1.7" />
+                <circle cx="14" cy="13.6" r="1.7" />
+            </g>
+        </Badge>
+    );
+}
+
 const ICON_BY_PROVIDER: Record<
     TenantJobRuntimeProviderId,
     (props: GlyphProps) => React.ReactElement
@@ -138,6 +154,7 @@ const ICON_BY_PROVIDER: Record<
     bullmq: BullmqIcon,
     pgboss: PgbossIcon,
     inngest: InngestIcon,
+    node: FleetNodeIcon,
 };
 
 export interface ProviderBrandIconProps extends GlyphProps {

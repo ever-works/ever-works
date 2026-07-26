@@ -15,6 +15,7 @@ import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } fro
 import {
     KnowledgeBaseService,
     MemoryConsolidationService,
+    MemoryHealthService,
     type MemoryConsolidationReport,
 } from '@ever-works/agent/services';
 import type {
@@ -26,6 +27,7 @@ import {
     KB_DOCUMENT_CLASSES,
     KB_DOCUMENT_SOURCES,
     KB_DOCUMENT_STATUSES,
+    type KbMemoryHealth,
 } from '@ever-works/contracts';
 import { OrganizationMembershipService } from '../organizations/organization-membership.service';
 import { ScopeContextService } from '../scope';
@@ -107,6 +109,28 @@ export class MemoryQueryDto {
 }
 
 /**
+ * Query params for `GET /api/memory/health` (Memory eval loop, M10).
+ *
+ * Both knobs are bounded server-side by `MemoryHealthService`; the
+ * validation here only rejects nonsense before it reaches the service.
+ */
+export class MemoryHealthQueryDto {
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    @Max(365)
+    @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
+    windowDays?: number;
+
+    @IsOptional()
+    @IsInt()
+    @Min(1)
+    @Max(3650)
+    @Transform(({ value }) => (value === undefined ? undefined : Number(value)))
+    staleAfterDays?: number;
+}
+
+/**
  * Body for `POST /api/memory/consolidate` (Memory Consolidation).
  * `apply` defaults to `false` — a bare POST is always a dry-run preview;
  * persisting markers requires an explicit `{ "apply": true }`.
@@ -147,7 +171,52 @@ export class OrgMemoryController {
         private readonly consolidation: MemoryConsolidationService,
         private readonly membership: OrganizationMembershipService,
         private readonly scopeContext: ScopeContextService,
+        private readonly health: MemoryHealthService,
     ) {}
+
+    @Get('memory/health')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Memory health — retrieval quality metrics for the active Organization',
+        description:
+            'Memory upgrades M10. Joins the append-only KB retrieval log against citation rows and the KB documents themselves to report: the recall-hit rate (were the documents we injected actually cited?), the stale-decision rate (settled calls nobody has revisited), the proposed-review backlog and its age, and the gap topics (questions retrieval could not answer). Every rate is `number | null` — `null` means "not measurable yet" and must never be rendered as 0%. The Organization comes from the request scope context, not a param.',
+    })
+    @ApiQuery({
+        name: 'windowDays',
+        required: false,
+        description: 'Rolling window for the retrieval metrics (default 30, clamped 1…365).',
+    })
+    @ApiQuery({
+        name: 'staleAfterDays',
+        required: false,
+        description: 'Age at which an untouched accepted decision counts as stale (default 90).',
+    })
+    @ApiResponse({ status: 200, description: 'Memory health metrics' })
+    async getMemoryHealth(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Query() query: MemoryHealthQueryDto,
+    ): Promise<KbMemoryHealth> {
+        const organizationId = this.scopeContext.getOrganizationId();
+        if (!organizationId) {
+            // No active Organization ⇒ the empty payload (all counts 0,
+            // every rate null). Mirrors the GET aggregation — never a
+            // cross-tenant scan.
+            return this.health.emptyHealth({
+                windowDays: query.windowDays,
+                staleAfterDays: query.staleAfterDays,
+            });
+        }
+
+        // Same defense-in-depth membership gate as the aggregation +
+        // consolidate routes: NotFound (not Forbidden) on a cross-tenant
+        // mismatch, matching the existence-leak contract.
+        await this.membership.ensureMember(organizationId, auth.userId);
+
+        return this.health.getOrgHealth(organizationId, {
+            windowDays: query.windowDays,
+            staleAfterDays: query.staleAfterDays,
+        });
+    }
 
     @Get('memory')
     @HttpCode(HttpStatus.OK)

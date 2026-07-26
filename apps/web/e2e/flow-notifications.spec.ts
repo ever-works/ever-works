@@ -340,23 +340,22 @@ test.describe('Notifications end-to-end', () => {
         expect(prefs2.subscriptions).toHaveLength(1);
         expect(prefs2.preference?.timezone).toBe('UTC');
 
-        // --- Step 8: the settings UI renders the preferences surface ---
+        // --- Step 8: the settings UI renders the event×channel gate matrix ---
         // The seeded (storageState) user owns the browser session. The
         // /settings/notifications page is server-rendered by
         // NotificationPreferencesSettings.
         //
-        // DEVIATION (probed): the page's SSR data fetch never reaches the API.
-        // `notification-preferences.ts` passes paths WITH a `/api` prefix
-        // (`/api/notifications/event-types`), but lib/constants already appends
-        // `/api` to API_URL — so serverFetch hits the DOUBLED, 404-ing path
-        // `…/api/api/notifications/event-types` (every other server-api client
-        // passes UNPREFIXED paths). The page's `.catch(() => [])` swallows the
-        // 404, so `initialEventTypes` is empty and the component renders its
-        // registry-empty branch — NOT the event×channel matrix. This is the
-        // deterministic, code-path behaviour in every environment (verified
-        // with a fresh, valid session), independent of the API contract, which
-        // the steps above (1-7) fully exercise and prove. So we assert the TRUE
-        // rendered surface: the page mounts and shows the empty-registry copy.
+        // Probed (fresh valid session): the page's SSR fetch reaches the API and
+        // loads the seeded core event-type registry, so the component renders
+        // the event×channel matrix (its header + one checkbox per event/channel
+        // cell), NOT the registry-empty branch. `notification-preferences.ts`
+        // passes UNPREFIXED paths (`/notifications/event-types`) and
+        // lib/constants appends `/api` to API_URL exactly once, so serverFetch
+        // hits the correct `…/api/notifications/event-types` — the old
+        // `/api/api/...` double-prefix 404 is fixed and now pinned by
+        // notification-preferences.unit.spec.ts. So we assert the TRUE rendered
+        // surface: the matrix header + the agent_run_finished→in-app gate cell,
+        // exactly the "which channels deliver an event" surface this flow drives.
         // (The unprefixed `/en` locale is stripped to `/settings/notifications`
         // by next-intl's `localePrefix: 'never'`, so either form resolves.)
         await page.context().addCookies([
@@ -372,10 +371,19 @@ test.describe('Notifications end-to-end', () => {
             timeout: 30_000,
         });
 
-        // The notification-preferences panel renders its registry-empty state
-        // (the literal copy from NotificationPreferencesSettings' empty branch).
+        // The notification-preferences panel renders the event×channel matrix:
+        // its own header plus one checkbox per (event, channel) pair.
         await expect(
-            page.getByText('No event types registered yet.', { exact: false }),
+            page.getByRole('heading', { name: 'Notification Preferences', level: 1 }),
+        ).toBeVisible({ timeout: 30_000 });
+
+        // Assert the seeded agent_run_finished × in-app gate cell (aria-label
+        // `${event.title} → ${column.label}`). The in-app column is always
+        // present, so this exact label is unique + stable even if the shared
+        // seeded user owns extra channel columns — and its presence proves the
+        // matrix (non-empty) branch rendered, not the registry-empty copy.
+        await expect(
+            page.getByRole('checkbox', { name: 'Agent run finished → In-app' }),
         ).toBeVisible({ timeout: 30_000 });
     });
 

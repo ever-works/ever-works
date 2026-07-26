@@ -50,6 +50,7 @@ export * from './work-knowledge-tag.entity';
 export * from './work-knowledge-citation.entity';
 export * from './work-knowledge-chunk.entity';
 export * from './work-knowledge-chunk-coordinate.entity';
+export * from './kb-retrieval-log.entity';
 export * from './kb-types';
 export * from './types';
 // Agents/Skills/Tasks (PR #1017 specs)
@@ -57,6 +58,7 @@ export * from './agent.entity';
 // Agent Action Approval Queue — human-in-the-loop gate for side-effectful actions.
 export * from './agent-action-proposal.entity';
 export * from './agent-run.entity';
+export * from './agent-escalation.entity';
 export * from './agent-run-log.entity';
 export * from './agent-budget.entity';
 export * from './agent-membership.entity';
@@ -65,6 +67,7 @@ export * from './skill-binding.entity';
 export * from './task.entity';
 export * from './task-assignee.entity';
 export * from './task-reviewer.entity';
+export * from './task-review-rejection.entity';
 export * from './task-approver.entity';
 export * from './task-block.entity';
 export * from './task-relation.entity';
@@ -118,10 +121,21 @@ export * from './inbound-trigger.entity';
 export * from './ingested-event.entity';
 // Event-ingest pull path (Wave 8) — per-(user, plugin) pull watermarks/cursors
 export * from './ingest-cursor.entity';
+// Inbound receivers — external workspace/installation → platform user binding
+export * from './ingest-install-binding.entity';
 // Meetings v1 (Wave 8, feature a) — captured meetings with transcripts
 export * from './meeting.entity';
 // Credits ledger + plan entitlements (pricing Wave 9 M1)
 export * from './credit-ledger-entry.entity';
 export * from './plan-entitlement.entity';
+// Payment provider bridge (billing PRD §5.3(3)/(4)) — customer mapping +
+// payment-method summary + auto-recharge state, and the invoice mirror
+export * from './billing-profile.entity';
+export * from './invoice.entity';
 // Fleet (Wave 12, slice 1) — enrolled execution nodes with heartbeat
 export * from './fleet-node.entity';
+// Streaming-terminal M9 / founder decision D1 — persisted, redacted,
+// retention-capped terminal transcripts.
+export * from './terminal-transcript-chunk.entity';
+
+export * from './fleet-job.entity';

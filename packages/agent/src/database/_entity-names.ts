@@ -50,6 +50,7 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'AgentAttachment',
     'AgentBudget',
     'AgentEmailAssignment',
+    'AgentEscalation',
     'AgentMembership',
     'AgentRun',
     'AgentRunLog',
@@ -58,6 +59,9 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'AuthAccount',
     'AuthSession',
     'AuthVerification',
+    // Payment provider bridge (billing PRD §5.3(3)/(4)) — customer +
+    // payment-method summary + auto-recharge state, and the invoice mirror
+    'BillingProfile',
     'CacheEntry',
     'ComposioTriggerSubscription',
     'Conversation',
@@ -66,6 +70,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'CreditLedgerEntry',
     'EmailConversation',
     'EmailMessage',
+    // Fleet job runtime (Desktop PRD M4) — lease-able work for nodes
+    'FleetJob',
     // Fleet (Wave 12, slice 1) — enrolled execution nodes w/ heartbeat
     'FleetNode',
     'GitHubAppInstallation',
@@ -75,8 +81,15 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'InboundTrigger',
     // Event-ingest pull path (Wave 8) — per-(user, plugin) pull cursors
     'IngestCursor',
+    // Inbound receivers — workspace/installation → platform user binding
+    'IngestInstallBinding',
     // Event-ingest spine (Wave 6) — normalized external events
     'IngestedEvent',
+    // Memory eval loop (memory upgrades M10) — append-only retrieval log
+    'KbRetrievalLog',
+    // Invoice mirror (billing PRD §3.5) — provider invoices/receipts,
+    // written only by the signature-verified webhook
+    'Invoice',
     // Meetings v1 (Wave 8, feature a) — captured meetings w/ transcripts
     'Meeting',
     'Mission',
@@ -112,6 +125,7 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'TaskChatMessage',
     'TaskKbMention',
     'TaskRelation',
+    'TaskReviewRejection',
     'TaskReviewer',
     'TaskWatcher',
     // ──────────────────────────
@@ -130,6 +144,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'TenantJobRuntimeConfig',
     'TenantRuntimeProviderAllowlist',
     // ──────────────────────────────────────────────────────────
+    // Streaming-terminal M9 / D1 — persisted terminal transcripts.
+    'TerminalTranscriptChunk',
     'UsageLedgerEntry',
     'User',
     'UserNotificationCategoryMute',

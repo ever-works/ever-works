@@ -8,6 +8,7 @@ import {
     KbDocumentSource,
     KbDocumentStatus,
     KbLockMode,
+    KbReviewState,
 } from '../../entities/kb-types';
 import { sanitizeLikePattern } from '../utils';
 
@@ -20,7 +21,32 @@ export interface KbDocumentListOptions {
     locked?: boolean;
     language?: string;
     source?: KbDocumentSource;
+    /**
+     * Memory facets — multi-value source filter (`?source=agent&source=user`).
+     * Applied in addition to the single-value `source` above so every
+     * existing caller keeps working unchanged.
+     */
+    sources?: KbDocumentSource[];
+    /**
+     * Memory upgrades M8 — review-state filter powering the review
+     * queue. `proposed` matches the column exactly; `accepted` also
+     * matches `NULL` because a null `review_state` reads as accepted
+     * everywhere else in the system (the M7 feature is additive and
+     * never backfilled pre-existing rows).
+     */
+    reviewState?: KbReviewState;
     q?: string;
+    /**
+     * Memory facets — widen the `q` predicate to the document BODY.
+     *
+     * The body lives inside the `metadata` `simple-json` column, which
+     * TypeORM maps to TEXT on every supported driver, so a LIKE over
+     * the serialized JSON is a portable full-document search. Opt-in
+     * (default `false`) because it is a table scan on a wide column:
+     * the tree/list callers that only need title+description must not
+     * silently pay for it.
+     */
+    searchBody?: boolean;
     limit?: number;
     offset?: number;
 }
@@ -209,6 +235,23 @@ export class WorkKnowledgeDocumentRepository {
             qb.andWhere('doc.source = :source', { source: opts.source });
         }
 
+        if (opts.sources && opts.sources.length > 0) {
+            qb.andWhere('doc.source IN (:...sources)', { sources: opts.sources });
+        }
+
+        if (opts.reviewState === KbReviewState.PROPOSED) {
+            qb.andWhere('doc.reviewState = :reviewState', {
+                reviewState: KbReviewState.PROPOSED,
+            });
+        } else if (opts.reviewState === KbReviewState.ACCEPTED) {
+            // `NULL` reads as accepted (M7 is additive — no backfill),
+            // so the accepted filter must include the un-stamped rows or
+            // it would hide every document created before the feature.
+            qb.andWhere('(doc.reviewState = :reviewState OR doc.reviewState IS NULL)', {
+                reviewState: KbReviewState.ACCEPTED,
+            });
+        }
+
         if (opts.q) {
             // Security: escape LIKE wildcards (%/_/\) in the user-supplied
             // search term and pair each predicate with an explicit ESCAPE
@@ -218,7 +261,10 @@ export class WorkKnowledgeDocumentRepository {
             // (DoS amplification within the caller's authorized Work/Org).
             // Mirrors agent.repository.ts; escape-only (no LOWER()) preserves
             // the existing matching for legitimate input.
-            qb.andWhere("(doc.title LIKE :q ESCAPE '\\' OR doc.description LIKE :q ESCAPE '\\')", {
+            const predicate = opts.searchBody
+                ? "(doc.title LIKE :q ESCAPE '\\' OR doc.description LIKE :q ESCAPE '\\' OR doc.metadata LIKE :q ESCAPE '\\')"
+                : "(doc.title LIKE :q ESCAPE '\\' OR doc.description LIKE :q ESCAPE '\\')";
+            qb.andWhere(predicate, {
                 q: `%${sanitizeLikePattern(opts.q)}%`,
             });
         }

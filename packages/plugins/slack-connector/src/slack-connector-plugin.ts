@@ -466,6 +466,11 @@ export class SlackConnectorPlugin implements IConnectorPlugin, IEventSourcePlugi
 				...(message.user ? { externalId: message.user } : {})
 			},
 			subject: { type: 'channel', externalId: channel },
+			// Work routing: the channel is the only container this
+			// connector knows. The platform resolves it against the
+			// ingesting user's own Works (`works.externalRefs`) and falls
+			// back to a user-scoped event when nothing claims it.
+			workHint: { kind: 'chat-channel', externalId: channel },
 			...(sourceUrl ? { sourceUrl } : {}),
 			payload: {
 				channel,

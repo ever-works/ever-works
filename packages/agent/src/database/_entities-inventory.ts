@@ -61,6 +61,7 @@ import { WorkKnowledgeDocument } from '../entities/work-knowledge-document.entit
 import { WorkKnowledgeUpload } from '../entities/work-knowledge-upload.entity';
 import { WorkKnowledgeTag } from '../entities/work-knowledge-tag.entity';
 import { WorkKnowledgeCitation } from '../entities/work-knowledge-citation.entity';
+import { KbRetrievalLog } from '../entities/kb-retrieval-log.entity';
 import { WorkKnowledgeChunk } from '../entities/work-knowledge-chunk.entity';
 import { WorkKnowledgeChunkCoordinate } from '../entities/work-knowledge-chunk-coordinate.entity';
 import { Mission } from '../entities/mission.entity';
@@ -73,6 +74,7 @@ import { Agent } from '../entities/agent.entity';
 import { AgentActionProposal } from '../entities/agent-action-proposal.entity';
 import { AgentRun } from '../entities/agent-run.entity';
 import { AgentRunLog } from '../entities/agent-run-log.entity';
+import { AgentEscalation } from '../entities/agent-escalation.entity';
 import { AgentBudget } from '../entities/agent-budget.entity';
 import { AgentMembership } from '../entities/agent-membership.entity';
 import { Team } from '../entities/team.entity';
@@ -83,6 +85,7 @@ import { SkillBinding } from '../entities/skill-binding.entity';
 import { Task } from '../entities/task.entity';
 import { TaskAssignee } from '../entities/task-assignee.entity';
 import { TaskReviewer } from '../entities/task-reviewer.entity';
+import { TaskReviewRejection } from '../entities/task-review-rejection.entity';
 import { TaskApprover } from '../entities/task-approver.entity';
 import { TaskBlock } from '../entities/task-block.entity';
 import { TaskRelation } from '../entities/task-relation.entity';
@@ -115,10 +118,17 @@ import { TenantCredentialSnapshot } from '../entities/tenant-credential-snapshot
 import { InboundTrigger } from '../entities/inbound-trigger.entity';
 import { IngestedEvent } from '../entities/ingested-event.entity';
 import { IngestCursor } from '../entities/ingest-cursor.entity';
+import { IngestInstallBinding } from '../entities/ingest-install-binding.entity';
 import { Meeting } from '../entities/meeting.entity';
 import { CreditLedgerEntry } from '../entities/credit-ledger-entry.entity';
 import { PlanEntitlement } from '../entities/plan-entitlement.entity';
+import { BillingProfile } from '../entities/billing-profile.entity';
+import { Invoice } from '../entities/invoice.entity';
 import { FleetNode } from '../entities/fleet-node.entity';
+import { TerminalTranscriptChunk } from '../entities/terminal-transcript-chunk.entity';
+
+import { FleetJob } from '../entities/fleet-job.entity';
+
 import {
     PluginEntity,
     UserPluginEntity,
@@ -186,6 +196,8 @@ export const ENTITIES = [
     AgentActionProposal,
     AgentRun,
     AgentRunLog,
+    // Judgment layer G3 - structured escalation records.
+    AgentEscalation,
     AgentBudget,
     AgentMembership,
     AgentAttachment,
@@ -200,6 +212,8 @@ export const ENTITIES = [
     Task,
     TaskAssignee,
     TaskReviewer,
+    // Orchestration M9 - durable rejection feedback for resume.
+    TaskReviewRejection,
     TaskApprover,
     TaskBlock,
     TaskRelation,
@@ -220,6 +234,10 @@ export const ENTITIES = [
     WorkKnowledgeCitation,
     WorkKnowledgeChunk,
     WorkKnowledgeChunkCoordinate,
+    // Memory eval loop (memory upgrades M10) — append-only retrieval log
+    // joined against citation rows to compute the recall-hit rate and
+    // the zero-result gap topics that feed consolidation synthesis.
+    KbRetrievalLog,
     // Plugin entities
     PluginEntity,
     UserPluginEntity,
@@ -261,6 +279,10 @@ export const ENTITIES = [
     // Event-ingest pull path (Wave 8) — per-(user, plugin) event-source
     // pull watermarks + continuation cursors.
     IngestCursor,
+    // Inbound receivers — external workspace/installation → platform user
+    // binding, so Slack/GitHub deliveries are attributed to the account
+    // that actually owns the workspace instead of the oldest install.
+    IngestInstallBinding,
     // Meetings v1 (Wave 8, feature a) — captured meetings with
     // transcripts, summaries and provider dedupe.
     Meeting,
@@ -268,7 +290,20 @@ export const ENTITIES = [
     // are the usage currency layered on the costCents metering.
     CreditLedgerEntry,
     PlanEntitlement,
+    // Payment provider bridge (billing PRD §5.3(3)/(4)) — provider
+    // customer mapping + default payment-method SUMMARY (brand/last4/exp
+    // only, never a PAN) + auto-recharge state, and the invoice mirror
+    // written exclusively by the signature-verified webhook.
+    BillingProfile,
+    Invoice,
     // Fleet (Wave 12, slice 1) — enrolled execution nodes (desktop /
     // headless) with hashed credentials + heartbeat status.
     FleetNode,
+    // Streaming-terminal M9 / founder decision D1 — append-only,
+    // redacted, retention-capped terminal transcript chunks.
+    TerminalTranscriptChunk,
+
+    // Fleet job runtime (Desktop PRD M4) — the lease-able work queue
+    // whose workers are the enrolled nodes above.
+    FleetJob,
 ];

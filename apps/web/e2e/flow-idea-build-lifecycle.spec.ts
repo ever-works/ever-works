@@ -619,26 +619,36 @@ test.describe('Idea build lifecycle (seeded user UI)', () => {
         await expect(page.getByText(queuedDesc).first()).toBeVisible({ timeout: 30_000 });
         await expect(page.getByText(acceptedDesc).first()).toBeVisible({ timeout: 30_000 });
 
-        // The page is server-filtered through a Status <select>
-        // (`name="status"`) + an "Apply" submit, which navigates to
-        // `/ideas?status=<value>`. Narrowing to "Accepted" keeps the
-        // terminal Idea visible and confirms the filter surface works.
-        const statusSelect = page.locator('select[name="status"]');
-        await expect(statusSelect).toBeVisible({ timeout: 30_000 });
-        await statusSelect.selectOption({ label: 'Accepted' });
-        await page.getByRole('button', { name: 'Apply' }).click();
+        // The page is server-filtered through a Status filter + an "Apply"
+        // submit that navigates to `/ideas?status=<value>`. The filter is a
+        // CUSTOM <Select> (a `<button aria-haspopup="listbox">` trigger + a
+        // portalled `role="listbox"`), NOT a native `<select>` — `name="status"`
+        // lives on a hidden `<input>` the Select's state feeds on submit. So it
+        // must be driven by opening the trigger and clicking the option row,
+        // then submitting the native GET form. Narrowing to "Accepted" keeps
+        // the terminal Idea visible and confirms the filter surface works.
+        const statusTrigger = page.locator('form button[aria-haspopup="listbox"]');
+        await expect(statusTrigger).toBeVisible({ timeout: 30_000 });
 
+        const applyStatus = async (label: string) => {
+            await statusTrigger.click();
+            await page.getByRole('option', { name: label, exact: true }).click();
+            // Trigger label reflects the picked value → hidden input committed.
+            await expect(statusTrigger).toContainText(label, { timeout: 30_000 });
+            await page.getByRole('button', { name: 'Apply' }).click();
+        };
+
+        await applyStatus('Accepted');
         // The Apply submit reloads the route under the accepted filter.
-        await page.waitForURL(/[?&]status=accepted\b/, { timeout: 30_000 });
+        await expect(page).toHaveURL(/[?&]status=accepted\b/, { timeout: 30_000 });
         await expect(page.getByText(acceptedDesc).first()).toBeVisible({ timeout: 30_000 });
 
         // The "Done" filter (status=done → accepted-with-Work) is the same
         // server-filter surface. Re-select it and apply; the accepted Idea
         // (backed by a real Work) stays visible.
-        await expect(statusSelect).toBeVisible({ timeout: 30_000 });
-        await statusSelect.selectOption({ label: 'Done' });
-        await page.getByRole('button', { name: 'Apply' }).click();
-        await page.waitForURL(/[?&]status=done\b/, { timeout: 30_000 });
+        await expect(statusTrigger).toBeVisible({ timeout: 30_000 });
+        await applyStatus('Done');
+        await expect(page).toHaveURL(/[?&]status=done\b/, { timeout: 30_000 });
         await expect(page.getByText(acceptedDesc).first()).toBeVisible({ timeout: 30_000 });
     });
 });

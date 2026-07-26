@@ -43,6 +43,7 @@ const ALL_PROVIDERS: readonly TenantJobRuntimeProviderId[] = [
     'pgboss',
     'temporal',
     'inngest',
+    'node',
 ];
 const ALL_MODES: readonly TenantJobRuntimeMode[] = ['inherit', 'byo', 'override'];
 
@@ -70,7 +71,7 @@ describe('JOB_RUNTIME_CREDENTIAL_SCHEMAS — provider coverage', () => {
         },
     );
 
-    it('declares schemas for exactly the five EW-685 contract providers (no orphan keys)', () => {
+    it('declares schemas for exactly the EW-685 contract providers (no orphan keys)', () => {
         const keys = Object.keys(JOB_RUNTIME_CREDENTIAL_SCHEMAS).sort();
         expect(keys).toEqual([...ALL_PROVIDERS].sort());
     });

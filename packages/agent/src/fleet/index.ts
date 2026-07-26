@@ -6,6 +6,10 @@
 export * from './fleet.module';
 export * from './fleet.service';
 export * from './fleet-node.repository';
+export * from './fleet-node-credential';
+export * from './fleet-job.service';
+export * from './fleet-job.repository';
 export * from './agent-fleet-tools';
 export { FleetNode } from '../entities/fleet-node.entity';
 export type { FleetNodeKind, FleetNodeStatus } from '../entities/fleet-node.entity';
+export { FleetJob } from '../entities/fleet-job.entity';

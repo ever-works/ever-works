@@ -62,6 +62,7 @@ describe('AccountImportService', () => {
 
         const userRepository = {
             findById: jest.fn(),
+            update: jest.fn().mockResolvedValue(undefined),
         };
         const workRepository = {
             findByUser: jest.fn().mockResolvedValue([]),
@@ -1375,6 +1376,211 @@ describe('AccountImportService', () => {
                 expect.objectContaining({ owner: 'someoneelse' }),
                 expect.anything(),
             );
+        });
+    });
+
+    /**
+     * Account-transfer whitelist sweep — the account-level profile.
+     *
+     * Onboarding answers ("What do you do") and account preferences are
+     * user-authored settings that previously did NOT round-trip: the
+     * whitelist only carried `{username, email, avatar}`, so an
+     * export/import silently reset the roles/team-size answers (and every
+     * suggestion surface built on them), the digest cadence and the
+     * notification/privacy opt-outs.
+     *
+     * One case per added field, plus the standing posture rules: enum
+     * values are drop-if-unrecognized on BOTH import paths, arrays only
+     * apply when they really are arrays, and a deliberate `false` must
+     * survive the round-trip.
+     */
+    describe('applyImport — account profile round-trip', () => {
+        function payloadWithProfile(profile: Record<string, unknown>): AccountExportPayload {
+            const payload = makePayload([]);
+            payload.data.profile = { username: 'octocat', email: 'o@e.com', ...profile } as any;
+            return payload;
+        }
+
+        it('round-trips onboarding roles + teamSize, merged into the existing wizard state', async () => {
+            const { service, mocks } = makeService();
+            mocks.userRepository.findById.mockResolvedValue({
+                id: 'user-1',
+                username: 'octocat',
+                onboardingState: {
+                    version: 2,
+                    lastStep: 3,
+                    ai: { choice: 'openrouter' },
+                    storage: { choice: 'user-github' },
+                    db: { choice: 'custom' },
+                    deploy: { choice: 'vercel' },
+                    skippedSteps: ['plugins'],
+                    pluginsReviewed: true,
+                },
+            });
+
+            const result = await service.applyImport(
+                'user-1',
+                payloadWithProfile({
+                    onboarding: { roles: ['engineering', 'product'], teamSize: 'small-2-10' },
+                }),
+                [],
+            );
+
+            expect(result.profileImported).toBe(true);
+            const [id, patch] = mocks.userRepository.update.mock.calls[0];
+            expect(id).toBe('user-1');
+            expect(patch.onboardingState.profile).toEqual({
+                roles: ['engineering', 'product'],
+                teamSize: 'small-2-10',
+            });
+            // The importer's own wizard progress must survive untouched.
+            expect(patch.onboardingState).toMatchObject({
+                lastStep: 3,
+                ai: { choice: 'openrouter' },
+                storage: { choice: 'user-github' },
+                pluginsReviewed: true,
+            });
+        });
+
+        it('drops unrecognized role ids and an unrecognized teamSize instead of defaulting them', async () => {
+            const { service, mocks } = makeService();
+            mocks.userRepository.findById.mockResolvedValue({ id: 'user-1', username: 'octocat' });
+
+            await service.applyImport(
+                'user-1',
+                payloadWithProfile({
+                    onboarding: {
+                        roles: ['engineering', 'wizard-of-the-coast', 42],
+                        teamSize: 'galactic',
+                    },
+                }),
+                [],
+            );
+
+            const patch = mocks.userRepository.update.mock.calls[0][1];
+            expect(patch.onboardingState.profile.roles).toEqual(['engineering']);
+            expect('teamSize' in patch.onboardingState.profile).toBe(false);
+        });
+
+        it('ignores a non-array roles value rather than writing it', async () => {
+            const { service, mocks } = makeService();
+            mocks.userRepository.findById.mockResolvedValue({ id: 'user-1', username: 'octocat' });
+
+            const result = await service.applyImport(
+                'user-1',
+                payloadWithProfile({ onboarding: { roles: 'engineering' } }),
+                [],
+            );
+
+            expect(result.profileImported).toBe(false);
+            expect(mocks.userRepository.update).not.toHaveBeenCalled();
+        });
+
+        it('round-trips the digest cadence', async () => {
+            const { service, mocks } = makeService();
+            mocks.userRepository.findById.mockResolvedValue({ id: 'user-1', username: 'octocat' });
+
+            await service.applyImport(
+                'user-1',
+                payloadWithProfile({ preferences: { digestFrequency: 'weekly' } }),
+                [],
+            );
+
+            expect(mocks.userRepository.update).toHaveBeenCalledWith(
+                'user-1',
+                expect.objectContaining({ digestFrequency: 'weekly' }),
+            );
+        });
+
+        it('drops an unrecognized digest cadence instead of resetting it to off', async () => {
+            const { service, mocks } = makeService();
+            mocks.userRepository.findById.mockResolvedValue({ id: 'user-1', username: 'octocat' });
+
+            const result = await service.applyImport(
+                'user-1',
+                payloadWithProfile({ preferences: { digestFrequency: 'hourly' } }),
+                [],
+            );
+
+            expect(result.profileImported).toBe(false);
+            expect(mocks.userRepository.update).not.toHaveBeenCalled();
+        });
+
+        it('round-trips every notification/privacy preference, including deliberate false values', async () => {
+            const { service, mocks } = makeService();
+            mocks.userRepository.findById.mockResolvedValue({ id: 'user-1', username: 'octocat' });
+
+            await service.applyImport(
+                'user-1',
+                payloadWithProfile({
+                    preferences: {
+                        emailAgentAlerts: true,
+                        emailTaskNotifications: false,
+                        emailBudgetAlerts: false,
+                        userResearchOptOut: true,
+                    },
+                }),
+                [],
+            );
+
+            // An opt-OUT is exactly the value that has to survive — these can
+            // never be applied through a truthiness check.
+            expect(mocks.userRepository.update).toHaveBeenCalledWith(
+                'user-1',
+                expect.objectContaining({
+                    emailAgentAlerts: true,
+                    emailTaskNotifications: false,
+                    emailBudgetAlerts: false,
+                    userResearchOptOut: true,
+                }),
+            );
+        });
+
+        it('never applies identity or privileged columns from the payload', async () => {
+            const { service, mocks } = makeService();
+            mocks.userRepository.findById.mockResolvedValue({ id: 'user-1', username: 'octocat' });
+
+            await service.applyImport(
+                'user-1',
+                payloadWithProfile({
+                    username: 'attacker',
+                    email: 'attacker@example.com',
+                    avatar: 'https://example.invalid/a.png',
+                    isPlatformAdmin: true,
+                    preferences: { digestFrequency: 'daily', isPlatformAdmin: true },
+                } as any),
+                [],
+            );
+
+            const patch = mocks.userRepository.update.mock.calls[0][1];
+            expect(patch).toEqual({ digestFrequency: 'daily' });
+        });
+
+        it('is a no-op for a pre-profile payload (no onboarding / preferences keys)', async () => {
+            const { service, mocks } = makeService();
+            mocks.userRepository.findById.mockResolvedValue({ id: 'user-1', username: 'octocat' });
+
+            const result = await service.applyImport('user-1', makePayload([]), []);
+
+            expect(result.profileImported).toBe(false);
+            expect(mocks.userRepository.update).not.toHaveBeenCalled();
+        });
+
+        it('a profile write failure is a warning, not a failed import', async () => {
+            const { service, mocks } = makeService();
+            mocks.userRepository.findById.mockResolvedValue({ id: 'user-1', username: 'octocat' });
+            mocks.userRepository.update.mockRejectedValue(new Error('db down'));
+
+            const result = await service.applyImport(
+                'user-1',
+                payloadWithProfile({ preferences: { digestFrequency: 'daily' } }),
+                [],
+            );
+
+            expect(result.success).toBe(true);
+            expect(
+                result.warnings.some((w) => w.includes('Failed to import profile settings')),
+            ).toBe(true);
         });
     });
 });

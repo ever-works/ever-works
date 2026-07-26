@@ -171,6 +171,17 @@ export class AgentsSkillsTasksExportService {
                     identifier: row.approverId,
                 })),
                 requireAllApprovers: task.requireAllApprovers,
+                // User-authored Task settings — isolation override + quality
+                // gates. Without these an export/import silently resets a
+                // Task that opted into isolation or curated its own checks.
+                // (Branch/PR/run state is deliberately excluded — see the
+                // note on `ExportedTask`.)
+                isolationMode: task.isolationMode ?? null,
+                acceptanceChecks: Array.isArray(task.acceptanceChecks)
+                    ? task.acceptanceChecks
+                    : null,
+                maxGateAttempts:
+                    typeof task.maxGateAttempts === 'number' ? task.maxGateAttempts : null,
                 createdAt: task.createdAt.toISOString(),
                 startedAt: task.startedAt?.toISOString() ?? null,
                 completedAt: task.completedAt?.toISOString() ?? null,

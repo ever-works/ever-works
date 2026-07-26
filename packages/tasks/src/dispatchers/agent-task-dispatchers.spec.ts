@@ -8,6 +8,7 @@ import { tasks } from '@trigger.dev/sdk';
 import {
     agentChatReplyTriggerAdapter,
     agentTaskExecuteTriggerAdapter,
+    terminalSessionTriggerAdapter,
 } from './agent-task-dispatchers';
 
 const PAYLOAD = {
@@ -74,5 +75,56 @@ describe('dispatcher adapters — loud degradation gate', () => {
             expect.objectContaining({ taskId: 'task-1' }),
             { idempotencyKey: PAYLOAD.dedupKey },
         );
+    });
+});
+
+/**
+ * The `terminal-session` task shipped with NO producer: its id appeared
+ * only in its own definition and the barrel export, so no session was ever
+ * started. These pin the producer that closes the loop.
+ */
+describe('terminalSessionTriggerAdapter', () => {
+    const TERMINAL_PAYLOAD = {
+        runId: '2f9d1f2a-9c7e-4b1a-8f0d-0a1b2c3d4e5f',
+        userId: 'user-1',
+        agentId: 'agent-1',
+        command: ['/bin/bash', '-i'],
+        cwd: '/work/task-42',
+        persistent: true,
+    };
+
+    it('triggers the terminal-session task with the payload the task destructures', async () => {
+        configure();
+        const handle = await terminalSessionTriggerAdapter.enqueue(TERMINAL_PAYLOAD);
+
+        expect(handle).toEqual({ jobRunId: 'run_123' });
+        expect(tasks.trigger).toHaveBeenCalledWith(
+            'terminal-session',
+            expect.objectContaining({
+                runId: TERMINAL_PAYLOAD.runId,
+                userId: 'user-1',
+                agentId: 'agent-1',
+                command: ['/bin/bash', '-i'],
+                cwd: '/work/task-42',
+                persistent: true,
+            }),
+            expect.anything(),
+        );
+    });
+
+    it('keys idempotency on the run id — the relay channel IS the run', async () => {
+        configure();
+        await terminalSessionTriggerAdapter.enqueue(TERMINAL_PAYLOAD);
+        expect(tasks.trigger).toHaveBeenCalledWith('terminal-session', expect.anything(), {
+            idempotencyKey: `terminal-session:${TERMINAL_PAYLOAD.runId}`,
+        });
+    });
+
+    it('degrades loudly (never reaching the SDK) on an unconfigured install', async () => {
+        unconfigure();
+        await expect(terminalSessionTriggerAdapter.enqueue(TERMINAL_PAYLOAD)).rejects.toMatchObject(
+            { name: 'JobRuntimeNotConfiguredError' },
+        );
+        expect(tasks.trigger).not.toHaveBeenCalled();
     });
 });

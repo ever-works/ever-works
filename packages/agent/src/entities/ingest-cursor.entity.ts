@@ -6,6 +6,7 @@ import {
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from 'typeorm';
+import { PortableDateColumn } from './_types';
 
 /**
  * Event-ingest spine (Wave 8) — per-(user, plugin) pull state for the
@@ -47,11 +48,17 @@ export class IngestCursor {
     cursor?: string | null;
 
     /** Completed-sweep high-water mark (passed as `since`). */
-    @Column({ type: 'timestamp', nullable: true })
+    // Portable date: better-sqlite3 (the e2e/CI driver) has no `timestamp`
+    // type, so a raw one makes TypeORM metadata validation throw
+    // DataTypeNotSupportedError and the API cannot boot there at all.
+    @PortableDateColumn({ nullable: true })
     watermark?: Date | null;
 
     /** When the in-flight sweep began (null when no sweep is running). */
-    @Column({ type: 'timestamp', nullable: true })
+    // Portable date: better-sqlite3 (the e2e/CI driver) has no `timestamp`
+    // type, so a raw one makes TypeORM metadata validation throw
+    // DataTypeNotSupportedError and the API cannot boot there at all.
+    @PortableDateColumn({ nullable: true })
     sweepStartedAt?: Date | null;
 
     @CreateDateColumn()

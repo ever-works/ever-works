@@ -20,6 +20,8 @@ import {
 // card's Team select (v1 UI: one team per Agent).
 import { addTeamMemberAction, removeTeamMemberAction } from '@/app/actions/dashboard/teams';
 import { AgentScorecardCard } from '@/components/agents/AgentScorecardCard';
+import { MergePolicyCard } from '@/components/policy/MergePolicyCard';
+import type { MergePolicyOverride } from '@ever-works/contracts';
 import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select';
 import { PluginModelSelect } from '@/components/plugins/form/PluginModelSelect';
 import type { Agent, AgentIdleBehavior, AgentPermissions } from '@/lib/api/agents';
@@ -194,6 +196,26 @@ export function AgentSettingsClient({
                 toast.error(error instanceof Error ? error.message : 'Could not save settings');
             }
         });
+    };
+
+    /**
+     * Merge-policy matrix (Wave 3, D4) — the Agent slice rides the same
+     * `PATCH /api/agents/:id` path as every other setting on this page, so
+     * it inherits that endpoint's ownership checks unchanged. The local
+     * `agent` copy is updated from the response so the card's
+     * `storedOverride` (which drives reset-to-inherit) never lags the row.
+     */
+    const saveMergePolicy = async (next: MergePolicyOverride | null) => {
+        try {
+            const updated = await updateAgentAction(agent.id, { mergePolicy: next });
+            setAgent(updated);
+            return { success: true };
+        } catch (error) {
+            return {
+                success: false,
+                error: error instanceof Error ? error.message : 'Could not save the merge policy',
+            };
+        }
     };
 
     const changeStatus = (action: 'pause' | 'resume' | 'archive') => {
@@ -547,6 +569,20 @@ export function AgentSettingsClient({
                     </div>
                 </section>
             ) : null}
+
+            {/* Merge policy (Wave 3, D4) — the MOST specific scope of the
+                matrix. Anything this Agent does not set inherits from its
+                Work, then the organization, then the tenant, then the
+                platform default; the card names the owner of every field. */}
+            <MergePolicyCard
+                scope="agent"
+                agentId={agent.id}
+                storedOverride={agent.mergePolicy ?? null}
+                onSave={saveMergePolicy}
+                title="Merge policy"
+                subtitle="Whether this Agent may land the pull requests it opens, and under what conditions."
+                testIdPrefix="agent-merge-policy"
+            />
 
             {/* Scorecard (Agent Scorecards increment 1 — additive section) */}
             <AgentScorecardCard agent={agent} />
