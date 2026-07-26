@@ -1215,6 +1215,16 @@
                 "skipped": "Gate skipped",
                 "none": "No checks"
             },
+            "decisionConflicts": {
+                "title": "This may re-open {count} settled decision(s)",
+                "subtitle": "Your organization already recorded a call on this subject.",
+                "overlap": "Shared terms: {terms}",
+                "advisory": "Advisory only — nothing is blocked. Open a decision to read the rationale, or supersede it if the call has changed.",
+                "signal": {
+                    "strong": "Strong match",
+                    "moderate": "Possible match"
+                }
+            },
             "checks": {
                 "title": "Checks",
                 "edit": "Edit",
@@ -2323,7 +2333,8 @@
                     "status": "Status",
                     "platform": "Platform",
                     "capabilities": "Capabilities",
-                    "lastSeen": "Last seen"
+                    "lastSeen": "Last seen",
+                    "load": "Load"
                 },
                 "empty": {
                     "title": "No nodes enrolled yet",
@@ -2381,6 +2392,11 @@
                     "disabled": "Node disabled — it stops accepting work and heartbeats",
                     "enabled": "Node enabled — it will come back online on its next heartbeat",
                     "removed": "Node removed"
+                },
+                "load": {
+                    "idle": "Idle",
+                    "busy": "{count} running",
+                    "currentJob": "Current job: {kind}"
                 }
             },
             "jobRuntime": {
@@ -4610,6 +4626,29 @@
                     "errorBusy": "Deleting…",
                     "errorPartial": "Deleted {ok}, failed {failed}."
                 },
+                "review": {
+                    "nav": "Review",
+                    "navAria": "Review queue — {count} documents awaiting review",
+                    "metaTitle": "Knowledge Base review queue",
+                    "title": "Review queue",
+                    "subtitle": "Agent-written notes stay out of agent context until you accept them.",
+                    "empty": "Nothing to review. New agent-written documents will appear here.",
+                    "loading": "Loading the review queue…",
+                    "retry": "Try again",
+                    "source": "From {source}",
+                    "accept": "Accept",
+                    "editThenAccept": "Edit & accept",
+                    "supersede": "Supersede",
+                    "supersedePrompt": "Replaced by",
+                    "supersedePlaceholder": "Pick the surviving decision…",
+                    "supersedeConfirm": "Supersede",
+                    "archive": "Archive",
+                    "cancel": "Cancel",
+                    "preview": "Toggle content preview",
+                    "previewLoading": "Loading preview…",
+                    "previewEmpty": "This document has no body yet.",
+                    "bannerMessage": "This document is awaiting review — it is not feeding agent context yet. Edit it if needed, then accept."
+                },
                 "workbench": {
                     "title": "Knowledge Base workbench",
                     "metaTitle": "Knowledge Base workbench",
@@ -6507,6 +6546,10 @@
             },
             "errors": {
                 "generic": "Failed to save. Please try again."
+            },
+            "mergePolicy": {
+                "title": "Merge policy",
+                "subtitle": "Whether agents may land the pull requests they open in this Organization. Works and Agents underneath can still override any single field."
             }
         },
         "switcher": {

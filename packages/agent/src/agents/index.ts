@@ -14,6 +14,11 @@ export * from './run-steering.service';
 export * from './run-credits-precheck';
 export * from './terminal-session-dispatcher';
 export * from './terminal-session-launcher.service';
+// Streaming-terminal M9 / founder decision D1 — persisted, redacted,
+// retention-capped transcripts + the replay surface.
+export * from './terminal-transcript-redaction';
+export * from './terminal-transcript.service';
+export * from './terminal-transcript.module';
 export * from './agent-run-canceller';
 export * from './agent-run-abort';
 export * from './agent-run-sweeper.service';
@@ -25,6 +30,7 @@ export * from './agent-notify-channel-facade';
 export * from './agent-plugin-tools-facade';
 export * from './agent-tools-skill';
 export * from './agent-tool.service';
+export * from './agent-domain-tool-sources';
 export * from './budget-period';
 export * from './guardrails';
 export * from './heartbeat-cron';

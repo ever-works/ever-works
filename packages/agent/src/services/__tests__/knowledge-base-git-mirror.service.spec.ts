@@ -5,7 +5,13 @@ import * as yaml from 'yaml';
 import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { KnowledgeBaseGitMirrorService } from '../knowledge-base-git-mirror.service';
 import { WorkKnowledgeDocument } from '../../entities/work-knowledge-document.entity';
-import { KbDocumentClass, KbDocumentSource, KbDocumentStatus } from '../../entities/kb-types';
+import {
+    KbDecisionStatus,
+    KbDocumentClass,
+    KbDocumentSource,
+    KbDocumentStatus,
+    KbReviewState,
+} from '../../entities/kb-types';
 
 /**
  * EW-641 Phase 1B/a — focused unit coverage for the KB Git mirror.
@@ -609,6 +615,211 @@ describe('KnowledgeBaseGitMirrorService', () => {
         });
     });
 
+    /**
+     * Memory upgrades M12 — decision metadata in the git mirror.
+     *
+     * Before this, the sidecar carried only the KB lifecycle `status`
+     * (draft/active/archived), so an agent reading the checked-out repo
+     * could not tell a LIVE decision from a REVERSED one, nor an
+     * agent-proposed doc awaiting review from an accepted one. These
+     * tests pin the round trip in BOTH directions.
+     */
+    describe('decision metadata round-trip (M12)', () => {
+        function buildDecisionDoc() {
+            return buildDoc({
+                path: 'decision/use-postgres.md',
+                slug: 'use-postgres',
+                title: 'Use Postgres',
+                kbDocumentClass: 'decision' as KbDocumentClass,
+                decision: { status: KbDecisionStatus.SUPERSEDED, rationale: 'moved to a fork' },
+                reviewState: KbReviewState.PROPOSED,
+            } as never);
+        }
+
+        describe('write side', () => {
+            it('mirrors decision_status + review_state into the sidecar', async () => {
+                const doc = buildDecisionDoc();
+                documentRepository.findById.mockResolvedValue(doc);
+                documentRepository.list.mockResolvedValue({ items: [doc], total: 1 });
+
+                await service.materializeDocument(WORK_ID, DOC_ID);
+
+                const sidecar = yaml.parse(
+                    await fs.readFile(
+                        path.join(tempDir, '.content/kb/decision/use-postgres.yml'),
+                        'utf-8',
+                    ),
+                );
+                expect(sidecar.decision_status).toBe('superseded');
+                expect(sidecar.review_state).toBe('proposed');
+                // The KB lifecycle status is orthogonal and still present.
+                expect(sidecar.status).toBe('active');
+            });
+
+            it('writes explicit nulls for a non-decision document (never omits the keys)', async () => {
+                await service.materializeDocument(WORK_ID, DOC_ID);
+
+                const sidecar = yaml.parse(
+                    await fs.readFile(path.join(tempDir, '.content/kb/brand/voice.yml'), 'utf-8'),
+                );
+                expect(sidecar).toHaveProperty('decision_status', null);
+                expect(sidecar).toHaveProperty('review_state', null);
+            });
+
+            it('carries both fields into the .index.yml catalogue', async () => {
+                const doc = buildDecisionDoc();
+                documentRepository.findById.mockResolvedValue(doc);
+                documentRepository.list.mockResolvedValue({ items: [doc], total: 1 });
+
+                await service.materializeDocument(WORK_ID, DOC_ID);
+
+                const index = yaml.parse(
+                    await fs.readFile(path.join(tempDir, '.content/kb/.index.yml'), 'utf-8'),
+                );
+                expect(index.documents[0]).toMatchObject({
+                    decision_status: 'superseded',
+                    review_state: 'proposed',
+                });
+            });
+        });
+
+        describe('read side — parseSidecarDecisionMetadata', () => {
+            it('reads back exactly what the writer wrote (full round trip)', async () => {
+                const doc = buildDecisionDoc();
+                documentRepository.findById.mockResolvedValue(doc);
+                documentRepository.list.mockResolvedValue({ items: [doc], total: 1 });
+                await service.materializeDocument(WORK_ID, DOC_ID);
+                const written = await fs.readFile(
+                    path.join(tempDir, '.content/kb/decision/use-postgres.yml'),
+                    'utf-8',
+                );
+
+                expect(KnowledgeBaseGitMirrorService.parseSidecarDecisionMetadata(written)).toEqual(
+                    {
+                        decisionStatus: KbDecisionStatus.SUPERSEDED,
+                        reviewState: KbReviewState.PROPOSED,
+                    },
+                );
+            });
+
+            it('DROPS unrecognized values rather than defaulting them', () => {
+                const parsed = KnowledgeBaseGitMirrorService.parseSidecarDecisionMetadata(
+                    yaml.stringify({ decision_status: 'yolo', review_state: 'maybe' }),
+                );
+                expect(parsed).toEqual({});
+            });
+
+            it('drops absent / null values and keeps the recognized half', () => {
+                expect(
+                    KnowledgeBaseGitMirrorService.parseSidecarDecisionMetadata(
+                        yaml.stringify({ decision_status: null, review_state: 'accepted' }),
+                    ),
+                ).toEqual({ reviewState: KbReviewState.ACCEPTED });
+
+                expect(
+                    KnowledgeBaseGitMirrorService.parseSidecarDecisionMetadata(
+                        yaml.stringify({ title: 'no decision keys at all' }),
+                    ),
+                ).toEqual({});
+            });
+
+            it('never throws on corrupt / non-object / empty YAML', () => {
+                expect(
+                    KnowledgeBaseGitMirrorService.parseSidecarDecisionMetadata('{[not: yaml'),
+                ).toEqual({});
+                expect(
+                    KnowledgeBaseGitMirrorService.parseSidecarDecisionMetadata(
+                        '- just\n- a list\n',
+                    ),
+                ).toEqual({});
+                expect(KnowledgeBaseGitMirrorService.parseSidecarDecisionMetadata('')).toEqual({});
+                expect(
+                    KnowledgeBaseGitMirrorService.parseSidecarDecisionMetadata(
+                        undefined as unknown as string,
+                    ),
+                ).toEqual({});
+            });
+
+            it('ignores prototype-shaped keys in a hand-edited sidecar', () => {
+                const hostile = '__proto__:\n  decision_status: accepted\ntitle: x\n';
+                expect(KnowledgeBaseGitMirrorService.parseSidecarDecisionMetadata(hostile)).toEqual(
+                    {},
+                );
+                expect(({} as Record<string, unknown>).decision_status).toBeUndefined();
+            });
+        });
+
+        describe('read side — restoreDocumentFromGit', () => {
+            it('restores decision status + review state alongside the body', async () => {
+                documentRepository.findById.mockResolvedValue(buildDecisionDoc());
+                gitFacade.getFileContent
+                    // 1st call = body .md, 2nd call = sidecar .yml
+                    .mockResolvedValueOnce({ content: '# older\n', encoding: 'utf-8' })
+                    .mockResolvedValueOnce({
+                        content: yaml.stringify({
+                            decision_status: 'accepted',
+                            review_state: 'accepted',
+                        }),
+                        encoding: 'utf-8',
+                    });
+
+                await service.restoreDocumentFromGit(WORK_ID, DOC_ID, COMMIT_SHA);
+
+                const patch = documentRepository.update.mock.calls[0][1];
+                expect(patch.decision).toMatchObject({ status: KbDecisionStatus.ACCEPTED });
+                // Pre-existing decision fields survive the merge.
+                expect(patch.decision.rationale).toBe('moved to a fork');
+                expect(patch.reviewState).toBe(KbReviewState.ACCEPTED);
+            });
+
+            it('leaves decision state UNTOUCHED when the sidecar is missing', async () => {
+                documentRepository.findById.mockResolvedValue(buildDecisionDoc());
+                gitFacade.getFileContent
+                    .mockResolvedValueOnce({ content: '# older\n', encoding: 'utf-8' })
+                    .mockResolvedValueOnce(null);
+
+                await service.restoreDocumentFromGit(WORK_ID, DOC_ID, COMMIT_SHA);
+
+                const patch = documentRepository.update.mock.calls[0][1];
+                expect(patch).not.toHaveProperty('decision');
+                expect(patch).not.toHaveProperty('reviewState');
+                // The body restore itself still happened.
+                expect(patch.metadata.body).toBe('# older\n');
+            });
+
+            it('survives a provider that throws on the sidecar fetch', async () => {
+                documentRepository.findById.mockResolvedValue(buildDecisionDoc());
+                gitFacade.getFileContent
+                    .mockResolvedValueOnce({ content: '# older\n', encoding: 'utf-8' })
+                    .mockRejectedValueOnce(new Error('getFileContent not implemented'));
+
+                const result = await service.restoreDocumentFromGit(WORK_ID, DOC_ID, COMMIT_SHA);
+
+                expect(result.restored).toBe(true);
+                expect(documentRepository.update.mock.calls[0][1]).not.toHaveProperty('decision');
+            });
+
+            it('decodes a base64 sidecar the same way it decodes the body', async () => {
+                documentRepository.findById.mockResolvedValue(buildDecisionDoc());
+                gitFacade.getFileContent
+                    .mockResolvedValueOnce({ content: '# older\n', encoding: 'utf-8' })
+                    .mockResolvedValueOnce({
+                        content: Buffer.from(
+                            yaml.stringify({ review_state: 'accepted' }),
+                            'utf-8',
+                        ).toString('base64'),
+                        encoding: 'base64',
+                    });
+
+                await service.restoreDocumentFromGit(WORK_ID, DOC_ID, COMMIT_SHA);
+
+                expect(documentRepository.update.mock.calls[0][1].reviewState).toBe(
+                    KbReviewState.ACCEPTED,
+                );
+            });
+        });
+    });
+
     function buildDocIndexShape() {
         return {
             id: DOC_ID,
@@ -617,6 +828,9 @@ describe('KnowledgeBaseGitMirrorService', () => {
             class: 'brand',
             tags: ['brand', 'voice'],
             status: 'active',
+            // Memory upgrades M12 — decision metadata rides the catalogue.
+            decision_status: null,
+            review_state: null,
             locked: false,
             lock_mode: null,
             word_count: 12,

@@ -8,3 +8,4 @@ export * from './tasks/index.js';
 export * from './policy/index.js';
 export * from './ingest/index.js';
 export * from './skills/index.js';
+export * from './fleet/index.js';

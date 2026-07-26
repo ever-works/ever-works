@@ -53,7 +53,7 @@ export class TenantJobRuntimeConfig {
 
     /**
      * Matches `IJobRuntimeProvider.runtimeId` from the EW-685 contract —
-     * one of `'trigger' | 'temporal' | 'bullmq' | 'pgboss' | 'inngest'`
+     * one of `'trigger' | 'temporal' | 'bullmq' | 'pgboss' | 'inngest' | 'node'`
      * today, extensible as new job-runtime plugins are bundled. Kept as
      * `varchar(64)` rather than a Postgres enum so adding a new provider
      * never needs a type-altering migration (same convention as

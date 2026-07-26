@@ -75,7 +75,7 @@ export class TenantCredentialSnapshot {
 
     /**
      * Matches `IJobRuntimeProvider.runtimeId` (one of `'trigger' |
-     * 'temporal' | 'bullmq' | 'pgboss' | 'inngest'` today). `varchar(64)`
+     * 'temporal' | 'bullmq' | 'pgboss' | 'inngest' | 'node'` today). `varchar(64)`
      * keeps it consistent with `tenant_job_runtime_config.providerId`.
      */
     @Column({ type: 'varchar', length: 64 })

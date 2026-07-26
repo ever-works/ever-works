@@ -16,7 +16,27 @@ export const ENTITLEMENT_KEYS = {
      * to the fallback 0, keeping enforcement doubly dark.
      */
     CREDIT_LIMITED: 'credit-limited',
+    /**
+     * Streaming-terminal M9 / founder decision D1 — how long a plan's
+     * terminal transcripts are kept, in days. Seeded per plan by the
+     * `1784300000000` migration (free 0 / standard 30 / premium -1).
+     *
+     *   -1 → forever (top plans)
+     *    0 → keep nothing (nothing is even written)
+     *    N → keep N days, then the `terminal-transcript-gc` cron prunes
+     *
+     * A plan code with no row resolves to
+     * `config.terminal.transcript.getFallbackRetentionDays()` (default
+     * 0 — fail-closed).
+     */
+    TERMINAL_TRANSCRIPT_RETENTION_DAYS: 'terminal-transcript-retention-days',
 } as const;
+
+/** Retention sentinel: never sweep this plan's transcripts. */
+export const RETENTION_FOREVER = -1;
+
+/** Retention sentinel: persist nothing for this plan. */
+export const RETENTION_NONE = 0;
 
 type CacheSlot = {
     value: number | string | null;

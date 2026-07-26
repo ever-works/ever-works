@@ -56,6 +56,7 @@ const PROVIDER_LABELS: Record<TenantJobRuntimeProviderId, string> = {
     bullmq: 'BullMQ',
     pgboss: 'pg-boss',
     inngest: 'Inngest',
+    node: 'Fleet nodes',
 };
 
 const MODE_OPTIONS: { value: TenantJobRuntimeMode; labelKey: string }[] = [

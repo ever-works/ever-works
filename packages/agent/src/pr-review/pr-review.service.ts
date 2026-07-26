@@ -21,8 +21,10 @@ import {
     type PrStructuredReview,
 } from './pr-review.types';
 
-/** Repo roles a Work can own — checked in this order for repo→Work matching. */
-const WORK_REPO_ROLES = ['work', 'website', 'data'] as const;
+// Repo→Work matching lives in ONE place (`works/work-repo-match.ts`) so
+// the ingest `workHint` resolver and this reviewer can never drift apart
+// on what "this repository belongs to that Work" means.
+import { matchWorkByRepo } from '../works/work-repo-match';
 
 /**
  * GitHub PR review loop (Wave 7, feature g) — the Work-aware reviewer.
@@ -218,27 +220,9 @@ export class PrReviewService {
      * without Work context). Never throws.
      */
     async matchWorkForRepo(userId: string, owner: string, repo: string): Promise<Work | null> {
-        const target = `${owner}/${repo}`.toLowerCase();
         try {
             const works = await this.workRepository.findByUser(userId);
-            for (const work of works) {
-                for (const role of WORK_REPO_ROLES) {
-                    const repoOwner = work.getRepoOwner?.(role);
-                    const repoName =
-                        role === 'data'
-                            ? work.getDataRepo?.()
-                            : role === 'website'
-                              ? work.getWebsiteRepo?.()
-                              : work.getMainRepo?.();
-                    if (
-                        repoOwner &&
-                        repoName &&
-                        `${repoOwner}/${repoName}`.toLowerCase() === target
-                    ) {
-                        return work;
-                    }
-                }
-            }
+            return matchWorkByRepo(works, owner, repo);
         } catch (error) {
             this.logger.warn(
                 `repo→Work matching failed for ${owner}/${repo}: ${this.messageOf(error)}`,
@@ -525,6 +509,12 @@ export class PrReviewService {
                 commentCount: input.review.comments.length,
             },
             ...(input.work ? { workId: input.work.id } : {}),
+            // Work routing: even when this reviewer could not match the
+            // repo itself (no `work`), the repository IS the hint, so the
+            // spine gets a second, independent chance to route the event
+            // through `matchWorkByRepo` — the same matcher this service
+            // uses, never a second one.
+            workHint: { kind: 'repo', externalId: `${owner}/${repo}` },
         };
         try {
             await this.eventIngest.ingest(input.userId, [envelope]);

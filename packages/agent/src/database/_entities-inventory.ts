@@ -122,6 +122,10 @@ import { PlanEntitlement } from '../entities/plan-entitlement.entity';
 import { BillingProfile } from '../entities/billing-profile.entity';
 import { Invoice } from '../entities/invoice.entity';
 import { FleetNode } from '../entities/fleet-node.entity';
+import { TerminalTranscriptChunk } from '../entities/terminal-transcript-chunk.entity';
+
+import { FleetJob } from '../entities/fleet-job.entity';
+
 import {
     PluginEntity,
     UserPluginEntity,
@@ -284,4 +288,12 @@ export const ENTITIES = [
     // Fleet (Wave 12, slice 1) — enrolled execution nodes (desktop /
     // headless) with hashed credentials + heartbeat status.
     FleetNode,
+    // Streaming-terminal M9 / founder decision D1 — append-only,
+    // redacted, retention-capped terminal transcript chunks.
+    TerminalTranscriptChunk,
+
+    // Fleet job runtime (Desktop PRD M4) — the lease-able work queue
+    // whose workers are the enrolled nodes above.
+    FleetJob,
+
 ];

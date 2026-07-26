@@ -38,6 +38,7 @@ export * from './knowledge-base-transcribe.service';
 export * from './knowledge-base-reembed.service';
 export * from './knowledge-base-buffer-extractor.service';
 export * from './knowledge-base-reconcile.service';
+export * from './decision-conflict.service';
 export * from './knowledge-base.module';
 export * from './kb-chunker';
 export * from './kb-rrf';

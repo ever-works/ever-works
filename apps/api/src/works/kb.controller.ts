@@ -46,6 +46,7 @@ import type {
     KbDocumentClass,
     KbDocumentStatus,
     KbLockMode,
+    KbReviewState,
     KbUploadExtractionStatus,
 } from '@ever-works/agent/entities';
 
@@ -91,6 +92,13 @@ export class KbController {
     @ApiQuery({ name: 'status', required: false })
     @ApiQuery({ name: 'tag', required: false })
     @ApiQuery({ name: 'locked', required: false })
+    @ApiQuery({
+        name: 'reviewState',
+        required: false,
+        enum: ['proposed', 'accepted'],
+        description:
+            'Memory upgrades M8 — review-queue filter. `proposed` lists only agent-authored / synthesized documents awaiting human review (excluded from context injection until accepted); `accepted` lists the reviewed set including pre-M7 rows whose column is NULL. Omit to list everything.',
+    })
     @ApiQuery({ name: 'q', required: false })
     @ApiQuery({ name: 'limit', required: false })
     @ApiQuery({ name: 'offset', required: false })
@@ -113,6 +121,7 @@ export class KbController {
             tag: query.tag,
             locked: query.locked,
             language: query.language,
+            reviewState: query.reviewState as KbReviewState | undefined,
             q: query.q,
             limit: query.limit,
             offset: query.offset,

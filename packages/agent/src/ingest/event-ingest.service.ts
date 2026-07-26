@@ -6,6 +6,7 @@ import { AgentMemoryFacadeService } from '../facades/agent-memory.facade';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import type { IngestedEvent } from '../entities/ingested-event.entity';
 import { IngestedEventRepository } from './ingested-event.repository';
+import { WorkHintResolverService } from './work-hint-resolver.service';
 
 export interface IngestResult {
     /** New rows written. */
@@ -82,6 +83,12 @@ export class EventIngestService {
         private readonly repository: IngestedEventRepository,
         private readonly activityLogService: ActivityLogService,
         @Optional() private readonly agentMemory?: AgentMemoryFacadeService,
+        // `workId` routing — turns a connector's `workHint` into a real
+        // Work for the owning user (and verifies a caller-supplied
+        // `workId` actually belongs to them). Appended LAST + @Optional()
+        // so every positional `new EventIngestService(...)` fixture keeps
+        // compiling and ingests exactly as it did before.
+        @Optional() private readonly workHints?: WorkHintResolverService,
     ) {}
 
     /**
@@ -114,7 +121,7 @@ export class EventIngestService {
             const { created } = await this.repository.createIfNew({
                 userId,
                 organizationId: envelope.organizationId ?? null,
-                workId: envelope.workId ?? null,
+                workId: await this.resolveWorkId(userId, envelope),
                 source: envelope.source,
                 sourceEventId: envelope.sourceEventId,
                 kind: envelope.kind,
@@ -135,6 +142,32 @@ export class EventIngestService {
         }
 
         return result;
+    }
+
+    /**
+     * Decide which Work (if any) this envelope belongs to.
+     *
+     * Precedence: an explicit `workId` wins (verified to belong to the
+     * ingesting user), then the connector's `workHint`, then null.
+     * Without the resolver bound the behaviour is byte-for-byte the
+     * pre-routing one — `envelope.workId ?? null`.
+     */
+    private async resolveWorkId(
+        userId: string,
+        envelope: IngestedEventEnvelope,
+    ): Promise<string | null> {
+        if (!this.workHints) return envelope.workId ?? null;
+        if (envelope.workId) {
+            const owned = await this.workHints.verifyOwnedWorkId(userId, envelope.workId);
+            if (!owned) {
+                this.logger.warn(
+                    `Ingest: dropping workId ${envelope.workId} on ${envelope.source}/` +
+                        `${envelope.sourceEventId} — not owned by user ${userId}.`,
+                );
+            }
+            return owned;
+        }
+        return this.workHints.resolve(userId, envelope.workHint);
     }
 
     /**

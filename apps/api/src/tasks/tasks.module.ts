@@ -11,6 +11,13 @@ import { DatabaseModule } from '@ever-works/agent/database';
 // controllers would fail to instantiate at boot with an "argument
 // AgentRepository is not available" Nest error.
 import { AgentsModule } from '@ever-works/agent/agents';
+// Memory upgrades M6 — `DecisionConflictService` (the re-litigation
+// guard behind `GET /api/tasks/:id/decision-conflicts`) is provided and
+// exported by `KnowledgeBaseModule`. NestJS only resolves a controller's
+// deps against its own module's imports, so this import is load-bearing:
+// without it the API fails to boot with an
+// `UnknownDependenciesException: TasksController (..., ?)`.
+import { KnowledgeBaseModule } from '@ever-works/agent/services';
 import {
     agentTaskExecuteTriggerAdapter,
     agentChatReplyTriggerAdapter,
@@ -40,7 +47,7 @@ import { TaskChatController } from './task-chat.controller';
 // breaking the entire Phase 15.3 / 15.4 dispatch fan-out.
 @Global()
 @Module({
-    imports: [TasksDomainModule, DatabaseModule, AgentsModule],
+    imports: [TasksDomainModule, DatabaseModule, AgentsModule, KnowledgeBaseModule],
     controllers: [TasksController, TaskChatController],
     providers: [
         { provide: AGENT_TASK_EXECUTE_DISPATCHER, useValue: agentTaskExecuteTriggerAdapter },

@@ -25,6 +25,8 @@ export * from './repositories/plan-entitlement.repository';
 // (customer + payment-method summary + auto-recharge) and the invoice mirror
 export * from './repositories/billing-profile.repository';
 export * from './repositories/invoice.repository';
+// Streaming-terminal M9 / D1 — append-only terminal transcript chunks.
+export * from './repositories/terminal-transcript-chunk.repository';
 export * from './repositories/work-budget.repository';
 export * from './repositories/work-budget-alert-state.repository';
 export * from './repositories/notification.repository';

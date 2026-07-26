@@ -16,7 +16,11 @@ import {
     GitProviderConnectionInfo,
 } from '@/lib/api';
 import type { Work } from '@/lib/api/types-only';
-import type { TaskAcceptanceCheck, WorkChecksPolicy } from '@ever-works/contracts';
+import type {
+    MergePolicyOverride,
+    TaskAcceptanceCheck,
+    WorkChecksPolicy,
+} from '@ever-works/contracts';
 // Security: server actions are reachable as POST endpoints via the
 // `Next-Action` header, so every exported action must independently verify
 // authentication at the Next.js layer before proxying to backend
@@ -1487,6 +1491,66 @@ export async function updateQualityGatesSettings(
             success: false,
             error:
                 error instanceof Error ? error.message : 'Failed to update quality gates settings',
+        };
+    }
+}
+
+/**
+ * Merge-policy matrix (Wave 3, founder decision D4) — the Work-scoped
+ * slice. Saves flow through the same `PATCH /works/:id` UpdateWorkDto
+ * path as the sibling settings cards; this feature adds a field to an
+ * existing write path rather than a parallel one.
+ *
+ * The payload is a PARTIAL by contract: every field OMITTED inside the
+ * object inherits from the organization, then the tenant, then the
+ * platform default. `null` clears the Work override entirely. The zod
+ * schema below mirrors the API's `MergePolicyDto` constraints so an
+ * obviously-invalid payload never leaves the browser — the API still
+ * validates and sanitizes independently.
+ */
+export async function updateWorkMergePolicy(
+    workId: string,
+    mergePolicy: MergePolicyOverride | null,
+) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    const mergePolicySchema = z
+        .object({
+            allowAgentMerge: z.boolean().optional(),
+            requireGreenGate: z.boolean().optional(),
+            requireHumanApproval: z.boolean().optional(),
+            allowedMergeMethods: z
+                .array(z.enum(['merge', 'squash', 'rebase']))
+                .max(3)
+                .optional(),
+            protectedBranches: z.array(z.string().min(1).max(255)).max(50).optional(),
+        })
+        .strict()
+        .nullable();
+
+    try {
+        const validation = mergePolicySchema.safeParse(mergePolicy);
+        if (!validation.success) {
+            return {
+                success: false,
+                error: validation.error.errors[0].message,
+            };
+        }
+
+        const response = await workAPI.update(workId, { mergePolicy: validation.data });
+        revalidatePath(`/works/${workId}/settings`);
+
+        return {
+            success: response.status === 'success',
+        };
+    } catch (error) {
+        console.error('Failed to update merge policy:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to update merge policy',
         };
     }
 }

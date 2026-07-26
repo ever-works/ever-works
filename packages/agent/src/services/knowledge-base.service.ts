@@ -134,6 +134,14 @@ interface ListOptions {
     tag?: string;
     locked?: boolean;
     language?: string;
+    /**
+     * Memory upgrades M8 — review-state filter. `proposed` is the review
+     * queue's list call (agent-authored / synthesized documents that are
+     * excluded from context injection until a human accepts them);
+     * `accepted` returns the reviewed set including pre-M7 rows whose
+     * column is still NULL. Omit for the historical "everything" list.
+     */
+    reviewState?: KbReviewState;
     q?: string;
     limit?: number;
     offset?: number;
@@ -673,6 +681,7 @@ export class KnowledgeBaseService {
                 tag: opts.tag,
                 locked: opts.locked,
                 language: opts.language,
+                reviewState: opts.reviewState,
                 q: undefined,
                 limit: opts.limit,
                 offset: opts.offset,
@@ -696,6 +705,7 @@ export class KnowledgeBaseService {
                 tag: opts.tag,
                 locked: opts.locked,
                 language: opts.language,
+                reviewState: opts.reviewState,
                 q: trimmedQ,
                 limit: fusionLimit,
                 offset: 0,
@@ -748,8 +758,32 @@ export class KnowledgeBaseService {
             if (fetched) materialized.push(fetched);
         }
 
-        const sliced = materialized.slice(requestedOffset, requestedOffset + requestedLimit);
-        return { items: sliced.map((d) => this.toDto(d)), total: materialized.length };
+        // Memory upgrades M8 — the semantic leg of the blend is a
+        // chunk-level k-NN with no metadata predicate, so a doc that the
+        // lexical (filtered) leg excluded can still enter via the
+        // semantic ranking. Re-apply the review-state predicate on the
+        // merged list so `reviewState=proposed` never leaks an accepted
+        // document into the review queue (and vice versa).
+        const filtered = opts.reviewState
+            ? materialized.filter((d) => this.matchesReviewState(d, opts.reviewState))
+            : materialized;
+
+        const sliced = filtered.slice(requestedOffset, requestedOffset + requestedLimit);
+        return { items: sliced.map((d) => this.toDto(d)), total: filtered.length };
+    }
+
+    /**
+     * Memory upgrades M8 — in-memory mirror of the repository's
+     * review-state predicate. `null` reads as `accepted` because M7
+     * never backfilled the column.
+     */
+    private matchesReviewState(
+        doc: Pick<WorkKnowledgeDocument, 'reviewState'>,
+        wanted: KbReviewState | undefined,
+    ): boolean {
+        if (!wanted) return true;
+        if (wanted === KbReviewState.PROPOSED) return doc.reviewState === KbReviewState.PROPOSED;
+        return doc.reviewState !== KbReviewState.PROPOSED;
     }
 
     async getDocument(
@@ -1324,6 +1358,11 @@ export class KnowledgeBaseService {
         if (!updated) {
             throw new NotFoundException(`KB document not found after transition: ${docId}`);
         }
+        // M12 — the mirror now carries `decision_status` / `review_state`
+        // in the sidecar, so a status transition MUST re-mirror. Without
+        // this the two fields only reached Git incidentally, whenever some
+        // unrelated body/title edit happened to trigger a mirror next.
+        await this.enqueueMirror(workId, docId, 'upsert', updated.path, updated.kbDocumentClass);
         return this.toBodyDto(updated);
     }
 
@@ -1366,6 +1405,8 @@ export class KnowledgeBaseService {
         if (!updated) {
             throw new NotFoundException(`KB document not found after accept: ${docId}`);
         }
+        // M12 — see transitionDecisionStatus: review state is mirrored now.
+        await this.enqueueMirror(workId, docId, 'upsert', updated.path, updated.kbDocumentClass);
         return this.toBodyDto(updated);
     }
 
@@ -1409,6 +1450,9 @@ export class KnowledgeBaseService {
         if (!updated) {
             throw new NotFoundException(`KB document not found after archive: ${docId}`);
         }
+        // M12 — see transitionDecisionStatus: the sidecar's `status` and
+        // `review_state` both move on an archive.
+        await this.enqueueMirror(workId, docId, 'upsert', updated.path, updated.kbDocumentClass);
         return this.toBodyDto(updated);
     }
 
