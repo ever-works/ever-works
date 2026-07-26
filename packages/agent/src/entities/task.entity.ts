@@ -171,6 +171,37 @@ export class Task {
     @Column({ type: 'simple-json', nullable: true })
     conflictPaths?: string[] | null;
 
+    // ── PR insights (kanban run cockpit M5) ──────────────────────────
+    // Cache written by `TaskPrStatusService` (on-demand refresh + the
+    // `task-pr-status-sync` cron). They live on Task beside `prNumber` /
+    // `prUrl` rather than on AgentRun for the SAME reason those do
+    // (agent-run.entity.ts: "branchRef/prUrl/prNumber are NOT duplicated
+    // here") — the pull request belongs to the Task's branch, which
+    // outlives any single run, and a Task accretes many runs against one
+    // PR. Plan 04 §4.1 put them on AgentRun; this is the same documented
+    // deviation Wave 2 already made, kept consistent on purpose.
+
+    /** `open | draft | closed | merged` as last observed from the provider. */
+    @Column({ type: 'varchar', length: 16, nullable: true })
+    prState?: string | null;
+
+    /** Rolled-up CI verdict for the PR head: `passing|failing|pending|unknown`. */
+    @Column({ type: 'varchar', length: 16, nullable: true })
+    ciState?: string | null;
+
+    /** When the PR status was last refreshed — drives the sync throttle. */
+    @Column({ type: 'timestamp', nullable: true })
+    ciCheckedAt?: Date | null;
+
+    /** Bounded check summary for the pill tooltip (plain text names only). */
+    @Column({ type: 'simple-json', nullable: true })
+    prChecks?: Array<{
+        name: string;
+        status: string;
+        conclusion?: string | null;
+        detailsUrl?: string;
+    }> | null;
+
     // ── Latest-run denorm (kanban run cockpit, Wave 2) ───────────────
     // Maintained by `TaskRunDenormService` on queued creation, claim and
     // terminal transition of task-kind AgentRuns. Denormalized so the

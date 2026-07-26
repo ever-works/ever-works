@@ -18,6 +18,7 @@ import {
 import {
     TaskChatService,
     TaskGateRunnerService,
+    TaskPrStatusService,
     TaskRecurrenceDispatcherService,
     TaskRunDenormService,
     TasksService,
@@ -218,6 +219,17 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
             provide: TaskChatService,
             useFactory: (apiClient: TriggerInternalApiClient) =>
                 createRemoteProxy(apiClient, 'TaskChatService'),
+            inject: [TriggerInternalApiClient],
+        },
+        // Kanban run cockpit (plan 04 M5/M7) — the task-pr-status-sync
+        // cron calls syncDuePrStatuses() over the internal RPC channel.
+        // The real service needs the git facade (provider plugins are
+        // only loaded in the API process), same shape as
+        // TaskWorkspaceService.
+        {
+            provide: TaskPrStatusService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'TaskPrStatusService'),
             inject: [TriggerInternalApiClient],
         },
         // Notifications v2 (EW-663) — the notification-channel-delivery

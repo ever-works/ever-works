@@ -54,6 +54,7 @@ import {
 import {
     TaskChatService,
     TaskGateRunnerService,
+    TaskPrStatusService,
     TaskRunDenormService,
     TaskWorkspaceService,
     TaskRecurrenceDispatcherService,
@@ -318,6 +319,13 @@ export class TriggerInternalController implements OnModuleInit {
         // arity rule above.
         @Optional()
         private readonly fleetJobService?: FleetJobService,
+        // Kanban run cockpit (plan 04 M5/M7) — backs the
+        // `task-pr-status-sync` cron: the worker proxy calls
+        // `syncDuePrStatuses()` over the internal RPC channel, landing
+        // here where the git-provider plugins + credentials are wired.
+        // Appended LAST + @Optional() per the arity rule above.
+        @Optional()
+        private readonly taskPrStatusService?: TaskPrStatusService,
     ) {}
 
     onModuleInit() {
@@ -402,6 +410,9 @@ export class TriggerInternalController implements OnModuleInit {
             // Fleet job runtime (Desktop PRD M4) — `fleet-job-lease-sweeper`
             // calls `reclaimExpired()` here (allow-list auto-derived).
             FleetJobService: this.fleetJobService,
+            // Kanban run cockpit (plan 04 M5/M7) — `task-pr-status-sync`
+            // calls `syncDuePrStatuses()` here (allow-list auto-derived).
+            TaskPrStatusService: this.taskPrStatusService,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),
