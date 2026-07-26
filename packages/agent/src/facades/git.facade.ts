@@ -29,6 +29,10 @@ import type {
     GitFileChange,
     IGitFacade,
     GitProviderInfo,
+    // PR insights (kanban run cockpit M5/M6).
+    GitDiffOptions,
+    GitDiffResult,
+    GitPullRequestStatus,
 } from '@ever-works/plugin';
 import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
@@ -104,6 +108,32 @@ export class MergePolicyRefusedError extends GitFacadeError {
         this.name = 'MergePolicyRefusedError';
         this.code = decision.code;
         this.policySource = decision.source;
+    }
+}
+
+/**
+ * PR insights (kanban run cockpit M5/M6) — the resolved git provider does
+ * not implement the optional capability the caller asked for.
+ *
+ * A dedicated leaf (rather than the generic `GitFacadeError`) because the
+ * distinction matters at the API boundary: "this provider cannot answer"
+ * is a 409 the caller resolves by switching provider, NOT a 500. Mapped
+ * by `FacadeExceptionFilter` on this exact `name`.
+ *
+ * Why an explicit guard exists at all: the lazy-plugin proxy
+ * over-reports optional methods (a `typeof plugin.foo === 'function'`
+ * check can pass for a method the concrete plugin never defined), so
+ * every optional-capability call site materialises the plugin and
+ * verifies before calling. See the known-gotcha note in plan 04 §7.7.
+ */
+export class GitOperationNotSupportedError extends GitFacadeError {
+    constructor(operation: string, providerId?: string) {
+        super(
+            `Git provider${providerId ? ` '${providerId}'` : ''} does not support ${operation}.`,
+            operation,
+            providerId,
+        );
+        this.name = 'GitOperationNotSupportedError';
     }
 }
 
@@ -881,6 +911,70 @@ export class GitFacadeService implements IGitFacade {
             return plugin.getPullRequestFiles(owner, repo, prNumber, token);
         }
         return [];
+    }
+
+    // ── PR insights (kanban run cockpit M5/M6) ────────────────────────
+    //
+    // Both capabilities are OPTIONAL on the contract. The absence path is
+    // an explicit `GitOperationNotSupportedError` (→ 409), never a
+    // TypeError-turned-500, and the presence check materialises the
+    // method off the resolved plugin first — the lazy-plugin proxy
+    // over-reports optional methods (see the class doc above).
+
+    /**
+     * PR state + review decision + rolled-up CI for the board's review
+     * pill. `null` when the PR no longer exists on the provider.
+     */
+    async getPullRequestStatus(
+        owner: string,
+        repo: string,
+        prNumber: number,
+        options: GitFacadeOptions,
+    ): Promise<GitPullRequestStatus | null> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        const impl = plugin.getPullRequestStatus;
+        if (typeof impl !== 'function') {
+            throw new GitOperationNotSupportedError('getPullRequestStatus', plugin.id);
+        }
+        return impl.call(plugin, owner, repo, prNumber, token);
+    }
+
+    /**
+     * Capped diff for an open pull request. The caps are the caller's
+     * (the API clamps them again against the platform ceiling inside
+     * `capDiffFiles`) — a provider that ignores them fails the contract
+     * conformance suite.
+     */
+    async getPullRequestDiff(
+        owner: string,
+        repo: string,
+        prNumber: number,
+        diffOptions: GitDiffOptions | undefined,
+        options: GitFacadeOptions,
+    ): Promise<GitDiffResult> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        const impl = plugin.getPullRequestDiff;
+        if (typeof impl !== 'function') {
+            throw new GitOperationNotSupportedError('getPullRequestDiff', plugin.id);
+        }
+        return impl.call(plugin, owner, repo, prNumber, diffOptions, token);
+    }
+
+    /** Same, for a pushed branch that has not opened a PR yet. */
+    async getCompareDiff(
+        owner: string,
+        repo: string,
+        base: string,
+        head: string,
+        diffOptions: GitDiffOptions | undefined,
+        options: GitFacadeOptions,
+    ): Promise<GitDiffResult> {
+        const { plugin, token } = await this.resolvePluginAndToken(options);
+        const impl = plugin.getCompareDiff;
+        if (typeof impl !== 'function') {
+            throw new GitOperationNotSupportedError('getCompareDiff', plugin.id);
+        }
+        return impl.call(plugin, owner, repo, base, head, diffOptions, token);
     }
 
     async createPullRequestComment(

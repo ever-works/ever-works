@@ -21,6 +21,7 @@ import { TaskAttachmentsSection } from './TaskAttachmentsSection';
 import { TaskBranchSection } from './TaskBranchSection';
 import { TaskChecksSection } from './TaskChecksSection';
 import { TaskRunControls } from './TaskRunControls';
+import { TaskRunsHistory } from './TaskRunsHistory';
 import { RunWithAgentMenu } from './RunWithAgentMenu';
 import { TaskDecisionConflicts } from './TaskDecisionConflicts';
 
@@ -101,6 +102,7 @@ export function TaskDetailClient({
     initialChatError = null,
     initialAttachmentsError = null,
     initialGateRun = null,
+    initialRuns = [],
 }: {
     task: Task;
     initialChat: TaskChatMessage[];
@@ -115,6 +117,14 @@ export function TaskDetailClient({
      * be pure waste.
      */
     initialGateRun?: AgentRunSession | null;
+    /**
+     * Run-driven lifecycle (kanban M7) — the Task's run HISTORY, newest
+     * first, server-fetched from the same `listSessions({ taskId })`
+     * projection `initialGateRun` comes from (one call, `limit: 10`).
+     * A Task accretes many runs; showing only the latest made "did this
+     * ever work?" unanswerable from the Task page.
+     */
+    initialRuns?: AgentRunSession[];
 }) {
     const t = useTranslations('dashboard.tasksPage.detail');
     const tStatus = useTranslations('dashboard.tasksPage.status');
@@ -363,6 +373,10 @@ export function TaskDetailClient({
 
                     {/* Quality gates (Wave 3 M6) — Checks section */}
                     <TaskChecksSection task={task} initialGateRun={initialGateRun} />
+
+                    {/* Run-driven lifecycle (kanban M7) — every run this
+                        Task has accrued, not just the latest. */}
+                    <TaskRunsHistory runs={initialRuns} />
 
                     {/* FU-5 — Attachments */}
                     <TaskAttachmentsSection

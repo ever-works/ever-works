@@ -154,6 +154,54 @@ export class TaskRepository {
     }
 
     /**
+     * PR insights (kanban run cockpit M5) — Tasks whose pull request is
+     * still OPEN and whose cached CI verdict has gone stale.
+     *
+     * Two deliberate narrowings, both about not burning a provider's rate
+     * limit on questions that cannot change the board:
+     *
+     *  - `prNumber IS NOT NULL` — nothing to ask about otherwise.
+     *  - `prState` is null / `open` / `draft` — a merged or closed PR is
+     *    TERMINAL. Once observed, we never poll it again; the plan's
+     *    "only while the PR is open" rule is enforced here rather than
+     *    left to the caller.
+     *
+     * Never-checked rows (`ciCheckedAt IS NULL`) sort first, then the
+     * stalest — so a newly opened PR gets its dot quickly and a long
+     * backlog drains in age order. Hits `idx_tasks_pr_status_sync`.
+     */
+    async findDuePrStatusSync(staleBefore: Date, limit = 50): Promise<Task[]> {
+        return this.repository
+            .createQueryBuilder('task')
+            .where('task.prNumber IS NOT NULL')
+            .andWhere('task.workId IS NOT NULL')
+            .andWhere("(task.prState IS NULL OR task.prState IN ('open', 'draft'))")
+            .andWhere('(task.ciCheckedAt IS NULL OR task.ciCheckedAt < :staleBefore)', {
+                staleBefore,
+            })
+            .orderBy('task.ciCheckedAt', 'ASC', 'NULLS FIRST')
+            .take(Math.max(1, Math.min(limit, 200)))
+            .getMany();
+    }
+
+    /**
+     * PR-status cache write. Query-builder update on purpose: like
+     * `updateLatestRun` it must NOT bump `updatedAt`, or every sync tick
+     * would reshuffle the updatedAt-ordered board.
+     */
+    async updatePrStatusCache(
+        taskId: string,
+        patch: Partial<Pick<Task, 'prState' | 'ciState' | 'ciCheckedAt' | 'prChecks'>>,
+    ): Promise<void> {
+        await this.repository
+            .createQueryBuilder()
+            .update(Task)
+            .set(patch)
+            .where('id = :taskId', { taskId })
+            .execute();
+    }
+
+    /**
      * Compare-and-swap status update: applies `data` (which advances the
      * status) ONLY while the row is still at `expectedStatus`, in a single
      * atomic `UPDATE … WHERE id=? AND status=?`. Returns true iff exactly one

@@ -12,6 +12,9 @@ export * from './terminal-session.task';
 // persisted terminal transcripts.
 export * from './terminal-transcript-gc.task';
 export * from './task-branch-gc.task';
+// Kanban run cockpit (plan 04 M5/M7) — refresh open-PR status + CI for
+// the board review pill, and land Tasks whose PR merged.
+export * from './task-pr-status-sync.task';
 // Desktop PRD M4 — return lapsed fleet-job leases to the pool so a
 // fleet whose nodes ALL died still converges (inline reclaim on the
 // lease path covers every other case).

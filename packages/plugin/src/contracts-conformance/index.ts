@@ -41,3 +41,12 @@ export {
 	createInMemorySecretStoreProvider
 } from '../contracts/__tests__/fakes/in-memory-secret-store-provider.js';
 export type { InMemorySecretStoreSeed } from '../contracts/__tests__/fakes/in-memory-secret-store-provider.js';
+
+// PR insights (kanban run cockpit M5/M6) — the two optional git-provider
+// read capabilities the Tasks board renders (PR status + capped diff).
+// Every provider that implements them runs this suite against itself.
+export { runGitPrInsightsContractSuite } from '../contracts/__tests__/git-pr-insights-conformance.spec.js';
+export type {
+	GitPrInsightsContractOptions,
+	GitPrInsightsSubject
+} from '../contracts/__tests__/git-pr-insights-conformance.spec.js';

@@ -329,6 +329,19 @@ export class TaskWorkspaceService {
             this.logger.log(
                 `Task ${task.id} branch ${workspace.branch} pushed; agent lacks canOpenPullRequests — leaving PR to a human.`,
             );
+            // Run-driven lifecycle (plan 04 M7): the run COMPLETED WITH
+            // CHANGES — they are committed and pushed on the Task branch —
+            // so the Task is reviewable and moves to `in_review` exactly
+            // like the PR-opened path. The only difference is who opens the
+            // pull request, which is a permission question, not a lifecycle
+            // one; before this, a Work whose agents may commit but not open
+            // PRs left every finished Task sitting in `in_progress` forever
+            // with no signal that it was waiting on a human.
+            //
+            // Deliberately the SAME `transitionTask` helper as the
+            // PR-opened branch — one transition path, agent-declared, so
+            // the approver / blocker / quality gates all still hold.
+            await this.transitionTask(task, TaskStatus.IN_REVIEW);
             return { outcome: 'pushed-no-pr' };
         }
 

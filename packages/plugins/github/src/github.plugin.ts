@@ -32,7 +32,11 @@ import type {
 	OAuthToken,
 	OAuthUser,
 	TransferRepoOptions,
-	TransferRepoResult
+	TransferRepoResult,
+	// PR insights (kanban run cockpit M5/M6).
+	GitDiffOptions,
+	GitDiffResult,
+	GitPullRequestStatus
 } from '@ever-works/plugin';
 import { GITHUB_SCOPES } from '@ever-works/plugin';
 // Security (SSRF): lexical guard to keep the admin-configurable `apiBaseUrl`
@@ -323,6 +327,42 @@ export class GitHubPlugin implements IPlugin, IGitProviderPlugin, IOAuthPlugin {
 	): Promise<GitPullRequestFile[]> {
 		const settings = await this.getSettings();
 		return this.apiService.getPullRequestFiles(owner, repo, prNumber, token, settings.apiBaseUrl);
+	}
+
+	// PR insights (kanban run cockpit M5/M6) — the board's review pill and
+	// diff preview read through these; the browser never talks to GitHub.
+
+	async getPullRequestStatus(
+		owner: string,
+		repo: string,
+		prNumber: number,
+		token: string
+	): Promise<GitPullRequestStatus | null> {
+		const settings = await this.getSettings();
+		return this.apiService.getPullRequestStatus(owner, repo, prNumber, token, settings.apiBaseUrl);
+	}
+
+	async getPullRequestDiff(
+		owner: string,
+		repo: string,
+		prNumber: number,
+		opts: GitDiffOptions | undefined,
+		token: string
+	): Promise<GitDiffResult> {
+		const settings = await this.getSettings();
+		return this.apiService.getPullRequestDiff(owner, repo, prNumber, opts, token, settings.apiBaseUrl);
+	}
+
+	async getCompareDiff(
+		owner: string,
+		repo: string,
+		base: string,
+		head: string,
+		opts: GitDiffOptions | undefined,
+		token: string
+	): Promise<GitDiffResult> {
+		const settings = await this.getSettings();
+		return this.apiService.getCompareDiff(owner, repo, base, head, opts, token, settings.apiBaseUrl);
 	}
 
 	async createPullRequestComment(

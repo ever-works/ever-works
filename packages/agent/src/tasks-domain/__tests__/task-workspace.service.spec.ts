@@ -272,7 +272,67 @@ describe('TaskWorkspaceService', () => {
                 agentCanOpenPullRequests: false,
             });
             expect(result.outcome).toBe('pushed-no-pr');
+            expect(tasks.updateById).toHaveBeenCalledWith(
+                expect.any(String),
+                expect.objectContaining({ branchState: 'pushed' }),
+            );
+            // No PR is opened — the permission the agent lacks is exactly
+            // the one that would open it.
+            expect(tasks.updateById).not.toHaveBeenCalledWith(
+                expect.any(String),
+                expect.objectContaining({ branchState: 'pr-open' }),
+            );
+        });
+
+        /**
+         * Run-driven lifecycle (plan 04 M7) — the Task status follows the
+         * RUN RESULT, not who is allowed to open a pull request.
+         *
+         * A `pushed-no-pr` run completed WITH CHANGES: they are committed
+         * and pushed on the Task branch, so the work is reviewable and the
+         * card belongs in the review column. Before this, such a Task sat
+         * in `in_progress` forever with no signal that it was waiting on a
+         * human to open the PR.
+         */
+        it('pushed-no-pr moves the Task to in_review — completed WITH changes', async () => {
+            const svc = buildFull();
+            await svc.finalizeRun({ ...finalizeInput(), agentCanOpenPullRequests: false });
+            expect(transitions.transition).toHaveBeenCalledWith(expect.anything(), 'in_review', {
+                actorType: 'agent',
+            });
+        });
+
+        it('uses the SAME agent-declared transition path as the PR-opened branch', async () => {
+            const svc = buildFull();
+            await svc.finalizeRun({ ...finalizeInput(), agentCanOpenPullRequests: false });
+            // Exactly one transition — the review-entry edge. A second
+            // (duplicated) write here would double-fire the gates.
+            expect(transitions.transition).toHaveBeenCalledTimes(1);
+            expect(transitions.transition.mock.calls[0][2]).toEqual({ actorType: 'agent' });
+        });
+
+        it('an empty run still does NOT enter review — nothing to review', async () => {
+            facadeExt.finalize.mockResolvedValue({ pushed: false, headSha: null, empty: true });
+            const svc = buildFull();
+            const result = await svc.finalizeRun({
+                ...finalizeInput(),
+                agentCanOpenPullRequests: false,
+            });
+            expect(result.outcome).toBe('no-changes');
             expect(transitions.transition).not.toHaveBeenCalled();
+        });
+
+        it('a conflicting run goes to blocked, never to review', async () => {
+            facadeExt.simulateMerge.mockResolvedValue({
+                clean: false,
+                conflictPaths: ['src/app.ts'],
+            });
+            const svc = buildFull();
+            await svc.finalizeRun({ ...finalizeInput(), agentCanOpenPullRequests: false });
+            expect(transitions.transition).toHaveBeenCalledTimes(1);
+            expect(transitions.transition).toHaveBeenCalledWith(expect.anything(), 'blocked', {
+                actorType: 'agent',
+            });
         });
     });
 });
