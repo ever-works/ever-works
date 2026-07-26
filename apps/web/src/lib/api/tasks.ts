@@ -46,6 +46,9 @@ export interface TaskRun {
     currentActivity: string | null;
     totalTokens: number | null;
     changedFilesCount: number | null;
+    /** Cost surfacing (orchestration M7) — settled run cost in cents;
+     *  null until the run reaches a terminal state. */
+    costCents?: number | null;
     startedAt: string | null;
     /** Quality gates (Wave 3 M6) — latest-run gate verdict for the board
      *  chip. `null`/absent = the run has no gate verdict. */
