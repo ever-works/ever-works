@@ -52,6 +52,10 @@ describe('TasksController — PR insights endpoints', () => {
             {} as never,
             {} as never,
             { getForTask, getDiffForTask } as never,
+            // Orchestration M9 + the run-dispatch gate were appended after this
+            // spec was written; neither path is exercised here.
+            {} as never,
+            {} as never,
         );
         return { controller, getForTask, getDiffForTask };
     }
