@@ -4217,6 +4217,42 @@
                     "defaultsLabel": "Default checks",
                     "defaultsDescription": "Inherited by every Task under this Work. A Task check with the same id overrides its default.",
                     "defaultsSave": "Save default checks"
+                },
+                "externalRefs": {
+                    "title": "Ingest routing claims",
+                    "subtitle": "Claim the external containers whose events belong to this Work. Ingested events carrying one of these identifiers are routed here instead of staying account-wide. Repositories are not listed — repository events already route through the repositories this Work declares.",
+                    "add": "Add",
+                    "save": "Save claims",
+                    "saved": "Routing claims saved",
+                    "saveFailed": "Could not save the routing claims",
+                    "remove": "Remove {id}",
+                    "kinds": {
+                        "chat-channel": {
+                            "label": "Chat channels",
+                            "helper": "Chat channel IDs whose messages belong to this Work (for example a Slack channel id like C0123456789).",
+                            "placeholder": "C0123456789"
+                        },
+                        "tracker-team": {
+                            "label": "Tracker teams",
+                            "helper": "Issue-tracker team keys whose issues belong to this Work (for example the team identifier ENG).",
+                            "placeholder": "ENG"
+                        },
+                        "doc-database": {
+                            "label": "Doc databases",
+                            "helper": "Document database IDs whose pages belong to this Work (for example a wiki or docs database id).",
+                            "placeholder": "db_2f19c4a7"
+                        },
+                        "meeting": {
+                            "label": "Meetings",
+                            "helper": "Recurring meeting IDs whose transcripts and notes belong to this Work.",
+                            "placeholder": "meeting-8891"
+                        }
+                    },
+                    "errors": {
+                        "duplicate": "That identifier is already claimed under this kind.",
+                        "tooLong": "Identifiers can be at most {max} characters.",
+                        "tooMany": "At most {max} identifiers per kind."
+                    }
                 }
             },
             "deploy": {
@@ -5227,6 +5263,34 @@
                     "description": "Repositories with this name already exist in your account. You can use a different name or accept the suggestion.",
                     "useSuggestion": "Use \"{slug}\" instead"
                 }
+            },
+            "campaign": {
+                "chip": "Start a campaign",
+                "title": "Start a campaign",
+                "subtitle": "Describe the campaign and we provision the whole go-to-market setup: a campaign Work, a goal for the objective, the prebuilt go-to-market agents, and tasks for the first pipeline stages.",
+                "nameLabel": "Campaign name",
+                "namePlaceholder": "Q3 developer launch",
+                "objectiveLabel": "Objective",
+                "objectivePlaceholder": "Book 25 qualified demos with platform engineering teams",
+                "targetLabel": "Target (optional)",
+                "targetValuePlaceholder": "25",
+                "targetUnitPlaceholder": "demos",
+                "channelsLabel": "Channels (optional)",
+                "channelsPlaceholder": "email, linkedin, newsletter",
+                "channelsHelper": "Comma-separated. Recorded as labels on the seeded pipeline tasks.",
+                "submit": "Start campaign",
+                "submitting": "Provisioning your campaign…",
+                "success": "Campaign \"{name}\" is ready",
+                "failed": "Could not start the campaign",
+                "provisions": {
+                    "title": "What this provisions",
+                    "work": "A Work of kind campaign",
+                    "goal": "A goal capturing the objective",
+                    "agents": "The prebuilt go-to-market agents",
+                    "tasks": "Tasks for the first pipeline stages",
+                    "pipeline": "The go-to-market pipeline as this Work's pipeline preference"
+                },
+                "pipelineNotPinned": "The go-to-market pipeline could not be pinned to this Work; runs will auto-detect a pipeline instead."
             }
         },
         "gitProvider": {

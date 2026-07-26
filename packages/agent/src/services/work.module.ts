@@ -171,6 +171,13 @@ import { WorkRepository } from '@src/database/repositories/work.repository';
         WorksConfigWriterService,
         WorksConfigProjectionService,
         WorksConfigRepositorySyncService,
+        // Campaign activation (roadmap 14.1) pins `gtm-pipeline` as the
+        // campaign Work's active pipeline provider through this service.
+        // It is the only work-scoped plugin write surface, and the global
+        // PluginsModule does not export it — so WorkModule (which already
+        // owns the instance) is what makes it reachable to
+        // `CampaignsModule` without spawning a second copy.
+        PluginOperationsService,
         PlatformSyncSecretService,
         WebhookSecretService,
         WorkRuntimeEnvService,

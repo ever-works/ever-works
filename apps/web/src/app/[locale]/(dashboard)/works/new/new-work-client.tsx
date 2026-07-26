@@ -8,6 +8,7 @@ import { WorkImportForm } from '@/components/works/WorkImportForm';
 import { GitProviderSelector } from './git-provider-selector';
 import { DeployProviderSelector, type DeployProvider } from './deploy-provider-selector';
 import { useTranslations } from 'next-intl';
+import { useRouter } from '@/i18n/navigation';
 import { toast } from 'sonner';
 import {
     BookOpen,
@@ -17,6 +18,7 @@ import {
     FolderKanban,
     FolderOpen,
     Globe,
+    Megaphone,
     PenLine,
     Star,
     Store,
@@ -151,6 +153,7 @@ export default function NewWorkClient({
             null,
     );
     const t = useTranslations('dashboard.workCreation');
+    const router = useRouter();
 
     // Composer state used by the entry view (creationMode === null).
     const [prompt, setPrompt] = useState(initialPrompt ?? '');
@@ -328,6 +331,21 @@ export default function NewWorkClient({
                         >
                             <FolderInput className="w-3.5 h-3.5" />
                             {t('buttons.import')}
+                        </Button>
+                        {/* Roadmap 14.1 — campaigns are not websites, so they
+                            get their own activation surface instead of a kind
+                            chip: one brief provisions the Work, the goal, the
+                            go-to-market agents and the first pipeline tasks. */}
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            className="gap-1.5"
+                            onClick={() => router.push('/works/new/campaign')}
+                            data-testid="start-campaign"
+                        >
+                            <Megaphone className="w-3.5 h-3.5" />
+                            {t('campaign.chip')}
                         </Button>
                     </div>
                 </div>
