@@ -1799,21 +1799,47 @@
                     "presetCredits": "You will receive {credits} credits",
                     "customAmount": "Custom $",
                     "comingSoon": "Payments are coming soon",
-                    "comingSoonBody": "Card top-ups are not yet available on this deployment. Your balance still tracks grants and usage."
+                    "comingSoonBody": "Card top-ups are not yet available on this deployment. Your balance still tracks grants and usage.",
+                    "packPrice": "{price} one-time",
+                    "packBonus": "+{percent}% bonus",
+                    "redirecting": "Redirecting…",
+                    "checkoutError": "Could not start checkout"
                 },
                 "paymentMethod": {
                     "title": "Payment method",
                     "comingSoon": "Payment method management arrives with the payments launch.",
-                    "empty": "No payment method on file."
+                    "empty": "No payment method on file.",
+                    "expires": "Expires {expiry}",
+                    "managedAtCheckout": "Card details are held by the payment provider — we only store the brand, last four digits and expiry.",
+                    "addAtCheckout": "A card is saved automatically the first time you buy credits."
                 },
                 "autoRecharge": {
                     "title": "Auto-recharge",
                     "comingSoon": "Automatic top-ups arrive with the payments launch.",
-                    "description": "Automatically top up your balance when it falls below a threshold."
+                    "description": "Automatically top up your balance when it falls below a threshold.",
+                    "needsPaymentMethod": "Buy credits once to save a payment method, then auto-recharge can be enabled.",
+                    "thresholdPlaceholder": "Below (credits)",
+                    "save": "Save",
+                    "saved": "Auto-recharge updated",
+                    "saveError": "Failed to update auto-recharge",
+                    "failures": "{count} recent auto-recharge attempts failed. Check your payment method."
                 },
                 "invoices": {
                     "title": "Invoice history",
-                    "empty": "No invoices yet. Invoices appear here once billing is live."
+                    "empty": "No invoices yet. Invoices appear here once billing is live.",
+                    "colNumber": "Invoice",
+                    "colDate": "Date",
+                    "colStatus": "Status",
+                    "colTotal": "Total",
+                    "view": "View",
+                    "statuses": {
+                        "draft": "Draft",
+                        "open": "Open",
+                        "paid": "Paid",
+                        "void": "Void",
+                        "uncollectible": "Uncollectible",
+                        "refunded": "Refunded"
+                    }
                 },
                 "ledger": {
                     "title": "Credits ledger",

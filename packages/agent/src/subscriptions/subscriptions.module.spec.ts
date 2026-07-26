@@ -2,7 +2,16 @@ import * as subscriptionsBarrel from './index';
 import { SubscriptionsModule } from './subscriptions.module';
 import { SubscriptionService } from './subscription.service';
 import { UsageLedgerService } from './usage-ledger.service';
-import { BillingProvider, ManualBillingProvider } from './billing/billing.provider';
+import {
+    BillingProvider,
+    BillingProviderError,
+    BillingProviderNotConfiguredError,
+    ManualBillingProvider,
+} from './billing/billing.provider';
+import { StripeBillingProvider, STRIPE_METADATA_KEYS } from './billing/stripe-billing.provider';
+import { BillingService, UnknownCreditPackError } from './billing/billing.service';
+import { AutoRechargeService } from './billing/auto-recharge.service';
+import { CREDIT_PACKS, CREDIT_PACK_IDS } from './billing/credit-packs';
 import { CreditLedgerService, InsufficientCreditsError } from './credits/credit-ledger.service';
 import { ENTITLEMENT_KEYS, EntitlementsService } from './credits/entitlements.service';
 import { RunCostSettlementService } from './credits/run-cost-settlement.service';
@@ -63,6 +72,18 @@ describe('SubscriptionsModule + barrel re-exports', () => {
             expect(subscriptionsBarrel.USAGE_SUMMARY_GROUP_BYS).toBe(USAGE_SUMMARY_GROUP_BYS);
         });
 
+        it('re-exports the money path (billing PRD B5)', () => {
+            expect(subscriptionsBarrel.BillingService).toBe(BillingService);
+            expect(subscriptionsBarrel.AutoRechargeService).toBe(AutoRechargeService);
+            expect(subscriptionsBarrel.StripeBillingProvider).toBe(StripeBillingProvider);
+            expect(subscriptionsBarrel.CREDIT_PACKS).toBe(CREDIT_PACKS);
+            expect(subscriptionsBarrel.UnknownCreditPackError).toBe(UnknownCreditPackError);
+            expect(subscriptionsBarrel.BillingProviderNotConfiguredError).toBe(
+                BillingProviderNotConfiguredError,
+            );
+            expect(subscriptionsBarrel.BillingProviderError).toBe(BillingProviderError);
+        });
+
         it('exposes the documented runtime symbols only (no extras silently appearing)', () => {
             const runtimeKeys = Object.keys(subscriptionsBarrel).sort();
             expect(runtimeKeys).toEqual(
@@ -71,7 +92,22 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                     'SubscriptionService',
                     'UsageLedgerService',
                     'BillingProvider',
+                    'BillingProviderError',
+                    'BillingProviderNotConfiguredError',
                     'ManualBillingProvider',
+                    // The money path (billing PRD B5)
+                    'CREDIT_PACKS',
+                    'CREDIT_PACK_IDS',
+                    'findCreditPack',
+                    'defaultAutoRechargePack',
+                    'StripeBillingProvider',
+                    'STRIPE_METADATA_KEYS',
+                    'STRIPE_PURCHASE_KINDS',
+                    'STRIPE_CLIENT_FACTORY',
+                    'BillingService',
+                    'BILLING_PAYMENT_REF_TYPE',
+                    'UnknownCreditPackError',
+                    'AutoRechargeService',
                     // Credits ledger + plan entitlements (pricing Wave 9 M1)
                     'CreditLedgerService',
                     'InsufficientCreditsError',
@@ -119,13 +155,58 @@ describe('SubscriptionsModule + barrel re-exports', () => {
             expect(getMeta('exports')).toContain(UsageSummaryService);
         });
 
-        it('binds the abstract BillingProvider token to ManualBillingProvider via useClass', () => {
+        it('binds the abstract BillingProvider token through a config-driven factory', () => {
             const providers = getMeta('providers');
             const billingBinding = providers.find(
                 (p: any) => p && typeof p === 'object' && p.provide === BillingProvider,
             );
             expect(billingBinding).toBeDefined();
-            expect(billingBinding.useClass).toBe(ManualBillingProvider);
+            expect(typeof billingBinding.useFactory).toBe('function');
+            // Both implementations must be injectable into the factory so
+            // a deployment can swap providers without touching consumers.
+            expect(billingBinding.inject).toEqual([StripeBillingProvider, ManualBillingProvider]);
+        });
+
+        it('the BillingProvider factory picks the real provider only when it is configured', () => {
+            const providers = getMeta('providers');
+            const billingBinding = providers.find(
+                (p: any) => p && typeof p === 'object' && p.provide === BillingProvider,
+            );
+            const stripe = { isConfigured: () => true } as unknown as StripeBillingProvider;
+            const manual = {} as unknown as ManualBillingProvider;
+            expect(billingBinding.useFactory(stripe, manual)).toBe(stripe);
+
+            const unconfigured = { isConfigured: () => false } as unknown as StripeBillingProvider;
+            expect(billingBinding.useFactory(unconfigured, manual)).toBe(manual);
+        });
+
+        it('declares + exports the money path (billing PRD B5)', () => {
+            const providers = getMeta('providers');
+            const exports = getMeta('exports');
+            expect(providers).toContain(BillingService);
+            expect(providers).toContain(AutoRechargeService);
+            expect(providers).toContain(StripeBillingProvider);
+            expect(providers).toContain(ManualBillingProvider);
+            expect(exports).toContain(BillingService);
+            expect(exports).toContain(AutoRechargeService);
+        });
+
+        it('pins the credit-pack table to the packs published on the website', () => {
+            expect(CREDIT_PACK_IDS).toEqual(['credits-1000', 'credits-5500', 'credits-25000']);
+            expect(CREDIT_PACKS.map((p) => [p.priceCents, p.credits])).toEqual([
+                [1000, 1000],
+                [5000, 5500],
+                [20000, 25000],
+            ]);
+        });
+
+        it('pins the provider metadata keys the webhook attribution depends on', () => {
+            expect(STRIPE_METADATA_KEYS).toEqual({
+                kind: 'ever_works_kind',
+                userId: 'ever_works_user_id',
+                packId: 'ever_works_pack_id',
+                referenceId: 'ever_works_reference_id',
+            });
         });
 
         it('exports SubscriptionService, UsageLedgerService, and BillingProvider', () => {
