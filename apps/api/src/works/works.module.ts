@@ -15,6 +15,12 @@ import { OrganizationsModule } from '../organizations/organizations.module';
 // Run orchestration (Wave 4 M3) — AgentsModule exports AgentRunRepository
 // for the per-Work runs-summary endpoint (DatabaseModule does not provide it).
 import { AgentsModule } from '@ever-works/agent/agents';
+// Wave 7 feature h — the in-platform PR review surface. PrReviewModule
+// supplies the SAME reviewer the GitHub webhook bridge runs, and
+// EventIngestModule supplies IngestedEventRepository so the diff view can
+// read back the `github.pr.review` envelopes a review already recorded.
+import { PrReviewModule } from '@ever-works/agent/pr-review';
+import { EventIngestModule } from '@ever-works/agent/ingest';
 
 // Controllers
 import { WorksController } from './works.controller';
@@ -60,6 +66,10 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
         // Run orchestration (Wave 4 M3) — AgentRunRepository for the
         // per-Work runs-summary endpoint.
         AgentsModule,
+        // Wave 7 feature h — on-demand agent PR review + the recorded
+        // review history behind `GET /works/:id/pull-requests/...`.
+        PrReviewModule,
+        EventIngestModule,
     ],
     providers: [
         CacheEntryRepository,

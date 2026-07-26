@@ -2822,11 +2822,13 @@
                     "kb": "Knowledge Base",
                     "generator": "Generate Work, one time or on schedule",
                     "deploy": "Deploy Work",
-                    "tasks": "Tasks for this Work"
+                    "tasks": "Tasks for this Work",
+                    "pullRequests": "Open pull requests across this Work's repositories, with the agent's review"
                 },
                 "tasks": "Tasks",
                 "posts": "Posts",
-                "pages": "Pages"
+                "pages": "Pages",
+                "pullRequests": "Pull requests"
             },
             "members": {
                 "title": "Team Members",
@@ -4790,6 +4792,63 @@
                 "queued": "queued",
                 "awaiting": "awaiting input",
                 "failedLast24h": "failed (24h)"
+            },
+            "pullRequests": {
+                "title": "Pull requests",
+                "subtitle": "{count} open across this Work’s repositories",
+                "loading": "Loading pull requests…",
+                "noOpen": "No open pull requests in this repository.",
+                "repoError": "Could not list pull requests: {message}",
+                "openExternal": "Open pull request #{number} on the git provider",
+                "empty": {
+                    "title": "No open pull requests",
+                    "body": "Pull requests opened on this Work’s repositories show up here, together with the agent’s review."
+                },
+                "roles": {
+                    "work": "main repo",
+                    "website": "website repo",
+                    "data": "data repo"
+                },
+                "states": {
+                    "open": "Open",
+                    "merged": "Merged",
+                    "closed": "Closed"
+                },
+                "pills": {
+                    "review": "Review",
+                    "viewing": "Viewing"
+                },
+                "detail": {
+                    "loading": "Loading the diff…",
+                    "refresh": "Refresh",
+                    "requestReview": "Request agent review",
+                    "reviews": "Agent reviews",
+                    "noReviews": "No agent review recorded for this pull request yet.",
+                    "fileNotes": "{count} file notes",
+                    "notPosted": "not posted to the pull request",
+                    "diff": "Diff",
+                    "noDiff": "No file changes to show.",
+                    "truncated": "Diff truncated",
+                    "fileTruncated": "truncated"
+                },
+                "errors": {
+                    "list": "Failed to load pull requests",
+                    "diff": "Failed to load the diff",
+                    "review": "Failed to run the agent review"
+                }
+            },
+            "externalEvents": {
+                "title": "External activity",
+                "subtitle": "Events ingested from the connectors for this Work — repos, trackers, docs, chat and meetings.",
+                "loading": "Loading external activity…",
+                "empty": "No external events for this Work yet. Connect a connector and claim its channel, repository or project on this Work.",
+                "emptyFiltered": "No external events from {source} for this Work.",
+                "error": "Failed to load external events",
+                "untitled": "Untitled event",
+                "openSource": "Open the original in the source system",
+                "filters": {
+                    "all": "All sources"
+                }
             }
         },
         "newPage": {
