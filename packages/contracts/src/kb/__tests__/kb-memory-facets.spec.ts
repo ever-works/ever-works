@@ -37,9 +37,7 @@ describe('deriveKbMemorySourceBadge', () => {
 	});
 
 	it('labels a consolidation-synthesized document as synthesized (via the tag)', () => {
-		expect(deriveKbMemorySourceBadge({ source: 'agent', tags: ['synthesis'] })).toBe(
-			'synthesized'
-		);
+		expect(deriveKbMemorySourceBadge({ source: 'agent', tags: ['synthesis'] })).toBe('synthesized');
 	});
 
 	it('labels a consolidation-synthesized document as synthesized (via the stable path)', () => {
@@ -87,9 +85,7 @@ describe('deriveKbMemorySourceBadge', () => {
 
 describe('readKbConnectorSource', () => {
 	it('reads the connector name the ingest spine stamped', () => {
-		expect(readKbConnectorSource({ metadata: { provenance: { source: 'linear' } } })).toBe(
-			'linear'
-		);
+		expect(readKbConnectorSource({ metadata: { provenance: { source: 'linear' } } })).toBe('linear');
 	});
 
 	it('returns null for a document with no provenance, a malformed one, or a blank source', () => {

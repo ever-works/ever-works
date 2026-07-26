@@ -62,8 +62,12 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *     GH setup   installation_id=123 (valid)   -> 500 (App creds unset; service throws downstream)
  *     GH callback no code/state                -> 400 ["code must be a string","state must be a string"]
  *     GH webhook  no x-github-event            -> 400 {message:'Missing GitHub event header'}
- *     GH webhook  event but empty body         -> 400 {message:'Missing raw webhook payload'}
- *     GH webhook  event + body, bad/no sig     -> 401 {message:'Invalid GitHub webhook signature'}
+ *     GH webhook  event but empty body         -> 400 {message:'Missing raw request payload'}
+ *     GH webhook  event + body, bad/no sig     -> 401, and the REASON depends on
+ *       deployment state, not on the request: 'GitHub events receiver is not
+ *       configured' when no receiver is registered anywhere (the keyless e2e
+ *       stack), 'Invalid GitHub webhook signature' once a binding exists and the
+ *       HMAC is what refuses. Both are the same fail-closed guarantee.
  *     GH webhook  GET (POST-only)              -> 404 'Cannot GET /api/github-app/webhooks'
  *     GH install  authed GET installations     -> 200 [] (reachable status; no installs yet)
  *     GH install  anon  GET installations      -> 401 {message:'Unauthorized',statusCode:401}
@@ -254,7 +258,9 @@ test.describe('integrations surface — github-app sibling controller + twenty-c
         // present the HMAC is what refuses. Both are the same guarantee — an
         // unsigned push is never processed — so assert the guarantee, not the
         // wording of one environment.
-        expect(body.message).toMatch(/invalid github webhook signature|receiver is not configured/i);
+        expect(body.message).toMatch(
+            /invalid github webhook signature|receiver is not configured/i,
+        );
     });
 
     test('8. the github-app STATUS route GET /installations is reachable for an authenticated user and returns a 200 empty list (a fresh user has no installations) — the sibling integration fails OPEN to an empty status, unlike the twenty-crm 403 gate', async ({

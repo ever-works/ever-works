@@ -298,15 +298,13 @@ describe('BillingService — webhook: purchases', () => {
     it('ignores a purchase carrying a pack id that is not in the table', async () => {
         const profiles = makeProfileRepository(PROFILE);
         const provider = makeProvider({
-            verifyAndParseWebhook: jest
-                .fn()
-                .mockResolvedValue(
-                    event({
-                        kind: 'credits.purchased',
-                        customerId: 'cus_1',
-                        packId: 'credits-hack',
-                    }),
-                ),
+            verifyAndParseWebhook: jest.fn().mockResolvedValue(
+                event({
+                    kind: 'credits.purchased',
+                    customerId: 'cus_1',
+                    packId: 'credits-hack',
+                }),
+            ),
         });
         const { service, ledgerService } = build({ provider, profiles });
 
