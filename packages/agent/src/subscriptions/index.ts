@@ -2,6 +2,12 @@ export * from './subscriptions.module';
 export * from './subscription.service';
 export * from './usage-ledger.service';
 export * from './billing/billing.provider';
+// The money path (billing PRD B5) — server-side packs, the real provider
+// implementation, checkout/webhook orchestration and auto-recharge.
+export * from './billing/credit-packs';
+export * from './billing/stripe-billing.provider';
+export * from './billing/billing.service';
+export * from './billing/auto-recharge.service';
 // Credits ledger + plan entitlements (pricing Wave 9 M1)
 export * from './credits/credit-ledger.service';
 export * from './credits/entitlements.service';
