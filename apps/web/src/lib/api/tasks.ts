@@ -283,6 +283,10 @@ export const tasksAPI = {
     /** Agents the board's picker offers for this Task. */
     async listRunCandidates(id: string) {
         return serverFetch<{ data: RunCandidateAgent[] }>(`/tasks/${id}/run-candidates`, {
+            method: 'GET',
+        });
+    },
+
     /**
      * Re-litigation guard (memory upgrades M6) — settled decisions this
      * Task appears to re-open. Deterministic term-overlap check on the

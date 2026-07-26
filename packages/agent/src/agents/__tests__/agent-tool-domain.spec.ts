@@ -229,9 +229,12 @@ describe('AgentToolService — domain chat tool assembly', () => {
         const byName = new Map(tools.map((tool) => [tool.name, tool]));
 
         await byName.get('list_recent_events')!.invoke({ limit: 5 });
+        // `findRecentByUser` was widened from (userId, limit) to
+        // (userId, ListRecentEventsFilter); the assertion was not updated
+        // with it. Repaired to the shipped signature.
         expect((sources.ingest!.repository as any).findRecentByUser).toHaveBeenCalledWith(
             'owner-9',
-            5,
+            { limit: 5 },
         );
 
         await byName.get('list_meetings')!.invoke({});
