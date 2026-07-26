@@ -50,6 +50,7 @@ export * from './work-knowledge-tag.entity';
 export * from './work-knowledge-citation.entity';
 export * from './work-knowledge-chunk.entity';
 export * from './work-knowledge-chunk-coordinate.entity';
+export * from './kb-retrieval-log.entity';
 export * from './kb-types';
 export * from './types';
 // Agents/Skills/Tasks (PR #1017 specs)

@@ -73,6 +73,25 @@ export class OrganizationRepository {
         return this.repository.findOne({ where: { linkedWorkId: workId } });
     }
 
+    /**
+     * Memory upgrades M9 — organizations that opted into the scheduled
+     * consolidation pass.
+     *
+     * `memory_consolidation` is a `simple-json` (TEXT) column on every
+     * supported driver, so there is no portable JSON predicate: the
+     * cheap `IS NOT NULL` filter narrows the scan to configured rows and
+     * the `enabled` flag is asserted in TypeScript. Bounded by `limit`
+     * so one cron tick can never materialize an unbounded org list.
+     */
+    async findWithMemoryConsolidationSettings(limit = 200): Promise<Organization[]> {
+        return this.repository
+            .createQueryBuilder('org')
+            .where('org.memoryConsolidation IS NOT NULL')
+            .orderBy('org.createdAt', 'ASC')
+            .take(limit)
+            .getMany();
+    }
+
     async create(data: Partial<Organization>): Promise<Organization> {
         const entity = this.repository.create(data);
         return this.repository.save(entity);

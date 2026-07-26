@@ -87,6 +87,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     // Invoice mirror (billing PRD §3.5) — provider invoices/receipts,
     // written only by the signature-verified webhook
     'Invoice',
+    // Memory eval loop (memory upgrades M10) — append-only retrieval log
+    'KbRetrievalLog',
     // Meetings v1 (Wave 8, feature a) — captured meetings w/ transcripts
     'Meeting',
     'Mission',

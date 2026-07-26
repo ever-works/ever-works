@@ -7,6 +7,8 @@ import { cn } from '@/lib/utils/cn';
 import { updateKbDocumentAction } from '@/app/actions/works/kb-document';
 import { lockKbDocumentAction, unlockKbDocumentAction } from '@/app/actions/works/kb-lock';
 import { KbGitHistoryModal } from './KbGitHistoryModal';
+import { KbAskWhyPanel } from './KbAskWhyPanel';
+import { KbSourceBadge } from './KbSourceBadge';
 import {
     KB_DOCUMENT_CLASSES,
     KB_DOCUMENT_STATUSES,
@@ -202,6 +204,22 @@ export function KbMetadataPanel({
                     label: tMeta('source'),
                 }}
             />
+
+            {/* Memory facets — provenance at a glance (human / agent /
+                synthesized / connector), derived from the source column
+                plus any ingest provenance. */}
+            <div className="flex items-center gap-2">
+                <KbSourceBadge document={current} testId="kb-metadata-source-badge" />
+            </div>
+
+            {/* Memory upgrades M11 — "Ask why" on a decision document.
+                Scoped to decisions because that is where the question
+                ("why is this what we do?") actually gets asked; the
+                endpoint itself works for any document. Collapsed by
+                default, fetched only on expand. */}
+            {current.class === 'decision' ? (
+                <KbAskWhyPanel workId={workId} documentId={current.id} />
+            ) : null}
 
             <HistoryField workId={workId} document={current} label={tMeta('history')} />
         </div>

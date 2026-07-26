@@ -75,6 +75,7 @@ import {
 } from '@ever-works/agent/plugins';
 import { EventIngestService, EventSourcePullService } from '@ever-works/agent/ingest';
 import { DigestService } from '@ever-works/agent/digest';
+import { MemoryConsolidationScheduleService } from '@ever-works/agent/services';
 import { CreditLedgerService } from '@ever-works/agent/subscriptions';
 
 /**
@@ -335,6 +336,13 @@ export class TriggerInternalController implements OnModuleInit {
         // Appended LAST + @Optional() per the arity rule above.
         @Optional()
         private readonly taskPrStatusService?: TaskPrStatusService,
+        // Memory consolidation cadence (memory upgrades M9) — backs the
+        // `memory-consolidation-tick` cron: the worker proxy calls
+        // `dispatchDue()` over the internal RPC channel, landing here
+        // where the org/tenant repositories, the AI facade and the
+        // notification producer are wired. Appended LAST + @Optional()
+        // per the arity rule above.
+        private readonly memoryConsolidationScheduleService?: MemoryConsolidationScheduleService,
     ) {}
 
     onModuleInit() {
@@ -427,6 +435,10 @@ export class TriggerInternalController implements OnModuleInit {
             // Kanban run cockpit (plan 04 M5/M7) — `task-pr-status-sync`
             // calls `syncDuePrStatuses()` here (allow-list auto-derived).
             TaskPrStatusService: this.taskPrStatusService,
+            // Memory consolidation cadence (memory upgrades M9) —
+            // `memory-consolidation-tick` calls `dispatchDue()` here
+            // (allow-list auto-derived).
+            MemoryConsolidationScheduleService: this.memoryConsolidationScheduleService,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),
