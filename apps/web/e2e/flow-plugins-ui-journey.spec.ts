@@ -283,15 +283,22 @@ test.describe('Plugins UI — search & filter interactions', () => {
             timeout: 20_000,
         });
 
-        await page.getByPlaceholder('Search plugins...').fill('openai');
+        // The search box is a client filter: a fill() that lands before React
+        // has attached onChange updates the input's value but never runs the
+        // filter, so the grid stays unfiltered. Re-fill until the filter has
+        // actually applied (the unrelated Vercel card is gone).
+        const vercelCard = page.getByRole('heading', { level: 3, name: 'Vercel', exact: true });
+        const search = page.getByPlaceholder('Search plugins...');
+        await expect(async () => {
+            if ((await vercelCard.count()) > 0) {
+                await search.fill('openai').catch(() => undefined);
+            }
+            expect(await vercelCard.count()).toBe(0);
+        }).toPass({ timeout: 45_000 });
+
         await expect(
             page.getByRole('heading', { level: 3, name: 'OpenAI', exact: true }),
         ).toBeVisible({ timeout: 15_000 });
-        // The category group heading disappears in flat/search mode and the
-        // unrelated Vercel card is filtered out.
-        await expect(
-            page.getByRole('heading', { level: 3, name: 'Vercel', exact: true }),
-        ).toHaveCount(0);
     });
 
     test('clearing the search via the X button restores the full grouped list', async ({
