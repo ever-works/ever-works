@@ -3,6 +3,7 @@ import {
     AnonymousUserCleanupService,
     DeployReadyPollerService,
     KnowledgeBaseReconcileService,
+    MemoryConsolidationScheduleService,
     WorkScheduleDispatcherService,
     WorkScheduleService,
 } from '@ever-works/agent/services';
@@ -10,6 +11,7 @@ import { MissionTickService } from '@ever-works/agent/missions';
 import { IdeaBuildExecutorService } from '@ever-works/agent/work-agent';
 import { GoalEvaluationService } from '@ever-works/agent/goals';
 import {
+    AgentEscalationService,
     AgentRunService,
     AgentRunSweeperService,
     AgentScheduleDispatcherService,
@@ -19,7 +21,9 @@ import {
 import {
     TaskChatService,
     TaskGateRunnerService,
+    TaskPrStatusService,
     TaskRecurrenceDispatcherService,
+    TaskReviewRejectionService,
     TaskRunDenormService,
     TasksService,
     TaskWorkspaceService,
@@ -124,6 +128,23 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
                 createRemoteProxy(apiClient, 'AgentRunService'),
             inject: [TriggerInternalApiClient],
         },
+        // Judgment layer G3 - `agent-task-execute` files an escalation
+        // here when the gate is exhausted (or the budget stopped the
+        // iterate loop).
+        {
+            provide: AgentEscalationService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'AgentEscalationService'),
+            inject: [TriggerInternalApiClient],
+        },
+        // Orchestration M9 - `agent-task-execute` persists the machine
+        // gate feedback here so a LATER resume can replay it.
+        {
+            provide: TaskReviewRejectionService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'TaskReviewRejectionService'),
+            inject: [TriggerInternalApiClient],
+        },
         {
             provide: AgentRepository,
             useFactory: (apiClient: TriggerInternalApiClient) =>
@@ -221,6 +242,17 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
                 createRemoteProxy(apiClient, 'TaskChatService'),
             inject: [TriggerInternalApiClient],
         },
+        // Kanban run cockpit (plan 04 M5/M7) — the task-pr-status-sync
+        // cron calls syncDuePrStatuses() over the internal RPC channel.
+        // The real service needs the git facade (provider plugins are
+        // only loaded in the API process), same shape as
+        // TaskWorkspaceService.
+        {
+            provide: TaskPrStatusService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'TaskPrStatusService'),
+            inject: [TriggerInternalApiClient],
+        },
         // Notifications v2 (EW-663) — the notification-channel-delivery
         // task calls `deliverToChannelOrThrow` on this proxy, which RPCs
         // to the live API where the channel plugins are loaded.
@@ -296,6 +328,17 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
                 createRemoteProxy(apiClient, 'CreditLedgerService'),
             inject: [TriggerInternalApiClient],
         },
+        // Memory consolidation cadence (memory upgrades M9) — the
+        // memory-consolidation-tick cron calls `dispatchDue()` on this
+        // proxy, which RPCs to the live API where the org/tenant
+        // repositories, the AI facade and the notification producer are
+        // wired. Same shape as DigestService above.
+        {
+            provide: MemoryConsolidationScheduleService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'MemoryConsolidationScheduleService'),
+            inject: [TriggerInternalApiClient],
+        },
         // Terminal transcripts (streaming-terminal M9 / founder decision
         // D1) — the terminal-transcript-gc cron calls `sweepExpired()` on
         // this proxy, which RPCs to the live API where the chunk
@@ -320,6 +363,8 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         AgentScheduleDispatcherService,
         AgentRunSweeperService,
         AgentRunService,
+        AgentEscalationService,
+        TaskReviewRejectionService,
         AgentRepository,
         AgentRunRepository,
         RunDispatchGateService,
@@ -338,6 +383,7 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         EventSourcePullService,
         DigestService,
         CreditLedgerService,
+        MemoryConsolidationScheduleService,
         TerminalTranscriptService,
     ],
 })

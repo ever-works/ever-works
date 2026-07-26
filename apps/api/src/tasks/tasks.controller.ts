@@ -5,6 +5,7 @@ import {
     Controller,
     Delete,
     Get,
+    Header,
     HttpCode,
     HttpStatus,
     NotFoundException,
@@ -19,12 +20,18 @@ import { Throttle } from '@nestjs/throttler';
 import {
     TasksService,
     TaskChatService,
+    TaskReviewRejectionService,
     TaskStatus,
     TaskPriority,
     RUN_BATCH_MAX_TASKS,
+    TaskPrStatusService,
     type TaskActorType,
     type ListTasksFilter,
 } from '@ever-works/agent/tasks-domain';
+// Judgment layer G3 - the Task-detail escalation feed. Provided +
+// exported by AgentsModule, which this module already imports.
+import { AgentEscalationService } from '@ever-works/agent/agents';
+import { DEFAULT_DIFF_MAX_BYTES, DEFAULT_DIFF_MAX_FILES } from '@ever-works/plugin';
 import { PluginUsageRepository } from '@ever-works/agent/database';
 // Review-fix I5 (second-pass NEW-1 corrected): populate the postChat
 // `lookups.ownedAgentSlugs` map so the mention parser can resolve
@@ -47,6 +54,8 @@ import {
     AddRelationDto,
     AddReviewerDto,
     CreateTaskDto,
+    RejectTaskDto,
+    ResolveEscalationDto,
     PostTaskChatDto,
     RunTaskDto,
     RunTasksBatchDto,
@@ -67,6 +76,9 @@ import {
  *   POST   /api/tasks/:id/assignees            add assignee
  *   DELETE /api/tasks/:id/assignees/:id        remove
  *   POST   /api/tasks/:id/reviewers            add reviewer
+ *   POST   /api/tasks/:id/reject               record reviewer rejection (M9)
+ *   GET    /api/tasks/:id/escalations          escalation feed (G3)
+ *   POST   /api/tasks/:id/escalations/:eid/resolve  close one (G3)
  *   POST   /api/tasks/:id/approvers            add approver
  *   POST   /api/tasks/:id/blocks               add blocker
  *   DELETE /api/tasks/:id/blocks/:blockId      remove
@@ -76,6 +88,26 @@ import {
  *
  * Cross-user reads return 404 (no existence leak via 403).
  */
+/**
+ * PR insights (kanban M6) — the platform ceiling on one diff response.
+ * A caller may ask for LESS (the sheet does, for its first paint); asking
+ * for more is silently clamped, here and again inside `capDiffFiles`.
+ */
+const MAX_DIFF_FILES = DEFAULT_DIFF_MAX_FILES;
+const MAX_DIFF_BYTES = DEFAULT_DIFF_MAX_BYTES;
+
+/**
+ * Parse a query-string number, clamp it into `1..max`, and fall back to
+ * `max` for anything absent or unparseable. Deliberately total: a junk
+ * `?maxFiles=abc` gets the platform default, never a 500 or an unbounded
+ * read.
+ */
+function clampNumeric(raw: string | undefined, max: number): number {
+    const parsed = Number(raw);
+    if (!Number.isFinite(parsed) || parsed <= 0) return max;
+    return Math.min(Math.floor(parsed), max);
+}
+
 @ApiTags('tasks')
 @Controller('api/tasks')
 export class TasksController {
@@ -89,6 +121,13 @@ export class TasksController {
         private readonly taskWorkspace: TaskWorkspaceService,
         // Memory upgrades M6 — deterministic re-litigation guard.
         private readonly decisionConflicts: DecisionConflictService,
+        // Orchestration M9 — durable reviewer rejections. Appended last
+        // so no existing positional construction changes.
+        private readonly rejections: TaskReviewRejectionService,
+        // Judgment layer G3 — escalation feed for the Task detail.
+        private readonly escalations: AgentEscalationService,
+        // Kanban run cockpit (plan 04 M5/M6) — PR status pill + diff sheet.
+        private readonly prInsights: TaskPrStatusService,
     ) {}
 
     /**
@@ -333,6 +372,49 @@ export class TasksController {
         return this.service.runTask(auth.userId, id, { agentId: body?.agentId ?? null });
     }
 
+    // ── PR insights (kanban M5 / M6) ──────────────────────────────
+
+    @Get(':id/pr-status')
+    @ApiOperation({
+        summary:
+            "Pull-request state + CI verdict for this Task's branch — the board's review pill.",
+        description:
+            'Serves the cached `prState`/`ciState`/`checks` written by the `task-pr-status-sync` cron, refreshing from the git provider only when the cache is older than the 60s floor (single-flight per Task, so a board full of review cards makes one call per PR). Owner-scoped: a Task the caller does not own 404s. A merged or closed PR is terminal and is never re-read. `409` when the connected git provider has no PR-status capability.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 120, ttl: 60_000 } })
+    async prStatus(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Query('refresh') refresh?: string,
+    ) {
+        return this.prInsights.getForTask(auth.userId, id, { refresh: refresh === 'true' });
+    }
+
+    @Get(':id/diff')
+    @ApiOperation({
+        summary: "Capped diff for this Task's pull request (or its pushed branch).",
+        description: `Proxies the Work's git provider through the facade — the browser never talks to a provider API. Hard caps: ${MAX_DIFF_FILES} files and ${Math.floor(
+            MAX_DIFF_BYTES / 1024,
+        )} KiB of patch text, both clamped again inside the provider contract; \`truncated\` tells the client to link out for the rest. Owner-scoped (404 for a Task the caller does not own), 404 when the Task has no branch or PR, 409 when the git provider is not connected or cannot answer.`,
+    })
+    @HttpCode(HttpStatus.OK)
+    // Repo content egress: this response carries the user's own source.
+    // It must never enter a shared or browser cache — plan 04 §7.2.
+    @Header('Cache-Control', 'private, no-store')
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async diff(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Query('maxFiles') maxFiles?: string,
+        @Query('maxBytes') maxBytes?: string,
+    ) {
+        return this.prInsights.getDiffForTask(auth.userId, id, {
+            maxFiles: clampNumeric(maxFiles, MAX_DIFF_FILES),
+            maxBytes: clampNumeric(maxBytes, MAX_DIFF_BYTES),
+        });
+    }
+
     @Post(':id/resolve-conflicts')
     @ApiOperation({ summary: 'Re-run the Task agent to resolve a workspace merge conflict.' })
     @HttpCode(HttpStatus.OK)
@@ -407,6 +489,88 @@ export class TasksController {
     ) {
         this.assertActorType(body.reviewerType);
         return this.service.addReviewer(auth.userId, id, body.reviewerType, body.reviewerId);
+    }
+
+    /**
+     * Orchestration M9 — record a reviewer REJECTION with its feedback.
+     *
+     * This is the human half of the rejection loop: the text lands in
+     * `task_review_rejections` and the NEXT resumed run for this Task is
+     * seeded with it, ahead of whatever message the resumer types. It
+     * also finally writes `task_reviewers.reviewState` — the advisory
+     * signal that existed with no writer — so the two never disagree.
+     *
+     * 201 rather than 200: this creates a durable record.
+     */
+    @Post(':id/reject')
+    @ApiOperation({
+        summary:
+            'Record a reviewer rejection with feedback. The next resumed run for this Task receives it as its first input.',
+    })
+    @HttpCode(HttpStatus.CREATED)
+    async rejectTask(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: RejectTaskDto,
+    ) {
+        const row = await this.rejections.rejectTask(auth.userId, id, body.feedback, {
+            runId: body.runId ?? null,
+        });
+        return {
+            id: row.id,
+            taskId: row.taskId,
+            source: row.source,
+            createdAt: row.createdAt,
+        };
+    }
+
+    /**
+     * Judgment layer G3 — everything an agent gave up on for this Task.
+     *
+     * Ownership is enforced by loading the Task first (404-no-leak); the
+     * escalations that follow are Task-scoped, which is what the Task
+     * detail renders.
+     */
+    @Get(':id/escalations')
+    @ApiOperation({
+        summary:
+            'Escalations recorded for this Task (gate exhausted / guardrail refusal / budget stop / merge refused / parked).',
+    })
+    @HttpCode(HttpStatus.OK)
+    async listEscalations(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ) {
+        // 404-no-leak gate: getOne is owner-scoped and throws for a
+        // foreign or missing Task before any escalation row is read.
+        await this.service.getOne(auth.userId, id);
+        return { data: await this.escalations.listForTask(id) };
+    }
+
+    /** Judgment layer G3 — a human answered; close the card. */
+    @Post(':id/escalations/:escalationId/resolve')
+    @ApiOperation({ summary: 'Resolve one escalation with an optional decision note.' })
+    @HttpCode(HttpStatus.OK)
+    async resolveEscalation(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('escalationId', ParseUUIDPipe) escalationId: string,
+        @Body() body: ResolveEscalationDto,
+    ) {
+        await this.service.getOne(auth.userId, id);
+        const resolved = await this.escalations.resolve(
+            escalationId,
+            auth.userId,
+            body.note ?? null,
+        );
+        if (!resolved) {
+            // Already resolved, or not this user's — the same answer for
+            // both, so a foreign id is not an existence oracle.
+            throw new NotFoundException(
+                `Escalation ${escalationId} not found or already resolved.`,
+            );
+        }
+        return { resolved: true, escalationId };
     }
 
     @Post(':id/approvers')

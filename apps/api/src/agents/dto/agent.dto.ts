@@ -529,6 +529,21 @@ export class ListRunSessionsQueryDto {
     @IsIn(['heartbeat', 'manual', 'task', 'chat', 'event'])
     kind?: 'heartbeat' | 'manual' | 'task' | 'chat' | 'event';
 
+    /**
+     * State-aware sweeper (Wave 4 M6) — the needs-attention quick filter.
+     *
+     * `attention=1` narrows to runs a human has to look at: the agent
+     * asked a question (`awaitingInput`) OR the platform raised a
+     * lifecycle flag (`attentionReason`). Accepted as `1`/`true` so the
+     * deep link in the notification (`/agents/sessions?attention=1`) works
+     * verbatim; any other value (including absent) leaves the list
+     * unfiltered, which is today's behavior.
+     */
+    @ApiProperty({ required: false, enum: ['1', 'true'] })
+    @IsOptional()
+    @IsIn(['1', 'true'])
+    attention?: '1' | 'true';
+
     @ApiProperty({ required: false, minimum: 1, maximum: 200 })
     @IsOptional()
     @Type(() => Number)

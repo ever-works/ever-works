@@ -61,6 +61,7 @@ import { WorkKnowledgeDocument } from '../entities/work-knowledge-document.entit
 import { WorkKnowledgeUpload } from '../entities/work-knowledge-upload.entity';
 import { WorkKnowledgeTag } from '../entities/work-knowledge-tag.entity';
 import { WorkKnowledgeCitation } from '../entities/work-knowledge-citation.entity';
+import { KbRetrievalLog } from '../entities/kb-retrieval-log.entity';
 import { WorkKnowledgeChunk } from '../entities/work-knowledge-chunk.entity';
 import { WorkKnowledgeChunkCoordinate } from '../entities/work-knowledge-chunk-coordinate.entity';
 import { Mission } from '../entities/mission.entity';
@@ -73,6 +74,7 @@ import { Agent } from '../entities/agent.entity';
 import { AgentActionProposal } from '../entities/agent-action-proposal.entity';
 import { AgentRun } from '../entities/agent-run.entity';
 import { AgentRunLog } from '../entities/agent-run-log.entity';
+import { AgentEscalation } from '../entities/agent-escalation.entity';
 import { AgentBudget } from '../entities/agent-budget.entity';
 import { AgentMembership } from '../entities/agent-membership.entity';
 import { Team } from '../entities/team.entity';
@@ -83,6 +85,7 @@ import { SkillBinding } from '../entities/skill-binding.entity';
 import { Task } from '../entities/task.entity';
 import { TaskAssignee } from '../entities/task-assignee.entity';
 import { TaskReviewer } from '../entities/task-reviewer.entity';
+import { TaskReviewRejection } from '../entities/task-review-rejection.entity';
 import { TaskApprover } from '../entities/task-approver.entity';
 import { TaskBlock } from '../entities/task-block.entity';
 import { TaskRelation } from '../entities/task-relation.entity';
@@ -193,6 +196,8 @@ export const ENTITIES = [
     AgentActionProposal,
     AgentRun,
     AgentRunLog,
+    // Judgment layer G3 - structured escalation records.
+    AgentEscalation,
     AgentBudget,
     AgentMembership,
     AgentAttachment,
@@ -207,6 +212,8 @@ export const ENTITIES = [
     Task,
     TaskAssignee,
     TaskReviewer,
+    // Orchestration M9 - durable rejection feedback for resume.
+    TaskReviewRejection,
     TaskApprover,
     TaskBlock,
     TaskRelation,
@@ -227,6 +234,10 @@ export const ENTITIES = [
     WorkKnowledgeCitation,
     WorkKnowledgeChunk,
     WorkKnowledgeChunkCoordinate,
+    // Memory eval loop (memory upgrades M10) — append-only retrieval log
+    // joined against citation rows to compute the recall-hit rate and
+    // the zero-result gap topics that feed consolidation synthesis.
+    KbRetrievalLog,
     // Plugin entities
     PluginEntity,
     UserPluginEntity,
@@ -295,5 +306,4 @@ export const ENTITIES = [
     // Fleet job runtime (Desktop PRD M4) — the lease-able work queue
     // whose workers are the enrolled nodes above.
     FleetJob,
-
 ];

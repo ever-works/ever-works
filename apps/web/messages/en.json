@@ -4219,6 +4219,42 @@
                     "defaultsLabel": "Default checks",
                     "defaultsDescription": "Inherited by every Task under this Work. A Task check with the same id overrides its default.",
                     "defaultsSave": "Save default checks"
+                },
+                "externalRefs": {
+                    "title": "Ingest routing claims",
+                    "subtitle": "Claim the external containers whose events belong to this Work. Ingested events carrying one of these identifiers are routed here instead of staying account-wide. Repositories are not listed — repository events already route through the repositories this Work declares.",
+                    "add": "Add",
+                    "save": "Save claims",
+                    "saved": "Routing claims saved",
+                    "saveFailed": "Could not save the routing claims",
+                    "remove": "Remove {id}",
+                    "kinds": {
+                        "chat-channel": {
+                            "label": "Chat channels",
+                            "helper": "Chat channel IDs whose messages belong to this Work (for example a Slack channel id like C0123456789).",
+                            "placeholder": "C0123456789"
+                        },
+                        "tracker-team": {
+                            "label": "Tracker teams",
+                            "helper": "Issue-tracker team keys whose issues belong to this Work (for example the team identifier ENG).",
+                            "placeholder": "ENG"
+                        },
+                        "doc-database": {
+                            "label": "Doc databases",
+                            "helper": "Document database IDs whose pages belong to this Work (for example a wiki or docs database id).",
+                            "placeholder": "db_2f19c4a7"
+                        },
+                        "meeting": {
+                            "label": "Meetings",
+                            "helper": "Recurring meeting IDs whose transcripts and notes belong to this Work.",
+                            "placeholder": "meeting-8891"
+                        }
+                    },
+                    "errors": {
+                        "duplicate": "That identifier is already claimed under this kind.",
+                        "tooLong": "Identifiers can be at most {max} characters.",
+                        "tooMany": "At most {max} identifiers per kind."
+                    }
                 }
             },
             "deploy": {
@@ -4785,6 +4821,78 @@
                         "failed": "Restore failed",
                         "close": "Close"
                     }
+                },
+                "facets": {
+                    "searchLabel": "Search memory",
+                    "searchPlaceholder": "Search titles and content…",
+                    "clear": "Clear filters",
+                    "typeLabel": "Type",
+                    "sourceLabel": "Source",
+                    "noMatches": "No documents match these filters.",
+                    "activeCount": "{count} matching",
+                    "badge": {
+                        "human": "Human",
+                        "agent": "Agent",
+                        "synthesized": "Synthesized",
+                        "connector": "Connector"
+                    },
+                    "badgeAria": {
+                        "human": "Written by a person",
+                        "agent": "Written by an agent run",
+                        "synthesized": "Merged by memory consolidation",
+                        "connector": "Came from a connected tool: {source}"
+                    }
+                },
+                "health": {
+                    "title": "Memory health",
+                    "subtitle": "How well the Knowledge Base is answering the questions agents actually ask.",
+                    "loading": "Measuring memory health…",
+                    "error": "Could not load memory health.",
+                    "retry": "Try again",
+                    "window": "Last {days} days",
+                    "notMeasurable": "Not measurable yet",
+                    "recall": {
+                        "label": "Recall hit rate",
+                        "explainer": "Of the documents we put in front of an agent, how many did it actually use. Low means we are injecting the wrong things.",
+                        "detail": "{cited} of {retrieved} injected documents were cited.",
+                        "noSignal": "Nothing has cited a document yet, so this cannot be measured — a 0% here would be a guess, not a fact."
+                    },
+                    "stale": {
+                        "label": "Stale decisions",
+                        "explainer": "Settled decisions nobody has touched in {days} days. High means the decision log is drifting from how the team actually works.",
+                        "detail": "{stale} of {accepted} accepted decisions are stale.",
+                        "none": "No accepted decisions yet."
+                    },
+                    "backlog": {
+                        "label": "Awaiting review",
+                        "explainer": "Agent-written notes stay out of agent context until a human accepts them. A growing backlog means learning is being captured and then discarded.",
+                        "detail": "Oldest has waited {oldest} days; average {average} days.",
+                        "none": "Nothing is waiting for review."
+                    },
+                    "gaps": {
+                        "label": "Questions we could not answer",
+                        "explainer": "Searches that returned nothing. These are fed into the next consolidation pass as synthesis candidates.",
+                        "occurrences": "asked {count}x",
+                        "none": "Every question in this window returned something."
+                    },
+                    "uncited": {
+                        "label": "Injected but never used",
+                        "retrievals": "injected {count}x",
+                        "none": "Everything injected has been used."
+                    }
+                },
+                "askWhy": {
+                    "trigger": "Ask why",
+                    "title": "Why this document showed up",
+                    "subtitle": "The recorded retrieval trail — no AI, no guessing.",
+                    "loading": "Loading the retrieval trail…",
+                    "error": "Could not load the retrieval trail.",
+                    "empty": "This document has not been retrieved in the last {days} days.",
+                    "alwaysInjected": "Always injected (no query)",
+                    "resultCount": "{count} documents returned",
+                    "citations": "Cited {count}x",
+                    "total": "{count} retrievals in the last {days} days",
+                    "close": "Close"
                 }
             },
             "runsSummary": {
@@ -5286,6 +5394,34 @@
                     "description": "Repositories with this name already exist in your account. You can use a different name or accept the suggestion.",
                     "useSuggestion": "Use \"{slug}\" instead"
                 }
+            },
+            "campaign": {
+                "chip": "Start a campaign",
+                "title": "Start a campaign",
+                "subtitle": "Describe the campaign and we provision the whole go-to-market setup: a campaign Work, a goal for the objective, the prebuilt go-to-market agents, and tasks for the first pipeline stages.",
+                "nameLabel": "Campaign name",
+                "namePlaceholder": "Q3 developer launch",
+                "objectiveLabel": "Objective",
+                "objectivePlaceholder": "Book 25 qualified demos with platform engineering teams",
+                "targetLabel": "Target (optional)",
+                "targetValuePlaceholder": "25",
+                "targetUnitPlaceholder": "demos",
+                "channelsLabel": "Channels (optional)",
+                "channelsPlaceholder": "email, linkedin, newsletter",
+                "channelsHelper": "Comma-separated. Recorded as labels on the seeded pipeline tasks.",
+                "submit": "Start campaign",
+                "submitting": "Provisioning your campaign…",
+                "success": "Campaign \"{name}\" is ready",
+                "failed": "Could not start the campaign",
+                "provisions": {
+                    "title": "What this provisions",
+                    "work": "A Work of kind campaign",
+                    "goal": "A goal capturing the objective",
+                    "agents": "The prebuilt go-to-market agents",
+                    "tasks": "Tasks for the first pipeline stages",
+                    "pipeline": "The go-to-market pipeline as this Work's pipeline preference"
+                },
+                "pipelineNotPinned": "The go-to-market pipeline could not be pinned to this Work; runs will auto-detect a pipeline instead."
             }
         },
         "gitProvider": {

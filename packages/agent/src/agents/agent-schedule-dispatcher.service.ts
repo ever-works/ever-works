@@ -1,10 +1,11 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { config } from '../config';
 import { AgentRepository } from '../database/repositories/agent.repository';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
 import { AgentStatus } from '../entities/agent.entity';
 import type { Agent } from '../entities/agent.entity';
 import { computeNextHeartbeat } from './heartbeat-cron';
+import { RunDispatchGateService } from './run-dispatch-gate.service';
 
 export interface AgentDispatchEntry {
     agentId: string;
@@ -65,7 +66,48 @@ export class AgentScheduleDispatcherService {
     constructor(
         private readonly agentRepository: AgentRepository,
         private readonly agentRunRepository: AgentRunRepository,
+        // Run orchestration — the same concurrency choke point every
+        // other dispatch path uses. Heartbeat runs DEFER rather than
+        // park (see {@link admitHeartbeat}). Appended LAST + @Optional()
+        // per the positional-spec arity rule; without it the dispatcher
+        // behaves exactly as it did before.
+        @Optional() private readonly dispatchGate?: RunDispatchGateService,
     ) {}
+
+    /**
+     * Heartbeat admission.
+     *
+     * Heartbeat runs DEFER instead of parking: `drainForWork` promotes
+     * concurrency-parked rows through the Task-keyed dispatch paths, and
+     * a heartbeat run has no Task — a parked one would sit in `queued`
+     * forever with nothing able to drain it (the drain says so out loud:
+     * "parked run has no taskId — cannot drain"). Skipping is both
+     * correct and self-healing: the cron re-offers the Agent on its next
+     * tick, and run-now tells the caller to try again.
+     *
+     * Never throws: a broken valve must not stop the sweep, so a
+     * counting failure admits.
+     */
+    private async admitHeartbeat(agent: Agent): Promise<boolean> {
+        if (!this.dispatchGate) return true;
+        try {
+            // No `reserve` callback: nothing is created when a heartbeat
+            // is refused, so there is no count+insert window to close.
+            const admission = await this.dispatchGate.admit({
+                userId: agent.userId,
+                // Heartbeats are Agent-scoped, not Work-scoped — the
+                // org/user valve is the one that applies.
+                workId: null,
+                organizationId: agent.organizationId ?? null,
+            });
+            return admission.admitted;
+        } catch (err) {
+            this.logger.warn(
+                `Dispatch gate admit failed for Agent ${agent.id} — failing open: ${err}`,
+            );
+            return true;
+        }
+    }
 
     /**
      * Caller is the Trigger.dev cron wrapper, which knows how to enqueue
@@ -116,6 +158,24 @@ export class AgentScheduleDispatcherService {
             // did not, leaving the run orphaned in `queued`.
             let createdRun: { id: string } | null = null;
             try {
+                // Run orchestration — the concurrency valve applies to the
+                // heartbeat cron too. Checked BEFORE the CAS claim so a
+                // refusal costs nothing to undo: the Agent keeps its
+                // `nextHeartbeatAt` and is simply re-offered next tick.
+                if (!(await this.admitHeartbeat(agent))) {
+                    this.logger.log(
+                        `Agent ${agent.id} deferred by the dispatch gate — retrying next tick.`,
+                    );
+                    summary.skipped += 1;
+                    summary.entries.push(
+                        this.entry(agent, {
+                            outcome: 'skipped',
+                            message: 'concurrency-limit',
+                        }),
+                    );
+                    continue;
+                }
+
                 originalNext = await this.agentRepository.tryClaimForRun(agent.id);
                 if (!originalNext) {
                     this.logger.warn(
@@ -220,7 +280,10 @@ export class AgentScheduleDispatcherService {
         agentId: string,
     ): Promise<
         | { outcome: 'dispatched'; runId: string }
-        | { outcome: 'skipped'; reason: 'already-claimed' | 'agent-missing' | 'inactive' }
+        | {
+              outcome: 'skipped';
+              reason: 'already-claimed' | 'agent-missing' | 'inactive' | 'concurrency-limit';
+          }
         | { outcome: 'failed'; message: string }
     > {
         const agent = await this.agentRepository.findById(agentId);
@@ -229,6 +292,13 @@ export class AgentScheduleDispatcherService {
         }
         if (agent.status !== AgentStatus.ACTIVE && agent.status !== AgentStatus.ERROR) {
             return { outcome: 'skipped', reason: 'inactive' };
+        }
+        // Run orchestration — run-now is a dispatch like any other. Checked
+        // before the CAS claim so a refusal leaves no state to unwind, and
+        // reported as a `skipped` reason the caller can retry on (a
+        // heartbeat run cannot be parked — nothing could ever drain it).
+        if (!(await this.admitHeartbeat(agent))) {
+            return { outcome: 'skipped', reason: 'concurrency-limit' };
         }
 
         // FU-2 review fix (codex P1): manual run-now must work for

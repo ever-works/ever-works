@@ -47,6 +47,24 @@ export class TaskRepository {
         return this.repository.findOne({ where: { slug } });
     }
 
+    /**
+     * Orchestration M9 — the Task an agent opened a given pull request
+     * for. `prNumber` is only unique WITHIN a repository, and a Work maps
+     * to one repository, so the (workId, prNumber) pair is the correct
+     * key — `prNumber` alone would collide across Works the moment two
+     * repos both have a PR #7.
+     *
+     * Newest first: a Task whose branch was recycled could in principle
+     * carry a stale number, and the most recently updated row is the one
+     * the reviewer was looking at.
+     */
+    async findByWorkAndPrNumber(workId: string, prNumber: number): Promise<Task | null> {
+        return this.repository.findOne({
+            where: { workId, prNumber },
+            order: { updatedAt: 'DESC' },
+        });
+    }
+
     async findByUserIdFiltered(
         userId: string,
         filter: ListTasksFilter = {},
@@ -151,6 +169,54 @@ export class TaskRepository {
             })
             .take(200)
             .getMany();
+    }
+
+    /**
+     * PR insights (kanban run cockpit M5) — Tasks whose pull request is
+     * still OPEN and whose cached CI verdict has gone stale.
+     *
+     * Two deliberate narrowings, both about not burning a provider's rate
+     * limit on questions that cannot change the board:
+     *
+     *  - `prNumber IS NOT NULL` — nothing to ask about otherwise.
+     *  - `prState` is null / `open` / `draft` — a merged or closed PR is
+     *    TERMINAL. Once observed, we never poll it again; the plan's
+     *    "only while the PR is open" rule is enforced here rather than
+     *    left to the caller.
+     *
+     * Never-checked rows (`ciCheckedAt IS NULL`) sort first, then the
+     * stalest — so a newly opened PR gets its dot quickly and a long
+     * backlog drains in age order. Hits `idx_tasks_pr_status_sync`.
+     */
+    async findDuePrStatusSync(staleBefore: Date, limit = 50): Promise<Task[]> {
+        return this.repository
+            .createQueryBuilder('task')
+            .where('task.prNumber IS NOT NULL')
+            .andWhere('task.workId IS NOT NULL')
+            .andWhere("(task.prState IS NULL OR task.prState IN ('open', 'draft'))")
+            .andWhere('(task.ciCheckedAt IS NULL OR task.ciCheckedAt < :staleBefore)', {
+                staleBefore,
+            })
+            .orderBy('task.ciCheckedAt', 'ASC', 'NULLS FIRST')
+            .take(Math.max(1, Math.min(limit, 200)))
+            .getMany();
+    }
+
+    /**
+     * PR-status cache write. Query-builder update on purpose: like
+     * `updateLatestRun` it must NOT bump `updatedAt`, or every sync tick
+     * would reshuffle the updatedAt-ordered board.
+     */
+    async updatePrStatusCache(
+        taskId: string,
+        patch: Partial<Pick<Task, 'prState' | 'ciState' | 'ciCheckedAt' | 'prChecks'>>,
+    ): Promise<void> {
+        await this.repository
+            .createQueryBuilder()
+            .update(Task)
+            .set(patch)
+            .where('id = :taskId', { taskId })
+            .execute();
     }
 
     /**

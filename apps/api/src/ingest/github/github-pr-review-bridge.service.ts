@@ -8,6 +8,7 @@ import {
 } from '@ever-works/agent/ingest';
 import { PrReviewService } from '@ever-works/agent/pr-review';
 import { PluginSettingsService, UserPluginRepository } from '@ever-works/agent/plugins';
+import { TaskReviewRejectionService } from '@ever-works/agent/tasks-domain';
 import type { IngestBindingMatch, IngestBindingResolution } from '../install-binding.types';
 
 export const GITHUB_PLUGIN_ID = 'github';
@@ -107,6 +108,19 @@ export interface GitHubWebhookBody {
         html_url?: string;
         user?: { login?: string; type?: string };
     };
+    /**
+     * Orchestration M9 - `pull_request_review` deliveries. A human
+     * rejecting the agent's PR is the single most common reason a run
+     * gets resumed, and until this shape existed the reviewer's words
+     * were lost between the provider and the next run.
+     */
+    review?: {
+        id?: number;
+        state?: string;
+        body?: string;
+        html_url?: string;
+        user?: { login?: string; type?: string };
+    };
 }
 
 /**
@@ -171,6 +185,12 @@ export class GitHubPrReviewBridgeService {
         private readonly eventIngestService: EventIngestService,
         private readonly prReviewService: PrReviewService,
         private readonly installBindings: IngestInstallBindingRepository,
+        // Orchestration M9 - persist `changes_requested` reviews so the
+        // next resumed run reads them. @Optional() is deliberately NOT
+        // used: this module already imports TasksDomainModule, and a
+        // silently-unbound rejection recorder would be a feature that
+        // looks wired and does nothing.
+        private readonly rejections: TaskReviewRejectionService,
     ) {}
 
     /**
@@ -262,6 +282,25 @@ export class GitHubPrReviewBridgeService {
     }
 
     /**
+     * The platform user bound to one GitHub workspace key
+     * (`installation:<id>` / `owner:<login>`), or `null`.
+     *
+     * The `ingest_install_bindings` row is the SINGLE source of install
+     * ownership for this provider — `resolveBinding` reads it for the
+     * per-install path and `GitHubWebhookDispatcherService` reads it for
+     * the platform-App path through this accessor, so the consolidated
+     * receiver never grows a second binding store. Best-effort: a lookup
+     * failure resolves to "not bound" rather than throwing on a public,
+     * unauthenticated endpoint.
+     */
+    async installBindingFor(key: string): Promise<{ userId: string } | null> {
+        const bound = await this.installBindings
+            .findByWorkspace(GITHUB_BINDING_PROVIDER, key)
+            .catch(() => null);
+        return bound ? { userId: bound.userId } : null;
+    }
+
+    /**
      * Persist the installation→user binding after a delivery has passed
      * signature verification, so the deployment self-migrates off the
      * legacy single-install path onto exact resolution.
@@ -325,6 +364,16 @@ export class GitHubPrReviewBridgeService {
         eventName: string,
         body: GitHubWebhookBody,
     ): Promise<{ ingested: IngestResult | null }> {
+        // Orchestration M9 - a `pull_request_review` with state
+        // `changes_requested` is a HUMAN REJECTION, not a review request.
+        // It never enters the review loop (the loop reviews; it does not
+        // react to being reviewed), so it is handled and returned before
+        // normalize() is consulted.
+        if (eventName === 'pull_request_review') {
+            await this.recordReviewRejection(binding, body);
+            return { ingested: null };
+        }
+
         const normalized = this.normalize(eventName, body);
         if (!normalized) {
             return { ingested: null };
@@ -345,6 +394,50 @@ export class GitHubPrReviewBridgeService {
         }
 
         return { ingested };
+    }
+
+    /**
+     * Orchestration M9 - persist a `changes_requested` PR review as
+     * durable rejection feedback for the Task the PR belongs to.
+     *
+     * Best-effort throughout: a webhook must answer 200 fast, and every
+     * miss here (not a rejection, a bot reviewer, an empty body, a PR
+     * that maps to no Work/Task) is an ORDINARY outcome, not an error.
+     * Bot reviewers are excluded for the same reason bot comments are:
+     * the loop must never treat its own output as human feedback.
+     */
+    private async recordReviewRejection(
+        binding: GitHubEventsBinding,
+        body: GitHubWebhookBody,
+    ): Promise<void> {
+        const review = body.review;
+        if (!review || review.state?.toLowerCase() !== 'changes_requested') return;
+        if (review.user?.type === 'Bot') return;
+        const feedback = (review.body ?? '').trim();
+        if (feedback.length === 0) return;
+
+        const fullName = body.repository?.full_name ?? '';
+        const [owner, repo] = fullName.split('/');
+        const prNumber = body.pull_request?.number;
+        if (!owner || !repo || typeof prNumber !== 'number') return;
+
+        try {
+            await this.rejections.recordPullRequestRejection({
+                userId: binding.userId,
+                owner,
+                repo,
+                prNumber,
+                feedback: feedback.slice(0, GITHUB_EVENT_TEXT_MAX_CHARS),
+                reviewerLabel: review.user?.login ?? null,
+                prUrl: body.pull_request?.html_url ?? review.html_url ?? null,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `PR rejection record failed for ${fullName}#${prNumber}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
     }
 
     /** Normalize a delivery into an envelope + review coordinates (or skip it). */

@@ -40,18 +40,21 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
         // the detail page hydrates in one round-trip and the panel
         // renders without a client-side flash of "no attachments".
         tasksAPI.listAttachments(id),
-        // Quality gates (Wave 3 M6) — latest run for this Task with its
-        // gate columns (resolvedChecks / checkResults / gateStatus /
-        // gateAttempts) for the Checks section. Best-effort: a miss just
-        // renders the pre-dispatch declared checks.
-        agentsAPI.listSessions({ taskId: id, limit: 1 }),
+        // Quality gates (Wave 3 M6) — the Task's runs, newest first.
+        // `[0]` carries the gate columns (resolvedChecks / checkResults /
+        // gateStatus / gateAttempts) for the Checks section and the run
+        // controls; the rest is the Runs history (kanban M7). ONE call
+        // for both — they read the same projection, so fetching twice
+        // would be pure waste. Best-effort: a miss just renders the
+        // pre-dispatch declared checks and no history.
+        agentsAPI.listSessions({ taskId: id, limit: 10 }),
     ]);
 
     const chat =
         chatResult.status === 'fulfilled' ? chatResult.value : { data: [] as TaskChatMessage[] };
     const attachments = attachmentResult.status === 'fulfilled' ? attachmentResult.value : [];
-    const gateRun =
-        gateRunResult.status === 'fulfilled' ? (gateRunResult.value.data[0] ?? null) : null;
+    const runs = gateRunResult.status === 'fulfilled' ? (gateRunResult.value.data ?? []) : [];
+    const gateRun = runs[0] ?? null;
 
     return (
         <TaskDetailClient
@@ -59,6 +62,7 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
             initialChat={chat.data ?? []}
             initialAttachments={attachments}
             initialGateRun={gateRun}
+            initialRuns={runs}
             initialChatError={
                 chatResult.status === 'rejected'
                     ? errorMessage(chatResult.reason, 'Failed to load conversation')

@@ -14,6 +14,8 @@ export * from './run-steering-port';
 export * from './task-isolation';
 export * from './task-run-denorm.service';
 export * from './task-workspace.service';
+// PR insights (kanban run cockpit M5/M6) — PR status cache + capped diff.
+export * from './task-pr-status.service';
 export * from './agent-task-tools';
 export * from './recurrence';
 export * from './task-recurrence-dispatcher.service';
@@ -46,3 +48,8 @@ export {
     TaskKbMentionRepository,
     UserTaskCounterRepository,
 } from '../database/repositories/task-side.repositories';
+export * from './task-review-rejection.service';
+export {
+    TaskReviewRejectionRepository,
+    type RecordTaskReviewRejectionInput,
+} from '../database/repositories/task-review-rejection.repository';

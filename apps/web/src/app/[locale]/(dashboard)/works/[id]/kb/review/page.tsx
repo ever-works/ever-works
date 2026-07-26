@@ -7,6 +7,7 @@ import { WorkbenchShell } from '@/components/kb/workbench/WorkbenchShell';
 import { WorkbenchUploadCoordinator } from '@/components/kb/workbench/WorkbenchUploadCoordinator';
 import { KbSearchPalette } from '@/components/kb/workbench/KbSearchPalette';
 import { KbReviewQueue } from '@/components/kb/workbench/KbReviewQueue';
+import { KbMemoryHealthPanel } from '@/components/kb/workbench/KbMemoryHealthPanel';
 import type { KbDocumentDto } from '@ever-works/contracts';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -56,7 +57,20 @@ export default async function WorkKnowledgeBaseReviewPage({ params }: Params) {
             <WorkbenchShell
                 left={<WorkbenchUploadCoordinator workId={id} />}
                 center={
-                    <KbReviewQueue workId={id} initialDocuments={documents} initialError={error} />
+                    <div className="flex flex-col gap-4">
+                        {/* Memory upgrades M10 — the health panel sits ABOVE
+                            the queue on purpose: "23 documents waiting, the
+                            oldest for 41 days" is the context that makes
+                            reviewing the queue feel worth doing, and the
+                            gap topics tell the reviewer WHICH proposals
+                            actually close a measured hole. */}
+                        <KbMemoryHealthPanel />
+                        <KbReviewQueue
+                            workId={id}
+                            initialDocuments={documents}
+                            initialError={error}
+                        />
+                    </div>
                 }
             />
         </>

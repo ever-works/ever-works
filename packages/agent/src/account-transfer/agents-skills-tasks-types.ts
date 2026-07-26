@@ -116,8 +116,10 @@ export interface ExportedTask {
     completedAt?: string | null;
     chat?: ExportedTaskChatMessage[];
     // NOTE — the Task BRANCH columns (`branchRef`, `branchState`,
-    // `baseSha`, `prNumber`, `prUrl`, `conflictPaths`) and the latest-run
-    // denorm (`latestRunId`, `latestRunStatus`) are DELIBERATELY absent,
+    // `baseSha`, `prNumber`, `prUrl`, `conflictPaths`), the PR-status
+    // cache (`prState`, `ciState`, `ciCheckedAt`, `prChecks` — kanban M5)
+    // and the latest-run denorm (`latestRunId`, `latestRunStatus`) are
+    // DELIBERATELY absent,
     // and that omission is correct rather than the usual "new column
     // forgotten in the transfer whitelist" bug. They are not settings —
     // they are live runtime state naming a git ref, a base commit and a

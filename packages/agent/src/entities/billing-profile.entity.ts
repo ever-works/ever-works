@@ -1,3 +1,4 @@
+import { PortableDateColumn } from './_types';
 import {
     Column,
     CreateDateColumn,
@@ -119,14 +120,14 @@ export class BillingProfile {
     @Column({ type: 'varchar', length: 128, nullable: true })
     autoRechargeInFlightKey?: string | null;
 
-    @Column({ type: 'timestamp', nullable: true })
+    @PortableDateColumn({ nullable: true })
     autoRechargeInFlightAt?: Date | null;
 
     /** Consecutive failures — drives the PAST_DUE-style banner. */
     @Column({ type: 'int', default: 0 })
     autoRechargeFailureCount: number;
 
-    @Column({ type: 'timestamp', nullable: true })
+    @PortableDateColumn({ nullable: true })
     autoRechargeLastFailureAt?: Date | null;
 
     @CreateDateColumn()

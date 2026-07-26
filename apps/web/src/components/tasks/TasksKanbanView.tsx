@@ -14,6 +14,8 @@ import { useTaskRunPolling } from '@/lib/hooks/use-task-run-polling';
 import { TaskBranchChip } from './TaskBranchChip';
 import { TaskRunChip } from './TaskRunChip';
 import { GateChip } from './GateChip';
+import { TaskPrPill } from './TaskPrPill';
+import { TaskDiffSheet } from './TaskDiffSheet';
 import { RunWithAgentMenu } from './RunWithAgentMenu';
 import {
     Inbox,
@@ -187,8 +189,11 @@ function TaskKanbanCard({
     const [menuOpen, setMenuOpen] = useState(false);
     const [pending, startTransition] = useTransition();
     const [dragging, setDragging] = useState(false);
+    // Kanban M6 — diff sheet, one per card, opened from the ± affordance.
+    const [diffOpen, setDiffOpen] = useState(false);
     const targets = NEXT_STATUS[task.status] ?? [];
     const runButtonRef = useRef<HTMLDivElement | null>(null);
+    const changedFiles = task.run?.changedFilesCount ?? null;
 
     return (
         <div
@@ -207,6 +212,9 @@ function TaskKanbanCard({
                 // text field, and ignore repeats from a held key.
                 if (e.key !== 'r' && e.key !== 'R') return;
                 if (e.metaKey || e.ctrlKey || e.altKey || e.repeat) return;
+                // The diff sheet is a modal over this card — while it is
+                // open the board's shortcuts belong to the sheet.
+                if (diffOpen) return;
                 const target = e.target as HTMLElement | null;
                 const tag = target?.tagName;
                 if (tag === 'INPUT' || tag === 'TEXTAREA' || target?.isContentEditable) return;
@@ -262,14 +270,34 @@ function TaskKanbanCard({
 
             {/* Wave 2 M7 — isolated-branch chip · Wave 2 run cockpit — run
                 chip · Wave 3 M6 — gate chip when the latest run carries a
-                gate verdict. */}
-            {(task.branchRef || task.run) && (
+                gate verdict · kanban M5 — PR review pill with the CI dot,
+                the one chip that answers "is this reviewable right now?".
+                */}
+            {(task.branchRef || task.run || task.prNumber != null) && (
                 <div className="flex flex-wrap gap-1">
                     {task.branchRef && <TaskBranchChip task={task} />}
+                    {task.prNumber != null && <TaskPrPill task={task} />}
                     {task.run && <TaskRunChip task={task} />}
                     {task.run?.gateStatus && <GateChip status={task.run.gateStatus} />}
                 </div>
             )}
+
+            {/* Kanban M6 — diff affordance. Rendered off the run's
+                `changedFilesCount` telemetry, or whenever the Task has a
+                branch/PR at all (a re-run may have reset the counter but
+                the change is still on the branch). */}
+            {(changedFiles != null || task.branchRef || task.prNumber != null) && (
+                <button
+                    type="button"
+                    onClick={() => setDiffOpen(true)}
+                    data-testid="task-diff-button"
+                    title="Preview the changes on this Task's branch"
+                    className="self-start text-[10px] font-mono text-text-muted hover:text-primary underline decoration-dotted"
+                >
+                    ± {changedFiles != null ? `${changedFiles} files` : 'diff'}
+                </button>
+            )}
+            <TaskDiffSheet taskId={task.id} open={diffOpen} onClose={() => setDiffOpen(false)} />
 
             {/* Labels */}
             {(task.labels ?? []).length > 0 && (
@@ -554,6 +582,16 @@ export function TasksKanbanView({ tasks: initialTasks }: { tasks: Task[] }) {
                     run: fresh.run ?? null,
                     latestRunId: fresh.latestRunId ?? task.latestRunId,
                     latestRunStatus: fresh.latestRunStatus ?? task.latestRunStatus,
+                    // Kanban M5 — the CI dot rides the same poll. The
+                    // `task-pr-status-sync` cron owns the refresh; the
+                    // board just re-reads the cached verdict, so a check
+                    // going red reaches the card without its own request.
+                    prState: fresh.prState ?? task.prState,
+                    ciState: fresh.ciState ?? task.ciState,
+                    ciCheckedAt: fresh.ciCheckedAt ?? task.ciCheckedAt,
+                    prChecks: fresh.prChecks ?? task.prChecks,
+                    prNumber: fresh.prNumber ?? task.prNumber,
+                    prUrl: fresh.prUrl ?? task.prUrl,
                 };
             }),
         );

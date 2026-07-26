@@ -246,7 +246,10 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
                     status: undefined,
                     workId: undefined,
                     agentId: undefined,
+                    taskId: undefined,
                     triggerKind: undefined,
+                    // Wave 4 M6 - absent `attention` never narrows the list.
+                    attention: false,
                 },
                 25,
                 0,
@@ -265,9 +268,28 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
             });
             expect(agentRuns.listSessionsForUser).toHaveBeenCalledWith(
                 'u1',
-                { status: 'running', workId, agentId, triggerKind: 'task' },
+                {
+                    status: 'running',
+                    workId,
+                    agentId,
+                    taskId: undefined,
+                    triggerKind: 'task',
+                    attention: false,
+                },
                 5,
                 10,
+            );
+        });
+
+        it('forwards the needs-attention quick filter (Wave 4 M6)', async () => {
+            // The notification deep-links to `?attention=1`, so this exact
+            // wire value has to reach the repository as a narrowing filter.
+            await controller.listRunSessions(auth, { attention: '1' });
+            expect(agentRuns.listSessionsForUser).toHaveBeenCalledWith(
+                'u1',
+                expect.objectContaining({ attention: true }),
+                25,
+                0,
             );
         });
 
@@ -937,6 +959,112 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
             await expect(controller.assignTask(auth, agentId, { taskId })).rejects.toBeInstanceOf(
                 InternalServerErrorException,
             );
+        });
+    });
+
+    /**
+     * Run orchestration — `assign-task` used to enqueue straight past the
+     * concurrency valve every other dispatch path respects, so an
+     * assign-task loop could put unbounded runs on a Work the board and
+     * fan-out paths would have parked. It now goes through the SAME
+     * `RunDispatchGateService.admit`, with the run row created inside the
+     * admission critical section.
+     */
+    describe('POST /:id/assign-task — dispatch gating', () => {
+        const workId = 'work-1';
+        const gatedController = (gate: unknown) =>
+            new AgentsController(
+                service,
+                files,
+                exportService,
+                dispatcher,
+                agentRuns,
+                agentRunLogs,
+                skillBindings,
+                pluginUsage,
+                tasks,
+                activityLog,
+                heartbeatTrigger,
+                taskExecuteDispatcher,
+                runCanceller,
+                gate as never,
+            );
+
+        beforeEach(() => {
+            tasks.getOne.mockResolvedValue({ id: taskId, workId, organizationId: 'org-1' });
+            agentRuns.createQueued.mockResolvedValue({ id: runId });
+        });
+
+        it('consults the gate with the Task scope', async () => {
+            const gate = { admit: jest.fn().mockResolvedValue({ admitted: true }) };
+            await gatedController(gate).assignTask(auth, agentId, { taskId });
+            expect(gate.admit).toHaveBeenCalledWith(
+                { userId: 'u1', workId, organizationId: 'org-1' },
+                expect.any(Function),
+            );
+        });
+
+        it('denormalizes workId so the run counts toward its Work valve', async () => {
+            const gate = {
+                admit: jest.fn(async (_i: unknown, reserve: (v: unknown) => Promise<void>) => {
+                    await reserve({ admitted: true });
+                    return { admitted: true };
+                }),
+            };
+            await gatedController(gate).assignTask(auth, agentId, { taskId });
+            expect(agentRuns.createQueued).toHaveBeenCalledWith(
+                expect.objectContaining({ workId, queuedReason: null }),
+            );
+        });
+
+        it('PARKS the run and SKIPS the enqueue when over the valve', async () => {
+            const gate = {
+                admit: jest.fn(async (_i: unknown, reserve: (v: unknown) => Promise<void>) => {
+                    await reserve({ admitted: false, queuedReason: 'concurrency-limit' });
+                    return { admitted: false, queuedReason: 'concurrency-limit' };
+                }),
+            };
+            const result = await gatedController(gate).assignTask(auth, agentId, { taskId });
+            expect(result).toEqual({
+                runId,
+                queued: true,
+                queuedReason: 'concurrency-limit',
+            });
+            expect(agentRuns.createQueued).toHaveBeenCalledWith(
+                expect.objectContaining({ queuedReason: 'concurrency-limit' }),
+            );
+            // The row exists and is drainable — it must NOT be enqueued or
+            // rolled to failed.
+            expect(taskExecuteDispatcher.enqueue).not.toHaveBeenCalled();
+            expect(agentRuns.markDispatchFailed).not.toHaveBeenCalled();
+        });
+
+        it('FAILS OPEN — a gate that throws never 500s a legitimate assignment', async () => {
+            const gate = { admit: jest.fn().mockRejectedValue(new Error('gate exploded')) };
+            const result = await gatedController(gate).assignTask(auth, agentId, { taskId });
+            expect(result.runId).toBe(runId);
+            expect(taskExecuteDispatcher.enqueue).toHaveBeenCalledTimes(1);
+        });
+
+        it('creates the run itself when a gate stub ignores the reserve callback', async () => {
+            const gate = { admit: jest.fn().mockResolvedValue({ admitted: true }) };
+            const result = await gatedController(gate).assignTask(auth, agentId, { taskId });
+            expect(result.runId).toBe(runId);
+            expect(agentRuns.createQueued).toHaveBeenCalledTimes(1);
+        });
+
+        it('behaves exactly as before when no gate is bound', async () => {
+            const result = await controller.assignTask(auth, agentId, { taskId });
+            expect(result.runId).toBe(runId);
+            expect(taskExecuteDispatcher.enqueue).toHaveBeenCalledTimes(1);
+        });
+
+        it('still short-circuits on an in-flight run WITHOUT consulting the gate', async () => {
+            agentRuns.findInFlightForTaskAgent.mockResolvedValueOnce({ id: runId });
+            const gate = { admit: jest.fn() };
+            const result = await gatedController(gate).assignTask(auth, agentId, { taskId });
+            expect(result).toEqual({ runId });
+            expect(gate.admit).not.toHaveBeenCalled();
         });
     });
 });
