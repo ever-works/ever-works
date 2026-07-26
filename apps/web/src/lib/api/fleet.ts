@@ -29,6 +29,22 @@ export interface FleetNodeView {
     createdAt: string | null;
     /** False for live nodes of the user's own configured clusters. */
     persisted: boolean;
+    /**
+     * Live execution load (Desktop PRD §4.1 "current load (running
+     * Tasks)"). `null`/absent means idle. Cluster-sourced rows never
+     * carry it — the platform does not lease work onto them.
+     */
+    load?: FleetNodeLoadView | null;
+}
+
+/** Per-node execution summary merged into the node list by the API edge. */
+export interface FleetNodeLoadView {
+    /** Jobs this node currently holds a live claim on. */
+    activeJobCount: number;
+    /** Kind of the oldest live claim, or null when idle. */
+    currentJobKind: string | null;
+    /** Id of the oldest live claim, or null when idle. */
+    currentJobId: string | null;
 }
 
 export interface CreateFleetEnrollmentTokenPayload {

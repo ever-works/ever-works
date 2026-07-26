@@ -145,6 +145,31 @@ export const JOB_RUNTIMES: RuntimeDescriptor[] = [
 				secret: true
 			}
 		]
+	},
+	{
+		id: 'job-runtime-node',
+		name: 'Fleet nodes',
+		description:
+			'Runs work on the machines you enrolled in Fleet — this one, and any other desktop or headless node. No broker to install: jobs are leased over the same outbound-only channel the nodes already use to check in.',
+		recommended: false,
+		requiresRedis: false,
+		requiresPostgres: false,
+		fields: [
+			{
+				key: 'FLEET_NODE_LEASE_TTL_SECONDS',
+				label: 'Lease TTL (seconds)',
+				required: false,
+				secret: false,
+				defaultValue: '300'
+			},
+			{
+				key: 'FLEET_NODE_REQUIRED_CAPABILITIES',
+				label: 'Required capability tags (comma-separated, blank = any node)',
+				required: false,
+				secret: false,
+				placeholder: 'workspace,git'
+			}
+		]
 	}
 ];
 

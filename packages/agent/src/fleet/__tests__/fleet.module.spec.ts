@@ -1,5 +1,6 @@
 /**
- * Fleet (Wave 12, slice 1) — module-shape pin for FleetModule.
+ * Fleet (Wave 12, slice 1 + Desktop PRD M4) — module-shape pin for
+ * FleetModule.
  *
  * Pattern mirrors `meetings.module.spec.ts`: heavy runtime trees
  * (TypeORM, the plugins services graph) are mocked at module scope so
@@ -15,6 +16,9 @@ jest.mock('@nestjs/typeorm', () => ({
 jest.mock('../../entities/fleet-node.entity', () => ({
     FleetNode: class FleetNode {},
 }));
+jest.mock('../../entities/fleet-job.entity', () => ({
+    FleetJob: class FleetJob {},
+}));
 jest.mock('../../plugins/services/plugin-registry.service', () => ({
     PluginRegistryService: class PluginRegistryService {},
 }));
@@ -24,24 +28,42 @@ jest.mock('../../plugins/services/plugin-settings.service', () => ({
 jest.mock('../fleet-node.repository', () => ({
     FleetNodeRepository: class FleetNodeRepository {},
 }));
+jest.mock('../fleet-job.repository', () => ({
+    FleetJobRepository: class FleetJobRepository {},
+}));
 jest.mock('../fleet.service', () => ({
     FleetService: class FleetService {},
+}));
+jest.mock('../fleet-job.service', () => ({
+    FleetJobService: class FleetJobService {},
 }));
 
 import 'reflect-metadata';
 import { FleetModule } from '../fleet.module';
 import { FleetNodeRepository } from '../fleet-node.repository';
+import { FleetJobRepository } from '../fleet-job.repository';
 import { FleetService } from '../fleet.service';
+import { FleetJobService } from '../fleet-job.service';
 
 describe('FleetModule', () => {
     const meta = (key: string): unknown[] => Reflect.getMetadata(key, FleetModule) ?? [];
 
-    it('provides the repository and the service', () => {
-        expect(meta('providers')).toEqual([FleetNodeRepository, FleetService]);
+    it('provides the registry and the job-runtime halves', () => {
+        expect(meta('providers')).toEqual([
+            FleetNodeRepository,
+            FleetJobRepository,
+            FleetService,
+            FleetJobService,
+        ]);
     });
 
-    it('exports both for the API surface + chat-tool assembly', () => {
-        expect(meta('exports')).toEqual([FleetNodeRepository, FleetService]);
+    it('exports all four for the API surface + chat-tool assembly', () => {
+        expect(meta('exports')).toEqual([
+            FleetNodeRepository,
+            FleetJobRepository,
+            FleetService,
+            FleetJobService,
+        ]);
     });
 
     it('imports only the entity feature (plugins resolve via the global module)', () => {
@@ -53,10 +75,17 @@ describe('fleet barrel', () => {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const barrel = require('../index');
 
-    it('re-exports the module, service, repository and tool factory', () => {
+    it('re-exports the module, services, repositories and tool factory', () => {
         expect(barrel.FleetModule).toBe(FleetModule);
         expect(barrel.FleetService).toBe(FleetService);
         expect(barrel.FleetNodeRepository).toBe(FleetNodeRepository);
+        expect(barrel.FleetJobService).toBe(FleetJobService);
+        expect(barrel.FleetJobRepository).toBe(FleetJobRepository);
         expect(typeof barrel.buildFleetTools).toBe('function');
+    });
+
+    it('re-exports the shared node-credential helper, so enroll / heartbeat / lease cannot drift', () => {
+        expect(typeof barrel.verifyNodeSecret).toBe('function');
+        expect(typeof barrel.constantTimeEquals).toBe('function');
     });
 });

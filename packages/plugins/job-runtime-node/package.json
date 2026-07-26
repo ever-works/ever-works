@@ -1,0 +1,75 @@
+{
+	"name": "@ever-works/job-runtime-node-plugin",
+	"version": "1.0.0",
+	"description": "Fleet node IJobRuntimeProvider plugin for Ever Works — the queue is the owner's enrolled machines: enqueue writes a lease-able job row, nodes poll for work over the existing outbound-only fleet channel, results come back the same way (Desktop PRD M4).",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run --passWithNoTests",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"peerDependencies": {
+		"@ever-works/contracts": "workspace:*",
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@ever-works/contracts": "workspace:*",
+		"@ever-works/plugin": "workspace:*",
+		"@types/node": "^22.0.0",
+		"tsup": "^8.4.0",
+		"typescript": "^5.9.3",
+		"vitest": "^4.1.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "job-runtime-node",
+			"name": "Fleet Node Job Runtime",
+			"version": "1.0.0",
+			"category": "job-runtime",
+			"capabilities": [
+				"job-runtime-enqueue",
+				"job-runtime-cancel",
+				"job-runtime-status",
+				"job-runtime-schedule",
+				"job-runtime-worker-host",
+				"job-runtime-bind-tenant"
+			],
+			"description": "Executes platform work on the machines the owner enrolled in Fleet. Enqueue writes a lease-able fleet job row; enrolled nodes claim it with an atomic CAS lease, keep the claim alive with job heartbeats, and report results — all over the existing outbound-only node channel, so no inbound port is opened on a user's machine. A node that dies mid-job has its lease reclaimed and the work re-offered to the fleet.",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "AGPL-3.0",
+			"autoEnable": false,
+			"systemPlugin": false,
+			"distribution": "core",
+			"builtIn": true,
+			"visibility": "operator",
+			"envVars": [
+				"FLEET_NODE_API_URL",
+				"FLEET_NODE_LEASE_TTL_SECONDS",
+				"FLEET_NODE_REQUIRED_CAPABILITIES",
+				"FLEET_NODE_RUNTIME_ENABLED"
+			]
+		}
+	}
+}

@@ -133,6 +133,9 @@ export async function runEnroll(deps: CliDeps, options: EnrollCommandOptions): P
 
 export interface StartCommandOptions {
 	heartbeatInterval?: string;
+	/** Opt in to leasing and executing platform work on this machine. */
+	work?: boolean;
+	concurrency?: string;
 }
 
 export async function runStart(deps: CliDeps, options: StartCommandOptions): Promise<void> {
@@ -140,7 +143,12 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	const stored = await requireConfig(deps);
 	const config: NodeConfig = override === undefined ? stored : { ...stored, heartbeatIntervalMs: override };
 
-	const { loop } = createNodeRuntime(config, deps.io);
+	const workerEnabled = options.work === true;
+	const concurrency = parseConcurrency(options.concurrency);
+	const { loop, worker } = createNodeRuntime(config, deps.io, {
+		workerEnabled,
+		...(concurrency !== undefined ? { concurrency } : {})
+	});
 	loop.onChange((state) => {
 		if (state.state === 'connected') {
 			deps.io.logger.info(`Heartbeat accepted — node ${config.nodeId} is online`);
@@ -148,6 +156,15 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	});
 
 	deps.out(`Starting node ${config.nodeId} → ${config.apiUrl} (every ${config.heartbeatIntervalMs / 1000}s)`);
+	if (worker) {
+		deps.out(
+			`Worker host enabled — leasing [${worker.registeredKinds.join(', ')}] with concurrency ${concurrency ?? 1}`
+		);
+	} else {
+		// Say so explicitly: an operator who expected this machine to run
+		// work should not have to infer it from an absence of log lines.
+		deps.out('Worker host disabled — reporting liveness only (pass --work to execute platform work)');
+	}
 
 	// Registered BEFORE the first beat so a Ctrl-C during startup is still a
 	// graceful shutdown rather than an abrupt kill.
@@ -157,12 +174,19 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	});
 	if (deps.signals) {
 		installShutdownHandlers(deps.signals, () => {
-			deps.io.logger.info('Shutdown signal received — stopping heartbeat');
+			deps.io.logger.info(
+				worker
+					? 'Shutdown signal received — stopping heartbeat and draining in-flight jobs'
+					: 'Shutdown signal received — stopping heartbeat'
+			);
 			requestShutdown();
 		});
 	}
 
 	await loop.start();
+	if (worker) {
+		await worker.start();
+	}
 
 	// Block until shutdown is requested: the injected hook (tests) or a signal
 	// (the real service). With neither wired there is nothing that could ever
@@ -171,7 +195,25 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 
 	loop.stop();
 	await loop.settled();
+	if (worker) {
+		// Drains: stops leasing at once, then WAITS for the jobs already
+		// running so their verdicts reach the platform instead of being
+		// abandoned to a lease expiry and re-run somewhere else.
+		await worker.stop();
+		const state = worker.getState();
+		deps.out(`Worker host stopped (completed ${state.completed}, failed ${state.failed}).`);
+	}
 	deps.out('Stopped.');
+}
+
+/** Parse `--concurrency`; anything unparseable falls back to the default. */
+export function parseConcurrency(raw: string | undefined): number | undefined {
+	if (raw === undefined) return undefined;
+	const parsed = Number.parseInt(raw, 10);
+	if (!Number.isFinite(parsed) || parsed < 1) {
+		throw new CliError(`Invalid --concurrency: ${raw} (expected a positive integer)`, EXIT_FAILURE);
+	}
+	return parsed;
 }
 
 export async function runStatus(deps: CliDeps): Promise<void> {
@@ -238,8 +280,10 @@ export function buildProgram(deps: CliDeps): Command {
 
 	program
 		.command('start')
-		.description('Run the heartbeat loop until SIGINT/SIGTERM')
+		.description('Run the heartbeat loop (and, with --work, the job worker host) until SIGINT/SIGTERM')
 		.option('-i, --heartbeat-interval <seconds>', 'Override the stored heartbeat cadence, in seconds')
+		.option('-w, --work', 'Lease and execute platform work on this machine (off by default)')
+		.option('-c, --concurrency <count>', 'Max jobs to execute at once when --work is set (default 1)')
 		.action(async (options: StartCommandOptions) => {
 			await runStart(deps, options);
 		});

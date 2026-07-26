@@ -60,6 +60,7 @@ import {
     TasksService,
 } from '@ever-works/agent/tasks-domain';
 import { CredentialVersionService } from '@ever-works/agent/tasks';
+import { FleetJobService } from '@ever-works/agent/fleet';
 import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
 import { DataSyncDispatcherService } from '../data-sync/data-sync-dispatcher.service';
 import { NotificationService } from '@ever-works/agent/notifications';
@@ -310,6 +311,13 @@ export class TriggerInternalController implements OnModuleInit {
         // LAST + @Optional() per the arity rule above.
         @Optional()
         private readonly eventSourcePullService?: EventSourcePullService,
+        // Fleet job runtime (Desktop PRD M4) — backs the
+        // `fleet-job-lease-sweeper` cron: the worker proxy calls
+        // `reclaimExpired()` over the internal RPC channel to return
+        // lapsed claims to the pool. Appended LAST + @Optional() per the
+        // arity rule above.
+        @Optional()
+        private readonly fleetJobService?: FleetJobService,
     ) {}
 
     onModuleInit() {
@@ -391,6 +399,9 @@ export class TriggerInternalController implements OnModuleInit {
             // Credits ledger (pricing Wave 9 M1) — `credits-daily-grant`
             // calls `dispatchDailyGrants()` here (allow-list auto-derived).
             CreditLedgerService: this.creditLedgerService,
+            // Fleet job runtime (Desktop PRD M4) — `fleet-job-lease-sweeper`
+            // calls `reclaimExpired()` here (allow-list auto-derived).
+            FleetJobService: this.fleetJobService,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),

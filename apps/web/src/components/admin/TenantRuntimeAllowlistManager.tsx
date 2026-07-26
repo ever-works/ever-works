@@ -44,6 +44,7 @@ const KNOWN_PROVIDERS: readonly TenantJobRuntimeProviderId[] = [
     'bullmq',
     'pgboss',
     'inngest',
+    'node',
 ] as const;
 
 const PROVIDER_LABELS: Record<TenantJobRuntimeProviderId, string> = {
@@ -52,6 +53,7 @@ const PROVIDER_LABELS: Record<TenantJobRuntimeProviderId, string> = {
     bullmq: 'BullMQ',
     pgboss: 'pg-boss',
     inngest: 'Inngest',
+    node: 'Fleet nodes',
 };
 
 export function TenantRuntimeAllowlistManager({
