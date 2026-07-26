@@ -1,0 +1,120 @@
+{
+	"name": "@ever-works/google-workspace-connector-plugin",
+	"version": "1.0.0",
+	"description": "Google Workspace connector plugin for Ever Works platform (event-source pull of Drive file changes and Calendar events via the official Google API Node.js clients, including Google Meet recording transcripts, with opt-in historical backfill)",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"private": false,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"clean": "rm -rf dist",
+		"type-check": "tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	},
+	"dependencies": {
+		"@ever-works/contracts": "workspace:*",
+		"@ever-works/plugin": "workspace:*",
+		"@googleapis/calendar": "^15.0.0",
+		"@googleapis/drive": "^20.2.0"
+	},
+	"devDependencies": {
+		"@types/node": "^22.0.0",
+		"tsup": "^8.0.0",
+		"typescript": "^5.9.3",
+		"vitest": "^4.1.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "google-workspace-connector",
+			"name": "Google Workspace Connector",
+			"version": "1.0.0",
+			"category": "connector",
+			"capabilities": [
+				"connector",
+				"event-source"
+			],
+			"description": "Google Workspace connector. Event-source pull of Drive file changes and Calendar events via the official Google API Node.js clients, plus Google Meet recording transcripts exported from the Meet Recordings folder, with opt-in historical backfill (backfillDays, max 90).",
+			"systemPlugin": false,
+			"builtIn": true,
+			"isDefault": false,
+			"autoEnable": false,
+			"settings": {
+				"type": "object",
+				"required": [
+					"clientId",
+					"clientSecret",
+					"refreshToken"
+				],
+				"properties": {
+					"clientId": {
+						"type": "string",
+						"title": "Google OAuth client id",
+						"x-envVar": "GOOGLE_WORKSPACE_CLIENT_ID"
+					},
+					"clientSecret": {
+						"type": "string",
+						"title": "Google OAuth client secret",
+						"x-secret": true,
+						"x-envVar": "GOOGLE_WORKSPACE_CLIENT_SECRET"
+					},
+					"refreshToken": {
+						"type": "string",
+						"title": "Google OAuth refresh token (drive.readonly + calendar.readonly scopes)",
+						"x-secret": true,
+						"x-envVar": "GOOGLE_WORKSPACE_REFRESH_TOKEN"
+					},
+					"surfaces": {
+						"type": "string",
+						"title": "Surfaces to ingest: drive, calendar, or drive,calendar (default both)",
+						"default": "drive,calendar"
+					},
+					"driveFolderIds": {
+						"type": "string",
+						"title": "Drive folder ids to ingest changes from (comma-separated; whole Drive when empty)"
+					},
+					"calendarIds": {
+						"type": "string",
+						"title": "Calendar ids to ingest events from (comma-separated; defaults to primary)",
+						"default": "primary"
+					},
+					"meetTranscripts": {
+						"type": "boolean",
+						"title": "Export Google Meet transcript documents into meeting envelopes",
+						"default": true
+					},
+					"backfillDays": {
+						"type": "number",
+						"title": "Historical backfill window in days on first pull (0 = off, max 90)",
+						"default": 0,
+						"minimum": 0,
+						"maximum": 90
+					}
+				}
+			}
+		}
+	},
+	"publishConfig": {
+		"access": "restricted",
+		"registry": "https://registry.npmjs.org"
+	}
+}

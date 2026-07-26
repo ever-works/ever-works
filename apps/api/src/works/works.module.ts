@@ -18,6 +18,12 @@ import { AgentsModule } from '@ever-works/agent/agents';
 // Campaign activation (roadmap 14.1) — composition module over Works,
 // Goals, Agent templates and Tasks; provides CampaignActivationService.
 import { CampaignsModule } from '@ever-works/agent/campaigns';
+// Wave 7 feature h — the in-platform PR review surface. PrReviewModule
+// supplies the SAME reviewer the GitHub webhook bridge runs, and
+// EventIngestModule supplies IngestedEventRepository so the diff view can
+// read back the `github.pr.review` envelopes a review already recorded.
+import { PrReviewModule } from '@ever-works/agent/pr-review';
+import { EventIngestModule } from '@ever-works/agent/ingest';
 
 // Controllers
 import { WorksController } from './works.controller';
@@ -67,6 +73,10 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
         // Campaign activation (roadmap 14.1) — CampaignActivationService
         // for POST /api/works/from-campaign-template.
         CampaignsModule,
+        // Wave 7 feature h — on-demand agent PR review + the recorded
+        // review history behind `GET /works/:id/pull-requests/...`.
+        PrReviewModule,
+        EventIngestModule,
     ],
     providers: [
         CacheEntryRepository,

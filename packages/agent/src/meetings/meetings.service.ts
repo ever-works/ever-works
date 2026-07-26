@@ -28,8 +28,27 @@ export const MEETING_SUMMARY_INPUT_MAX_CHARS = 24_000;
 /** Cap on the stored/emitted summary text. */
 export const MEETING_SUMMARY_MAX_CHARS = 4_000;
 
-/** Envelope kinds the meetings processor consumes (recordings → rows). */
-export const MEETING_RECORDING_EVENT_KINDS = ['zoom.recording'] as const;
+/**
+ * Envelope kinds the meetings processor consumes (recordings → rows).
+ *
+ * One processor, one path: every provider that can hand the platform a
+ * meeting recording + transcript normalizes into one of these kinds and
+ * lands on the SAME `ingestTranscript` pipeline. Google Meet needs no
+ * connector of its own — Meet transcripts arrive through the Google
+ * Workspace connector's Drive sweep as `google.meet-recording`.
+ */
+export const MEETING_RECORDING_EVENT_KINDS = ['zoom.recording', 'google.meet-recording'] as const;
+
+/**
+ * Envelope kind → `MeetingSource`. The kind (not the producing plugin
+ * id) is authoritative, so a future connector can emit an existing kind
+ * without inventing a source. Unknown kinds fall back to `import`
+ * rather than guessing.
+ */
+const MEETING_KIND_SOURCES: Readonly<Record<string, MeetingSource>> = {
+    'zoom.recording': 'zoom',
+    'google.meet-recording': 'google-meet',
+};
 
 export interface CreateMeetingInput {
     title: string;
@@ -86,19 +105,22 @@ const VALID_SOURCES: readonly MeetingSource[] = ['zoom', 'google-meet', 'manual'
  *        chat recall exactly like every other connector event.
  *
  * Recordings→Meetings processor: at boot this service registers a
- * kind processor for `zoom.recording` envelopes (pulled by the
- * zoom-connector event source) — each becomes a Meeting row
- * (`createIfNew`, dedupe on owner+source+externalId) and, when the
- * envelope carries transcript text, runs `ingestTranscript`. The
- * processor is idempotent: re-delivered envelopes dedupe on the
- * meeting row, and a transcript identical to the stored one is not
- * re-ingested.
+ * kind processor for every kind in {@link MEETING_RECORDING_EVENT_KINDS}
+ * — `zoom.recording` (pulled by the zoom-connector event source) and
+ * `google.meet-recording` (Meet transcript documents picked up by the
+ * google-workspace-connector's Drive sweep). Each becomes a Meeting row
+ * (`createIfNew`, dedupe on owner+source+externalId) whose `source` is
+ * derived from the envelope kind, and, when the envelope carries
+ * transcript text, runs `ingestTranscript`. The processor is
+ * idempotent: re-delivered envelopes dedupe on the meeting row, and a
+ * transcript identical to the stored one is not re-ingested.
  *
  * LIVE BOT-JOIN (an Ever Works bot joining meetings/calls to capture
  * transcripts in real time) is the documented v2 FOLLOW-UP — it will
  * feed this same `ingestTranscript` path, so nothing here changes for
- * it. Google Meet lands as a sibling connector emitting its own
- * recording kind (add it to `MEETING_RECORDING_EVENT_KINDS`).
+ * it. A future provider adds its kind to
+ * {@link MEETING_RECORDING_EVENT_KINDS} plus one `MEETING_KIND_SOURCES`
+ * entry and inherits the whole pipeline.
  */
 @Injectable()
 export class MeetingsService implements OnModuleInit {
@@ -288,7 +310,7 @@ export class MeetingsService implements OnModuleInit {
             title: title.slice(0, 500),
             startedAt,
             endedAt,
-            source: 'zoom',
+            source: MEETING_KIND_SOURCES[event.kind] ?? 'import',
             externalId,
             participants: [],
             sourceUrl: event.sourceUrl ?? null,

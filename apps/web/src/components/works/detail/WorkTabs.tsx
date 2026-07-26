@@ -114,6 +114,30 @@ export function WorkTabs({ work }: WorkTabsProps) {
             isActive: pathname.includes('/tasks'),
         },
         {
+            // Wave 7 feature h — open PRs across the Work's repos, with
+            // the diff + agent review view. The listing endpoint shipped
+            // with no web caller; this tab is the caller.
+            name: t('pullRequests'),
+            tooltip: tTooltip('pullRequests'),
+            href: ROUTES.DASHBOARD_WORK_PULL_REQUESTS(work.id),
+            icon: (
+                <svg
+                    className="w-4 h-4 shrink-0"
+                    fill="none"
+                    stroke="currentColor"
+                    viewBox="0 0 24 24"
+                >
+                    <path
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        strokeWidth={2}
+                        d="M6 3v12m0 0a3 3 0 103 3M6 15a3 3 0 113-3m9 3V9a3 3 0 00-3-3h-3m0 0l3-3m-3 3l3 3"
+                    />
+                </svg>
+            ),
+            isActive: pathname.includes('/pull-requests'),
+        },
+        {
             name: t('kb'),
             tooltip: tTooltip('kb'),
             href: ROUTES.DASHBOARD_WORK_KB(work.id),
