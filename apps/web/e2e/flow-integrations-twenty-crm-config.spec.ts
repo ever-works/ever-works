@@ -228,7 +228,11 @@ test.describe('integrations surface — github-app sibling controller + twenty-c
             headers: { 'x-github-event': 'ping' },
         });
         expect(noBody.status(), 'event header but no raw body -> 400').toBe(400);
-        expect((await jsonBody(noBody)).message).toBe('Missing raw webhook payload');
+        // The route now delegates to the shared GitHub webhook dispatcher, which
+        // words this "raw request payload". What matters is that the SECOND
+        // precondition is the raw-payload one, not that it is spelled a
+        // particular way.
+        expect((await jsonBody(noBody)).message).toMatch(/missing raw (request|webhook) payload/i);
     });
 
     test('7. a WEBHOOK with a valid event + body but an unverifiable signature is rejected as UNAUTHORIZED (401), and it fails closed even with no secret configured — an unsigned push can never be processed', async ({
@@ -244,7 +248,13 @@ test.describe('integrations surface — github-app sibling controller + twenty-c
         expect(res.status(), 'bad/absent signature -> 401 (fail closed)').toBe(401);
         const body = await jsonBody(res);
         expect(body.statusCode).toBe(401);
-        expect(body.message).toBe('Invalid GitHub webhook signature');
+        // The dispatcher fails closed through TWO doors and which one you hit
+        // depends on deployment state, not on the request: with no receiver
+        // registered anywhere it refuses as "not configured"; with a binding
+        // present the HMAC is what refuses. Both are the same guarantee — an
+        // unsigned push is never processed — so assert the guarantee, not the
+        // wording of one environment.
+        expect(body.message).toMatch(/invalid github webhook signature|receiver is not configured/i);
     });
 
     test('8. the github-app STATUS route GET /installations is reachable for an authenticated user and returns a 200 empty list (a fresh user has no installations) — the sibling integration fails OPEN to an empty status, unlike the twenty-crm 403 gate', async ({
