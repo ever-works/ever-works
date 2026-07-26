@@ -42,6 +42,7 @@ import { TaskNotificationService } from './task-notification.service';
 import { TaskRunDenormService } from './task-run-denorm.service';
 import { TaskReviewRejectionService } from './task-review-rejection.service';
 import { TaskWorkspaceService } from './task-workspace.service';
+import { TaskPrStatusService } from './task-pr-status.service';
 import { FacadesModule } from '../facades/facades.module';
 import { PolicyModule } from '../policy/policy.module';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
@@ -123,6 +124,10 @@ import { NotificationsModule } from '../notifications/notifications.module';
         // TaskReviewRejectionRepository, which AgentsModule (imported
         // above) owns and exports alongside AgentRunRepository.
         TaskReviewRejectionService,
+        // Kanban run cockpit (plan 04 M5/M6) — PR status cache + capped
+        // diff reads. Uses the git facade (FacadesModule, imported above)
+        // and TaskTransitionService for the merged-PR -> done landing.
+        TaskPrStatusService,
         // Wave 3 M2 — acceptance-check runner (quality gates). Needs only
         // AgentRunRepository (exported by AgentsModule above) to persist
         // per-run gate results.
@@ -151,6 +156,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
         TaskRunDenormService,
         TaskWorkspaceService,
         TaskReviewRejectionService,
+        TaskPrStatusService,
         TaskGateRunnerService,
     ],
 })

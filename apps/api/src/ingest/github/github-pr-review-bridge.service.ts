@@ -282,6 +282,25 @@ export class GitHubPrReviewBridgeService {
     }
 
     /**
+     * The platform user bound to one GitHub workspace key
+     * (`installation:<id>` / `owner:<login>`), or `null`.
+     *
+     * The `ingest_install_bindings` row is the SINGLE source of install
+     * ownership for this provider — `resolveBinding` reads it for the
+     * per-install path and `GitHubWebhookDispatcherService` reads it for
+     * the platform-App path through this accessor, so the consolidated
+     * receiver never grows a second binding store. Best-effort: a lookup
+     * failure resolves to "not bound" rather than throwing on a public,
+     * unauthenticated endpoint.
+     */
+    async installBindingFor(key: string): Promise<{ userId: string } | null> {
+        const bound = await this.installBindings
+            .findByWorkspace(GITHUB_BINDING_PROVIDER, key)
+            .catch(() => null);
+        return bound ? { userId: bound.userId } : null;
+    }
+
+    /**
      * Persist the installation→user binding after a delivery has passed
      * signature verification, so the deployment self-migrates off the
      * legacy single-install path onto exact resolution.

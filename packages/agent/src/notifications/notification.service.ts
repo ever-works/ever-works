@@ -614,6 +614,57 @@ export class NotificationService {
     }
 
     /**
+     * Memory consolidation cadence (memory upgrades M9) — in-app row +
+     * notifications-v2 channel fanout announcing that a scheduled
+     * consolidation pass produced something to review.
+     *
+     * Deliberately reuses the generic producer path (no new category, no
+     * new transport): the message is the deterministic
+     * "N promoted / M synthesized / K superseded" line and the action
+     * link lands on the Memory page where Apply / the review queue live.
+     * Dedup key is per-org+day, so a re-run of the same cron window
+     * updates nothing instead of stacking duplicates.
+     */
+    async notifyMemoryConsolidation(args: {
+        userId: string;
+        organizationId: string;
+        title: string;
+        message: string;
+        /** `dry-run` (preview only) or `propose` (documents landed for review). */
+        mode: 'dry-run' | 'propose';
+        metadata?: Record<string, unknown>;
+        deduplicationKey?: string;
+    }): Promise<void> {
+        const safeMessage = sanitizeDescription(args.message, 500);
+        const actionUrl = '/memory';
+        await this.create({
+            userId: args.userId,
+            type: NotificationType.INFO,
+            category: NotificationCategory.SYSTEM,
+            title: this.sanitizeLabel(args.title),
+            message: safeMessage,
+            actionUrl,
+            actionLabel: 'Review memory',
+            metadata: {
+                organizationId: args.organizationId,
+                mode: args.mode,
+                ...(args.metadata ?? {}),
+            },
+            deduplicationKey:
+                args.deduplicationKey ?? `memory_consolidation_${args.organizationId}`,
+        });
+        await this.dispatchFanout({
+            userId: args.userId,
+            eventKey: 'memory_consolidation_ready',
+            title: args.title,
+            message: safeMessage,
+            actionUrl,
+            actionLabel: 'Review memory',
+            urgent: false,
+        });
+    }
+
+    /**
      * Delete expired and old notifications
      * Should be called periodically by a cleanup job
      */

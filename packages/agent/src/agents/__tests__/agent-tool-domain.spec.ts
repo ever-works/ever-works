@@ -232,6 +232,8 @@ describe('AgentToolService — domain chat tool assembly', () => {
         // `findRecentByUser` was widened from (userId, limit) to
         // (userId, ListRecentEventsFilter); the assertion was not updated
         // with it. Repaired to the shipped signature.
+        // #1872 gave findRecentByUser a filter object (workId/source support);
+        // the owner stays the first positional arg — that is what this pins.
         expect((sources.ingest!.repository as any).findRecentByUser).toHaveBeenCalledWith(
             'owner-9',
             { limit: 5 },

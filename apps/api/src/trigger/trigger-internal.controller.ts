@@ -57,6 +57,7 @@ import {
     TaskChatService,
     TaskGateRunnerService,
     TaskReviewRejectionService,
+    TaskPrStatusService,
     TaskRunDenormService,
     TaskWorkspaceService,
     TaskRecurrenceDispatcherService,
@@ -76,6 +77,7 @@ import {
 } from '@ever-works/agent/plugins';
 import { EventIngestService, EventSourcePullService } from '@ever-works/agent/ingest';
 import { DigestService } from '@ever-works/agent/digest';
+import { MemoryConsolidationScheduleService } from '@ever-works/agent/services';
 import { CreditLedgerService } from '@ever-works/agent/subscriptions';
 
 /**
@@ -341,6 +343,18 @@ export class TriggerInternalController implements OnModuleInit {
         // @Optional() per the arity rule above.
         @Optional()
         private readonly taskReviewRejectionService?: TaskReviewRejectionService,
+        // Memory consolidation cadence (memory upgrades M9) — backs the
+        // `memory-consolidation-tick` cron: the worker proxy calls
+        // `dispatchDue()` over the internal RPC channel, landing here
+        // where the org/tenant repositories, the AI facade and the
+        // notification producer are wired. Appended LAST + @Optional()
+        private readonly memoryConsolidationScheduleService?: MemoryConsolidationScheduleService,
+        // Kanban run cockpit (plan 04 M5/M7) — backs the
+        // `task-pr-status-sync` cron: the worker proxy calls
+        // `syncDuePrStatuses()` over the internal RPC channel, landing
+        // here where the git-provider plugins + credentials are wired.
+        // Appended LAST + @Optional() per the arity rule above.
+        private readonly taskPrStatusService?: TaskPrStatusService,
     ) {}
 
     onModuleInit() {
@@ -435,7 +449,13 @@ export class TriggerInternalController implements OnModuleInit {
             // Fleet job runtime (Desktop PRD M4) — `fleet-job-lease-sweeper`
             // calls `reclaimExpired()` here (allow-list auto-derived).
             FleetJobService: this.fleetJobService,
-
+            // Memory consolidation cadence (memory upgrades M9) —
+            // `memory-consolidation-tick` calls `dispatchDue()` here
+            // (allow-list auto-derived).
+            MemoryConsolidationScheduleService: this.memoryConsolidationScheduleService,
+            // Kanban run cockpit (plan 04 M5/M7) — `task-pr-status-sync`
+            // calls `syncDuePrStatuses()` here (allow-list auto-derived).
+            TaskPrStatusService: this.taskPrStatusService,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),

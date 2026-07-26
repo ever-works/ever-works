@@ -12,6 +12,9 @@ export * from './terminal-session.task';
 // persisted terminal transcripts.
 export * from './terminal-transcript-gc.task';
 export * from './task-branch-gc.task';
+// Kanban run cockpit (plan 04 M5/M7) — refresh open-PR status + CI for
+// the board review pill, and land Tasks whose PR merged.
+export * from './task-pr-status-sync.task';
 // Desktop PRD M4 — return lapsed fleet-job leases to the pool so a
 // fleet whose nodes ALL died still converges (inline reclaim on the
 // lease path covers every other case).
@@ -37,3 +40,6 @@ export * from './webhook-delivery.task';
 export * from './run-plugin-operation.task';
 // Pricing Wave 9 M1 — daily free-credit grant (idempotent per user/day).
 export * from './credits-daily-grant.task';
+// Memory upgrades M9 — scheduled consolidation pass (opt-in per org,
+// dry-run by default, never auto-applied).
+export * from './memory-consolidation-tick.task';

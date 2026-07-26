@@ -85,6 +85,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'IngestInstallBinding',
     // Event-ingest spine (Wave 6) — normalized external events
     'IngestedEvent',
+    // Memory eval loop (memory upgrades M10) — append-only retrieval log
+    'KbRetrievalLog',
     // Invoice mirror (billing PRD §3.5) — provider invoices/receipts,
     // written only by the signature-verified webhook
     'Invoice',
