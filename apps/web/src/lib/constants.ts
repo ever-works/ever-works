@@ -92,6 +92,8 @@ export const ROUTES = {
     DASHBOARD_WORKS_NEW: '/works/new',
     DASHBOARD_WORK: (id: string) => `/works/${id}`,
     DASHBOARD_WORK_ACTIVITY: (id: string) => `/works/${id}/activity`,
+    // Wave 7 feature h — the in-platform PR review surface.
+    DASHBOARD_WORK_PULL_REQUESTS: (id: string) => `/works/${id}/pull-requests`,
     DASHBOARD_WORK_ITEMS: (id: string) => `/works/${id}/items`,
     DASHBOARD_WORK_KB: (id: string) => `/works/${id}/kb`,
     DASHBOARD_WORK_GENERATOR: (id: string) => `/works/${id}/generator`,
