@@ -60,17 +60,15 @@ const otherAuth: AuthenticatedUser = { ...auth, userId: 'user-2' } as Authentica
 
 function makeService(overrides: Record<string, unknown> = {}) {
     return {
-        getPacks: jest
-            .fn()
-            .mockReturnValue([
-                {
-                    id: 'credits-1000',
-                    priceCents: 1000,
-                    credits: 1000,
-                    currency: 'usd',
-                    label: 'a',
-                },
-            ]),
+        getPacks: jest.fn().mockReturnValue([
+            {
+                id: 'credits-1000',
+                priceCents: 1000,
+                credits: 1000,
+                currency: 'usd',
+                label: 'a',
+            },
+        ]),
         isProviderConfigured: jest.fn().mockReturnValue(true),
         startCreditCheckout: jest.fn().mockResolvedValue({
             url: 'https://pay.example/cs_1',
