@@ -349,35 +349,59 @@ export class TaskTransitionService {
                 let admission: { admitted: boolean; queuedReason?: string } = {
                     admitted: true,
                 };
+                // Pre-create a queued AgentRun row so the worker can find
+                // it via findInFlightForTaskAgent (T6 chat-dedup posture).
+                // `workId` is denormalized here (Wave 4 M1) so per-Work
+                // concurrency counts + the Sessions view need no join.
+                //
+                // Handed to the gate as the `reserve` half of admission so
+                // the count and this insert are one critical section under
+                // the advisory lock (no-op off Postgres).
+                const reserve = async (verdict: {
+                    admitted: boolean;
+                    queuedReason?: string;
+                }): Promise<void> => {
+                    run = this.runs
+                        ? await this.runs.createQueued({
+                              agentId,
+                              userId: task.userId,
+                              triggerKind: 'task',
+                              taskId: task.id,
+                              workId: task.workId ?? null,
+                              queuedReason: verdict.admitted
+                                  ? null
+                                  : (verdict.queuedReason ?? 'concurrency-limit'),
+                          })
+                        : null;
+                };
                 if (this.dispatchGate) {
                     try {
-                        admission = await this.dispatchGate.admit({
-                            userId: task.userId,
-                            workId: task.workId ?? null,
-                            organizationId: task.organizationId ?? null,
-                        });
+                        admission = await this.dispatchGate.admit(
+                            {
+                                userId: task.userId,
+                                workId: task.workId ?? null,
+                                organizationId: task.organizationId ?? null,
+                            },
+                            reserve,
+                        );
                     } catch (gateErr) {
                         this.logger.warn(
                             `Dispatch gate admit failed for task ${task.id} — failing open: ${gateErr}`,
                         );
                     }
+                    // Defence in depth: the gate calls `reserve` on every
+                    // path INCLUDING its own fail-open, but a gate stub
+                    // that ignores the callback must not silently produce a
+                    // dispatch with no run row behind it.
+                    if (!run) await reserve(admission);
+                } else {
+                    await reserve(admission);
                 }
-                // Pre-create a queued AgentRun row so the worker can find
-                // it via findInFlightForTaskAgent (T6 chat-dedup posture).
-                // `workId` is denormalized here (Wave 4 M1) so per-Work
-                // concurrency counts + the Sessions view need no join.
-                run = this.runs
-                    ? await this.runs.createQueued({
-                          agentId,
-                          userId: task.userId,
-                          triggerKind: 'task',
-                          taskId: task.id,
-                          workId: task.workId ?? null,
-                          queuedReason: admission.admitted
-                              ? null
-                              : (admission.queuedReason ?? 'concurrency-limit'),
-                      })
-                    : null;
+                // TypeScript's control-flow analysis cannot see the
+                // assignment that happens inside `reserve`, so it still
+                // believes `run` is the `null` it was initialised to.
+                // Re-widen to the declared type.
+                run = run as { id: string } | null;
                 // Kanban run cockpit — mirror the freshly-queued run onto the
                 // Task row so the board chip appears before the worker even
                 // claims it. The service is best-effort by contract (logs +

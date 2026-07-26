@@ -1094,7 +1094,7 @@ export class AgentsController {
     @Post(':id/assign-task')
     @ApiOperation({
         summary:
-            'Assign a Task to this Agent — pre-creates an AgentRun for the (taskId, agentId) pair and enqueues `agent-task-execute`.',
+            'Assign a Task to this Agent — pre-creates an AgentRun for the (taskId, agentId) pair and enqueues `agent-task-execute`. Over the concurrency valve the run is created parked (`queued: true`) and promoted by the drain when a slot frees.',
     })
     @HttpCode(HttpStatus.ACCEPTED)
     @Throttle({ long: { limit: 30, ttl: 60_000 } })
@@ -1102,7 +1102,7 @@ export class AgentsController {
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: AssignTaskToAgentDto,
-    ): Promise<{ runId: string }> {
+    ): Promise<{ runId: string; queued?: boolean; queuedReason?: string }> {
         await this.service.getOne(auth.userId, id);
         // Cross-user 404 on the Task too — surfaces via TasksService.
         const task = await this.tasks.getOne(auth.userId, body.taskId);
@@ -1120,12 +1120,69 @@ export class AgentsController {
         if (inflight) {
             return { runId: inflight.id };
         }
-        const run = await this.agentRuns.createQueued({
-            agentId: id,
-            userId: auth.userId,
-            triggerKind: 'task',
-            taskId: body.taskId,
-        });
+        // Run orchestration — this endpoint used to enqueue straight past
+        // the concurrency valve, so an assign-task loop could put
+        // unbounded runs on a Work that the board / fan-out paths would
+        // have parked. It now goes through the SAME gate, with the row
+        // created inside the admission critical section.
+        //
+        // `workId` is denormalized here for the same reason the fan-out
+        // does it: without it this run counts toward nothing, and the
+        // per-Work valve cannot see it.
+        let created: { id: string } | undefined;
+        const reserve = async (verdict: {
+            admitted: boolean;
+            queuedReason?: string;
+        }): Promise<void> => {
+            created = await this.agentRuns.createQueued({
+                agentId: id,
+                userId: auth.userId,
+                triggerKind: 'task',
+                taskId: body.taskId,
+                workId: task.workId ?? null,
+                queuedReason: verdict.admitted ? null : (verdict.queuedReason ?? null),
+            });
+        };
+        let admission: { admitted: boolean; queuedReason?: string } = { admitted: true };
+        if (this.dispatchGate) {
+            try {
+                admission = await this.dispatchGate.admit(
+                    {
+                        userId: auth.userId,
+                        workId: task.workId ?? null,
+                        organizationId: task.organizationId ?? null,
+                    },
+                    reserve,
+                );
+            } catch (gateErr) {
+                // Fail-open — a broken safety valve must never 500 a
+                // legitimate assignment.
+                this.logger.warn(
+                    `Dispatch gate admit failed for task ${body.taskId} — failing open: ${gateErr}`,
+                );
+            }
+            if (!created) await reserve(admission);
+        } else {
+            await reserve(admission);
+        }
+        const run = created!;
+        if (!admission.admitted) {
+            // Parked: the row exists with its `queuedReason`, the enqueue
+            // is SKIPPED, and `RunDispatchGateService.drainForWork`
+            // promotes it on the next terminal transition for this Work.
+            void this.tryLog({
+                userId: auth.userId,
+                agentId: id,
+                actionType: ActivityActionType.AGENT_TASK_ASSIGNED,
+                details: {
+                    runId: run.id,
+                    taskId: body.taskId,
+                    queued: true,
+                    queuedReason: admission.queuedReason,
+                },
+            });
+            return { runId: run.id, queued: true, queuedReason: admission.queuedReason };
+        }
         let handle: { runId: string } | undefined;
         try {
             handle = await this.taskExecuteDispatcher.enqueue({

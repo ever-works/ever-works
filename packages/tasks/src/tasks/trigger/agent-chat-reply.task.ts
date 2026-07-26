@@ -134,6 +134,12 @@ export const agentChatReplyTask = task<'agent-chat-reply', AgentChatReplyPayload
                 // are equal, but using payload.userId keeps this fallback row consistent
                 // with the dispatcher's pre-created row and avoids attributing the run to
                 // a different owner should the lookup ever resolve a foreign agent.
+                //
+                // DOCUMENTED dispatch-gate bypass: worker-side bookkeeping
+                // for a job the runtime has ALREADY accepted and started.
+                // The gate ran at dispatch time (`TaskChatService.post`);
+                // re-admitting here could only refuse work already in
+                // flight and strand it with no run row.
                 run = await runs.createQueued({
                     agentId: agent.id,
                     userId: payload.userId,

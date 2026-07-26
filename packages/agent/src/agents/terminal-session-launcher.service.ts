@@ -31,6 +31,12 @@ import {
  * caller can ignore them and the HTTP caller can map them to statuses.
  * A dispatcher that throws DOES bubble (after releasing the claim): the
  * user pressed a button and deserves the real error.
+ *
+ * DOCUMENTED `RunDispatchGateService` bypass, and it must stay one: this
+ * attaches a shell to an AgentRun that the gate ALREADY admitted and
+ * that is already live (`LIVE_RUN_STATUSES`). It creates no AgentRun and
+ * consumes no run slot, so re-admitting here would only be able to
+ * refuse a terminal for work that is running regardless.
  */
 
 export type TerminalSessionRefusal =

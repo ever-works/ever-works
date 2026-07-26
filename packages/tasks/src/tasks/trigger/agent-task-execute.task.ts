@@ -280,6 +280,12 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                 run = await runs.findInFlightForTaskAgent(payload.taskId, payload.agentId);
             }
             if (!run) {
+                // DOCUMENTED dispatch-gate bypass: worker-side bookkeeping
+                // for a job the runtime has ALREADY accepted and started.
+                // The gate ran at dispatch time
+                // (`TaskTransitionService.dispatchAgentRun`, the drain, or
+                // assign-task); re-admitting here could only refuse work
+                // already in flight and strand it with no run row.
                 run = await runs.createQueued({
                     agentId: agent.id,
                     userId: agent.userId,

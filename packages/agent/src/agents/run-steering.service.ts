@@ -205,30 +205,46 @@ export class RunSteeringService implements RunSteeringPort {
             );
         }
 
-        // Same concurrency choke point as every other dispatch path.
-        const admission = this.dispatchGate
-            ? await this.dispatchGate.admit({
-                  userId,
-                  workId: run.workId ?? null,
-                  organizationId: run.organizationId ?? null,
-              })
-            : { admitted: true as const, queuedReason: undefined };
-
-        const next = await this.runs.createQueued({
-            agentId: run.agentId,
-            userId,
-            triggerKind: 'task',
-            taskId: run.taskId,
-            workId: run.workId ?? null,
-            organizationId: run.organizationId ?? null,
-            runnerKind: run.runnerKind ?? null,
-            queuedReason: admission.admitted ? null : (admission.queuedReason ?? null),
-            // Streaming terminal — the conversation lifetime survives the
-            // process lifetime, and so does the SHAPE of the session. A
-            // resumed persistent run still wants an interactive terminal,
-            // which is what the fan-out's `requirePersistent` gate reads.
-            persistent: run.persistent === true,
-        });
+        // Same concurrency choke point as every other dispatch path — and
+        // the row that consumes the admitted slot is created INSIDE it, so
+        // count + insert are one critical section (advisory-locked on
+        // Postgres, documented no-op elsewhere).
+        let created: AgentRun | undefined;
+        const reserve = async (verdict: {
+            admitted: boolean;
+            queuedReason?: string;
+        }): Promise<void> => {
+            created = await this.runs.createQueued({
+                agentId: run.agentId,
+                userId,
+                triggerKind: 'task',
+                taskId: run.taskId!,
+                workId: run.workId ?? null,
+                organizationId: run.organizationId ?? null,
+                runnerKind: run.runnerKind ?? null,
+                queuedReason: verdict.admitted ? null : (verdict.queuedReason ?? null),
+                // Streaming terminal — the conversation lifetime survives
+                // the process lifetime, and so does the SHAPE of the
+                // session. A resumed persistent run still wants an
+                // interactive terminal, which is what the fan-out's
+                // `requirePersistent` gate reads.
+                persistent: run.persistent === true,
+            });
+        };
+        const admission: { admitted: boolean; queuedReason?: string } = this.dispatchGate
+            ? await this.dispatchGate.admit(
+                  {
+                      userId,
+                      workId: run.workId ?? null,
+                      organizationId: run.organizationId ?? null,
+                  },
+                  reserve,
+              )
+            : { admitted: true, queuedReason: undefined };
+        // Gate absent, or a gate stub that ignored the callback.
+        if (!created) await reserve(admission);
+        // Non-null from here: `reserve` either ran above or threw.
+        const next = created!;
 
         // The conversation lifetime survives the process lifetime: hand the
         // pipeline plugin its own resume id, and seed the first message so

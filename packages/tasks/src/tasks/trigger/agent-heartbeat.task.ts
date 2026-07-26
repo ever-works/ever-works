@@ -130,6 +130,12 @@ export const agentHeartbeatTask = task<'agent-heartbeat', AgentHeartbeatPayload>
                 run = await runs.findInFlightForAgent(agent.id);
             }
             if (!run) {
+                // DOCUMENTED dispatch-gate bypass: this is worker-side
+                // bookkeeping for a job the runtime has ALREADY accepted
+                // and started, not a new admission. The gate ran at
+                // dispatch time (`AgentScheduleDispatcherService`); asking
+                // it again here could only refuse work that is already
+                // executing, which would strand the job with no run row.
                 run = await runs.createQueued({
                     agentId: agent.id,
                     userId: payload.userId,
