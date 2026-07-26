@@ -1,7 +1,7 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
 import { API_BASE, authedHeaders } from './helpers/api';
 import { loadSeededTestUser } from './helpers/seeded-test-user';
-import { clickUntil } from './helpers/nav';
+import { clickAndExpectUrl, clickUntil } from './helpers/nav';
 
 /**
  * flow-goals-ui-journey — the `/goals` DASHBOARD UI, end-to-end.
@@ -318,8 +318,10 @@ test.describe('Goals — /goals list catalog (UI)', () => {
         await page.goto('/en/goals', { waitUntil: 'domcontentloaded' });
         const card = cardFor(page, goal.id);
         await expect(card).toBeVisible({ timeout: 30_000 });
-        await card.click();
-        await page.waitForURL(new RegExp(`/goals/${goal.id}`), { timeout: 30_000 });
+        // Post-condition: the URL is this Goal's detail page. The card is a
+        // client <Link>: a click landing before hydration is silently swallowed
+        // (and a soft nav never re-fires `load`, so waitForURL would hang).
+        await clickAndExpectUrl(page, card, new RegExp(`/goals/${goal.id}`));
         await expect(page.getByRole('heading', { name: title, level: 1 })).toBeVisible({
             timeout: 30_000,
         });
@@ -412,15 +414,18 @@ test.describe('Goals — /goals/:id detail (UI)', () => {
 
         await page.goto(`/en/goals/${goal.id}`, { waitUntil: 'domcontentloaded' });
         const pause = page.getByRole('button', { name: 'Pause' });
-        await expect(pause).toBeVisible({ timeout: 30_000 });
-        await pause.click();
+        const activate = page.getByRole('button', { name: 'Activate' });
+        // Post-condition: the action set flips to the paused shape (Activate is
+        // rendered again). A Pause click landing before React wires onClick is
+        // silently swallowed — same remedy as the Activate test above.
+        await clickUntil(pause, async () => (await activate.count()) > 0);
 
         // Paused: Activate returns; Pause + Evaluate now disappear.
-        await expect(page.getByRole('button', { name: 'Activate' })).toBeVisible({
-            timeout: 30_000,
-        });
-        await expect(page.getByRole('button', { name: 'Pause' })).toHaveCount(0);
+        await expect(activate).toBeVisible({ timeout: 30_000 });
+        await expect(pause).toHaveCount(0);
         await expect(page.getByRole('button', { name: 'Evaluate now' })).toHaveCount(0);
+        // Persisted truth: the lifecycle really moved server-side.
+        expect(await getGoalLifecycle(request, token, goal.id)).toBe('paused');
     });
 
     test('UI Evaluate now degrades gracefully with no metrics provider', async ({
@@ -433,8 +438,18 @@ test.describe('Goals — /goals/:id detail (UI)', () => {
 
         await page.goto(`/en/goals/${goal.id}`, { waitUntil: 'domcontentloaded' });
         const evaluate = page.getByRole('button', { name: 'Evaluate now' });
-        await expect(evaluate).toBeVisible({ timeout: 30_000 });
-        await evaluate.click();
+        // Evaluate-now is a graceful no-op in this keyless env, so nothing
+        // durable changes in the DOM. The post-condition that proves the click
+        // was not swallowed pre-hydration is therefore that the server action
+        // was actually DISPATCHED — a POST to this page's own URL. (Re-running
+        // it is harmless: it writes no sample and leaves the status alone.)
+        let evaluateDispatched = false;
+        page.on('request', (req) => {
+            if (req.method() === 'POST' && req.url().includes(`/goals/${goal.id}`)) {
+                evaluateDispatched = true;
+            }
+        });
+        await clickUntil(evaluate, async () => evaluateDispatched);
 
         // ProviderNotFoundError (404) in this keyless env → the Goal must stay
         // ACTIVE (Pause still offered) and NO sample gets written.
@@ -472,9 +487,19 @@ test.describe('Goals — /goals/:id detail (UI)', () => {
         });
         // The only listbox trigger on the detail page is the outcome override.
         const trigger = page.locator('button[aria-haspopup="listbox"]');
-        await expect(trigger).toBeVisible();
-        await trigger.click();
-        await page.getByRole('option', { name: 'Achieved' }).click();
+        const achieved = page.getByRole('option', { name: 'Achieved' });
+        // Post-condition of OPENING: the option row is on screen. The dropdown
+        // is rendered by client state, so a trigger click before hydration is
+        // swallowed and no listbox ever appears.
+        await clickUntil(trigger, () => achieved.isVisible().catch(() => false));
+        // Post-condition of PICKING: the override PERSISTED (the API reports the
+        // Goal completed). We re-pick only while it has not landed, so a click
+        // that did take effect is never repeated.
+        await clickUntil(
+            achieved,
+            async () =>
+                (await getGoalLifecycle(request, token, goal.id).catch(() => '')) === 'completed',
+        );
 
         // Durable proof: the terminal OutcomeBadge now renders "Achieved".
         await expect(page.getByText('Achieved').first()).toBeVisible({ timeout: 30_000 });
@@ -494,9 +519,10 @@ test.describe('Goals — /goals/:id detail (UI)', () => {
         await expect(del).toBeVisible({ timeout: 30_000 });
         // The delete flow guards with window.confirm().
         page.on('dialog', (dialog) => dialog.accept());
-        await del.click();
-
-        await page.waitForURL(/\/goals$/, { timeout: 30_000 });
+        // Post-condition: the client `router.push('/goals')` landed us back on
+        // the catalog. A click before hydration never even raises the confirm,
+        // and re-clicking is safe because we stop as soon as the URL matches.
+        await clickAndExpectUrl(page, del, /\/goals$/);
         await expect(cardFor(page, goal.id)).toHaveCount(0);
         // Cascade confirmed at the API: the row is gone.
         expect(await getGoalStatus(request, token, goal.id)).toBe(404);
@@ -554,17 +580,23 @@ test.describe('Goals — /goals/new create form (UI)', () => {
         const create = page.getByRole('button', { name: 'Create Goal' });
         await expect(create).toBeVisible({ timeout: 30_000 });
 
-        // Empty title → title-required toast, still on the form.
-        await create.click();
-        await expect(page.getByText('Title is required.')).toBeVisible({ timeout: 10_000 });
+        // Empty title → title-required toast, still on the form. Post-condition
+        // is that toast: the whole validation lives in a client onClick, so a
+        // click before hydration is swallowed and no toast is ever raised.
+        // (`.first()` — retries can stack duplicate toasts of the same text.)
+        const titleRequired = page.getByText('Title is required.').first();
+        await clickUntil(create, () => titleRequired.isVisible().catch(() => false));
+        await expect(titleRequired).toBeVisible({ timeout: 10_000 });
         await expect(page).toHaveURL(/\/goals\/new/);
 
-        // Title but no metric source → metric-source-required toast.
+        // Title but no metric source → metric-source-required toast. (The form
+        // is provably hydrated by now, so this fill reaches React state.)
         await page.getByLabel('Title').fill(`Validation ${suffix()}`);
-        await create.click();
-        await expect(page.getByText('Provider plugin ID and metric ID are required.')).toBeVisible({
-            timeout: 10_000,
-        });
+        const metricRequired = page
+            .getByText('Provider plugin ID and metric ID are required.')
+            .first();
+        await clickUntil(create, () => metricRequired.isVisible().catch(() => false));
+        await expect(metricRequired).toBeVisible({ timeout: 10_000 });
         await expect(page).toHaveURL(/\/goals\/new/);
     });
 
@@ -580,17 +612,37 @@ test.describe('Goals — /goals/new create form (UI)', () => {
         // start filling, so the fills never race the cold render/hydration.
         const titleInput = page.getByLabel('Title');
         await expect(titleInput).toBeVisible({ timeout: 30_000 });
-        await titleInput.fill(title);
-        await page.getByLabel('Provider plugin ID').fill('stripe');
-        await page.getByLabel('Metric ID').fill('income');
-        await page.getByLabel('Target value').fill('2500');
-        await page.getByLabel('Unit').fill('usd');
-        await page.getByRole('button', { name: 'Create Goal' }).click();
 
-        // Server action creates the draft and routes to its detail page via a
-        // client soft-nav (`router.push`). Use toHaveURL (auto-retrying) rather
-        // than waitForURL('load') — the load event never re-fires on a soft nav.
-        await expect(page).toHaveURL(/\/goals\/[0-9a-f]{8}-[0-9a-f]{4}-/, { timeout: 30_000 });
+        // Every field is a CONTROLLED React input and the submit is a client
+        // onClick, so BOTH halves are swallowable pre-hydration: a fill that
+        // never reaches setState is wiped by the next render, and a click before
+        // onClick is wired does nothing at all. Post-condition = the server
+        // action's `router.push` landed on /goals/<uuid>; before each retry we
+        // re-fill only the fields that actually lost their value.
+        const fields: Array<[string, string]> = [
+            ['Title', title],
+            ['Provider plugin ID', 'stripe'],
+            ['Metric ID', 'income'],
+            ['Target value', '2500'],
+            ['Unit', 'usd'],
+        ];
+        const detailUrl = /\/goals\/[0-9a-f]{8}-[0-9a-f]{4}-/;
+        const create = page.getByRole('button', { name: 'Create Goal' });
+        await expect(async () => {
+            if (!detailUrl.test(page.url())) {
+                for (const [label, value] of fields) {
+                    const input = page.getByLabel(label);
+                    if ((await input.inputValue().catch(() => '')) !== value) {
+                        await input.fill(value).catch(() => undefined);
+                    }
+                }
+                await create.click({ timeout: 5_000, noWaitAfter: true }).catch(() => undefined);
+            }
+            // toHaveURL polls the URL only — the `load` event never re-fires on
+            // a soft nav, so waitForURL('load') would hang even once it landed.
+            await expect(page).toHaveURL(detailUrl, { timeout: 5_000 });
+        }).toPass({ timeout: 60_000 });
+
         await expect(page.getByRole('heading', { name: title, level: 1 })).toBeVisible({
             timeout: 30_000,
         });
@@ -618,8 +670,10 @@ test.describe('Goals — dashboard navigation', () => {
         if (!(await link.isVisible({ timeout: 10_000 }).catch(() => false))) {
             test.skip(true, 'no Goals nav link surfaced in this build');
         }
-        await link.click();
-        await page.waitForURL(/\/goals(\?|$)/, { timeout: 30_000 });
+        // Post-condition: the catalog URL. Sidebar entries are client <Link>s —
+        // a pre-hydration click never starts the soft nav, and `load` never
+        // re-fires on one either, so waitForURL would time out regardless.
+        await clickAndExpectUrl(page, link, /\/goals(\?|$)/);
         await expect(page.getByRole('heading', { name: 'Goals', level: 1 })).toBeVisible({
             timeout: 30_000,
         });
