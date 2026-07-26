@@ -1,12 +1,14 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
 import { creditsAPI, subscriptionsAPI } from '@/lib/api/credits';
+import { billingAPI } from '@/lib/api/billing';
 import type {
     CreditsBalance,
     CreditsLedgerPage,
     SubscriptionPlanList,
     SubscriptionPlanSummary,
 } from '@/lib/api/credits.shared';
+import type { BillingOverview, InvoiceListPage } from '@/lib/api/billing.shared';
 import { BillingSettings } from '@/components/settings/BillingSettings';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -27,18 +29,23 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function BillingSettingsPage() {
     // Each fetch degrades independently: a failed call renders that
     // section's error/empty state instead of failing the whole page.
-    const [plan, plans, balance, ledger] = await Promise.all([
+    const [plan, plans, balance, ledger, overview, invoices] = await Promise.all([
         subscriptionsAPI.currentPlan().catch((): SubscriptionPlanSummary | null => null),
         subscriptionsAPI.listPlans().catch((): SubscriptionPlanList | null => null),
         creditsAPI.balance().catch((): CreditsBalance | null => null),
         creditsAPI.ledger({ pageSize: 10 }).catch((): CreditsLedgerPage | null => null),
+        // The money path (billing PRD B5) — packs, provider-configured
+        // flag, payment-method summary and auto-recharge in one call.
+        billingAPI.overview().catch((): BillingOverview | null => null),
+        billingAPI.invoices({ pageSize: 10 }).catch((): InvoiceListPage | null => null),
     ]);
 
-    // PRD §3.2/§3.7 — the purchase/payment-method/auto-recharge surfaces
-    // ship behind a server-side flag, default OFF, until the payment
-    // provider lands (Wave 9.4). Flipping PAYMENTS_ENABLED=true reveals
-    // the interactive top-up UI; checkout itself stays disabled until
-    // the provider checkout seam exists.
+    // PRD §3.2/§3.7 — the purchase / payment-method / auto-recharge
+    // surfaces sit behind a server-side MASTER SWITCH, default OFF.
+    // Turning it on is necessary but not sufficient: the cards only go
+    // live when the API also reports `providerConfigured` (real keys are
+    // wired), so a flag flip on a keyless deployment still renders the
+    // coming-soon state rather than buttons that always error.
     const paymentsEnabled = process.env.PAYMENTS_ENABLED === 'true';
 
     return (
@@ -48,6 +55,8 @@ export default async function BillingSettingsPage() {
             initialPlans={plans}
             initialBalance={balance}
             initialLedger={ledger}
+            initialOverview={overview}
+            initialInvoices={invoices}
         />
     );
 }

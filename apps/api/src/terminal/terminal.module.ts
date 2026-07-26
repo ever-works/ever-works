@@ -1,5 +1,5 @@
 import { Module } from '@nestjs/common';
-import { AgentsModule } from '@ever-works/agent/agents';
+import { AgentsModule, TerminalTranscriptModule } from '@ever-works/agent/agents';
 import { DatabaseModule } from '@ever-works/agent/database';
 import { TerminalRelayRegistry } from './terminal-relay.registry';
 import { TerminalAttachService } from './terminal-attach.service';
@@ -17,9 +17,14 @@ import { TerminalWsService } from './terminal-ws.service';
  * Single-replica note: the in-process `FanoutBus` default applies —
  * cross-replica fan-out is a later milestone (Redis pub/sub behind the
  * same seam). Current deployments run one API replica.
+ *
+ * M9 / founder decision D1 adds `TerminalTranscriptModule`: the publish
+ * endpoint persists redacted frames best-effort, and the attach
+ * controller gains an owner-scoped `GET .../terminal/transcript` replay
+ * route so a pane can rehydrate scrollback that outlived the relay.
  */
 @Module({
-    imports: [AgentsModule, DatabaseModule],
+    imports: [AgentsModule, DatabaseModule, TerminalTranscriptModule],
     controllers: [TerminalAttachController, TerminalInternalController],
     providers: [TerminalRelayRegistry, TerminalAttachService, TerminalWsService],
     exports: [TerminalRelayRegistry, TerminalAttachService],

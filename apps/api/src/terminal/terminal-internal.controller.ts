@@ -6,6 +6,7 @@ import {
     Headers,
     HttpCode,
     HttpStatus,
+    Optional,
     Param,
     Post,
 } from '@nestjs/common';
@@ -15,6 +16,8 @@ import { timingSafeEqual } from 'crypto';
 import { config } from '@ever-works/agent/config';
 import { normalizeTerminalFrame, isValidTerminalRunId } from '@ever-works/contracts';
 import { AgentRunRepository } from '@ever-works/agent/database';
+import { TerminalTranscriptService } from '@ever-works/agent/agents';
+import type { TerminalFrame } from '@ever-works/contracts';
 import { Public } from '../auth';
 import { TerminalAttachService } from './terminal-attach.service';
 import { TerminalRelayRegistry } from './terminal-relay.registry';
@@ -51,6 +54,12 @@ export class TerminalInternalController {
         private readonly registry: TerminalRelayRegistry,
         private readonly attach: TerminalAttachService,
         private readonly runs: AgentRunRepository,
+        // Appended LAST + @Optional() so every positional
+        // `new TerminalInternalController(...)` in the existing specs
+        // keeps compiling, and an install that has not wired the
+        // transcript module still relays live frames — it just stores
+        // nothing (M9 persistence is additive to M3 relaying).
+        @Optional() private readonly transcripts?: TerminalTranscriptService,
     ) {}
 
     private ensureSecret(authorization?: string, triggerSecret?: string) {
@@ -100,15 +109,50 @@ export class TerminalInternalController {
         }
         let accepted = 0;
         let dropped = 0;
+        // Streaming-terminal M9 / D1: the frames the relay accepted are
+        // exactly the frames worth persisting — same seq discipline, same
+        // dedupe verdict, one ingest chokepoint.
+        const persistable: TerminalFrame[] = [];
         for (const item of items) {
             const frame = normalizeTerminalFrame(item);
             if (frame && this.registry.publish(runId, frame)) {
                 accepted++;
+                persistable.push(frame);
             } else {
                 dropped++;
             }
         }
+        this.persistBestEffort(runId, persistable);
         return { accepted, dropped };
+    }
+
+    /**
+     * Fire-and-forget transcript write (streaming-terminal M9 / founder
+     * decision D1).
+     *
+     * Deliberately NOT awaited: this handler is on the live output path
+     * and the worker transport flushes a batch every ~150ms. Storage
+     * latency must never become session latency, and a storage failure
+     * must never fail a session — `persistFrames` already swallows its
+     * own errors, and the `.catch` here is the belt to that suspenders.
+     *
+     * Redaction and the plan-tier retention check both happen inside the
+     * service, BEFORE anything reaches the database.
+     */
+    private persistBestEffort(runId: string, frames: ReadonlyArray<TerminalFrame>): void {
+        if (!this.transcripts || frames.length === 0) {
+            return;
+        }
+        try {
+            // try/catch AND .catch: `Promise.resolve(fn())` still throws
+            // synchronously if `fn` itself throws before returning a
+            // promise, which would take the whole publish down with it.
+            void Promise.resolve(this.transcripts.persistFrames(runId, frames)).catch(
+                () => undefined,
+            );
+        } catch {
+            // Transcript persistence is never allowed to fail a session.
+        }
     }
 
     /**

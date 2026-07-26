@@ -156,10 +156,15 @@ describe('UserPluginRepository', () => {
     });
 
     describe('findByPlugin', () => {
-        it('queries `find` with pluginId + `user` relation (NOT pluginEntity)', async () => {
-            // The `user` relation here is the inverse — given a pluginId,
-            // load all users who have a record. Pinned so a future swap
-            // to `pluginEntity` (which would be redundant) is deliberate.
+        it('queries `find` by pluginId ONLY — it must never ask for a relation the entity lacks', async () => {
+            // `UserPluginEntity` declares exactly one relation
+            // (`pluginEntity`); the owner is a loosely-coupled `userId`
+            // STRING column, deliberately not a `user` relation. This
+            // query used to pass `relations: ['user']`, which TypeORM
+            // rejects at RUNTIME with `EntityPropertyNotFoundError` —
+            // a failure this very mock used to hide, and which reached
+            // production as a 500 on both public ingest receivers.
+            // Pinned so nobody "restores" the relation.
             const rows = [{ id: 'up-1', userId: 'u-1' }];
             const { repo, typeormRepo } = makeService({
                 find: jest.fn().mockResolvedValue(rows),
@@ -167,10 +172,8 @@ describe('UserPluginRepository', () => {
 
             await repo.findByPlugin('p-1');
 
-            expect(typeormRepo.find).toHaveBeenCalledWith({
-                where: { pluginId: 'p-1' },
-                relations: ['user'],
-            });
+            expect(typeormRepo.find).toHaveBeenCalledWith({ where: { pluginId: 'p-1' } });
+            expect(typeormRepo.find.mock.calls[0][0]).not.toHaveProperty('relations');
         });
     });
 

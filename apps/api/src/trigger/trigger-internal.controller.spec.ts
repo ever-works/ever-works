@@ -22,6 +22,8 @@ jest.mock('@ever-works/agent/agents', () => ({
     AgentRunSweeperService: class AgentRunSweeperService {},
     // Wave 4 M2 — drain-on-terminal RPC target (run orchestration).
     RunDispatchGateService: class RunDispatchGateService {},
+    // Streaming-terminal M9 / D1 — `terminal-transcript-gc` RPC target.
+    TerminalTranscriptService: class TerminalTranscriptService {},
     AGENT_HEARTBEAT_TRIGGER: 'AGENT_HEARTBEAT_TRIGGER',
 }));
 jest.mock('@ever-works/agent/tasks-domain', () => ({

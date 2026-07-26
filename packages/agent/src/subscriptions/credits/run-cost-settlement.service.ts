@@ -18,6 +18,7 @@ import { UserRepository } from '@src/database/repositories/user.repository';
 // RunDispatchGateService, implemented here, bound to the
 // RUN_CREDITS_PRECHECK token by the api-side @Global() SubscriptionsModule).
 import type { RunCreditsPrecheck } from '../../agents/run-credits-precheck';
+import { AutoRechargeService } from '../billing/auto-recharge.service';
 
 /**
  * Pricing Wave 9 M2 — wires real usage metering into the credits ledger.
@@ -71,6 +72,11 @@ export class RunCostSettlementService implements RunCostSettler, RunCreditsPrech
         private readonly userRepository: UserRepository,
         @Optional() private readonly notificationService?: NotificationService,
         @Optional() private readonly pluginSettingsService?: PluginSettingsService,
+        // Billing PRD §3.4 — the debit-time threshold check. @Optional()
+        // because the worker-side RPC proxy module binds the settler
+        // without the money path; a missing binding simply means no
+        // auto-recharge, never a failed settlement.
+        @Optional() private readonly autoRechargeService?: AutoRechargeService,
     ) {}
 
     /** Never rejects — see the RunCostSettler contract. */
@@ -132,6 +138,11 @@ export class RunCostSettlementService implements RunCostSettler, RunCreditsPrech
                 });
                 result.debitedCredits = entry ? Math.abs(entry.amountCredits) : 0;
                 result.status = 'settled';
+                // Debit-time auto-recharge check (PRD §3.4). Best-effort:
+                // the balance moved, so this is the moment a threshold can
+                // be crossed — but a billing hiccup must never redden a
+                // settled run.
+                await this.maybeAutoRecharge(run.userId);
                 return result;
             } catch (err) {
                 if (err instanceof InsufficientCreditsError) {
@@ -199,7 +210,31 @@ export class RunCostSettlementService implements RunCostSettler, RunCreditsPrech
         }
 
         result.status = result.debitedCredits > 0 ? 'partial' : 'exhausted';
+        // An exhausted balance is the strongest possible threshold
+        // crossing — try to top up here too.
+        await this.maybeAutoRecharge(run.userId);
         return result;
+    }
+
+    /**
+     * Fire the auto-recharge threshold check after a balance movement.
+     * Swallows everything: the service itself already guards against
+     * double-firing (compare-and-set on the profile's in-flight slot), and
+     * settlement must stay non-fatal per PRD §6.
+     */
+    private async maybeAutoRecharge(userId: string): Promise<void> {
+        if (!this.autoRechargeService) {
+            return;
+        }
+        try {
+            await this.autoRechargeService.maybeRecharge(userId);
+        } catch (err) {
+            this.logger.warn(
+                `Auto-recharge check failed for user ${userId} (ignored): ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+        }
     }
 
     /**

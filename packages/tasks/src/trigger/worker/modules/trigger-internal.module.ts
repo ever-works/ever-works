@@ -14,6 +14,7 @@ import {
     AgentRunSweeperService,
     AgentScheduleDispatcherService,
     RunDispatchGateService,
+    TerminalTranscriptService,
 } from '@ever-works/agent/agents';
 import {
     TaskChatService,
@@ -307,6 +308,17 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
                 createRemoteProxy(apiClient, 'CreditLedgerService'),
             inject: [TriggerInternalApiClient],
         },
+        // Terminal transcripts (streaming-terminal M9 / founder decision
+        // D1) — the terminal-transcript-gc cron calls `sweepExpired()` on
+        // this proxy, which RPCs to the live API where the chunk
+        // repository and the plan-entitlement lever are wired. Same shape
+        // as CreditLedgerService above.
+        {
+            provide: TerminalTranscriptService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'TerminalTranscriptService'),
+            inject: [TriggerInternalApiClient],
+        },
     ],
     exports: [
         TriggerInternalApiClient,
@@ -338,6 +350,7 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         EventSourcePullService,
         DigestService,
         CreditLedgerService,
+        TerminalTranscriptService,
     ],
 })
 export class TriggerInternalModule {}

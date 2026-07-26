@@ -19,6 +19,7 @@ import { ActivitySyncSettings } from './ActivitySyncSettings';
 import { TaskIsolationSettings } from './TaskIsolationSettings';
 import { QualityGatesSettings } from './QualityGatesSettings';
 import { MergePolicySettings } from './MergePolicySettings';
+import { ExternalRefsSettings } from './ExternalRefsSettings';
 interface SettingsFormProps {
     work: Work;
     user: AuthUser;
@@ -67,6 +68,11 @@ export function SettingsForm({ work, user, initialRepositories }: SettingsFormPr
 
                 {/* Activity Feed sync mode (EW-120 dual-mode) */}
                 <ActivitySyncSettings />
+
+                {/* Ingest routing claims — which external containers
+                    (chat channels, tracker teams, doc databases, meetings)
+                    route their events to this Work. */}
+                <ExternalRefsSettings />
 
                 {/* Git Committer Settings */}
                 <CommitterSettings />
