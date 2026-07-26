@@ -1,6 +1,7 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
 import { API_BASE, authedHeaders } from './helpers/api';
 import { loadSeededTestUser } from './helpers/seeded-test-user';
+import { clickUntil } from './helpers/nav';
 
 /**
  * flow-goals-ui-journey — the `/goals` DASHBOARD UI, end-to-end.
@@ -391,12 +392,15 @@ test.describe('Goals — /goals/:id detail (UI)', () => {
         const goal = await createGoal(request, token, { title: `UI Activate ${suffix()}` });
 
         await page.goto(`/en/goals/${goal.id}`, { waitUntil: 'domcontentloaded' });
+        // Click until the transition actually happens: a click landing before
+        // React wires the handler is silently swallowed (button visible+enabled,
+        // click "succeeds", nothing fires) — see helpers/nav.ts.
         const activate = page.getByRole('button', { name: 'Activate' });
-        await expect(activate).toBeVisible({ timeout: 30_000 });
-        await activate.click();
+        const pause = page.getByRole('button', { name: 'Pause' });
+        await clickUntil(activate, async () => (await pause.count()) > 0);
 
         // Durable proof of the active transition: Pause appears, Activate gone.
-        await expect(page.getByRole('button', { name: 'Pause' })).toBeVisible({ timeout: 30_000 });
+        await expect(pause).toBeVisible({ timeout: 30_000 });
         await expect(page.getByRole('button', { name: 'Evaluate now' })).toBeVisible();
         await expect(page.getByRole('button', { name: 'Activate' })).toHaveCount(0);
     });

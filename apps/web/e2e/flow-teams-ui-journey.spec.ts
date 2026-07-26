@@ -497,12 +497,23 @@ test.describe('Teams UI — settings page (/teams/:id/settings)', () => {
         const team = await seedTeam({ name: `Delete Me ${stamp()}` });
         await page.goto(`/en/teams/${team.id}/settings`, { waitUntil: 'domcontentloaded' });
 
-        await expect(page.getByTestId('team-settings-delete')).toBeVisible({ timeout: 30_000 });
-        // The delete handler goes through window.confirm — auto-accept it.
-        page.once('dialog', (dialog) => dialog.accept());
-        await page.getByTestId('team-settings-delete').click();
+        const deleteBtn = page.getByTestId('team-settings-delete');
+        await expect(deleteBtn).toBeVisible({ timeout: 30_000 });
+        // The delete handler goes through window.confirm — auto-accept EVERY
+        // dialog (not just the first): a click swallowed before hydration fires
+        // no dialog at all, so a `once` handler would be consumed by nothing and
+        // the retry click would then hang on an unhandled confirm.
+        page.on('dialog', (dialog) => void dialog.accept().catch(() => undefined));
 
-        await page.waitForURL(/\/teams(?:\?|$)/, { timeout: 30_000 });
+        // Retry the click until the delete actually navigates us back to the
+        // list — same pre-hydration swallowed-click hazard as elsewhere.
+        const listUrl = /\/teams(?:\?|$)/;
+        await expect(async () => {
+            if (!listUrl.test(page.url())) {
+                await deleteBtn.click({ timeout: 5_000, noWaitAfter: true }).catch(() => undefined);
+            }
+            await expect(page).toHaveURL(listUrl, { timeout: 5_000 });
+        }).toPass({ timeout: 60_000 });
         // The deleted team is gone from the API (404) — its card can't reappear.
         await expect
             .poll(
