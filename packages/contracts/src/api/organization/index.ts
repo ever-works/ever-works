@@ -8,6 +8,8 @@
  * decorators across the workspace boundary.
  */
 
+import type { MergePolicyOverride } from '../../policy/merge-policy.types.js';
+
 export interface CreateOrganizationRequest {
 	/** Display name. 1-200 chars. */
 	name: string;
@@ -51,6 +53,13 @@ export interface UpdateOrganizationRequest {
 	 * `visionUpdatedAt` to now.
 	 */
 	vision?: string | null;
+	/**
+	 * Merge-policy matrix (Wave 3, D4) — the organization-scoped PARTIAL.
+	 * Omit to leave unchanged; explicit `null` clears the override so
+	 * everything inherits the tenant, then the platform default. Fields
+	 * omitted INSIDE the object inherit individually.
+	 */
+	mergePolicy?: MergePolicyOverride | null;
 }
 
 export interface OrganizationResponse {
@@ -67,6 +76,17 @@ export interface OrganizationResponse {
 	vision: string | null;
 	/** PR-6 — ISO timestamp of the last vision change (null = never set). */
 	visionUpdatedAt: string | null;
+	/**
+	 * Merge-policy matrix (Wave 3, D4) — the PARTIAL stored on this row.
+	 * `null` means the organization declares nothing. OPTIONAL rather than
+	 * required: the field is additive, so a response from an API build that
+	 * predates it simply omits the key, and every consumer already has to
+	 * treat "absent" and "null" the same way (both mean "inherit").
+	 *
+	 * The EFFECTIVE policy is a fold of four scopes and is never derivable
+	 * from this field alone — read `GET /api/merge-policy/resolve` for that.
+	 */
+	mergePolicy?: MergePolicyOverride | null;
 	createdAt: string;
 	updatedAt: string;
 }

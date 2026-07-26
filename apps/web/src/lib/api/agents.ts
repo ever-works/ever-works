@@ -1,4 +1,5 @@
 import 'server-only';
+import type { MergePolicyOverride } from '@ever-works/contracts';
 import { serverFetch, serverMutation } from './server-api';
 
 /**
@@ -115,6 +116,12 @@ export interface Agent {
     avatarIcon: string | null;
     avatarImageUploadId: string | null;
     scorecard: AgentScorecardMetric[] | null;
+    /**
+     * Merge-policy matrix (Wave 3, D4) — the Agent-scoped PARTIAL override,
+     * the MOST specific scope. Omitted fields inherit Work → organization →
+     * tenant → platform default; `null` clears the Agent override.
+     */
+    mergePolicy?: MergePolicyOverride | null;
     contentHash: string | null;
     createdAt: string;
     updatedAt: string;
@@ -175,6 +182,8 @@ export interface UpdateAgentInput {
     /** Teams & Companies spec §3 — additive PATCH field (null clears the manager edge). */
     reportsToAgentId?: string | null;
     scorecard?: AgentScorecardMetric[] | null;
+    /** Merge-policy matrix (Wave 3, D4) — PARTIAL; `null` clears the override. */
+    mergePolicy?: MergePolicyOverride | null;
 }
 
 export interface AgentFileBody {

@@ -1,7 +1,11 @@
 import { Module } from '@nestjs/common';
 import { PolicyModule } from '@ever-works/agent/policy';
 import { AgentsModule } from '@ever-works/agent/agents';
+import { DatabaseModule } from '@ever-works/agent/database';
 import { WorkModule } from '@ever-works/agent/services';
+import { AuthModule } from '../auth/auth.module';
+import { IsPlatformAdminGuard } from '../auth/guards/platform-admin.guard';
+import { OperatorTenantMergePolicyController } from '../operator/tenant-merge-policy/operator-tenant-merge-policy.controller';
 import { MergePolicyController } from './merge-policy.controller';
 
 /**
@@ -15,14 +19,25 @@ import { MergePolicyController } from './merge-policy.controller';
  * BEFORE resolving anything, so this endpoint can never become a
  * cross-tenant policy oracle.
  *
- * There is no controller for WRITES here on purpose: a policy is a field
- * on an existing entity, so it is set through that entity's existing
- * PATCH endpoint (Work / Agent / organization) with that entity's
- * existing permission checks — extension, not a parallel surface.
+ * Customer-owned WRITES have no controller here on purpose: a policy is a
+ * field on an existing entity, so it is set through that entity's existing
+ * PATCH endpoint (Work / Agent / organization) with that entity's existing
+ * permission checks — extension, not a parallel surface.
+ *
+ * The one exception is the TENANT scope, which owns no user-facing entity
+ * and therefore no PATCH endpoint to extend. `OperatorTenantMergePolicyController`
+ * closes that gap behind `IsPlatformAdminGuard`; see the controller's own
+ * header for why a tenant ceiling must not be settable from underneath.
+ * `AuthModule` is imported for the same reason
+ * `TenantJobRuntimeModule` imports it: the guard extends `AuthSessionGuard`,
+ * which injects `Symbol(AUTH_PROVIDER)` and would otherwise crash module
+ * init. `DatabaseModule` supplies `TenantRepository` (the write) and
+ * `UserRepository` (the guard's `isPlatformAdmin` lookup).
  */
 @Module({
-    imports: [PolicyModule, WorkModule, AgentsModule],
-    controllers: [MergePolicyController],
+    imports: [PolicyModule, WorkModule, AgentsModule, DatabaseModule, AuthModule],
+    controllers: [MergePolicyController, OperatorTenantMergePolicyController],
+    providers: [IsPlatformAdminGuard],
     exports: [PolicyModule],
 })
 export class MergePolicyApiModule {}

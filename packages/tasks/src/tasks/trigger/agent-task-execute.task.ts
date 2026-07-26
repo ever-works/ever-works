@@ -658,6 +658,15 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                                 .permissions?.canOpenPullRequests !== false,
                         workspace: provisioned,
                         ...(gateNote ? { gate: gateNote } : {}),
+                        // Merge-policy matrix (Wave 3, D4) — the run's REAL
+                        // gate verdict feeds `requireGreenGate` at the merge
+                        // decision point. `gateNote` above is deliberately
+                        // narrower (fully-green only, PR-body prose); a
+                        // 'warn' Work reaches finalize with a red gate and
+                        // the merge decision has to see that, not a
+                        // prettified version of it. `null` when the gate
+                        // never ran, which a requireGreenGate policy refuses.
+                        gateStatus: gateOutcome?.gateStatus ?? null,
                     });
                     return {
                         status: 'completed',
@@ -666,6 +675,9 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                         runId: run.id,
                         dedupKey: payload.dedupKey,
                         workspaceOutcome: finalize.outcome,
+                        // Additive: absent unless an operator opted into
+                        // agent merges for this scope.
+                        ...(finalize.merge ? { mergeOutcome: finalize.merge } : {}),
                     };
                 } catch (error) {
                     // The run executed but its output never landed on the
