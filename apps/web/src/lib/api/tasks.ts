@@ -115,24 +115,18 @@ export interface TaskDiff {
 
 // ── Board dispatch (kanban M3 / M4) ───────────────────────────────
 
-/**
- * Stable machine codes the board keys its behaviour off — mirrored from
- * `@ever-works/agent/tasks-domain`. Never branch on the message: the
- * production build redacts thrown Server-Action messages.
- */
-export const RUN_ALREADY_IN_FLIGHT = 'RUN_ALREADY_IN_FLIGHT';
-export const RUN_AGENT_AMBIGUOUS = 'RUN_AGENT_AMBIGUOUS';
-export const RUN_NO_AGENT = 'RUN_NO_AGENT';
-export const RUN_AGENT_NOT_FOUND = 'RUN_AGENT_NOT_FOUND';
-
-/** One row of the board's agent picker. */
-export interface RunCandidateAgent {
-    id: string;
-    name: string;
-    slug?: string;
-    status?: string;
-    source: 'assignee' | 'task' | 'work-default';
-}
+// The dispatch sentinels and the picker row shape are consumed by a
+// `'use client'` component, so they live in a `server-only`-free module
+// (`tasks.shared.ts`). Re-exported here so server-side callers keep one
+// import site.
+export {
+    RUN_ALREADY_IN_FLIGHT,
+    RUN_AGENT_AMBIGUOUS,
+    RUN_NO_AGENT,
+    RUN_AGENT_NOT_FOUND,
+    type RunCandidateAgent,
+} from './tasks.shared';
+import type { RunCandidateAgent } from './tasks.shared';
 
 export interface RunTaskResult {
     taskId: string;
