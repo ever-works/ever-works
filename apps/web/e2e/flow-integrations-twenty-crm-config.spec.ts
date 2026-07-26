@@ -37,9 +37,11 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *                   GET  installations               (authed; no @Public)
  *                   POST installations/:id/sync      (authed)
  *                   POST installations/:id/repositories/:repoId/onboard (authed)
- *   - apps/api/src/integrations/github-app/github-app-webhook.controller.ts
+ *   - apps/api/src/ingest/github/github-app-webhook.controller.ts (moved here
+ *     when the two GitHub webhook receivers were consolidated; the route is
+ *     unchanged and now forwards to GitHubWebhookDispatcherService)
  *       @Public() POST webhooks: order = (1) missing x-github-event -> 400, then
- *         (2) missing rawBody -> 400, then (3) verifyWebhookSignature -> 401.
+ *         (2) missing rawBody -> 400, then (3) unverifiable signature -> 401.
  *   - apps/api/src/integrations/github-app/github-app.service.ts
  *       getInstallation() rejects non-numeric installation_id with 400 BEFORE
  *       calling GitHub; getCredentials() throws when GITHUB_APP creds unset (so

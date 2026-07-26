@@ -16,6 +16,22 @@ import type { HttpMethod } from './api-call';
  *  - `requiresConfirmation: true` on every destructive/irreversible/spendy op
  *    — the factory refuses to run it until the model re-calls with
  *    `confirmed: true`, which only happens after the user agrees in chat.
+ *
+ * ## Naming convention (decided; applies to NEW tools only)
+ *
+ * `snake_case`, action verb + singular noun (`get_digest`,
+ * `review_pull_request`). Every one of this manifest's entries already
+ * follows it, and so do the newer platform-side domain tools, so this is
+ * the majority convention on both sides — it is now the rule for anything
+ * added from here on.
+ *
+ * The platform's ORIGINAL built-in tools are camelCase (`searchWeb`,
+ * `sendEmail`, `createTask`), as are the hand-written web tools in the
+ * sibling `*.tools.ts` files (`listWorks`, `createMission`). Those are
+ * NOT renamed: a tool name is part of a live model contract and appears
+ * in stored conversation histories, so a rename breaks replay for zero
+ * user-visible gain. The split is documented rather than churned — see
+ * `docs/specs/features/chat-everything/README.md`.
  */
 
 export type OperationKind = 'read' | 'create' | 'update' | 'destructive' | 'action';
@@ -255,6 +271,67 @@ export const OPERATION_REGISTRY: OperationSpec[] = [
             'List the current user’s fleet — the machines enrolled to execute their work (desktop and headless nodes) plus live nodes of their own configured clusters. Each node carries kind, online/offline status, capability tags, platform and last-seen time.',
         kind: 'read',
         params: [],
+    },
+
+    // ── Event ingest, digest and PR review ───────────────────────
+    //
+    // The three tools the platform had and the web side structurally
+    // could not: this manifest binds tools to REST operations, and until
+    // the receiver/endpoint work landed there was no owner-scoped REST
+    // route behind any of them. Registering them here is what makes the
+    // platform and web tool surfaces finally agree.
+    {
+        toolName: 'list_recent_events',
+        method: 'GET',
+        path: '/api/ingest/events',
+        summary:
+            'List the current user’s recent external events ingested from connected sources (GitHub pull requests and @ever-works mentions, Slack, calendar and other connectors), newest first — optionally narrowed to one Work or one source. Use when asked what has been happening, what came in recently, or what a source has reported.',
+        kind: 'read',
+        params: [
+            {
+                name: 'workId',
+                in: 'query',
+                type: 'string',
+                description: 'Only events routed to this Work',
+            },
+            {
+                name: 'source',
+                in: 'query',
+                type: 'string',
+                description: 'Filter by producing plugin id, e.g. github or slack',
+            },
+            { name: 'limit', in: 'query', type: 'number', description: 'Max rows (default 20)' },
+        ],
+    },
+    {
+        toolName: 'get_digest',
+        method: 'GET',
+        path: '/api/digest',
+        summary:
+            'Get the current user’s activity digest for the day or the week — agent runs completed and failed, tasks done and in review, pull requests opened, ingested events by source, and progress on active goals — rendered as markdown plus a one-line summary. Use when asked for a catch-up, a standup, a recap or "what happened".',
+        kind: 'read',
+        params: [
+            {
+                name: 'period',
+                in: 'query',
+                type: 'string',
+                description: 'Digest window: daily (default) or weekly',
+            },
+        ],
+    },
+    {
+        toolName: 'review_pull_request',
+        method: 'POST',
+        path: '/api/pr-review',
+        summary:
+            'Run the Work-aware AI reviewer on a pull request and post the review as a comment on it. The repository must be connected to one of the current user’s Works. Optionally takes a reviewer instruction to focus the review.',
+        kind: 'action',
+        body: true,
+        bodyHint: 'owner, repo, prNumber, and optionally instruction and workId.',
+        // Posts a public comment on someone’s pull request and spends
+        // model credits on the diff — irreversible and spendy, so the
+        // user confirms in chat before it runs.
+        requiresConfirmation: true,
     },
 
     // ── Merge policy (Wave 3, founder decision D4) ───────────────

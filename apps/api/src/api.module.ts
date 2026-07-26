@@ -57,6 +57,8 @@ import { IngestModule } from './ingest/ingest.module';
 import { MeetingsApiModule } from './meetings/meetings.module';
 import { FleetApiModule } from './fleet/fleet.module';
 import { MergePolicyApiModule } from './merge-policy/merge-policy.module';
+import { DigestApiModule } from './digest/digest.module';
+import { PrReviewApiModule } from './pr-review/pr-review.module';
 import { TelemetryModule } from './telemetry/telemetry.module';
 import { UsersModule } from './users/users.module';
 import { ScopeModule } from './scope/scope.module';
@@ -217,6 +219,17 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // BillingService + BillingProvider seam. Additive beside the
         // read-only credits surface in SubscriptionsModule.
         BillingApiModule,
+        // Digest read (Wave 7) — GET /api/digest owner-scoped composed
+        // digest over the agent-side DigestModule. Cadence stays a
+        // profile preference; delivery stays on the digest-dispatcher
+        // cron. Exists so the `get_digest` chat tool has a REST operation
+        // the manifest-driven web tool registry can bind to.
+        DigestApiModule,
+        // AI PR review (Wave 7) — POST /api/pr-review owner-scoped
+        // trigger over the agent-side PrReviewModule, the third REST
+        // operation the web tool registry was missing. Refuses any
+        // repository not connected to one of the caller's own Works.
+        PrReviewApiModule,
         TelemetryModule,
         FunnelAnalyticsBindingModule,
         UploadsModule,

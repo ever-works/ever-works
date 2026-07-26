@@ -47,5 +47,16 @@ export type IngestBindingRefusal =
     /** Several installs matched and nothing distinguishes them. */
     | 'ambiguous-install';
 
-/** How the owning install was determined (drives the warn/record logic). */
-export type IngestBindingMatch = 'binding' | 'single-install' | 'signature';
+/**
+ * How the owning install was determined (drives the warn/record logic).
+ *
+ * `app-install` is the GitHub-only fifth path added by the receiver
+ * consolidation: the delivery verified against the PLATFORM GitHub App
+ * webhook secret, so the owner is the platform user who installed the
+ * App (`github_app_installations.createdByUserId`, or the GitHub user
+ * link behind `createdByGithubUserId`). It exists so that installing the
+ * GitHub App turns the review loop on with no second setup step — the
+ * binding it produces is still written to `ingest_install_bindings`, so
+ * there remains exactly ONE install-binding table.
+ */
+export type IngestBindingMatch = 'binding' | 'single-install' | 'signature' | 'app-install';
