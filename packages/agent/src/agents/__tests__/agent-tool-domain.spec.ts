@@ -229,13 +229,11 @@ describe('AgentToolService — domain chat tool assembly', () => {
         const byName = new Map(tools.map((tool) => [tool.name, tool]));
 
         await byName.get('list_recent_events')!.invoke({ limit: 5 });
-        // `findRecentByUser` takes either a bare limit or a filter object;
-        // the tool passes the filter form so `workId` / `source` can ride
-        // along. What this assertion is actually for is the FIRST
-        // argument — the owner is the agent's user, never the model's.
+        // #1872 gave findRecentByUser a filter object (workId/source support);
+        // the owner stays the first positional arg — that is what this pins.
         expect((sources.ingest!.repository as any).findRecentByUser).toHaveBeenCalledWith(
             'owner-9',
-            expect.objectContaining({ limit: 5 }),
+            { limit: 5 },
         );
 
         await byName.get('list_meetings')!.invoke({});

@@ -21,6 +21,31 @@ const NON_TERMINAL: AgentRunStatus[] = ['queued', 'running'];
  */
 const QUEUED_ONLY: AgentRunStatus[] = ['queued'];
 
+/**
+ * Namespace (`classid`) for every run-admission advisory lock, so this
+ * subsystem can never collide with another feature's advisory locks in
+ * the same Postgres database. Arbitrary but STABLE — changing it would
+ * make an old deploy and a new one lock on different keys during a
+ * rolling restart, which is exactly the window the lock exists for.
+ */
+export const RUN_ADMISSION_LOCK_CLASS_ID = 0x6577_0001 | 0; // 'ew' + subsystem 1
+
+/**
+ * FNV-1a over the scope key, coerced into Postgres' signed `int4` range
+ * (`pg_advisory_xact_lock(int4, int4)`). A hash collision costs only
+ * some extra serialization between two unrelated scopes — never
+ * correctness — which is why a 32-bit digest is enough here.
+ */
+export function advisoryLockObjectId(scopeKey: string): number {
+    let hash = 0x811c9dc5;
+    for (let i = 0; i < scopeKey.length; i += 1) {
+        hash ^= scopeKey.charCodeAt(i);
+        // FNV prime 16777619, kept in 32-bit space via Math.imul.
+        hash = Math.imul(hash, 0x01000193);
+    }
+    return hash | 0;
+}
+
 @Injectable()
 export class AgentRunRepository {
     private readonly logger = new Logger(AgentRunRepository.name);
@@ -806,6 +831,64 @@ export class AgentRunRepository {
     }
 
     // ── Run orchestration (Wave 4 M2/M3) ───────────────────────────
+
+    /**
+     * Serialize one admission scope's count-then-create against other
+     * dispatchers, so the concurrency valve cannot be walked past by a
+     * parallel burst.
+     *
+     * POSTGRES: takes `pg_advisory_xact_lock(classid, objid)` inside a
+     * throwaway transaction and holds it for the whole of `fn`. Two
+     * dispatchers admitting into the SAME scope now queue behind each
+     * other: the second one's count sees the first one's freshly
+     * committed run row instead of the pre-burst number. `fn` runs on
+     * the pool's normal connection (auto-commit), so its writes are
+     * visible the moment this transaction releases the lock.
+     *
+     * EVERY OTHER DRIVER (better-sqlite3 — the whole e2e/CI stack —
+     * plus mysql/mssql): advisory locks do not exist, so this is a
+     * DOCUMENTED no-op that calls `fn` directly. Behaviour there is
+     * exactly what it was before this method existed: a burst may
+     * transiently exceed a valve by the burst width. That is acceptable
+     * because the valve is a safety valve, and because the CAS claim in
+     * {@link claimQueuedForDispatch} — not this lock — is the
+     * correctness floor that stops two drains double-dispatching one
+     * run.
+     *
+     * Never fails the caller on account of the lock itself: a lock
+     * acquisition error degrades to running `fn` unlocked (same posture
+     * as the gate's fail-open counting), because a broken safety valve
+     * must never stop legitimate work.
+     */
+    async withAdmissionLock<T>(scopeKey: string, fn: () => Promise<T>): Promise<T> {
+        const driver = this.repository.manager.connection.options.type;
+        if (driver !== 'postgres') {
+            return fn();
+        }
+        const objId = advisoryLockObjectId(scopeKey);
+        // Distinguishes "the lock plumbing broke" (swallow, retry
+        // unlocked) from "`fn` threw" (re-raise). Re-running `fn` after
+        // it already ran would double-create the run row it reserves.
+        let entered = false;
+        try {
+            return await this.repository.manager.connection.transaction(async (manager) => {
+                await manager.query('SELECT pg_advisory_xact_lock($1, $2)', [
+                    RUN_ADMISSION_LOCK_CLASS_ID,
+                    objId,
+                ]);
+                entered = true;
+                return fn();
+            });
+        } catch (err) {
+            if (entered) throw err;
+            this.logger.warn(
+                `Admission advisory lock unavailable for scope ${scopeKey} — admitting unlocked: ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+            return fn();
+        }
+    }
 
     /**
      * In-flight = `running`, plus `queued` rows that were actually handed

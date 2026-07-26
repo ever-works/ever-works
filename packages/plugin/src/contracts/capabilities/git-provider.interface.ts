@@ -201,6 +201,97 @@ export interface ListPullRequestsOptions {
 	readonly page?: number;
 }
 
+// ── PR insights (kanban run cockpit M5/M6) ─────────────────────────
+//
+// Two optional read capabilities used by the Tasks board to render a
+// review pill (PR state + CI dot) and a diff preview without the
+// browser ever talking to a provider API. Both are OPTIONAL: a
+// git-provider plugin that cannot answer simply omits them, and the
+// facade maps the absence to a caller-actionable 409 rather than a 500
+// (the lazy-plugin proxy over-reports method presence, so callers must
+// verify before calling — see `GitFacadeService`).
+
+/** Lifecycle of a single CI check / status attached to a commit. */
+export type GitCheckStatus = 'queued' | 'in_progress' | 'completed' | 'unknown';
+
+/**
+ * Terminal verdict of a check. `null` while the check has not completed.
+ * The string set is deliberately provider-neutral — implementations map
+ * their own vocabulary onto it.
+ */
+export type GitCheckConclusion =
+	| 'success'
+	| 'failure'
+	| 'neutral'
+	| 'cancelled'
+	| 'timed_out'
+	| 'action_required'
+	| 'skipped'
+	| 'stale';
+
+export interface GitPullRequestCheck {
+	/** Human name of the check. Plain text — never rendered as markup. */
+	readonly name: string;
+	readonly status: GitCheckStatus;
+	readonly conclusion?: GitCheckConclusion | null;
+	readonly detailsUrl?: string;
+}
+
+/**
+ * Rolled-up CI verdict for the PR's head commit, in the exact vocabulary
+ * the board's CI dot renders: green / red / amber / gray.
+ */
+export type GitCiState = 'passing' | 'failing' | 'pending' | 'unknown';
+
+/** Aggregate review verdict across the PR's reviewers. */
+export type GitReviewDecision = 'approved' | 'changes_requested' | 'review_required';
+
+export interface GitPullRequestStatus {
+	readonly number: number;
+	/** `draft` is reported separately from `open` so the pill can say so. */
+	readonly state: 'open' | 'draft' | 'closed' | 'merged';
+	readonly merged: boolean;
+	/** Provider's mergeability verdict; `null` when still being computed. */
+	readonly mergeable?: boolean | null;
+	readonly headSha?: string | null;
+	readonly reviewDecision?: GitReviewDecision | null;
+	readonly ciState: GitCiState;
+	/** Bounded list — implementations cap it (see `MAX_PR_CHECKS`). */
+	readonly checks: readonly GitPullRequestCheck[];
+	readonly url?: string;
+	readonly title?: string;
+}
+
+/** Hard caps a diff request may ask for. */
+export interface GitDiffOptions {
+	readonly maxBytes?: number;
+	readonly maxFiles?: number;
+}
+
+export interface GitDiffFile {
+	readonly path: string;
+	/** Provider status verbatim (`added`/`modified`/`removed`/…). */
+	readonly status: string;
+	readonly additions: number;
+	readonly deletions: number;
+	/** Unified patch; omitted when the byte budget was already spent. */
+	readonly patch?: string;
+	/** True when this file's own patch was dropped for the byte budget. */
+	readonly patchOmitted?: boolean;
+}
+
+export interface GitDiffResult {
+	readonly files: readonly GitDiffFile[];
+	/** True when files and/or patches were dropped to honour the caps. */
+	readonly truncated: boolean;
+	/** Files the provider reported BEFORE the file cap was applied. */
+	readonly totalFiles: number;
+	readonly totalAdditions: number;
+	readonly totalDeletions: number;
+	/** Bytes of patch text actually returned. */
+	readonly patchBytes: number;
+}
+
 /**
  * Local git operations using isomorphic-git.
  * Implemented in BaseGitProvider - plugin developers extend that class.
@@ -304,6 +395,46 @@ export interface IGitProviderPlugin extends IPlugin, IGitOperations {
 		token: string
 	): Promise<GitPullRequest[]>;
 	getPullRequestFiles?(owner: string, repo: string, prNumber: number, token: string): Promise<GitPullRequestFile[]>;
+
+	/**
+	 * PR insights (kanban M5) — state + review decision + rolled-up CI
+	 * verdict for the board's review pill. Returns `null` when the PR
+	 * does not exist (never throws for a 404), so a deleted PR degrades
+	 * to "no pill" instead of an error banner.
+	 */
+	getPullRequestStatus?(
+		owner: string,
+		repo: string,
+		prNumber: number,
+		token: string
+	): Promise<GitPullRequestStatus | null>;
+
+	/**
+	 * PR insights (kanban M6) — capped diff for the board's preview
+	 * sheet. Implementations MUST honour `opts.maxFiles`/`opts.maxBytes`
+	 * and report `truncated: true` when anything was dropped: the caller
+	 * shows a "see the full diff on the provider" link off that flag.
+	 */
+	getPullRequestDiff?(
+		owner: string,
+		repo: string,
+		prNumber: number,
+		opts: GitDiffOptions | undefined,
+		token: string
+	): Promise<GitDiffResult>;
+
+	/**
+	 * Same shape for a branch that has no PR yet (`base...head`). Cheap
+	 * on providers with a compare endpoint; omit it where there is none.
+	 */
+	getCompareDiff?(
+		owner: string,
+		repo: string,
+		base: string,
+		head: string,
+		opts: GitDiffOptions | undefined,
+		token: string
+	): Promise<GitDiffResult>;
 	createPullRequestComment?(
 		owner: string,
 		repo: string,

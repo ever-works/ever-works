@@ -2,8 +2,10 @@ import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { config } from '../config';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
 import {
+    AGENT_CHAT_REPLY_DISPATCHER,
     AGENT_TASK_EXECUTE_DISPATCHER,
     JOB_RUNTIME_NOT_CONFIGURED_REASON,
+    type AgentChatReplyDispatcher,
     type AgentTaskExecuteDispatcher,
 } from '../tasks-domain/task-dispatcher';
 import { RUN_CREDITS_PRECHECK, type RunCreditsPrecheck } from './run-credits-precheck';
@@ -45,6 +47,34 @@ export interface RunDispatchDrainResult {
 }
 
 /**
+ * Persist-the-run half of an admission. Runs INSIDE the advisory lock
+ * (Postgres) so the valve's count and the row that consumes a slot are
+ * one critical section instead of a check-then-insert race.
+ *
+ * Contract: exactly one call per `admit()` that supplies it, and it must
+ * be the thing that creates the `agent_runs` row (parked or not).
+ */
+export type RunDispatchReserve = (admission: RunDispatchAdmitResult) => Promise<void>;
+
+/**
+ * The scope a burst is serialized on. Narrowest-wins: a Work when the
+ * run has one (that is the valve that actually saturates, and it keeps
+ * two Works in one org from serializing against each other), else the
+ * org, else the user.
+ *
+ * Consequence, stated plainly: with a Work-scoped lock the per-ORG valve
+ * is still check-then-insert across different Works of the same org. It
+ * is a safety valve with a burst-width tolerance, not a quota — and
+ * locking every dispatch in an org behind one key would be a far worse
+ * trade.
+ */
+export function runAdmissionLockScope(input: RunDispatchAdmitInput): string {
+    if (input.workId) return `work:${input.workId}`;
+    if (input.organizationId) return `org:${input.organizationId}`;
+    return `user:${input.userId}`;
+}
+
+/**
  * Run orchestration (Wave 4 M2) — the single concurrency choke point for
  * agent-run dispatch.
  *
@@ -63,11 +93,29 @@ export interface RunDispatchDrainResult {
  * terminal transitions (worker terminal writes, user cancel) and from the
  * stuck-run sweeper as the safety net.
  *
- * Races: the count is check-then-insert without an advisory lock (the
- * e2e suite runs on sqlite, which has none), so a parallel burst can
- * transiently exceed a valve by the burst width. Acceptable for a safety
- * valve; the CAS claim in `claimQueuedForDispatch` is what prevents the
- * harmful race — two drains double-dispatching one run.
+ * Races: pass a `reserve` callback to `admit()` and the count + the
+ * caller's row insert become ONE critical section, serialized per
+ * admission scope by `pg_advisory_xact_lock` when the driver is Postgres
+ * (`AgentRunRepository.withAdmissionLock`). On sqlite — the entire e2e
+ * stack — advisory locks do not exist, so that degrades to a documented
+ * no-op and a parallel burst can still transiently exceed a valve by the
+ * burst width. Acceptable for a safety valve; the CAS claim in
+ * `claimQueuedForDispatch` remains the correctness floor either way — it
+ * is what prevents the harmful race, two drains double-dispatching one
+ * run.
+ *
+ * EVERY path that enqueues an AgentRun goes through `admit()`: the task
+ * fan-out and board/batch run (`TaskTransitionService.dispatchAgentRun`),
+ * resume (`RunSteeringService`), agent-mention chat replies
+ * (`TaskChatService`), the heartbeat cron + run-now
+ * (`AgentScheduleDispatcherService`) and `POST /agents/:id/assign-task`.
+ * The DOCUMENTED bypasses, which must stay bypassed, are:
+ *   - this service's own `drainForWork` (it IS the gate, and re-admits);
+ *   - the worker-side `createQueued` fallbacks in `@ever-works/tasks`
+ *     trigger tasks — the job runtime has already accepted that job, so
+ *     the row is bookkeeping for work in flight, not a new admission;
+ *   - `TerminalSessionLauncher` — attaches a shell to an ALREADY-admitted
+ *     live run; it enqueues no AgentRun.
  */
 @Injectable()
 export class RunDispatchGateService {
@@ -89,6 +137,14 @@ export class RunDispatchGateService {
         @Optional()
         @Inject(RUN_CREDITS_PRECHECK)
         private readonly creditsPrecheck?: RunCreditsPrecheck,
+        // Chat-triggered runs are now gated too, so the drain must be
+        // able to put one back on the path it came from. Same @Optional()
+        // + appended-LAST posture as every other seam here (the
+        // positional-spec arity rule): unit tests and chat-less installs
+        // simply report `no-dispatcher` for a parked chat run.
+        @Optional()
+        @Inject(AGENT_CHAT_REPLY_DISPATCHER)
+        private readonly chatDispatcher?: AgentChatReplyDispatcher,
     ) {}
 
     /** Env default today; per-Work override column when it lands. */
@@ -104,8 +160,47 @@ export class RunDispatchGateService {
      * Decide whether a new run may be handed to the job runtime NOW.
      * Never throws on its own account — callers treat a thrown counting
      * failure as fail-open (a broken safety valve must not stop work).
+     *
+     * `reserve` (optional) turns the call into a critical section: the
+     * count AND the caller's `agent_runs` insert run under one
+     * `pg_advisory_xact_lock` on Postgres, closing the check-then-insert
+     * window that let a parallel burst walk past the valve. On every
+     * other driver the lock is a documented no-op (see
+     * {@link AgentRunRepository.withAdmissionLock}). When `reserve` is
+     * supplied it is called EXACTLY ONCE — including on the fail-open
+     * path, so a broken valve still produces a run — and errors it
+     * raises propagate to the caller unchanged.
+     *
+     * Callers that only need the verdict (the drain, admission probes)
+     * omit `reserve` and get the pre-existing behaviour byte for byte.
      */
-    async admit(input: RunDispatchAdmitInput): Promise<RunDispatchAdmitResult> {
+    async admit(
+        input: RunDispatchAdmitInput,
+        reserve?: RunDispatchReserve,
+    ): Promise<RunDispatchAdmitResult> {
+        if (!reserve) return this.evaluate(input);
+        // `withAdmissionLock` is optional on the repository so hand-built
+        // stubs in unit tests (and any partial mock) keep working — they
+        // simply run unlocked, which is what sqlite does anyway.
+        const run = async (): Promise<RunDispatchAdmitResult> => {
+            let admission: RunDispatchAdmitResult;
+            try {
+                admission = await this.evaluate(input);
+            } catch (err) {
+                // Fail-open: a broken counting query must never stop
+                // legitimate dispatch. The caller still gets its row.
+                this.logger.warn(`Dispatch gate: admission evaluation failed (fail-open): ${err}`);
+                admission = { admitted: true };
+            }
+            await reserve(admission);
+            return admission;
+        };
+        return typeof this.runs.withAdmissionLock === 'function'
+            ? this.runs.withAdmissionLock(runAdmissionLockScope(input), run)
+            : run();
+    }
+
+    private async evaluate(input: RunDispatchAdmitInput): Promise<RunDispatchAdmitResult> {
         const workLimit = this.resolveWorkLimit();
         if (input.workId && workLimit > 0) {
             const inFlight = await this.runs.countInFlightForWork(input.workId);
@@ -178,14 +273,20 @@ export class RunDispatchGateService {
             );
             if (!candidate) return { dispatched: false, reason: 'no-candidate' };
             if (!candidate.taskId) {
-                // Only the task dispatch path parks runs today; a parked
-                // run without a Task cannot be re-dispatched through the
-                // agent-task-execute path. Surface loudly.
+                // Every parking path is Task-keyed (task fan-out, board
+                // run, resume, chat reply); a parked run without a Task
+                // cannot be re-dispatched through either runtime path.
+                // Surface loudly.
                 this.logger.warn(
                     `Dispatch gate: parked run ${candidate.id} has no taskId — cannot drain.`,
                 );
                 return { dispatched: false, reason: 'no-candidate' };
             }
+            // A chat-triggered run must go back out as `agent-chat-reply`
+            // with its triggering message, NOT as `agent-task-execute` —
+            // re-dispatching it on the task path would drop the message
+            // the agent is supposed to be replying to.
+            const viaChat = candidate.triggerKind === 'chat' && Boolean(candidate.chatMessageId);
 
             const admission = await this.admit({
                 userId: candidate.userId,
@@ -194,7 +295,7 @@ export class RunDispatchGateService {
             });
             if (!admission.admitted) return { dispatched: false, reason: 'over-limit' };
 
-            if (!this.dispatcher) {
+            if (viaChat ? !this.chatDispatcher : !this.dispatcher) {
                 // Nothing to dispatch through — leave the row parked (it
                 // was never claimed) and tell the caller why.
                 return { dispatched: false, reason: 'no-dispatcher' };
@@ -207,18 +308,28 @@ export class RunDispatchGateService {
             if (!claimed) return { dispatched: false, reason: 'claim-lost' };
 
             try {
-                const handle = await this.dispatcher.enqueue({
-                    agentId: candidate.agentId,
-                    userId: candidate.userId,
-                    taskId: candidate.taskId,
-                    // Unique per parked row — the original generation-based
-                    // key is unknowable here, and this run was never handed
-                    // to the runtime, so a run-scoped key both dedups a
-                    // double drain at the runner AND cannot collide with the
-                    // fan-out key of the run that was admitted immediately.
-                    dedupKey: `${candidate.taskId}:${candidate.agentId}:drain:${candidate.id}`,
-                    runId: candidate.id,
-                });
+                // Unique per parked row — the original generation-based
+                // key is unknowable here, and this run was never handed
+                // to the runtime, so a run-scoped key both dedups a
+                // double drain at the runner AND cannot collide with the
+                // fan-out key of the run that was admitted immediately.
+                const dedupKey = `${candidate.taskId}:${candidate.agentId}:drain:${candidate.id}`;
+                const handle = viaChat
+                    ? await this.chatDispatcher!.enqueue({
+                          agentId: candidate.agentId,
+                          userId: candidate.userId,
+                          taskId: candidate.taskId,
+                          triggeringMessageId: candidate.chatMessageId!,
+                          dedupKey,
+                          runId: candidate.id,
+                      })
+                    : await this.dispatcher!.enqueue({
+                          agentId: candidate.agentId,
+                          userId: candidate.userId,
+                          taskId: candidate.taskId,
+                          dedupKey,
+                          runId: candidate.id,
+                      });
                 if (handle?.runId) {
                     try {
                         await this.runs.setTriggerRunId(candidate.id, handle.runId);

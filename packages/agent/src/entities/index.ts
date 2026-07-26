@@ -125,6 +125,15 @@ export * from './meeting.entity';
 // Credits ledger + plan entitlements (pricing Wave 9 M1)
 export * from './credit-ledger-entry.entity';
 export * from './plan-entitlement.entity';
+// Payment provider bridge (billing PRD §5.3(3)/(4)) — customer mapping +
+// payment-method summary + auto-recharge state, and the invoice mirror
+export * from './billing-profile.entity';
+export * from './invoice.entity';
 // Fleet (Wave 12, slice 1) — enrolled execution nodes with heartbeat
 export * from './fleet-node.entity';
+// Streaming-terminal M9 / founder decision D1 — persisted, redacted,
+// retention-capped terminal transcripts.
+export * from './terminal-transcript-chunk.entity';
+
 export * from './fleet-job.entity';
+

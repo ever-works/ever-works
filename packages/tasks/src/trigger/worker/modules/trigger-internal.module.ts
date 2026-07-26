@@ -14,10 +14,12 @@ import {
     AgentRunSweeperService,
     AgentScheduleDispatcherService,
     RunDispatchGateService,
+    TerminalTranscriptService,
 } from '@ever-works/agent/agents';
 import {
     TaskChatService,
     TaskGateRunnerService,
+    TaskPrStatusService,
     TaskRecurrenceDispatcherService,
     TaskRunDenormService,
     TasksService,
@@ -220,6 +222,17 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
                 createRemoteProxy(apiClient, 'TaskChatService'),
             inject: [TriggerInternalApiClient],
         },
+        // Kanban run cockpit (plan 04 M5/M7) — the task-pr-status-sync
+        // cron calls syncDuePrStatuses() over the internal RPC channel.
+        // The real service needs the git facade (provider plugins are
+        // only loaded in the API process), same shape as
+        // TaskWorkspaceService.
+        {
+            provide: TaskPrStatusService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'TaskPrStatusService'),
+            inject: [TriggerInternalApiClient],
+        },
         // Notifications v2 (EW-663) — the notification-channel-delivery
         // task calls `deliverToChannelOrThrow` on this proxy, which RPCs
         // to the live API where the channel plugins are loaded.
@@ -295,6 +308,17 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
                 createRemoteProxy(apiClient, 'CreditLedgerService'),
             inject: [TriggerInternalApiClient],
         },
+        // Terminal transcripts (streaming-terminal M9 / founder decision
+        // D1) — the terminal-transcript-gc cron calls `sweepExpired()` on
+        // this proxy, which RPCs to the live API where the chunk
+        // repository and the plan-entitlement lever are wired. Same shape
+        // as CreditLedgerService above.
+        {
+            provide: TerminalTranscriptService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'TerminalTranscriptService'),
+            inject: [TriggerInternalApiClient],
+        },
     ],
     exports: [
         TriggerInternalApiClient,
@@ -326,6 +350,7 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         EventSourcePullService,
         DigestService,
         CreditLedgerService,
+        TerminalTranscriptService,
     ],
 })
 export class TriggerInternalModule {}

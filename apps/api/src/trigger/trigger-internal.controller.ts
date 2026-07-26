@@ -50,10 +50,12 @@ import {
     AgentRunSweeperService,
     AgentScheduleDispatcherService,
     RunDispatchGateService,
+    TerminalTranscriptService,
 } from '@ever-works/agent/agents';
 import {
     TaskChatService,
     TaskGateRunnerService,
+    TaskPrStatusService,
     TaskRunDenormService,
     TaskWorkspaceService,
     TaskRecurrenceDispatcherService,
@@ -311,13 +313,28 @@ export class TriggerInternalController implements OnModuleInit {
         // LAST + @Optional() per the arity rule above.
         @Optional()
         private readonly eventSourcePullService?: EventSourcePullService,
+        // Streaming-terminal M9 / founder decision D1 — backs the
+        // `terminal-transcript-gc` cron: the worker proxy calls
+        // `sweepExpired()` over the internal RPC channel, landing here
+        // where the chunk repository + plan entitlements are wired.
+        // Appended LAST + @Optional() per the arity rule above.
+        @Optional()
+        private readonly terminalTranscriptService?: TerminalTranscriptService,
+
         // Fleet job runtime (Desktop PRD M4) — backs the
         // `fleet-job-lease-sweeper` cron: the worker proxy calls
         // `reclaimExpired()` over the internal RPC channel to return
         // lapsed claims to the pool. Appended LAST + @Optional() per the
         // arity rule above.
-        @Optional()
         private readonly fleetJobService?: FleetJobService,
+
+        // Kanban run cockpit (plan 04 M5/M7) — backs the
+        // `task-pr-status-sync` cron: the worker proxy calls
+        // `syncDuePrStatuses()` over the internal RPC channel, landing
+        // here where the git-provider plugins + credentials are wired.
+        // Appended LAST + @Optional() per the arity rule above.
+        @Optional()
+        private readonly taskPrStatusService?: TaskPrStatusService,
     ) {}
 
     onModuleInit() {
@@ -399,9 +416,17 @@ export class TriggerInternalController implements OnModuleInit {
             // Credits ledger (pricing Wave 9 M1) — `credits-daily-grant`
             // calls `dispatchDailyGrants()` here (allow-list auto-derived).
             CreditLedgerService: this.creditLedgerService,
+            // Streaming-terminal M9 / D1 — `terminal-transcript-gc` calls
+            // `sweepExpired()` here (allow-list auto-derived).
+            TerminalTranscriptService: this.terminalTranscriptService,
+
             // Fleet job runtime (Desktop PRD M4) — `fleet-job-lease-sweeper`
             // calls `reclaimExpired()` here (allow-list auto-derived).
             FleetJobService: this.fleetJobService,
+
+            // Kanban run cockpit (plan 04 M5/M7) — `task-pr-status-sync`
+            // calls `syncDuePrStatuses()` here (allow-list auto-derived).
+            TaskPrStatusService: this.taskPrStatusService,
             ...(this.workProposalsApiService
                 ? { WorkProposalsApiService: this.workProposalsApiService }
                 : {}),

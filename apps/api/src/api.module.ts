@@ -21,6 +21,7 @@ import { HealthModule } from './health/health.module';
 import { TriggerInternalModule } from './trigger/trigger-internal.module';
 import { GitHubAppModule, TwentyCrmModule } from './integrations';
 import { SubscriptionsModule } from './subscriptions/subscriptions.module';
+import { BillingApiModule } from './billing/billing.module';
 import { NotificationsModule } from './notifications/notifications.module';
 import { BudgetsModule } from './budgets/budgets.module';
 import { ScreenshotModule } from './plugins-capabilities/screenshot/screenshot.module';
@@ -223,6 +224,12 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // operation the web tool registry was missing. Refuses any
         // repository not connected to one of the caller's own Works.
         PrReviewApiModule,
+        // The money path (billing PRD B5) — /api/credits/checkout,
+        // /api/billing/{overview,invoices,auto-recharge} and the
+        // signature-verified /api/billing/webhook over the agent-side
+        // BillingService + BillingProvider seam. Additive beside the
+        // read-only credits surface in SubscriptionsModule.
+        BillingApiModule,
         TelemetryModule,
         FunnelAnalyticsBindingModule,
         UploadsModule,

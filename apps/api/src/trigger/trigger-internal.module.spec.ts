@@ -59,6 +59,12 @@ jest.mock('@ever-works/agent/work-agent', () => ({
 // the entity transitive imports under jest.
 jest.mock('@ever-works/agent/agents', () => ({
     AgentsModule: class AgentsModule {},
+    // Streaming-terminal M9 / D1 — the module imports
+    // TerminalTranscriptModule (and the controller it declares imports
+    // TerminalTranscriptService) from the agents barrel; stub both so
+    // the entity chain is never loaded.
+    TerminalTranscriptModule: class TerminalTranscriptModule {},
+    TerminalTranscriptService: class TerminalTranscriptService {},
 }));
 jest.mock('@ever-works/agent/tasks-domain', () => ({
     TasksDomainModule: class TasksDomainModule {},
