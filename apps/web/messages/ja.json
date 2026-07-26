@@ -5562,6 +5562,10 @@
             },
             "errors": {
                 "generic": "Failed to save. Please try again."
+            },
+            "mergePolicy": {
+                "title": "Merge policy",
+                "subtitle": "Whether agents may land the pull requests they open in this Organization. Works and Agents underneath can still override any single field."
             }
         },
         "switcher": {

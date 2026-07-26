@@ -45,6 +45,8 @@ jest.mock('../ingest-install-binding.repository', () => ({
 }));
 
 import 'reflect-metadata';
+import { WorkRepository } from '../../database/repositories/work.repository';
+import { WorkHintResolverService } from '../work-hint-resolver.service';
 import { EventIngestModule } from '../ingest.module';
 import { IngestedEventRepository } from '../ingested-event.repository';
 import { EventIngestService } from '../event-ingest.service';
@@ -63,6 +65,8 @@ describe('EventIngestModule', () => {
             EventIngestService,
             IngestCursorRepository,
             EventSourcePullService,
+            WorkRepository,
+            WorkHintResolverService,
             IngestInstallBindingRepository,
         ]);
     });
@@ -73,6 +77,8 @@ describe('EventIngestModule', () => {
             EventIngestService,
             IngestCursorRepository,
             EventSourcePullService,
+            WorkRepository,
+            WorkHintResolverService,
             IngestInstallBindingRepository,
         ]);
     });
@@ -81,7 +87,9 @@ describe('EventIngestModule', () => {
         const imports = meta('imports');
         expect(imports).toContain(ActivityLogModule);
         expect(imports).toContain(FacadesModule);
-        expect(imports).toHaveLength(3);
+        // Two forFeature() calls now: the ingest entities plus Work, which the
+        // workId-routing resolver reads. Both render as TypeOrmFeatureStub.
+        expect(imports).toHaveLength(4);
     });
 });
 

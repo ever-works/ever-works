@@ -12,6 +12,10 @@ export * from './terminal-session.task';
 // persisted terminal transcripts.
 export * from './terminal-transcript-gc.task';
 export * from './task-branch-gc.task';
+// Desktop PRD M4 — return lapsed fleet-job leases to the pool so a
+// fleet whose nodes ALL died still converges (inline reclaim on the
+// lease path covers every other case).
+export * from './fleet-job-lease-sweeper.task';
 export * from './user-research-rerun-dispatcher.task';
 export * from './mission-tick.task';
 // PR-4 — Idea → Work build executor (flag-gated, dry-run by default).

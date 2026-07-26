@@ -4,6 +4,7 @@ import { useMemo, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import {
+    Activity,
     AlertTriangle,
     Copy,
     Laptop,
@@ -252,6 +253,9 @@ export function FleetSettings({ initialNodes, loadError }: FleetSettingsProps) {
                                     {t('table.platform')}
                                 </th>
                                 <th className="px-4 py-2.5 font-medium text-text-muted dark:text-text-muted-dark">
+                                    {t('table.load')}
+                                </th>
+                                <th className="px-4 py-2.5 font-medium text-text-muted dark:text-text-muted-dark">
                                     {t('table.capabilities')}
                                 </th>
                                 <th className="px-4 py-2.5 font-medium text-text-muted dark:text-text-muted-dark">
@@ -293,6 +297,37 @@ export function FleetSettings({ initialNodes, loadError }: FleetSettingsProps) {
                                     </td>
                                     <td className="px-4 py-3 text-text-muted dark:text-text-muted-dark">
                                         {node.platform ?? '-'}
+                                    </td>
+                                    <td className="px-4 py-3">
+                                        {(() => {
+                                            const activeJobs = node.load?.activeJobCount ?? 0;
+                                            return (
+                                                <span
+                                                    className={`inline-flex items-center gap-1.5 text-xs font-medium ${
+                                                        activeJobs > 0
+                                                            ? 'text-info'
+                                                            : 'text-text-muted dark:text-text-muted-dark'
+                                                    }`}
+                                                    data-testid={`fleet-node-load-${node.id}`}
+                                                    title={
+                                                        node.load?.currentJobKind
+                                                            ? t('load.currentJob', {
+                                                                  kind: node.load.currentJobKind,
+                                                              })
+                                                            : undefined
+                                                    }
+                                                >
+                                                    {activeJobs > 0 ? (
+                                                        <>
+                                                            <Activity className="w-3 h-3" />
+                                                            {t('load.busy', { count: activeJobs })}
+                                                        </>
+                                                    ) : (
+                                                        t('load.idle')
+                                                    )}
+                                                </span>
+                                            );
+                                        })()}
                                     </td>
                                     <td className="px-4 py-3">
                                         <div className="flex flex-wrap gap-1">

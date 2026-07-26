@@ -366,6 +366,15 @@ describe('GitHubPrReviewBridgeService', () => {
             const [, envelopes] = eventIngestService.ingest.mock.calls[0];
             expect(envelopes[0].sourceEventId).toBe('pr:octo/site#7@def456');
         });
+
+        it('carries the repo workHint so the spine can route the event to a Work', async () => {
+            const { service, eventIngestService } = createService();
+            await service.handleEvent(BINDING, 'pull_request', prOpenedBody());
+            await flush();
+
+            const [, envelopes] = eventIngestService.ingest.mock.calls[0];
+            expect(envelopes[0].workHint).toEqual({ kind: 'repo', externalId: 'octo/site' });
+        });
     });
 
     describe('@ever-works mention loop', () => {
@@ -378,6 +387,7 @@ describe('GitHubPrReviewBridgeService', () => {
             expect(envelopes[0]).toMatchObject({
                 kind: 'github.mention',
                 sourceEventId: 'comment:octo/site:42',
+                workHint: { kind: 'repo', externalId: 'octo/site' },
             });
             expect(prReviewService.reviewPullRequest).toHaveBeenCalledWith({
                 userId: 'user-1',

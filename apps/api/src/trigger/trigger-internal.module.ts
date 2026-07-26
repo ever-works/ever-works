@@ -13,6 +13,7 @@ import { TasksDomainModule } from '@ever-works/agent/tasks-domain';
 import { EventIngestModule } from '@ever-works/agent/ingest';
 import { DigestModule } from '@ever-works/agent/digest';
 import { SubscriptionsModule as AgentSubscriptionsModule } from '@ever-works/agent/subscriptions';
+import { FleetModule as AgentFleetModule } from '@ever-works/agent/fleet';
 import { WorkProposalsModule } from '../work-proposals/work-proposals.module';
 import { DataSyncModule } from '../data-sync/data-sync.module';
 import { TenantJobRuntimeModule } from '../account/tenant-job-runtime/tenant-job-runtime.module';
@@ -94,6 +95,15 @@ import { OrganizationsModule } from '../organizations/organizations.module';
         // can drive `sweepExpired()` over the internal RPC channel each
         // night, pruning each run's transcript to its plan-tier window.
         TerminalTranscriptModule,
+
+        // Fleet job runtime (Desktop PRD M4) — exposes FleetJobService
+        // through the remote-proxy controller so the
+        // fleet-job-lease-sweeper cron task (in packages/tasks) can drive
+        // `reclaimExpired()` over the internal RPC channel. Reclaim also
+        // runs inline on every node lease poll; the cron is what makes a
+        // fleet whose nodes ALL died still converge.
+        AgentFleetModule,
+
     ],
     controllers: [TriggerInternalController],
 })

@@ -64,12 +64,25 @@ export class UserPluginRepository {
     }
 
     /**
-     * Find all user records for a specific plugin
+     * Find all user records for a specific plugin.
+     *
+     * NOTE: `UserPluginEntity` deliberately has NO `user` relation — the
+     * owner is a loosely-coupled `userId` string column (see the entity's
+     * own comment), and the only relation it declares is `pluginEntity`.
+     * This method used to ask TypeORM for `relations: ['user']`, which
+     * throws `EntityPropertyNotFoundError` at QUERY time — invisible to
+     * unit tests (they mock the repository) and to `tsc`. It went
+     * unnoticed while the method had no callers; the 2026-07 program
+     * wired it into three live paths (the Slack + GitHub webhook
+     * receivers, which then 500'd on EVERY delivery instead of failing
+     * closed with a 401, and the `event-source` pull tick, whose
+     * catch-and-continue turned it into a silently dead pull half).
+     * Callers only ever read `userId` / `enabled` / `createdAt`, so the
+     * fix is simply not to ask for a relation that does not exist.
      */
     async findByPlugin(pluginId: string): Promise<UserPluginEntity[]> {
         return this.repository.find({
             where: { pluginId },
-            relations: ['user'],
         });
     }
 

@@ -130,3 +130,6 @@ export * from './fleet-node.entity';
 // Streaming-terminal M9 / founder decision D1 — persisted, redacted,
 // retention-capped terminal transcripts.
 export * from './terminal-transcript-chunk.entity';
+
+export * from './fleet-job.entity';
+

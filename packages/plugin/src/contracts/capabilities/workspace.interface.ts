@@ -59,6 +59,18 @@ export interface WorkspaceFinalizeResult {
 	headSha: string | null;
 	/** True when there was nothing to commit (clean tree). */
 	empty: boolean;
+	/**
+	 * How many distinct files the branch changed relative to the base it
+	 * was cut from (`git diff --name-only <baseSha>..HEAD`), i.e. the
+	 * whole branch's footprint — not just this finalize's commit — so a
+	 * re-run on a reused workspace reports the cumulative total.
+	 *
+	 * OPTIONAL and best-effort: providers that cannot compute it (or
+	 * whose diff call fails) omit it, and the caller leaves
+	 * `agent_runs.changedFilesCount` untouched rather than writing a
+	 * wrong 0. Never a reason to fail a finalize.
+	 */
+	changedFiles?: number;
 }
 
 export interface WorkspaceMergeSimulation {

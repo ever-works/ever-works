@@ -52,6 +52,41 @@ export interface TaskRun {
     gateStatus?: GateStatus | null;
 }
 
+// ── Board dispatch (kanban M3 / M4) ───────────────────────────────
+
+/**
+ * Stable machine codes the board keys its behaviour off — mirrored from
+ * `@ever-works/agent/tasks-domain`. Never branch on the message: the
+ * production build redacts thrown Server-Action messages.
+ */
+export const RUN_ALREADY_IN_FLIGHT = 'RUN_ALREADY_IN_FLIGHT';
+export const RUN_AGENT_AMBIGUOUS = 'RUN_AGENT_AMBIGUOUS';
+export const RUN_NO_AGENT = 'RUN_NO_AGENT';
+export const RUN_AGENT_NOT_FOUND = 'RUN_AGENT_NOT_FOUND';
+
+/** One row of the board's agent picker. */
+export interface RunCandidateAgent {
+    id: string;
+    name: string;
+    slug?: string;
+    status?: string;
+    source: 'assignee' | 'task' | 'work-default';
+}
+
+export interface RunTaskResult {
+    taskId: string;
+    agentId: string;
+    runId: string | null;
+    dispatched: boolean;
+    parked: boolean;
+    queuedReason?: string;
+    error?: string;
+}
+
+export type RunBatchItemResult =
+    | { taskId: string; ok: true; run: RunTaskResult }
+    | { taskId: string; ok: false; error: { code: string; message: string } };
+
 export interface Task {
     id: string;
     userId: string;
@@ -237,6 +272,11 @@ export const tasksAPI = {
         });
     },
 
+    // ── Board dispatch (kanban M3 / M4) ───────────────────────────
+
+    /** Agents the board's picker offers for this Task. */
+    async listRunCandidates(id: string) {
+        return serverFetch<{ data: RunCandidateAgent[] }>(`/tasks/${id}/run-candidates`, {
     /**
      * Re-litigation guard (memory upgrades M6) — settled decisions this
      * Task appears to re-open. Deterministic term-overlap check on the
@@ -246,6 +286,35 @@ export const tasksAPI = {
     async decisionConflicts(id: string) {
         return serverFetch<DecisionConflictReportDto>(`/tasks/${id}/decision-conflicts`, {
             method: 'GET',
+        });
+    },
+
+    /**
+     * Run the Task now. `agentId` omitted lets the server resolve it;
+     * an ambiguous / empty resolution answers 400 with a `code` +
+     * `candidates` body the caller turns into the picker.
+     */
+    async run(id: string, agentId?: string | null) {
+        return serverMutation<RunTaskResult>({
+            endpoint: `/tasks/${id}/run`,
+            data: agentId ? { agentId } : {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /** Run several Tasks at once — per-item results, never all-or-nothing. */
+    async runBatch(items: { taskId: string; agentId?: string | null }[]) {
+        return serverMutation<{ results: RunBatchItemResult[] }>({
+            endpoint: `/tasks/run-batch`,
+            data: {
+                items: items.map((item) => ({
+                    taskId: item.taskId,
+                    ...(item.agentId ? { agentId: item.agentId } : {}),
+                })),
+            },
+            method: 'POST',
+            wrapInData: false,
         });
     },
 

@@ -204,8 +204,14 @@ export class SandboxWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 		// Empty run: no new commit AND the branch has nothing beyond the
 		// base — there is nothing worth pushing or PR-ing.
 		if (!dirty && (headSha === null || headSha === handle.baseSha)) {
-			return { pushed: false, headSha, empty: true };
+			return { pushed: false, headSha, empty: true, changedFiles: 0 };
 		}
+
+		// Run telemetry — the branch's file footprint vs the base it was
+		// cut from. Best-effort: a failed diff omits the field entirely
+		// (the caller then leaves the run's counter untouched rather
+		// than stamping a wrong 0) and never fails the finalize.
+		const changedFiles = await this.countChangedFiles(dir, handle.baseSha, opts.auth);
 
 		let pushed = false;
 		if (opts.push) {
@@ -221,7 +227,36 @@ export class SandboxWorkspacePlugin implements IPlugin, IWorkspacePlugin {
 			pushed = true;
 		}
 
-		return { pushed, headSha, empty: false };
+		return {
+			pushed,
+			headSha,
+			empty: false,
+			...(changedFiles === null ? {} : { changedFiles })
+		};
+	}
+
+	/**
+	 * `git diff --name-only <baseSha>..HEAD` → distinct changed-file
+	 * count for the run-telemetry counter. Returns null when the diff
+	 * cannot be taken (unknown base after a shallow fetch, git failure),
+	 * so the caller can tell "no data" apart from "zero files".
+	 */
+	private async countChangedFiles(
+		dir: string,
+		baseSha: string,
+		auth?: WorkspaceProvisionSpec['auth']
+	): Promise<number | null> {
+		try {
+			const diff = await this.git(['diff', '--name-only', `${baseSha}..HEAD`], dir, auth);
+			if (diff.code !== 0) return null;
+			const files = diff.stdout
+				.split('\n')
+				.map((line) => line.trim())
+				.filter((line) => line.length > 0);
+			return new Set(files).size;
+		} catch {
+			return null;
+		}
 	}
 
 	async simulateMerge(

@@ -121,6 +121,9 @@ import { CreditLedgerEntry } from '../entities/credit-ledger-entry.entity';
 import { PlanEntitlement } from '../entities/plan-entitlement.entity';
 import { FleetNode } from '../entities/fleet-node.entity';
 import { TerminalTranscriptChunk } from '../entities/terminal-transcript-chunk.entity';
+
+import { FleetJob } from '../entities/fleet-job.entity';
+
 import {
     PluginEntity,
     UserPluginEntity,
@@ -280,4 +283,9 @@ export const ENTITIES = [
     // Streaming-terminal M9 / founder decision D1 — append-only,
     // redacted, retention-capped terminal transcript chunks.
     TerminalTranscriptChunk,
+
+    // Fleet job runtime (Desktop PRD M4) — the lease-able work queue
+    // whose workers are the enrolled nodes above.
+    FleetJob,
+
 ];

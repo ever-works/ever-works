@@ -66,9 +66,16 @@ export const config = {
          * lands the log emitter). Lowercased + trimmed for resilience to
          * deploy-manifest typos (`Trigger ` → `trigger`).
          */
-        getActiveProviderId(): 'trigger' | 'temporal' | 'bullmq' | 'pgboss' | 'inngest' {
+        getActiveProviderId(): 'trigger' | 'temporal' | 'bullmq' | 'pgboss' | 'inngest' | 'node' {
             const raw = (process.env.EVER_WORKS_JOB_RUNTIME ?? '').trim().toLowerCase();
-            if (raw === 'temporal' || raw === 'bullmq' || raw === 'pgboss' || raw === 'inngest') {
+            if (
+                raw === 'temporal' ||
+                raw === 'bullmq' ||
+                raw === 'pgboss' ||
+                raw === 'inngest' ||
+                // Desktop PRD M4 — the fleet runtime (job-runtime-node).
+                raw === 'node'
+            ) {
                 return raw;
             }
             return 'trigger';
