@@ -2,6 +2,7 @@ import { test, expect, type APIRequestContext, type Page } from '@playwright/tes
 import { API_BASE, authedHeaders, registerUserViaAPI, type RegisteredUser } from './helpers/api';
 import { loadSeededTestUser } from './helpers/seeded-test-user';
 import { getPluginViaAPI, enablePluginViaAPI, disablePluginViaAPI } from './helpers/plugins';
+import { clickAndExpectUrl, clickUntil } from './helpers/nav';
 
 /**
  * Plugins UI journey — /plugins catalog, /plugins/:id detail, and
@@ -38,7 +39,10 @@ import { getPluginViaAPI, enablePluginViaAPI, disablePluginViaAPI } from './help
  *     openai   → ai-provider, builtIn:true, systemPlugin:false, v1.0.0, caps:['ai-provider']
  *     tavily   → search, systemPlugin:true (no toggle button, "System" badge), caps:['search','content-extractor']
  *     anthropic→ ai-provider, enabled:false by default (hidden under "Enabled only")
- *     pdf-extractor → content-extractor, builtIn, keyless-enable, has readme + settingsSchema{mistralApiKey}
+ *     pdf-extractor → content-extractor, builtIn, keyless-enable. NB: its readme +
+ *       settingsSchema{mistralApiKey} live on the plugin CLASS, so they are only
+ *       served once the EW-693 lazy stub has materialized; while cold the detail
+ *       payload is package.json-manifest-only (empty schema, no readme).
  *     discord-connector / slack-connector → category 'connector'
  *
  * Robustness: fresh registerUserViaAPI() users for API assertions; the seeded
@@ -279,15 +283,22 @@ test.describe('Plugins UI — search & filter interactions', () => {
             timeout: 20_000,
         });
 
-        await page.getByPlaceholder('Search plugins...').fill('openai');
+        // The search box is a client filter: a fill() that lands before React
+        // has attached onChange updates the input's value but never runs the
+        // filter, so the grid stays unfiltered. Re-fill until the filter has
+        // actually applied (the unrelated Vercel card is gone).
+        const vercelCard = page.getByRole('heading', { level: 3, name: 'Vercel', exact: true });
+        const search = page.getByPlaceholder('Search plugins...');
+        await expect(async () => {
+            if ((await vercelCard.count()) > 0) {
+                await search.fill('openai').catch(() => undefined);
+            }
+            expect(await vercelCard.count()).toBe(0);
+        }).toPass({ timeout: 45_000 });
+
         await expect(
             page.getByRole('heading', { level: 3, name: 'OpenAI', exact: true }),
         ).toBeVisible({ timeout: 15_000 });
-        // The category group heading disappears in flat/search mode and the
-        // unrelated Vercel card is filtered out.
-        await expect(
-            page.getByRole('heading', { level: 3, name: 'Vercel', exact: true }),
-        ).toHaveCount(0);
     });
 
     test('clearing the search via the X button restores the full grouped list', async ({
@@ -334,7 +345,14 @@ test.describe('Plugins UI — search & filter interactions', () => {
         page,
     }) => {
         await openPluginsList(page);
-        await page.getByRole('button', { name: 'Connectors', exact: true }).click();
+        // The chip is a client filter: a click landing before hydration is
+        // silently swallowed (the grid never filters). Click until the filter
+        // actually took effect — i.e. the OpenAI card is gone.
+        const openAiCard = page.getByRole('heading', { level: 3, name: 'OpenAI', exact: true });
+        await clickUntil(
+            page.getByRole('button', { name: 'Connectors', exact: true }),
+            async () => (await openAiCard.count()) === 0,
+        );
 
         // Connector plugins surface; the AI-provider OpenAI card is filtered out.
         await expect(
@@ -367,12 +385,22 @@ test.describe('Plugins UI — search & filter interactions', () => {
             page.getByRole('heading', { level: 3, name: 'Anthropic', exact: true }),
         ).toBeVisible({ timeout: 20_000 });
 
-        await page.getByRole('checkbox').check();
+        // `check()` fails outright here when the click beats hydration
+        // ("Clicking the checkbox did not change its state") — the input is a
+        // client filter whose handler may not be attached yet. Click until the
+        // filter actually applied: the disabled Anthropic card is gone.
+        const anthropicCard = page.getByRole('heading', {
+            level: 3,
+            name: 'Anthropic',
+            exact: true,
+        });
+        await clickUntil(
+            page.getByRole('checkbox'),
+            async () => (await anthropicCard.count()) === 0,
+        );
 
         // Anthropic (disabled) drops out; Tavily (system → always enabled) stays.
-        await expect(
-            page.getByRole('heading', { level: 3, name: 'Anthropic', exact: true }),
-        ).toHaveCount(0, { timeout: 15_000 });
+        await expect(anthropicCard).toHaveCount(0, { timeout: 15_000 });
         await expect(
             page.getByRole('heading', { level: 3, name: 'Tavily', exact: true }),
         ).toBeVisible();
@@ -400,20 +428,95 @@ test.describe('Plugins UI — detail page', () => {
         await expect(page.getByRole('button', { name: /^(Enable|Disable)$/ })).toBeVisible();
     });
 
-    test('pdf-extractor detail renders the Plugin Settings panel and the About/readme section', async ({
+    test('pdf-extractor detail: header chrome always renders; the Plugin Settings + About cards track exactly what the API exposes', async ({
         page,
+        request,
     }) => {
+        // What this page renders is driven entirely by the plugin payload
+        // (apps/web/src/components/plugins/PluginSettings.tsx):
+        //   - the "Plugin Settings" card renders only when
+        //     getVisibleProperties(settingsSchema, ['global','user']) is non-empty
+        //   - the "About" card renders only when `readme` is a non-empty string
+        //
+        // Since EW-693 (dynamic plugin distribution) filesystem-discovered
+        // plugins are registered as LAZY manifest-only stubs
+        // (packages/agent/src/plugins/services/lazy-plugin-proxy.ts). Until the
+        // real module materializes, GET /api/plugins/:id serves the package.json
+        // `everworks.plugin` manifest only, so it reports
+        // `settingsSchema:{type:'object',properties:{}}` and NO `readme` —
+        // both of those live on the plugin CLASS, and the registry folds them in
+        // only via updateRegisteredManifest() after first materialization.
+        // Consequence: for a cold pdf-extractor neither card renders at all, and
+        // even its display name differs (package.json "PDF Content Extractor" vs
+        // the class manifest's "PDF Content Processor").
+        //
+        // So: read the contract off the API FIRST (that GET is a pure sync read —
+        // it never materializes), then assert the page matches it in BOTH
+        // directions. This keeps the original intent (the settings panel and the
+        // readme section are rendered when the plugin has them, and are absent —
+        // not empty shells — when it doesn't) while staying correct whether or
+        // not the plugin has materialized in the API process.
+        const probeUser: RegisteredUser = await registerUserViaAPI(request);
+        const plugin = await getPluginViaAPI(request, probeUser.access_token, PDF);
+
+        const schemaProps =
+            (
+                plugin.settingsSchema as
+                    | { properties?: Record<string, { scope?: string; hidden?: boolean }> }
+                    | undefined
+            )?.properties ?? {};
+        // Mirrors getVisibleProperties(schema, ['global','user']) — the exact
+        // predicate PluginSettings.tsx uses to compute `hasSettings`.
+        const visibleProps = Object.values(schemaProps).filter(
+            (p) => !p.hidden && ['global', 'user'].includes(p.scope ?? 'global'),
+        );
+        const expectsSettingsPanel = visibleProps.length > 0;
+        const readme = typeof plugin.readme === 'string' ? plugin.readme : '';
+        const expectsAbout = readme.length > 0;
+
         await page.goto('/en/plugins/pdf-extractor', { waitUntil: 'domcontentloaded' });
+
+        // --- Header chrome: manifest-only, so it renders in either state. ----
+        // The display name is manifest-sourced (see above), so pin it to what
+        // the API actually reports rather than to one of the two literals.
         await expect(
-            page.getByRole('heading', { level: 1, name: 'PDF Content Extractor' }),
+            page.getByRole('heading', { level: 1, name: String(plugin.name) }),
         ).toBeVisible({ timeout: 30_000 });
-        // It ships a settingsSchema (mistralApiKey) → the "Plugin Settings" card.
-        await expect(page.getByRole('heading', { name: 'Plugin Settings' })).toBeVisible({
-            timeout: 15_000,
-        });
-        // It ships a readme → the "About" section renders its markdown.
-        await expect(page.getByRole('heading', { name: 'About', exact: true })).toBeVisible();
-        await expect(page.getByText(/PDF Content Processor/i).first()).toBeVisible();
+        await expect(page.getByText('v1.0.0', { exact: true })).toBeVisible();
+        // builtIn comes from the registry entry (not the manifest) → stable.
+        await expect(page.getByText('Built-in', { exact: true })).toBeVisible();
+        await expect(page.getByRole('link', { name: /Back to Plugins/i })).toBeVisible();
+        // Metadata footer: author + the human label for category 'content-extractor'.
+        await expect(page.getByText(/Author:\s*Ever Works Team/)).toBeVisible();
+        await expect(page.getByText('Content Processors', { exact: true }).first()).toBeVisible();
+        // Not a system plugin → the header exposes an enable/disable toggle.
+        await expect(page.getByRole('button', { name: /^(Enable|Disable)$/ })).toBeVisible();
+
+        // --- Settings card ---------------------------------------------------
+        const settingsHeading = page.getByRole('heading', { name: 'Plugin Settings' });
+        const saveButton = page.getByRole('button', { name: /Save Settings/i });
+        if (expectsSettingsPanel) {
+            await expect(settingsHeading).toBeVisible({ timeout: 15_000 });
+            // The card always carries the Save control under its fields.
+            await expect(saveButton).toBeVisible();
+        } else {
+            // No global/user-scoped fields reach the client → PluginSettings
+            // renders NO card at all (not an empty one), so its Save control
+            // must be absent too.
+            await expect(settingsHeading).toHaveCount(0);
+            await expect(saveButton).toHaveCount(0);
+        }
+
+        // --- About / readme card ---------------------------------------------
+        const aboutHeading = page.getByRole('heading', { name: 'About', exact: true });
+        if (expectsAbout) {
+            await expect(aboutHeading).toBeVisible({ timeout: 15_000 });
+            // The readme markdown is rendered (its H2 "What does the PDF Content
+            // Processor do?" is the first thing PluginReadme emits).
+            await expect(page.getByText(/PDF Content Processor/i).first()).toBeVisible();
+        } else {
+            await expect(aboutHeading).toHaveCount(0);
+        }
     });
 
     test('Tavily detail: system plugin → "System" badge + capability badge, no toggle', async ({
@@ -440,14 +543,13 @@ test.describe('Plugins UI — detail page', () => {
 
     test('the "Back to Plugins" link returns to the catalog list', async ({ page }) => {
         await page.goto('/en/plugins/openai', { waitUntil: 'domcontentloaded' });
+        // The back control is a next-intl <Link> → client-side (soft) nav. Two
+        // hazards, both handled by clickAndExpectUrl: the URL must be POLLED (a
+        // soft nav fires no document 'load', so waitForURL would hang), and the
+        // click must be RETRIED (under CI load it can land before hydration has
+        // wired the router, doing nothing at all).
         const back = page.getByRole('link', { name: /Back to Plugins/i });
-        await expect(back).toBeVisible({ timeout: 30_000 });
-        await back.click();
-        // The back control is a next-intl <Link> → client-side (soft) nav, which
-        // never fires a document 'load' event, so waitForURL's default
-        // waitUntil:'load' hangs. Poll the URL instead; then wait out the
-        // first-hit /plugins compile for the catalog heading.
-        await expect(page).toHaveURL(/\/plugins(\/)?$/, { timeout: 30_000 });
+        await clickAndExpectUrl(page, back, /\/plugins(\/)?$/);
         await expect(page.getByRole('heading', { level: 1, name: 'Plugins' })).toBeVisible({
             timeout: 30_000,
         });

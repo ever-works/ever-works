@@ -1,6 +1,7 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
 import { API_BASE, authedHeaders, loginViaAPI } from './helpers/api';
 import { loadSeededTestUser } from './helpers/seeded-test-user';
+import { clickUntil } from './helpers/nav';
 
 /**
  * Agents — /en/agents catalog + /agents/[id] detail DRIVEN THROUGH THE UI.
@@ -440,23 +441,22 @@ test.describe('Agent settings — status controls', () => {
         const agent = await createSeededAgent(request);
         const token = await seededToken(request);
         await page.goto(`/en/agents/${agent.id}/settings`, { waitUntil: 'domcontentloaded' });
-        const activate = page.getByRole('button', { name: 'Activate', exact: true });
-        await expect(activate).toBeVisible({ timeout: 30_000 });
-        await activate.click();
+        /** Persisted status — the source of truth for "the action ran". */
+        const persistedStatus = async (): Promise<string> => {
+            const res = await request.get(`${API_BASE}/api/agents/${agent.id}`, {
+                headers: authedHeaders(token),
+            });
+            return ((await res.json()) as UiAgent).status;
+        };
 
-        // The server action mutates via the same seeded user; assert on the
-        // persisted API status (most robust vs. any client re-render timing).
-        await expect
-            .poll(
-                async () => {
-                    const res = await request.get(`${API_BASE}/api/agents/${agent.id}`, {
-                        headers: authedHeaders(token),
-                    });
-                    return ((await res.json()) as UiAgent).status;
-                },
-                { timeout: 20_000 },
-            )
-            .toBe('active');
+        // Click until the server actually flipped the status. A click landing
+        // before React attaches the handler is silently swallowed (button
+        // visible+enabled, click "succeeds", no server action dispatched) — CI
+        // saw the status stay 'draft' for the full poll budget. Re-clicking only
+        // while it is still not active means a landed activate is never repeated.
+        const activate = page.getByRole('button', { name: 'Activate', exact: true });
+        await clickUntil(activate, async () => (await persistedStatus()) === 'active', 60_000);
+        expect(await persistedStatus()).toBe('active');
     });
 });
 

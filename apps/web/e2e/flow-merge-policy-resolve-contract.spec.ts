@@ -56,7 +56,14 @@ test.describe('GET /api/merge-policy/resolve', () => {
             headers: authedHeaders(u.access_token),
         });
         expect(res.status()).toBe(400);
-        expect(errText(await res.json())).toContain('Provide workId and/or agentId');
+        // The message must NAME the scopes the caller may supply so a bare
+        // call is actionable. `organizationId` joined the list after this spec
+        // was written, so match the requirement rather than one revision of
+        // the sentence.
+        const msg = errText(await res.json());
+        expect(msg).toMatch(/provide/i);
+        expect(msg).toContain('workId');
+        expect(msg).toContain('agentId');
     });
 
     test('an untouched Work resolves to the conservative platform default', async ({ request }) => {

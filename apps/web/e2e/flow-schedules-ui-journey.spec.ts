@@ -3,6 +3,7 @@ import { API_BASE, authedHeaders, createWorkViaAPI } from './helpers/api';
 import { createTaskViaAPI, createAgentViaAPI } from './helpers/agents-tasks';
 import { createTriggerViaAPI } from './helpers/triggers';
 import { loadSeededTestUser } from './helpers/seeded-test-user';
+import { clickAndExpectUrl, clickUntil } from './helpers/nav';
 
 /**
  * Schedules ("Cadence") view — UI JOURNEY, driven in the browser (#1671).
@@ -165,8 +166,18 @@ async function openSchedulesTab(page: Page): Promise<void> {
     await page.goto(ACTIVITY_URL, { waitUntil: 'domcontentloaded' });
     const toggle = page.getByTestId('activity-view-toggle').first();
     await expect(toggle).toBeVisible({ timeout: 30_000 });
-    await toggle.getByRole('button', { name: 'Schedules' }).click();
-    await expect(page.getByTestId('schedules-list')).toBeVisible({ timeout: 30_000 });
+
+    // The segmented toggle is a client control: a click landing before React
+    // has attached its handler is silently swallowed — the button is visible
+    // and "clickable", the click reports success, and the tab never switches,
+    // so `schedules-list` never mounts. Click until the list is actually up.
+    // (Same hydration hazard as helpers/nav.ts documents.)
+    const list = page.getByTestId('schedules-list');
+    await clickUntil(
+        toggle.getByRole('button', { name: 'Schedules' }),
+        async () => (await list.count()) > 0,
+    );
+    await expect(list).toBeVisible({ timeout: 30_000 });
 }
 
 test.describe('Schedules UI — shell & tab toggle', () => {
@@ -211,7 +222,11 @@ test.describe('Schedules UI — shell & tab toggle', () => {
         const toggle = page.getByTestId('activity-view-toggle').first();
         await expect(toggle).toBeVisible({ timeout: 30_000 });
         const schedulesBtn = toggle.getByRole('button', { name: 'Schedules' });
-        await schedulesBtn.click();
+        // Post-condition: the schedules list is actually MOUNTED (the tab really
+        // switched). A toggle click landing before React attaches the handler is
+        // silently swallowed — visible + "clicked", but no tab change at all.
+        const list = page.getByTestId('schedules-list');
+        await clickUntil(schedulesBtn, async () => (await list.count()) > 0);
 
         await expect(page.getByTestId('schedules-list')).toBeVisible({ timeout: 30_000 });
         await expect(schedulesBtn).toHaveAttribute('aria-pressed', 'true');
@@ -229,9 +244,16 @@ test.describe('Schedules UI — shell & tab toggle', () => {
         await page.goto(ACTIVITY_URL, { waitUntil: 'domcontentloaded' });
         const toggle = page.getByTestId('activity-view-toggle').first();
         await expect(toggle).toBeVisible({ timeout: 30_000 });
-        await toggle.getByRole('button', { name: 'Schedules' }).click();
+        // Post-condition: the URL gains ?view=schedules (the client `router.replace`
+        // sync fires off the tab state). A pre-hydration click is swallowed, so the
+        // URL never changes and the reload below would land back on Log — re-click
+        // until the param is really there.
+        await clickAndExpectUrl(
+            page,
+            toggle.getByRole('button', { name: 'Schedules' }),
+            /[?&]view=schedules/,
+        );
 
-        await expect(page).toHaveURL(/[?&]view=schedules/, { timeout: 15_000 });
         await page.reload({ waitUntil: 'domcontentloaded' });
         // The ?view= param wins on load → still on the Schedules tab after reload.
         await expect(page.getByTestId('schedules-list')).toBeVisible({ timeout: 30_000 });
@@ -403,9 +425,14 @@ test.describe('Schedules UI — source rows render', () => {
         await openSchedulesTab(page);
         const row = page.getByTestId(rowTestId('mission_tick', missionId));
         await expect(row).toBeVisible({ timeout: 30_000 });
-        await row.getByRole('link').first().click();
-        await page.waitForURL(new RegExp(`/missions/${missionId}`), { timeout: 30_000 });
-        await expect(page).toHaveURL(new RegExp(`/missions/${missionId}`));
+        // Post-condition: the URL is the mission detail. This is an App Router
+        // <Link> soft nav — `waitForURL` would hang waiting for a `load` that never
+        // fires, and a click landing before hydration never starts the nav at all.
+        await clickAndExpectUrl(
+            page,
+            row.getByRole('link').first(),
+            new RegExp(`/missions/${missionId}`),
+        );
     });
 });
 
@@ -432,7 +459,11 @@ test.describe('Schedules UI — client filters', () => {
         const chip = page
             .getByTestId('schedules-list')
             .getByRole('button', { name: /Mission tick/ });
-        await chip.click();
+        // Post-condition: the non-matching data_sync row is really gone (the filter
+        // applied). A chip click that beats hydration is swallowed — aria-pressed
+        // never flips and nothing narrows. The chip SETS the filter (not a toggle),
+        // so a retry can never undo a click that already landed.
+        await clickUntil(chip, async () => !(await dataSyncRow.isVisible().catch(() => false)));
         await expect(chip).toHaveAttribute('aria-pressed', 'true');
 
         // The mission survives the filter; the data_sync (work) row is filtered out.
@@ -460,15 +491,19 @@ test.describe('Schedules UI — client filters', () => {
         await expect(missionRow).toBeVisible({ timeout: 30_000 });
         await expect(hbRow).toBeVisible();
 
+        // `check()` throws outright when the click beats hydration
+        // ("Clicking the checkbox did not change its state") — this is a client
+        // filter whose handler may not be attached yet. Drive it to the STATE:
+        // click until the disabled heartbeat row is actually filtered out.
         const activeOnly = page.getByTestId('schedules-list').locator('input[type="checkbox"]');
-        await activeOnly.check();
+        await clickUntil(activeOnly, async () => !(await hbRow.isVisible().catch(() => false)));
 
         // The active mission stays; the draft (disabled) heartbeat is dropped.
         await expect(missionRow).toBeVisible();
         await expect(hbRow).toBeHidden();
 
-        // Unchecking restores the disabled row.
-        await activeOnly.uncheck();
+        // Unchecking restores the disabled row (same state-driven approach).
+        await clickUntil(activeOnly, async () => hbRow.isVisible().catch(() => false));
         await expect(hbRow).toBeVisible();
     });
 
@@ -548,19 +583,33 @@ test.describe('Schedules UI — inbound triggers surface', () => {
         page,
     }) => {
         await openSchedulesTab(page);
-        await page.getByRole('button', { name: 'New trigger' }).click();
+        // Post-condition: the create dialog is actually open. `New trigger` only
+        // flips client state (setCreateOpen) — a click before hydration is
+        // swallowed and the dialog never mounts.
+        const dialogHeading = page.getByRole('heading', { name: 'New inbound trigger' });
+        await clickUntil(
+            page.getByRole('button', { name: 'New trigger' }),
+            async () => (await dialogHeading.count()) > 0,
+        );
 
         // Dialog fields render; Create is disabled until a name is entered.
-        await expect(page.getByRole('heading', { name: 'New inbound trigger' })).toBeVisible({
-            timeout: 15_000,
-        });
+        await expect(dialogHeading).toBeVisible({ timeout: 15_000 });
         const createBtn = page.getByRole('button', { name: 'Create', exact: true });
         await expect(createBtn).toBeDisabled();
 
         const name = `UI Dialog Hook ${stamp()}`;
-        await page.getByPlaceholder('Deploy notifications').fill(name);
-        await expect(createBtn).toBeEnabled();
-        await createBtn.click();
+        const nameInput = page.getByPlaceholder('Deploy notifications');
+        // The name field is a CONTROLLED input and Create is gated on the React
+        // state (`disabled={name.trim().length === 0}`). A fill landing before
+        // onChange is attached writes the DOM value but never updates state, so
+        // Create stays disabled forever. Drive to the STATE: re-fill only while
+        // the button is still disabled, so a fill that landed is never redone.
+        await expect(async () => {
+            if (await createBtn.isDisabled()) {
+                await nameInput.fill(name).catch(() => undefined);
+            }
+            await expect(createBtn).toBeEnabled({ timeout: 2_000 });
+        }).toPass({ timeout: 30_000 });
 
         // Create succeeds (server action → POST /inbound-triggers) and the
         // one-time secret reveal panel replaces the form. The reveal is the ONLY
@@ -568,6 +617,11 @@ test.describe('Schedules UI — inbound triggers surface', () => {
         // recipe. (Wait for the reveal heading itself — the create dialog heading
         // stays mounted until the panel swaps in, so we must not race on it.)
         const revealHeading = page.getByRole('heading', { name: 'Trigger secret' });
+        // Post-condition: that reveal panel is mounted. A swallowed Create click
+        // dispatches no action at all. Retrying cannot double-create: the button
+        // self-disables (`isSubmitting`) for the whole in-flight submit and the
+        // handler early-returns while submitting, and on success the dialog closes.
+        await clickUntil(createBtn, async () => (await revealHeading.count()) > 0, 60_000);
         await expect(revealHeading).toBeVisible({ timeout: 20_000 });
         // Exact labels — the create dialog's description also contains the phrase
         // "signed webhook URL", so a non-exact match would strict-violate.
@@ -579,7 +633,12 @@ test.describe('Schedules UI — inbound triggers surface', () => {
             page.locator('code', { hasText: '/api/inbound-triggers/' }).first(),
         ).toContainText('/fire');
 
-        await page.getByRole('button', { name: 'Done' }).click();
+        // Post-condition: the reveal panel is gone (Done clears `reveal` state) —
+        // another purely client handler that a pre-hydration click would swallow.
+        await clickUntil(
+            page.getByRole('button', { name: 'Done' }),
+            async () => (await revealHeading.count()) === 0,
+        );
         await expect(revealHeading).toHaveCount(0);
         // The freshly-created trigger is now listed in the manager.
         await expect(page.locator('li', { hasText: name })).toBeVisible({ timeout: 15_000 });
