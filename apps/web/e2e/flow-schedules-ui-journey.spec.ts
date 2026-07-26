@@ -3,6 +3,7 @@ import { API_BASE, authedHeaders, createWorkViaAPI } from './helpers/api';
 import { createTaskViaAPI, createAgentViaAPI } from './helpers/agents-tasks';
 import { createTriggerViaAPI } from './helpers/triggers';
 import { loadSeededTestUser } from './helpers/seeded-test-user';
+import { clickUntil } from './helpers/nav';
 
 /**
  * Schedules ("Cadence") view — UI JOURNEY, driven in the browser (#1671).
@@ -165,8 +166,18 @@ async function openSchedulesTab(page: Page): Promise<void> {
     await page.goto(ACTIVITY_URL, { waitUntil: 'domcontentloaded' });
     const toggle = page.getByTestId('activity-view-toggle').first();
     await expect(toggle).toBeVisible({ timeout: 30_000 });
-    await toggle.getByRole('button', { name: 'Schedules' }).click();
-    await expect(page.getByTestId('schedules-list')).toBeVisible({ timeout: 30_000 });
+
+    // The segmented toggle is a client control: a click landing before React
+    // has attached its handler is silently swallowed — the button is visible
+    // and "clickable", the click reports success, and the tab never switches,
+    // so `schedules-list` never mounts. Click until the list is actually up.
+    // (Same hydration hazard as helpers/nav.ts documents.)
+    const list = page.getByTestId('schedules-list');
+    await clickUntil(
+        toggle.getByRole('button', { name: 'Schedules' }),
+        async () => (await list.count()) > 0,
+    );
+    await expect(list).toBeVisible({ timeout: 30_000 });
 }
 
 test.describe('Schedules UI — shell & tab toggle', () => {
@@ -460,15 +471,19 @@ test.describe('Schedules UI — client filters', () => {
         await expect(missionRow).toBeVisible({ timeout: 30_000 });
         await expect(hbRow).toBeVisible();
 
+        // `check()` throws outright when the click beats hydration
+        // ("Clicking the checkbox did not change its state") — this is a client
+        // filter whose handler may not be attached yet. Drive it to the STATE:
+        // click until the disabled heartbeat row is actually filtered out.
         const activeOnly = page.getByTestId('schedules-list').locator('input[type="checkbox"]');
-        await activeOnly.check();
+        await clickUntil(activeOnly, async () => !(await hbRow.isVisible().catch(() => false)));
 
         // The active mission stays; the draft (disabled) heartbeat is dropped.
         await expect(missionRow).toBeVisible();
         await expect(hbRow).toBeHidden();
 
-        // Unchecking restores the disabled row.
-        await activeOnly.uncheck();
+        // Unchecking restores the disabled row (same state-driven approach).
+        await clickUntil(activeOnly, async () => hbRow.isVisible().catch(() => false));
         await expect(hbRow).toBeVisible();
     });
 
