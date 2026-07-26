@@ -11,7 +11,9 @@ import {
     type RunTaskResult,
     type Task,
     type TaskChatMessage,
+    type TaskDiff,
     type TaskPriority,
+    type TaskPrStatus,
     type TaskStatus,
 } from '@/lib/api/tasks';
 import { ApiResponseError } from '@/lib/api/server-api';
@@ -223,6 +225,64 @@ export async function runTasksBatchAction(
                 },
             })),
         };
+    }
+}
+
+// ── PR insights (kanban M5 / M6) ──────────────────────────────────
+
+/**
+ * The board's review pill data for one Task.
+ *
+ * Read-only, so no `revalidatePath`. NEVER throws: the pill is a
+ * decoration on a card, and a provider hiccup must not blank the board —
+ * a failed read degrades to `null` (no pill) exactly like a Task that
+ * has no PR. Server-Action prod-redaction rule: the caller gets a value
+ * or `null`, never a message it would have to branch on.
+ */
+export async function getTaskPrStatusAction(
+    id: string,
+    opts: { refresh?: boolean } = {},
+): Promise<TaskPrStatus | null> {
+    // Security: verify session server-side before reading data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
+    try {
+        return await tasksAPI.prStatus(id, opts);
+    } catch {
+        return null;
+    }
+}
+
+/**
+ * Capped diff for the board's diff sheet.
+ *
+ * Discriminated union rather than a throw: the sheet has real,
+ * user-actionable failure states (no branch yet → 404; git provider not
+ * connected or without the capability → 409) and the production build
+ * redacts thrown Server-Action messages, so branching on `err.message`
+ * would silently do nothing once deployed (MEMORY bug class).
+ */
+export type TaskDiffActionResult =
+    | { ok: true; data: TaskDiff }
+    | { ok: false; code: 'NOT_FOUND' | 'PROVIDER_UNAVAILABLE' | 'DIFF_FAILED' };
+
+export async function getTaskDiffAction(
+    id: string,
+    opts: { maxFiles?: number; maxBytes?: number } = {},
+): Promise<TaskDiffActionResult> {
+    // Security: verify session server-side before reading data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
+    try {
+        return { ok: true, data: await tasksAPI.diff(id, opts) };
+    } catch (err) {
+        if (err instanceof ApiResponseError) {
+            if (err.statusCode === 404) return { ok: false, code: 'NOT_FOUND' };
+            if (err.statusCode === 409) return { ok: false, code: 'PROVIDER_UNAVAILABLE' };
+        }
+        return { ok: false, code: 'DIFF_FAILED' };
     }
 }
 

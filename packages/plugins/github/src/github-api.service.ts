@@ -18,9 +18,72 @@ import type {
 	ListRepositoriesOptions,
 	ListPullRequestsOptions,
 	TransferRepoOptions,
-	TransferRepoResult
+	TransferRepoResult,
+	GitCheckConclusion,
+	GitCheckStatus,
+	GitDiffFile,
+	GitDiffOptions,
+	GitDiffResult,
+	GitPullRequestCheck,
+	GitPullRequestStatus,
+	GitReviewDecision
 } from '@ever-works/plugin/git';
+import { capChecks, capDiffFiles, deriveCiState, resolveDiffCaps } from '@ever-works/plugin/git';
 import { GitHubVerifiedOrgService, parseVerifiedOrgs } from './github-verified-org.service.js';
+
+/**
+ * PR insights (kanban run cockpit M5/M6) — GitHub's check vocabulary
+ * mapped onto the provider-neutral contract vocabulary. Anything not
+ * listed degrades to `unknown`/`null` rather than being guessed at: an
+ * unrecognised conclusion must never be laundered into a pass.
+ */
+const CHECK_STATUS_MAP: Record<string, GitCheckStatus> = {
+	queued: 'queued',
+	in_progress: 'in_progress',
+	waiting: 'queued',
+	requested: 'queued',
+	pending: 'queued',
+	completed: 'completed'
+};
+
+const CHECK_CONCLUSION_MAP: Record<string, GitCheckConclusion> = {
+	success: 'success',
+	failure: 'failure',
+	neutral: 'neutral',
+	cancelled: 'cancelled',
+	timed_out: 'timed_out',
+	action_required: 'action_required',
+	skipped: 'skipped',
+	stale: 'stale',
+	// Legacy commit-status states share the rollup vocabulary.
+	error: 'failure'
+};
+
+const REVIEW_DECISION_MAP: Record<string, GitReviewDecision> = {
+	APPROVED: 'approved',
+	CHANGES_REQUESTED: 'changes_requested',
+	REVIEW_REQUIRED: 'review_required'
+};
+
+/** Pages of check-runs/statuses to read before giving up (rate budget). */
+const CHECKS_PER_PAGE = 100;
+
+/** GitHub file payload → the contract's provider-neutral diff row. */
+function toDiffFile(file: {
+	filename: string;
+	status?: string;
+	additions?: number;
+	deletions?: number;
+	patch?: string;
+}): GitDiffFile {
+	return {
+		path: file.filename,
+		status: file.status ?? 'modified',
+		additions: file.additions ?? 0,
+		deletions: file.deletions ?? 0,
+		...(file.patch ? { patch: file.patch } : {})
+	};
+}
 
 function sanitizeDescription(description?: string): string {
 	if (!description) return '';
@@ -649,6 +712,186 @@ export class GitHubApiService {
 			deletions: file.deletions,
 			patch: file.patch
 		}));
+	}
+
+	/**
+	 * PR insights (kanban M5) — PR state + review decision + rolled-up CI
+	 * for the board's review pill.
+	 *
+	 * Three API reads, all bounded: the PR itself, its head commit's
+	 * check-runs, and its head commit's legacy commit-statuses (many
+	 * external CI providers still only publish the latter — reading both
+	 * is what makes the dot honest across setups). A missing PR resolves
+	 * to `null`; a checks read that 404s/403s (e.g. a token without
+	 * `checks:read`) degrades to "no checks" rather than failing the
+	 * whole status — a pill with an unknown dot beats no pill at all.
+	 */
+	async getPullRequestStatus(
+		owner: string,
+		repo: string,
+		prNumber: number,
+		token: string,
+		baseUrl?: string
+	): Promise<GitPullRequestStatus | null> {
+		const octokit = this.createOctokit(token, baseUrl);
+
+		let pr;
+		try {
+			const response = await octokit.rest.pulls.get({ owner, repo, pull_number: prNumber });
+			pr = response.data;
+		} catch (err) {
+			if (err instanceof RequestError && err.status === 404) return null;
+			throw err;
+		}
+
+		const headSha: string | null = pr.head?.sha ?? null;
+		const checks = headSha ? await this.readChecks(octokit, owner, repo, headSha) : [];
+		const capped = capChecks(checks);
+
+		const merged = pr.merged === true || pr.merged_at != null;
+		const state: GitPullRequestStatus['state'] = merged
+			? 'merged'
+			: pr.state === 'closed'
+				? 'closed'
+				: pr.draft === true
+					? 'draft'
+					: 'open';
+
+		const rawDecision = (pr as { review_decision?: string | null }).review_decision;
+		const reviewDecision: GitReviewDecision | null = rawDecision
+			? (REVIEW_DECISION_MAP[rawDecision] ?? null)
+			: null;
+
+		return {
+			number: pr.number,
+			state,
+			merged,
+			mergeable: typeof pr.mergeable === 'boolean' ? pr.mergeable : null,
+			headSha,
+			reviewDecision,
+			ciState: deriveCiState(capped),
+			checks: capped,
+			url: pr.html_url,
+			title: pr.title
+		};
+	}
+
+	/**
+	 * Read check-runs AND commit-statuses for one commit and normalise
+	 * both onto the contract vocabulary. Best-effort per source: a token
+	 * missing one scope still gets the other half.
+	 */
+	private async readChecks(
+		octokit: Octokit,
+		owner: string,
+		repo: string,
+		ref: string
+	): Promise<GitPullRequestCheck[]> {
+		const out: GitPullRequestCheck[] = [];
+
+		try {
+			const { data } = await octokit.rest.checks.listForRef({
+				owner,
+				repo,
+				ref,
+				per_page: CHECKS_PER_PAGE
+			});
+			for (const run of data.check_runs ?? []) {
+				const check: GitPullRequestCheck = {
+					name: run.name,
+					status: CHECK_STATUS_MAP[run.status] ?? 'unknown',
+					conclusion: run.conclusion ? (CHECK_CONCLUSION_MAP[run.conclusion] ?? null) : null,
+					...(run.details_url ? { detailsUrl: run.details_url } : {})
+				};
+				out.push(check);
+			}
+		} catch {
+			// `checks:read` not granted, or a provider without the Checks
+			// API. Fall through to commit statuses.
+		}
+
+		try {
+			const { data } = await octokit.rest.repos.listCommitStatusesForRef({
+				owner,
+				repo,
+				ref,
+				per_page: CHECKS_PER_PAGE
+			});
+			// Statuses are append-only per context — keep the newest per
+			// context so a fixed re-run doesn't leave a stale red behind.
+			const newestByContext = new Map<string, (typeof data)[number]>();
+			for (const status of data) {
+				if (!newestByContext.has(status.context)) newestByContext.set(status.context, status);
+			}
+			for (const status of newestByContext.values()) {
+				const settled = status.state !== 'pending';
+				out.push({
+					name: status.context,
+					status: settled ? 'completed' : 'queued',
+					conclusion: settled ? (CHECK_CONCLUSION_MAP[status.state] ?? null) : null,
+					...(status.target_url ? { detailsUrl: status.target_url } : {})
+				});
+			}
+		} catch {
+			// Same posture — an unreadable source contributes nothing.
+		}
+
+		return out;
+	}
+
+	/**
+	 * PR insights (kanban M6) — capped PR diff. The file cap is applied at
+	 * the REQUEST (`per_page`) so we never pull a 3,000-file PR into
+	 * memory just to slice it; `capDiffFiles` then enforces the byte
+	 * budget and the final file cap with the shared rule.
+	 */
+	async getPullRequestDiff(
+		owner: string,
+		repo: string,
+		prNumber: number,
+		opts: GitDiffOptions | undefined,
+		token: string,
+		baseUrl?: string
+	): Promise<GitDiffResult> {
+		const octokit = this.createOctokit(token, baseUrl);
+		const { maxFiles } = resolveDiffCaps(opts);
+
+		const { data } = await octokit.rest.pulls.listFiles({
+			owner,
+			repo,
+			pull_number: prNumber,
+			// One extra so `totalFiles > files.length` can prove there IS
+			// more without a second round trip.
+			per_page: Math.min(maxFiles + 1, 100)
+		});
+
+		return capDiffFiles(data.map(toDiffFile), opts);
+	}
+
+	/**
+	 * PR insights (kanban M6) — `base...head` compare for a branch that
+	 * has no PR yet. Same caps, same shape.
+	 */
+	async getCompareDiff(
+		owner: string,
+		repo: string,
+		base: string,
+		head: string,
+		opts: GitDiffOptions | undefined,
+		token: string,
+		baseUrl?: string
+	): Promise<GitDiffResult> {
+		const octokit = this.createOctokit(token, baseUrl);
+		const { maxFiles } = resolveDiffCaps(opts);
+
+		const { data } = await octokit.rest.repos.compareCommitsWithBasehead({
+			owner,
+			repo,
+			basehead: `${base}...${head}`,
+			per_page: Math.min(maxFiles + 1, 100)
+		});
+
+		return capDiffFiles((data.files ?? []).map(toDiffFile), opts);
 	}
 
 	async createPullRequestComment(

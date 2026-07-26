@@ -1,4 +1,8 @@
 export * from './git-provider.interface.js';
+// PR insights (kanban run cockpit M5/M6) — pure CI rollup + diff-cap
+// rules shared by every git-provider implementation and asserted by the
+// conformance suite.
+export * from './git-provider.pr-insights.js';
 export * from './oauth.interface.js';
 export * from './deployment.interface.js';
 export * from './screenshot.interface.js';
