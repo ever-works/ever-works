@@ -817,6 +817,21 @@ export const config = {
             return Number.isFinite(raw) && raw > 0 ? raw : 120;
         },
         /**
+         * Judgment layer G2 — grade a GREEN gate against the Task's
+         * acceptance criteria with an LLM judge before the PR is opened.
+         * Default **off**.
+         *
+         * Off by default because it can withhold a PR that every
+         * deterministic check approved: that is the whole point of the
+         * feature, and also exactly why an operator has to opt into it.
+         * With it off (or with no AI provider wired, or with a Task that
+         * declares no criteria) the gate is byte-for-byte what it is
+         * today — see `shouldRunGateJudge`.
+         */
+        isGateJudgeEnabled() {
+            return (process.env.AGENT_GATE_JUDGE || 'off').toLowerCase() === 'on';
+        },
+        /**
          * Judgment layer G3 — kill switch for structured escalation
          * records. Default ON: when an agent gives up, a human needs a
          * card saying so. Off falls back to log-lines-only.

@@ -1,6 +1,9 @@
 import {
     WORK_CHECKS_POLICIES,
+    type GateStatus,
+    type GateVerdict,
     type TaskAcceptanceCheck,
+    type TaskGateJudgement,
     type WorkChecksPolicy,
 } from '@ever-works/contracts';
 import type { Task } from '../entities/task.entity';
@@ -23,6 +26,7 @@ export const MAX_GATE_ATTEMPTS = 5;
 export const DEFAULT_GATE_ATTEMPTS = 2;
 
 type TaskChecksSource = Partial<Pick<Task, 'acceptanceChecks'>> | null | undefined;
+type TaskCriteriaSource = Partial<Pick<Task, 'description'>> | null | undefined;
 type WorkChecksSource = Partial<Pick<Work, 'checkDefaults'>> | null | undefined;
 type TaskAttemptsSource = Partial<Pick<Task, 'maxGateAttempts'>> | null | undefined;
 type WorkAttemptsSource = Partial<Pick<Work, 'maxGateAttempts'>> | null | undefined;
@@ -122,4 +126,116 @@ export function resolveMaxGateAttempts(task: TaskAttemptsSource, work: WorkAttem
         return DEFAULT_GATE_ATTEMPTS;
     }
     return Math.min(MAX_GATE_ATTEMPTS, Math.max(MIN_GATE_ATTEMPTS, Math.trunc(raw)));
+}
+
+/**
+ * Judgment layer G2 — the Task's acceptance criteria, as prose a judge can
+ * grade a run against.
+ *
+ * The platform has no dedicated criteria column, and inventing one would
+ * put the same sentence in two places. The Task ALREADY states what "done"
+ * means: its description is the ask, and its resolved checks are the
+ * mechanical half of the same contract. This composes both.
+ *
+ * Returns `''` when the Task has no description. That is load-bearing:
+ * `shouldRunGateJudge` treats empty criteria as "no judge configured", so
+ * a Task that never said what done means is never graded by opinion. The
+ * alternative — judging against the title alone — makes the verdict a coin
+ * flip, and a coin flip that can withhold a PR is worse than no judge.
+ */
+export function resolveAcceptanceCriteria(
+    task: TaskCriteriaSource,
+    checks: readonly TaskAcceptanceCheck[] = [],
+): string {
+    const description = typeof task?.description === 'string' ? task.description.trim() : '';
+    if (!description) return '';
+
+    const named = checks
+        .filter((check) => check?.required !== false)
+        .map((check) => (check?.name || check?.id || '').trim())
+        .filter((label) => label.length > 0);
+    if (named.length === 0) return description;
+    return `${description}\n\nDeclared acceptance checks: ${named.join(', ')}.`;
+}
+
+/**
+ * Should the LLM acceptance-criteria judge run for this graded attempt?
+ *
+ * FOUR conditions, all required, ordered by cost — the first three are
+ * free, and only when all four hold does a model call happen:
+ *
+ * 1. the operator switch is on (`AGENT_GATE_JUDGE`, default **off**);
+ * 2. the Work's policy is `required` — under `warn` the operator said
+ *    "report, do not block", and a judge that can withhold a PR would
+ *    contradict that; under `off` nothing grades at all;
+ * 3. the checks came back `green` — a red gate already has a verdict, and
+ *    paying a model to agree with a nonzero exit code buys nothing;
+ * 4. the Task actually declares criteria (see
+ *    {@link resolveAcceptanceCriteria}).
+ *
+ * With any of them false the gate behaves byte-for-byte as it did before
+ * the judge existed.
+ */
+export function shouldRunGateJudge(input: {
+    enabled: boolean;
+    policy: WorkChecksPolicy;
+    gateStatus: GateStatus;
+    criteria: string;
+}): boolean {
+    return (
+        input.enabled &&
+        input.policy === 'required' &&
+        input.gateStatus === 'green' &&
+        typeof input.criteria === 'string' &&
+        input.criteria.trim().length > 0
+    );
+}
+
+/**
+ * Judgment layer G2 — collapse "what the checks observed" + "what the
+ * judge thinks" + "is there budget left" into the one decision the worker
+ * acts on.
+ *
+ * Pure and total, because it is the single place the gate's control flow
+ * is decided and every branch of it is a product behavior somebody can be
+ * surprised by:
+ *
+ * - policy `off` → `pass`. The gate never ran.
+ * - `red` under `required` → `retry` while attempts remain, else `fail`.
+ *   Exactly the pre-judge iterate loop.
+ * - `red` under `warn` → `pass`. Warn reports; it never blocks.
+ * - `skipped` / `none` under `required` → `fail`. A required policy that
+ *   resolved zero checks must not ship a PR on the strength of a gate that
+ *   did not run (pre-judge behavior, preserved verbatim).
+ * - `green` → whatever the judge said, or `pass` when there is no judge.
+ *   A judge `retry` with no attempts left becomes `escalate`: the agent
+ *   has spent its budget and the criteria are still unmet, which is a
+ *   human's decision, not another loop.
+ */
+export function resolveGateVerdict(input: {
+    gateStatus: GateStatus;
+    policy: WorkChecksPolicy;
+    judgement?: TaskGateJudgement | null;
+    /** `true` when another gate attempt is still inside the budget. */
+    attemptsRemaining: boolean;
+}): GateVerdict {
+    if (input.policy === 'off') return 'pass';
+
+    if (input.gateStatus === 'red') {
+        if (input.policy !== 'required') return 'pass';
+        return input.attemptsRemaining ? 'retry' : 'fail';
+    }
+
+    // 'skipped' / 'none' — nothing was graded, so there is nothing for
+    // another attempt to fix and no judge ran (`shouldRunGateJudge`
+    // requires a green gate).
+    if (input.gateStatus !== 'green') {
+        return input.policy === 'required' ? 'fail' : 'pass';
+    }
+
+    const judgement = input.judgement;
+    if (!judgement) return 'pass';
+    if (judgement.verdict === 'escalate') return 'escalate';
+    if (judgement.verdict === 'retry') return input.attemptsRemaining ? 'retry' : 'escalate';
+    return 'pass';
 }

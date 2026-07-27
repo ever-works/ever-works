@@ -149,6 +149,77 @@ export type GateStatus = 'green' | 'red' | 'skipped' | 'none';
 export type WorkChecksPolicy = 'off' | 'warn' | 'required';
 
 /**
+ * What the harness DOES with a graded run (judgment layer G2).
+ *
+ * {@link GateStatus} says what the CHECKS observed; this says what
+ * happens next. They are deliberately separate types: `gateStatus` is
+ * persisted onto the run and rendered as a chip, while the verdict is a
+ * per-attempt control-flow decision that is recomputed every time the
+ * gate re-runs.
+ *
+ * - `pass`     — proceed to finalize/PR exactly as a green gate always has.
+ * - `fail`     — stop, withhold the PR, tell the human. The terminal
+ *                outcome of a red gate that ran out of attempts.
+ * - `retry`    — feed structured feedback back into the SAME run's agent
+ *                loop and grade again. This is the bounded iterate loop
+ *                that already existed for a red gate; the judge is simply
+ *                a second producer of it.
+ * - `escalate` — stop and file a structured escalation through
+ *                `AgentEscalationService`, because a human has to decide.
+ *                Distinct from `fail`: the commands all passed, so there is
+ *                no failing check to point at — the work does not satisfy
+ *                what the Task asked for.
+ */
+export type GateVerdict = 'pass' | 'fail' | 'retry' | 'escalate';
+
+/** Canonical list — one source of truth for validators and pins. */
+export const GATE_VERDICTS: readonly GateVerdict[] = ['pass', 'fail', 'retry', 'escalate'];
+
+/**
+ * The subset of {@link GateVerdict} an LLM judge is allowed to return.
+ *
+ * `fail` is deliberately absent: "the commands failed" is an observation
+ * the process supervisor makes, never an opinion. A judge that could
+ * return `fail` would be able to overrule an exit code, which is exactly
+ * the property quality gates exist to avoid.
+ */
+export type GateJudgeVerdict = 'pass' | 'retry' | 'escalate';
+
+/** Canonical list — mirrors {@link GateJudgeVerdict} for `@IsIn`/zod. */
+export const GATE_JUDGE_VERDICTS: readonly GateJudgeVerdict[] = ['pass', 'retry', 'escalate'];
+
+/**
+ * One judge opinion about whether a run's output satisfies the Task's
+ * acceptance criteria. Produced only when a judge is configured; absent
+ * (`null`) otherwise, in which case the gate behaves exactly as it always
+ * has.
+ */
+export interface TaskGateJudgement {
+	/** What the harness should do next. */
+	verdict: GateJudgeVerdict;
+	/** One-line justification. Plain text — never rendered as markup. */
+	reason: string;
+	/**
+	 * Criteria the judge considers unmet, verbatim-ish. Empty on `pass`;
+	 * on `retry` these become the iterate message the agent reads.
+	 */
+	unmet: string[];
+	/** Provider plugin id that produced the opinion (audit trail). */
+	provider?: string;
+	/** Model id that produced the opinion (audit trail). */
+	model?: string;
+}
+
+/** Hard caps the judge applies to model output before it is used anywhere. */
+export const GATE_JUDGE_MAX_REASON_CHARS = 500;
+export const GATE_JUDGE_MAX_UNMET_ENTRIES = 10;
+export const GATE_JUDGE_MAX_UNMET_CHARS = 300;
+
+/** Cap on the criteria/output blocks spliced into the judge prompt. */
+export const GATE_JUDGE_MAX_CRITERIA_CHARS = 4000;
+export const GATE_JUDGE_MAX_OUTPUT_CHARS = 4000;
+
+/**
  * Canonical list of policies. Import sanitizers treat anything outside
  * this set as drop-if-unrecognized (never default-if-unrecognized).
  */

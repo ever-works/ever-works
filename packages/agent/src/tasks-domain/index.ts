@@ -6,6 +6,7 @@ export * from './tasks.module';
 export * from './tasks.service';
 export * from './task-gates';
 export * from './task-gate-runner.service';
+export * from './task-gate-judge.service';
 export * from './check-env';
 export * from './task-transition.service';
 export * from './task-chat.service';

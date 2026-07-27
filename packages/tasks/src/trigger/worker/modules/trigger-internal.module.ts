@@ -20,6 +20,7 @@ import {
 } from '@ever-works/agent/agents';
 import {
     TaskChatService,
+    TaskGateJudgeService,
     TaskGateRunnerService,
     TaskPrStatusService,
     TaskRecurrenceDispatcherService,
@@ -215,6 +216,18 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
                 createRemoteProxy(apiClient, 'TaskGateRunnerService'),
             inject: [TriggerInternalApiClient],
         },
+        // Judgment layer G2 — the acceptance-criteria judge. Must run
+        // API-side for the same reason the gate runner does, plus one of
+        // its own: it calls `AiFacadeService`, and the AI provider plugins
+        // (and the budget guard + usage ledger behind them) are only
+        // loaded in the API process. agent-task-execute calls `judge`
+        // over the internal RPC channel after a GREEN gate.
+        {
+            provide: TaskGateJudgeService,
+            useFactory: (apiClient: TriggerInternalApiClient) =>
+                createRemoteProxy(apiClient, 'TaskGateJudgeService'),
+            inject: [TriggerInternalApiClient],
+        },
         // Wave 3 M2 — dispatch-freeze. agent-task-execute loads the Task's
         // Work to resolve the acceptance-check set + policy right after the
         // run claim. The API already exposes 'WorkRepository' in its remote
@@ -375,6 +388,7 @@ export const DATA_SYNC_DISPATCHER_SERVICE = 'DataSyncDispatcherService';
         TaskWorkspaceService,
         FleetJobService,
         TaskGateRunnerService,
+        TaskGateJudgeService,
         WorkRepository,
         NotificationChannelFacadeService,
         AnonymousUserCleanupService,
