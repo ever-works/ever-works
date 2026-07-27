@@ -1055,4 +1055,67 @@ export const config = {
             return process.env.KB_EMBEDDING_MODE || 'auto';
         },
     },
+
+    /**
+     * Event-ingest spine — salience filter knobs.
+     *
+     * The ingest pipeline used to write EVERY envelope a connector
+     * produced straight into the feed, so a chatty source (bot pings,
+     * presence changes, reaction spam) could drown the signal a user
+     * actually connected the source for.
+     *
+     * All three knobs default to OFF, which reproduces the previous
+     * behaviour byte for byte: min score `0` admits everything, and both
+     * mute lists are empty. An operator opts in per deployment.
+     */
+    ingest: {
+        /**
+         * Minimum salience score (0–100) an envelope must reach to be
+         * stored. `0` (default) = filter disabled, everything is kept.
+         * Values outside 0–100 and unparseable input fall back to `0` —
+         * a typo must never start silently dropping a customer's events.
+         */
+        getSalienceMinScore(): number {
+            const raw = Number.parseInt(process.env.INGEST_SALIENCE_MIN_SCORE || '', 10);
+            if (!Number.isFinite(raw) || raw <= 0) return 0;
+            return Math.min(raw, 100);
+        },
+        /**
+         * Comma-separated event kinds to drop outright, e.g.
+         * `slack.presence,github.watch`. Matched case-insensitively
+         * against the envelope `kind`; a trailing `.*` makes it a
+         * prefix match (`slack.*`). Empty (default) = nothing muted.
+         */
+        getSalienceMutedKinds(): string[] {
+            return parseCsvList(process.env.INGEST_SALIENCE_MUTED_KINDS);
+        },
+        /**
+         * Comma-separated actor names to drop outright (noisy bots and
+         * automations). Matched case-insensitively as a SUBSTRING of the
+         * envelope actor name, so `dependabot` mutes
+         * `dependabot[bot]`. Empty (default) = nothing muted.
+         */
+        getSalienceMutedActors(): string[] {
+            return parseCsvList(process.env.INGEST_SALIENCE_MUTED_ACTORS);
+        },
+        /** True when any knob is set — i.e. the filter can drop something. */
+        isSalienceFilterEnabled(): boolean {
+            return (
+                this.getSalienceMinScore() > 0 ||
+                this.getSalienceMutedKinds().length > 0 ||
+                this.getSalienceMutedActors().length > 0
+            );
+        },
+    },
 };
+
+/** Comma-separated env list → trimmed, lowercased, blank-dropped, deduped. */
+function parseCsvList(raw: string | undefined): string[] {
+    if (typeof raw !== 'string' || raw.trim().length === 0) return [];
+    const seen = new Set<string>();
+    for (const part of raw.split(',')) {
+        const value = part.trim().toLowerCase();
+        if (value.length > 0) seen.add(value);
+    }
+    return [...seen];
+}
