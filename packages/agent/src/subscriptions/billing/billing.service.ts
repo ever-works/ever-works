@@ -3,7 +3,11 @@ import { BillingProfileRepository } from '@src/database/repositories/billing-pro
 import { CreditLedgerRepository } from '@src/database/repositories/credit-ledger.repository';
 import { InvoiceRepository } from '@src/database/repositories/invoice.repository';
 import { UserRepository } from '@src/database/repositories/user.repository';
-import { BillingProfile } from '@src/entities/billing-profile.entity';
+import {
+    BillingProfile,
+    isPastDueSubscriptionStatus,
+    type BillingSubscriptionStatus,
+} from '@src/entities/billing-profile.entity';
 import { CreditLedgerKind } from '@src/entities/credit-ledger-entry.entity';
 import { Invoice, InvoiceStatus } from '@src/entities/invoice.entity';
 import { CreditLedgerService } from '../credits/credit-ledger.service';
@@ -11,6 +15,7 @@ import {
     BillingProvider,
     BillingProviderError,
     BillingProviderNotConfiguredError,
+    type BillingSubscriptionSnapshot,
     type BillingWebhookEvent,
 } from './billing.provider';
 import { CREDIT_PACKS, findCreditPack, type CreditPack } from './credit-packs';
@@ -24,6 +29,22 @@ export class UnknownCreditPackError extends Error {
     constructor(packId: string) {
         super(`Unknown credit pack: ${packId}`);
         this.name = 'UnknownCreditPackError';
+    }
+}
+
+/**
+ * A lifecycle mutation (cancel / resume / portal) was asked for on an
+ * owner who has no manageable provider subscription. Stable `name` so the
+ * API boundary maps it to a 409 instead of an unmapped 500.
+ *
+ * This is also what a CROSS-OWNER attempt surfaces as: every lifecycle
+ * call resolves the profile from the authenticated user id, so asking
+ * about somebody else's subscription resolves to "you have none".
+ */
+export class NoActiveSubscriptionError extends Error {
+    constructor(message = 'No manageable subscription for this account') {
+        super(message);
+        this.name = 'NoActiveSubscriptionError';
     }
 }
 
@@ -45,6 +66,24 @@ export interface CreditCheckoutStarted {
     credits: number;
 }
 
+/**
+ * The subscription lifecycle as the Billing page renders it (audit
+ * B07/B08). Deliberately does NOT carry the provider subscription id:
+ * the client never needs it, and every mutation is resolved server-side
+ * from the session user.
+ */
+export interface SubscriptionStateView {
+    status: BillingSubscriptionStatus;
+    /** Cancel requested; the plan runs until `currentPeriodEnd`. */
+    cancelAtPeriodEnd: boolean;
+    currentPeriodEnd: Date | null;
+    canceledAt: Date | null;
+    /** `past_due` / `unpaid` — drives the recovery banner. */
+    pastDue: boolean;
+    /** There is a real provider subscription that cancel/resume can act on. */
+    manageable: boolean;
+}
+
 export interface BillingOverview {
     providerConfigured: boolean;
     providerId: string;
@@ -63,6 +102,8 @@ export interface BillingOverview {
         packId: string | null;
         failureCount: number;
     };
+    /** Real lifecycle state — the status chip is no longer assumed active. */
+    subscription: SubscriptionStateView;
 }
 
 export interface WebhookOutcome {
@@ -81,6 +122,7 @@ export interface WebhookOutcome {
         // `PlanSubscriptionService`, which owns the tier grant/revoke.
         | 'subscription-activated'
         | 'subscription-canceled'
+        | 'subscription-reconciled'
         | 'ignored'
         | 'unattributed';
     creditsDelta?: number;
@@ -218,7 +260,137 @@ export class BillingService {
                 packId: profile?.autoRechargePackId ?? null,
                 failureCount: profile?.autoRechargeFailureCount ?? 0,
             },
+            subscription: this.toSubscriptionState(profile),
         };
+    }
+
+    // ── Subscription lifecycle (audit B07/B08) ───────────────────────
+
+    /**
+     * Project the persisted lifecycle columns into what the UI renders.
+     *
+     * No profile, or no provider subscription id, ⇒ `none` + not
+     * manageable: the account is on the free tier (or payments are not
+     * wired), so the page shows a plain plan card and no cancel control
+     * rather than a button that would 409.
+     */
+    private toSubscriptionState(profile: BillingProfile | null): SubscriptionStateView {
+        const status: BillingSubscriptionStatus = profile?.subscriptionStatus ?? 'none';
+        const hasSubscription = Boolean(profile?.providerSubscriptionId);
+        return {
+            status,
+            cancelAtPeriodEnd: profile?.cancelAtPeriodEnd ?? false,
+            currentPeriodEnd: profile?.currentPeriodEnd ?? null,
+            canceledAt: profile?.subscriptionCanceledAt ?? null,
+            pastDue: isPastDueSubscriptionStatus(profile?.subscriptionStatus),
+            // Manageable only when the provider is wired AND we hold an
+            // id to act on — otherwise cancel/resume have nothing to call.
+            manageable: hasSubscription && this.billingProvider.isConfigured(),
+        };
+    }
+
+    /**
+     * Schedule a cancellation for the end of the paid period (B07).
+     *
+     * Owner-scoped by construction: the profile is resolved from the
+     * AUTHENTICATED user id — there is no subscription id parameter to
+     * smuggle, so no caller can reach another account's (or another
+     * org's) subscription. {@link requireOwnedSubscription} additionally
+     * re-checks ownership on the row that came back, so a future lookup
+     * bug cannot turn into a cross-owner mutation.
+     */
+    async cancelSubscription(userId: string): Promise<SubscriptionStateView> {
+        const profile = await this.requireOwnedSubscription(userId);
+        const snapshot = await this.billingProvider.cancelSubscriptionAtPeriodEnd({
+            subscriptionId: profile.providerSubscriptionId as string,
+        });
+        return this.persistSubscriptionSnapshot(userId, snapshot);
+    }
+
+    /** Undo a pending at-period-end cancellation (B07). */
+    async resumeSubscription(userId: string): Promise<SubscriptionStateView> {
+        const profile = await this.requireOwnedSubscription(userId);
+        if (profile.subscriptionStatus === 'canceled') {
+            // Already ended — there is nothing to resume, and pretending
+            // otherwise would leave the UI showing a plan that is gone.
+            throw new NoActiveSubscriptionError('This subscription has already ended');
+        }
+        const snapshot = await this.billingProvider.resumeSubscription({
+            subscriptionId: profile.providerSubscriptionId as string,
+        });
+        return this.persistSubscriptionSnapshot(userId, snapshot);
+    }
+
+    /**
+     * Hosted portal session — the PAST_DUE recovery action (B08).
+     *
+     * Needs only a provider CUSTOMER (not a subscription), so an owner
+     * whose card failed can fix it even after the subscription lapsed.
+     * The return URL is built by the caller from the platform's own web
+     * origin; nothing from the browser reaches the provider.
+     */
+    async createBillingPortalSession(userId: string, returnUrl: string): Promise<{ url: string }> {
+        if (!this.billingProvider.isConfigured()) {
+            throw new BillingProviderNotConfiguredError();
+        }
+        const profile = await this.billingProfileRepository.findByUserId(userId);
+        if (!profile || profile.userId !== userId || !profile.providerCustomerId) {
+            throw new NoActiveSubscriptionError('No billing account for this user');
+        }
+        return this.billingProvider.createBillingPortalSession({
+            customerId: profile.providerCustomerId,
+            returnUrl,
+        });
+    }
+
+    /**
+     * Resolve the caller's OWN profile and assert it carries a
+     * subscription the provider can act on.
+     *
+     * The `profile.userId !== userId` re-check is deliberate defence in
+     * depth: the lookup is already keyed by user id, so a mismatch can
+     * only mean a future bug in the query — and a mismatch here would be
+     * a cross-account mutation, the one failure this path must never have.
+     */
+    private async requireOwnedSubscription(userId: string): Promise<BillingProfile> {
+        if (!this.billingProvider.isConfigured()) {
+            throw new BillingProviderNotConfiguredError();
+        }
+        const profile = await this.billingProfileRepository.findByUserId(userId);
+        if (!profile || profile.userId !== userId) {
+            throw new NoActiveSubscriptionError();
+        }
+        if (!profile.providerSubscriptionId) {
+            throw new NoActiveSubscriptionError();
+        }
+        return profile;
+    }
+
+    /** Persist a provider snapshot and return the projected view. */
+    private async persistSubscriptionSnapshot(
+        userId: string,
+        snapshot: BillingSubscriptionSnapshot,
+    ): Promise<SubscriptionStateView> {
+        const updated = await this.billingProfileRepository.updateSubscriptionState(userId, {
+            providerSubscriptionId: snapshot.subscriptionId,
+            subscriptionStatus: snapshot.status,
+            cancelAtPeriodEnd: snapshot.cancelAtPeriodEnd,
+            currentPeriodEnd: snapshot.currentPeriodEnd,
+            subscriptionCanceledAt: snapshot.canceledAt,
+        });
+        // The row read-back is authoritative when we have it; the
+        // snapshot is the fallback so a repository that returns nothing
+        // still yields the state the provider just confirmed.
+        return updated
+            ? this.toSubscriptionState(updated)
+            : {
+                  status: snapshot.status,
+                  cancelAtPeriodEnd: snapshot.cancelAtPeriodEnd,
+                  currentPeriodEnd: snapshot.currentPeriodEnd,
+                  canceledAt: snapshot.canceledAt,
+                  pastDue: isPastDueSubscriptionStatus(snapshot.status),
+                  manageable: this.billingProvider.isConfigured(),
+              };
     }
 
     /** Owner-scoped invoice history (PRD §3.5). */
@@ -291,6 +463,7 @@ export class BillingService {
                 return this.applyPaymentMethod(event);
             case 'subscription.activated':
             case 'subscription.canceled':
+            case 'subscription.updated':
                 return this.applySubscription(event);
             case 'ignored':
             default:
@@ -299,20 +472,44 @@ export class BillingService {
     }
 
     /**
-     * Paid-plan lifecycle (audit B24). Delegated whole — the tier grant
-     * lives with the plan repositories, not with the credits ledger. A
-     * deployment that somehow lacks the collaborator acknowledges the
+     * Subscription deliveries — the ONE entry point for all three kinds.
+     *
+     * Two things can happen, and they are deliberately separate:
+     *
+     *  1. **The snapshot projection** (audit B07/B08) runs for every kind
+     *     that carries one. It is what the Billing page reads: the status
+     *     chip, the past-due banner, a pending at-period-end cancel. A
+     *     `past_due` or `paused` delivery moves ONLY this.
+     *  2. **The tier move** (audit B24) is delegated to
+     *     `PlanSubscriptionService` and happens for exactly two kinds —
+     *     `subscription.activated` and `subscription.canceled`. Nothing
+     *     else may grant or revoke a paid plan.
+     *
+     * Keeping (2) narrow is the point. Before these were separated, the
+     * plan handler's `else` branch revoked on every non-activation kind,
+     * so a dunning delivery would have downgraded a paying customer.
+     *
+     * A deployment that lacks the plan collaborator acknowledges the
      * delivery rather than 500-ing it into an infinite provider retry.
      */
     private async applySubscription(event: BillingWebhookEvent): Promise<WebhookOutcome> {
-        if (!this.planSubscriptionService) {
-            this.logger.warn(
-                `Billing webhook ${event.id}: subscription event received but plan handling is not wired — acknowledged`,
-            );
-            return { eventId: event.id, kind: event.kind, action: 'ignored' };
+        const reconciled = await this.reconcileSubscriptionSnapshot(event);
+
+        if (event.kind === 'subscription.activated' || event.kind === 'subscription.canceled') {
+            if (!this.planSubscriptionService) {
+                this.logger.warn(
+                    `Billing webhook ${event.id}: subscription event received but plan handling is not wired — acknowledged`,
+                );
+                return { eventId: event.id, kind: event.kind, action: 'ignored' };
+            }
+            const action = await this.planSubscriptionService.applyWebhook(event);
+            return { eventId: event.id, kind: event.kind, action };
         }
-        const action = await this.planSubscriptionService.applyWebhook(event);
-        return { eventId: event.id, kind: event.kind, action };
+
+        if (!reconciled) {
+            return this.unattributed(event);
+        }
+        return { eventId: event.id, kind: event.kind, action: 'subscription-reconciled' };
     }
 
     private async applyPurchase(event: BillingWebhookEvent): Promise<WebhookOutcome> {
@@ -465,6 +662,34 @@ export class BillingService {
             paymentMethodExpYear: event.paymentMethod.expYear,
         });
         return { eventId: event.id, kind: event.kind, action: 'payment-method-updated' };
+    }
+
+    /**
+     * Reconcile the provider's view of the subscription onto the owner's
+     * profile (audit B07/B08).
+     *
+     * This is what makes the status chip and the PAST_DUE banner true
+     * without anyone visiting the page: dunning, recovery, an
+     * out-of-band cancellation in the provider's own portal, and the
+     * terminal delete all arrive here and overwrite the same columns.
+     *
+     * Naturally idempotent — it is a last-write-wins projection of state,
+     * not a ledger movement, so a replayed delivery writes the same row.
+     */
+    private async reconcileSubscriptionSnapshot(event: BillingWebhookEvent): Promise<boolean> {
+        const profile = await this.resolveProfile(event);
+        if (!profile || !event.subscription) {
+            return false;
+        }
+        const snapshot = event.subscription;
+        await this.billingProfileRepository.updateSubscriptionState(profile.userId, {
+            providerSubscriptionId: snapshot.subscriptionId,
+            subscriptionStatus: snapshot.status,
+            cancelAtPeriodEnd: snapshot.cancelAtPeriodEnd,
+            currentPeriodEnd: snapshot.currentPeriodEnd,
+            subscriptionCanceledAt: snapshot.canceledAt,
+        });
+        return true;
     }
 
     private async resolveProfile(event: BillingWebhookEvent): Promise<BillingProfile | null> {

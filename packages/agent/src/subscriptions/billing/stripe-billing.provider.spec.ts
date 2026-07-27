@@ -522,6 +522,205 @@ describe('StripeBillingProvider — event normalization', () => {
         expect(normalized.customerId).toBe('cus_expanded');
         expect(normalized.paymentId).toBe('pi_expanded');
     });
+
+    // ── Subscription lifecycle (audit B07/B08) ───────────────────────
+
+    function subscriptionObject(overrides: Record<string, unknown> = {}) {
+        return {
+            id: 'sub_1',
+            customer: 'cus_1',
+            currency: 'usd',
+            status: 'active',
+            cancel_at_period_end: false,
+            canceled_at: null,
+            // Only subscriptions WE sold carry this marker, and the
+            // normalizer refuses to speak about any others — a Stripe
+            // account may hold subscriptions this platform never sold, and
+            // projecting their state onto one of our billing profiles
+            // would be wrong. The fixture represents one of ours.
+            metadata: {
+                [STRIPE_METADATA_KEYS.kind]: STRIPE_PURCHASE_KINDS.planSubscription,
+                [STRIPE_METADATA_KEYS.userId]: 'u1',
+                [STRIPE_METADATA_KEYS.planCode]: 'standard',
+                [STRIPE_METADATA_KEYS.referenceId]: 'u1:standard',
+            },
+            // Period end lives on the ITEMS in the current API version.
+            items: { data: [{ id: 'si_1', current_period_end: 1_790_000_000 }] },
+            ...overrides,
+        };
+    }
+
+    it('normalizes a subscription update, reading the period end off the item', async () => {
+        const normalized = await parse({
+            id: 'evt_12',
+            type: 'customer.subscription.updated',
+            data: { object: subscriptionObject({ cancel_at_period_end: true }) },
+        });
+
+        // An ACTIVE subscription re-asserts the tier, so the kind is
+        // `subscription.activated` (idempotent). What this test is really
+        // about is the SNAPSHOT — which now rides on every kind, so a
+        // `cancel_at_period_end` toggle reaches the billing profile.
+        expect(normalized.kind).toBe('subscription.activated');
+        expect(normalized.customerId).toBe('cus_1');
+        expect(normalized.subscription).toEqual({
+            subscriptionId: 'sub_1',
+            status: 'active',
+            cancelAtPeriodEnd: true,
+            currentPeriodEnd: new Date(1_790_000_000 * 1000),
+            canceledAt: null,
+        });
+    });
+
+    it('carries a past_due status straight through (drives the recovery banner)', async () => {
+        const normalized = await parse({
+            id: 'evt_13',
+            type: 'customer.subscription.updated',
+            data: { object: subscriptionObject({ status: 'past_due' }) },
+        });
+
+        expect(normalized.subscription?.status).toBe('past_due');
+    });
+
+    it('treats a delete as terminal regardless of what the object still says', async () => {
+        const normalized = await parse({
+            id: 'evt_14',
+            type: 'customer.subscription.deleted',
+            data: {
+                object: subscriptionObject({
+                    status: 'active',
+                    cancel_at_period_end: true,
+                    canceled_at: 1_789_000_000,
+                }),
+            },
+        });
+
+        expect(normalized.subscription).toEqual(
+            expect.objectContaining({
+                status: 'canceled',
+                cancelAtPeriodEnd: false,
+                canceledAt: new Date(1_789_000_000 * 1000),
+            }),
+        );
+    });
+
+    it('falls back to the legacy top-level period end on an older payload', async () => {
+        const normalized = await parse({
+            id: 'evt_15',
+            type: 'customer.subscription.updated',
+            data: {
+                object: subscriptionObject({
+                    items: { data: [] },
+                    current_period_end: 1_791_000_000,
+                }),
+            },
+        });
+
+        expect(normalized.subscription?.currentPeriodEnd).toEqual(new Date(1_791_000_000 * 1000));
+    });
+
+    it('maps an unrecognized provider status to `none` rather than trusting it', async () => {
+        const normalized = await parse({
+            id: 'evt_16',
+            type: 'customer.subscription.updated',
+            data: { object: subscriptionObject({ status: 'some_future_state' }) },
+        });
+
+        expect(normalized.subscription?.status).toBe('none');
+    });
+});
+
+describe('StripeBillingProvider — subscription mutations + portal (B07/B08)', () => {
+    beforeEach(() => {
+        process.env.STRIPE_SECRET_KEY = 'sk_test_x';
+    });
+
+    function withSubscriptions() {
+        const updated = {
+            id: 'sub_1',
+            status: 'active',
+            cancel_at_period_end: true,
+            canceled_at: null,
+            items: { data: [{ current_period_end: 1_790_000_000 }] },
+        };
+        const client = fakeClient({
+            subscriptions: { update: jest.fn().mockResolvedValue(updated) },
+            billingPortal: {
+                sessions: {
+                    create: jest
+                        .fn()
+                        .mockResolvedValue({ url: 'https://pay.example/portal/bps_1' }),
+                },
+            },
+        });
+        return build(client);
+    }
+
+    it('cancel schedules at period end — it never deletes the subscription', async () => {
+        const { provider, client } = withSubscriptions();
+
+        const snapshot = await provider.cancelSubscriptionAtPeriodEnd({
+            subscriptionId: 'sub_1',
+        });
+
+        expect(client.subscriptions.update).toHaveBeenCalledWith('sub_1', {
+            cancel_at_period_end: true,
+        });
+        // There is no `cancel`/delete call on the fake — if the provider
+        // ever reached for one this spec would throw.
+        expect(client.subscriptions.cancel).toBeUndefined();
+        expect(snapshot).toEqual({
+            subscriptionId: 'sub_1',
+            status: 'active',
+            cancelAtPeriodEnd: true,
+            currentPeriodEnd: new Date(1_790_000_000 * 1000),
+            canceledAt: null,
+        });
+    });
+
+    it('resume clears the pending cancellation flag', async () => {
+        const { provider, client } = withSubscriptions();
+
+        await provider.resumeSubscription({ subscriptionId: 'sub_1' });
+
+        expect(client.subscriptions.update).toHaveBeenCalledWith('sub_1', {
+            cancel_at_period_end: false,
+        });
+    });
+
+    it('creates a portal session with the SERVER-built return URL', async () => {
+        const { provider, client } = withSubscriptions();
+
+        const session = await provider.createBillingPortalSession({
+            customerId: 'cus_1',
+            returnUrl: 'https://app.test/settings/billing',
+        });
+
+        expect(client.billingPortal.sessions.create).toHaveBeenCalledWith({
+            customer: 'cus_1',
+            return_url: 'https://app.test/settings/billing',
+        });
+        expect(session).toEqual({ url: 'https://pay.example/portal/bps_1' });
+    });
+
+    it('fails closed on every lifecycle call without a secret key', async () => {
+        delete process.env.STRIPE_SECRET_KEY;
+        const { provider, factory } = build();
+
+        await expect(
+            provider.cancelSubscriptionAtPeriodEnd({ subscriptionId: 'sub_1' }),
+        ).rejects.toBeInstanceOf(BillingProviderNotConfiguredError);
+        await expect(
+            provider.resumeSubscription({ subscriptionId: 'sub_1' }),
+        ).rejects.toBeInstanceOf(BillingProviderNotConfiguredError);
+        await expect(
+            provider.createBillingPortalSession({
+                customerId: 'cus_1',
+                returnUrl: 'https://app.test/settings/billing',
+            }),
+        ).rejects.toBeInstanceOf(BillingProviderNotConfiguredError);
+        expect(factory).not.toHaveBeenCalled();
+    });
 });
 
 describe('StripeBillingProvider — paid-plan checkout (audit B24)', () => {
@@ -816,7 +1015,17 @@ describe('StripeBillingProvider — subscription event normalization (audit B24)
                 type: 'customer.subscription.updated',
                 data: { object: { id: 'sub_1', status, metadata: planMeta } },
             });
-            expect(normalized.kind).toBe('ignored');
+            // The invariant this test is named for: a transient state must
+            // never produce a REVOKING kind. `subscription.canceled` is
+            // the only kind that revokes.
+            expect(normalized.kind).not.toBe('subscription.canceled');
+            // It used to assert `ignored`, which was the proxy for "nothing
+            // happens" back when there was nowhere else for these to go.
+            // Audit B07/B08 gives them a home: they now surface as a
+            // lifecycle snapshot, which is what drives the dunning banner.
+            // The no-revoke guarantee moved to where revoking actually
+            // happens — see plan-subscription.service.spec.
+            expect(normalized.kind).toBe('subscription.updated');
         }
     });
 

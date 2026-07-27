@@ -9,6 +9,41 @@ import {
 } from 'typeorm';
 
 /**
+ * Vendor-neutral subscription lifecycle states (audit B07/B08).
+ *
+ * The list is the intersection every mainstream payment provider models,
+ * so nothing here leaks a vendor vocabulary into the schema or the UI.
+ * `none` is the platform's own value: the account has no provider-side
+ * subscription at all (free tier, or payments not wired), which is
+ * distinct from `canceled` (it HAD one and it ended).
+ */
+export const BILLING_SUBSCRIPTION_STATUSES = [
+    'none',
+    'trialing',
+    'active',
+    'past_due',
+    'unpaid',
+    'paused',
+    'canceled',
+    'incomplete',
+    'incomplete_expired',
+] as const;
+
+export type BillingSubscriptionStatus = (typeof BILLING_SUBSCRIPTION_STATUSES)[number];
+
+/** Statuses that mean "the provider could not collect" — drives the banner. */
+export const BILLING_PAST_DUE_STATUSES: readonly BillingSubscriptionStatus[] = [
+    'past_due',
+    'unpaid',
+];
+
+export function isPastDueSubscriptionStatus(
+    status: BillingSubscriptionStatus | null | undefined,
+): boolean {
+    return status != null && BILLING_PAST_DUE_STATUSES.includes(status);
+}
+
+/**
  * Billing profile (billing PRD §4.2 / §5.3(3)) — the per-owner bridge
  * between a platform user and the external payment provider.
  *
@@ -129,6 +164,42 @@ export class BillingProfile {
 
     @PortableDateColumn({ nullable: true })
     autoRechargeLastFailureAt?: Date | null;
+
+    // ── Subscription lifecycle (audit B07/B08) ──────────────────────
+    /**
+     * The provider's subscription identifier, when this owner has a
+     * recurring plan. Opaque, never a secret. NULL means "no provider
+     * subscription" — the account is on the free tier (or payments are
+     * not wired), and cancel/resume are inoperable rather than silently
+     * no-op'ing.
+     */
+    @Column({ type: 'varchar', length: 128, nullable: true })
+    providerSubscriptionId?: string | null;
+
+    /**
+     * Last reconciled lifecycle status. Written by the cancel/resume
+     * calls AND by the signature-verified webhook, so a provider-side
+     * change (dunning → `past_due`, final failure → `canceled`) lands
+     * here without anyone visiting the Billing page.
+     */
+    @Column({ type: 'varchar', length: 32, nullable: true })
+    subscriptionStatus?: BillingSubscriptionStatus | null;
+
+    /**
+     * True once the owner has asked to cancel but the paid period is
+     * still running. The plan stays usable until `currentPeriodEnd`;
+     * resuming before then clears the flag with no gap in service.
+     */
+    @Column({ type: 'boolean', default: false })
+    cancelAtPeriodEnd: boolean;
+
+    /** End of the paid period — when a pending cancellation takes effect. */
+    @PortableDateColumn({ nullable: true })
+    currentPeriodEnd?: Date | null;
+
+    /** When the subscription actually ended (not when cancel was requested). */
+    @PortableDateColumn({ nullable: true })
+    subscriptionCanceledAt?: Date | null;
 
     @CreateDateColumn()
     createdAt: Date;

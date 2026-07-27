@@ -23,11 +23,18 @@ class FakeUnknownCreditPackError extends Error {
         this.name = 'UnknownCreditPackError';
     }
 }
+class FakeNoActiveSubscriptionError extends Error {
+    constructor(message = 'No manageable subscription for this account') {
+        super(message);
+        this.name = 'NoActiveSubscriptionError';
+    }
+}
 
 jest.mock('@ever-works/agent/subscriptions', () => ({
     BillingProviderNotConfiguredError: FakeBillingProviderNotConfiguredError,
     BillingProviderError: FakeBillingProviderError,
     UnknownCreditPackError: FakeUnknownCreditPackError,
+    NoActiveSubscriptionError: FakeNoActiveSubscriptionError,
     BillingService: class BillingService {},
     CREDIT_PACK_IDS: ['credits-1000', 'credits-5500', 'credits-25000'],
 }));
@@ -90,6 +97,14 @@ function makeService(overrides: Record<string, unknown> = {}) {
                 packId: null,
                 failureCount: 0,
             },
+            subscription: {
+                status: 'active',
+                cancelAtPeriodEnd: false,
+                currentPeriodEnd: new Date('2026-08-01T00:00:00Z'),
+                canceledAt: null,
+                pastDue: false,
+                manageable: true,
+            },
         }),
         listInvoices: jest
             .fn()
@@ -100,6 +115,26 @@ function makeService(overrides: Record<string, unknown> = {}) {
             autoRechargePackId: 'credits-1000',
             autoRechargeFailureCount: 0,
         }),
+        // Subscription lifecycle (audit B07/B08).
+        cancelSubscription: jest.fn().mockResolvedValue({
+            status: 'active',
+            cancelAtPeriodEnd: true,
+            currentPeriodEnd: new Date('2026-08-01T00:00:00Z'),
+            canceledAt: null,
+            pastDue: false,
+            manageable: true,
+        }),
+        resumeSubscription: jest.fn().mockResolvedValue({
+            status: 'active',
+            cancelAtPeriodEnd: false,
+            currentPeriodEnd: new Date('2026-08-01T00:00:00Z'),
+            canceledAt: null,
+            pastDue: false,
+            manageable: true,
+        }),
+        createBillingPortalSession: jest
+            .fn()
+            .mockResolvedValue({ url: 'https://pay.example/portal/bps_1' }),
         ...overrides,
     } as any;
 }
@@ -293,6 +328,107 @@ describe('BillingController — overview, invoices, auto-recharge', () => {
             packId: 'credits-1000',
         });
         expect(result).toEqual(expect.objectContaining({ enabled: true, thresholdCredits: 500 }));
+    });
+});
+
+/**
+ * Subscription lifecycle at the HTTP boundary (audit B07/B08).
+ *
+ * The routes take NO body and NO id: everything is resolved from the
+ * session user, which is what makes a cross-account (or cross-org)
+ * request structurally impossible rather than merely checked.
+ */
+describe('BillingController — subscription cancel / resume / portal', () => {
+    beforeAll(() => {
+        process.env.WEB_URL = 'https://app.test';
+    });
+
+    it('cancels for the AUTHENTICATED user and echoes the new state', async () => {
+        const service = makeService();
+        const controller = new BillingController(service);
+
+        const result = await controller.cancelSubscription(auth);
+
+        expect(service.cancelSubscription).toHaveBeenCalledWith('user-1');
+        expect(result.subscription).toEqual(
+            expect.objectContaining({ cancelAtPeriodEnd: true, status: 'active' }),
+        );
+    });
+
+    it('cannot be pointed at another account: the session user is the only input', async () => {
+        const service = makeService();
+        const controller = new BillingController(service);
+
+        await controller.cancelSubscription(auth);
+        await controller.cancelSubscription(otherAuth);
+
+        expect(service.cancelSubscription).toHaveBeenNthCalledWith(1, 'user-1');
+        expect(service.cancelSubscription).toHaveBeenNthCalledWith(2, 'user-2');
+        // There is no id/body parameter on the route at all.
+        expect(controller.cancelSubscription).toHaveLength(1);
+        expect(controller.resumeSubscription).toHaveLength(1);
+    });
+
+    it('resumes for the authenticated user', async () => {
+        const service = makeService();
+        const controller = new BillingController(service);
+
+        const result = await controller.resumeSubscription(auth);
+
+        expect(service.resumeSubscription).toHaveBeenCalledWith('user-1');
+        expect(result.subscription.cancelAtPeriodEnd).toBe(false);
+    });
+
+    it('maps "no subscription" to 409 — the same answer a foreign account gets', async () => {
+        const service = makeService({
+            cancelSubscription: jest.fn().mockRejectedValue(new FakeNoActiveSubscriptionError()),
+            resumeSubscription: jest.fn().mockRejectedValue(new FakeNoActiveSubscriptionError()),
+        });
+        const controller = new BillingController(service);
+
+        await expect(controller.cancelSubscription(auth)).rejects.toBeInstanceOf(ConflictException);
+        await expect(controller.resumeSubscription(otherAuth)).rejects.toBeInstanceOf(
+            ConflictException,
+        );
+    });
+
+    it('maps provider-not-configured to 503 so the UI can degrade', async () => {
+        const service = makeService({
+            cancelSubscription: jest
+                .fn()
+                .mockRejectedValue(new FakeBillingProviderNotConfiguredError()),
+        });
+        const controller = new BillingController(service);
+
+        await expect(controller.cancelSubscription(auth)).rejects.toBeInstanceOf(
+            ServiceUnavailableException,
+        );
+    });
+
+    it('builds the portal return URL server-side (no client-supplied redirect)', async () => {
+        const service = makeService();
+        const controller = new BillingController(service);
+
+        const result = await controller.createPortalSession(auth);
+
+        expect(service.createBillingPortalSession).toHaveBeenCalledWith(
+            'user-1',
+            'https://app.test/settings/billing',
+        );
+        expect(result.url).toBe('https://pay.example/portal/bps_1');
+    });
+
+    it('surfaces the subscription state on the overview (the status chip’s source)', async () => {
+        const service = makeService();
+        const controller = new BillingController(service);
+
+        const result = await controller.getOverview(auth);
+
+        expect(result).toEqual(
+            expect.objectContaining({
+                subscription: expect.objectContaining({ status: 'active', manageable: true }),
+            }),
+        );
     });
 });
 

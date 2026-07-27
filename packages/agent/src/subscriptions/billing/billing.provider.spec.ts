@@ -1,4 +1,8 @@
-import { BillingProvider, ManualBillingProvider } from './billing.provider';
+import {
+    BillingProvider,
+    BillingProviderNotConfiguredError,
+    ManualBillingProvider,
+} from './billing.provider';
 
 /**
  * BillingProvider is the abstract surface UsageLedgerService talks to. The
@@ -78,5 +82,28 @@ describe('ManualBillingProvider', () => {
     it('inherits the no-op recordUsageCharge() (no external gateway in manual mode)', async () => {
         const provider = new ManualBillingProvider();
         await expect(provider.recordUsageCharge({ id: 'led-1' } as any)).resolves.toBeUndefined();
+    });
+
+    /**
+     * Subscription lifecycle (audit B07/B08). The manual binding moves no
+     * money and manages no subscription, so cancel/resume/portal inherit
+     * the not-configured throw — a keyless deployment surfaces a 503 and
+     * the UI degrades, rather than pretending a cancellation happened.
+     */
+    it('fails closed on every subscription lifecycle call', async () => {
+        const provider = new ManualBillingProvider();
+
+        await expect(
+            provider.cancelSubscriptionAtPeriodEnd({ subscriptionId: 'sub_1' }),
+        ).rejects.toBeInstanceOf(BillingProviderNotConfiguredError);
+        await expect(
+            provider.resumeSubscription({ subscriptionId: 'sub_1' }),
+        ).rejects.toBeInstanceOf(BillingProviderNotConfiguredError);
+        await expect(
+            provider.createBillingPortalSession({
+                customerId: 'cus_1',
+                returnUrl: 'https://app.test/settings/billing',
+            }),
+        ).rejects.toBeInstanceOf(BillingProviderNotConfiguredError);
     });
 });

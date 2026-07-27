@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { config } from '@src/config';
+import type { BillingSubscriptionStatus } from '@src/entities/billing-profile.entity';
 import { UsageLedgerEntry } from '@src/entities/usage-ledger-entry.entity';
 import type { CreditPack } from './credit-packs';
 
@@ -209,6 +210,43 @@ export interface BillingInvoiceSnapshot {
 }
 
 /**
+ * A subscription's lifecycle as the provider currently reports it
+ * (audit B07/B08). Vendor-neutral: `status` is the shared token set from
+ * {@link BillingSubscriptionStatus}, dates are real `Date`s, and the id
+ * is opaque. Returned by cancel/resume AND carried on the reconciling
+ * webhook, so both paths persist the same shape.
+ */
+export interface BillingSubscriptionSnapshot {
+    readonly subscriptionId: string;
+    readonly status: BillingSubscriptionStatus;
+    /** Cancel requested, paid period still running. */
+    readonly cancelAtPeriodEnd: boolean;
+    /** When a pending cancellation takes effect. */
+    readonly currentPeriodEnd: Date | null;
+    /** When the subscription actually ended. */
+    readonly canceledAt: Date | null;
+}
+
+/** Cancel/resume input. The id is server-resolved, never client-supplied. */
+export interface SubscriptionMutationRequest {
+    readonly subscriptionId: string;
+}
+
+/**
+ * Hosted self-service portal (the PAST_DUE recovery action, B08). The
+ * return URL is always built server-side from the platform's own web
+ * origin — accepting one from the client would be an open redirect.
+ */
+export interface BillingPortalRequest {
+    readonly customerId: string;
+    readonly returnUrl: string;
+}
+
+export interface BillingPortalSession {
+    readonly url: string;
+}
+
+/**
  * The closed set of provider events the money path reacts to. Anything
  * else the provider sends is acknowledged and ignored — an unknown event
  * type must never 500 a webhook (the provider would retry forever).
@@ -230,6 +268,20 @@ export type BillingWebhookEventKind =
     | 'subscription.activated'
     /** A paid plan lapsed (cancelled, unpaid, or deleted). */
     | 'subscription.canceled'
+    /**
+     * A subscription's LIFECYCLE moved (audit B07/B08) — dunning, pause,
+     * resume, or a period roll — carrying the full provider snapshot.
+     *
+     * Deliberately NOT a grant or a revoke. Those remain
+     * `subscription.activated` / `subscription.canceled` above, which are
+     * the only two kinds allowed to move a user's tier. This one exists
+     * so the states those two treat as "not actionable" (`past_due`,
+     * `paused`, `incomplete`) still reach the product instead of being
+     * dropped — that is what makes a dunning banner or a resume button
+     * possible without giving the lifecycle path the power to downgrade
+     * anyone.
+     */
+    | 'subscription.updated'
     /** Recognized envelope, no action for us. */
     | 'ignored';
 
@@ -250,6 +302,8 @@ export interface BillingWebhookEvent {
     readonly invoice?: BillingInvoiceSnapshot;
     /** Populated for `payment_method.updated`. */
     readonly paymentMethod?: PaymentMethodSummary;
+    /** Populated for `subscription.updated` (audit B07/B08). */
+    readonly subscription?: BillingSubscriptionSnapshot;
     /** Provider payment id, for correlation on refunds. */
     readonly paymentId: string | null;
     /** Raw provider event type, for logging/diagnostics. Never a secret. */
@@ -334,6 +388,37 @@ export abstract class BillingProvider {
 
     /** Off-session charge against a stored payment method (auto-recharge). */
     async chargeOffSession(_request: OffSessionChargeRequest): Promise<OffSessionChargeResult> {
+        throw new BillingProviderNotConfiguredError();
+    }
+
+    /**
+     * Schedule a cancellation for the end of the paid period (audit B07).
+     *
+     * At-period-end ONLY by design: the owner keeps what they paid for,
+     * and {@link resumeSubscription} can undo it with no gap in service.
+     * There is deliberately no immediate-termination method on this seam.
+     */
+    async cancelSubscriptionAtPeriodEnd(
+        _request: SubscriptionMutationRequest,
+    ): Promise<BillingSubscriptionSnapshot> {
+        throw new BillingProviderNotConfiguredError();
+    }
+
+    /** Undo a pending at-period-end cancellation (audit B07). */
+    async resumeSubscription(
+        _request: SubscriptionMutationRequest,
+    ): Promise<BillingSubscriptionSnapshot> {
+        throw new BillingProviderNotConfiguredError();
+    }
+
+    /**
+     * Hosted self-service portal — the PAST_DUE recovery action (B08).
+     * Card capture stays entirely on the provider's tokenized surface, so
+     * no cardholder datum ever reaches the platform.
+     */
+    async createBillingPortalSession(
+        _request: BillingPortalRequest,
+    ): Promise<BillingPortalSession> {
         throw new BillingProviderNotConfiguredError();
     }
 

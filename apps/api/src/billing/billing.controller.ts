@@ -21,6 +21,7 @@ import {
     BillingProviderError,
     BillingProviderNotConfiguredError,
     BillingService,
+    NoActiveSubscriptionError,
     UnknownCreditPackError,
 } from '@ever-works/agent/subscriptions';
 import { Invoice } from '@ever-works/agent/entities';
@@ -129,6 +130,78 @@ export class BillingController {
         }
     }
 
+    // ── Subscription lifecycle (audit B07/B08) ───────────────────────
+
+    @Post('subscription/cancel')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Cancel the subscription at the end of the paid period',
+        description:
+            'Schedules an at-period-end cancellation through the billing-provider seam and persists ' +
+            'the returned lifecycle state on the billing profile. The plan keeps working until the ' +
+            'period ends and `POST subscription/resume` reverses it. Owner-scoped: the subscription ' +
+            'is resolved from the session user, so no caller can cancel another account’s plan.',
+    })
+    @ApiResponse({ status: 200, description: 'Cancellation scheduled' })
+    @ApiResponse({ status: 409, description: 'No manageable subscription for this account' })
+    @ApiResponse({ status: 503, description: 'Payment provider not configured' })
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
+    async cancelSubscription(@CurrentUser() auth: AuthenticatedUser) {
+        try {
+            const subscription = await this.billingService.cancelSubscription(auth.userId);
+            return { status: 'success', subscription };
+        } catch (error) {
+            throw mapBillingError(error);
+        }
+    }
+
+    @Post('subscription/resume')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Resume a subscription that was set to cancel at period end',
+        description:
+            'Clears a pending at-period-end cancellation through the billing-provider seam. Refused ' +
+            'with 409 once the subscription has actually ended — there is nothing left to resume.',
+    })
+    @ApiResponse({ status: 200, description: 'Subscription resumed' })
+    @ApiResponse({ status: 409, description: 'No manageable subscription for this account' })
+    @ApiResponse({ status: 503, description: 'Payment provider not configured' })
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
+    async resumeSubscription(@CurrentUser() auth: AuthenticatedUser) {
+        try {
+            const subscription = await this.billingService.resumeSubscription(auth.userId);
+            return { status: 'success', subscription };
+        } catch (error) {
+            throw mapBillingError(error);
+        }
+    }
+
+    @Post('portal')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Open the provider’s hosted billing portal',
+        description:
+            'The PAST_DUE recovery action: returns a redirect URL where the owner can update the card ' +
+            'that failed. Capture stays on the provider’s tokenized surface. The return URL is built ' +
+            'server-side from WEB_URL — a client-supplied one would be an open redirect.',
+    })
+    @ApiResponse({ status: 200, description: 'Portal session created' })
+    @ApiResponse({ status: 409, description: 'No billing account for this user' })
+    @ApiResponse({ status: 503, description: 'Payment provider not configured' })
+    @Throttle({ long: { limit: 10, ttl: 60_000 } })
+    async createPortalSession(@CurrentUser() auth: AuthenticatedUser) {
+        const base = config.webAppUrl().replace(/\/+$/, '');
+        try {
+            const session = await this.billingService.createBillingPortalSession(
+                auth.userId,
+                `${base}/settings/billing`,
+            );
+            return { status: 'success', url: session.url };
+        } catch (error) {
+            throw mapBillingError(error);
+        }
+    }
+
     /**
      * Explicit projection. `defaultPaymentMethodRef` and every provider
      * secret stay server-side; only display metadata crosses the wire.
@@ -228,6 +301,13 @@ function mapBillingError(error: unknown): unknown {
     }
     if (error instanceof UnknownCreditPackError) {
         return new BadRequestException(error.message);
+    }
+    // Subscription lifecycle (audit B07/B08): "you have nothing to
+    // cancel/resume" is a state conflict, not a server fault — and it is
+    // the same answer a cross-owner attempt gets, so the response cannot
+    // be used to probe whether another account has a subscription.
+    if (error instanceof NoActiveSubscriptionError) {
+        return new ConflictException(error.message);
     }
     if (error instanceof BillingProviderError) {
         return new ConflictException(error.message);

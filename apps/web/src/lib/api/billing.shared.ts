@@ -33,6 +33,44 @@ export interface AutoRechargeSettings {
     failureCount: number;
 }
 
+/**
+ * Vendor-neutral subscription lifecycle (audit B07/B08). Mirrors the
+ * API's `BillingSubscriptionStatus`; `none` means the account has no
+ * provider subscription at all (free tier / payments not wired), which
+ * is distinct from `canceled` (it had one and it ended).
+ */
+export type SubscriptionLifecycleStatus =
+    | 'none'
+    | 'trialing'
+    | 'active'
+    | 'past_due'
+    | 'unpaid'
+    | 'paused'
+    | 'canceled'
+    | 'incomplete'
+    | 'incomplete_expired';
+
+export interface SubscriptionState {
+    status: SubscriptionLifecycleStatus;
+    /** Cancel requested; the plan runs until `currentPeriodEnd`. */
+    cancelAtPeriodEnd: boolean;
+    currentPeriodEnd: string | null;
+    canceledAt: string | null;
+    pastDue: boolean;
+    /** There is a real provider subscription cancel/resume can act on. */
+    manageable: boolean;
+}
+
+/** What an overview with no subscription block looks like. */
+export const EMPTY_SUBSCRIPTION_STATE: SubscriptionState = {
+    status: 'none',
+    cancelAtPeriodEnd: false,
+    currentPeriodEnd: null,
+    canceledAt: null,
+    pastDue: false,
+    manageable: false,
+};
+
 export interface BillingOverview {
     status: string;
     /** False ⇒ render the coming-soon state instead of live controls. */
@@ -43,6 +81,22 @@ export interface BillingOverview {
     balanceCredits: number;
     paymentMethod: PaymentMethodSummary | null;
     autoRecharge: AutoRechargeSettings;
+    /**
+     * Optional on the wire: an older API (or a degraded response) simply
+     * omits it, and {@link subscriptionState} falls back to `none` rather
+     * than the page crashing on an undefined read.
+     */
+    subscription?: SubscriptionState;
+}
+
+export interface SubscriptionMutationResponse {
+    status: string;
+    subscription: SubscriptionState;
+}
+
+export interface BillingPortalResponse {
+    status: string;
+    url: string;
 }
 
 export type InvoiceStatus = 'draft' | 'open' | 'paid' | 'void' | 'uncollectible' | 'refunded';
@@ -175,4 +229,104 @@ export function canUpgradePlan(
     subscriptionsEnabled: boolean,
 ): boolean {
     return canBuyCredits(overview, paymentsEnabled) && subscriptionsEnabled;
+}
+
+// ── Subscription lifecycle (audit B07/B08) ─────────────────────────
+
+/** Never-undefined lifecycle state for the page to render from. */
+export function subscriptionState(overview: BillingOverview | null): SubscriptionState {
+    return overview?.subscription ?? EMPTY_SUBSCRIPTION_STATE;
+}
+
+/**
+ * Badge tone for the plan status chip. `none` reads as positive because
+ * an account with no provider subscription is a perfectly healthy free
+ * account — the chip should not imply something is wrong.
+ */
+export function subscriptionStatusTone(
+    status: SubscriptionLifecycleStatus,
+): 'positive' | 'negative' | 'warning' | 'neutral' {
+    switch (status) {
+        case 'none':
+        case 'active':
+        case 'trialing':
+            return 'positive';
+        case 'past_due':
+        case 'unpaid':
+            return 'negative';
+        case 'canceled':
+        case 'incomplete_expired':
+            return 'neutral';
+        case 'paused':
+        case 'incomplete':
+            return 'warning';
+        default:
+            return 'neutral';
+    }
+}
+
+/**
+ * Message keys the status chip can render, as a literal union — next-intl
+ * types `t()` against the message tree, so a plain `string` would not
+ * typecheck at the call site.
+ */
+export type SubscriptionStatusLabelKey =
+    | 'currentPlan.statusActive'
+    | `currentPlan.statuses.${Exclude<SubscriptionLifecycleStatus, 'none' | 'active'>}`;
+
+/**
+ * Translation key (relative to `dashboard.settings.billing`) for a
+ * status. `active` and `none` deliberately keep the pre-existing
+ * `currentPlan.statusActive` key so the copy — and anything asserting on
+ * it — is unchanged for the common case.
+ */
+export function subscriptionStatusLabelKey(
+    status: SubscriptionLifecycleStatus,
+): SubscriptionStatusLabelKey {
+    return status === 'none' || status === 'active'
+        ? 'currentPlan.statusActive'
+        : `currentPlan.statuses.${status}`;
+}
+
+/** The recovery banner shows only for a genuinely uncollected subscription. */
+export function isSubscriptionPastDue(overview: BillingOverview | null): boolean {
+    const state = subscriptionState(overview);
+    return state.pastDue || state.status === 'past_due' || state.status === 'unpaid';
+}
+
+/**
+ * Cancel is offerable while the plan is live and not already scheduled to
+ * end. Both gates from `canBuyCredits` still apply — a deployment with
+ * payments off never shows a money control.
+ */
+export function canCancelSubscription(
+    overview: BillingOverview | null,
+    paymentsEnabled: boolean,
+): boolean {
+    const state = subscriptionState(overview);
+    return (
+        canBuyCredits(overview, paymentsEnabled) &&
+        state.manageable &&
+        !state.cancelAtPeriodEnd &&
+        (state.status === 'active' ||
+            state.status === 'trialing' ||
+            state.status === 'past_due' ||
+            state.status === 'unpaid' ||
+            state.status === 'paused')
+    );
+}
+
+/** Resume is offerable only while a scheduled cancellation is still pending. */
+export function canResumeSubscription(
+    overview: BillingOverview | null,
+    paymentsEnabled: boolean,
+): boolean {
+    const state = subscriptionState(overview);
+    return (
+        canBuyCredits(overview, paymentsEnabled) &&
+        state.manageable &&
+        state.cancelAtPeriodEnd &&
+        state.status !== 'canceled' &&
+        state.status !== 'incomplete_expired'
+    );
 }

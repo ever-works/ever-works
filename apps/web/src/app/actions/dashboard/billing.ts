@@ -146,3 +146,88 @@ export async function updateAutoRechargeAction(settings: {
         return { success: false as const, enabled: null, error: message };
     }
 }
+
+/**
+ * Cancel the subscription at the end of the paid period (audit B07).
+ *
+ * Returns a discriminated union rather than throwing — production
+ * redacts thrown server-action messages, so the client must branch on
+ * the return value. 409 means "nothing to cancel", which is also the
+ * answer a cross-account attempt would get.
+ */
+export async function cancelSubscriptionAction() {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const result = await billingAPI.cancelSubscription();
+        revalidatePath(ROUTES.DASHBOARD_SETTINGS_BILLING);
+        return { success: true as const, subscription: result.subscription, error: null };
+    } catch (error) {
+        console.error('[cancelSubscriptionAction]', error);
+        let message = 'Failed to cancel the subscription';
+        if (error instanceof ApiResponseError) {
+            if (error.statusCode === 409) {
+                message = 'There is no active subscription to cancel.';
+            } else if (error.statusCode === 503) {
+                message = 'Card payments are not enabled on this deployment yet.';
+            }
+        }
+        return { success: false as const, subscription: null, error: message };
+    }
+}
+
+/** Undo a pending at-period-end cancellation (audit B07). */
+export async function resumeSubscriptionAction() {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const result = await billingAPI.resumeSubscription();
+        revalidatePath(ROUTES.DASHBOARD_SETTINGS_BILLING);
+        return { success: true as const, subscription: result.subscription, error: null };
+    } catch (error) {
+        console.error('[resumeSubscriptionAction]', error);
+        let message = 'Failed to resume the subscription';
+        if (error instanceof ApiResponseError) {
+            if (error.statusCode === 409) {
+                message = 'This subscription has already ended.';
+            } else if (error.statusCode === 503) {
+                message = 'Card payments are not enabled on this deployment yet.';
+            }
+        }
+        return { success: false as const, subscription: null, error: message };
+    }
+}
+
+/**
+ * Open the provider's hosted billing portal — the PAST_DUE recovery
+ * action (audit B08). The URL comes from the API, which builds the
+ * return URL from its own WEB_URL; nothing from the browser is trusted.
+ */
+export async function openBillingPortalAction() {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const result = await billingAPI.billingPortal();
+        return { success: true as const, url: result.url, error: null };
+    } catch (error) {
+        console.error('[openBillingPortalAction]', error);
+        let message = 'Could not open the billing portal';
+        if (error instanceof ApiResponseError) {
+            if (error.statusCode === 409) {
+                message = 'There is no billing account to manage yet.';
+            } else if (error.statusCode === 503) {
+                message = 'Card payments are not enabled on this deployment yet.';
+            }
+        }
+        return { success: false as const, url: null, error: message };
+    }
+}
