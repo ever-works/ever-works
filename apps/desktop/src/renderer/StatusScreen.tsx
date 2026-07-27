@@ -1,17 +1,22 @@
 import { useEffect, useState } from 'react';
-import type { DesktopBridge, LogEntry, ServiceId, ServiceStatus } from '../shared/ipc-contract';
+import type { DesktopBridge, DesktopConfig, LogEntry, ServiceId, ServiceStatus } from '../shared/ipc-contract';
 
 interface StatusScreenProps {
 	bridge: DesktopBridge;
+	config: DesktopConfig;
 }
 
 /** Service status + log panes shown when the wizard is already complete. */
-export function StatusScreen({ bridge }: StatusScreenProps) {
+export function StatusScreen({ bridge, config }: StatusScreenProps) {
 	const [statuses, setStatuses] = useState<ServiceStatus[]>([]);
 	const [activeService, setActiveService] = useState<ServiceId>('api');
 	const [logs, setLogs] = useState<LogEntry[]>([]);
+	const isRemote = config.mode === 'remote-client';
 
 	useEffect(() => {
+		if (isRemote) {
+			return;
+		}
 		void bridge.getStatus().then(setStatuses);
 		const offStatus = bridge.onStatus(setStatuses);
 		const poll = setInterval(() => void bridge.getStatus().then(setStatuses), 3000);
@@ -19,9 +24,12 @@ export function StatusScreen({ bridge }: StatusScreenProps) {
 			offStatus();
 			clearInterval(poll);
 		};
-	}, [bridge]);
+	}, [bridge, isRemote]);
 
 	useEffect(() => {
+		if (isRemote) {
+			return;
+		}
 		void bridge.getLogs(activeService).then(setLogs);
 		const offLog = bridge.onLog((entry) => {
 			if (entry.serviceId === activeService) {
@@ -29,7 +37,35 @@ export function StatusScreen({ bridge }: StatusScreenProps) {
 			}
 		});
 		return offLog;
-	}, [bridge, activeService]);
+	}, [bridge, activeService, isRemote]);
+
+	if (isRemote) {
+		return (
+			<div className="shell">
+				<h1>Ever Works Desktop</h1>
+				<p className="muted">Client mode — connected to a remote instance</p>
+
+				<div className="panel">
+					<div className="check-row">
+						<span className="badge ok">Remote</span>
+						<span>{config.remote?.label ?? config.remote?.webUrl ?? 'Not configured'}</span>
+					</div>
+					{config.remote && (
+						<div className="check-row">
+							<span className="badge">API</span>
+							<span className="muted">{config.remote.apiUrl}</span>
+						</div>
+					)}
+					<p className="muted" style={{ marginTop: 12 }}>
+						No services run on this machine in client mode. The platform runs on the instance above.
+					</p>
+					<div className="actions">
+						<button onClick={() => void bridge.openWebApp()}>Open Ever Works</button>
+					</div>
+				</div>
+			</div>
+		);
+	}
 
 	return (
 		<div className="shell">
