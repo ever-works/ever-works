@@ -90,11 +90,27 @@ export function isFleetJobActive(status: FleetJobStatus): boolean {
  * the node is asked to run, because a fleet node has no model access and
  * no platform credentials: everything it executes has to be expressed as
  * a command and an exit code, exactly like `acceptance-checks`.
+ *
+ * `browser-check` is the v2 executor: drive a REAL browser binary on the
+ * node against a URL and report what it rendered. It exists so the
+ * `browser` capability tag a node advertises is backed by work the node
+ * can actually perform — a capability nothing ever exercises is a lie
+ * the scheduler will eventually act on.
  */
-export type FleetJobKind = 'acceptance-checks' | 'agent-task';
+export type FleetJobKind = 'acceptance-checks' | 'agent-task' | 'browser-check';
 
 /** Canonical job-kind list. */
-export const FLEET_JOB_KINDS: readonly FleetJobKind[] = ['acceptance-checks', 'agent-task'];
+export const FLEET_JOB_KINDS: readonly FleetJobKind[] = ['acceptance-checks', 'agent-task', 'browser-check'];
+
+/**
+ * Capability tag a node must advertise to be eligible for
+ * `browser-check`. Named here (not in the node) so the enqueue side and
+ * the detector cannot drift.
+ */
+export const FLEET_BROWSER_CAPABILITY = 'browser';
+
+/** Capability tag advertised when a usable GPU was detected on the node. */
+export const FLEET_GPU_CAPABILITY = 'gpu';
 
 /** Type guard for a job kind arriving off the wire. */
 export function isFleetJobKind(value: unknown): value is FleetJobKind {
@@ -261,6 +277,48 @@ export interface FleetAgentTaskPayload {
 	workspacePath?: string;
 	/** Ordered commands the node executes for this run. */
 	steps?: FleetAgentTaskStep[];
+}
+
+/**
+ * Executor input for `browser-check`.
+ *
+ * The node resolves a browser binary itself (the same probe that decides
+ * whether it advertises the `browser` tag at all) and drives it against
+ * `url`. `headed` asks for a visible window rather than headless — only
+ * honourable on a node that also advertises `display`, and refused
+ * rather than silently downgraded so a headed-only check cannot pass on
+ * a machine that never opened a window.
+ */
+export interface FleetBrowserCheckPayload {
+	/** Optional platform Task the check belongs to (reporting only). */
+	taskId?: string;
+	/** Optional platform run the check belongs to (reporting only). */
+	runId?: string;
+	/** Absolute http(s) URL to load. */
+	url: string;
+	/** Require a visible (non-headless) browser window. Default false. */
+	headed?: boolean;
+	/** Fail the check unless the rendered DOM contains this text. */
+	expectText?: string;
+	/** Wall-clock budget for the navigation. Clamped node-side. */
+	timeoutSec?: number;
+}
+
+/** Verdict of one `browser-check` job. */
+export interface FleetBrowserCheckResult extends Record<string, unknown> {
+	/** True when the browser rendered the page and every expectation held. */
+	ok: boolean;
+	/** Browser executable the node actually used (path, never a credential). */
+	browserPath: string;
+	/** Whether the run was headless. */
+	headless: boolean;
+	/** Bytes of DOM the browser produced. */
+	domBytes: number;
+	/** `<title>` of the loaded document when one was present. */
+	title: string | null;
+	durationMs: number;
+	/** Why the check failed, when it did. */
+	error?: string;
 }
 
 /** Request body for `POST /api/fleet/jobs/lease`. */

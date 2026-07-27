@@ -49,6 +49,12 @@ function config(overrides: Partial<NodeConfig> = {}): NodeConfig {
 		name: 'build-box-01',
 		heartbeatIntervalMs: DEFAULT_HEARTBEAT_INTERVAL_MS,
 		enrolledAt: '2026-07-25T10:00:00.000Z',
+		// Both are normalized onto every load so an OLDER config file
+		// still produces a complete NodeConfig. The fixture has to carry
+		// them or the round-trip compares against a shape the store no
+		// longer returns.
+		paused: false,
+		secretStorage: 'file',
 		...overrides
 	};
 }
@@ -183,6 +189,13 @@ describe('redactConfig', () => {
 			name: 'build-box-01',
 			heartbeatIntervalMs: DEFAULT_HEARTBEAT_INTERVAL_MS,
 			enrolledAt: '2026-07-25T10:00:00.000Z',
+			// Neither is a credential: `paused` is lifecycle state and
+			// `secretStorage` is the storage MODE (file vs keychain), not
+			// the secret. This assertion is an exhaustive allowlist on
+			// purpose — that is what makes it catch a credential field
+			// leaking into the redacted view.
+			paused: false,
+			secretStorage: 'file',
 			hasSecret: true
 		});
 	});

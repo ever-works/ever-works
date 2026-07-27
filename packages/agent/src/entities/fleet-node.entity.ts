@@ -52,6 +52,20 @@ import { PortableDateColumn } from './_types';
  * `k8s` is list-time only — never persisted as a row.
  */
 export type { FleetNodeKind, FleetNodeStatus } from '@ever-works/contracts';
+/** Statuses in which the platform will NOT lease new work onto a node. */
+export const FLEET_NODE_NON_LEASABLE_STATUSES: readonly FleetNodeStatus[] = [
+    'enrolling',
+    'paused',
+    'disabled',
+];
+
+/**
+ * Statuses that must be PRESERVED by an accepted heartbeat instead of
+ * being overwritten with `online`. A drained node that goes dark is
+ * indistinguishable from a dead one, so it keeps beating — but a beat
+ * must never silently un-pause it.
+ */
+export const FLEET_NODE_STICKY_STATUSES: readonly FleetNodeStatus[] = ['paused', 'disabled'];
 
 @Entity({ name: 'fleet_nodes' })
 @Index('idx_fleet_nodes_user', ['userId'])
@@ -74,7 +88,7 @@ export class FleetNode {
     @Column({ type: 'varchar', length: 16 })
     kind: FleetNodeKind;
 
-    /** 'enrolling' | 'online' | 'offline' | 'disabled'. */
+    /** 'enrolling' | 'online' | 'offline' | 'paused' | 'disabled'. */
     @Column({ type: 'varchar', length: 16 })
     status: FleetNodeStatus;
 

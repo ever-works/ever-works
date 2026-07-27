@@ -38,6 +38,14 @@ export type {
 	FleetNodeStatus,
 	FleetNodeView
 } from '@ever-works/contracts';
+/**
+ * Node lifecycle as reported by the platform.
+ *
+ * `paused` is a drain, not a cut: the platform stops leasing new work
+ * onto the node while its in-flight jobs keep reporting, and heartbeats
+ * stay accepted so a drained machine remains visible in Fleet.
+ */
+export type FleetNodeStatus = 'enrolling' | 'online' | 'offline' | 'paused' | 'disabled';
 
 export { FLEET_ENROLLABLE_NODE_KINDS, isFleetEnrollableNodeKind } from '@ever-works/contracts';
 
@@ -80,10 +88,22 @@ export const MIN_HEARTBEAT_INTERVAL_MS = 5_000;
 export const MAX_HEARTBEAT_INTERVAL_MS = 15 * 60_000;
 
 /**
- * Everything the node needs to resume operating after a restart. Persisted to
- * the OS config directory with 0600 permissions where the platform supports
- * them — `secret` is a credential and must never be logged or sent to a
- * renderer process.
+ * Where the heartbeat secret physically lives.
+ *
+ * - `keychain` — the OS credential store (Keychain / Credential Manager /
+ *   Secret Service) holds it; the config file carries no credential at all.
+ * - `file`     — fallback: the secret is inline in the config file, which is
+ *   then locked down to the owner (0600 on POSIX, an inheritance-stripped
+ *   owner-only ACL on Windows). Always announced with a loud warning.
+ */
+export type NodeSecretStorage = 'keychain' | 'file';
+
+/**
+ * Everything the node needs to resume operating after a restart.
+ *
+ * `secret` is a credential and must never be logged or sent to a renderer
+ * process. It is held in the OS keychain when one is available and only
+ * falls back to the config file otherwise — see {@link NodeSecretStorage}.
  */
 export interface NodeConfig {
 	/** Platform API origin, no trailing slash (e.g. `https://api.ever.works`). */
@@ -97,6 +117,16 @@ export interface NodeConfig {
 	name?: string;
 	heartbeatIntervalMs: number;
 	enrolledAt: string;
+	/**
+	 * Where {@link NodeConfig.secret} is stored. Absent means `file`, so
+	 * configs written before keychain support still load unchanged.
+	 */
+	secretStorage?: NodeSecretStorage;
+	/**
+	 * Operator drain flag set by `ever-works-node pause`. A paused node
+	 * still heartbeats (so it stays observable) but leases no new work.
+	 */
+	paused?: boolean;
 }
 
 /** Credential-free projection of {@link NodeConfig}, safe to log or render. */
@@ -110,6 +140,10 @@ export interface RedactedNodeConfig {
 	enrolledAt: string;
 	/** True when a heartbeat secret is stored — the value itself never leaves the config store. */
 	hasSecret: boolean;
+	/** Where the secret is kept. Safe to show: it names a location, not a value. */
+	secretStorage: NodeSecretStorage;
+	/** True when the operator has drained this node locally. */
+	paused: boolean;
 }
 
 /** Drop the credential from a config so it can cross a log or IPC boundary. */
@@ -121,7 +155,9 @@ export function redactConfig(config: NodeConfig): RedactedNodeConfig {
 		capabilities: [...config.capabilities],
 		heartbeatIntervalMs: config.heartbeatIntervalMs,
 		enrolledAt: config.enrolledAt,
-		hasSecret: typeof config.secret === 'string' && config.secret.length > 0
+		hasSecret: typeof config.secret === 'string' && config.secret.length > 0,
+		secretStorage: config.secretStorage ?? 'file',
+		paused: config.paused === true
 	};
 	if (config.name !== undefined) {
 		redacted.name = config.name;

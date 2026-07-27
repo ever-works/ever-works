@@ -64,7 +64,19 @@ export function isFleetEnrollableNodeKind(value: unknown): value is FleetEnrolla
  * - `offline`   — no heartbeat for the configured window, or drained.
  * - `disabled`  — operator-drained; heartbeats are refused.
  */
-export type FleetNodeStatus = 'enrolling' | 'online' | 'offline' | 'disabled';
+/**
+ * Heartbeat-derived lifecycle state.
+ *
+ * `paused` is a DRAIN, not a cut: the node stops being offered new
+ * work but keeps its in-flight claims, keeps reporting their verdicts,
+ * and keeps heartbeating so it stays observable in Fleet. `disabled`
+ * is the operator's harder stop — also drained rather than severed
+ * (in-flight work still reports) but not resumable by the node itself.
+ *
+ * Stored in a plain `varchar(16)` with no enum/check constraint, so
+ * adding a value is a code-level change only — no migration.
+ */
+export type FleetNodeStatus = 'enrolling' | 'online' | 'offline' | 'paused' | 'disabled';
 
 /** Canonical status list. */
 export const FLEET_NODE_STATUSES: readonly FleetNodeStatus[] = ['enrolling', 'online', 'offline', 'disabled'];

@@ -1,12 +1,15 @@
-import { execFile } from 'node:child_process';
-import { constants as fsConstants } from 'node:fs';
+import { execFile, execFileSync } from 'node:child_process';
+import { accessSync, constants as fsConstants, existsSync } from 'node:fs';
 import * as fsp from 'node:fs/promises';
 import * as os from 'node:os';
 import * as path from 'node:path';
+import { resolveBrowserPath } from './core/browser-probe';
 import type { CommandRunner } from './core/capabilities';
 import { readEnvironment, type CapabilityEnvironment } from './core/capabilities';
 import { resolveConfigPath, type ConfigFileSystem } from './core/config-store';
 import type { FetchLike } from './core/fleet-client';
+import type { Logger } from './core/logger';
+import { keychainDisabledByEnv, resolveSecretStore, type SecretStore } from './core/secret-store';
 
 /**
  * Real IO adapters for the headless node.
@@ -39,6 +42,33 @@ export function createCommandRunner(): CommandRunner {
 	};
 }
 
+/**
+ * Owner-only ACL for a file on Windows, via `icacls`.
+ *
+ * This is the win32 half of audit A45. Windows has no POSIX mode bits —
+ * `fs.chmod` there only toggles the read-only flag — and the previous
+ * behaviour was to skip the tightening entirely, leaving the node
+ * credential protected by nothing but whatever the profile's inherited
+ * ACL happened to admit.
+ *
+ * `/inheritance:r` strips inherited entries (this is what actually
+ * removes broad access) and `/grant:r` then re-grants full control to
+ * the current user alone.
+ */
+export function restrictFileToOwnerWindows(filePath: string): void {
+	const user = process.env.USERDOMAIN
+		? `${process.env.USERDOMAIN}\\${process.env.USERNAME ?? ''}`
+		: (process.env.USERNAME ?? '');
+	if (!user.trim() || user.trim() === '\\') {
+		throw new Error('Cannot determine the current Windows user to grant the config file to');
+	}
+	execFileSync('icacls', [filePath, '/inheritance:r', '/grant:r', `${user}:(F)`], {
+		windowsHide: true,
+		stdio: 'ignore',
+		timeout: 10_000
+	});
+}
+
 export function createConfigFileSystem(): ConfigFileSystem {
 	return {
 		readFile: async (filePath) => {
@@ -66,6 +96,12 @@ export function createConfigFileSystem(): ConfigFileSystem {
 		chmod: async (filePath, mode) => {
 			await fsp.chmod(filePath, mode);
 		},
+		remove: async (filePath) => {
+			await fsp.rm(filePath, { force: true });
+		},
+		restrict: async (filePath) => {
+			restrictFileToOwnerWindows(filePath);
+		},
 		dirname: (filePath) => path.dirname(filePath)
 	};
 }
@@ -80,12 +116,69 @@ export function defaultConfigPath(): string {
 	});
 }
 
+/** True when the path is an existing file this process may execute. */
+export function isExecutableFile(filePath: string): boolean {
+	try {
+		if (!existsSync(filePath)) {
+			return false;
+		}
+		if (process.platform === 'win32') {
+			// Windows has no execute bit; existence is the whole test.
+			return true;
+		}
+		accessSync(filePath, fsConstants.X_OK);
+		return true;
+	} catch {
+		return false;
+	}
+}
+
+/** Resolve a bare command name on `PATH`, or null. */
+export function lookupOnPath(command: string): string | null {
+	const which = process.platform === 'win32' ? 'where' : 'which';
+	try {
+		const output = execFileSync(which, [command], {
+			encoding: 'utf8',
+			windowsHide: true,
+			stdio: ['ignore', 'pipe', 'ignore'],
+			timeout: 5_000
+		});
+		const first = output.split(/\r?\n/).find((line) => line.trim());
+		return first ? first.trim() : null;
+	} catch {
+		return null;
+	}
+}
+
+/**
+ * Host facts for capability detection, including the browser executable
+ * this machine would actually launch. Resolving it HERE (once, at
+ * startup) rather than inside the detector keeps `detectCapabilities`
+ * pure and keeps the `browser` tag and the `browser-check` executor
+ * pointed at the same binary.
+ */
 export function currentEnvironment(): CapabilityEnvironment {
-	return readEnvironment({
-		platform: process.platform,
-		arch: process.arch,
-		version: process.version,
-		env: process.env
+	return readEnvironment(
+		{
+			platform: process.platform,
+			arch: process.arch,
+			version: process.version,
+			env: process.env
+		},
+		resolveBrowserPath,
+		{ fileExists: isExecutableFile, lookupOnPath }
+	);
+}
+
+/**
+ * The OS keychain for this host, or null when there is none (headless
+ * Linux without a Secret Service, containers, an operator opt-out).
+ * A null return is always announced through the logger.
+ */
+export function createSecretStore(logger?: Logger): SecretStore | null {
+	return resolveSecretStore({
+		disabled: keychainDisabledByEnv(process.env),
+		...(logger ? { logger } : {})
 	});
 }
 
