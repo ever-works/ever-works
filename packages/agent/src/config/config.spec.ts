@@ -855,6 +855,13 @@ describe('agent/config', () => {
                 // (EVER_WORKS_IDEA_BUILD_EXECUTOR_ENABLED, default off, +
                 // DRY_RUN default on). Pinned alphabetically.
                 'ideaBuildExecutor',
+                // Audit item (k) — `ingest.*` group adds the event-ingest
+                // salience filter knobs (INGEST_SALIENCE_MIN_SCORE,
+                // INGEST_SALIENCE_MUTED_KINDS,
+                // INGEST_SALIENCE_MUTED_ACTORS). All default to OFF so
+                // ingest behaviour is unchanged when unset. Pinned
+                // alphabetically.
+                'ingest',
                 'isCli',
                 // EW-683 / EW-685 P0 T3 — `jobRuntime.*` group adds the
                 // `EVER_WORKS_JOB_RUNTIME` selector for the pluggable

@@ -70,7 +70,7 @@ describe('EventIngestService', () => {
         it('maps the envelope onto the row shape (actor/subject flattened, occurredAt parsed)', async () => {
             const result = await build().ingest('user-1', [envelope()]);
 
-            expect(result).toEqual({ inserted: 1, duplicates: 0, rejected: 0 });
+            expect(result).toEqual({ inserted: 1, duplicates: 0, rejected: 0, filtered: 0 });
             expect(repository.createIfNew).toHaveBeenCalledWith({
                 userId: 'user-1',
                 organizationId: null,
@@ -95,7 +95,7 @@ describe('EventIngestService', () => {
 
             const result = await build().ingest('user-1', [envelope(), envelope()]);
 
-            expect(result).toEqual({ inserted: 1, duplicates: 1, rejected: 0 });
+            expect(result).toEqual({ inserted: 1, duplicates: 1, rejected: 0, filtered: 0 });
             expect(repository.createIfNew).toHaveBeenCalledTimes(2);
         });
 
@@ -104,14 +104,14 @@ describe('EventIngestService', () => {
 
             const result = await build().ingest('user-1', [oversized, envelope()]);
 
-            expect(result).toEqual({ inserted: 1, duplicates: 0, rejected: 1 });
+            expect(result).toEqual({ inserted: 1, duplicates: 0, rejected: 1, filtered: 0 });
             expect(repository.createIfNew).toHaveBeenCalledTimes(1);
         });
 
         it('rejects envelopes with an unparseable occurredAt', async () => {
             const result = await build().ingest('user-1', [envelope({ occurredAt: 'not-a-date' })]);
 
-            expect(result).toEqual({ inserted: 0, duplicates: 0, rejected: 1 });
+            expect(result).toEqual({ inserted: 0, duplicates: 0, rejected: 1, filtered: 0 });
             expect(repository.createIfNew).not.toHaveBeenCalled();
         });
 
@@ -122,7 +122,7 @@ describe('EventIngestService', () => {
                 envelope({ kind: '' }),
             ]);
 
-            expect(result).toEqual({ inserted: 0, duplicates: 0, rejected: 3 });
+            expect(result).toEqual({ inserted: 0, duplicates: 0, rejected: 3, filtered: 0 });
             expect(repository.createIfNew).not.toHaveBeenCalled();
         });
     });
@@ -134,7 +134,13 @@ describe('EventIngestService', () => {
 
             const result = await build().processBatch(10);
 
-            expect(result).toEqual({ processed: 1, activities: 1, memories: 1, failed: 0 });
+            expect(result).toEqual({
+                processed: 1,
+                activities: 1,
+                memories: 1,
+                issueLinks: 0,
+                failed: 0,
+            });
             expect(activityLog.log).toHaveBeenCalledWith(
                 expect.objectContaining({
                     userId: 'user-1',
@@ -181,7 +187,13 @@ describe('EventIngestService', () => {
 
             const result = await build().processBatch(10);
 
-            expect(result).toEqual({ processed: 1, activities: 1, memories: 0, failed: 0 });
+            expect(result).toEqual({
+                processed: 1,
+                activities: 1,
+                memories: 0,
+                issueLinks: 0,
+                failed: 0,
+            });
             expect(repository.markProcessed).toHaveBeenCalledWith('row-1');
         });
 
@@ -190,7 +202,13 @@ describe('EventIngestService', () => {
 
             const result = await build({ withMemory: false }).processBatch(10);
 
-            expect(result).toEqual({ processed: 1, activities: 1, memories: 0, failed: 0 });
+            expect(result).toEqual({
+                processed: 1,
+                activities: 1,
+                memories: 0,
+                issueLinks: 0,
+                failed: 0,
+            });
             expect(repository.markProcessed).toHaveBeenCalledWith('row-1');
         });
 
@@ -204,7 +222,13 @@ describe('EventIngestService', () => {
 
             const result = await build().processBatch(10);
 
-            expect(result).toEqual({ processed: 1, activities: 1, memories: 1, failed: 1 });
+            expect(result).toEqual({
+                processed: 1,
+                activities: 1,
+                memories: 1,
+                issueLinks: 0,
+                failed: 1,
+            });
             expect(repository.markProcessed).not.toHaveBeenCalledWith('row-bad');
             expect(repository.markProcessed).toHaveBeenCalledWith('row-good');
         });
@@ -307,7 +331,13 @@ describe('EventIngestService', () => {
 
             expect(process).toHaveBeenCalledWith(event);
             expect(order).toEqual(['processor', 'activity']);
-            expect(result).toEqual({ processed: 1, activities: 1, memories: 1, failed: 0 });
+            expect(result).toEqual({
+                processed: 1,
+                activities: 1,
+                memories: 1,
+                issueLinks: 0,
+                failed: 0,
+            });
         });
 
         it('never invokes a processor for kinds it did not register', async () => {
@@ -320,7 +350,13 @@ describe('EventIngestService', () => {
             const result = await service.processBatch(10);
 
             expect(process).not.toHaveBeenCalled();
-            expect(result).toEqual({ processed: 1, activities: 1, memories: 1, failed: 0 });
+            expect(result).toEqual({
+                processed: 1,
+                activities: 1,
+                memories: 1,
+                issueLinks: 0,
+                failed: 0,
+            });
         });
 
         it('processor failure is REQUIRED-grade: row left unprocessed, no Activity duplicate risk', async () => {
@@ -338,7 +374,13 @@ describe('EventIngestService', () => {
 
             const result = await service.processBatch(10);
 
-            expect(result).toEqual({ processed: 1, activities: 1, memories: 1, failed: 1 });
+            expect(result).toEqual({
+                processed: 1,
+                activities: 1,
+                memories: 1,
+                issueLinks: 0,
+                failed: 1,
+            });
             expect(repository.markProcessed).not.toHaveBeenCalledWith('row-bad');
             expect(repository.markProcessed).toHaveBeenCalledWith('row-good');
             // The failed row's Activity was NOT written — the retry next
@@ -433,5 +475,126 @@ describe('EventIngestService — workId routing', () => {
         expect(repository.createIfNew).toHaveBeenCalledWith(
             expect.objectContaining({ workId: 'work-explicit' }),
         );
+    });
+});
+
+/**
+ * Salience filter seam (audit item (k)) — the spine's pre-filter
+ * behaviour (store everything) is the contract when no filter is bound.
+ */
+describe('EventIngestService — salience filter seam', () => {
+    let repository: { createIfNew: jest.Mock };
+    let activityLog: { log: jest.Mock };
+    let salience: { isSalient: jest.Mock };
+
+    const build = (withFilter = true) =>
+        new EventIngestService(
+            repository as never,
+            activityLog as never,
+            undefined,
+            undefined,
+            withFilter ? (salience as never) : undefined,
+        );
+
+    beforeEach(() => {
+        repository = {
+            createIfNew: jest.fn(async () => ({ event: storedEvent(), created: true })),
+        };
+        activityLog = { log: jest.fn(async () => ({ id: 'activity-1' })) };
+        salience = { isSalient: jest.fn(() => true) };
+    });
+
+    it('⭐ stores everything when no filter is bound (pre-filter behaviour preserved)', async () => {
+        const result = await build(false).ingest('user-1', [envelope(), envelope()]);
+        expect(result).toEqual({ inserted: 2, duplicates: 0, rejected: 0, filtered: 0 });
+        expect(repository.createIfNew).toHaveBeenCalledTimes(2);
+    });
+
+    it('drops non-salient envelopes before insert and counts them separately', async () => {
+        salience.isSalient.mockReturnValueOnce(false).mockReturnValueOnce(true);
+
+        const result = await build().ingest('user-1', [
+            envelope({ sourceEventId: 'noise' }),
+            envelope({ sourceEventId: 'signal' }),
+        ]);
+
+        expect(result).toEqual({ inserted: 1, duplicates: 0, rejected: 0, filtered: 1 });
+        expect(repository.createIfNew).toHaveBeenCalledTimes(1);
+        expect(repository.createIfNew).toHaveBeenCalledWith(
+            expect.objectContaining({ sourceEventId: 'signal' }),
+        );
+    });
+
+    it('the structural floor still wins — a malformed envelope is `rejected`, not `filtered`', async () => {
+        const result = await build().ingest('user-1', [envelope({ kind: '' })]);
+        expect(result).toEqual({ inserted: 0, duplicates: 0, rejected: 1, filtered: 0 });
+        // Never even asked the filter about a malformed envelope.
+        expect(salience.isSalient).not.toHaveBeenCalled();
+    });
+});
+
+/**
+ * External-issue ↔ Task link refresh (audit item (i)) — a best-effort
+ * drain step that must never fail the batch and must never run when the
+ * mapping service is not bound.
+ */
+describe('EventIngestService — external-issue link refresh', () => {
+    let repository: {
+        createIfNew: jest.Mock;
+        findUnprocessed: jest.Mock;
+        markProcessed: jest.Mock;
+    };
+    let activityLog: { log: jest.Mock };
+    let externalIssueLinks: { tryRecordEvent: jest.Mock };
+
+    const build = (withLinks = true) =>
+        new EventIngestService(
+            repository as never,
+            activityLog as never,
+            undefined,
+            undefined,
+            undefined,
+            withLinks ? (externalIssueLinks as never) : undefined,
+        );
+
+    beforeEach(() => {
+        repository = {
+            createIfNew: jest.fn(async () => ({ event: storedEvent(), created: true })),
+            findUnprocessed: jest.fn(async () => [storedEvent({ kind: 'linear.issue' })]),
+            markProcessed: jest.fn(async () => undefined),
+        };
+        activityLog = { log: jest.fn(async () => ({ id: 'activity-1' })) };
+        externalIssueLinks = { tryRecordEvent: jest.fn(async () => true) };
+    });
+
+    it('refreshes the link for a processed event and counts it', async () => {
+        const result = await build().processBatch(10);
+        expect(externalIssueLinks.tryRecordEvent).toHaveBeenCalledTimes(1);
+        expect(result).toEqual({
+            processed: 1,
+            activities: 1,
+            memories: 0,
+            issueLinks: 1,
+            failed: 0,
+        });
+    });
+
+    it('counts nothing when the event is not a linked issue', async () => {
+        externalIssueLinks.tryRecordEvent.mockResolvedValue(false);
+        const result = await build().processBatch(10);
+        expect(result.issueLinks).toBe(0);
+        expect(result.processed).toBe(1);
+    });
+
+    it('runs the drain unchanged when the mapping service is not bound', async () => {
+        const result = await build(false).processBatch(10);
+        expect(result).toEqual({
+            processed: 1,
+            activities: 1,
+            memories: 0,
+            issueLinks: 0,
+            failed: 0,
+        });
+        expect(repository.markProcessed).toHaveBeenCalledWith('row-1');
     });
 });

@@ -7,6 +7,8 @@ import { ActivityActionType, ActivityStatus } from '../entities/activity-log.typ
 import type { IngestedEvent } from '../entities/ingested-event.entity';
 import { IngestedEventRepository } from './ingested-event.repository';
 import { WorkHintResolverService } from './work-hint-resolver.service';
+import { IngestSalienceService } from './ingest-salience.service';
+import { ExternalIssueLinkService } from './external-issue-link.service';
 
 /**
  * Kinds that resolve to a DEDICATED Activity action type instead of the
@@ -43,6 +45,12 @@ export interface IngestResult {
     duplicates: number;
     /** Envelopes rejected before insert (oversized payload, bad shape). */
     rejected: number;
+    /**
+     * Envelopes dropped by the salience filter — well-formed, just not
+     * worth a feed row under the operator's configuration. Always `0`
+     * when the filter is unconfigured (its default).
+     */
+    filtered: number;
 }
 
 export interface ProcessBatchResult {
@@ -52,6 +60,11 @@ export interface ProcessBatchResult {
     activities: number;
     /** Memory observations saved (0 when no provider is enabled). */
     memories: number;
+    /**
+     * External-issue ↔ Task links refreshed (0 when the mapping service
+     * is not bound, or when no processed event was a linked issue).
+     */
+    issueLinks: number;
     /**
      * Rows whose REQUIRED processor (kind processor or Activity write)
      * failed — left unprocessed for retry.
@@ -100,6 +113,19 @@ export interface IngestedEventKindProcessor {
  * Activity write — e.g. `zoom.recording` envelopes becoming Meeting
  * rows. A kind-processor failure is REQUIRED-grade: the row stays
  * unprocessed and retries next tick.
+ *
+ * Two later, deliberately OPTIONAL stages hang off the same pipeline:
+ *
+ *   - **Salience filter** (audit item (k)) — `IngestSalienceService`
+ *     drops low-value envelopes at `ingest()` time so a chatty source
+ *     cannot flood the feed. Unbound or unconfigured (its default) means
+ *     nothing is filtered, i.e. byte-for-byte the previous behaviour.
+ *   - **External-issue ↔ Task links** (audit item (i)) —
+ *     `ExternalIssueLinkService` refreshes an existing issue↔Task link
+ *     during the drain (best-effort, never creates one).
+ *
+ * Both are `@Optional()` constructor params appended LAST, so every
+ * positional `new EventIngestService(...)` fixture keeps compiling.
  */
 @Injectable()
 export class EventIngestService {
@@ -118,6 +144,15 @@ export class EventIngestService {
         // so every positional `new EventIngestService(...)` fixture keeps
         // compiling and ingests exactly as it did before.
         @Optional() private readonly workHints?: WorkHintResolverService,
+        // Salience filter (audit item (k)) — drops low-value envelopes
+        // before they reach the feed. Appended LAST + @Optional() for the
+        // same reason as `workHints`; absent (or unconfigured) means
+        // NOTHING is filtered, i.e. exactly the pre-filter behaviour.
+        @Optional() private readonly salience?: IngestSalienceService,
+        // External-issue ↔ Task links (audit item (i)). Best-effort
+        // freshness stamping during the drain; absent = no-op. Appended
+        // LAST + @Optional() per the same fixture-compatibility rule.
+        @Optional() private readonly externalIssueLinks?: ExternalIssueLinkService,
     ) {}
 
     /**
@@ -133,7 +168,7 @@ export class EventIngestService {
 
     /** Dedupe-insert a batch of envelopes for one owner. */
     async ingest(userId: string, envelopes: IngestedEventEnvelope[]): Promise<IngestResult> {
-        const result: IngestResult = { inserted: 0, duplicates: 0, rejected: 0 };
+        const result: IngestResult = { inserted: 0, duplicates: 0, rejected: 0, filtered: 0 };
 
         for (const envelope of envelopes) {
             if (!this.isIngestible(envelope)) {
@@ -144,6 +179,15 @@ export class EventIngestService {
             const occurredAt = new Date(envelope.occurredAt);
             if (Number.isNaN(occurredAt.getTime())) {
                 result.rejected += 1;
+                continue;
+            }
+
+            // Salience gate runs AFTER the structural floor so a
+            // malformed envelope is still counted as `rejected`, not
+            // silently reclassified as "not interesting". No filter
+            // bound (or none configured) = nothing dropped.
+            if (this.salience && !this.salience.isSalient(envelope)) {
+                result.filtered += 1;
                 continue;
             }
 
@@ -205,7 +249,13 @@ export class EventIngestService {
      * retried next tick (Activity write failed) or completed.
      */
     async processBatch(limit = 50): Promise<ProcessBatchResult> {
-        const result: ProcessBatchResult = { processed: 0, activities: 0, memories: 0, failed: 0 };
+        const result: ProcessBatchResult = {
+            processed: 0,
+            activities: 0,
+            memories: 0,
+            issueLinks: 0,
+            failed: 0,
+        };
         const events = await this.repository.findUnprocessed(limit);
 
         for (const event of events) {
@@ -244,6 +294,14 @@ export class EventIngestService {
 
             if (await this.trySaveMemory(event)) {
                 result.memories += 1;
+            }
+
+            // External-issue ↔ Task freshness — best-effort, never fails
+            // the batch, never creates a link (see the service doc).
+            if (this.externalIssueLinks) {
+                if (await this.externalIssueLinks.tryRecordEvent(event)) {
+                    result.issueLinks += 1;
+                }
             }
 
             await this.repository.markProcessed(event.id);

@@ -120,6 +120,7 @@ import { InboundTrigger } from '../entities/inbound-trigger.entity';
 import { IngestedEvent } from '../entities/ingested-event.entity';
 import { IngestCursor } from '../entities/ingest-cursor.entity';
 import { IngestInstallBinding } from '../entities/ingest-install-binding.entity';
+import { ExternalIssueLink } from '../entities/external-issue-link.entity';
 import { Meeting } from '../entities/meeting.entity';
 import { CreditLedgerEntry } from '../entities/credit-ledger-entry.entity';
 import { PlanEntitlement } from '../entities/plan-entitlement.entity';
@@ -286,6 +287,10 @@ export const ENTITIES = [
     // binding, so Slack/GitHub deliveries are attributed to the account
     // that actually owns the workspace instead of the oldest install.
     IngestInstallBinding,
+    // Event-ingest spine — external tracker issue → platform Task
+    // mapping, so an ingested Linear/Jira/GitHub issue can be bound to
+    // the Task that mirrors it.
+    ExternalIssueLink,
     // Meetings v1 (Wave 8, feature a) — captured meetings with
     // transcripts, summaries and provider dedupe.
     Meeting,

@@ -12,6 +12,7 @@ import {
 	GOOGLE_EVENT_TEXT_MAX_CHARS,
 	GOOGLE_TRANSCRIPT_MAX_CHARS
 } from './google-workspace-connector-plugin.js';
+import { supportsEventSourceBackfill } from '@ever-works/plugin';
 
 const listDriveFilesMock = vi.fn();
 const exportDocMock = vi.fn();
@@ -422,6 +423,60 @@ describe('GoogleWorkspaceConnectorPlugin', () => {
 			});
 			expect(listDriveFilesMock).toHaveBeenCalledTimes(1);
 			expect(res.events).toEqual([]);
+		});
+	});
+
+	// `backfill()` capability method (audit item (l)).
+	describe('backfill', () => {
+		it('is exposed as the capability method, feature-detectable by callers', () => {
+			expect(typeof plugin.backfill).toBe('function');
+			expect(supportsEventSourceBackfill(plugin as never)).toBe(true);
+		});
+
+		it('⭐ sweeps an EXPLICIT window regardless of the settings backfillDays', async () => {
+			listDriveFilesMock.mockResolvedValue({ files: [] });
+
+			// `backfillDays` deliberately absent: history used to be
+			// reachable ONLY through that first-pull setting.
+			const result = await plugin.backfill({ since: '2026-05-01T00:00:00.000Z', settings: DRIVE_ONLY });
+
+			expect(listDriveFilesMock.mock.calls[0][0].q).toContain('2026-05-01T00:00:00.000Z');
+			expect(result.complete).toBe(true);
+			expect(result.nextCursor).toBeUndefined();
+		});
+
+		it('opens on the first CONFIGURED surface, not always drive', async () => {
+			listCalendarEventsMock.mockResolvedValue({ items: [] });
+			await plugin.backfill({ since: '2026-05-01T00:00:00.000Z', settings: CALENDAR_ONLY });
+			expect(listCalendarEventsMock).toHaveBeenCalledTimes(1);
+			expect(listDriveFilesMock).not.toHaveBeenCalled();
+		});
+
+		it('marks the sweep as a backfill so the per-phase page bound engages, and resumes', async () => {
+			listDriveFilesMock.mockResolvedValue({ files: [], nextPageToken: 'more' });
+
+			const first = await plugin.backfill({ since: '2026-05-01T00:00:00.000Z', settings: DRIVE_ONLY });
+			expect(JSON.parse(first.nextCursor as string).f).toBe(1);
+			expect(first.complete).toBeUndefined();
+
+			await plugin.backfill({
+				since: '2026-05-01T00:00:00.000Z',
+				cursor: first.nextCursor,
+				settings: DRIVE_ONLY
+			});
+			expect(listDriveFilesMock.mock.calls[1][0].pageToken).toBe('more');
+		});
+
+		it('rejects a malformed window loudly instead of sweeping something arbitrary', async () => {
+			await expect(plugin.backfill({ since: 'last week', settings: DRIVE_ONLY })).rejects.toThrow(
+				/valid ISO 8601/
+			);
+		});
+
+		it('still requires credentials — an unconfigured source fails with the stable error name', async () => {
+			await expect(plugin.backfill({ since: '2026-05-01T00:00:00.000Z', settings: {} })).rejects.toMatchObject({
+				name: 'EventSourceNotConfiguredError'
+			});
 		});
 	});
 });

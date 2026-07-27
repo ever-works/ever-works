@@ -18,6 +18,14 @@ Capabilities: `connector`, `connector-linear`, `event-source`.
   widens the FIRST pull's window only, bounded to
   `LINEAR_BACKFILL_MAX_PAGES` pages per phase.
 
+- **Historical backfill (`backfill()` capability method)** — the optional
+  `backfill()` method on the `event-source` capability runs the same sweep
+  out-of-band over an EXPLICIT window, so history can be imported at any time
+  instead of only as a side effect of the first pull's `backfillDays`. One call
+  fetches one page and hands back a cursor, so the per-phase page bound still
+  applies. Re-delivery is free — the ingest pipeline dedupes on
+  `(source, sourceEventId)`.
+
 ## Settings
 
 | Key              | Notes                                                        |

@@ -42,6 +42,14 @@ accounts and requires super-admin configuration — while a refresh token is the
 same "paste one secret" operation and works for both. Service accounts with
 domain-wide delegation remain a documented follow-up for org-wide sweeps.
 
+- **Historical backfill (`backfill()` capability method)** — the optional
+  `backfill()` method on the `event-source` capability runs the same sweep
+  out-of-band over an EXPLICIT window, so history can be imported at any time
+  instead of only as a side effect of the first pull's `backfillDays`. One call
+  fetches one page and hands back a cursor, so the per-phase page bound still
+  applies. Re-delivery is free — the ingest pipeline dedupes on
+  `(source, sourceEventId)`.
+
 ## Settings
 
 | Key               | Notes                                                               |
