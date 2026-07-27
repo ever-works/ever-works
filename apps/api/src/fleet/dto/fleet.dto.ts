@@ -1,6 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
-    ArrayMaxSize,
     IsArray,
     IsBoolean,
     IsIn,
@@ -10,9 +9,32 @@ import {
     MaxLength,
     MinLength,
 } from 'class-validator';
-import type { FleetNodeKind } from '@ever-works/agent/fleet';
+import {
+    FLEET_CREDENTIAL_MAX_LENGTH,
+    FLEET_CREDENTIAL_MIN_LENGTH,
+    FLEET_ENROLLABLE_NODE_KINDS,
+    FLEET_MAX_NODE_NAME_LENGTH,
+    FLEET_MAX_PLATFORM_LENGTH,
+    FLEET_MAX_VERSION_LENGTH,
+    FLEET_MIN_NODE_NAME_LENGTH,
+} from '@ever-works/contracts';
+import type { FleetEnrollableNodeKind } from '@ever-works/contracts';
+import {
+    MaxConfiguredCapabilityTagLength,
+    MaxConfiguredCapabilityTags,
+} from './fleet-capability.validators';
 
-const ENROLLABLE_KINDS: FleetNodeKind[] = ['desktop-node', 'node'];
+/**
+ * Every bound below comes from the SHARED fleet contract
+ * (`@ever-works/contracts`) rather than a literal typed twice: the node
+ * apps validate against the same constants, so a change is a compile
+ * error on both sides instead of a runtime rejection nobody sees.
+ *
+ * The capability caps are the exception — they are operator knobs
+ * (`config.fleet.*`), so they go through the validation-time
+ * constraints in `./fleet-capability.validators`.
+ */
+const ENROLLABLE_KINDS: readonly FleetEnrollableNodeKind[] = FLEET_ENROLLABLE_NODE_KINDS;
 
 /**
  * Request body for `POST /api/fleet/nodes/enrollment-token` — issue a
@@ -21,24 +43,28 @@ const ENROLLABLE_KINDS: FleetNodeKind[] = ['desktop-node', 'node'];
  * of truth.
  */
 export class CreateFleetEnrollmentTokenDto {
-    @ApiProperty({ minLength: 1, maxLength: 200 })
+    @ApiProperty({ minLength: FLEET_MIN_NODE_NAME_LENGTH, maxLength: FLEET_MAX_NODE_NAME_LENGTH })
     @IsString()
-    @MinLength(1)
-    @MaxLength(200)
+    @MinLength(FLEET_MIN_NODE_NAME_LENGTH)
+    @MaxLength(FLEET_MAX_NODE_NAME_LENGTH)
     name: string;
 
     @ApiProperty({ enum: ENROLLABLE_KINDS, description: 'App shape of the node.' })
     @IsIn(ENROLLABLE_KINDS)
-    kind: FleetNodeKind;
+    kind: FleetEnrollableNodeKind;
 }
 
 /** Request body for `PATCH /api/fleet/nodes/:id` (partial update). */
 export class UpdateFleetNodeDto {
-    @ApiProperty({ required: false, minLength: 1, maxLength: 200 })
+    @ApiProperty({
+        required: false,
+        minLength: FLEET_MIN_NODE_NAME_LENGTH,
+        maxLength: FLEET_MAX_NODE_NAME_LENGTH,
+    })
     @IsOptional()
     @IsString()
-    @MinLength(1)
-    @MaxLength(200)
+    @MinLength(FLEET_MIN_NODE_NAME_LENGTH)
+    @MaxLength(FLEET_MAX_NODE_NAME_LENGTH)
     name?: string;
 
     @ApiProperty({
@@ -53,28 +79,33 @@ export class UpdateFleetNodeDto {
 
 /** Node self-description shared by enroll + heartbeat refresh. */
 export class FleetNodeSelfDescriptionDto {
-    @ApiProperty({ required: false, maxLength: 64, description: 'os/arch, e.g. linux/x64.' })
+    @ApiProperty({
+        required: false,
+        maxLength: FLEET_MAX_PLATFORM_LENGTH,
+        description: 'os/arch, e.g. linux/x64.',
+    })
     @IsOptional()
     @IsString()
-    @MaxLength(64)
+    @MaxLength(FLEET_MAX_PLATFORM_LENGTH)
     platform?: string;
 
-    @ApiProperty({ required: false, maxLength: 32 })
+    @ApiProperty({ required: false, maxLength: FLEET_MAX_VERSION_LENGTH })
     @IsOptional()
     @IsString()
-    @MaxLength(32)
+    @MaxLength(FLEET_MAX_VERSION_LENGTH)
     version?: string;
 
     @ApiProperty({
         required: false,
         type: [String],
-        description: "Capability tags, e.g. ['terminal', 'workspace', 'docker'].",
+        description:
+            "Capability tags, e.g. ['terminal', 'workspace', 'docker']. Count and per-tag length are operator-configurable (FLEET_MAX_CAPABILITY_TAGS / FLEET_MAX_CAPABILITY_TAG_LENGTH; defaults 16 / 32).",
     })
     @IsOptional()
     @IsArray()
-    @ArrayMaxSize(16)
+    @MaxConfiguredCapabilityTags()
     @IsString({ each: true })
-    @MaxLength(32, { each: true })
+    @MaxConfiguredCapabilityTagLength({ each: true })
     capabilities?: string[];
 }
 
@@ -84,10 +115,14 @@ export class FleetNodeSelfDescriptionDto {
  * `FleetService.enroll` (fail-closed 401 on any invalid path).
  */
 export class EnrollFleetNodeDto extends FleetNodeSelfDescriptionDto {
-    @ApiProperty({ minLength: 16, maxLength: 256, description: 'One-time enrollment token.' })
+    @ApiProperty({
+        minLength: FLEET_CREDENTIAL_MIN_LENGTH,
+        maxLength: FLEET_CREDENTIAL_MAX_LENGTH,
+        description: 'One-time enrollment token.',
+    })
     @IsString()
-    @MinLength(16)
-    @MaxLength(256)
+    @MinLength(FLEET_CREDENTIAL_MIN_LENGTH)
+    @MaxLength(FLEET_CREDENTIAL_MAX_LENGTH)
     token: string;
 }
 
@@ -100,9 +135,13 @@ export class FleetHeartbeatDto extends FleetNodeSelfDescriptionDto {
     @IsUUID()
     nodeId: string;
 
-    @ApiProperty({ minLength: 16, maxLength: 256, description: 'Node secret minted at enroll.' })
+    @ApiProperty({
+        minLength: FLEET_CREDENTIAL_MIN_LENGTH,
+        maxLength: FLEET_CREDENTIAL_MAX_LENGTH,
+        description: 'Node secret minted at enroll.',
+    })
     @IsString()
-    @MinLength(16)
-    @MaxLength(256)
+    @MinLength(FLEET_CREDENTIAL_MIN_LENGTH)
+    @MaxLength(FLEET_CREDENTIAL_MAX_LENGTH)
     secret: string;
 }

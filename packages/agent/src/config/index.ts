@@ -1,6 +1,35 @@
+import {
+    FLEET_DEFAULT_ENROLLMENT_TOKEN_TTL_MS,
+    FLEET_DEFAULT_MAX_CAPABILITY_TAG_LENGTH,
+    FLEET_DEFAULT_MAX_CAPABILITY_TAGS,
+    FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS,
+    FLEET_MAX_CAPABILITY_TAG_LENGTH_CEILING,
+    FLEET_MAX_CAPABILITY_TAGS_CEILING,
+    FLEET_MIN_ENROLLMENT_TOKEN_TTL_MS,
+    FLEET_MIN_NODE_OFFLINE_AFTER_MS,
+} from '@ever-works/contracts';
 import { DatabaseType } from '@src/database';
 
 type AppType = 'cli' | 'api';
+
+/**
+ * Parse an integer env var into a clamped range, falling back to
+ * `fallback` when unset/unparseable. Used by the Fleet knobs, where a
+ * deploy-manifest typo must degrade to the documented default rather
+ * than to `NaN` (which silently expires every enrollment token).
+ */
+function clampedIntEnv(
+    raw: string | undefined,
+    fallback: number,
+    min: number,
+    max: number,
+): number {
+    const parsed = parseInt(raw ?? '', 10);
+    if (!Number.isFinite(parsed)) {
+        return fallback;
+    }
+    return Math.min(Math.max(parsed, min), max);
+}
 
 export const config = {
     getEnvironment() {
@@ -873,6 +902,72 @@ export const config = {
          */
         isMergePolicyEnforcementEnabled() {
             return (process.env.AGENT_MERGE_POLICY_ENFORCEMENT || 'on').toLowerCase() !== 'off';
+        },
+    },
+
+    /**
+     * Fleet (Wave 12) — operator knobs for the node registry.
+     *
+     * These four values shipped as hard-coded constants in
+     * `FleetService`, which made them un-tunable for anyone running the
+     * platform: a fleet of slow-to-provision machines could not lengthen
+     * the enrollment window, and an operator whose nodes advertise a
+     * richer capability vocabulary could not raise the tag caps without
+     * a code change. Defaults are EXACTLY the previous constants, so an
+     * environment that sets nothing behaves byte-for-byte as before.
+     *
+     * Every getter clamps into a documented range rather than trusting
+     * the env: `capabilities` is a stored JSON column and a lease-time
+     * filter input, so an unbounded knob would be a denial-of-service
+     * surface, and a zero/NaN TTL would expire every token instantly.
+     */
+    fleet: {
+        /**
+         * How long a one-time enrollment token stays redeemable.
+         * Default 15 minutes (`FLEET_ENROLLMENT_TOKEN_TTL_MS`), floored
+         * at 30s so a token can always actually be typed in.
+         */
+        getEnrollmentTokenTtlMs(): number {
+            return clampedIntEnv(
+                process.env.FLEET_ENROLLMENT_TOKEN_TTL_MS,
+                FLEET_DEFAULT_ENROLLMENT_TOKEN_TTL_MS,
+                FLEET_MIN_ENROLLMENT_TOKEN_TTL_MS,
+                Number.MAX_SAFE_INTEGER,
+            );
+        },
+        /**
+         * Silence after which an `online` node is swept to `offline` by
+         * the next owner-scoped list read. Default 5 minutes.
+         *
+         * Shortening this below a node's heartbeat cadence makes healthy
+         * nodes flap; the 30s floor stops the value becoming nonsense,
+         * it does not stop it becoming unwise.
+         */
+        getNodeOfflineAfterMs(): number {
+            return clampedIntEnv(
+                process.env.FLEET_NODE_OFFLINE_AFTER_MS,
+                FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS,
+                FLEET_MIN_NODE_OFFLINE_AFTER_MS,
+                Number.MAX_SAFE_INTEGER,
+            );
+        },
+        /** Max capability tags one node may advertise. Default 16, hard ceiling 64. */
+        getMaxCapabilityTags(): number {
+            return clampedIntEnv(
+                process.env.FLEET_MAX_CAPABILITY_TAGS,
+                FLEET_DEFAULT_MAX_CAPABILITY_TAGS,
+                1,
+                FLEET_MAX_CAPABILITY_TAGS_CEILING,
+            );
+        },
+        /** Max length of one capability tag. Default 32, hard ceiling 128. */
+        getMaxCapabilityTagLength(): number {
+            return clampedIntEnv(
+                process.env.FLEET_MAX_CAPABILITY_TAG_LENGTH,
+                FLEET_DEFAULT_MAX_CAPABILITY_TAG_LENGTH,
+                1,
+                FLEET_MAX_CAPABILITY_TAG_LENGTH_CEILING,
+            );
         },
     },
 

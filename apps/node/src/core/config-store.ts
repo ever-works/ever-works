@@ -1,8 +1,9 @@
 import {
 	DEFAULT_HEARTBEAT_INTERVAL_MS,
+	isFleetEnrollableNodeKind,
 	MAX_HEARTBEAT_INTERVAL_MS,
 	MIN_HEARTBEAT_INTERVAL_MS,
-	type FleetNodeKind,
+	type FleetEnrollableNodeKind,
 	type NodeConfig
 } from './types';
 
@@ -71,8 +72,6 @@ export function resolveConfigPath(input: ResolveConfigPathInput): string {
 	return join(base, CONFIG_DIR_NAME, CONFIG_FILE_NAME);
 }
 
-const ENROLLABLE_KINDS: readonly FleetNodeKind[] = ['desktop-node', 'node'];
-
 function clampInterval(value: unknown): number {
 	if (typeof value !== 'number' || !Number.isFinite(value)) {
 		return DEFAULT_HEARTBEAT_INTERVAL_MS;
@@ -111,8 +110,10 @@ export function parseConfig(raw: string | null): NodeConfig | null {
 		return null;
 	}
 
-	const kind: FleetNodeKind =
-		typeof candidate.kind === 'string' && ENROLLABLE_KINDS.includes(candidate.kind) ? candidate.kind : 'node';
+	// Unrecognised kinds are DROPPED to the safe default, never trusted:
+	// the enrollable set is the shared contract's, so a server-side
+	// addition needs no edit here.
+	const kind: FleetEnrollableNodeKind = isFleetEnrollableNodeKind(candidate.kind) ? candidate.kind : 'node';
 
 	const config: NodeConfig = {
 		apiUrl: candidate.apiUrl,

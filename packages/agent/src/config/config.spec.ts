@@ -839,6 +839,11 @@ describe('agent/config', () => {
                 'branding',
                 'database',
                 'everWorks',
+                // Fleet limits — `fleet.*` holds the clamped
+                // enrollment-token TTL, offline-after window and
+                // capability-tag ceilings shared with the node.
+                // Pinned alphabetically, before `fleetNode`.
+                'fleet',
                 // Desktop PRD M4 — `fleetNode.*` group reads the
                 // `FLEET_NODE_*` operator knobs for the `node` job
                 // runtime (lease TTL, capability tags, kill switch and

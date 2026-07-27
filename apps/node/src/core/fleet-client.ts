@@ -1,5 +1,14 @@
 import type { Logger } from './logger';
-import { MAX_CREDENTIAL_LENGTH, MIN_CREDENTIAL_LENGTH, type FleetNodeView, type NodeSelfDescription } from './types';
+import {
+	MAX_CREDENTIAL_LENGTH,
+	MIN_CREDENTIAL_LENGTH,
+	type FleetEnrollRequest,
+	type FleetEnrollResponse,
+	type FleetHeartbeatRequest,
+	type FleetHeartbeatResponse,
+	type FleetNodeView,
+	type NodeSelfDescription
+} from './types';
 
 /**
  * HTTP client for the two public Fleet endpoints the node apps use:
@@ -55,25 +64,18 @@ export interface FetchRequestInit {
 
 export type FetchLike = (url: string, init: FetchRequestInit) => Promise<FetchResponseLike>;
 
-export interface EnrollRequest extends NodeSelfDescription {
-	token: string;
-}
-
-export interface EnrollResponse {
-	nodeId: string;
-	secret: string;
-	node: FleetNodeView;
-}
-
-export interface HeartbeatRequest extends NodeSelfDescription {
-	nodeId: string;
-	secret: string;
-}
-
-export interface HeartbeatResponse {
-	ok: true;
-	node: FleetNodeView;
-}
+/**
+ * The four enroll/heartbeat wire shapes, aliased to the SHARED contract
+ * in `@ever-works/contracts` under the names this app has always used.
+ *
+ * These are deliberately aliases and not re-declarations: adding or
+ * renaming a field server-side now fails this app's `tsc` instead of
+ * silently producing a request the API rejects at runtime.
+ */
+export type EnrollRequest = FleetEnrollRequest;
+export type EnrollResponse = FleetEnrollResponse;
+export type HeartbeatRequest = FleetHeartbeatRequest;
+export type HeartbeatResponse = FleetHeartbeatResponse;
 
 export interface FleetClientOptions {
 	apiUrl: string;

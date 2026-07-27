@@ -10,7 +10,7 @@ import {
 	DEFAULT_HEARTBEAT_INTERVAL_MS,
 	MAX_HEARTBEAT_INTERVAL_MS,
 	MIN_HEARTBEAT_INTERVAL_MS,
-	type FleetNodeKind,
+	type FleetEnrollableNodeKind,
 	type NodeConfig
 } from './types';
 
@@ -37,7 +37,7 @@ export interface NodeIo {
 export interface EnrollNodeOptions extends NodeIo {
 	apiUrl: string;
 	token: string;
-	kind: FleetNodeKind;
+	kind: FleetEnrollableNodeKind;
 	/** Local display label. Optional — defaults to the platform-assigned name. */
 	name?: string;
 	heartbeatIntervalMs?: number;
