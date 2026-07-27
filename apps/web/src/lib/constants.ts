@@ -170,6 +170,8 @@ export const ROUTES = {
     DASHBOARD_SETTINGS_JOB_RUNTIME: '/settings/job-runtime',
     // Wave 13 — Billing + Usage & Credits pages (billing/usage PRD §2).
     DASHBOARD_SETTINGS_BILLING: '/settings/billing',
+    // Payment-method management (billing PRD §3.3, audit B10 + B25).
+    DASHBOARD_SETTINGS_PAYMENT_METHOD: '/settings/billing/payment-method',
     DASHBOARD_USAGE: '/settings/usage',
     // Dynamic plugin settings routes
     DASHBOARD_SETTINGS_PLUGIN_CATEGORY: (category: string) => `/settings/plugins/${category}`,

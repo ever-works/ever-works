@@ -8,6 +8,8 @@ import type {
     PlanCheckoutResponse,
     PlanCheckoutReturnResponse,
     SubscriptionMutationResponse,
+    PaymentMethodListPage,
+    PaymentMethodSetupResponse,
 } from './billing.shared';
 
 export type {
@@ -18,6 +20,8 @@ export type {
     PlanCheckoutResponse,
     PlanCheckoutReturnResponse,
     SubscriptionMutationResponse,
+    PaymentMethodListPage,
+    PaymentMethodSetupResponse,
 };
 
 /**
@@ -116,6 +120,41 @@ export const billingAPI = {
      */
     async billingPortal(): Promise<BillingPortalResponse> {
         return serverFetch<BillingPortalResponse>('/billing/portal', { method: 'POST' });
+    },
+
+    // ── Payment methods (billing PRD §3.3, audit B10 + B25) ─────────
+    //
+    // Note what is NOT here: any call that sends card data. Adding a
+    // card is `startPaymentMethodSetup()`, which returns a redirect to
+    // the PROVIDER'S hosted element — the PAN is posted to them, never
+    // to this app or to our API.
+
+    /** The owner's stored cards, display metadata + opaque handles only. */
+    async paymentMethods(): Promise<PaymentMethodListPage> {
+        return serverFetch<PaymentMethodListPage>('/billing/payment-methods', { method: 'GET' });
+    },
+
+    /** Start a hosted card capture. The body is empty by contract. */
+    async startPaymentMethodSetup(): Promise<PaymentMethodSetupResponse> {
+        return serverFetch<PaymentMethodSetupResponse>('/billing/payment-methods/setup-session', {
+            method: 'POST',
+            body: JSON.stringify({}),
+        });
+    },
+
+    /** Promote a stored card to the default — the "replace" action. */
+    async setDefaultPaymentMethod(id: string): Promise<{ status: string }> {
+        return serverFetch(`/billing/payment-methods/${encodeURIComponent(id)}/default`, {
+            method: 'PUT',
+        });
+    },
+
+    /** Remove a stored card; 409 when it is the last on a paid plan. */
+    async removePaymentMethod(id: string): Promise<PaymentMethodListPage> {
+        return serverFetch<PaymentMethodListPage>(
+            `/billing/payment-methods/${encodeURIComponent(id)}`,
+            { method: 'DELETE' },
+        );
     },
 
     /** Enable/disable threshold-triggered top-ups. */

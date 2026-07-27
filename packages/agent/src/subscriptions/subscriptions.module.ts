@@ -8,6 +8,7 @@ import { StripeBillingProvider } from './billing/stripe-billing.provider';
 import { BillingService } from './billing/billing.service';
 import { AutoRechargeService } from './billing/auto-recharge.service';
 import { PlanSubscriptionService } from './billing/plan-subscription.service';
+import { PaymentMethodService } from './billing/payment-method.service';
 import { CreditLedgerService } from './credits/credit-ledger.service';
 import { EntitlementsService } from './credits/entitlements.service';
 import { RunCostSettlementService } from './credits/run-cost-settlement.service';
@@ -42,6 +43,10 @@ import { UsageSummaryService } from './credits/usage-summary.service';
         // path that actually puts an account on a paid tier. Additive
         // beside the credit top-up path; shares the same provider seam.
         PlanSubscriptionService,
+        // Add / replace / remove a stored payment method (billing PRD
+        // §3.3, audit B10 + B25). Capture happens on the provider's
+        // hosted element — no card datum ever reaches this process.
+        PaymentMethodService,
         // Both provider implementations are instantiable; the factory
         // below picks one PER DEPLOYMENT from configuration. Keeping
         // ManualBillingProvider as a real provider means the fallback is
@@ -69,6 +74,7 @@ import { UsageSummaryService } from './credits/usage-summary.service';
         BillingService,
         AutoRechargeService,
         PlanSubscriptionService,
+        PaymentMethodService,
         BillingProvider,
     ],
 })

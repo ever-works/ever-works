@@ -3,6 +3,7 @@ import {
     StripeBillingProvider,
     STRIPE_METADATA_KEYS,
     STRIPE_PURCHASE_KINDS,
+    STRIPE_SETUP_KIND,
 } from './stripe-billing.provider';
 
 /**
@@ -40,7 +41,10 @@ afterEach(() => {
 
 function fakeClient(overrides: Record<string, unknown> = {}) {
     return {
-        customers: { create: jest.fn().mockResolvedValue({ id: 'cus_new' }) },
+        customers: {
+            create: jest.fn().mockResolvedValue({ id: 'cus_new' }),
+            update: jest.fn().mockResolvedValue({ id: 'cus_1' }),
+        },
         checkout: {
             sessions: {
                 create: jest
@@ -52,9 +56,22 @@ function fakeClient(overrides: Record<string, unknown> = {}) {
         paymentIntents: {
             create: jest.fn().mockResolvedValue({ id: 'pi_1', status: 'succeeded' }),
         },
+        paymentMethods: {
+            list: jest.fn().mockResolvedValue({ data: [] }),
+            retrieve: jest.fn().mockResolvedValue({ id: 'pm_1', customer: 'cus_1', card: {} }),
+            detach: jest.fn().mockResolvedValue({ id: 'pm_1' }),
+        },
         webhooks: { constructEvent: jest.fn() },
         ...overrides,
     } as any;
+}
+
+function cardMethod(id: string, customer: string | null, last4 = '4242') {
+    return {
+        id,
+        customer,
+        card: { brand: 'visa', last4, exp_month: 4, exp_year: 2031 },
+    };
 }
 
 function build(client = fakeClient()) {
@@ -218,6 +235,151 @@ describe('StripeBillingProvider — checkout', () => {
         });
 
         expect(result).toEqual({ paymentId: '', status: 'failed', failureCode: 'card_declined' });
+    });
+});
+
+describe('StripeBillingProvider — payment methods (billing PRD §3.3)', () => {
+    beforeEach(() => {
+        process.env.STRIPE_SECRET_KEY = 'sk_test_x';
+    });
+
+    it('captures cards through the provider HOSTED element, never a form of ours', async () => {
+        const { provider, client } = build();
+
+        const session = await provider.createPaymentMethodSetupSession({
+            userId: 'u1',
+            customerId: 'cus_1',
+            successUrl: 'https://app.test/ok',
+            cancelUrl: 'https://app.test/no',
+        });
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        // `mode: setup` is the hosted card element: the PAN is posted to
+        // the provider's page, not to us.
+        expect(params.mode).toBe('setup');
+        expect(params.customer).toBe('cus_1');
+        // No card datum is ever passed out of this process.
+        expect(JSON.stringify(params)).not.toMatch(/card|number|cvc/i);
+        expect(session).toEqual({ url: 'https://pay.example/cs_1', sessionId: 'cs_1' });
+    });
+
+    it('stamps the setup session with a kind that can NEVER credit the ledger', async () => {
+        const { provider, client } = build();
+
+        await provider.createPaymentMethodSetupSession({
+            userId: 'u1',
+            customerId: 'cus_1',
+            successUrl: 'https://app.test/ok',
+            cancelUrl: 'https://app.test/no',
+        });
+
+        const meta = client.checkout.sessions.create.mock.calls[0][0].metadata;
+        expect(meta[STRIPE_METADATA_KEYS.kind]).toBe(STRIPE_SETUP_KIND);
+        expect(Object.values(STRIPE_PURCHASE_KINDS)).not.toContain(meta[STRIPE_METADATA_KEYS.kind]);
+    });
+
+    it('lists only cards attached to the given customer, as display metadata', async () => {
+        const client = fakeClient();
+        client.paymentMethods.list.mockResolvedValue({
+            data: [cardMethod('pm_1', 'cus_1'), cardMethod('pm_2', 'cus_1', '1881')],
+        });
+        const { provider } = build(client);
+
+        const methods = await provider.listPaymentMethods('cus_1');
+
+        expect(client.paymentMethods.list).toHaveBeenCalledWith(
+            expect.objectContaining({ customer: 'cus_1', type: 'card' }),
+        );
+        expect(methods).toEqual([
+            { ref: 'pm_1', brand: 'visa', last4: '4242', expMonth: 4, expYear: 2031 },
+            { ref: 'pm_2', brand: 'visa', last4: '1881', expMonth: 4, expYear: 2031 },
+        ]);
+    });
+
+    it('findPaymentMethod() returns null for a reference owned by ANOTHER customer', async () => {
+        const client = fakeClient();
+        client.paymentMethods.retrieve.mockResolvedValue(cardMethod('pm_x', 'cus_victim'));
+        const { provider } = build(client);
+
+        await expect(provider.findPaymentMethod('cus_attacker', 'pm_x')).resolves.toBeNull();
+    });
+
+    it('findPaymentMethod() returns null (never throws) for an unknown reference', async () => {
+        const client = fakeClient();
+        client.paymentMethods.retrieve.mockRejectedValue(new Error('No such PaymentMethod pm_zzz'));
+        const { provider } = build(client);
+
+        await expect(provider.findPaymentMethod('cus_1', 'pm_zzz')).resolves.toBeNull();
+    });
+
+    it('refuses to make a FOREIGN payment method the default', async () => {
+        const client = fakeClient();
+        client.paymentMethods.retrieve.mockResolvedValue(cardMethod('pm_x', 'cus_victim'));
+        const { provider } = build(client);
+
+        await expect(
+            provider.setDefaultPaymentMethod('cus_attacker', 'pm_x'),
+        ).rejects.toBeInstanceOf(BillingProviderError);
+        expect(client.customers.update).not.toHaveBeenCalled();
+    });
+
+    it('refuses to detach a FOREIGN payment method', async () => {
+        const client = fakeClient();
+        client.paymentMethods.retrieve.mockResolvedValue(cardMethod('pm_x', 'cus_victim'));
+        const { provider } = build(client);
+
+        await expect(provider.detachPaymentMethod('cus_attacker', 'pm_x')).rejects.toBeInstanceOf(
+            BillingProviderError,
+        );
+        expect(client.paymentMethods.detach).not.toHaveBeenCalled();
+    });
+
+    it('sets and detaches an OWNED payment method', async () => {
+        const client = fakeClient();
+        client.paymentMethods.retrieve.mockResolvedValue(cardMethod('pm_1', 'cus_1'));
+        const { provider } = build(client);
+
+        const updated = await provider.setDefaultPaymentMethod('cus_1', 'pm_1');
+        expect(client.customers.update).toHaveBeenCalledWith('cus_1', {
+            invoice_settings: { default_payment_method: 'pm_1' },
+        });
+        expect(updated).toEqual({
+            ref: 'pm_1',
+            brand: 'visa',
+            last4: '4242',
+            expMonth: 4,
+            expYear: 2031,
+        });
+
+        await provider.detachPaymentMethod('cus_1', 'pm_1');
+        expect(client.paymentMethods.detach).toHaveBeenCalledWith('pm_1');
+    });
+
+    it('fails closed on every payment-method method without a secret key', async () => {
+        delete process.env.STRIPE_SECRET_KEY;
+        const { provider, factory } = build();
+
+        await expect(
+            provider.createPaymentMethodSetupSession({
+                userId: 'u1',
+                customerId: 'cus_1',
+                successUrl: 'https://app.test/ok',
+                cancelUrl: 'https://app.test/no',
+            }),
+        ).rejects.toBeInstanceOf(BillingProviderNotConfiguredError);
+        await expect(provider.listPaymentMethods('cus_1')).rejects.toBeInstanceOf(
+            BillingProviderNotConfiguredError,
+        );
+        await expect(provider.findPaymentMethod('cus_1', 'pm_1')).rejects.toBeInstanceOf(
+            BillingProviderNotConfiguredError,
+        );
+        await expect(provider.setDefaultPaymentMethod('cus_1', 'pm_1')).rejects.toBeInstanceOf(
+            BillingProviderNotConfiguredError,
+        );
+        await expect(provider.detachPaymentMethod('cus_1', 'pm_1')).rejects.toBeInstanceOf(
+            BillingProviderNotConfiguredError,
+        );
+        expect(factory).not.toHaveBeenCalled();
     });
 });
 
@@ -504,6 +666,41 @@ describe('StripeBillingProvider — event normalization', () => {
                 providerType: 'customer.subscription.trial_will_end',
             }),
         );
+    });
+
+    it('normalizes payment_method.detached to `payment_method.removed`', async () => {
+        const normalized = await parse({
+            id: 'evt_12',
+            type: 'payment_method.detached',
+            data: {
+                object: cardMethod('pm_gone', null),
+                // The object has already lost its customer; attribution
+                // comes from the SIGNED previous_attributes.
+                previous_attributes: { customer: 'cus_1' },
+            },
+        });
+
+        expect(normalized.kind).toBe('payment_method.removed');
+        expect(normalized.customerId).toBe('cus_1');
+        expect(normalized.paymentMethod).toEqual(
+            expect.objectContaining({ ref: 'pm_gone', last4: '4242' }),
+        );
+    });
+
+    it('a hosted CARD-CAPTURE session never credits the ledger', async () => {
+        const normalized = await parse({
+            id: 'evt_13',
+            type: 'checkout.session.completed',
+            data: {
+                object: {
+                    customer: 'cus_1',
+                    payment_status: 'no_payment_required',
+                    metadata: { [STRIPE_METADATA_KEYS.kind]: STRIPE_SETUP_KIND },
+                },
+            },
+        });
+
+        expect(normalized.kind).toBe('ignored');
     });
 
     it('resolves expanded objects to ids', async () => {

@@ -118,6 +118,8 @@ export interface WebhookOutcome {
         | 'reversed-idempotent'
         | 'invoice-mirrored'
         | 'payment-method-updated'
+        | 'payment-method-removed'
+        | 'payment-method-removed-noop'
         // Paid-plan lifecycle (audit B24) — delegated to
         // `PlanSubscriptionService`, which owns the tier grant/revoke.
         | 'subscription-activated'
@@ -461,6 +463,8 @@ export class BillingService {
                 return this.mirrorInvoice(event);
             case 'payment_method.updated':
                 return this.applyPaymentMethod(event);
+            case 'payment_method.removed':
+                return this.applyPaymentMethodRemoved(event);
             case 'subscription.activated':
             case 'subscription.canceled':
             case 'subscription.updated':
@@ -662,6 +666,38 @@ export class BillingService {
             paymentMethodExpYear: event.paymentMethod.expYear,
         });
         return { eventId: event.id, kind: event.kind, action: 'payment-method-updated' };
+    }
+
+    /**
+     * A card was detached at the provider (our own remove route, or the
+     * provider dashboard). Clear the stored summary ONLY when the removed
+     * reference is the one we hold — detaching a non-default card must
+     * not blank the default — and take auto-recharge down with it, since
+     * an off-session charge is inoperable without a stored method.
+     */
+    private async applyPaymentMethodRemoved(event: BillingWebhookEvent): Promise<WebhookOutcome> {
+        const profile = await this.resolveProfile(event);
+        if (!profile || !event.paymentMethod) {
+            return this.unattributed(event);
+        }
+        if (profile.defaultPaymentMethodRef !== event.paymentMethod.ref) {
+            return { eventId: event.id, kind: event.kind, action: 'payment-method-removed-noop' };
+        }
+        await this.billingProfileRepository.updatePaymentMethod(profile.userId, {
+            defaultPaymentMethodRef: null,
+            paymentMethodBrand: null,
+            paymentMethodLast4: null,
+            paymentMethodExpMonth: null,
+            paymentMethodExpYear: null,
+        });
+        if (profile.autoRechargeEnabled) {
+            await this.billingProfileRepository.updateAutoRecharge(profile.userId, {
+                autoRechargeEnabled: false,
+                autoRechargeThresholdCredits: profile.autoRechargeThresholdCredits ?? null,
+                autoRechargePackId: profile.autoRechargePackId ?? null,
+            });
+        }
+        return { eventId: event.id, kind: event.kind, action: 'payment-method-removed' };
     }
 
     /**

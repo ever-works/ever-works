@@ -6,6 +6,7 @@ import { toast } from 'sonner';
 import {
     AlertCircle,
     AlertTriangle,
+    ArrowRight,
     CreditCard,
     FileText,
     RefreshCw,
@@ -16,6 +17,8 @@ import {
 import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
+import { Link } from '@/i18n/navigation';
+import { ROUTES } from '@/lib/constants';
 import {
     cancelSubscriptionAction,
     changePlanAction,
@@ -129,6 +132,24 @@ function SectionCard({
             </div>
             {children}
         </div>
+    );
+}
+
+/**
+ * Entry point to the manage-payment-methods route (billing PRD §3.3,
+ * audit B10 + B25). Purely additive: the summary above stays read-only,
+ * this just gives it somewhere to go.
+ */
+function PaymentMethodManageLink({ label }: { label: string }) {
+    return (
+        <Link
+            href={ROUTES.DASHBOARD_SETTINGS_PAYMENT_METHOD}
+            data-testid="billing-payment-method-manage"
+            className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+        >
+            {label}
+            <ArrowRight className="w-3 h-3" />
+        </Link>
     );
 }
 
@@ -696,6 +717,7 @@ export function BillingSettings({
                             <p className="mt-2 text-xs text-text-muted dark:text-text-muted-dark">
                                 {t('paymentMethod.managedAtCheckout')}
                             </p>
+                            <PaymentMethodManageLink label={t('paymentMethod.manage')} />
                         </div>
                     ) : (
                         <div data-testid="billing-payment-method-empty">
@@ -705,6 +727,7 @@ export function BillingSettings({
                             <p className="mt-1 text-xs text-text-muted dark:text-text-muted-dark">
                                 {t('paymentMethod.addAtCheckout')}
                             </p>
+                            <PaymentMethodManageLink label={t('paymentMethod.addCta')} />
                         </div>
                     )}
                 </SectionCard>

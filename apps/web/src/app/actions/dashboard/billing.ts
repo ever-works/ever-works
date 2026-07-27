@@ -231,3 +231,92 @@ export async function openBillingPortalAction() {
         return { success: false as const, url: null, error: message };
     }
 }
+
+/**
+ * Start a hosted card capture (billing PRD §3.3, audit B10 + B25).
+ *
+ * Returns the PROVIDER'S hosted-element URL for the client to navigate
+ * to. No card field is sent — there is none to send: the PAN and CVC are
+ * entered on the provider's own page and never transit this app, this
+ * action, or our API. All we ever get back is an opaque reference plus
+ * brand / last four / expiry.
+ */
+export async function startPaymentMethodSetupAction() {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const result = await billingAPI.startPaymentMethodSetup();
+        return { success: true as const, url: result.url, error: null };
+    } catch (error) {
+        // Security: log full error server-side; return a generic client-safe message.
+        console.error('[startPaymentMethodSetupAction]', error);
+        let message = 'Could not start card setup';
+        if (error instanceof ApiResponseError && error.statusCode === 503) {
+            message = 'Card payments are not enabled on this deployment yet.';
+        }
+        return { success: false as const, url: null, error: message };
+    }
+}
+
+/** Promote a stored card to the default — the "replace" action. */
+export async function setDefaultPaymentMethodAction(id: string) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        await billingAPI.setDefaultPaymentMethod(id);
+        revalidatePath(ROUTES.DASHBOARD_SETTINGS_PAYMENT_METHOD);
+        revalidatePath(ROUTES.DASHBOARD_SETTINGS_BILLING);
+        return { success: true as const, error: null };
+    } catch (error) {
+        console.error('[setDefaultPaymentMethodAction]', error);
+        let message = 'Could not update the default payment method';
+        if (error instanceof ApiResponseError) {
+            if (error.statusCode === 404) {
+                message = 'That payment method is no longer available.';
+            } else if (error.statusCode === 503) {
+                message = 'Card payments are not enabled on this deployment yet.';
+            }
+        }
+        return { success: false as const, error: message };
+    }
+}
+
+/**
+ * Remove a stored card.
+ *
+ * A 409 here is the deliberate "last payment method on an active paid
+ * subscription" refusal — surfaced as guidance to add a replacement
+ * first, not as a generic failure.
+ */
+export async function removePaymentMethodAction(id: string) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        await billingAPI.removePaymentMethod(id);
+        revalidatePath(ROUTES.DASHBOARD_SETTINGS_PAYMENT_METHOD);
+        revalidatePath(ROUTES.DASHBOARD_SETTINGS_BILLING);
+        return { success: true as const, error: null };
+    } catch (error) {
+        console.error('[removePaymentMethodAction]', error);
+        let message = 'Could not remove the payment method';
+        if (error instanceof ApiResponseError) {
+            if (error.statusCode === 409) {
+                message = 'Add another payment method before removing the last one on a paid plan.';
+            } else if (error.statusCode === 404) {
+                message = 'That payment method is no longer available.';
+            } else if (error.statusCode === 503) {
+                message = 'Card payments are not enabled on this deployment yet.';
+            }
+        }
+        return { success: false as const, error: message };
+    }
+}
