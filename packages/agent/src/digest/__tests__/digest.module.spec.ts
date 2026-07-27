@@ -25,6 +25,9 @@ jest.mock('../../goals/goals.module', () => ({
 jest.mock('../../notifications/notifications.module', () => ({
     NotificationsModule: class NotificationsModule {},
 }));
+jest.mock('../../facades/facades.module', () => ({
+    FacadesModule: class FacadesModule {},
+}));
 jest.mock('../digest.service', () => ({
     DigestService: class DigestService {},
 }));
@@ -38,6 +41,7 @@ import { AgentsModule } from '../../agents/agents.module';
 import { EventIngestModule } from '../../ingest/ingest.module';
 import { GoalsModule } from '../../goals/goals.module';
 import { NotificationsModule } from '../../notifications/notifications.module';
+import { FacadesModule } from '../../facades/facades.module';
 
 describe('DigestModule', () => {
     const meta = (key: string): unknown[] => Reflect.getMetadata(key, DigestModule) ?? [];
@@ -55,7 +59,16 @@ describe('DigestModule', () => {
             EventIngestModule,
             GoalsModule,
             NotificationsModule,
+            FacadesModule,
         ]);
+    });
+
+    it('reaches the model ONLY through FacadesModule (no provider module imported)', () => {
+        // The narrative summary must ride `AiFacadeService` so provider
+        // resolution, the settings hierarchy, budget guards and usage
+        // metering all apply. Importing a provider plugin module here
+        // would be a raw-provider back door.
+        expect(meta('imports')).toContain(FacadesModule);
     });
 });
 
@@ -69,5 +82,6 @@ describe('digest barrel', () => {
         expect(typeof barrel.buildDigestTools).toBe('function');
         expect(barrel.DIGEST_PERIODS).toEqual(['daily', 'weekly']);
         expect(barrel.DIGEST_FREQUENCIES).toEqual(['off', 'daily', 'weekly']);
+        expect(barrel.DIGEST_SCOPES).toEqual(['personal', 'organization']);
     });
 });

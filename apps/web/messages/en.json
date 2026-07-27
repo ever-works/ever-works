@@ -1944,7 +1944,8 @@
                 "gitProviders": "Git Providers",
                 "dangerZone": "Danger Zone",
                 "billing": "Billing",
-                "usageCredits": "Usage & Credits"
+                "usageCredits": "Usage & Credits",
+                "digest": "Digest"
             },
             "githubApp": {
                 "title": "GitHub App Installations",
@@ -2618,6 +2619,42 @@
                     "loading": "Loading…",
                     "error": "Failed to load chart data.",
                     "unattributed": "Unattributed"
+                }
+            },
+            "digest": {
+                "title": "Digest",
+                "subtitle": "Scheduled activity briefings: agent runs, task movement, pull requests, connected-source events and goal progress, delivered on the cadence you choose. Your personal digest and your organization’s digest are separate settings — turning one on never changes the other.",
+                "scopes": {
+                    "personal": "Personal",
+                    "organization": "Organization"
+                },
+                "cadences": {
+                    "daily": "Daily",
+                    "weekly": "Weekly"
+                },
+                "fields": {
+                    "scopeLabel": "Scope",
+                    "scopeHelper": "Personal covers only your own activity. Organization covers everything happening across your organization. Both can be on at the same time.",
+                    "orgContext": "Editing the digest for {name}.",
+                    "enabledLabel": "Send me a personal digest",
+                    "enabledHelper": "Delivered in-app and to any notification channel you have connected. Quiet windows are skipped instead of sending an empty briefing.",
+                    "orgEnabledLabel": "Send an organization digest",
+                    "orgEnabledHelper": "One shared briefing covering the whole organization, delivered to the organization owner. Members keep receiving their own personal digests.",
+                    "cadenceLabel": "Cadence",
+                    "cadenceHelper": "Daily covers the last 24 hours; weekly covers the last 7 days.",
+                    "narrativeLabel": "Include an AI summary",
+                    "narrativeHelper": "Adds a short written summary on top of the counts. The counts are always computed exactly; if no AI provider is available the summary is skipped and the digest says so.",
+                    "lastRunAt": "Last sent {when}"
+                },
+                "actions": {
+                    "save": "Save",
+                    "saving": "Saving..."
+                },
+                "messages": {
+                    "saveSuccess": "Digest settings saved",
+                    "saveError": "Failed to save the digest settings",
+                    "noOrg": "No active organization for this session, so there is no organization digest to configure. Create or switch to an organization first.",
+                    "noAiProvider": "No AI provider is configured, so digests will arrive without the written summary. Every count is still computed and delivered."
                 }
             }
         },
