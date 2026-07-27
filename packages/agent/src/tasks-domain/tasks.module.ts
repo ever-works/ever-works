@@ -37,6 +37,7 @@ import { TaskTransitionService } from './task-transition.service';
 import { TasksService } from './tasks.service';
 import { TaskChatService } from './task-chat.service';
 import { TaskGateRunnerService } from './task-gate-runner.service';
+import { TaskGateJudgeService } from './task-gate-judge.service';
 import { TaskRecurrenceDispatcherService } from './task-recurrence-dispatcher.service';
 import { TaskNotificationService } from './task-notification.service';
 import { TaskRunDenormService } from './task-run-denorm.service';
@@ -132,6 +133,11 @@ import { NotificationsModule } from '../notifications/notifications.module';
         // AgentRunRepository (exported by AgentsModule above) to persist
         // per-run gate results.
         TaskGateRunnerService,
+        // Judgment layer G2 — the LLM-vs-criteria judge that turns a green
+        // gate into pass/retry/escalate. Consumes AiFacadeService only
+        // (FacadesModule, imported above) and treats it as @Optional(), so
+        // a deployment with no AI provider degrades to "no judge".
+        TaskGateJudgeService,
     ],
     exports: [
         TaskRepository,
@@ -158,6 +164,7 @@ import { NotificationsModule } from '../notifications/notifications.module';
         TaskReviewRejectionService,
         TaskPrStatusService,
         TaskGateRunnerService,
+        TaskGateJudgeService,
     ],
 })
 export class TasksDomainModule {}

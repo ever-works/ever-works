@@ -18,6 +18,10 @@
  *                          attempt and the required checks are still red.
  * - `gate-precheck-red`  — the cheap L0 pre-check failed and the policy
  *                          refuses to spend a model call on it.
+ * - `judge-escalated`    — every acceptance check passed, but the
+ *                          acceptance-criteria judge says the run does not
+ *                          satisfy what the Task asked for. No failing
+ *                          command to point at: a human has to decide.
  * - `guardrail-refusal`  — a guardrail (permission, allowlist, policy)
  *                          refused an action the agent needed to take.
  * - `budget-stop`        — an Agent/Work budget or credit ceiling stopped
@@ -33,6 +37,7 @@
 export type AgentEscalationReasonCode =
 	| 'gate-exhausted'
 	| 'gate-precheck-red'
+	| 'judge-escalated'
 	| 'guardrail-refusal'
 	| 'budget-stop'
 	| 'merge-refused'
@@ -44,6 +49,7 @@ export type AgentEscalationReasonCode =
 export const AGENT_ESCALATION_REASON_CODES: readonly AgentEscalationReasonCode[] = [
 	'gate-exhausted',
 	'gate-precheck-red',
+	'judge-escalated',
 	'guardrail-refusal',
 	'budget-stop',
 	'merge-refused',

@@ -1,6 +1,11 @@
 import { logger as triggerLogger, task } from '@trigger.dev/sdk';
 import { NestFactory } from '@nestjs/core';
-import type { TaskAcceptanceCheck, TaskCheckResult } from '@ever-works/contracts';
+import type {
+    GateVerdict,
+    TaskAcceptanceCheck,
+    TaskCheckResult,
+    TaskGateJudgement,
+} from '@ever-works/contracts';
 import { AgentRepository, AgentRunRepository, WorkRepository } from '@ever-works/agent/database';
 import {
     AgentEscalationService,
@@ -10,11 +15,15 @@ import {
 import { config } from '@ever-works/agent/config';
 import {
     resolveAcceptanceChecks,
+    resolveAcceptanceCriteria,
     resolveChecksPolicy,
+    resolveGateVerdict,
     resolveL0Checks,
     resolveMaxGateAttempts,
+    shouldRunGateJudge,
     shouldRunL0PreCheck,
     TaskChatService,
+    TaskGateJudgeService,
     TaskGateRunnerService,
     TaskReviewRejectionService,
     TaskRunDenormService,
@@ -110,6 +119,40 @@ function composeGateIterateMessage(input: {
             for (const tailLine of neutralizeControlTokens(checkResult.logTail).split('\n')) {
                 lines.push(`    ${tailLine}`);
             }
+        }
+    }
+    return lines.join('\n');
+}
+
+/**
+ * Judgment layer G2 — compose the iterate message for a JUDGE `retry`.
+ *
+ * The red-gate message above says "a command failed, here is its output".
+ * This one cannot: every command passed. What it has instead is a named
+ * list of criteria the judge read as unmet, and it has to be explicit that
+ * the checks are NOT the problem — otherwise the agent's obvious next move
+ * is to re-run the tests it already passed.
+ *
+ * Security (prompt-injection hardening): `reason`/`unmet` are model-authored
+ * text derived from an attacker-influenced Task description, and this
+ * string becomes the run's `immediateInput`. Same mechanical control-token
+ * strip as every other dynamic field on this path.
+ */
+function composeJudgeIterateMessage(input: {
+    judgement: TaskGateJudgement;
+    attempt: number;
+    maxAttempts: number;
+}): string {
+    const lines: string[] = [
+        `Acceptance review: every automated check PASSED, but the task's acceptance criteria are NOT met yet (attempt ${input.attempt} of ${input.maxAttempts}).`,
+        'Do not re-run or "fix" the checks — they are green. Close the gaps listed below in the workspace, then finish. The review runs again automatically after you are done.',
+        '',
+        `Reviewer verdict: ${neutralizeControlTokens(input.judgement.reason || 'acceptance criteria unmet')}`,
+    ];
+    if (input.judgement.unmet.length > 0) {
+        lines.push('', 'Unmet criteria:');
+        for (const entry of input.judgement.unmet) {
+            lines.push(`- ${neutralizeControlTokens(entry)}`);
         }
     }
     return lines.join('\n');
@@ -517,9 +560,74 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
             // (cancelled / budget-blocked inside execute / dispatch failure),
             // so re-running the checks would grade unchanged work.
             let iterateStop: 'budget' | 'agent-loop' | null = null;
+            // Judgment layer G2 — the acceptance-criteria judge's latest
+            // opinion, and the verdict it collapses to together with the
+            // check results. `null` judgement = no judge ran (the default),
+            // which `resolveGateVerdict` maps to the pre-judge behavior.
+            let judgement: TaskGateJudgement | null = null;
+            let gateVerdict: GateVerdict = 'pass';
+            // What the agent says it did — the text the judge grades. Kept
+            // in step with the iterate loop so a later attempt is judged on
+            // its own summary, not the first attempt's.
+            let runSummary = result.outcome?.summary ?? '';
             if (provisioned && runSucceeded && gatePolicy !== 'off') {
                 const gateRunner = appContext.get(TaskGateRunnerService);
                 const maxGateAttempts = resolveMaxGateAttempts(taskRow, gateWork);
+                // G2 — dispatch-freeze for the judge, mirroring the check
+                // set: the criteria are read ONCE, so an edit mid-run
+                // affects the next run and not this one.
+                const judgeEnabled = config.agents.isGateJudgeEnabled();
+                const criteria = judgeEnabled
+                    ? resolveAcceptanceCriteria(taskRow, resolvedChecks)
+                    : '';
+                /**
+                 * Grade one gate outcome with the LLM judge. Returns null —
+                 * "no opinion" — whenever the judge is not applicable
+                 * (`shouldRunGateJudge`) or the RPC never landed. Both
+                 * degrade to exactly the pass/fail gate that shipped
+                 * before, which is the whole optionality contract.
+                 */
+                const runJudge = async (
+                    outcome: Awaited<ReturnType<TaskGateRunnerService['runChecks']>>,
+                ): Promise<TaskGateJudgement | null> => {
+                    if (
+                        !shouldRunGateJudge({
+                            enabled: judgeEnabled,
+                            policy: gatePolicy,
+                            gateStatus: outcome.gateStatus,
+                            criteria,
+                        })
+                    ) {
+                        return null;
+                    }
+                    try {
+                        await bestEffort(() =>
+                            runs.updateTelemetry(claimedRunId, {
+                                currentActivity: 'Reviewing output against acceptance criteria',
+                            }),
+                        );
+                        return await appContext.get(TaskGateJudgeService).judge({
+                            userId: payload.userId,
+                            taskId: payload.taskId,
+                            runId: run.id,
+                            workId: taskRow.workId ?? null,
+                            agentId: agent.id,
+                            criteria,
+                            output: runSummary,
+                            checkResults: outcome.results,
+                        });
+                    } catch (error) {
+                        // The judge is advisory infrastructure. An RPC that
+                        // never landed must not convert a green gate into a
+                        // withheld PR.
+                        triggerLogger.warn(
+                            `Gate judge skipped for run ${claimedRunId}: ${
+                                error instanceof Error ? error.message : String(error)
+                            }`,
+                        );
+                        return null;
+                    }
+                };
                 try {
                     gateAttempts = 1;
                     gateOutcome = await gateRunner.runChecks({
@@ -528,6 +636,13 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                         runId: run.id,
                         policy: gatePolicy,
                         attempt: gateAttempts,
+                    });
+                    judgement = await runJudge(gateOutcome);
+                    gateVerdict = resolveGateVerdict({
+                        gateStatus: gateOutcome.gateStatus,
+                        policy: gatePolicy,
+                        judgement,
+                        attemptsRemaining: gateAttempts < maxGateAttempts,
                     });
 
                     // Wave 3 M5 — bounded red → iterate loop. On a red gate
@@ -539,11 +654,15 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                     // (`resolveMaxGateAttempts`, clamped 1..5), or the Agent
                     // budget stops it. 'skipped' (zero checks) never
                     // iterates: there is nothing for another attempt to fix.
-                    while (
-                        gatePolicy === 'required' &&
-                        gateOutcome.gateStatus === 'red' &&
-                        gateAttempts < maxGateAttempts
-                    ) {
+                    //
+                    // Judgment layer G2 — the loop is now driven by the
+                    // VERDICT rather than by `gateStatus === 'red'` alone,
+                    // so the judge's `retry` feeds this exact loop instead
+                    // of inventing a second one. `resolveGateVerdict` only
+                    // ever yields 'retry' under a 'required' policy with
+                    // attempts left, so the pre-judge entry conditions are
+                    // unchanged.
+                    while (gateVerdict === 'retry') {
                         // Budget consult between attempts (existing
                         // AgentBudget surface via AgentRunService — RPC).
                         // Only an explicit `allowed: false` stops the loop:
@@ -563,18 +682,32 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                             // documented fail-open to the loop cap.
                         }
 
-                        const iterateMessage = composeGateIterateMessage({
-                            failing: filterRequiredGateFailures(
-                                gateOutcome.results,
-                                resolvedChecks,
-                            ),
-                            attempt: gateAttempts,
-                            maxAttempts: maxGateAttempts,
-                        });
+                        // G2 — WHICH feedback the agent gets depends on who
+                        // asked for the retry. A judge retry means the
+                        // commands are green, so replaying the red-gate
+                        // message would send the agent to re-run passing
+                        // tests instead of closing the named gap.
+                        const judgeRetry = judgement?.verdict === 'retry';
+                        const iterateMessage = judgeRetry
+                            ? composeJudgeIterateMessage({
+                                  judgement: judgement as TaskGateJudgement,
+                                  attempt: gateAttempts,
+                                  maxAttempts: maxGateAttempts,
+                              })
+                            : composeGateIterateMessage({
+                                  failing: filterRequiredGateFailures(
+                                      gateOutcome.results,
+                                      resolvedChecks,
+                                  ),
+                                  attempt: gateAttempts,
+                                  maxAttempts: maxGateAttempts,
+                              });
                         const nextAttempt = gateAttempts + 1;
                         await bestEffort(() =>
                             runs.updateTelemetry(claimedRunId, {
-                                currentActivity: `Quality gate red — iterating (attempt ${nextAttempt} of ${maxGateAttempts})`,
+                                currentActivity: judgeRetry
+                                    ? `Acceptance criteria unmet — iterating (attempt ${nextAttempt} of ${maxGateAttempts})`
+                                    : `Quality gate red — iterating (attempt ${nextAttempt} of ${maxGateAttempts})`,
                             }),
                         );
                         let iterateSucceeded = false;
@@ -593,6 +726,10 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                             iterateSucceeded =
                                 iterateResult.status === 'assembled' ||
                                 iterateResult.status === 'dispatched';
+                            // G2 — grade the NEW work, not the old summary.
+                            if (iterateSucceeded && iterateResult.outcome?.summary) {
+                                runSummary = iterateResult.outcome.summary;
+                            }
                         } catch {
                             // An iterate attempt that crashed in transit is
                             // handled like any other incomplete attempt —
@@ -616,6 +753,13 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                             policy: gatePolicy,
                             attempt: gateAttempts,
                         });
+                        judgement = await runJudge(gateOutcome);
+                        gateVerdict = resolveGateVerdict({
+                            gateStatus: gateOutcome.gateStatus,
+                            policy: gatePolicy,
+                            judgement,
+                            attemptsRemaining: gateAttempts < maxGateAttempts,
+                        });
                     }
                 } catch (error) {
                     // A crashed gate step marks the run FAILED, never green —
@@ -635,23 +779,45 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                     };
                 }
 
-                if (gatePolicy === 'required' && gateOutcome.gateStatus !== 'green') {
+                // The loop can also exit through a `break` (budget cap, or an
+                // iterate attempt whose agent loop never completed), which
+                // leaves `gateVerdict` on its now-stale 'retry'. Recompute
+                // once with no attempts remaining: a red gate settles to
+                // 'fail', unmet criteria to 'escalate', and an already-final
+                // verdict is unchanged (the resolver is idempotent for
+                // 'pass' / 'fail' / 'escalate').
+                gateVerdict = resolveGateVerdict({
+                    gateStatus: gateOutcome.gateStatus,
+                    policy: gatePolicy,
+                    judgement,
+                    attemptsRemaining: false,
+                });
+
+                if (gateVerdict !== 'pass') {
                     // Red after every allowed attempt — or 'skipped' when the
-                    // required policy found zero checks. Either way: no
-                    // finalize, no PR. The workspace and the Task's
-                    // branchState stay exactly as they are; a human reply in
-                    // task chat resumes the agent, which re-runs the checks.
+                    // required policy found zero checks — or (G2) green
+                    // checks whose output does not satisfy the Task's
+                    // acceptance criteria. Either way: no finalize, no PR.
+                    // The workspace and the Task's branchState stay exactly
+                    // as they are; a human reply in task chat resumes the
+                    // agent, which re-runs the checks.
                     const requiredFailed = filterRequiredGateFailures(
                         gateOutcome.results,
                         resolvedChecks,
                     );
+                    // G2 — the judge blocked a gate every command approved.
+                    // There is no failing check to name, so the summary,
+                    // chat message, escalation reason and durable feedback
+                    // all have to say something different.
+                    const judgeEscalated = gateVerdict === 'escalate' && judgement !== null;
                     const attemptNoun = gateAttempts === 1 ? 'attempt' : 'attempts';
-                    const summary =
-                        resolvedChecks.length === 0
-                            ? 'Quality gate: no checks configured — PR withheld (checks policy is required).'
-                            : `Quality gate red after ${gateAttempts} ${attemptNoun}: ${requiredFailed
-                                  .map((checkResult) => checkResult.id)
-                                  .join(', ')} — PR withheld.`;
+                    const summary = judgeEscalated
+                        ? `Acceptance review after ${gateAttempts} ${attemptNoun}: checks passed but the task's acceptance criteria are unmet — PR withheld.`
+                        : resolvedChecks.length === 0
+                          ? 'Quality gate: no checks configured — PR withheld (checks policy is required).'
+                          : `Quality gate red after ${gateAttempts} ${attemptNoun}: ${requiredFailed
+                                .map((checkResult) => checkResult.id)
+                                .join(', ')} — PR withheld.`;
                     await runs.markCompleted(run.id, summary);
                     await bestEffort(() =>
                         runDenorm.recordTerminal(payload.taskId, claimedRunId, 'completed'),
@@ -661,26 +827,42 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                     // Task chat gets the human-facing breakdown. Plain text —
                     // the chat surface never renders agent messages as markup.
                     const taskChat = appContext.get(TaskChatService);
-                    const chatBody =
-                        resolvedChecks.length === 0
-                            ? 'Quality gate: no checks configured, and this Work requires acceptance checks — no PR was opened. Add checks to the Task or to the Work defaults, then send a message here to re-run.'
-                            : [
-                                  `Quality gate red after ${gateAttempts} ${attemptNoun} — no PR was opened.`,
-                                  ...(iterateStop === 'budget'
-                                      ? [
-                                            '',
-                                            "Iteration stopped early: the Agent's budget cap for this period was reached.",
-                                        ]
-                                      : []),
-                                  '',
-                                  'Failed checks:',
-                                  ...requiredFailed.map(
-                                      (checkResult) =>
-                                          `- ${checkResult.id}: ${describeCheckFailure(checkResult)}`,
-                                  ),
-                                  '',
-                                  'Fix the issues (or adjust the checks), then send a message here to re-run.',
-                              ].join('\n');
+                    const chatBody = judgeEscalated
+                        ? [
+                              `Every acceptance check passed, but the acceptance review found the task is not done after ${gateAttempts} ${attemptNoun} — no PR was opened.`,
+                              ...(iterateStop === 'budget'
+                                  ? [
+                                        '',
+                                        "Iteration stopped early: the Agent's budget cap for this period was reached.",
+                                    ]
+                                  : []),
+                              '',
+                              `Reviewer verdict: ${judgement?.reason || 'acceptance criteria unmet'}`,
+                              ...(judgement && judgement.unmet.length > 0
+                                  ? ['', 'Unmet criteria:', ...judgement.unmet.map((e) => `- ${e}`)]
+                                  : []),
+                              '',
+                              "Close the gaps (or adjust the task's acceptance criteria), then send a message here to re-run.",
+                          ].join('\n')
+                        : resolvedChecks.length === 0
+                          ? 'Quality gate: no checks configured, and this Work requires acceptance checks — no PR was opened. Add checks to the Task or to the Work defaults, then send a message here to re-run.'
+                          : [
+                                `Quality gate red after ${gateAttempts} ${attemptNoun} — no PR was opened.`,
+                                ...(iterateStop === 'budget'
+                                    ? [
+                                          '',
+                                          "Iteration stopped early: the Agent's budget cap for this period was reached.",
+                                      ]
+                                    : []),
+                                '',
+                                'Failed checks:',
+                                ...requiredFailed.map(
+                                    (checkResult) =>
+                                        `- ${checkResult.id}: ${describeCheckFailure(checkResult)}`,
+                                ),
+                                '',
+                                'Fix the issues (or adjust the checks), then send a message here to re-run.',
+                            ].join('\n');
                     await bestEffort(() =>
                         taskChat.post(payload.userId, {
                             taskId: payload.taskId,
@@ -694,55 +876,93 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                     // ended as a chat message and a log line, so "what is
                     // waiting on me?" had no answer. Record the structured
                     // escalation the Task detail + digest read.
+                    //
+                    // G2 — the judge's `escalate` verdict writes through
+                    // THIS service, deliberately: an escalation is already
+                    // the platform's answer to "an agent stopped and a human
+                    // has to decide", and a judge that invented its own
+                    // notification path would be a second inbox nobody
+                    // watches.
                     await bestEffort(() =>
                         appContext.get(AgentEscalationService).record({
                             userId: payload.userId,
-                            reasonCode: iterateStop === 'budget' ? 'budget-stop' : 'gate-exhausted',
+                            reasonCode:
+                                iterateStop === 'budget'
+                                    ? 'budget-stop'
+                                    : judgeEscalated
+                                      ? 'judge-escalated'
+                                      : 'gate-exhausted',
                             runId: run.id,
                             taskId: payload.taskId,
                             workId: taskRow.workId ?? null,
                             agentId: agent.id,
                             summary,
-                            decisionNeeded:
-                                resolvedChecks.length === 0
-                                    ? 'This Work requires acceptance checks but none are configured. Add checks to the Task or the Work defaults, or change the checks policy.'
-                                    : iterateStop === 'budget'
-                                      ? "The Agent's budget cap stopped the fix loop before the checks went green. Decide whether to raise the budget, fix the failures by hand, or narrow the task."
-                                      : 'The agent could not get the required checks green within its attempt budget. Decide whether to fix the failures by hand, adjust the checks, or raise the attempt budget.',
-                            attempted: requiredFailed.map((checkResult) => ({
-                                label: String(checkResult.id),
-                                outcome: describeCheckFailure(checkResult),
-                                ...(checkResult.logTail ? { detail: checkResult.logTail } : {}),
-                            })),
+                            decisionNeeded: judgeEscalated
+                                ? `Every acceptance check passed, but the acceptance review says the task is not done: ${
+                                      judgement?.reason || 'the criteria are unmet'
+                                  } Decide whether to close the gaps by hand, restate the task's acceptance criteria, or accept the work as-is.`
+                                : resolvedChecks.length === 0
+                                  ? 'This Work requires acceptance checks but none are configured. Add checks to the Task or the Work defaults, or change the checks policy.'
+                                  : iterateStop === 'budget'
+                                    ? "The Agent's budget cap stopped the fix loop before the checks went green. Decide whether to raise the budget, fix the failures by hand, or narrow the task."
+                                    : 'The agent could not get the required checks green within its attempt budget. Decide whether to fix the failures by hand, adjust the checks, or raise the attempt budget.',
+                            attempted: judgeEscalated
+                                ? (judgement?.unmet ?? []).map((entry, index) => ({
+                                      label: `criterion-${index + 1}`,
+                                      outcome: 'unmet',
+                                      detail: entry,
+                                  }))
+                                : requiredFailed.map((checkResult) => ({
+                                      label: String(checkResult.id),
+                                      outcome: describeCheckFailure(checkResult),
+                                      ...(checkResult.logTail
+                                          ? { detail: checkResult.logTail }
+                                          : {}),
+                                  })),
                         }),
                     );
                     // Orchestration M9 — persist the machine feedback so a
                     // LATER resume replays it. The iterate loop already fed
                     // it to the run that was executing, but that run is
-                    // terminal now and its context is gone.
-                    if (requiredFailed.length > 0) {
+                    // terminal now and its context is gone. G2 routes the
+                    // judge's feedback through the SAME durable record: a
+                    // resumed run must know why the review blocked it, and
+                    // there is no failing check to rediscover.
+                    const durableFeedback = judgeEscalated
+                        ? composeJudgeIterateMessage({
+                              judgement: judgement as TaskGateJudgement,
+                              attempt: gateAttempts,
+                              maxAttempts: gateAttempts,
+                          })
+                        : requiredFailed.length > 0
+                          ? composeGateIterateMessage({
+                                failing: requiredFailed,
+                                attempt: gateAttempts,
+                                maxAttempts: gateAttempts,
+                            })
+                          : null;
+                    if (durableFeedback) {
                         await bestEffort(() =>
                             appContext.get(TaskReviewRejectionService).recordGateRejection({
                                 taskId: payload.taskId,
                                 workId: taskRow.workId ?? null,
                                 runId: run.id,
-                                feedback: composeGateIterateMessage({
-                                    failing: requiredFailed,
-                                    attempt: gateAttempts,
-                                    maxAttempts: gateAttempts,
-                                }),
+                                feedback: durableFeedback,
                             }),
                         );
                     }
 
                     return {
                         status: 'completed',
-                        reason: 'gate-red',
+                        reason: judgeEscalated ? 'gate-judge-escalated' : 'gate-red',
                         agentId: agent.id,
                         taskId: payload.taskId,
                         runId: run.id,
                         dedupKey: payload.dedupKey,
                         gateStatus: gateOutcome.gateStatus,
+                        // Additive: the pass/fail gate had no verdict to
+                        // report, so nothing downstream reads this yet.
+                        gateVerdict,
                         gateAttempts,
                     };
                 }
