@@ -1,0 +1,176 @@
+name: Desktop App Build
+
+# Builds the Ever Works Desktop Electron app for Windows, macOS and Linux and
+# uploads the installers as workflow artifacts.
+#
+# Code signing (A11): certificates are read from repository secrets and mapped
+# to env vars by the `Resolve code signing` step below. When those secrets are
+# absent — which is always the case for forks and for pull requests from forks,
+# because GitHub does not expose secrets to them — `scripts/package-app.js`
+# degrades to an UNSIGNED build and prints a loud `::warning`. Packaging never
+# fails just because signing material is missing.
+#
+# Self-contained runtime (A7): `pnpm --filter ever-works-desktop bundle` stages
+# the built API + Next.js standalone server into `apps/desktop/bundle/`, which
+# electron-builder copies into `resources/app-bundle`. That is what makes an
+# installed app runnable without the developer's monorepo checkout. Staging the
+# payload requires a full platform build, so it runs on the Linux cell for
+# pushes and manual dispatches (and on every cell when explicitly requested) —
+# pull-request cells build the shell alone to keep PR feedback fast, and the
+# resulting app then reports that local-stack mode is unavailable.
+
+on:
+  push:
+    branches: [main, develop, stage]
+    paths:
+      - 'apps/desktop/**'
+      - '.github/workflows/desktop-build.yml'
+  pull_request:
+    branches: [main, develop, stage]
+    paths:
+      - 'apps/desktop/**'
+      - '.github/workflows/desktop-build.yml'
+  workflow_dispatch:
+    inputs:
+      bundle_runtime:
+        description: 'Stage the self-contained platform runtime into the installers (slow — full platform build on every OS)'
+        type: boolean
+        default: false
+        required: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  NODE_OPTIONS: --max-old-space-size=6144
+
+jobs:
+  build:
+    name: ${{ matrix.label }}
+    runs-on: ${{ matrix.runner }}
+
+    strategy:
+      # One red OS should not hide the state of the other two.
+      fail-fast: false
+      matrix:
+        include:
+          - label: linux
+            runner: ubuntu-latest
+            target: linux
+            artifacts: |
+              apps/desktop/release/*.AppImage
+              apps/desktop/release/*.deb
+          - label: windows
+            runner: windows-latest
+            target: win
+            artifacts: |
+              apps/desktop/release/*.exe
+          - label: macos
+            runner: macos-latest
+            target: mac
+            artifacts: |
+              apps/desktop/release/*.dmg
+              apps/desktop/release/*.zip
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v7
+        with:
+          ref: ${{ github.event.pull_request.head.sha || github.sha }}
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271 # v3
+        with:
+          version: 10.33.3
+
+      - name: Setup Node.js 22.x
+        uses: actions/setup-node@v7
+        with:
+          node-version: 22.x
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      # The repo does not allow-list `electron` in `onlyBuiltDependencies`, so
+      # its postinstall never runs and the platform binary is not downloaded.
+      # electron-builder needs it to package. Idempotent.
+      - name: Download the Electron binary
+        working-directory: apps/desktop
+        run: node node_modules/electron/install.js
+
+      - name: Build the desktop shell
+        run: pnpm --filter ever-works-desktop build
+
+      - name: Test the desktop shell
+        run: pnpm --filter ever-works-desktop test
+
+      # ---------------------------------------------------------------------
+      # Self-contained runtime payload (A7)
+      # ---------------------------------------------------------------------
+      - name: Decide whether to stage the platform runtime
+        id: bundle
+        shell: bash
+        run: |
+          if [ "${{ inputs.bundle_runtime }}" = "true" ]; then
+            echo "stage=true" >> "$GITHUB_OUTPUT"
+          elif [ "${{ github.event_name }}" != "pull_request" ] && [ "${{ matrix.target }}" = "linux" ]; then
+            # Cost gate: a full platform build per OS is expensive. Prove the
+            # bundled path on Linux for pushes; use the workflow_dispatch input
+            # to produce fully self-contained installers for all three.
+            echo "stage=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "stage=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      # `NEXT_BUILD_OUTPUT=standalone` makes the Next.js build emit the
+      # self-contained server the bundle ships (see apps/web/next.config.ts).
+      - name: Build the platform (API + standalone web)
+        if: steps.bundle.outputs.stage == 'true'
+        env:
+          NEXT_BUILD_OUTPUT: standalone
+        run: pnpm build
+
+      - name: Stage the self-contained runtime payload
+        if: steps.bundle.outputs.stage == 'true'
+        run: pnpm --filter ever-works-desktop bundle
+
+      - name: Write a placeholder runtime manifest
+        if: steps.bundle.outputs.stage != 'true'
+        run: pnpm --filter ever-works-desktop bundle:skip
+
+      # ---------------------------------------------------------------------
+      # Packaging + code signing (A11)
+      # ---------------------------------------------------------------------
+      # Secrets are passed as env vars, never as command arguments (arguments
+      # are visible in process listings). `scripts/package-app.js` decides what
+      # to do with them and prints only their NAMES when something is missing.
+      # Forks / PRs from forks receive empty strings here, which is the
+      # supported unsigned path.
+      - name: Package installers
+        working-directory: apps/desktop
+        env:
+          DESKTOP_WINDOWS_CERTIFICATE_BASE64: ${{ secrets.DESKTOP_WINDOWS_CERTIFICATE_BASE64 }}
+          DESKTOP_WINDOWS_CERTIFICATE_PASSWORD: ${{ secrets.DESKTOP_WINDOWS_CERTIFICATE_PASSWORD }}
+          DESKTOP_MACOS_CERTIFICATE_BASE64: ${{ secrets.DESKTOP_MACOS_CERTIFICATE_BASE64 }}
+          DESKTOP_MACOS_CERTIFICATE_PASSWORD: ${{ secrets.DESKTOP_MACOS_CERTIFICATE_PASSWORD }}
+          DESKTOP_APPLE_ID: ${{ secrets.DESKTOP_APPLE_ID }}
+          DESKTOP_APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.DESKTOP_APPLE_APP_SPECIFIC_PASSWORD }}
+          DESKTOP_APPLE_TEAM_ID: ${{ secrets.DESKTOP_APPLE_TEAM_ID }}
+        run: node scripts/package-app.js --os ${{ matrix.target }}
+
+      - name: List produced artifacts
+        shell: bash
+        run: ls -la apps/desktop/release || true
+
+      - name: Upload installers
+        uses: actions/upload-artifact@v4
+        with:
+          name: ever-works-desktop-${{ matrix.label }}
+          path: ${{ matrix.artifacts }}
+          if-no-files-found: error
+          retention-days: 14
