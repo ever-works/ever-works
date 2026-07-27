@@ -8,6 +8,34 @@ import type { IngestedEvent } from '../entities/ingested-event.entity';
 import { IngestedEventRepository } from './ingested-event.repository';
 import { WorkHintResolverService } from './work-hint-resolver.service';
 
+/**
+ * Kinds that resolve to a DEDICATED Activity action type instead of the
+ * generic `EXTERNAL_EVENT_INGESTED` (git activity ingestion, audit item
+ * j).
+ *
+ * Every other kind is unchanged: the map is consulted with a fallback,
+ * so a connector that never appears here produces byte-for-byte the row
+ * it produced before this map existed.
+ *
+ * Two things travel with a dedicated action type:
+ *
+ *   * the action type itself, so the feed can say "pushed 3 commits"
+ *     rather than "an external event landed"; and
+ *   * the envelope `payload` copied into `activity_log.details`, because
+ *     the routing block those rows are built from (repoFullName / ref /
+ *     sha / prNumber / taskId) is what a renderer needs and it is NOT in
+ *     the provenance `metadata` block. Generic ingested events keep
+ *     provenance-only metadata and a null `details`, exactly as before —
+ *     widening that for every connector would push arbitrary third-party
+ *     message text into the feed payload.
+ */
+export const INGEST_ACTIVITY_ACTION_BY_KIND: Readonly<Record<string, ActivityActionType>> =
+    Object.freeze({
+        'github.push': ActivityActionType.GIT_PUSHED,
+        'github.commit': ActivityActionType.GIT_COMMITTED,
+        'github.merge': ActivityActionType.GIT_MERGED,
+    });
+
 export interface IngestResult {
     /** New rows written. */
     inserted: number;
@@ -54,9 +82,10 @@ export interface IngestedEventKindProcessor {
  * `(source, sourceEventId)`); `processBatch()` — driven by the
  * `event-ingest-tick` cron — fans each unprocessed row out to:
  *
- *   1. Activity log (`EXTERNAL_EVENT_INGESTED`, provenance in
- *      `metadata` incl. `sourceUrl`) — REQUIRED: a failed write leaves
- *      the row unprocessed so the next tick retries it.
+ *   1. Activity log (`EXTERNAL_EVENT_INGESTED`, or the dedicated action
+ *      type in {@link INGEST_ACTIVITY_ACTION_BY_KIND} for git activity;
+ *      provenance in `metadata` incl. `sourceUrl`) — REQUIRED: a failed
+ *      write leaves the row unprocessed so the next tick retries it.
  *   2. Agent Memory via `AgentMemoryFacadeService.saveMemory` with
  *      provenance tags/metadata — BEST-EFFORT: no provider enabled or a
  *      provider error never fails the batch (mirrors
@@ -234,14 +263,19 @@ export class EventIngestService {
     }
 
     private async writeActivity(event: IngestedEvent): Promise<void> {
+        // Kinds with a dedicated action type (git activity) also carry
+        // their routing payload into `details`; everything else keeps the
+        // pre-existing generic row, provenance-only.
+        const dedicatedAction = INGEST_ACTIVITY_ACTION_BY_KIND[event.kind];
         await this.activityLogService.log(
             {
                 userId: event.userId,
                 ...(event.workId ? { workId: event.workId } : {}),
-                actionType: ActivityActionType.EXTERNAL_EVENT_INGESTED,
+                actionType: dedicatedAction ?? ActivityActionType.EXTERNAL_EVENT_INGESTED,
                 action: event.kind,
                 status: ActivityStatus.COMPLETED,
                 summary: this.summarize(event),
+                ...(dedicatedAction && event.payload ? { details: event.payload } : {}),
                 metadata: this.provenance(event),
             },
             // Feed orders by "when it happened", not "when the platform

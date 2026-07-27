@@ -67,6 +67,12 @@ describe('activity-log.types', () => {
             ['CHAT_CONVERSATION', 'chat_conversation'],
             // Community
             ['COMMUNITY_PR_MERGED', 'community_pr_merged'],
+            // Git activity ingestion (audit item j) — pushes, the commits
+            // inside them, and merged pull requests, landed by the GitHub
+            // receiver through the event-ingest spine.
+            ['GIT_PUSHED', 'git_pushed'],
+            ['GIT_COMMITTED', 'git_committed'],
+            ['GIT_MERGED', 'git_merged'],
         ];
 
         it.each(cases)('%s → %s', (key, value) => {
@@ -104,7 +110,9 @@ describe('activity-log.types', () => {
             const literals = Object.values(ActivityActionType).filter((v) => typeof v === 'string');
             // +1 EXTERNAL_EVENT_INGESTED (event-ingest spine, Wave 6) -> 116.
             // +2 task_merged / task_merge_refused (agent-merge path, #1874) -> 118.
-            expect(literals).toHaveLength(118);
+            // +3 git_pushed / git_committed / git_merged (git activity
+            //    ingestion, audit item j) -> 121.
+            expect(literals).toHaveLength(121);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {
