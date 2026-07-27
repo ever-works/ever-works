@@ -38,6 +38,7 @@ jest.mock('@ever-works/agent/database', () => ({
     AgentEmailAssignmentRepository: class AgentEmailAssignmentRepository {},
     TenantEmailAddressRepository: class TenantEmailAddressRepository {},
     NotificationChannelRepository: class NotificationChannelRepository {},
+    WorkRepository: class WorkRepository {},
 }));
 jest.mock('@ever-works/agent/facades', () => ({
     FacadesModule: class FacadesModule {},
@@ -84,6 +85,7 @@ jest.mock('@ever-works/agent/pr-review', () => ({
 jest.mock('@ever-works/agent/policy', () => ({
     PolicyModule: class PolicyModule {},
     MergePolicyService: class MergePolicyService {},
+    PullRequestGateService: class PullRequestGateService {},
 }));
 jest.mock('@ever-works/agent/services', () => ({
     WorkOwnershipService: class WorkOwnershipService {},
@@ -127,7 +129,14 @@ import {
     TaskReviewerRepository,
     TaskApproverRepository,
 } from '@ever-works/agent/tasks-domain';
-import { AgentRepository, AGENT_DOMAIN_TOOL_SOURCES } from '@ever-works/agent/agents';
+import {
+    AgentRepository,
+    AGENT_DOMAIN_TOOL_SOURCES,
+    AGENT_GIT_FACADE,
+} from '@ever-works/agent/agents';
+import { GitFacadeService } from '@ever-works/agent/facades';
+import { PullRequestGateService } from '@ever-works/agent/policy';
+import { WorkRepository } from '@ever-works/agent/database';
 
 type FactoryProvider = {
     provide?: unknown;
@@ -208,5 +217,79 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
             'prReview',
             'mergePolicy',
         ]);
+    });
+});
+
+/**
+ * Quality gates (audit W3 M3) — the `openPullRequest` Agent tool is one of
+ * the non-worker `createPullRequest` callers, so its adapter has to consult
+ * `PullRequestGateService`. These build the real factory with stubs and
+ * exercise the three outcomes.
+ */
+describe('api-side AgentsModule — AGENT_GIT_FACADE PR gate', () => {
+    type OpenPrFacade = {
+        openPullRequest: (input: Record<string, unknown>) => Promise<{ number: number }>;
+    };
+
+    const buildFacade = (gate: { assertAllowed: jest.Mock }, git: Record<string, jest.Mock>) => {
+        const factory = findProvider(AGENT_GIT_FACADE);
+        return factory?.useFactory?.(git, { findById: jest.fn() }, gate, {
+            findById: jest.fn().mockResolvedValue({ id: 'work-1', checksPolicy: 'required' }),
+        }) as OpenPrFacade;
+    };
+
+    const makeGit = () => ({
+        getRepoDir: jest.fn().mockResolvedValue('/tmp/work-1'),
+        createPullRequest: jest.fn().mockResolvedValue({ number: 12, url: 'https://pr/12' }),
+    });
+
+    it('injects the PR gate and the Work repository alongside the git facade', () => {
+        expect(findProvider(AGENT_GIT_FACADE)?.inject).toEqual([
+            GitFacadeService,
+            AgentRepository,
+            PullRequestGateService,
+            WorkRepository,
+        ]);
+    });
+
+    it('opens the PR when the gate allows it', async () => {
+        const git = makeGit();
+        const gate = { assertAllowed: jest.fn().mockResolvedValue({ allowed: true }) };
+        const facade = buildFacade(gate, git);
+
+        const pr = await facade.openPullRequest({
+            userId: 'u1',
+            agentId: 'a1',
+            workId: 'work-1',
+            title: 't',
+            body: 'b',
+            head: 'feature',
+        });
+
+        expect(gate.assertAllowed).toHaveBeenCalled();
+        expect(git.createPullRequest).toHaveBeenCalled();
+        expect(pr.number).toBe(12);
+    });
+
+    it('opens NO PR and surfaces the refusal when the gate fails', async () => {
+        const git = makeGit();
+        const gate = {
+            assertAllowed: jest
+                .fn()
+                .mockRejectedValue(new Error('Quality gate red — build (red).')),
+        };
+        const facade = buildFacade(gate, git);
+
+        await expect(
+            facade.openPullRequest({
+                userId: 'u1',
+                agentId: 'a1',
+                workId: 'work-1',
+                title: 't',
+                body: 'b',
+                head: 'feature',
+            }),
+        ).rejects.toThrow('Quality gate red');
+        expect(git.createPullRequest).not.toHaveBeenCalled();
     });
 });

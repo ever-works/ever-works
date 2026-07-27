@@ -53,7 +53,7 @@ describe('DataGeneratorModule', () => {
         expect(exports).toHaveLength(1);
     });
 
-    it('imports the documented 5 modules by name', () => {
+    it('imports the documented 6 modules by name', () => {
         const imports = meta('imports') as Array<{ name?: string }>;
         const names = imports.map((m) => m?.name);
         expect(names).toEqual(
@@ -63,9 +63,12 @@ describe('DataGeneratorModule', () => {
                 'DatabaseModule',
                 'WorkOperationsModule',
                 'CategoryIconModule',
+                // Quality gates (audit W3 M3) — supplies PullRequestGateService.
+                // Dropping it silently un-gates both generation PRs.
+                'PolicyModule',
             ]),
         );
-        expect(imports).toHaveLength(5);
+        expect(imports).toHaveLength(6);
     });
 });
 

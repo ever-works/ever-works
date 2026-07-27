@@ -34,7 +34,7 @@ describe('MarkdownGeneratorModule', () => {
         expect(exports).toContain(MarkdownGeneratorService);
     });
 
-    it('imports DataGenerator / Facades / Database / WorkOperations modules by name', () => {
+    it('imports DataGenerator / Facades / Database / WorkOperations / Policy modules by name', () => {
         const imports = getModuleMetadata('imports');
         const names = imports.map((mod: any) => mod?.name);
         expect(names).toEqual(
@@ -43,14 +43,17 @@ describe('MarkdownGeneratorModule', () => {
                 'FacadesModule',
                 'DatabaseModule',
                 'WorkOperationsModule',
+                // Quality gates (audit W3 M3) — supplies PullRequestGateService.
+                // Dropping it silently un-gates the markdown sync PR.
+                'PolicyModule',
             ]),
         );
     });
 
-    it('keeps the imports list at the documented 4-module shape', () => {
+    it('keeps the imports list at the documented 5-module shape', () => {
         const imports = getModuleMetadata('imports');
         // Pin the count so a future silent extra-import is a deliberate change.
-        expect(imports).toHaveLength(4);
+        expect(imports).toHaveLength(5);
     });
 });
 

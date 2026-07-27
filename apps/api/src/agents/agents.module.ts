@@ -29,6 +29,7 @@ import {
     AgentEmailAssignmentRepository,
     TenantEmailAddressRepository,
     NotificationChannelRepository,
+    WorkRepository,
 } from '@ever-works/agent/database';
 import { NotificationChannelFacadeService } from '@ever-works/agent/facades';
 import { EmailModule } from '../email/email.module';
@@ -74,7 +75,7 @@ import { DigestModule, DigestService } from '@ever-works/agent/digest';
 import { MeetingsModule, MeetingRepository } from '@ever-works/agent/meetings';
 import { FleetModule, FleetService } from '@ever-works/agent/fleet';
 import { PrReviewModule, PrReviewService } from '@ever-works/agent/pr-review';
-import { PolicyModule, MergePolicyService } from '@ever-works/agent/policy';
+import { PolicyModule, MergePolicyService, PullRequestGateService } from '@ever-works/agent/policy';
 import { WorkOwnershipService } from '@ever-works/agent/services';
 import {
     FacadesModule,
@@ -453,8 +454,17 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
         // (see docs/specs/features/email-providers/spec.md).
         {
             provide: AGENT_GIT_FACADE,
-            inject: [GitFacadeService, AgentRepository],
-            useFactory: (git: GitFacadeService, agents: AgentRepository): AgentGitFacade => ({
+            // Quality gates (audit W3 M3) — `PullRequestGateService` +
+            // `WorkRepository` are APPENDED so `openPullRequest` can ask the
+            // Work's checks policy before it opens anything. Appending keeps
+            // the existing positional factory arguments untouched.
+            inject: [GitFacadeService, AgentRepository, PullRequestGateService, WorkRepository],
+            useFactory: (
+                git: GitFacadeService,
+                agents: AgentRepository,
+                prGate: PullRequestGateService,
+                works: WorkRepository,
+            ): AgentGitFacade => ({
                 async commitToRepo({ userId, agentId, workId, message, files, branch }) {
                     const agent = await agents.findById(agentId);
                     if (!agent) {
@@ -541,6 +551,29 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                 async openPullRequest({ userId, agentId, workId, title, body, head, base, draft }) {
                     void agentId;
                     const providerId = 'github';
+                    // Quality gates (audit W3 M3) — "a red check opens no PR"
+                    // holds for the Agent tool too. `assertAllowed` THROWS on
+                    // a refusal, which is the right shape here: the tool's
+                    // contract is "return a pull request", so the refusal
+                    // (and its reason) reaches the model instead of a
+                    // fabricated success. A Work with the default
+                    // `checksPolicy: 'off'` short-circuits before any
+                    // subprocess or checkout resolution.
+                    const work = await works.findById(workId);
+                    const gateCwd = work
+                        ? await git
+                              .getRepoDir('work', workId, {
+                                  userId,
+                                  workId,
+                                  providerId,
+                              } as any)
+                              .catch(() => null)
+                        : null;
+                    await prGate.assertAllowed({
+                        work,
+                        cwd: gateCwd,
+                        context: `agent-tool openPullRequest work=${workId}`,
+                    });
                     const pr = await git.createPullRequest(
                         {
                             owner: '',

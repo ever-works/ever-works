@@ -7,7 +7,13 @@ import { WorkOperationsModule } from '@src/work-operations';
 import { WorksConfigService } from '@src/works-config/services/works-config.service';
 import { WorksConfigWriterService } from '@src/works-config/services/works-config-writer.service';
 import { CategoryIconModule } from '../../services/category-icon/category-icon.module';
+import { PolicyModule } from '../../policy/policy.module';
 
+/**
+ * `PolicyModule` is imported for `PullRequestGateService` (audit W3 M3):
+ * both the update-mode generation PR and the source-sync PR must consult
+ * the Work's quality gate before they are opened.
+ */
 @Module({
     imports: [
         FacadesModule,
@@ -15,6 +21,7 @@ import { CategoryIconModule } from '../../services/category-icon/category-icon.m
         DatabaseModule,
         WorkOperationsModule,
         CategoryIconModule,
+        PolicyModule,
     ],
     providers: [DataGeneratorService, WorksConfigService, WorksConfigWriterService],
     exports: [DataGeneratorService],

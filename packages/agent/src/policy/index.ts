@@ -7,5 +7,8 @@ export * from './merge-policy';
 export * from './merge-policy.enforcer';
 export * from './merge-policy.repository';
 export * from './merge-policy.service';
+// Quality gates — the PR gate every non-worker `createPullRequest` caller
+// routes through (audit W3 M3).
+export * from './pull-request-gate.service';
 export * from './agent-merge-policy-tools';
 export * from './policy.module';

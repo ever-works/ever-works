@@ -134,21 +134,25 @@ describe('ItemsGeneratorModule + barrel re-exports', () => {
             expect(exports).toHaveLength(4);
         });
 
-        it('imports DatabaseModule, FacadesModule, and PipelineModule (by name)', () => {
+        it('imports DatabaseModule, FacadesModule, PipelineModule and PolicyModule (by name)', () => {
             const imports = getMeta('imports');
             const importNames = imports.map((m: any) => m?.name ?? String(m));
             expect(importNames).toContain('DatabaseModule');
             expect(importNames).toContain('FacadesModule');
             expect(importNames).toContain('PipelineModule');
+            // Quality gates (audit W3 M3): both PR-opening services here
+            // consult `PullRequestGateService`, which PolicyModule exports.
+            // Dropping this import silently un-gates every item PR.
+            expect(importNames).toContain('PolicyModule');
         });
 
         it('does NOT import PluginsModule, ItemsGeneratorPipelineModule, or other indirect deps directly (kept thin)', () => {
             const imports = getMeta('imports');
             const importNames = imports.map((m: any) => m?.name ?? String(m));
-            // Pinning the explicit dependency surface — three modules.
+            // Pinning the explicit dependency surface — four modules.
             // Adding more imports here MUST be a deliberate change because
             // it grows the cold-start dependency graph for every consumer.
-            expect(imports).toHaveLength(3);
+            expect(imports).toHaveLength(4);
             expect(importNames).not.toContain('PluginsModule');
             expect(importNames).not.toContain('PipelineOrchestratorModule');
         });

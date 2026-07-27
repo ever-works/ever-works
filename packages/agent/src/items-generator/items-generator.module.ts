@@ -6,6 +6,7 @@ import { ItemImportExecutorService } from './item-import-executor.service';
 import { DatabaseModule } from '../database/database.module';
 import { FacadesModule } from '../facades/facades.module';
 import { PipelineModule } from '../pipeline/pipeline.module';
+import { PolicyModule } from '../policy/policy.module';
 
 /**
  * Items Generator Module
@@ -16,9 +17,14 @@ import { PipelineModule } from '../pipeline/pipeline.module';
  *  - ItemExportService           — CSV/Excel bulk export (EW-533 Phase 1)
  *  - ItemImportService           — CSV/Excel parse + validate (EW-533 Phase 2)
  *  - ItemImportExecutorService   — CSV/Excel bulk write + PR (EW-533 Phase 3)
+ *
+ * `PolicyModule` is imported for `PullRequestGateService` (audit W3 M3):
+ * both PR-opening services here route through the Work's quality gate. It
+ * is a deliberately leaf module (four entities, no service graph), so this
+ * costs the cold-start dependency graph almost nothing.
  */
 @Module({
-    imports: [DatabaseModule, FacadesModule, PipelineModule],
+    imports: [DatabaseModule, FacadesModule, PipelineModule, PolicyModule],
     providers: [
         ItemSubmissionService,
         ItemExportService,
