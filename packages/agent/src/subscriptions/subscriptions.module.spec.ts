@@ -9,7 +9,11 @@ import {
     ManualBillingProvider,
 } from './billing/billing.provider';
 import { StripeBillingProvider, STRIPE_METADATA_KEYS } from './billing/stripe-billing.provider';
-import { BillingService, UnknownCreditPackError } from './billing/billing.service';
+import {
+    BillingService,
+    NoActiveSubscriptionError,
+    UnknownCreditPackError,
+} from './billing/billing.service';
 import { AutoRechargeService } from './billing/auto-recharge.service';
 import {
     CheckoutSessionNotFoundError,
@@ -84,6 +88,9 @@ describe('SubscriptionsModule + barrel re-exports', () => {
             expect(subscriptionsBarrel.StripeBillingProvider).toBe(StripeBillingProvider);
             expect(subscriptionsBarrel.CREDIT_PACKS).toBe(CREDIT_PACKS);
             expect(subscriptionsBarrel.UnknownCreditPackError).toBe(UnknownCreditPackError);
+            // Subscription lifecycle (audit B07/B08) — cancel/resume and
+            // the portal recovery action map this to a 409 at the API.
+            expect(subscriptionsBarrel.NoActiveSubscriptionError).toBe(NoActiveSubscriptionError);
             expect(subscriptionsBarrel.BillingProviderNotConfiguredError).toBe(
                 BillingProviderNotConfiguredError,
             );
@@ -124,6 +131,8 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                     'BillingService',
                     'BILLING_PAYMENT_REF_TYPE',
                     'UnknownCreditPackError',
+                    // Subscription lifecycle (audit B07/B08)
+                    'NoActiveSubscriptionError',
                     'AutoRechargeService',
                     // Paid-plan purchase (audit B24)
                     'PlanSubscriptionService',

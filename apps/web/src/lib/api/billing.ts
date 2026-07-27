@@ -2,18 +2,22 @@ import 'server-only';
 import { serverFetch } from './server-api';
 import type {
     BillingOverview,
+    BillingPortalResponse,
     CreditCheckoutResponse,
     InvoiceListPage,
     PlanCheckoutResponse,
     PlanCheckoutReturnResponse,
+    SubscriptionMutationResponse,
 } from './billing.shared';
 
 export type {
     BillingOverview,
+    BillingPortalResponse,
     CreditCheckoutResponse,
     InvoiceListPage,
     PlanCheckoutResponse,
     PlanCheckoutReturnResponse,
+    SubscriptionMutationResponse,
 };
 
 /**
@@ -77,6 +81,23 @@ export const billingAPI = {
     },
 
     /**
+     * Schedule an at-period-end cancellation (audit B07). No body: the
+     * subscription is resolved server-side from the session user.
+     */
+    async cancelSubscription(): Promise<SubscriptionMutationResponse> {
+        return serverFetch<SubscriptionMutationResponse>('/billing/subscription/cancel', {
+            method: 'POST',
+        });
+    },
+
+    /** Clear a pending at-period-end cancellation (audit B07). */
+    async resumeSubscription(): Promise<SubscriptionMutationResponse> {
+        return serverFetch<SubscriptionMutationResponse>('/billing/subscription/resume', {
+            method: 'POST',
+        });
+    },
+
+    /**
      * Finalize the browser's return from a plan checkout so the new tier
      * shows immediately. The webhook is still the authority; this call is
      * idempotent and scoped to the session user by the API.
@@ -87,6 +108,14 @@ export const billingAPI = {
             `/billing/checkout/plan/return?${search.toString()}`,
             { method: 'GET' },
         );
+    },
+
+    /**
+     * Hosted portal redirect — the PAST_DUE recovery action (audit B08).
+     * The return URL is built by the API from its own WEB_URL.
+     */
+    async billingPortal(): Promise<BillingPortalResponse> {
+        return serverFetch<BillingPortalResponse>('/billing/portal', { method: 'POST' });
     },
 
     /** Enable/disable threshold-triggered top-ups. */

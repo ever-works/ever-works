@@ -78,6 +78,13 @@ export interface PlanCheckoutReturn {
 export type PlanWebhookAction =
     | 'subscription-activated'
     | 'subscription-canceled'
+    /**
+     * A lifecycle snapshot was accepted (audit B07/B08) — dunning, pause,
+     * resume or a period roll. Distinct from activated/canceled because
+     * it changes NEITHER: the tier is untouched and only the billing
+     * profile's view of the subscription moves.
+     */
+    | 'subscription-reconciled'
     | 'ignored'
     | 'unattributed';
 
@@ -252,8 +259,34 @@ export class PlanSubscriptionService {
             return activated ? 'subscription-activated' : 'ignored';
         }
 
-        const canceled = await this.cancel(userId, event.subscriptionId ?? null);
-        return canceled ? 'subscription-canceled' : 'ignored';
+        if (event.kind === 'subscription.canceled') {
+            const canceled = await this.cancel(userId, event.subscriptionId ?? null);
+            return canceled ? 'subscription-canceled' : 'ignored';
+        }
+
+        // `subscription.updated` (audit B07/B08) is a LIFECYCLE SNAPSHOT —
+        // dunning, pause, resume, a period roll. It deliberately does NOT
+        // grant and does NOT revoke: the grant is `subscription.activated`
+        // and the revoke is `subscription.canceled`, both of which the
+        // provider emits alongside this. Reconciling the snapshot is the
+        // billing profile's job, not the tier's.
+        if (event.kind === 'subscription.updated') {
+            return 'subscription-reconciled';
+        }
+
+        // Any OTHER kind is acknowledged, never acted on.
+        //
+        // This branch used to be a bare fallthrough to `cancel()`, which
+        // meant every kind that was not `subscription.activated` revoked
+        // the plan. That was safe only while the union had exactly two
+        // members; the moment a third arrived (this change), a `past_due`
+        // or `paused` delivery would have silently downgraded a paying
+        // customer. Revoking is now something only an explicit
+        // `subscription.canceled` can do.
+        this.logger.warn(
+            `Billing webhook ${event.id}: unhandled subscription kind '${event.kind}' — acknowledged without changing the plan`,
+        );
+        return 'ignored';
     }
 
     // ── Persistence ──────────────────────────────────────────────────

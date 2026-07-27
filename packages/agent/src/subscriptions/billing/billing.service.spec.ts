@@ -1,9 +1,14 @@
 import {
     BillingService,
+    NoActiveSubscriptionError,
     UnknownCreditPackError,
     BILLING_PAYMENT_REF_TYPE,
 } from './billing.service';
-import { BillingProviderNotConfiguredError, type BillingWebhookEvent } from './billing.provider';
+import {
+    BillingProviderNotConfiguredError,
+    type BillingSubscriptionSnapshot,
+    type BillingWebhookEvent,
+} from './billing.provider';
 import { CreditLedgerKind } from '@src/entities/credit-ledger-entry.entity';
 
 /**
@@ -32,6 +37,24 @@ function makeProvider(overrides: Record<string, unknown> = {}) {
         }),
         chargeOffSession: jest.fn(),
         verifyAndParseWebhook: jest.fn(),
+        // Subscription lifecycle (audit B07/B08).
+        cancelSubscriptionAtPeriodEnd: jest.fn().mockResolvedValue({
+            subscriptionId: 'sub_1',
+            status: 'active',
+            cancelAtPeriodEnd: true,
+            currentPeriodEnd: new Date('2026-08-01T00:00:00Z'),
+            canceledAt: null,
+        }),
+        resumeSubscription: jest.fn().mockResolvedValue({
+            subscriptionId: 'sub_1',
+            status: 'active',
+            cancelAtPeriodEnd: false,
+            currentPeriodEnd: new Date('2026-08-01T00:00:00Z'),
+            canceledAt: null,
+        }),
+        createBillingPortalSession: jest
+            .fn()
+            .mockResolvedValue({ url: 'https://pay.example/portal/bps_1' }),
         ...overrides,
     } as any;
 }
@@ -45,6 +68,14 @@ function makeProfileRepository(profile: any = null, overrides: Record<string, un
             .mockResolvedValue(profile ?? { userId: 'u1', providerCustomerId: 'cus_1' }),
         updatePaymentMethod: jest.fn().mockResolvedValue(profile),
         updateAutoRecharge: jest.fn().mockResolvedValue(profile),
+        // Last-write-wins projection of the provider's lifecycle state.
+        updateSubscriptionState: jest
+            .fn()
+            .mockImplementation(async (_userId: string, state: any) => ({
+                ...(profile ?? {}),
+                ...state,
+                subscriptionCanceledAt: state.subscriptionCanceledAt ?? null,
+            })),
         claimAutoRechargeSlot: jest.fn().mockResolvedValue(true),
         releaseAutoRechargeSlot: jest.fn().mockResolvedValue(undefined),
         recordAutoRechargeFailure: jest.fn().mockResolvedValue(undefined),
@@ -737,5 +768,312 @@ describe('handleWebhook — paid-plan lifecycle is delegated, not duplicated (au
         // A 5xx here would make the provider retry a delivery we can
         // never resolve.
         expect((await service.handleWebhook('{}', 'sig')).action).toBe('ignored');
+    });
+});
+
+/**
+ * Subscription lifecycle (audit B07/B08).
+ *
+ * B07 — the page could start a subscription but not manage one: no
+ * cancel path and no `cancelAtPeriodEnd` state. B08 — the status chip
+ * was hardcoded to "active" and nothing surfaced a failed collection.
+ *
+ * What these pin: cancel goes through the SEAM and persists the flag;
+ * resume clears it; a past-due webhook flips the persisted status; and
+ * every lifecycle call is owner-scoped so a caller can never reach
+ * another account's (or another org's) subscription.
+ */
+
+/** An owner on a paid plan, org-scoped, with a live provider subscription. */
+const SUBSCRIBED_PROFILE = {
+    ...PROFILE,
+    organizationId: 'org-a',
+    providerSubscriptionId: 'sub_1',
+    subscriptionStatus: 'active',
+    cancelAtPeriodEnd: false,
+    currentPeriodEnd: new Date('2026-08-01T00:00:00Z'),
+    subscriptionCanceledAt: null,
+};
+
+describe('BillingService — subscription cancel / resume (B07)', () => {
+    it('cancels AT PERIOD END through the provider seam and persists the flag', async () => {
+        const profiles = makeProfileRepository(SUBSCRIBED_PROFILE);
+        const { service, provider } = build({ profiles });
+
+        const state = await service.cancelSubscription('u1');
+
+        expect(provider.cancelSubscriptionAtPeriodEnd).toHaveBeenCalledWith({
+            subscriptionId: 'sub_1',
+        });
+        // The persisted row is what the UI reads back.
+        expect(profiles.updateSubscriptionState).toHaveBeenCalledWith(
+            'u1',
+            expect.objectContaining({
+                providerSubscriptionId: 'sub_1',
+                subscriptionStatus: 'active',
+                cancelAtPeriodEnd: true,
+                currentPeriodEnd: new Date('2026-08-01T00:00:00Z'),
+            }),
+        );
+        expect(state.cancelAtPeriodEnd).toBe(true);
+        expect(state.status).toBe('active');
+        expect(state.manageable).toBe(true);
+    });
+
+    it('keeps the paid period the owner already bought', async () => {
+        const profiles = makeProfileRepository(SUBSCRIBED_PROFILE);
+        const { service } = build({ profiles });
+
+        const state = await service.cancelSubscription('u1');
+
+        // At-period-end, not immediate: the plan is still `active` and
+        // the period end is preserved so the UI can say when it stops.
+        expect(state.status).toBe('active');
+        expect(state.currentPeriodEnd).toEqual(new Date('2026-08-01T00:00:00Z'));
+        expect(state.canceledAt).toBeNull();
+    });
+
+    it('resume clears the pending cancellation', async () => {
+        const profiles = makeProfileRepository({
+            ...SUBSCRIBED_PROFILE,
+            cancelAtPeriodEnd: true,
+        });
+        const { service, provider } = build({ profiles });
+
+        const state = await service.resumeSubscription('u1');
+
+        expect(provider.resumeSubscription).toHaveBeenCalledWith({ subscriptionId: 'sub_1' });
+        expect(state.cancelAtPeriodEnd).toBe(false);
+        expect(profiles.updateSubscriptionState).toHaveBeenCalledWith(
+            'u1',
+            expect.objectContaining({ cancelAtPeriodEnd: false }),
+        );
+    });
+
+    it('refuses to resume a subscription that has already ended', async () => {
+        const profiles = makeProfileRepository({
+            ...SUBSCRIBED_PROFILE,
+            subscriptionStatus: 'canceled',
+            cancelAtPeriodEnd: false,
+        });
+        const { service, provider } = build({ profiles });
+
+        await expect(service.resumeSubscription('u1')).rejects.toBeInstanceOf(
+            NoActiveSubscriptionError,
+        );
+        expect(provider.resumeSubscription).not.toHaveBeenCalled();
+    });
+
+    it('refuses cancel when the owner has no provider subscription', async () => {
+        // A free-tier profile: customer mapping only, no subscription id.
+        const profiles = makeProfileRepository(PROFILE);
+        const { service, provider } = build({ profiles });
+
+        await expect(service.cancelSubscription('u1')).rejects.toBeInstanceOf(
+            NoActiveSubscriptionError,
+        );
+        expect(provider.cancelSubscriptionAtPeriodEnd).not.toHaveBeenCalled();
+        expect(profiles.updateSubscriptionState).not.toHaveBeenCalled();
+    });
+
+    it('fails closed when the payment provider is not configured', async () => {
+        const profiles = makeProfileRepository(SUBSCRIBED_PROFILE);
+        const provider = makeProvider({ isConfigured: jest.fn().mockReturnValue(false) });
+        const { service } = build({ provider, profiles });
+
+        await expect(service.cancelSubscription('u1')).rejects.toBeInstanceOf(
+            BillingProviderNotConfiguredError,
+        );
+        expect(provider.cancelSubscriptionAtPeriodEnd).not.toHaveBeenCalled();
+    });
+});
+
+describe('BillingService — subscription lifecycle is owner/org scoped', () => {
+    it('resolves the subscription from the CALLER, never a supplied id', async () => {
+        const profiles = makeProfileRepository(SUBSCRIBED_PROFILE);
+        const { service } = build({ profiles });
+
+        await service.cancelSubscription('u1');
+
+        // The only input that reaches the lookup is the caller's user id.
+        expect(profiles.findByUserId).toHaveBeenCalledWith('u1');
+    });
+
+    it('refuses a caller from another org: they simply have no subscription', async () => {
+        // User `u2` (org-b) has no billing profile at all; `u1` (org-a)
+        // owns the only subscription in the system.
+        const profiles = makeProfileRepository(null, {
+            findByUserId: jest.fn().mockResolvedValue(null),
+        });
+        const { service, provider } = build({ profiles });
+
+        await expect(service.cancelSubscription('u2')).rejects.toBeInstanceOf(
+            NoActiveSubscriptionError,
+        );
+        // Nothing was cancelled anywhere — u1's subscription is untouched.
+        expect(provider.cancelSubscriptionAtPeriodEnd).not.toHaveBeenCalled();
+        expect(profiles.updateSubscriptionState).not.toHaveBeenCalled();
+    });
+
+    it('refuses to mutate a row belonging to a different owner/org', async () => {
+        // Defence in depth: even if the lookup ever handed back another
+        // org's row, the ownership re-check stops the mutation.
+        const profiles = makeProfileRepository(null, {
+            findByUserId: jest.fn().mockResolvedValue(SUBSCRIBED_PROFILE),
+        });
+        const { service, provider } = build({ profiles });
+
+        await expect(service.cancelSubscription('u2')).rejects.toBeInstanceOf(
+            NoActiveSubscriptionError,
+        );
+        expect(provider.cancelSubscriptionAtPeriodEnd).not.toHaveBeenCalled();
+    });
+
+    it('refuses a portal session for a foreign billing account', async () => {
+        const profiles = makeProfileRepository(null, {
+            findByUserId: jest.fn().mockResolvedValue(SUBSCRIBED_PROFILE),
+        });
+        const { service, provider } = build({ profiles });
+
+        await expect(
+            service.createBillingPortalSession('u2', 'https://app.test/settings/billing'),
+        ).rejects.toBeInstanceOf(NoActiveSubscriptionError);
+        expect(provider.createBillingPortalSession).not.toHaveBeenCalled();
+    });
+
+    it('opens the portal for the caller’s own customer (the past-due recovery action)', async () => {
+        const profiles = makeProfileRepository(SUBSCRIBED_PROFILE);
+        const { service, provider } = build({ profiles });
+
+        const session = await service.createBillingPortalSession(
+            'u1',
+            'https://app.test/settings/billing',
+        );
+
+        expect(provider.createBillingPortalSession).toHaveBeenCalledWith({
+            customerId: 'cus_1',
+            returnUrl: 'https://app.test/settings/billing',
+        });
+        expect(session.url).toBe('https://pay.example/portal/bps_1');
+    });
+});
+
+describe('BillingService — subscription webhook reconciliation (B08)', () => {
+    function subscriptionEvent(snapshot: Partial<BillingSubscriptionSnapshot> = {}) {
+        return event({
+            id: 'evt_sub',
+            kind: 'subscription.updated',
+            customerId: 'cus_1',
+            providerType: 'customer.subscription.updated',
+            subscription: {
+                subscriptionId: 'sub_1',
+                status: 'active',
+                cancelAtPeriodEnd: false,
+                currentPeriodEnd: new Date('2026-08-01T00:00:00Z'),
+                canceledAt: null,
+                ...snapshot,
+            },
+        });
+    }
+
+    it('a past-due delivery flips the persisted status', async () => {
+        const profiles = makeProfileRepository(SUBSCRIBED_PROFILE);
+        const provider = makeProvider({
+            verifyAndParseWebhook: jest
+                .fn()
+                .mockResolvedValue(subscriptionEvent({ status: 'past_due' })),
+        });
+        const { service } = build({ provider, profiles });
+
+        const outcome = await service.handleWebhook('{}', 'sig');
+
+        expect(outcome.action).toBe('subscription-reconciled');
+        expect(profiles.updateSubscriptionState).toHaveBeenCalledWith(
+            'u1',
+            expect.objectContaining({ subscriptionStatus: 'past_due' }),
+        );
+    });
+
+    it('the overview then reports pastDue so the banner renders', async () => {
+        const profiles = makeProfileRepository({
+            ...SUBSCRIBED_PROFILE,
+            subscriptionStatus: 'past_due',
+        });
+        const { service } = build({ profiles });
+
+        const overview = await service.getOverview('u1');
+
+        expect(overview.subscription.status).toBe('past_due');
+        expect(overview.subscription.pastDue).toBe(true);
+        expect(overview.subscription.manageable).toBe(true);
+    });
+
+    it('reconciles an out-of-band cancellation made in the provider’s portal', async () => {
+        const profiles = makeProfileRepository(SUBSCRIBED_PROFILE);
+        const provider = makeProvider({
+            verifyAndParseWebhook: jest.fn().mockResolvedValue(
+                subscriptionEvent({
+                    status: 'canceled',
+                    cancelAtPeriodEnd: false,
+                    canceledAt: new Date('2026-07-20T00:00:00Z'),
+                }),
+            ),
+        });
+        const { service } = build({ provider, profiles });
+
+        await service.handleWebhook('{}', 'sig');
+
+        expect(profiles.updateSubscriptionState).toHaveBeenCalledWith(
+            'u1',
+            expect.objectContaining({
+                subscriptionStatus: 'canceled',
+                subscriptionCanceledAt: new Date('2026-07-20T00:00:00Z'),
+            }),
+        );
+    });
+
+    it('is replay-safe: a re-delivered event writes the same state', async () => {
+        const profiles = makeProfileRepository(SUBSCRIBED_PROFILE);
+        const provider = makeProvider({
+            verifyAndParseWebhook: jest
+                .fn()
+                .mockResolvedValue(subscriptionEvent({ cancelAtPeriodEnd: true })),
+        });
+        const { service } = build({ provider, profiles });
+
+        await service.handleWebhook('{}', 'sig');
+        await service.handleWebhook('{}', 'sig');
+
+        const writes = profiles.updateSubscriptionState.mock.calls.map(
+            (call: unknown[]) => call[1],
+        );
+        expect(writes[0]).toEqual(writes[1]);
+    });
+
+    it('acknowledges a subscription event it cannot attribute', async () => {
+        const profiles = makeProfileRepository(null, {
+            findByCustomerId: jest.fn().mockResolvedValue(null),
+            findByUserId: jest.fn().mockResolvedValue(null),
+        });
+        const provider = makeProvider({
+            verifyAndParseWebhook: jest.fn().mockResolvedValue(subscriptionEvent({})),
+        });
+        const { service } = build({ provider, profiles });
+
+        const outcome = await service.handleWebhook('{}', 'sig');
+
+        expect(outcome.action).toBe('unattributed');
+        expect(profiles.updateSubscriptionState).not.toHaveBeenCalled();
+    });
+
+    it('an account with no provider subscription reads as `none`, not `active`', async () => {
+        const profiles = makeProfileRepository(PROFILE);
+        const { service } = build({ profiles });
+
+        const overview = await service.getOverview('u1');
+
+        expect(overview.subscription.status).toBe('none');
+        expect(overview.subscription.manageable).toBe(false);
+        expect(overview.subscription.pastDue).toBe(false);
     });
 });

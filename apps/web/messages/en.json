@@ -2506,7 +2506,30 @@
                 "loadError": "Some billing data could not be loaded. Refresh the page to try again.",
                 "currentPlan": {
                     "title": "Current plan",
-                    "statusActive": "Active"
+                    "statusActive": "Active",
+                    "statuses": {
+                        "trialing": "Trial",
+                        "past_due": "Past due",
+                        "unpaid": "Unpaid",
+                        "paused": "Paused",
+                        "canceled": "Canceled",
+                        "incomplete": "Incomplete",
+                        "incomplete_expired": "Expired"
+                    },
+                    "cancel": "Cancel subscription",
+                    "cancelSuccess": "Your subscription will end at the end of the current period.",
+                    "cancelError": "Failed to cancel the subscription.",
+                    "cancelScheduled": "Your subscription ends at the end of the current period.",
+                    "cancelScheduledOn": "Your subscription ends on {date}.",
+                    "resume": "Resume subscription",
+                    "resumeSuccess": "Your subscription will continue as normal.",
+                    "resumeError": "Failed to resume the subscription."
+                },
+                "pastDue": {
+                    "title": "We could not collect your latest payment",
+                    "body": "Update your payment method to keep your plan active. Your card details are handled by the payment provider.",
+                    "action": "Update payment method",
+                    "error": "Could not open the billing portal."
                 },
                 "plans": {
                     "title": "Plans",

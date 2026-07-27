@@ -379,6 +379,38 @@ describe('applyWebhook — activation and revocation', () => {
         };
     }
 
+    /**
+     * REGRESSION (audit B07/B08). `applyWebhook` used to be
+     * `if (activated) {…} else { cancel() }` — a bare fallthrough that was
+     * only safe while the kind union had exactly two members. Adding
+     * `subscription.updated` for the lifecycle made every dunning, pause
+     * and resume delivery land in the else-branch, which would have
+     * silently downgraded a PAYING customer. Revoking is now something
+     * only an explicit `subscription.canceled` can do.
+     */
+    it.each([
+        // The real third member: a lifecycle snapshot.
+        ['subscription.updated', 'subscription-reconciled'],
+        // A kind this service has never heard of. Cast deliberately —
+        // the whole point is to simulate a FUTURE union member reaching a
+        // build of this service that predates it, which is exactly how the
+        // old fallthrough would have started revoking plans.
+        ['subscription.trial_ending', 'ignored'],
+    ])('a %s delivery never revokes the plan', async (kind, expected) => {
+        const { service, subscriptionService } = build({
+            profileRepository: makeProfileRepository({
+                findByCustomerId: jest.fn().mockResolvedValue({ userId: 'u1' }),
+            }),
+        });
+
+        await expect(
+            service.applyWebhook(event({ kind: kind as BillingWebhookEvent['kind'] })),
+        ).resolves.toBe(expected);
+        // Granting is `assignPlanToUser`; revoking is `cancel()`, which
+        // reaches the subscription repository. Neither may happen here.
+        expect(subscriptionService.assignPlanToUser).not.toHaveBeenCalled();
+    });
+
     it('activates the plan, attributing by provider customer id', async () => {
         const { service, subscriptionService, profileRepository } = build({
             profileRepository: makeProfileRepository({

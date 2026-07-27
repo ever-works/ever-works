@@ -6,13 +6,20 @@
 import { describe, expect, it } from 'vitest';
 import {
     canBuyCredits,
+    canCancelSubscription,
     canConfigureAutoRecharge,
+    canResumeSubscription,
     canUpgradePlan,
     formatCardExpiry,
     formatPaymentMethod,
     invoiceStatusTone,
+    isSubscriptionPastDue,
     packBonusPercent,
+    subscriptionState,
+    subscriptionStatusLabelKey,
+    subscriptionStatusTone,
     type BillingOverview,
+    type SubscriptionState,
 } from './billing.shared';
 
 function overview(partial: Partial<BillingOverview> = {}): BillingOverview {
@@ -25,6 +32,19 @@ function overview(partial: Partial<BillingOverview> = {}): BillingOverview {
         balanceCredits: 0,
         paymentMethod: null,
         autoRecharge: { enabled: false, thresholdCredits: null, packId: null, failureCount: 0 },
+        ...partial,
+    };
+}
+
+/** A live, manageable subscription unless a test says otherwise. */
+function subscription(partial: Partial<SubscriptionState> = {}): SubscriptionState {
+    return {
+        status: 'active',
+        cancelAtPeriodEnd: false,
+        currentPeriodEnd: '2026-08-01T00:00:00.000Z',
+        canceledAt: null,
+        pastDue: false,
+        manageable: true,
         ...partial,
     };
 }
@@ -142,5 +162,125 @@ describe('canUpgradePlan — a tier is only sellable when it can also be applied
 
     it('is true only when all three gates pass', () => {
         expect(canUpgradePlan(configured, true, true)).toBe(true);
+    });
+});
+
+/**
+ * Subscription lifecycle (audit B07/B08). These helpers ARE the UI rule:
+ * which chip renders, whether the past-due banner shows, and whether the
+ * page offers cancel or resume. Pinning them here keeps the JSX free of
+ * untested conditionals.
+ */
+describe('subscriptionState — a missing block never crashes the page', () => {
+    it('falls back to `none` when the API omitted the subscription', () => {
+        expect(subscriptionState(overview())).toEqual({
+            status: 'none',
+            cancelAtPeriodEnd: false,
+            currentPeriodEnd: null,
+            canceledAt: null,
+            pastDue: false,
+            manageable: false,
+        });
+    });
+
+    it('falls back to `none` when the overview failed to load', () => {
+        expect(subscriptionState(null).status).toBe('none');
+    });
+});
+
+describe('subscriptionStatusTone / subscriptionStatusLabelKey (B08)', () => {
+    it('reads a free account (`none`) as healthy, not broken', () => {
+        expect(subscriptionStatusTone('none')).toBe('positive');
+        expect(subscriptionStatusTone('active')).toBe('positive');
+        expect(subscriptionStatusTone('trialing')).toBe('positive');
+    });
+
+    it('flags the uncollected states as negative', () => {
+        expect(subscriptionStatusTone('past_due')).toBe('negative');
+        expect(subscriptionStatusTone('unpaid')).toBe('negative');
+    });
+
+    it('keeps the pre-existing key for the common case, adds keys for the rest', () => {
+        expect(subscriptionStatusLabelKey('none')).toBe('currentPlan.statusActive');
+        expect(subscriptionStatusLabelKey('active')).toBe('currentPlan.statusActive');
+        expect(subscriptionStatusLabelKey('past_due')).toBe('currentPlan.statuses.past_due');
+        expect(subscriptionStatusLabelKey('canceled')).toBe('currentPlan.statuses.canceled');
+    });
+});
+
+describe('isSubscriptionPastDue — when the recovery banner shows', () => {
+    it('shows for past_due and unpaid', () => {
+        expect(
+            isSubscriptionPastDue(overview({ subscription: subscription({ status: 'past_due' }) })),
+        ).toBe(true);
+        expect(
+            isSubscriptionPastDue(overview({ subscription: subscription({ status: 'unpaid' }) })),
+        ).toBe(true);
+    });
+
+    it('does not show for a healthy or absent subscription', () => {
+        expect(isSubscriptionPastDue(overview({ subscription: subscription() }))).toBe(false);
+        expect(isSubscriptionPastDue(overview())).toBe(false);
+        expect(isSubscriptionPastDue(null)).toBe(false);
+    });
+
+    it('trusts the server-computed flag even if the token set later grows', () => {
+        expect(
+            isSubscriptionPastDue(
+                overview({ subscription: subscription({ status: 'active', pastDue: true }) }),
+            ),
+        ).toBe(true);
+    });
+});
+
+describe('canCancelSubscription / canResumeSubscription (B07)', () => {
+    it('offers cancel on a live, manageable subscription', () => {
+        expect(canCancelSubscription(overview({ subscription: subscription() }), true)).toBe(true);
+        expect(canResumeSubscription(overview({ subscription: subscription() }), true)).toBe(false);
+    });
+
+    it('swaps to resume once a cancellation is pending', () => {
+        const pending = overview({ subscription: subscription({ cancelAtPeriodEnd: true }) });
+        expect(canCancelSubscription(pending, true)).toBe(false);
+        expect(canResumeSubscription(pending, true)).toBe(true);
+    });
+
+    it('offers neither once the subscription has actually ended', () => {
+        const ended = overview({
+            subscription: subscription({ status: 'canceled', cancelAtPeriodEnd: true }),
+        });
+        expect(canCancelSubscription(ended, true)).toBe(false);
+        expect(canResumeSubscription(ended, true)).toBe(false);
+    });
+
+    it('still offers cancel while the subscription is past due', () => {
+        expect(
+            canCancelSubscription(
+                overview({ subscription: subscription({ status: 'past_due' }) }),
+                true,
+            ),
+        ).toBe(true);
+    });
+
+    it('offers nothing on a free account with no provider subscription', () => {
+        expect(canCancelSubscription(overview(), true)).toBe(false);
+        expect(canResumeSubscription(overview(), true)).toBe(false);
+    });
+
+    it('offers nothing when the subscription is not manageable', () => {
+        const unmanageable = overview({ subscription: subscription({ manageable: false }) });
+        expect(canCancelSubscription(unmanageable, true)).toBe(false);
+        expect(canResumeSubscription(unmanageable, true)).toBe(false);
+    });
+
+    it('respects the deployment master switch and the provider gate', () => {
+        const live = overview({ subscription: subscription() });
+        expect(canCancelSubscription(live, false)).toBe(false);
+        expect(
+            canCancelSubscription(
+                overview({ providerConfigured: false, subscription: subscription() }),
+                true,
+            ),
+        ).toBe(false);
     });
 });

@@ -6,12 +6,16 @@ import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 // headers and (critically here) the webhook signature verification.
 import Stripe from 'stripe';
 import { config } from '@src/config';
+import type { BillingSubscriptionStatus } from '@src/entities/billing-profile.entity';
 import {
     BillingProvider,
     BillingProviderError,
     BillingProviderNotConfiguredError,
     type BillingInvoiceLine,
     type BillingInvoiceSnapshot,
+    type BillingPortalRequest,
+    type BillingPortalSession,
+    type BillingSubscriptionSnapshot,
     type BillingWebhookEvent,
     type BillingWebhookEventKind,
     type CheckoutSessionSnapshot,
@@ -22,6 +26,7 @@ import {
     type PaymentMethodSummary,
     type PlanCheckoutRequest,
     type PlanCheckoutSession,
+    type SubscriptionMutationRequest,
 } from './billing.provider';
 
 /**
@@ -340,6 +345,54 @@ export class StripeBillingProvider extends BillingProvider {
         }
     }
 
+    /**
+     * Schedule the cancellation for the end of the paid period (B07).
+     *
+     * `cancel_at_period_end: true` is an UPDATE, not a delete: the
+     * subscription keeps serving until the period ends and
+     * {@link resumeSubscription} can reverse it. We deliberately never
+     * call `subscriptions.cancel()` (immediate termination) from the
+     * self-service path — the owner already paid for the period.
+     */
+    async cancelSubscriptionAtPeriodEnd(
+        request: SubscriptionMutationRequest,
+    ): Promise<BillingSubscriptionSnapshot> {
+        const stripe = this.requireClient();
+        const subscription = await stripe.subscriptions.update(request.subscriptionId, {
+            cancel_at_period_end: true,
+        });
+        return toSubscriptionSnapshot(subscription);
+    }
+
+    /** Clear a pending at-period-end cancellation (B07). */
+    async resumeSubscription(
+        request: SubscriptionMutationRequest,
+    ): Promise<BillingSubscriptionSnapshot> {
+        const stripe = this.requireClient();
+        const subscription = await stripe.subscriptions.update(request.subscriptionId, {
+            cancel_at_period_end: false,
+        });
+        return toSubscriptionSnapshot(subscription);
+    }
+
+    /**
+     * Hosted portal session — the PAST_DUE recovery action (B08). Card
+     * re-entry happens entirely on the provider's tokenized surface, so
+     * no cardholder datum reaches the platform, and the return URL is the
+     * server-built one the caller passed.
+     */
+    async createBillingPortalSession(request: BillingPortalRequest): Promise<BillingPortalSession> {
+        const stripe = this.requireClient();
+        const session = await stripe.billingPortal.sessions.create({
+            customer: request.customerId,
+            return_url: request.returnUrl,
+        });
+        if (!session.url) {
+            throw new BillingProviderError('Billing portal session did not return a redirect URL');
+        }
+        return { url: session.url };
+    }
+
     async verifyAndParseWebhook(
         rawBody: string,
         signature: string | undefined,
@@ -490,6 +543,8 @@ export class StripeBillingProvider extends BillingProvider {
 
             case 'customer.subscription.created':
             case 'customer.subscription.updated':
+            case 'customer.subscription.paused':
+            case 'customer.subscription.resumed':
             case 'customer.subscription.deleted': {
                 const subscription = event.data.object as Stripe.Subscription;
                 const meta = subscription.metadata ?? {};
@@ -509,6 +564,16 @@ export class StripeBillingProvider extends BillingProvider {
                     subscriptionId: subscription.id,
                     currentPeriodEnd: readCurrentPeriodEnd(subscription),
                     cancelAtPeriodEnd: subscription.cancel_at_period_end ?? false,
+                    currency: subscription.currency ?? null,
+                    // The snapshot rides on EVERY kind, not just the
+                    // lifecycle one. An `active` update is how
+                    // `cancel_at_period_end` first becomes true — if the
+                    // snapshot only travelled with `subscription.updated`,
+                    // a scheduled cancellation would never reach the
+                    // billing profile and the resume button could never
+                    // appear. The kind decides whether the TIER moves; the
+                    // snapshot is projected regardless.
+                    subscription: toSubscriptionSnapshot(subscription),
                 };
                 if (live) {
                     return { ...shared, kind: 'subscription.activated' };
@@ -521,9 +586,29 @@ export class StripeBillingProvider extends BillingProvider {
                     subscription.status === 'unpaid' ||
                     subscription.status === 'incomplete_expired'
                 ) {
-                    return { ...shared, kind: 'subscription.canceled' };
+                    return {
+                        ...shared,
+                        kind: 'subscription.canceled',
+                        subscription:
+                            event.type === 'customer.subscription.deleted'
+                                ? // A delete is terminal regardless of what
+                                  // the object still says about the period.
+                                  {
+                                      ...shared.subscription,
+                                      status: 'canceled' as const,
+                                      cancelAtPeriodEnd: false,
+                                  }
+                                : shared.subscription,
+                    };
                 }
-                return { ...shared, kind: 'ignored' };
+                // Everything left is a LIFECYCLE move that must not touch
+                // the tier: dunning (`past_due`), `paused`, `incomplete`.
+                // Audit B24 returned `ignored` here, which is why the
+                // product could never show a dunning banner or a resume
+                // button — the events existed and were thrown away.
+                // B07/B08 surfaces them as a snapshot instead. The tier is
+                // still moved only by the two branches above.
+                return { ...shared, kind: 'subscription.updated' };
             }
 
             case 'payment_method.attached': {
@@ -654,6 +739,51 @@ function toInvoiceSnapshot(invoice: Stripe.Invoice): BillingInvoiceSnapshot {
         pdfUrl: invoice.invoice_pdf ?? null,
         lines,
         issuedAt: toUnixDate((raw['created'] as number | undefined) ?? null),
+    };
+}
+
+/**
+ * Every provider lifecycle token maps 1:1 onto the platform's own set,
+ * so this is a lookup, not a heuristic. An unrecognized token (a future
+ * provider state) resolves to `none` rather than being trusted as active
+ * — the fail-closed direction for anything that gates paid capability.
+ */
+const SUBSCRIPTION_STATUS_MAP: Record<string, BillingSubscriptionStatus> = {
+    active: 'active',
+    trialing: 'trialing',
+    past_due: 'past_due',
+    unpaid: 'unpaid',
+    paused: 'paused',
+    canceled: 'canceled',
+    incomplete: 'incomplete',
+    incomplete_expired: 'incomplete_expired',
+};
+
+/**
+ * Period end moved from the subscription onto its ITEMS in the current
+ * API version, so read the item value first and keep the legacy
+ * top-level field as a fallback — a webhook replay of an older delivery
+ * must still yield a period end.
+ */
+function subscriptionPeriodEnd(subscription: Stripe.Subscription): Date | null {
+    const items = subscription.items?.data ?? [];
+    for (const item of items) {
+        const end = (item as unknown as Record<string, unknown>)['current_period_end'];
+        if (typeof end === 'number') {
+            return toUnixDate(end);
+        }
+    }
+    const legacy = (subscription as unknown as Record<string, unknown>)['current_period_end'];
+    return typeof legacy === 'number' ? toUnixDate(legacy) : null;
+}
+
+function toSubscriptionSnapshot(subscription: Stripe.Subscription): BillingSubscriptionSnapshot {
+    return {
+        subscriptionId: subscription.id,
+        status: SUBSCRIPTION_STATUS_MAP[subscription.status] ?? 'none',
+        cancelAtPeriodEnd: subscription.cancel_at_period_end === true,
+        currentPeriodEnd: subscriptionPeriodEnd(subscription),
+        canceledAt: toUnixDate(subscription.canceled_at),
     };
 }
 
