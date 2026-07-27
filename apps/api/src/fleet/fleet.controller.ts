@@ -14,8 +14,13 @@ import {
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import type { CreateEnrollmentTokenResult, FleetNodeView } from '@ever-works/agent/fleet';
+import type { CreateEnrollmentTokenResult } from '@ever-works/agent/fleet';
 import { FleetJobService, FleetService } from '@ever-works/agent/fleet';
+import type {
+    FleetEnrollResponse,
+    FleetHeartbeatResponse,
+    FleetNodeView,
+} from '@ever-works/contracts';
 import { Public } from '../auth/decorators/public.decorator';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
@@ -132,9 +137,7 @@ export class FleetController {
     })
     @HttpCode(HttpStatus.CREATED)
     @Throttle({ long: { limit: 30, ttl: 60_000 } })
-    async enroll(
-        @Body() body: EnrollFleetNodeDto,
-    ): Promise<{ nodeId: string; secret: string; node: FleetNodeView }> {
+    async enroll(@Body() body: EnrollFleetNodeDto): Promise<FleetEnrollResponse> {
         const result = await this.service.enroll(body.token, {
             platform: body.platform,
             version: body.version,
@@ -155,7 +158,7 @@ export class FleetController {
     })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 240, ttl: 60_000 } })
-    async heartbeat(@Body() body: FleetHeartbeatDto): Promise<{ ok: true; node: FleetNodeView }> {
+    async heartbeat(@Body() body: FleetHeartbeatDto): Promise<FleetHeartbeatResponse> {
         const result = await this.service.heartbeat(body.nodeId, body.secret, {
             platform: body.platform,
             version: body.version,

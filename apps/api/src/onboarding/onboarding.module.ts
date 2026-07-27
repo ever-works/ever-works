@@ -13,6 +13,11 @@ import {
 import { FacadesModule, GitFacadeService } from '@ever-works/agent/facades';
 import { DatabaseModule } from '@ever-works/agent/database';
 import { WorkModule } from '@ever-works/agent/services';
+// A55 — the role-seeding service lives with the agent templates it
+// activates; importing the agent-side module (Nest resolves it once for
+// the whole app) is what gives this module the provider without
+// duplicating the template catalog wiring here.
+import { AgentsModule as AgentDomainAgentsModule } from '@ever-works/agent/agents';
 import { OnboardingController } from './onboarding.controller';
 import { OnboardingService } from './onboarding.service';
 import { OnboardingTerminalService } from './onboarding-terminal.service';
@@ -25,12 +30,20 @@ import { OnboardingStateService } from './onboarding-state.service';
 import { OnboardingCatalogController } from './onboarding-catalog.controller';
 import { OnboardingCatalogService } from './onboarding-catalog.service';
 import { OnboardingTelemetryController } from './onboarding-telemetry.controller';
+import { OnboardingSuggestionsController } from './onboarding-suggestions.controller';
 import { ClaimController } from './claim.controller';
 import { AuthModule } from '../auth';
 import { UsersModule } from '../users/users.module';
 
 @Module({
-    imports: [FacadesModule, DatabaseModule, WorkModule, AuthModule, UsersModule],
+    imports: [
+        FacadesModule,
+        DatabaseModule,
+        WorkModule,
+        AuthModule,
+        UsersModule,
+        AgentDomainAgentsModule,
+    ],
     controllers: [
         OnboardingController,
         WellKnownController,
@@ -39,6 +52,7 @@ import { UsersModule } from '../users/users.module';
         OnboardingStateController,
         OnboardingCatalogController,
         OnboardingTelemetryController,
+        OnboardingSuggestionsController,
     ],
     providers: [
         OnboardingService,

@@ -7,7 +7,19 @@ import {
     Optional,
 } from '@nestjs/common';
 import type { IPlugin } from '@ever-works/plugin';
-import type { FleetNodeLoadView } from '@ever-works/contracts';
+import {
+    FLEET_DEFAULT_ENROLLMENT_TOKEN_TTL_MS,
+    FLEET_DEFAULT_MAX_CAPABILITY_TAG_LENGTH,
+    FLEET_DEFAULT_MAX_CAPABILITY_TAGS,
+    FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS,
+    FLEET_ENROLLABLE_NODE_KINDS,
+    FLEET_MAX_NODE_NAME_LENGTH,
+    FLEET_MAX_PLATFORM_LENGTH,
+    FLEET_MAX_VERSION_LENGTH,
+    FLEET_MIN_NODE_NAME_LENGTH,
+} from '@ever-works/contracts';
+import type { FleetNodeView } from '@ever-works/contracts';
+import { config } from '../config';
 import { FleetNode, FleetNodeKind, FleetNodeStatus } from '../entities/fleet-node.entity';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
@@ -20,18 +32,35 @@ import {
     UUID_RE,
 } from './fleet-node-credential';
 
-/** One-time enrollment tokens expire 15 minutes after issue. */
-export const FLEET_ENROLLMENT_TOKEN_TTL_MS = 15 * 60_000;
+/**
+ * Fleet limits are OPERATOR KNOBS, read through `config.fleet.*` on
+ * every use so an env change lands without a restart-shaped code change
+ * (and so tests can drive both branches). The constants below are the
+ * DEFAULTS those getters fall back to — the same values these used to
+ * be hard-coded at — and they stay exported because the node apps and
+ * the specs legitimately need the default, not the live setting.
+ */
 
-/** An `online` node with no heartbeat for this long sweeps to `offline`. */
-export const FLEET_NODE_OFFLINE_AFTER_MS = 5 * 60_000;
+/** Default one-time enrollment-token lifetime (15 minutes). */
+export const FLEET_ENROLLMENT_TOKEN_TTL_MS = FLEET_DEFAULT_ENROLLMENT_TOKEN_TTL_MS;
+
+/** Default silence after which an `online` node sweeps to `offline` (5 minutes). */
+export const FLEET_NODE_OFFLINE_AFTER_MS = FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS;
 
 /** Kinds a machine can enroll as ('k8s' is list-time only, never a row). */
-export const FLEET_ENROLLABLE_KINDS: readonly FleetNodeKind[] = ['desktop-node', 'node'];
+export const FLEET_ENROLLABLE_KINDS: readonly FleetNodeKind[] = FLEET_ENROLLABLE_NODE_KINDS;
 
-/** Caps on the node self-description (defensive, DTOs cap the edge too). */
-export const FLEET_MAX_CAPABILITY_TAGS = 16;
-export const FLEET_MAX_CAPABILITY_TAG_LENGTH = 32;
+/** Default caps on the node self-description (defensive, DTOs cap the edge too). */
+export const FLEET_MAX_CAPABILITY_TAGS = FLEET_DEFAULT_MAX_CAPABILITY_TAGS;
+export const FLEET_MAX_CAPABILITY_TAG_LENGTH = FLEET_DEFAULT_MAX_CAPABILITY_TAG_LENGTH;
+
+/**
+ * The wire view of one fleet node now lives in `@ever-works/contracts`
+ * so the API, the web tier and the node apps compile against ONE
+ * declaration. Re-exported here because `@ever-works/agent/fleet` is
+ * where every server-side consumer already imports it from.
+ */
+export type { FleetNodeView };
 
 /**
  * Sentinel `DeployFacadeService.getTokenFromSettings` returns for
@@ -42,31 +71,6 @@ export const FLEET_MAX_CAPABILITY_TAG_LENGTH = 32;
  * excludes every platform-managed cluster.
  */
 const PLATFORM_MANAGED_KUBECONFIG_SENTINEL = '__ever-works-platform-managed-kubeconfig__';
-
-/** Wire/view shape of one fleet node (never carries credential hashes). */
-export interface FleetNodeView {
-    id: string;
-    name: string;
-    kind: FleetNodeKind;
-    status: FleetNodeStatus;
-    platform: string | null;
-    version: string | null;
-    capabilities: string[];
-    lastHeartbeatAt: string | null;
-    createdAt: string | null;
-    /**
-     * True for enrolled rows; false for nodes of the user's own
-     * configured clusters, which are surfaced live and never stored.
-     */
-    persisted: boolean;
-    /**
-     * Live execution load (Desktop PRD §4.1 "current load (running
-     * Tasks)"). Populated by the API edge from `FleetJobService`;
-     * `null`/absent means idle. Cluster-sourced rows never carry it —
-     * the platform does not lease work onto them.
-     */
-    load?: FleetNodeLoadView | null;
-}
 
 export interface CreateEnrollmentTokenInput {
     name: string;
@@ -140,8 +144,10 @@ export class FleetService {
         input: CreateEnrollmentTokenInput,
     ): Promise<CreateEnrollmentTokenResult> {
         const name = typeof input.name === 'string' ? input.name.trim() : '';
-        if (name.length < 1 || name.length > 200) {
-            throw new BadRequestException('Node name must be 1-200 characters');
+        if (name.length < FLEET_MIN_NODE_NAME_LENGTH || name.length > FLEET_MAX_NODE_NAME_LENGTH) {
+            throw new BadRequestException(
+                `Node name must be ${FLEET_MIN_NODE_NAME_LENGTH}-${FLEET_MAX_NODE_NAME_LENGTH} characters`,
+            );
         }
         if (!FLEET_ENROLLABLE_KINDS.includes(input.kind)) {
             throw new BadRequestException(
@@ -163,7 +169,7 @@ export class FleetService {
         return {
             node: this.toView(node),
             token,
-            expiresInSec: Math.floor(FLEET_ENROLLMENT_TOKEN_TTL_MS / 1000),
+            expiresInSec: Math.floor(config.fleet.getEnrollmentTokenTtlMs() / 1000),
         };
     }
 
@@ -194,7 +200,10 @@ export class FleetService {
             return null;
         }
         const issuedAt = node.createdAt instanceof Date ? node.createdAt.getTime() : NaN;
-        if (!Number.isFinite(issuedAt) || Date.now() - issuedAt > FLEET_ENROLLMENT_TOKEN_TTL_MS) {
+        if (
+            !Number.isFinite(issuedAt) ||
+            Date.now() - issuedAt > config.fleet.getEnrollmentTokenTtlMs()
+        ) {
             return null;
         }
 
@@ -204,8 +213,8 @@ export class FleetService {
             enrollmentTokenHash: sha256Hex(secret),
             status: 'online' as FleetNodeStatus,
             lastHeartbeatAt: now,
-            platform: sanitizeText(input.platform, 64),
-            version: sanitizeText(input.version, 32),
+            platform: sanitizeText(input.platform, FLEET_MAX_PLATFORM_LENGTH),
+            version: sanitizeText(input.version, FLEET_MAX_VERSION_LENGTH),
             capabilities: sanitizeCapabilities(input.capabilities),
         };
         // CAS: single-use by construction — a raced duplicate enroll
@@ -260,9 +269,9 @@ export class FleetService {
         if (refresh.capabilities !== undefined) {
             patch.capabilities = sanitizeCapabilities(refresh.capabilities);
         }
-        const platform = sanitizeText(refresh.platform, 64);
+        const platform = sanitizeText(refresh.platform, FLEET_MAX_PLATFORM_LENGTH);
         if (platform) patch.platform = platform;
-        const version = sanitizeText(refresh.version, 32);
+        const version = sanitizeText(refresh.version, FLEET_MAX_VERSION_LENGTH);
         if (version) patch.version = version;
 
         await this.repository.update(node.id, patch);
@@ -278,7 +287,7 @@ export class FleetService {
     async listForUser(userId: string): Promise<FleetNodeView[]> {
         await this.repository.sweepOffline(
             userId,
-            new Date(Date.now() - FLEET_NODE_OFFLINE_AFTER_MS),
+            new Date(Date.now() - config.fleet.getNodeOfflineAfterMs()),
         );
         const rows = await this.repository.findByUser(userId);
         const clusterNodes = await this.listOwnClusterNodes(userId);
@@ -288,8 +297,13 @@ export class FleetService {
     /** Rename an enrolled node (owner-scoped, no existence leak). */
     async renameForUser(userId: string, nodeId: string, name: string): Promise<FleetNodeView> {
         const trimmed = typeof name === 'string' ? name.trim() : '';
-        if (trimmed.length < 1 || trimmed.length > 200) {
-            throw new BadRequestException('Node name must be 1-200 characters');
+        if (
+            trimmed.length < FLEET_MIN_NODE_NAME_LENGTH ||
+            trimmed.length > FLEET_MAX_NODE_NAME_LENGTH
+        ) {
+            throw new BadRequestException(
+                `Node name must be ${FLEET_MIN_NODE_NAME_LENGTH}-${FLEET_MAX_NODE_NAME_LENGTH} characters`,
+            );
         }
         const node = await this.getOwnedNode(userId, nodeId);
         await this.repository.update(node.id, { name: trimmed });
@@ -392,8 +406,8 @@ export class FleetService {
             name,
             kind: 'k8s',
             status: node.ready ? 'online' : 'offline',
-            platform: sanitizeText(node.platform, 64),
-            version: sanitizeText(node.version, 32),
+            platform: sanitizeText(node.platform, FLEET_MAX_PLATFORM_LENGTH),
+            version: sanitizeText(node.version, FLEET_MAX_VERSION_LENGTH),
             capabilities: sanitizeCapabilities(node.roles),
             lastHeartbeatAt: null,
             createdAt: null,
@@ -425,15 +439,22 @@ function sanitizeText(value: unknown, maxLength: number): string | null {
     return trimmed.slice(0, maxLength);
 }
 
+/**
+ * Truncate + dedupe capability tags to the CONFIGURED caps. Read per
+ * call rather than captured at module load so an operator override is
+ * honoured by the running process and both branches are testable.
+ */
 function sanitizeCapabilities(value: unknown): string[] {
     if (!Array.isArray(value)) return [];
+    const maxTags = config.fleet.getMaxCapabilityTags();
+    const maxTagLength = config.fleet.getMaxCapabilityTagLength();
     const out: string[] = [];
     for (const entry of value) {
         if (typeof entry !== 'string') continue;
-        const tag = entry.trim().slice(0, FLEET_MAX_CAPABILITY_TAG_LENGTH);
+        const tag = entry.trim().slice(0, maxTagLength);
         if (!tag || out.includes(tag)) continue;
         out.push(tag);
-        if (out.length >= FLEET_MAX_CAPABILITY_TAGS) break;
+        if (out.length >= maxTags) break;
     }
     return out;
 }

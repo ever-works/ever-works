@@ -4,6 +4,8 @@ export * from './agents.module';
 export * from './agents.service';
 export * from './agent-templates';
 export * from './agent-templates.service';
+export * from './role-seeding';
+export * from './role-seeding.service';
 export * from './agent-file.service';
 export * from './agent-schedule-dispatcher.service';
 export * from './agent-export.service';

@@ -364,7 +364,14 @@
                 "creating": "Creating…",
                 "created": "Created",
                 "createdToast": "Agent created — find it under Agents.",
-                "createFailed": "Failed to create the agent. Try again."
+                "createFailed": "Failed to create the agent. Try again.",
+                "skillsTitle": "Skills that pair with these",
+                "seedAll": "Set up my starter agents",
+                "seeding": "Setting up…",
+                "seedDone": "Set up {count} starter agents — find them under Agents.",
+                "seedAlreadyDone": "Your starter agents are already set up.",
+                "seedPartial": "Set up {created} agents; {failed} could not be created.",
+                "seedFailed": "Could not set up your starter agents. Try again."
             },
             "skipHint": "Optional — skip if you'd rather not say. Your answers only improve suggestions and can be changed later."
         },

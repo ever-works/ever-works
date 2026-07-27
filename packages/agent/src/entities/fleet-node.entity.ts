@@ -1,4 +1,5 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
+import type { FleetNodeKind, FleetNodeStatus } from '@ever-works/contracts';
 import { PortableDateColumn } from './_types';
 
 /**
@@ -38,11 +39,15 @@ import { PortableDateColumn } from './_types';
  * entity throws EntityMetadataNotFoundError on first query.
  */
 
-/** App shape of the node ('k8s' is list-time only — never persisted). */
-export type FleetNodeKind = 'desktop-node' | 'node' | 'k8s';
-
-/** Heartbeat-derived lifecycle state. */
-export type FleetNodeStatus = 'enrolling' | 'online' | 'offline' | 'disabled';
+/**
+ * The kind/status unions are the SHARED contract's
+ * (`@ever-works/contracts`), re-exported here so the entity, the API
+ * edge, the web tier and the node apps cannot drift: adding a status
+ * server-side is a compile error everywhere that switches on it.
+ *
+ * `k8s` is list-time only — never persisted as a row.
+ */
+export type { FleetNodeKind, FleetNodeStatus } from '@ever-works/contracts';
 
 @Entity({ name: 'fleet_nodes' })
 @Index('idx_fleet_nodes_user', ['userId'])

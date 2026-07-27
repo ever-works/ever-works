@@ -1,4 +1,5 @@
 import 'server-only';
+import type { FleetEnrollableNodeKind, FleetNodeView } from '@ever-works/contracts';
 import { serverFetch, serverMutation } from './server-api';
 
 /**
@@ -13,43 +14,23 @@ import { serverFetch, serverMutation } from './server-api';
  * is never readable again.
  */
 
-export type FleetNodeKind = 'desktop-node' | 'node' | 'k8s';
-
-export type FleetNodeStatus = 'enrolling' | 'online' | 'offline' | 'disabled';
-
-export interface FleetNodeView {
-    id: string;
-    name: string;
-    kind: FleetNodeKind;
-    status: FleetNodeStatus;
-    platform: string | null;
-    version: string | null;
-    capabilities: string[];
-    lastHeartbeatAt: string | null;
-    createdAt: string | null;
-    /** False for live nodes of the user's own configured clusters. */
-    persisted: boolean;
-    /**
-     * Live execution load (Desktop PRD §4.1 "current load (running
-     * Tasks)"). `null`/absent means idle. Cluster-sourced rows never
-     * carry it — the platform does not lease work onto them.
-     */
-    load?: FleetNodeLoadView | null;
-}
-
-/** Per-node execution summary merged into the node list by the API edge. */
-export interface FleetNodeLoadView {
-    /** Jobs this node currently holds a live claim on. */
-    activeJobCount: number;
-    /** Kind of the oldest live claim, or null when idle. */
-    currentJobKind: string | null;
-    /** Id of the oldest live claim, or null when idle. */
-    currentJobId: string | null;
-}
+/**
+ * Node kind/status and the node view are the SHARED contract
+ * (`@ever-works/contracts`), re-exported here so this tier, the API and
+ * the node apps compile against ONE declaration. This file used to
+ * hand-copy them, which is exactly how the three copies drifted.
+ */
+export type {
+    FleetNodeKind,
+    FleetNodeStatus,
+    FleetNodeView,
+    FleetNodeLoadView,
+    FleetEnrollableNodeKind,
+} from '@ever-works/contracts';
 
 export interface CreateFleetEnrollmentTokenPayload {
     name: string;
-    kind: Exclude<FleetNodeKind, 'k8s'>;
+    kind: FleetEnrollableNodeKind;
 }
 
 export interface CreateFleetEnrollmentTokenResponse {
