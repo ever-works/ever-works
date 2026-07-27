@@ -20,12 +20,21 @@ import { serverFetch, serverMutation } from './server-api';
  * the node apps compile against ONE declaration. This file used to
  * hand-copy them, which is exactly how the three copies drifted.
  */
+import type {
+    FleetNodeDetailView,
+    FleetNodeDrainResult,
+    FleetEnrollmentTokenView,
+} from '@ever-works/contracts';
+
 export type {
     FleetNodeKind,
     FleetNodeStatus,
     FleetNodeView,
     FleetNodeLoadView,
     FleetEnrollableNodeKind,
+    FleetNodeDetailView,
+    FleetNodeDrainResult,
+    FleetEnrollmentTokenView,
 } from '@ever-works/contracts';
 
 export interface CreateFleetEnrollmentTokenPayload {
@@ -43,6 +52,10 @@ export interface CreateFleetEnrollmentTokenResponse {
 export interface UpdateFleetNodePayload {
     name?: string;
     disabled?: boolean;
+    /** Admin-edited tags. Writing them pins the set by default. */
+    capabilities?: string[];
+    /** `false` hands tag ownership back to the node's heartbeats. */
+    capabilitiesPinned?: boolean;
 }
 
 // NOTE: no leading `/api` here — `serverFetch`/`serverMutation` prepend
@@ -78,6 +91,42 @@ export const fleetAPI = {
             endpoint: `${BASE}/nodes/${nodeId}`,
             data: {},
             method: 'DELETE',
+            wrapInData: false,
+        });
+    },
+
+    nodeDetail: async (nodeId: string) => {
+        return serverFetch<FleetNodeDetailView>(`${BASE}/nodes/${nodeId}`);
+    },
+
+    listOutstandingTokens: async () => {
+        return serverFetch<FleetEnrollmentTokenView[]>(`${BASE}/enrollment-tokens`);
+    },
+
+    revokeEnrollmentToken: async (nodeId: string) => {
+        return serverMutation<void>({
+            endpoint: `${BASE}/enrollment-tokens/${nodeId}`,
+            data: {},
+            method: 'DELETE',
+            wrapInData: false,
+        });
+    },
+
+    /** Re-key a node. The replacement token is returned exactly once. */
+    rotateNodeCredential: async (nodeId: string) => {
+        return serverMutation<CreateFleetEnrollmentTokenResponse>({
+            endpoint: `${BASE}/nodes/${nodeId}/rotate`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    drainNode: async (nodeId: string, drain: boolean) => {
+        return serverMutation<FleetNodeDrainResult>({
+            endpoint: `${BASE}/nodes/${nodeId}/drain`,
+            data: { drain },
+            method: 'POST',
             wrapInData: false,
         });
     },

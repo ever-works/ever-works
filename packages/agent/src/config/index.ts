@@ -213,6 +213,80 @@ export const config = {
         },
     },
 
+    /**
+     * Fleet — the owner's own machines (desktop nodes, headless nodes,
+     * their configured clusters) and the job-lease channel that runs
+     * work on them.
+     *
+     * ONE switch for the whole surface: the `/api/fleet/**` controllers
+     * (registry, admin and the node work channel), the Fleet settings
+     * page and its nav entry. Turning it off is a deployment saying "my
+     * users have no machines of their own" — the platform's own runtimes
+     * are untouched.
+     *
+     * **Default ON**, deliberately, and that is not a style choice: the
+     * Fleet surface already ships, so a default-off flag would silently
+     * REMOVE a working feature from every existing deployment on
+     * upgrade. Operators who want it gone set `FLEET_ENABLED=false`
+     * explicitly, exactly like `SCHEDULED_UPDATES_ENABLED`.
+     *
+     * Off is a hard gate, not a hint: the API answers 404 (not 403) on
+     * every fleet route, so a disabled deployment does not even confirm
+     * the surface exists, and an enrolled node's credential buys nothing.
+     */
+    fleet: {
+        isEnabled(): boolean {
+            return process.env.FLEET_ENABLED !== 'false';
+        },
+        /**
+         * How long a one-time enrollment token stays redeemable.
+         * Default 15 minutes (`FLEET_ENROLLMENT_TOKEN_TTL_MS`), floored
+         * at 30s so a token can always actually be typed in.
+         */
+        getEnrollmentTokenTtlMs(): number {
+            return clampedIntEnv(
+                process.env.FLEET_ENROLLMENT_TOKEN_TTL_MS,
+                FLEET_DEFAULT_ENROLLMENT_TOKEN_TTL_MS,
+                FLEET_MIN_ENROLLMENT_TOKEN_TTL_MS,
+                Number.MAX_SAFE_INTEGER,
+            );
+        },
+        /**
+         * Silence after which an `online` node is swept to `offline` by
+         * the next owner-scoped list read. Default 5 minutes.
+         *
+         * Shortening this below a node's heartbeat cadence makes healthy
+         * nodes flap; the 30s floor stops the value becoming nonsense,
+         * it does not stop it becoming unwise.
+         */
+        getNodeOfflineAfterMs(): number {
+            return clampedIntEnv(
+                process.env.FLEET_NODE_OFFLINE_AFTER_MS,
+                FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS,
+                FLEET_MIN_NODE_OFFLINE_AFTER_MS,
+                Number.MAX_SAFE_INTEGER,
+            );
+        },
+        /** Max capability tags one node may advertise. Default 16, hard ceiling 64. */
+        getMaxCapabilityTags(): number {
+            return clampedIntEnv(
+                process.env.FLEET_MAX_CAPABILITY_TAGS,
+                FLEET_DEFAULT_MAX_CAPABILITY_TAGS,
+                1,
+                FLEET_MAX_CAPABILITY_TAGS_CEILING,
+            );
+        },
+        /** Max length of one capability tag. Default 32, hard ceiling 128. */
+        getMaxCapabilityTagLength(): number {
+            return clampedIntEnv(
+                process.env.FLEET_MAX_CAPABILITY_TAG_LENGTH,
+                FLEET_DEFAULT_MAX_CAPABILITY_TAG_LENGTH,
+                1,
+                FLEET_MAX_CAPABILITY_TAG_LENGTH_CEILING,
+            );
+        },
+    },
+
     // Database configuration
     database: {
         getType() {
@@ -921,55 +995,6 @@ export const config = {
      * filter input, so an unbounded knob would be a denial-of-service
      * surface, and a zero/NaN TTL would expire every token instantly.
      */
-    fleet: {
-        /**
-         * How long a one-time enrollment token stays redeemable.
-         * Default 15 minutes (`FLEET_ENROLLMENT_TOKEN_TTL_MS`), floored
-         * at 30s so a token can always actually be typed in.
-         */
-        getEnrollmentTokenTtlMs(): number {
-            return clampedIntEnv(
-                process.env.FLEET_ENROLLMENT_TOKEN_TTL_MS,
-                FLEET_DEFAULT_ENROLLMENT_TOKEN_TTL_MS,
-                FLEET_MIN_ENROLLMENT_TOKEN_TTL_MS,
-                Number.MAX_SAFE_INTEGER,
-            );
-        },
-        /**
-         * Silence after which an `online` node is swept to `offline` by
-         * the next owner-scoped list read. Default 5 minutes.
-         *
-         * Shortening this below a node's heartbeat cadence makes healthy
-         * nodes flap; the 30s floor stops the value becoming nonsense,
-         * it does not stop it becoming unwise.
-         */
-        getNodeOfflineAfterMs(): number {
-            return clampedIntEnv(
-                process.env.FLEET_NODE_OFFLINE_AFTER_MS,
-                FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS,
-                FLEET_MIN_NODE_OFFLINE_AFTER_MS,
-                Number.MAX_SAFE_INTEGER,
-            );
-        },
-        /** Max capability tags one node may advertise. Default 16, hard ceiling 64. */
-        getMaxCapabilityTags(): number {
-            return clampedIntEnv(
-                process.env.FLEET_MAX_CAPABILITY_TAGS,
-                FLEET_DEFAULT_MAX_CAPABILITY_TAGS,
-                1,
-                FLEET_MAX_CAPABILITY_TAGS_CEILING,
-            );
-        },
-        /** Max length of one capability tag. Default 32, hard ceiling 128. */
-        getMaxCapabilityTagLength(): number {
-            return clampedIntEnv(
-                process.env.FLEET_MAX_CAPABILITY_TAG_LENGTH,
-                FLEET_DEFAULT_MAX_CAPABILITY_TAG_LENGTH,
-                1,
-                FLEET_MAX_CAPABILITY_TAG_LENGTH_CEILING,
-            );
-        },
-    },
 
     /**
      * Streaming-terminal M9 / founder decision D1 — persisted terminal

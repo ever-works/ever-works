@@ -29,6 +29,8 @@
  * the body. Every invalid path answers with one undifferentiated 401.
  */
 
+import type { FleetJobView } from './fleet-jobs.types';
+
 import type { FleetNodeLoadView } from './fleet-jobs.types.js';
 
 /**
@@ -97,6 +99,12 @@ export interface FleetNodeView {
 	 * configured clusters, which are surfaced live and never stored.
 	 */
 	persisted: boolean;
+	/**
+	 * True once an operator hand-edited the capability tags, which stops
+	 * heartbeats from overwriting them. Always false for cluster rows,
+	 * which are surfaced live and never stored.
+	 */
+	capabilitiesPinned?: boolean;
 	/**
 	 * Live execution load. Populated by the API edge from the job
 	 * service; `null`/absent means idle. Cluster-sourced rows never
@@ -186,3 +194,67 @@ export const FLEET_MIN_ENROLLMENT_TOKEN_TTL_MS = 30_000;
  * beats, so the window can be shortened but not to nonsense.
  */
 export const FLEET_MIN_NODE_OFFLINE_AFTER_MS = 30_000;
+
+/**
+ * `GET /api/fleet/nodes/:id` — one node plus what it has been doing.
+ *
+ * Lives in contracts (not at the API edge) because the web tier renders
+ * it: two hand-copied declarations is exactly how `FleetNodeView` drifted
+ * into three copies before it was consolidated here.
+ */
+export interface FleetNodeDetailView {
+	node: FleetNodeView;
+	/** Newest-first job history for this node (all outcomes). */
+	recentJobs: FleetJobView[];
+	/**
+	 * The failed subset of {@link recentJobs}, newest first — pulled out
+	 * so the drawer can lead with "why is this machine unhappy" instead
+	 * of making the operator filter a mixed list by eye.
+	 */
+	failures: FleetJobView[];
+	/**
+	 * True when the job history could not be read at all (job tables
+	 * unavailable). The node itself still renders — a job-runtime hiccup
+	 * must never make a node look like it does not exist.
+	 */
+	historyUnavailable: boolean;
+}
+
+/** `POST /api/fleet/nodes/:id/drain` — drain / undrain result. */
+export interface FleetNodeDrainResult {
+	node: FleetNodeView;
+	/**
+	 * How many in-flight claims went back to the queue. Draining without
+	 * requeuing would strand the node's work until each lease lapsed — up
+	 * to a full lease TTL per job, on a machine that is by then refusing
+	 * to report.
+	 */
+	releasedJobs: number;
+}
+
+/**
+ * One OUTSTANDING enrollment token — minted but never used.
+ *
+ * The plaintext token is NOT here and can never be re-read; it was
+ * returned exactly once at mint time. This is the metadata the admin
+ * list and the revoke control need.
+ */
+export interface FleetEnrollmentTokenView {
+	/** Id of the node the token was minted for (the revoke handle). */
+	nodeId: string;
+	name: string;
+	kind: FleetNodeKind;
+	/** When the token was issued (ISO). */
+	issuedAt: string | null;
+	/** When it stops being consumable (ISO). */
+	expiresAt: string | null;
+	/** True once `expiresAt` has passed — still revocable, never usable. */
+	expired: boolean;
+	/**
+	 * True when this token REPLACED an existing credential (a rotate)
+	 * rather than being a first enrollment. Drives a badge so an
+	 * operator can tell a re-key apart from a machine that has never
+	 * connected.
+	 */
+	rotated?: boolean;
+}

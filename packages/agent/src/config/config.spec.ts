@@ -839,9 +839,12 @@ describe('agent/config', () => {
                 'branding',
                 'database',
                 'everWorks',
-                // Fleet limits — `fleet.*` holds the clamped
-                // enrollment-token TTL, offline-after window and
-                // capability-tag ceilings shared with the node.
+                // Fleet — ONE group covering both halves of the surface:
+                // the `FLEET_ENABLED` switch that gates the whole thing
+                // (registry + admin + node work channel + settings page,
+                // default ON because the surface already shipped), and
+                // the clamped limits shared with the node (token TTL,
+                // offline-after window, capability-tag ceilings).
                 // Pinned alphabetically, before `fleetNode`.
                 'fleet',
                 // Desktop PRD M4 — `fleetNode.*` group reads the

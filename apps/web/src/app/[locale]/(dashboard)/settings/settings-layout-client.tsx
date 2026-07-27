@@ -26,6 +26,13 @@ import { getCategoryIcon } from '@/lib/utils/plugin-category-icons';
 interface SettingsLayoutClientProps {
     children: React.ReactNode;
     settingsMenu: SettingsMenuResponse | null;
+    /**
+     * `FLEET_ENABLED`, resolved on the server. Defaults to true so a
+     * caller that has not been updated still shows the tab — the flag
+     * exists to let an operator turn Fleet OFF, never to make the
+     * shipped default depend on someone remembering to pass a prop.
+     */
+    fleetEnabled?: boolean;
 }
 
 interface StaticTab {
