@@ -4,6 +4,7 @@ import { randomUUID } from 'node:crypto';
 import { join } from 'node:path';
 import { loadSeed } from './helpers/seed';
 import { API_BASE } from './helpers/api';
+import { clickUntil } from './helpers/nav';
 
 /**
  * EW-742 P5.1 (#1516) — Operator admin UI for the per-tenant runtime
@@ -336,8 +337,14 @@ test.describe('Operator tenant runtime allow-list — admin UI (#1516)', () => {
             // intermittently fails to dispatch the onChange the React
             // listener picks up, so the `draft` set never gains the provider
             // and `isDirty` stays false → Save stays disabled.
-            await page.locator('label[for="runtime-allowlist-temporal"]').click();
-            await expect(target).toBeChecked({ timeout: 5_000 });
+            // The label capture is necessary but NOT sufficient: a click that
+            // lands before the client component wires its onChange is dropped
+            // outright, so `draft` never updates and Save stays disabled.
+            // Re-click until the box is actually checked (a landed click is
+            // never undone, because the retry stops as soon as it is true).
+            await clickUntil(page.locator('label[for="runtime-allowlist-temporal"]'), () =>
+                target.isChecked(),
+            );
             await expect(saveBtn).toBeEnabled({ timeout: 5_000 });
             await saveBtn.click();
             // Wait for the post-save UI to settle: when the action returns
@@ -375,8 +382,10 @@ test.describe('Operator tenant runtime allow-list — admin UI (#1516)', () => {
             // Click the label rather than the bare input — React onChange is
             // unreliable on direct input clicks pre-hydration (see the
             // "check a provider" case for the full rationale).
-            await page.locator('label[for="runtime-allowlist-temporal"]').click();
-            await expect(target).not.toBeChecked({ timeout: 5_000 });
+            await clickUntil(
+                page.locator('label[for="runtime-allowlist-temporal"]'),
+                async () => !(await target.isChecked()),
+            );
             const saveBtn = page.getByRole('button', { name: /Save allow-list/i });
             await expect(saveBtn).toBeEnabled({ timeout: 5_000 });
             await saveBtn.click();
@@ -408,8 +417,9 @@ test.describe('Operator tenant runtime allow-list — admin UI (#1516)', () => {
                 // Click the label rather than the bare input — same reason
                 // as the "check a provider" case (React onChange is
                 // unreliable on direct input clicks).
-                await page.locator('label[for="runtime-allowlist-bullmq"]').click();
-                await expect(bullmq).toBeChecked({ timeout: 5_000 });
+                await clickUntil(page.locator('label[for="runtime-allowlist-bullmq"]'), () =>
+                    bullmq.isChecked(),
+                );
                 const saveBtn = page.getByRole('button', { name: /Save allow-list/i });
                 await expect(saveBtn).toBeEnabled({ timeout: 5_000 });
                 // The Save action is a Next.js Server Action → POST to the
@@ -511,7 +521,9 @@ test.describe('Operator tenant runtime allow-list — admin UI (#1516)', () => {
             // Force a dirty state we can save — click the label so the
             // onChange propagates reliably to React (see check-a-provider
             // for the rationale).
-            await page.locator('label[for="runtime-allowlist-inngest"]').click();
+            await clickUntil(page.locator('label[for="runtime-allowlist-inngest"]'), () =>
+                target.isChecked(),
+            );
             const saveBtn = page.getByRole('button', { name: /Save allow-list/i });
             await expect(saveBtn).toBeEnabled({ timeout: 5_000 });
             // The Save action is a Next.js Server Action → POST to the page
