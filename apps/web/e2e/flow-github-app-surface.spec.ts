@@ -88,7 +88,7 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *
  *   Webhook receiver — POST /api/github-app/webhooks (@Public):
  *                 - X-GitHub-Event present but NO body (rawBody absent) →
- *                   400 {message:'Missing raw webhook payload', error:
+ *                   400 {message:'Missing raw request payload', error:
  *                   'Bad Request'} (the rawBody guard, ordered after the
  *                   event-name guard, before signature verification —
  *                   NOT covered by the signature sibling).
@@ -402,7 +402,7 @@ test.describe('GitHub-App controller surface — authz + contracts', () => {
 
     // ── 12 ── webhook receiver: the rawBody-presence guard (distinct from
     //          the signature matrix the sibling owns) — an event header
-    //          with NO body is a 400 "Missing raw webhook payload"; and a
+    //          with NO body is a 400 "Missing raw request payload"; and a
     //          GET on the POST-only route is a 404. Both prove the public
     //          receiver is shaped correctly before authenticity is even
     //          considered.
@@ -420,7 +420,10 @@ test.describe('GitHub-App controller surface — authz + contracts', () => {
             error: string;
         };
         expect(noBodyJson.error).toBe('Bad Request');
-        expect(noBodyJson.message).toBe('Missing raw webhook payload');
+        // The route now delegates to the shared GitHub webhook dispatcher,
+        // which words this "raw request payload". The guard that fired is what
+        // this test owns, not the spelling of its message.
+        expect(noBodyJson.message).toMatch(/missing raw (request|webhook) payload/i);
 
         // Wrong method on the webhook path → NestJS 404 route-not-found.
         const wrongMethod = await request.get(`${API_BASE}${WEBHOOKS}`);

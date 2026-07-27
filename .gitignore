@@ -77,3 +77,8 @@ packages/tasks/plugins
 
 # Generated OpenAPI artifact (pnpm generate:openapi) — never commit
 apps/api/openapi.json
+
+# Local dev server logs (run-api.ps1 / run-web.ps1 redirect here)
+api.log
+web.log
+api-mem.log

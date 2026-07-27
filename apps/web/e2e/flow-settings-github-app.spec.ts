@@ -48,8 +48,11 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *        contract worth pinning, they come from different exceptions.)
  *     - POST /webhooks  (@Public) event header → raw body → signature, in that
  *         order: missing event 400 "Missing GitHub event header"; event but
- *         empty body 400 "Missing raw webhook payload"; event + body, bad/no
- *         sig 401 "Invalid GitHub webhook signature".
+ *         empty body 400 "Missing raw request payload"; event + body, bad/no
+ *         sig 401 — either "Invalid GitHub webhook signature" (a binding
+ *         exists and the HMAC refuses) or "GitHub events receiver is not
+ *         configured" (nothing registered anywhere, as on the keyless e2e
+ *         stack). Which door fires is deployment state, not request shape.
  *     - wrong HTTP method on any path → 404 "Cannot <METHOD> /…".
  *
  *   Web Next.js routes (apps/web/src/app/api/github-app/{setup,callback}):
@@ -442,26 +445,32 @@ test.describe('GitHub App — inbound webhook guard ORDERING (event → raw body
         expect(String((await noEvent.json()).message)).toMatch(/missing github event/i);
 
         // Rung 2 — event header present but the request carries NO raw body.
-        // The controller demands req.rawBody and 400s with a DISTINCT message
-        // ("Missing raw webhook payload") before it ever consults the secret.
+        // The receiver demands req.rawBody and 400s with a DISTINCT message
+        // before it ever consults the secret. (The shared dispatcher words it
+        // "raw request payload"; the older controller said "webhook payload" —
+        // the RUNG is what this test owns, not the noun.)
         const emptyBody = await request.post(`${API_BASE}${WEBHOOKS}`, {
             headers: { 'X-GitHub-Event': 'installation' },
         });
         expect(emptyBody.status(), 'event but empty body → 400').toBe(400);
-        expect(String((await emptyBody.json()).message)).toMatch(/missing raw webhook payload/i);
+        expect(String((await emptyBody.json()).message)).toMatch(
+            /missing raw (request|webhook) payload/i,
+        );
 
         // Rung 3 — event header AND a body present, but no (or an invalid)
-        // signature: now the signature verifier runs and rejects with 401.
-        // In CI the webhook secret is unset so this 401s unconditionally —
-        // which is exactly the safe default we want to pin (never 2xx, never
-        // 5xx for an unsigned delivery).
+        // signature: now the authenticity check runs and rejects with 401.
+        // It fails closed through two doors and which one fires is deployment
+        // state, not request shape: with no receiver registered anywhere it
+        // refuses as "not configured", and once a binding exists the HMAC is
+        // what refuses. Both are the property being pinned — an unsigned
+        // delivery is never 2xx and never 5xx.
         const unsigned = await request.post(`${API_BASE}${WEBHOOKS}`, {
             headers: { 'Content-Type': 'application/json', 'X-GitHub-Event': 'installation' },
             data: { action: 'created', installation: { id: 42 } },
         });
         expect(unsigned.status(), 'present body, no signature → 401').toBe(401);
         expect(String((await unsigned.json()).message)).toMatch(
-            /invalid github webhook signature/i,
+            /invalid github webhook signature|receiver is not configured/i,
         );
 
         // The three rungs returned three DIFFERENT (status,message) pairs —
