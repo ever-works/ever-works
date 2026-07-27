@@ -7,6 +7,7 @@ import { describe, expect, it } from 'vitest';
 import {
     canBuyCredits,
     canConfigureAutoRecharge,
+    canUpgradePlan,
     formatCardExpiry,
     formatPaymentMethod,
     invoiceStatusTone,
@@ -117,5 +118,29 @@ describe('canConfigureAutoRecharge', () => {
 
     it('is false whenever buying is off', () => {
         expect(canConfigureAutoRecharge(withCard, false)).toBe(false);
+    });
+});
+
+describe('canUpgradePlan — a tier is only sellable when it can also be applied', () => {
+    const configured = overview({ providerConfigured: true });
+
+    it('needs the payments master switch', () => {
+        expect(canUpgradePlan(configured, false, true)).toBe(false);
+    });
+
+    it('needs a configured provider', () => {
+        expect(canUpgradePlan(overview({ providerConfigured: false }), true, true)).toBe(false);
+    });
+
+    it('needs subscriptions to be enabled — an upgrade that cannot apply is not offered', () => {
+        expect(canUpgradePlan(configured, true, false)).toBe(false);
+    });
+
+    it('is false when the overview could not be loaded at all', () => {
+        expect(canUpgradePlan(null, true, true)).toBe(false);
+    });
+
+    it('is true only when all three gates pass', () => {
+        expect(canUpgradePlan(configured, true, true)).toBe(true);
     });
 });

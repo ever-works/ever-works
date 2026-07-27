@@ -77,6 +77,84 @@ export interface CreditCheckoutSession {
     readonly customerId: string;
 }
 
+/**
+ * A subscription plan, priced by the SERVER from `subscription_plans`.
+ *
+ * The seam deliberately takes a flat descriptor rather than the TypeORM
+ * entity: a provider implementation must never reach into our schema,
+ * and the caller must be the one that decided what this plan costs.
+ */
+export interface BillingPlanDescriptor {
+    /** `subscription_plans.code` — echoed back on the provider event. */
+    readonly code: string;
+    /** Display label shown on the hosted checkout page. */
+    readonly label: string;
+    /** Recurring price in cents, from the server plan row. */
+    readonly priceCents: number;
+    readonly currency: string;
+    /** Only monthly today; widened here so the seam does not need a bump. */
+    readonly interval: 'month' | 'year';
+}
+
+/**
+ * Who is subscribing, and to what (audit B24). Same trust posture as
+ * {@link CreditCheckoutRequest}: the caller names a PLAN CODE, never a
+ * price, and the return URLs are built server-side.
+ */
+export interface PlanCheckoutRequest {
+    readonly userId: string;
+    readonly userEmail?: string | null;
+    readonly customerId?: string | null;
+    /** The server-resolved plan — never client-supplied numbers. */
+    readonly plan: BillingPlanDescriptor;
+    /**
+     * Where the provider returns the buyer after a successful payment.
+     *
+     * The IMPLEMENTATION is responsible for appending its own session
+     * identifier to this URL (providers use different template tokens);
+     * the caller supplies a clean, server-built URL and stays
+     * vendor-neutral. The return route needs that identifier to read the
+     * session back — see {@link CheckoutSessionSnapshot}.
+     */
+    readonly successUrl: string;
+    readonly cancelUrl: string;
+    /** `{userId}:{planCode}` — echoed back on the signed provider event. */
+    readonly referenceId: string;
+}
+
+export interface PlanCheckoutSession {
+    /** Redirect the browser here. */
+    readonly url: string;
+    readonly sessionId: string;
+    readonly customerId: string;
+}
+
+/**
+ * A read-back of a hosted checkout session, used by the RETURN route so
+ * a buyer who lands back on the Billing page sees their plan immediately
+ * instead of waiting for the asynchronous webhook.
+ *
+ * `userId` is the value WE stamped into the session metadata at creation
+ * time, so the return route can prove the session belongs to the caller
+ * before acting on it — a session id in a URL is not an authorization.
+ */
+export interface CheckoutSessionSnapshot {
+    readonly sessionId: string;
+    readonly status: 'complete' | 'open' | 'expired';
+    /** True when the provider settled the money (or none was required). */
+    readonly paid: boolean;
+    /** What the session was created for. */
+    readonly purpose: 'plan' | 'credits' | 'other';
+    /** Platform user id from OUR metadata — the ownership check. */
+    readonly userId: string | null;
+    readonly planCode: string | null;
+    readonly packId: string | null;
+    readonly customerId: string | null;
+    /** Provider subscription id, for plan sessions. */
+    readonly subscriptionId: string | null;
+    readonly currentPeriodEnd: Date | null;
+}
+
 /** Off-session charge for auto-recharge (PRD §3.4). */
 export interface OffSessionChargeRequest {
     readonly customerId: string;
@@ -144,6 +222,14 @@ export type BillingWebhookEventKind =
     | 'invoice.updated'
     /** The customer's default payment method changed. */
     | 'payment_method.updated'
+    /**
+     * A paid plan is now in force (audit B24) — first checkout, renewal,
+     * or a provider-side change back to an active/trialing state. The
+     * ONLY billing-verified path that may grant a paid tier.
+     */
+    | 'subscription.activated'
+    /** A paid plan lapsed (cancelled, unpaid, or deleted). */
+    | 'subscription.canceled'
     /** Recognized envelope, no action for us. */
     | 'ignored';
 
@@ -168,6 +254,18 @@ export interface BillingWebhookEvent {
     readonly paymentId: string | null;
     /** Raw provider event type, for logging/diagnostics. Never a secret. */
     readonly providerType: string;
+    /**
+     * Plan code echoed from OUR subscription metadata. Populated for
+     * `subscription.*` kinds only. Optional so the existing credit-path
+     * event literals stay valid.
+     */
+    readonly planCode?: string | null;
+    /** Provider subscription id, for `subscription.*` kinds. */
+    readonly subscriptionId?: string | null;
+    /** End of the paid period currently in force. */
+    readonly currentPeriodEnd?: Date | null;
+    /** The provider will not renew at `currentPeriodEnd`. */
+    readonly cancelAtPeriodEnd?: boolean | null;
 }
 
 export abstract class BillingProvider {
@@ -213,6 +311,24 @@ export abstract class BillingProvider {
     async createCreditCheckoutSession(
         _request: CreditCheckoutRequest,
     ): Promise<CreditCheckoutSession> {
+        throw new BillingProviderNotConfiguredError();
+    }
+
+    /**
+     * Hosted checkout for a recurring PLAN subscription (audit B24).
+     * Same posture as the credit checkout: the caller hands over a
+     * server-priced plan descriptor, never a client number.
+     */
+    async createPlanCheckoutSession(_request: PlanCheckoutRequest): Promise<PlanCheckoutSession> {
+        throw new BillingProviderNotConfiguredError();
+    }
+
+    /**
+     * Read one hosted checkout session back, for the return route. The
+     * snapshot carries the metadata WE stamped at creation time so the
+     * caller can verify ownership before acting on it.
+     */
+    async retrieveCheckoutSession(_sessionId: string): Promise<CheckoutSessionSnapshot> {
         throw new BillingProviderNotConfiguredError();
     }
 

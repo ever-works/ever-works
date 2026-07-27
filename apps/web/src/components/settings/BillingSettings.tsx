@@ -10,6 +10,7 @@ import { Select } from '@/components/ui/select';
 import {
     changePlanAction,
     startCreditCheckoutAction,
+    startPlanCheckoutAction,
     updateAutoRechargeAction,
 } from '@/app/actions/dashboard/billing';
 import {
@@ -29,6 +30,7 @@ import {
 import {
     canBuyCredits,
     canConfigureAutoRecharge,
+    canUpgradePlan,
     formatCardExpiry,
     formatPaymentMethod,
     invoiceStatusTone,
@@ -126,6 +128,12 @@ export function BillingSettings({
     const [selectedPackId, setSelectedPackId] = useState<string | null>(packs[0]?.id ?? null);
     const [checkoutPending, setCheckoutPending] = useState(false);
 
+    // Paid-tier purchase (audit B24). Same two gates as buying credits,
+    // plus subscriptions being enabled — an upgrade the deployment can't
+    // apply must not be offered as a live button.
+    const upgradeEnabled = canUpgradePlan(overview, paymentsEnabled, subscriptionsEnabled);
+    const [upgradingPlanCode, setUpgradingPlanCode] = useState<string | null>(null);
+
     const [autoRechargeOn, setAutoRechargeOn] = useState(overview?.autoRecharge.enabled ?? false);
     const [autoRechargeThreshold, setAutoRechargeThreshold] = useState(
         overview?.autoRecharge.thresholdCredits != null
@@ -158,6 +166,30 @@ export function BillingSettings({
             setCheckoutPending(false);
         }
     }, [selectedPackId, t]);
+
+    const handleUpgradePlan = useCallback(
+        async (plan: SubscriptionPlanListItem) => {
+            if (!upgradeEnabled) {
+                // Degraded deployment: keep the pre-payments affordance
+                // rather than a button that always errors.
+                toast.info(t('plans.upgradeHint'));
+                return;
+            }
+            setUpgradingPlanCode(plan.code);
+            try {
+                // Only a PLAN CODE crosses the wire — the server prices it.
+                const result = await startPlanCheckoutAction(plan.code);
+                if (result.success && result.url) {
+                    window.location.assign(result.url);
+                    return;
+                }
+                toast.error(result.error ?? t('credits.checkoutError'));
+            } finally {
+                setUpgradingPlanCode(null);
+            }
+        },
+        [upgradeEnabled, t],
+    );
 
     const handleSaveAutoRecharge = useCallback(async () => {
         setAutoRechargeSaving(true);
@@ -363,14 +395,19 @@ export function BillingSettings({
                                     </Button>
                                 ) : (
                                     // Paid tiers activate through a billing-verified
-                                    // path only (EW-711 #23) — until the payment
-                                    // provider lands this is a contact affordance.
+                                    // path only (EW-711 #23): this starts a hosted
+                                    // plan checkout (audit B24). On a deployment
+                                    // without payments it degrades to the original
+                                    // coming-soon hint rather than erroring.
                                     <Button
                                         className="text-xs w-full"
                                         data-testid={`billing-plan-upgrade-${plan.code}`}
-                                        onClick={() => toast.info(t('plans.upgradeHint'))}
+                                        disabled={upgradingPlanCode !== null}
+                                        onClick={() => void handleUpgradePlan(plan)}
                                     >
-                                        {t('plans.upgrade')}
+                                        {upgradingPlanCode === plan.code
+                                            ? t('credits.redirecting')
+                                            : t('plans.upgrade')}
                                     </Button>
                                 )}
                             </div>

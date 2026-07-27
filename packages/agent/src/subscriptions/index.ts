@@ -8,6 +8,8 @@ export * from './billing/credit-packs';
 export * from './billing/stripe-billing.provider';
 export * from './billing/billing.service';
 export * from './billing/auto-recharge.service';
+// Paid-plan purchase: checkout, return-route sync, activation (audit B24)
+export * from './billing/plan-subscription.service';
 // Credits ledger + plan entitlements (pricing Wave 9 M1)
 export * from './credits/credit-ledger.service';
 export * from './credits/entitlements.service';

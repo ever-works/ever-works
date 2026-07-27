@@ -96,6 +96,9 @@ function build(parts: Partial<Record<string, any>> = {}) {
     const ledgerRepo = parts.ledgerRepo ?? makeLedgerRepository();
     const ledgerService = parts.ledgerService ?? makeLedgerService();
     const users = parts.users ?? makeUserRepository();
+    // Paid-plan lifecycle collaborator (audit B24) — OPTIONAL, so the
+    // credit-path specs keep the original 6-argument construction.
+    const plans = parts.plans;
     const service = new BillingService(
         provider,
         profiles,
@@ -103,8 +106,9 @@ function build(parts: Partial<Record<string, any>> = {}) {
         ledgerRepo,
         ledgerService,
         users,
+        plans,
     );
-    return { service, provider, profiles, invoices, ledgerRepo, ledgerService, users };
+    return { service, provider, profiles, invoices, ledgerRepo, ledgerService, users, plans };
 }
 
 const CHECKOUT = {
@@ -682,5 +686,56 @@ describe('BillingService — overview, invoices and auto-recharge settings', () 
             autoRechargeThresholdCredits: 500,
             autoRechargePackId: 'credits-5500',
         });
+    });
+});
+
+describe('handleWebhook — paid-plan lifecycle is delegated, not duplicated (audit B24)', () => {
+    function planEvent(kind: 'subscription.activated' | 'subscription.canceled') {
+        return event({
+            id: 'evt_plan_1',
+            kind,
+            customerId: 'cus_1',
+            planCode: 'standard',
+            subscriptionId: 'sub_1',
+            providerType: 'checkout.session.completed',
+        });
+    }
+
+    it('hands a subscription event to the plan service and echoes its action', async () => {
+        const plans = { applyWebhook: jest.fn().mockResolvedValue('subscription-activated') };
+        const provider = makeProvider({
+            verifyAndParseWebhook: jest.fn().mockResolvedValue(planEvent('subscription.activated')),
+        });
+        const { service, ledgerService } = build({ provider, plans });
+
+        const outcome = await service.handleWebhook('{}', 'sig');
+
+        expect(plans.applyWebhook).toHaveBeenCalledWith(
+            expect.objectContaining({ kind: 'subscription.activated', planCode: 'standard' }),
+        );
+        expect(outcome.action).toBe('subscription-activated');
+        // A plan sale must never touch the credits ledger.
+        expect(ledgerService.record).not.toHaveBeenCalled();
+    });
+
+    it('echoes a revocation action', async () => {
+        const plans = { applyWebhook: jest.fn().mockResolvedValue('subscription-canceled') };
+        const provider = makeProvider({
+            verifyAndParseWebhook: jest.fn().mockResolvedValue(planEvent('subscription.canceled')),
+        });
+        const { service } = build({ provider, plans });
+
+        expect((await service.handleWebhook('{}', 'sig')).action).toBe('subscription-canceled');
+    });
+
+    it('acknowledges (never 500s) when plan handling is not wired', async () => {
+        const provider = makeProvider({
+            verifyAndParseWebhook: jest.fn().mockResolvedValue(planEvent('subscription.activated')),
+        });
+        const { service } = build({ provider });
+
+        // A 5xx here would make the provider retry a delivery we can
+        // never resolve.
+        expect((await service.handleWebhook('{}', 'sig')).action).toBe('ignored');
     });
 });
