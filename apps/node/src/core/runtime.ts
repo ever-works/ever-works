@@ -5,12 +5,15 @@ import { HeartbeatLoop, type Scheduler } from './heartbeat';
 import { WorkerLoop } from './worker-loop';
 import { runAcceptanceChecksJob } from './executors/acceptance-checks';
 import { runAgentTaskJob } from './executors/agent-task';
+import { runBrowserCheckJob } from './executors/browser-check';
 import type { Logger } from './logger';
 import {
 	DEFAULT_HEARTBEAT_INTERVAL_MS,
 	MAX_HEARTBEAT_INTERVAL_MS,
 	MIN_HEARTBEAT_INTERVAL_MS,
 	type FleetEnrollableNodeKind,
+	type FleetNodeKind,
+	type FleetNodeView,
 	type NodeConfig
 } from './types';
 
@@ -125,6 +128,13 @@ export interface CreateNodeRuntimeOptions {
 	 * service's own working directory.
 	 */
 	agentTaskWorkspacePath?: string;
+
+	/**
+	 * Start the worker drained. The node still heartbeats (so it stays
+	 * observable in Fleet) but leases nothing until it is resumed —
+	 * how `ever-works-node pause` survives a service restart.
+	 */
+	startPaused?: boolean;
 }
 
 /**
@@ -171,10 +181,10 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			...(options.concurrency !== undefined ? { concurrency: options.concurrency } : {}),
 			...(options.leaseTtlSec !== undefined ? { leaseTtlSec: options.leaseTtlSec } : {}),
 			...(options.idlePollMs !== undefined ? { idlePollMs: options.idlePollMs } : {}),
+			...(options.startPaused !== undefined ? { startPaused: options.startPaused } : {}),
 			...(io.scheduler ? { scheduler: io.scheduler } : {})
 		});
-		// The v1 executor. Registering it HERE (not inside WorkerLoop) is
-		// the executor seam: a second job kind is one more `register` call
+		// The executor seam: a job kind is one more `register` call
 		// against the same protocol — no new endpoint, no new credential.
 		worker.register('acceptance-checks', (job) => runAcceptanceChecksJob(job));
 		// The general kind. Without it an enrolled machine could only ever
@@ -188,11 +198,63 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 					: {})
 			})
 		);
+		// `browser-check` is registered ONLY when this machine actually
+		// resolved a browser executable (audit A26). A node advertising
+		// the `browser` capability with no executor behind it would fail
+		// every job that tag invited, so the tag and the executor are
+		// switched on by the SAME fact.
+		if (io.environment.browserPath) {
+			const browserPath = io.environment.browserPath;
+			worker.register('browser-check', (job) =>
+				runBrowserCheckJob(job, {
+					resolveBrowser: () => browserPath,
+					hasDisplay: io.environment.hasDisplay
+				})
+			);
+		}
 		runtime.worker = worker;
 		runtime.jobClient = jobClient;
 	}
 
 	return runtime;
+}
+
+/**
+ * Tell the platform to drain (or resume) this node, using the node's own
+ * heartbeat credential.
+ *
+ * Returns the refreshed node view so the caller can report the status
+ * the platform actually settled on rather than the one it asked for.
+ */
+export async function pauseNode(config: NodeConfig, io: NodeIo, paused: boolean): Promise<FleetNodeView> {
+	io.logger.protect(config.secret);
+	const client = new FleetClient({
+		apiUrl: config.apiUrl,
+		fetchFn: io.fetchFn,
+		logger: io.logger,
+		userAgent: io.userAgent ?? `ever-works-node/${io.version}`
+	});
+	const result = await client.pause({ nodeId: config.nodeId, secret: config.secret, paused });
+	return result.node;
+}
+
+/**
+ * Retire this node's registration on the platform.
+ *
+ * The local credential is erased by the CALLER (`clearConfig`), always,
+ * even when this call fails — an operator decommissioning a machine
+ * must not be left with a live secret on it because the API was
+ * unreachable.
+ */
+export async function unenrollNode(config: NodeConfig, io: NodeIo): Promise<void> {
+	io.logger.protect(config.secret);
+	const client = new FleetClient({
+		apiUrl: config.apiUrl,
+		fetchFn: io.fetchFn,
+		logger: io.logger,
+		userAgent: io.userAgent ?? `ever-works-node/${io.version}`
+	});
+	await client.unenroll({ nodeId: config.nodeId, secret: config.secret });
 }
 
 /** Process-signal abstraction so shutdown wiring is testable. */

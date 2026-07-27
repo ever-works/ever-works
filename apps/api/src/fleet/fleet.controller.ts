@@ -34,6 +34,8 @@ import {
     DrainFleetNodeDto,
     EnrollFleetNodeDto,
     FleetHeartbeatDto,
+    FleetNodePauseDto,
+    FleetUnenrollDto,
     UpdateFleetNodeDto,
 } from './dto/fleet.dto';
 import { FleetEnabledGuard } from './guards/fleet-enabled.guard';
@@ -57,6 +59,7 @@ const NODE_HISTORY_LIMIT = 25;
  *                                             old secret dies immediately
  *   POST   /api/fleet/nodes/:id/drain         drain: disable AND requeue
  *                                             the node's in-flight claims
+ *   PATCH  /api/fleet/nodes/:id               rename / pause / disable
  *   DELETE /api/fleet/nodes/:id               remove registration
  *   GET    /api/fleet/enrollment-tokens       outstanding (unused) tokens
  *   DELETE /api/fleet/enrollment-tokens/:id   revoke one BEFORE it is used
@@ -77,6 +80,8 @@ const NODE_HISTORY_LIMIT = 25;
  *
  * `FleetEnabledGuard` gates the class on `FLEET_ENABLED`, so the
  * registry and the node work channel go dark together.
+ *   POST   /api/fleet/pause                   node drains/resumes itself
+ *   POST   /api/fleet/unenroll                node retires itself
  */
 @ApiTags('fleet')
 @Controller('api/fleet')
@@ -224,6 +229,7 @@ export class FleetController {
     @ApiOperation({
         summary: 'Rename, disable/enable, and/or hand-edit the capability tags of a fleet node',
     })
+    @ApiOperation({ summary: 'Rename and/or pause/disable a fleet node' })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async update(
@@ -231,12 +237,16 @@ export class FleetController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: UpdateFleetNodeDto,
     ): Promise<FleetNodeView> {
+        // Reject only when NOTHING actionable arrived. Each field is an
+        // independent edit, so the guard has to name all four — dropping
+        // one here would 400 a perfectly valid single-field PATCH.
         if (
             typeof body.name !== 'string' &&
             typeof body.disabled !== 'boolean' &&
+            typeof body.paused !== 'boolean' &&
             !Array.isArray(body.capabilities)
         ) {
-            throw new BadRequestException('Provide name, disabled and/or capabilities');
+            throw new BadRequestException('Provide name, disabled, paused and/or capabilities');
         }
         let view: FleetNodeView | null = null;
         if (typeof body.name === 'string') {
@@ -252,6 +262,11 @@ export class FleetController {
                 body.capabilities,
                 body.capabilitiesPinned ?? true,
             );
+        }
+        // Pause first, disable second: when both arrive, the harder stop
+        // is the one that must be visible in the returned view.
+        if (typeof body.paused === 'boolean') {
+            view = await this.service.setPausedForUser(auth.userId, id, body.paused);
         }
         if (typeof body.disabled === 'boolean') {
             view = await this.service.setDisabledForUser(auth.userId, id, body.disabled);
@@ -309,5 +324,41 @@ export class FleetController {
             throw new UnauthorizedException('Invalid node credential');
         }
         return { ok: true, node: result.node };
+    }
+
+    @Public()
+    @Post('pause')
+    @ApiOperation({
+        summary:
+            'Node self-pause/resume (public, node-secret-authenticated). Pausing DRAINS: no new work is leased onto the node, the jobs it already holds keep reporting, and heartbeats stay accepted so it remains observable.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async pause(@Body() body: FleetNodePauseDto): Promise<{ ok: true; node: FleetNodeView }> {
+        const result = await this.service.setPausedByCredential(
+            body.nodeId,
+            body.secret,
+            body.paused,
+        );
+        if (!result) {
+            throw new UnauthorizedException('Invalid node credential');
+        }
+        return { ok: true, node: result.node };
+    }
+
+    @Public()
+    @Post('unenroll')
+    @ApiOperation({
+        summary:
+            'Node self-unenrollment (public, node-secret-authenticated). Deletes the registration the presented credential belongs to, which is what renders that credential worthless.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async unenroll(@Body() body: FleetUnenrollDto): Promise<{ ok: true }> {
+        const removed = await this.service.unenrollByCredential(body.nodeId, body.secret);
+        if (!removed) {
+            throw new UnauthorizedException('Invalid node credential');
+        }
+        return { ok: true };
     }
 }

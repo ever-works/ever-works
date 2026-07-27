@@ -70,11 +70,20 @@ export class UpdateFleetNodeDto {
     @ApiProperty({
         required: false,
         description:
-            'true drains the node (stops heartbeats being accepted); false re-enables it as offline until its next heartbeat.',
+            'true drains the node (no new work is leased onto it; in-flight jobs still report and heartbeats are still accepted so it stays observable); false re-enables it as offline until its next heartbeat.',
     })
     @IsOptional()
     @IsBoolean()
     disabled?: boolean;
+
+    @ApiProperty({
+        required: false,
+        description:
+            'true pauses (drains) the node without disabling it; false resumes it as offline until its next heartbeat. A paused node keeps heartbeating and keeps reporting the jobs it already holds.',
+    })
+    @IsOptional()
+    @IsBoolean()
+    paused?: boolean;
 
     @ApiProperty({
         required: false,
@@ -168,6 +177,23 @@ export class EnrollFleetNodeDto extends FleetNodeSelfDescriptionDto {
 }
 
 /**
+ * Credential pair every node-initiated fleet call carries. The
+ * `(nodeId, secret)` pair IS the credential — checked constant-time
+ * against the stored sha256, fail-closed to one undifferentiated 401.
+ */
+export class FleetNodeCredentialDto {
+    @ApiProperty({ format: 'uuid' })
+    @IsUUID()
+    nodeId: string;
+
+    @ApiProperty({ minLength: 16, maxLength: 256, description: 'Node secret minted at enroll.' })
+    @IsString()
+    @MinLength(16)
+    @MaxLength(256)
+    secret: string;
+}
+
+/**
  * Request body for the PUBLIC `POST /api/fleet/heartbeat` — node
  * credential auth (constant-time hash check, fail-closed 401).
  */
@@ -186,3 +212,24 @@ export class FleetHeartbeatDto extends FleetNodeSelfDescriptionDto {
     @MaxLength(FLEET_CREDENTIAL_MAX_LENGTH)
     secret: string;
 }
+
+/**
+ * Request body for the PUBLIC `POST /api/fleet/pause` — a node draining
+ * (or resuming) ITSELF with its own heartbeat credential, so an
+ * operator at the machine's keyboard does not need a platform session.
+ */
+export class FleetNodePauseDto extends FleetNodeCredentialDto {
+    @ApiProperty({
+        description:
+            'true drains this node (no new work is leased onto it; in-flight jobs still report); false resumes it.',
+    })
+    @IsBoolean()
+    paused: boolean;
+}
+
+/**
+ * Request body for the PUBLIC `POST /api/fleet/unenroll` — a node
+ * retiring its own registration. Deleting the row is what makes the
+ * credential worthless from that moment on.
+ */
+export class FleetUnenrollDto extends FleetNodeCredentialDto {}

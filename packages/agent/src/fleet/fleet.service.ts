@@ -18,9 +18,14 @@ import {
     FLEET_MAX_VERSION_LENGTH,
     FLEET_MIN_NODE_NAME_LENGTH,
 } from '@ever-works/contracts';
-import type { FleetNodeView } from '@ever-works/contracts';
+import type { FleetNodeView, FleetNodeLoadView } from '@ever-works/contracts';
 import { config } from '../config';
-import { FleetNode, FleetNodeKind, FleetNodeStatus } from '../entities/fleet-node.entity';
+import {
+    FleetNode,
+    FleetNodeKind,
+    FleetNodeStatus,
+    FLEET_NODE_STICKY_STATUSES,
+} from '../entities/fleet-node.entity';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { FleetNodeRepository } from './fleet-node.repository';
@@ -269,7 +274,15 @@ export class FleetService {
     /**
      * Authenticated node heartbeat. Constant-time secret check against
      * the stored hash; fail-closed null on any invalid path (unknown
-     * node, disabled node, missing credential, bad secret).
+     * node, still-enrolling node, missing credential, bad secret).
+     *
+     * A PAUSED or DISABLED node is still accepted (audit A29). Draining
+     * a machine must not blind the operator to it: a node that is told
+     * to stop taking work and then vanishes from Fleet is
+     * indistinguishable from one that crashed, which is precisely the
+     * moment its owner most needs to see it. The beat therefore stamps
+     * `lastHeartbeatAt` but PRESERVES the sticky status, so a heartbeat
+     * can never silently un-pause or re-enable a node.
      */
     async heartbeat(
         nodeId: unknown,
@@ -289,15 +302,15 @@ export class FleetService {
 
         const node = await this.repository.findById(nodeId);
         if (!node) return null;
-        // A disabled node must stop reporting; an enrolling node has no
-        // secret yet (the hash column still holds the token hash).
-        if (node.status === 'disabled' || node.status === 'enrolling') return null;
+        // An enrolling node has no secret yet (the hash column still
+        // holds the token hash), so it can never authenticate here.
+        if (node.status === 'enrolling') return null;
         if (!constantTimeEquals(node.enrollmentTokenHash, sha256Hex(secret))) {
             return null;
         }
 
         const patch: Partial<FleetNode> = {
-            status: 'online',
+            status: FLEET_NODE_STICKY_STATUSES.includes(node.status) ? node.status : 'online',
             // Server-stamped — the node never supplies its own clock.
             lastHeartbeatAt: new Date(),
         };
@@ -474,10 +487,16 @@ export class FleetService {
     }
 
     /**
-     * Disable (drain) or re-enable a node. Disabling an `enrolling`
-     * node revokes its unused token (the enroll CAS requires status
+     * Disable or re-enable a node. Disabling an `enrolling` node
+     * revokes its unused token (the enroll CAS requires status
      * `enrolling`); re-enabling lands on `offline` until the next
      * accepted heartbeat proves the node alive.
+     *
+     * Disabling DRAINS rather than severs: no further work is leased
+     * onto the node, but the jobs it already holds keep their claims
+     * and still report their verdicts, and the node keeps heartbeating
+     * so it remains observable (see `heartbeat` and
+     * `FleetJobService.authenticateNode`).
      */
     async setDisabledForUser(
         userId: string,
@@ -490,10 +509,106 @@ export class FleetService {
         return this.toView({ ...node, status });
     }
 
+    /**
+     * Pause (drain) or resume a node, owner-scoped.
+     *
+     * Distinct from `setDisabledForUser`: pausing is the SOFT stop an
+     * operator reaches for when a machine is needed for something else
+     * for an hour. New work stops being leased onto it immediately, its
+     * in-flight claims keep running and keep reporting, and it keeps
+     * heartbeating so it stays visible. Resuming lands on `offline`
+     * until the next accepted heartbeat proves the node alive — the
+     * same convention `setDisabledForUser` uses.
+     */
+    async setPausedForUser(
+        userId: string,
+        nodeId: string,
+        paused: boolean,
+    ): Promise<FleetNodeView> {
+        const node = await this.getOwnedNode(userId, nodeId);
+        // Never let "resume" silently undo a disable: a disabled node
+        // has to be re-enabled explicitly.
+        if (!paused && node.status === 'disabled') {
+            return this.toView(node);
+        }
+        const status: FleetNodeStatus = paused ? 'paused' : 'offline';
+        await this.repository.update(node.id, { status });
+        return this.toView({ ...node, status });
+    }
+
+    /**
+     * Node-initiated pause/resume — `ever-works-node pause` on the
+     * machine itself. Authenticated with the node's OWN heartbeat
+     * secret (the same constant-time hash check every node-facing
+     * endpoint uses), so an operator sitting at the keyboard can drain
+     * their machine without a platform session.
+     *
+     * Returns null on every invalid path so the edge answers one
+     * undifferentiated 401. A still-enrolling node cannot pause: its
+     * hash column holds a token, not a secret.
+     */
+    async setPausedByCredential(
+        nodeId: unknown,
+        secret: unknown,
+        paused: boolean,
+    ): Promise<{ node: FleetNodeView } | null> {
+        const node = await this.authenticateNodeByCredential(nodeId, secret);
+        if (!node) return null;
+        // A node may drain ITSELF, but must not be able to lift an
+        // owner-imposed disable by asking nicely.
+        if (!paused && node.status === 'disabled') {
+            return { node: this.toView(node) };
+        }
+        const status: FleetNodeStatus = paused ? 'paused' : 'offline';
+        await this.repository.update(node.id, { status });
+        return { node: this.toView({ ...node, status }) };
+    }
+
+    /**
+     * Node-initiated unenrollment — `ever-works-node unenroll`. Deletes
+     * the registration the presented credential belongs to, which is
+     * what makes the credential itself worthless from that moment on.
+     *
+     * Deliberately a DELETE rather than a status flip: the machine is
+     * telling the platform it is leaving, and leaving a dangling row
+     * whose secret still lives on a decommissioned laptop is the worse
+     * outcome. Returns false on every invalid path (one 401 at the edge).
+     */
+    async unenrollByCredential(nodeId: unknown, secret: unknown): Promise<boolean> {
+        const node = await this.authenticateNodeByCredential(nodeId, secret);
+        if (!node) return false;
+        await this.repository.delete(node.id);
+        return true;
+    }
+
     /** Delete a node registration (owner-scoped, no existence leak). */
     async deleteForUser(userId: string, nodeId: string): Promise<void> {
         const node = await this.getOwnedNode(userId, nodeId);
         await this.repository.delete(node.id);
+    }
+
+    /**
+     * Resolve + verify a node by its own heartbeat credential. Shares
+     * the heartbeat posture exactly: shape guards before any read,
+     * constant-time hash compare, null on every failure.
+     */
+    private async authenticateNodeByCredential(
+        nodeId: unknown,
+        secret: unknown,
+    ): Promise<FleetNode | null> {
+        if (typeof nodeId !== 'string' || !UUID_RE.test(nodeId)) return null;
+        if (
+            typeof secret !== 'string' ||
+            secret.length < CREDENTIAL_MIN_LENGTH ||
+            secret.length > CREDENTIAL_MAX_LENGTH
+        ) {
+            return null;
+        }
+        const node = await this.repository.findById(nodeId);
+        if (!node) return null;
+        if (node.status === 'enrolling') return null;
+        if (!constantTimeEquals(node.enrollmentTokenHash, sha256Hex(secret))) return null;
+        return node;
     }
 
     private async getOwnedNode(userId: string, nodeId: string): Promise<FleetNode> {
