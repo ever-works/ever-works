@@ -1,8 +1,20 @@
 import 'server-only';
 import { serverFetch } from './server-api';
-import type { BillingOverview, CreditCheckoutResponse, InvoiceListPage } from './billing.shared';
+import type {
+    BillingOverview,
+    CreditCheckoutResponse,
+    InvoiceListPage,
+    PlanCheckoutResponse,
+    PlanCheckoutReturnResponse,
+} from './billing.shared';
 
-export type { BillingOverview, CreditCheckoutResponse, InvoiceListPage };
+export type {
+    BillingOverview,
+    CreditCheckoutResponse,
+    InvoiceListPage,
+    PlanCheckoutResponse,
+    PlanCheckoutReturnResponse,
+};
 
 /**
  * The money path (billing PRD B5) — server-side wrappers over
@@ -42,6 +54,39 @@ export const billingAPI = {
             method: 'POST',
             body: JSON.stringify({ packId }),
         });
+    },
+
+    /**
+     * Start a paid-plan checkout (audit B24). The body carries a PLAN
+     * CODE (and optionally an org the caller belongs to) — the API prices
+     * it from `subscription_plans` and rejects any price field. The
+     * return URLs are built by the API from `WEB_URL`, never here.
+     */
+    async startPlanCheckout(
+        planCode: string,
+        organizationId?: string | null,
+    ): Promise<PlanCheckoutResponse> {
+        const body: { planCode: string; organizationId?: string } = { planCode };
+        if (organizationId) {
+            body.organizationId = organizationId;
+        }
+        return serverFetch<PlanCheckoutResponse>('/billing/checkout/plan', {
+            method: 'POST',
+            body: JSON.stringify(body),
+        });
+    },
+
+    /**
+     * Finalize the browser's return from a plan checkout so the new tier
+     * shows immediately. The webhook is still the authority; this call is
+     * idempotent and scoped to the session user by the API.
+     */
+    async completePlanCheckout(sessionId: string): Promise<PlanCheckoutReturnResponse> {
+        const search = new URLSearchParams({ sessionId });
+        return serverFetch<PlanCheckoutReturnResponse>(
+            `/billing/checkout/plan/return?${search.toString()}`,
+            { method: 'GET' },
+        );
     },
 
     /** Enable/disable threshold-triggered top-ups. */

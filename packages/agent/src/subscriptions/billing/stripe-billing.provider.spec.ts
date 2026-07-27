@@ -46,6 +46,7 @@ function fakeClient(overrides: Record<string, unknown> = {}) {
                 create: jest
                     .fn()
                     .mockResolvedValue({ id: 'cs_1', url: 'https://pay.example/cs_1' }),
+                retrieve: jest.fn(),
             },
         },
         paymentIntents: {
@@ -520,5 +521,312 @@ describe('StripeBillingProvider — event normalization', () => {
 
         expect(normalized.customerId).toBe('cus_expanded');
         expect(normalized.paymentId).toBe('pi_expanded');
+    });
+});
+
+describe('StripeBillingProvider — paid-plan checkout (audit B24)', () => {
+    beforeEach(() => {
+        process.env.STRIPE_SECRET_KEY = 'sk_test_x';
+    });
+
+    const planRequest = {
+        userId: 'u1',
+        customerId: 'cus_1',
+        plan: {
+            code: 'standard',
+            label: 'Standard plan',
+            priceCents: 2900,
+            currency: 'usd',
+            interval: 'month' as const,
+        },
+        successUrl: 'https://app.test/settings/billing?plan=success',
+        cancelUrl: 'https://app.test/settings/billing?plan=cancelled',
+        referenceId: 'u1:standard',
+    };
+
+    it('creates a recurring session priced from the SERVER plan descriptor', async () => {
+        const { provider, client } = build();
+
+        const session = await provider.createPlanCheckoutSession(planRequest);
+
+        expect(session).toEqual({
+            url: 'https://pay.example/cs_1',
+            sessionId: 'cs_1',
+            customerId: 'cus_1',
+        });
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        expect(params.mode).toBe('subscription');
+        expect(params.line_items[0].price_data.unit_amount).toBe(2900);
+        expect(params.line_items[0].price_data.recurring).toEqual({ interval: 'month' });
+    });
+
+    it('mirrors the plan metadata onto the SUBSCRIPTION so renewals stay attributable', async () => {
+        const { provider, client } = build();
+
+        await provider.createPlanCheckoutSession(planRequest);
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        expect(params.metadata[STRIPE_METADATA_KEYS.kind]).toBe(
+            STRIPE_PURCHASE_KINDS.planSubscription,
+        );
+        expect(params.metadata[STRIPE_METADATA_KEYS.planCode]).toBe('standard');
+        // Unlike the credit path, the lifecycle events are a DIFFERENT
+        // decision and must carry the plan themselves.
+        expect(params.subscription_data.metadata).toEqual(params.metadata);
+    });
+
+    it('appends its own session-id token to the caller’s clean success URL', async () => {
+        const { provider, client } = build();
+
+        await provider.createPlanCheckoutSession(planRequest);
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        expect(params.success_url).toBe(
+            'https://app.test/settings/billing?plan=success&session_id={CHECKOUT_SESSION_ID}',
+        );
+        // The cancel URL is passed through untouched.
+        expect(params.cancel_url).toBe('https://app.test/settings/billing?plan=cancelled');
+    });
+
+    it('fails closed with no secret key', async () => {
+        delete process.env.STRIPE_SECRET_KEY;
+        const { provider } = build();
+
+        await expect(provider.createPlanCheckoutSession(planRequest)).rejects.toBeInstanceOf(
+            BillingProviderNotConfiguredError,
+        );
+    });
+
+    it('reads a session back with the metadata WE stamped (the ownership check)', async () => {
+        const client = fakeClient();
+        client.checkout.sessions.retrieve = jest.fn().mockResolvedValue({
+            id: 'cs_plan_1',
+            status: 'complete',
+            payment_status: 'paid',
+            customer: 'cus_1',
+            subscription: { id: 'sub_1', current_period_end: 1790000000 },
+            metadata: {
+                [STRIPE_METADATA_KEYS.kind]: STRIPE_PURCHASE_KINDS.planSubscription,
+                [STRIPE_METADATA_KEYS.userId]: 'u1',
+                [STRIPE_METADATA_KEYS.planCode]: 'standard',
+            },
+        });
+        const { provider } = build(client);
+
+        const snapshot = await provider.retrieveCheckoutSession('cs_plan_1');
+
+        expect(snapshot).toEqual(
+            expect.objectContaining({
+                sessionId: 'cs_plan_1',
+                status: 'complete',
+                paid: true,
+                purpose: 'plan',
+                userId: 'u1',
+                planCode: 'standard',
+                customerId: 'cus_1',
+                subscriptionId: 'sub_1',
+            }),
+        );
+        expect(snapshot.currentPeriodEnd).toEqual(new Date(1790000000 * 1000));
+    });
+
+    it('treats a trial session (no payment required) as settled', async () => {
+        const client = fakeClient();
+        client.checkout.sessions.retrieve = jest.fn().mockResolvedValue({
+            id: 'cs_plan_2',
+            status: 'complete',
+            payment_status: 'no_payment_required',
+            metadata: {
+                [STRIPE_METADATA_KEYS.kind]: STRIPE_PURCHASE_KINDS.planSubscription,
+                [STRIPE_METADATA_KEYS.userId]: 'u1',
+                [STRIPE_METADATA_KEYS.planCode]: 'standard',
+            },
+        });
+        const { provider } = build(client);
+
+        expect((await provider.retrieveCheckoutSession('cs_plan_2')).paid).toBe(true);
+    });
+
+    it('labels a credit session read through this route as `credits`, not `plan`', async () => {
+        const client = fakeClient();
+        client.checkout.sessions.retrieve = jest.fn().mockResolvedValue({
+            id: 'cs_1',
+            status: 'complete',
+            payment_status: 'paid',
+            metadata: {
+                [STRIPE_METADATA_KEYS.kind]: STRIPE_PURCHASE_KINDS.checkout,
+                [STRIPE_METADATA_KEYS.userId]: 'u1',
+                [STRIPE_METADATA_KEYS.packId]: 'credits-1000',
+            },
+        });
+        const { provider } = build(client);
+
+        const snapshot = await provider.retrieveCheckoutSession('cs_1');
+        expect(snapshot.purpose).toBe('credits');
+        expect(snapshot.planCode).toBeNull();
+    });
+
+    it('never echoes the provider message when a session cannot be read', async () => {
+        const client = fakeClient();
+        client.checkout.sessions.retrieve = jest
+            .fn()
+            .mockRejectedValue(new Error('No such checkout.session: cs_secret; req_123'));
+        const { provider } = build(client);
+
+        await expect(provider.retrieveCheckoutSession('cs_missing')).rejects.toMatchObject({
+            name: 'BillingProviderError',
+            message: 'Checkout session could not be read',
+        });
+    });
+});
+
+describe('StripeBillingProvider — subscription event normalization (audit B24)', () => {
+    beforeEach(() => {
+        process.env.STRIPE_SECRET_KEY = 'sk_test_x';
+        process.env.STRIPE_WEBHOOK_SECRET = 'whsec_x';
+    });
+
+    function parse(raw: any) {
+        const client = fakeClient({
+            webhooks: { constructEvent: jest.fn().mockReturnValue(raw) },
+        });
+        const { provider } = build(client);
+        return provider.verifyAndParseWebhook('{}', 'sig');
+    }
+
+    const planMeta = {
+        [STRIPE_METADATA_KEYS.kind]: STRIPE_PURCHASE_KINDS.planSubscription,
+        [STRIPE_METADATA_KEYS.userId]: 'u1',
+        [STRIPE_METADATA_KEYS.planCode]: 'standard',
+        [STRIPE_METADATA_KEYS.referenceId]: 'u1:standard',
+    };
+
+    it('normalizes a paid plan checkout to subscription.activated', async () => {
+        const normalized = await parse({
+            id: 'evt_p1',
+            type: 'checkout.session.completed',
+            data: {
+                object: {
+                    payment_status: 'paid',
+                    customer: 'cus_1',
+                    client_reference_id: 'u1:standard',
+                    subscription: 'sub_1',
+                    amount_total: 2900,
+                    currency: 'usd',
+                    metadata: planMeta,
+                },
+            },
+        });
+
+        expect(normalized).toEqual(
+            expect.objectContaining({
+                kind: 'subscription.activated',
+                planCode: 'standard',
+                subscriptionId: 'sub_1',
+                customerId: 'cus_1',
+                referenceId: 'u1:standard',
+            }),
+        );
+    });
+
+    it('never activates a plan from an unpaid checkout session', async () => {
+        const normalized = await parse({
+            id: 'evt_p2',
+            type: 'checkout.session.completed',
+            data: { object: { payment_status: 'unpaid', metadata: planMeta } },
+        });
+
+        expect(normalized.kind).toBe('ignored');
+    });
+
+    it('does not confuse a plan checkout with a credit top-up', async () => {
+        const normalized = await parse({
+            id: 'evt_p3',
+            type: 'checkout.session.completed',
+            data: {
+                object: { payment_status: 'paid', amount_total: 2900, metadata: planMeta },
+            },
+        });
+
+        // A plan sale must NEVER credit the usage ledger.
+        expect(normalized.kind).not.toBe('credits.purchased');
+        expect(normalized.packId).toBeNull();
+    });
+
+    it('normalizes an active subscription update to subscription.activated', async () => {
+        const normalized = await parse({
+            id: 'evt_p4',
+            type: 'customer.subscription.updated',
+            data: {
+                object: {
+                    id: 'sub_1',
+                    status: 'active',
+                    customer: 'cus_1',
+                    cancel_at_period_end: true,
+                    current_period_end: 1790000000,
+                    metadata: planMeta,
+                },
+            },
+        });
+
+        expect(normalized).toEqual(
+            expect.objectContaining({
+                kind: 'subscription.activated',
+                subscriptionId: 'sub_1',
+                planCode: 'standard',
+                cancelAtPeriodEnd: true,
+            }),
+        );
+        expect(normalized.currentPeriodEnd).toEqual(new Date(1790000000 * 1000));
+    });
+
+    it('reads the period end from the subscription ITEM when the root field is absent', async () => {
+        const normalized = await parse({
+            id: 'evt_p5',
+            type: 'customer.subscription.updated',
+            data: {
+                object: {
+                    id: 'sub_1',
+                    status: 'trialing',
+                    metadata: planMeta,
+                    items: { data: [{ current_period_end: 1790000001 }] },
+                },
+            },
+        });
+
+        expect(normalized.kind).toBe('subscription.activated');
+        expect(normalized.currentPeriodEnd).toEqual(new Date(1790000001 * 1000));
+    });
+
+    it('normalizes a deleted subscription to subscription.canceled', async () => {
+        const normalized = await parse({
+            id: 'evt_p6',
+            type: 'customer.subscription.deleted',
+            data: { object: { id: 'sub_1', status: 'canceled', metadata: planMeta } },
+        });
+
+        expect(normalized.kind).toBe('subscription.canceled');
+        expect(normalized.subscriptionId).toBe('sub_1');
+    });
+
+    it('does NOT revoke a plan on a transient dunning state', async () => {
+        for (const status of ['past_due', 'incomplete']) {
+            const normalized = await parse({
+                id: `evt_p7_${status}`,
+                type: 'customer.subscription.updated',
+                data: { object: { id: 'sub_1', status, metadata: planMeta } },
+            });
+            expect(normalized.kind).toBe('ignored');
+        }
+    });
+
+    it('ignores a subscription that is not one of ours', async () => {
+        const normalized = await parse({
+            id: 'evt_p8',
+            type: 'customer.subscription.updated',
+            data: { object: { id: 'sub_other', status: 'active', metadata: {} } },
+        });
+
+        expect(normalized.kind).toBe('ignored');
     });
 });

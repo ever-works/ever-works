@@ -11,6 +11,12 @@ import {
 import { StripeBillingProvider, STRIPE_METADATA_KEYS } from './billing/stripe-billing.provider';
 import { BillingService, UnknownCreditPackError } from './billing/billing.service';
 import { AutoRechargeService } from './billing/auto-recharge.service';
+import {
+    CheckoutSessionNotFoundError,
+    PlanNotPurchasableError,
+    PlanSubscriptionService,
+    UnknownSubscriptionPlanError,
+} from './billing/plan-subscription.service';
 import { CREDIT_PACKS, CREDIT_PACK_IDS } from './billing/credit-packs';
 import { CreditLedgerService, InsufficientCreditsError } from './credits/credit-ledger.service';
 import { ENTITLEMENT_KEYS, EntitlementsService } from './credits/entitlements.service';
@@ -84,6 +90,17 @@ describe('SubscriptionsModule + barrel re-exports', () => {
             expect(subscriptionsBarrel.BillingProviderError).toBe(BillingProviderError);
         });
 
+        it('re-exports the paid-plan purchase path (audit B24)', () => {
+            expect(subscriptionsBarrel.PlanSubscriptionService).toBe(PlanSubscriptionService);
+            expect(subscriptionsBarrel.UnknownSubscriptionPlanError).toBe(
+                UnknownSubscriptionPlanError,
+            );
+            expect(subscriptionsBarrel.PlanNotPurchasableError).toBe(PlanNotPurchasableError);
+            expect(subscriptionsBarrel.CheckoutSessionNotFoundError).toBe(
+                CheckoutSessionNotFoundError,
+            );
+        });
+
         it('exposes the documented runtime symbols only (no extras silently appearing)', () => {
             const runtimeKeys = Object.keys(subscriptionsBarrel).sort();
             expect(runtimeKeys).toEqual(
@@ -108,6 +125,11 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                     'BILLING_PAYMENT_REF_TYPE',
                     'UnknownCreditPackError',
                     'AutoRechargeService',
+                    // Paid-plan purchase (audit B24)
+                    'PlanSubscriptionService',
+                    'UnknownSubscriptionPlanError',
+                    'PlanNotPurchasableError',
+                    'CheckoutSessionNotFoundError',
                     // Credits ledger + plan entitlements (pricing Wave 9 M1)
                     'CreditLedgerService',
                     'InsufficientCreditsError',
@@ -194,6 +216,11 @@ describe('SubscriptionsModule + barrel re-exports', () => {
             expect(exports).toContain(AutoRechargeService);
         });
 
+        it('declares + exports PlanSubscriptionService (audit B24 — paid-plan checkout)', () => {
+            expect(getMeta('providers')).toContain(PlanSubscriptionService);
+            expect(getMeta('exports')).toContain(PlanSubscriptionService);
+        });
+
         it('pins the credit-pack table to the packs published on the website', () => {
             expect(CREDIT_PACK_IDS).toEqual(['credits-1000', 'credits-5500', 'credits-25000']);
             expect(CREDIT_PACKS.map((p) => [p.priceCents, p.credits])).toEqual([
@@ -209,6 +236,9 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                 userId: 'ever_works_user_id',
                 packId: 'ever_works_pack_id',
                 referenceId: 'ever_works_reference_id',
+                // Audit B24 — mirrored onto subscription_data.metadata so
+                // renewals/cancels stay attributable to a tier.
+                planCode: 'ever_works_plan_code',
             });
         });
 

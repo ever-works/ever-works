@@ -79,6 +79,29 @@ export interface CreditCheckoutResponse {
     credits: number;
 }
 
+/** Paid-plan checkout (audit B24). Prices are echoed FROM the server. */
+export interface PlanCheckoutResponse {
+    status: string;
+    url: string;
+    sessionId: string;
+    planCode: string;
+    priceCents: number;
+    currency: string;
+}
+
+/** Result of finalizing the browser's return from a plan checkout. */
+export interface PlanCheckoutReturnResponse {
+    /**
+     * `active` once the tier is in force; `pending` while money settles;
+     * `ignored` when a credit top-up session returned through this plan
+     * route — not an error, it simply activates no plan.
+     */
+    status: 'active' | 'pending' | 'ignored';
+    /** True once the plan is actually in force for the owner. */
+    activated: boolean;
+    planCode: string | null;
+}
+
 // ── Pure helpers (unit-tested in billing.shared.unit.spec.ts) ───────
 
 /** Bonus credits a pack grants over the 1 credit = 1¢ par rate. */
@@ -138,4 +161,18 @@ export function canConfigureAutoRecharge(
     paymentsEnabled: boolean,
 ): boolean {
     return canBuyCredits(overview, paymentsEnabled) && Boolean(overview?.paymentMethod);
+}
+
+/**
+ * A paid tier is purchasable only when the deployment's master switch is
+ * on, the provider is wired AND subscriptions are enabled (an upgrade
+ * that cannot be applied must not be offered). Same single-testable-place
+ * rule as {@link canBuyCredits} — audit B24.
+ */
+export function canUpgradePlan(
+    overview: BillingOverview | null,
+    paymentsEnabled: boolean,
+    subscriptionsEnabled: boolean,
+): boolean {
+    return canBuyCredits(overview, paymentsEnabled) && subscriptionsEnabled;
 }

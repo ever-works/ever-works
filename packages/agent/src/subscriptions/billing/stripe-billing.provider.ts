@@ -14,11 +14,14 @@ import {
     type BillingInvoiceSnapshot,
     type BillingWebhookEvent,
     type BillingWebhookEventKind,
+    type CheckoutSessionSnapshot,
     type CreditCheckoutRequest,
     type CreditCheckoutSession,
     type OffSessionChargeRequest,
     type OffSessionChargeResult,
     type PaymentMethodSummary,
+    type PlanCheckoutRequest,
+    type PlanCheckoutSession,
 } from './billing.provider';
 
 /**
@@ -32,12 +35,21 @@ export const STRIPE_METADATA_KEYS = {
     userId: 'ever_works_user_id',
     packId: 'ever_works_pack_id',
     referenceId: 'ever_works_reference_id',
+    /**
+     * Plan checkout (audit B24). Stamped on the checkout session AND
+     * mirrored onto `subscription_data.metadata`, so the later
+     * `customer.subscription.*` events still carry the plan we sold —
+     * without it a renewal could not be attributed to a tier.
+     */
+    planCode: 'ever_works_plan_code',
 } as const;
 
-/** `kind` metadata values — the two ways a credit purchase can originate. */
+/** `kind` metadata values — how a purchase at the provider originated. */
 export const STRIPE_PURCHASE_KINDS = {
     checkout: 'credit-topup',
     autoRecharge: 'credit-auto-recharge',
+    /** A recurring plan subscription (audit B24). */
+    planSubscription: 'plan-subscription',
 } as const;
 
 export type StripeClientFactory = (secretKey: string) => Stripe;
@@ -187,6 +199,111 @@ export class StripeBillingProvider extends BillingProvider {
         return { url: session.url, sessionId: session.id, customerId };
     }
 
+    /**
+     * Recurring plan checkout (audit B24) — `mode: 'subscription'`.
+     *
+     * Two metadata stamps, deliberately:
+     *   - on the SESSION, so `checkout.session.completed` is attributable
+     *     and the return route can prove ownership;
+     *   - mirrored onto `subscription_data.metadata`, so every later
+     *     `customer.subscription.*` (renewal, cancel, dunning) still
+     *     names the plan. Unlike the credit path — where mirroring onto
+     *     the payment intent would double-credit — a subscription's
+     *     lifecycle events are a DIFFERENT decision than the checkout, so
+     *     they must carry the plan code themselves.
+     */
+    async createPlanCheckoutSession(request: PlanCheckoutRequest): Promise<PlanCheckoutSession> {
+        const stripe = this.requireClient();
+        const customerId = await this.ensureCustomer({
+            userId: request.userId,
+            email: request.userEmail,
+            existingCustomerId: request.customerId,
+        });
+
+        const metadata = {
+            [STRIPE_METADATA_KEYS.kind]: STRIPE_PURCHASE_KINDS.planSubscription,
+            [STRIPE_METADATA_KEYS.userId]: request.userId,
+            [STRIPE_METADATA_KEYS.planCode]: request.plan.code,
+            [STRIPE_METADATA_KEYS.referenceId]: request.referenceId,
+        };
+
+        const session = await stripe.checkout.sessions.create({
+            mode: 'subscription',
+            customer: customerId,
+            client_reference_id: request.referenceId,
+            // The seam leaves the session-identifier token to the
+            // implementation; this one is Stripe's.
+            success_url: withSessionIdTemplate(request.successUrl),
+            cancel_url: request.cancelUrl,
+            line_items: [
+                {
+                    quantity: 1,
+                    price_data: {
+                        // Price comes from the SERVER plan row.
+                        currency: request.plan.currency,
+                        unit_amount: request.plan.priceCents,
+                        recurring: { interval: request.plan.interval },
+                        product_data: { name: request.plan.label },
+                    },
+                },
+            ],
+            metadata,
+            subscription_data: { metadata },
+        });
+
+        if (!session.url) {
+            throw new BillingProviderError('Checkout session did not return a redirect URL');
+        }
+        return { url: session.url, sessionId: session.id, customerId };
+    }
+
+    /**
+     * Read one hosted checkout session back for the RETURN route.
+     *
+     * Everything the caller authorizes on (`userId`, `planCode`) comes
+     * from the metadata WE wrote at creation time and the provider stored
+     * server-side — the browser only ever supplies the session id.
+     */
+    async retrieveCheckoutSession(sessionId: string): Promise<CheckoutSessionSnapshot> {
+        const stripe = this.requireClient();
+        let session: Stripe.Checkout.Session;
+        try {
+            session = await stripe.checkout.sessions.retrieve(sessionId, {
+                expand: ['subscription'],
+            });
+        } catch {
+            // Never echo the provider message — it can quote request params.
+            throw new BillingProviderError('Checkout session could not be read');
+        }
+
+        const meta = session.metadata ?? {};
+        const kind = meta[STRIPE_METADATA_KEYS.kind];
+        const subscription = session.subscription;
+        return {
+            sessionId: session.id,
+            status: normalizeSessionStatus(session.status),
+            // A subscription with a trial settles with `no_payment_required`.
+            paid:
+                session.payment_status === 'paid' ||
+                session.payment_status === 'no_payment_required',
+            purpose:
+                kind === STRIPE_PURCHASE_KINDS.planSubscription
+                    ? 'plan'
+                    : kind === STRIPE_PURCHASE_KINDS.checkout
+                      ? 'credits'
+                      : 'other',
+            userId: meta[STRIPE_METADATA_KEYS.userId] ?? null,
+            planCode: meta[STRIPE_METADATA_KEYS.planCode] ?? null,
+            packId: meta[STRIPE_METADATA_KEYS.packId] ?? null,
+            customerId: asId(session.customer),
+            subscriptionId: asId(subscription),
+            currentPeriodEnd:
+                subscription && typeof subscription === 'object'
+                    ? readCurrentPeriodEnd(subscription as Stripe.Subscription)
+                    : null,
+        };
+    }
+
     async chargeOffSession(request: OffSessionChargeRequest): Promise<OffSessionChargeResult> {
         const stripe = this.requireClient();
         try {
@@ -270,6 +387,30 @@ export class StripeBillingProvider extends BillingProvider {
             case 'checkout.session.completed': {
                 const session = event.data.object as Stripe.Checkout.Session;
                 const meta = session.metadata ?? {};
+                // A plan checkout activates a tier; it never touches the
+                // credits ledger. Handled before the credit branch so the
+                // two purchase kinds can never be confused.
+                if (meta[STRIPE_METADATA_KEYS.kind] === STRIPE_PURCHASE_KINDS.planSubscription) {
+                    // A subscription with a trial settles as
+                    // `no_payment_required` — still a live plan.
+                    if (
+                        session.payment_status !== 'paid' &&
+                        session.payment_status !== 'no_payment_required'
+                    ) {
+                        return { ...base, kind: 'ignored' };
+                    }
+                    return {
+                        ...base,
+                        kind: 'subscription.activated',
+                        customerId: asId(session.customer),
+                        referenceId: session.client_reference_id ?? null,
+                        planCode: meta[STRIPE_METADATA_KEYS.planCode] ?? null,
+                        subscriptionId: asId(session.subscription),
+                        amountCents: session.amount_total ?? null,
+                        currency: session.currency ?? null,
+                        cancelAtPeriodEnd: false,
+                    };
+                }
                 // Only OUR credit top-ups credit the ledger.
                 if (meta[STRIPE_METADATA_KEYS.kind] !== STRIPE_PURCHASE_KINDS.checkout) {
                     return { ...base, kind: 'ignored' };
@@ -347,6 +488,44 @@ export class StripeBillingProvider extends BillingProvider {
                 };
             }
 
+            case 'customer.subscription.created':
+            case 'customer.subscription.updated':
+            case 'customer.subscription.deleted': {
+                const subscription = event.data.object as Stripe.Subscription;
+                const meta = subscription.metadata ?? {};
+                // Only subscriptions WE sold carry a plan code. Anything
+                // else on this account is not ours to act on.
+                if (meta[STRIPE_METADATA_KEYS.kind] !== STRIPE_PURCHASE_KINDS.planSubscription) {
+                    return { ...base, kind: 'ignored' };
+                }
+                const live =
+                    event.type !== 'customer.subscription.deleted' &&
+                    (subscription.status === 'active' || subscription.status === 'trialing');
+                const shared = {
+                    ...base,
+                    customerId: asId(subscription.customer),
+                    planCode: meta[STRIPE_METADATA_KEYS.planCode] ?? null,
+                    referenceId: meta[STRIPE_METADATA_KEYS.referenceId] ?? null,
+                    subscriptionId: subscription.id,
+                    currentPeriodEnd: readCurrentPeriodEnd(subscription),
+                    cancelAtPeriodEnd: subscription.cancel_at_period_end ?? false,
+                };
+                if (live) {
+                    return { ...shared, kind: 'subscription.activated' };
+                }
+                // `incomplete` / `past_due` are transient dunning states —
+                // the plan is not revoked until the provider says it is.
+                if (
+                    event.type === 'customer.subscription.deleted' ||
+                    subscription.status === 'canceled' ||
+                    subscription.status === 'unpaid' ||
+                    subscription.status === 'incomplete_expired'
+                ) {
+                    return { ...shared, kind: 'subscription.canceled' };
+                }
+                return { ...shared, kind: 'ignored' };
+            }
+
             case 'payment_method.attached': {
                 const method = event.data.object as Stripe.PaymentMethod;
                 return {
@@ -394,6 +573,49 @@ function asId(value: unknown): string | null {
         return (value as { id: string }).id;
     }
     return null;
+}
+
+/**
+ * `current_period_end` moved from the subscription root onto each
+ * subscription ITEM in recent API versions. Read both shapes so the
+ * period end survives a provider API-version bump (it is display/renewal
+ * metadata — a missing value degrades to `null`, never an error).
+ */
+function readCurrentPeriodEnd(subscription: Stripe.Subscription): Date | null {
+    const raw = subscription as unknown as Record<string, unknown>;
+    const root = raw['current_period_end'];
+    if (typeof root === 'number') {
+        return toUnixDate(root);
+    }
+    const firstItem = subscription.items?.data?.[0] as unknown as
+        | Record<string, unknown>
+        | undefined;
+    const itemEnd = firstItem?.['current_period_end'];
+    return typeof itemEnd === 'number' ? toUnixDate(itemEnd) : null;
+}
+
+/**
+ * Append Stripe's `{CHECKOUT_SESSION_ID}` template to the caller's clean
+ * success URL. The provider substitutes it at redirect time, which is
+ * how the return route learns which session to read back. Kept in this
+ * file because the token is vendor-specific.
+ */
+function withSessionIdTemplate(successUrl: string): string {
+    if (successUrl.includes('{CHECKOUT_SESSION_ID}')) {
+        return successUrl;
+    }
+    const separator = successUrl.includes('?') ? '&' : '?';
+    return `${successUrl}${separator}session_id={CHECKOUT_SESSION_ID}`;
+}
+
+/** Provider session status → our closed set. Unknown ⇒ still `open`. */
+function normalizeSessionStatus(
+    status: Stripe.Checkout.Session['status'],
+): CheckoutSessionSnapshot['status'] {
+    if (status === 'complete' || status === 'expired') {
+        return status;
+    }
+    return 'open';
 }
 
 function toUnixDate(seconds: number | null | undefined): Date | null {

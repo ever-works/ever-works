@@ -80,6 +80,42 @@ export async function startCreditCheckoutAction(packId: string) {
     }
 }
 
+/**
+ * Start a paid-plan checkout (audit B24).
+ *
+ * The client sends a PLAN CODE and nothing else; the API prices it from
+ * `subscription_plans`, refuses free plans, builds the return URLs
+ * itself and scopes everything to the session user. Returns the provider
+ * redirect URL as a discriminated union so the caller can render the
+ * failure branch inline (production redacts thrown server-action
+ * messages).
+ */
+export async function startPlanCheckoutAction(planCode: string) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    try {
+        const result = await billingAPI.startPlanCheckout(planCode);
+        return { success: true as const, url: result.url, error: null };
+    } catch (error) {
+        // Security: log full error server-side; return a generic client-safe message.
+        console.error('[startPlanCheckoutAction]', error);
+        let message = 'Could not start checkout';
+        if (error instanceof ApiResponseError) {
+            if (error.statusCode === 503) {
+                message = 'Card payments are not enabled on this deployment yet.';
+            } else if (error.statusCode === 400) {
+                message = 'That plan is not available for purchase.';
+            } else if (error.statusCode === 404) {
+                message = 'Plan not found.';
+            }
+        }
+        return { success: false as const, url: null, error: message };
+    }
+}
+
 /** Update threshold-triggered auto-recharge (billing PRD §3.4). */
 export async function updateAutoRechargeAction(settings: {
     enabled: boolean;

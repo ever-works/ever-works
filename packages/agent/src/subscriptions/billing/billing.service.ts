@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { BillingProfileRepository } from '@src/database/repositories/billing-profile.repository';
 import { CreditLedgerRepository } from '@src/database/repositories/credit-ledger.repository';
 import { InvoiceRepository } from '@src/database/repositories/invoice.repository';
@@ -14,6 +14,7 @@ import {
     type BillingWebhookEvent,
 } from './billing.provider';
 import { CREDIT_PACKS, findCreditPack, type CreditPack } from './credit-packs';
+import { PlanSubscriptionService } from './plan-subscription.service';
 
 /** Correlation refType stamped on every purchase/refund ledger movement. */
 export const BILLING_PAYMENT_REF_TYPE = 'billing-payment';
@@ -76,6 +77,10 @@ export interface WebhookOutcome {
         | 'reversed-idempotent'
         | 'invoice-mirrored'
         | 'payment-method-updated'
+        // Paid-plan lifecycle (audit B24) — delegated to
+        // `PlanSubscriptionService`, which owns the tier grant/revoke.
+        | 'subscription-activated'
+        | 'subscription-canceled'
         | 'ignored'
         | 'unattributed';
     creditsDelta?: number;
@@ -114,6 +119,14 @@ export class BillingService {
         private readonly creditLedgerRepository: CreditLedgerRepository,
         private readonly creditLedgerService: CreditLedgerService,
         private readonly userRepository: UserRepository,
+        /**
+         * Paid-plan lifecycle (audit B24). Appended LAST so every
+         * existing positional construction in the specs keeps working;
+         * `@Optional()` so a caller that only needs the credits path can
+         * still build the service without the plan collaborator.
+         */
+        @Optional()
+        private readonly planSubscriptionService?: PlanSubscriptionService,
     ) {}
 
     /** Server-side pack table — the only source of prices. */
@@ -276,10 +289,30 @@ export class BillingService {
                 return this.mirrorInvoice(event);
             case 'payment_method.updated':
                 return this.applyPaymentMethod(event);
+            case 'subscription.activated':
+            case 'subscription.canceled':
+                return this.applySubscription(event);
             case 'ignored':
             default:
                 return { eventId: event.id, kind: event.kind, action: 'ignored' };
         }
+    }
+
+    /**
+     * Paid-plan lifecycle (audit B24). Delegated whole — the tier grant
+     * lives with the plan repositories, not with the credits ledger. A
+     * deployment that somehow lacks the collaborator acknowledges the
+     * delivery rather than 500-ing it into an infinite provider retry.
+     */
+    private async applySubscription(event: BillingWebhookEvent): Promise<WebhookOutcome> {
+        if (!this.planSubscriptionService) {
+            this.logger.warn(
+                `Billing webhook ${event.id}: subscription event received but plan handling is not wired — acknowledged`,
+            );
+            return { eventId: event.id, kind: event.kind, action: 'ignored' };
+        }
+        const action = await this.planSubscriptionService.applyWebhook(event);
+        return { eventId: event.id, kind: event.kind, action };
     }
 
     private async applyPurchase(event: BillingWebhookEvent): Promise<WebhookOutcome> {
