@@ -10,6 +10,8 @@ export * from './billing/billing.service';
 export * from './billing/auto-recharge.service';
 // Paid-plan purchase: checkout, return-route sync, activation (audit B24)
 export * from './billing/plan-subscription.service';
+// Payment-method management (billing PRD §3.3, audit B10 + B25)
+export * from './billing/payment-method.service';
 // Credits ledger + plan entitlements (pricing Wave 9 M1)
 export * from './credits/credit-ledger.service';
 export * from './credits/entitlements.service';

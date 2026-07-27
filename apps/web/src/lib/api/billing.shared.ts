@@ -26,6 +26,38 @@ export interface PaymentMethodSummary {
     expYear: number | null;
 }
 
+/**
+ * One stored card on the manage-payment-methods surface (billing PRD
+ * §3.3, audit B10 + B25).
+ *
+ * `id` is an opaque HANDLE, not the provider's payment-method reference —
+ * the reference never leaves the API. Everything else is display
+ * metadata; there is no field here that could carry a card number,
+ * because a card number never reaches our servers in the first place.
+ */
+export interface PaymentMethodRow {
+    id: string;
+    brand: string | null;
+    last4: string | null;
+    expMonth: number | null;
+    expYear: number | null;
+    isDefault: boolean;
+}
+
+export interface PaymentMethodListPage {
+    status: string;
+    /** False ⇒ render the coming-soon state instead of live controls. */
+    providerConfigured: boolean;
+    methods: PaymentMethodRow[];
+}
+
+export interface PaymentMethodSetupResponse {
+    status: string;
+    /** The PROVIDER'S hosted card element — redirect the browser here. */
+    url: string;
+    sessionId: string;
+}
+
 export interface AutoRechargeSettings {
     enabled: boolean;
     thresholdCredits: number | null;
@@ -168,7 +200,9 @@ export function packBonusPercent(pack: Pick<CreditPackSummary, 'priceCents' | 'c
 }
 
 /** `visa •••• 4242` — display only; the token reference never leaves the API. */
-export function formatPaymentMethod(method: PaymentMethodSummary | null): string | null {
+export function formatPaymentMethod(
+    method: Pick<PaymentMethodSummary, 'brand' | 'last4'> | null,
+): string | null {
     if (!method || !method.last4) {
         return null;
     }
@@ -177,11 +211,39 @@ export function formatPaymentMethod(method: PaymentMethodSummary | null): string
 }
 
 /** `04 / 2031`, or null when the provider gave us no expiry. */
-export function formatCardExpiry(method: PaymentMethodSummary | null): string | null {
+export function formatCardExpiry(
+    method: Pick<PaymentMethodSummary, 'expMonth' | 'expYear'> | null,
+): string | null {
     if (!method?.expMonth || !method?.expYear) {
         return null;
     }
     return `${String(method.expMonth).padStart(2, '0')} / ${method.expYear}`;
+}
+
+/**
+ * True when the manage-payment-methods surface should offer live
+ * controls. Same two gates as buying credits: the deployment master
+ * switch AND real provider keys.
+ */
+export function canManagePaymentMethods(
+    page: Pick<PaymentMethodListPage, 'providerConfigured'> | null,
+    paymentsEnabled: boolean,
+): boolean {
+    return Boolean(paymentsEnabled && page?.providerConfigured);
+}
+
+/**
+ * Whether removing this card is offerable at all.
+ *
+ * Mirrors the API rule so the button is disabled rather than clicked
+ * into a 409: the LAST card cannot be removed while a paid plan is
+ * active. The server re-checks — this is UX, not the enforcement point.
+ */
+export function canRemovePaymentMethod(
+    methods: readonly PaymentMethodRow[],
+    onPaidPlan: boolean,
+): boolean {
+    return methods.length > 1 || !onPaidPlan;
 }
 
 /** Badge tone bucket for an invoice status (colors mapped in the component). */

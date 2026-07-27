@@ -608,6 +608,65 @@ describe('BillingService — webhook: invoices + payment methods', () => {
         expect(written.paymentMethodLast4).toBe('4242');
     });
 
+    it('clears the stored summary when the DEFAULT card is detached out-of-band', async () => {
+        const profiles = makeProfileRepository({ ...PROFILE, autoRechargeEnabled: true });
+        const provider = makeProvider({
+            verifyAndParseWebhook: jest.fn().mockResolvedValue(
+                event({
+                    kind: 'payment_method.removed',
+                    customerId: 'cus_1',
+                    paymentMethod: {
+                        ref: 'pm_1',
+                        brand: 'visa',
+                        last4: '4242',
+                        expMonth: 12,
+                        expYear: 2030,
+                    },
+                }),
+            ),
+        });
+        const { service } = build({ provider, profiles });
+
+        const outcome = await service.handleWebhook('{}', 'sig');
+
+        expect(outcome.action).toBe('payment-method-removed');
+        expect(profiles.updatePaymentMethod).toHaveBeenCalledWith(
+            'u1',
+            expect.objectContaining({ defaultPaymentMethodRef: null }),
+        );
+        // Auto-recharge cannot run without a stored method — leaving the
+        // toggle on would be a lie in the UI and a guaranteed failure.
+        expect(profiles.updateAutoRecharge).toHaveBeenCalledWith(
+            'u1',
+            expect.objectContaining({ autoRechargeEnabled: false }),
+        );
+    });
+
+    it('leaves the default alone when a NON-default card is detached', async () => {
+        const profiles = makeProfileRepository(PROFILE);
+        const provider = makeProvider({
+            verifyAndParseWebhook: jest.fn().mockResolvedValue(
+                event({
+                    kind: 'payment_method.removed',
+                    customerId: 'cus_1',
+                    paymentMethod: {
+                        ref: 'pm_other',
+                        brand: 'visa',
+                        last4: '1881',
+                        expMonth: 12,
+                        expYear: 2030,
+                    },
+                }),
+            ),
+        });
+        const { service } = build({ provider, profiles });
+
+        const outcome = await service.handleWebhook('{}', 'sig');
+
+        expect(outcome.action).toBe('payment-method-removed-noop');
+        expect(profiles.updatePaymentMethod).not.toHaveBeenCalled();
+    });
+
     it('acknowledges an unhandled event type without touching the ledger', async () => {
         const provider = makeProvider({
             verifyAndParseWebhook: jest

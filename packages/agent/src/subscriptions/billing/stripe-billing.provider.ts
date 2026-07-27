@@ -23,6 +23,8 @@ import {
     type CreditCheckoutSession,
     type OffSessionChargeRequest,
     type OffSessionChargeResult,
+    type PaymentMethodSetupRequest,
+    type PaymentMethodSetupSession,
     type PaymentMethodSummary,
     type PlanCheckoutRequest,
     type PlanCheckoutSession,
@@ -56,6 +58,15 @@ export const STRIPE_PURCHASE_KINDS = {
     /** A recurring plan subscription (audit B24). */
     planSubscription: 'plan-subscription',
 } as const;
+
+/**
+ * `kind` metadata value stamped on a hosted CARD-CAPTURE session
+ * (`mode: 'setup'`). Deliberately outside {@link STRIPE_PURCHASE_KINDS}:
+ * a setup session moves no money, so a `checkout.session.completed` that
+ * carries this value must never reach the purchase branch and credit the
+ * ledger. The webhook normalizes it to `payment_method.updated`.
+ */
+export const STRIPE_SETUP_KIND = 'payment-method-setup' as const;
 
 export type StripeClientFactory = (secretKey: string) => Stripe;
 
@@ -611,6 +622,23 @@ export class StripeBillingProvider extends BillingProvider {
                 return { ...shared, kind: 'subscription.updated' };
             }
 
+            case 'payment_method.detached': {
+                // A card removed out-of-band (provider dashboard) must not
+                // leave a stale "•••• 4242" on our Billing page. The object
+                // has already lost its customer, so attribution falls back
+                // to `previous_attributes.customer`, which the provider
+                // sends inside the SIGNED envelope.
+                const method = event.data.object as Stripe.PaymentMethod;
+                const previous = (event.data as { previous_attributes?: { customer?: unknown } })
+                    .previous_attributes;
+                return {
+                    ...base,
+                    kind: 'payment_method.removed',
+                    customerId: asId(method.customer) ?? asId(previous?.customer),
+                    paymentMethod: toPaymentMethodSummary(method),
+                };
+            }
+
             case 'payment_method.attached': {
                 const method = event.data.object as Stripe.PaymentMethod;
                 return {
@@ -638,6 +666,94 @@ export class StripeBillingProvider extends BillingProvider {
             this.clientKey = secretKey as string;
         }
         return this.client;
+    }
+
+    /**
+     * A Checkout Session in `mode: 'setup'` — the provider's own hosted
+     * card element. The PAN/CVC are entered on a page STRIPE serves and
+     * posted to Stripe; this process never sees, receives or logs a card
+     * number. What comes back later (via `payment_method.attached`) is an
+     * opaque `pm_…` reference plus brand/last4/expiry.
+     *
+     * The metadata `kind` is {@link STRIPE_SETUP_KIND} and NOT one of
+     * {@link STRIPE_PURCHASE_KINDS}, so the completed-session webhook
+     * branch cannot mistake a card save for a paid top-up.
+     */
+    async createPaymentMethodSetupSession(
+        request: PaymentMethodSetupRequest,
+    ): Promise<PaymentMethodSetupSession> {
+        const stripe = this.requireClient();
+        const session = await stripe.checkout.sessions.create({
+            mode: 'setup',
+            customer: request.customerId,
+            success_url: request.successUrl,
+            cancel_url: request.cancelUrl,
+            metadata: {
+                [STRIPE_METADATA_KEYS.kind]: STRIPE_SETUP_KIND,
+                [STRIPE_METADATA_KEYS.userId]: request.userId,
+            },
+        });
+        if (!session.url) {
+            throw new BillingProviderError('Setup session did not return a redirect URL');
+        }
+        return { url: session.url, sessionId: session.id };
+    }
+    async listPaymentMethods(customerId: string): Promise<PaymentMethodSummary[]> {
+        const stripe = this.requireClient();
+        // Scoped BY CUSTOMER at the provider: the list can only ever
+        // contain cards attached to the caller's own customer record.
+        const page = await stripe.paymentMethods.list({
+            customer: customerId,
+            type: 'card',
+            limit: 20,
+        });
+        return (page.data ?? []).map(toPaymentMethodSummary);
+    }
+    /**
+     * Ownership-checked read. A `pm_…` reference is guessable-shaped, so
+     * every mutation below routes through here first: a reference that
+     * belongs to a DIFFERENT customer resolves to `null` exactly like one
+     * that does not exist, and the caller answers 404 either way.
+     */
+    async findPaymentMethod(
+        customerId: string,
+        paymentMethodRef: string,
+    ): Promise<PaymentMethodSummary | null> {
+        const stripe = this.requireClient();
+        let method: Stripe.PaymentMethod;
+        try {
+            method = await stripe.paymentMethods.retrieve(paymentMethodRef);
+        } catch {
+            // Unknown reference — never echo the provider message, it can
+            // quote the requested id back into our logs/response.
+            return null;
+        }
+        if (asId(method.customer) !== customerId) {
+            return null;
+        }
+        return toPaymentMethodSummary(method);
+    }
+    async setDefaultPaymentMethod(
+        customerId: string,
+        paymentMethodRef: string,
+    ): Promise<PaymentMethodSummary> {
+        const stripe = this.requireClient();
+        const owned = await this.findPaymentMethod(customerId, paymentMethodRef);
+        if (!owned) {
+            throw new BillingProviderError('Payment method not found', 'payment-method-not-found');
+        }
+        await stripe.customers.update(customerId, {
+            invoice_settings: { default_payment_method: paymentMethodRef },
+        });
+        return owned;
+    }
+    async detachPaymentMethod(customerId: string, paymentMethodRef: string): Promise<void> {
+        const stripe = this.requireClient();
+        const owned = await this.findPaymentMethod(customerId, paymentMethodRef);
+        if (!owned) {
+            throw new BillingProviderError('Payment method not found', 'payment-method-not-found');
+        }
+        await stripe.paymentMethods.detach(paymentMethodRef);
     }
 }
 

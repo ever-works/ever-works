@@ -16,6 +16,11 @@ import {
 } from './billing/billing.service';
 import { AutoRechargeService } from './billing/auto-recharge.service';
 import {
+    LastPaymentMethodError,
+    PaymentMethodNotFoundError,
+    PaymentMethodService,
+} from './billing/payment-method.service';
+import {
     CheckoutSessionNotFoundError,
     PlanNotPurchasableError,
     PlanSubscriptionService,
@@ -99,6 +104,9 @@ describe('SubscriptionsModule + barrel re-exports', () => {
 
         it('re-exports the paid-plan purchase path (audit B24)', () => {
             expect(subscriptionsBarrel.PlanSubscriptionService).toBe(PlanSubscriptionService);
+            expect(subscriptionsBarrel.PaymentMethodService).toBe(PaymentMethodService);
+            expect(subscriptionsBarrel.PaymentMethodNotFoundError).toBe(PaymentMethodNotFoundError);
+            expect(subscriptionsBarrel.LastPaymentMethodError).toBe(LastPaymentMethodError);
             expect(subscriptionsBarrel.UnknownSubscriptionPlanError).toBe(
                 UnknownSubscriptionPlanError,
             );
@@ -139,6 +147,14 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                     'UnknownSubscriptionPlanError',
                     'PlanNotPurchasableError',
                     'CheckoutSessionNotFoundError',
+                    // Payment methods (audit B10/B25)
+                    'PaymentMethodService',
+                    'PaymentMethodNotFoundError',
+                    'LastPaymentMethodError',
+                    // Provider-side setup-session marker + the handle
+                    // helper the payment-method routes share.
+                    'STRIPE_SETUP_KIND',
+                    'paymentMethodHandle',
                     // Credits ledger + plan entitlements (pricing Wave 9 M1)
                     'CreditLedgerService',
                     'InsufficientCreditsError',
@@ -227,6 +243,7 @@ describe('SubscriptionsModule + barrel re-exports', () => {
 
         it('declares + exports PlanSubscriptionService (audit B24 — paid-plan checkout)', () => {
             expect(getMeta('providers')).toContain(PlanSubscriptionService);
+            expect(getMeta('providers')).toContain(PaymentMethodService);
             expect(getMeta('exports')).toContain(PlanSubscriptionService);
         });
 

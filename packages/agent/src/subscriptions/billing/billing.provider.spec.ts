@@ -47,6 +47,49 @@ describe('BillingProvider abstract', () => {
         await provider.recordUsageCharge({ id: 'led-1' });
         expect(onCharge).toHaveBeenCalledWith({ id: 'led-1' });
     });
+
+    // Payment-method management (billing PRD §3.3, audit B10 + B25).
+    // Every one of these must FAIL CLOSED on the abstract, so a
+    // deployment with no provider keys can never appear to have added,
+    // replaced or removed a card.
+    describe('payment-method management defaults to not-configured', () => {
+        const provider = new TestProvider();
+
+        it('createPaymentMethodSetupSession() throws', async () => {
+            await expect(
+                provider.createPaymentMethodSetupSession({
+                    userId: 'u1',
+                    customerId: 'cus_1',
+                    successUrl: 'https://app.test/ok',
+                    cancelUrl: 'https://app.test/no',
+                }),
+            ).rejects.toBeInstanceOf(BillingProviderNotConfiguredError);
+        });
+
+        it('listPaymentMethods() throws', async () => {
+            await expect(provider.listPaymentMethods('cus_1')).rejects.toBeInstanceOf(
+                BillingProviderNotConfiguredError,
+            );
+        });
+
+        it('findPaymentMethod() throws', async () => {
+            await expect(provider.findPaymentMethod('cus_1', 'pm_1')).rejects.toBeInstanceOf(
+                BillingProviderNotConfiguredError,
+            );
+        });
+
+        it('setDefaultPaymentMethod() throws', async () => {
+            await expect(provider.setDefaultPaymentMethod('cus_1', 'pm_1')).rejects.toBeInstanceOf(
+                BillingProviderNotConfiguredError,
+            );
+        });
+
+        it('detachPaymentMethod() throws', async () => {
+            await expect(provider.detachPaymentMethod('cus_1', 'pm_1')).rejects.toBeInstanceOf(
+                BillingProviderNotConfiguredError,
+            );
+        });
+    });
 });
 
 describe('ManualBillingProvider', () => {

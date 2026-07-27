@@ -184,6 +184,32 @@ export interface PaymentMethodSummary {
     readonly expYear: number | null;
 }
 
+/**
+ * Ask the provider for a HOSTED card-capture surface (billing PRD §3.3).
+ *
+ * The browser is redirected to a page the PROVIDER serves and renders;
+ * the PAN/CVC are posted straight to them and are tokenized there. No
+ * card datum ever transits our servers, our forms, or our logs — the
+ * only thing that comes back is an opaque payment-method reference.
+ * That is the whole reason this is a redirect and not a form we own.
+ */
+export interface PaymentMethodSetupRequest {
+    readonly userId: string;
+    /** Provider customer the captured method attaches to. Server-resolved. */
+    readonly customerId: string;
+    readonly userEmail?: string | null;
+    /** Where the provider returns the buyer after saving the card. */
+    readonly successUrl: string;
+    /** Where the provider returns the buyer after cancelling. */
+    readonly cancelUrl: string;
+}
+
+export interface PaymentMethodSetupSession {
+    /** Redirect the browser here — the provider's hosted card element. */
+    readonly url: string;
+    readonly sessionId: string;
+}
+
 /** One line on a mirrored invoice. */
 export interface BillingInvoiceLine {
     readonly description: string;
@@ -282,6 +308,8 @@ export type BillingWebhookEventKind =
      * anyone.
      */
     | 'subscription.updated'
+    /** A stored payment method was detached from the customer. */
+    | 'payment_method.removed'
     /** Recognized envelope, no action for us. */
     | 'ignored';
 
@@ -300,7 +328,7 @@ export interface BillingWebhookEvent {
     readonly currency: string | null;
     /** Populated for `invoice.updated`. */
     readonly invoice?: BillingInvoiceSnapshot;
-    /** Populated for `payment_method.updated`. */
+    /** Populated for `payment_method.updated` and `payment_method.removed`. */
     readonly paymentMethod?: PaymentMethodSummary;
     /** Populated for `subscription.updated` (audit B07/B08). */
     readonly subscription?: BillingSubscriptionSnapshot;
@@ -388,6 +416,53 @@ export abstract class BillingProvider {
 
     /** Off-session charge against a stored payment method (auto-recharge). */
     async chargeOffSession(_request: OffSessionChargeRequest): Promise<OffSessionChargeResult> {
+        throw new BillingProviderNotConfiguredError();
+    }
+
+    // ── Payment-method management (billing PRD §3.3) ─────────────────
+    //
+    // Add / replace / remove, all expressed in terms of an OPAQUE
+    // provider reference. Capture is a redirect to the provider's hosted
+    // element (see {@link PaymentMethodSetupRequest}); nothing in this
+    // seam ever accepts a card number, and no implementation may add a
+    // method that does.
+
+    /** Hosted card-capture session — the ONLY way a card is added. */
+    async createPaymentMethodSetupSession(
+        _request: PaymentMethodSetupRequest,
+    ): Promise<PaymentMethodSetupSession> {
+        throw new BillingProviderNotConfiguredError();
+    }
+
+    /** Every card stored against a provider customer. Display metadata only. */
+    async listPaymentMethods(_customerId: string): Promise<PaymentMethodSummary[]> {
+        throw new BillingProviderNotConfiguredError();
+    }
+
+    /**
+     * Read one stored method, but ONLY if it belongs to `customerId`.
+     * Returns `null` when it does not exist or is owned by somebody else —
+     * the ownership check that keeps a guessed reference from reaching
+     * another account's card. Implementations must not throw for a
+     * foreign reference; a `null` lets the caller answer 404.
+     */
+    async findPaymentMethod(
+        _customerId: string,
+        _paymentMethodRef: string,
+    ): Promise<PaymentMethodSummary | null> {
+        throw new BillingProviderNotConfiguredError();
+    }
+
+    /** Promote a stored method to the customer's default (replace). */
+    async setDefaultPaymentMethod(
+        _customerId: string,
+        _paymentMethodRef: string,
+    ): Promise<PaymentMethodSummary> {
+        throw new BillingProviderNotConfiguredError();
+    }
+
+    /** Detach a stored method from the customer (remove). */
+    async detachPaymentMethod(_customerId: string, _paymentMethodRef: string): Promise<void> {
         throw new BillingProviderNotConfiguredError();
     }
 

@@ -18,8 +18,11 @@ import {
     subscriptionState,
     subscriptionStatusLabelKey,
     subscriptionStatusTone,
+    canManagePaymentMethods,
+    canRemovePaymentMethod,
     type BillingOverview,
     type SubscriptionState,
+    type PaymentMethodRow,
 } from './billing.shared';
 
 function overview(partial: Partial<BillingOverview> = {}): BillingOverview {
@@ -49,6 +52,18 @@ function subscription(partial: Partial<SubscriptionState> = {}): SubscriptionSta
     };
 }
 
+function method(partial: Partial<PaymentMethodRow> = {}): PaymentMethodRow {
+    return {
+        id: 'a'.repeat(32),
+        brand: 'visa',
+        last4: '4242',
+        expMonth: 4,
+        expYear: 2031,
+        isDefault: false,
+        ...partial,
+    };
+}
+
 describe('packBonusPercent', () => {
     it('is 0 at the 1 credit = 1¢ par rate', () => {
         expect(packBonusPercent({ priceCents: 1000, credits: 1000 })).toBe(0);
@@ -67,32 +82,22 @@ describe('packBonusPercent', () => {
 
 describe('formatPaymentMethod / formatCardExpiry', () => {
     it('renders brand + last4 only', () => {
-        expect(
-            formatPaymentMethod({ brand: 'visa', last4: '4242', expMonth: 4, expYear: 2031 }),
-        ).toBe('Visa •••• 4242');
+        expect(formatPaymentMethod({ brand: 'visa', last4: '4242' })).toBe('Visa •••• 4242');
     });
 
     it('falls back to a generic label without a brand', () => {
-        expect(
-            formatPaymentMethod({ brand: null, last4: '4242', expMonth: null, expYear: null }),
-        ).toBe('Card •••• 4242');
+        expect(formatPaymentMethod({ brand: null, last4: '4242' })).toBe('Card •••• 4242');
     });
 
     it('renders nothing when there is no card on file', () => {
         expect(formatPaymentMethod(null)).toBeNull();
-        expect(
-            formatPaymentMethod({ brand: 'visa', last4: null, expMonth: null, expYear: null }),
-        ).toBeNull();
+        expect(formatPaymentMethod({ brand: 'visa', last4: null })).toBeNull();
     });
 
     it('zero-pads the expiry month', () => {
-        expect(formatCardExpiry({ brand: 'visa', last4: '4242', expMonth: 4, expYear: 2031 })).toBe(
-            '04 / 2031',
-        );
+        expect(formatCardExpiry({ expMonth: 4, expYear: 2031 })).toBe('04 / 2031');
         expect(formatCardExpiry(null)).toBeNull();
-        expect(
-            formatCardExpiry({ brand: 'visa', last4: '4242', expMonth: null, expYear: 2031 }),
-        ).toBeNull();
+        expect(formatCardExpiry({ expMonth: null, expYear: 2031 })).toBeNull();
     });
 });
 
@@ -282,5 +287,68 @@ describe('canCancelSubscription / canResumeSubscription (B07)', () => {
                 true,
             ),
         ).toBe(false);
+    });
+});
+
+describe('canManagePaymentMethods — same two gates as buying', () => {
+    it('is false when the deployment flag is off', () => {
+        expect(canManagePaymentMethods({ providerConfigured: true }, false)).toBe(false);
+    });
+
+    it('is false when the provider is not configured', () => {
+        expect(canManagePaymentMethods({ providerConfigured: false }, true)).toBe(false);
+    });
+
+    it('is false when the list could not be loaded at all', () => {
+        expect(canManagePaymentMethods(null, true)).toBe(false);
+    });
+
+    it('is true only when both gates pass', () => {
+        expect(canManagePaymentMethods({ providerConfigured: true }, true)).toBe(true);
+    });
+});
+
+describe('canRemovePaymentMethod — the last card on a paid plan is protected', () => {
+    it('refuses the last card while a paid plan is active', () => {
+        expect(canRemovePaymentMethod([method()], true)).toBe(false);
+    });
+
+    it('allows the last card on a free plan', () => {
+        expect(canRemovePaymentMethod([method()], false)).toBe(true);
+    });
+
+    it('allows removing when a replacement exists, paid plan or not', () => {
+        const two = [method(), method({ id: 'b'.repeat(32) })];
+        expect(canRemovePaymentMethod(two, true)).toBe(true);
+        expect(canRemovePaymentMethod(two, false)).toBe(true);
+    });
+
+    it('stays conservative on an empty list — a state the server never sees', () => {
+        // The helper is a faithful mirror of the server guard, which is
+        // `all.length <= 1 && hasActivePaidSubscription` — so an empty
+        // list answers the same way a single-card list does.
+        //
+        // That case is unreachable in practice: `remove()` runs
+        // `requireOwnedMethod` first, so a card that does not exist is a
+        // 404 long before the last-card rule is consulted, and `all`
+        // therefore always holds at least the card being removed. With
+        // zero cards the UI renders no remove button at all, so the value
+        // is never read. Pinned as false because mirroring the server
+        // exactly matters more than a nicer answer to a question nobody
+        // asks.
+        expect(canRemovePaymentMethod([], true)).toBe(false);
+        expect(canRemovePaymentMethod([], false)).toBe(true);
+    });
+});
+
+describe('formatters accept a payment-method row (no provider reference needed)', () => {
+    it('formats brand + last four', () => {
+        expect(formatPaymentMethod(method({ brand: 'amex', last4: '1881' }))).toBe(
+            'Amex •••• 1881',
+        );
+    });
+
+    it('formats the expiry', () => {
+        expect(formatCardExpiry(method({ expMonth: 9, expYear: 2030 }))).toBe('09 / 2030');
     });
 });
