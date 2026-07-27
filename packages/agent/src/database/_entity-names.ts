@@ -107,6 +107,7 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'OnboardingRequest',
     'Organization',
     'OrganizationNotificationDefault',
+    'OrganizationOnboardingProfile',
     // Plan entitlements (pricing Wave 9 M1)
     'PlanEntitlement',
     'PluginUsageEvent',

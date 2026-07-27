@@ -272,7 +272,13 @@
             "slack": {
                 "name": "Slack",
                 "description": "Install the Ever Works app for Slack: mention the bot to chat with the platform, ingest channel activity into Memory and Activities, and get replies in-thread.",
-                "action": "Connect Slack"
+                "action": "Connect Slack",
+                "close": "Close",
+                "enable": "Enable Slack",
+                "enabled": "Slack is connected",
+                "enabledToast": "Slack connected",
+                "enableFailed": "Could not enable Slack. Please try again.",
+                "advancedSettings": "Advanced settings"
             },
             "discord": {
                 "name": "Discord",

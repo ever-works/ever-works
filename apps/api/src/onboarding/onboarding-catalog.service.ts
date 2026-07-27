@@ -12,6 +12,18 @@ import type {
 } from '@ever-works/contracts/api';
 
 /**
+ * Audit item (b) — connector plugins the dedicated "Communication"
+ * wizard step owns. The step now connects them IN PLACE (settings form
+ * + enable) instead of linking out to Settings → Plugins, so they are
+ * reserved out of the generic "Plugins & Integrations" list below; a
+ * user should never be offered the same connector twice in one wizard.
+ *
+ * Exported so the reservation is assertable from a spec rather than
+ * being an invisible literal inside `getCatalog`.
+ */
+export const COMMUNICATION_PLUGIN_IDS: readonly string[] = ['slack-connector', 'discord-connector'];
+
+/**
  * Builds the catalog payload the web wizard renders:
  *
  *  - AI choice cards (Ever Works AI default + 5 BYOK options)
@@ -194,6 +206,7 @@ export class OnboardingCatalogService {
                 ...storage.map((c) => c.pluginId),
                 ...db.map((c) => c.pluginId),
                 ...deploy.map((c) => c.pluginId),
+                ...COMMUNICATION_PLUGIN_IDS,
             ].filter((id): id is string => Boolean(id)),
         );
 
