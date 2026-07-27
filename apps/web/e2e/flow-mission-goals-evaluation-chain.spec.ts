@@ -138,6 +138,13 @@ const GOAL_DTO_KEYS = [
     'outcome',
     'createdAt',
     'updatedAt',
+    // Judgment layer (G1): a Goal may carry weighted success `criteria` and
+    // hard `constraints` that veto ACHIEVED, plus the `resolvedScore` the
+    // evaluator writes. Present on the DTO whether or not a given Goal uses
+    // them, so they belong in the pinned surface.
+    'criteria',
+    'constraints',
+    'resolvedScore',
 ];
 
 async function createMission(

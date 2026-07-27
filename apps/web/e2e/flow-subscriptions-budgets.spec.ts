@@ -231,19 +231,39 @@ test.describe('Flow: Subscriptions — plan shape + tier transition (enabled in 
 
         const u = await registerUserViaAPI(request);
 
-        // Every plan code in the enum is a legal transition target (proves the
-        // advertised tier set, since /plans catalogue is not exposed in this build).
+        // Every plan code in the enum is a legal transition target.
         for (const code of PLAN_CODES) {
             const res = await setPlan(request, u.access_token, code);
             expect(res.status(), `POST plan {planCode:'${code}'} status ${res.status()}`).toBe(200);
             expect(((await res.json()) as PlanResponse).plan.code).toBe(code);
         }
 
-        // The catalogue endpoint genuinely isn't exposed here.
+        // The catalogue endpoint now EXISTS (Wave 13 billing added GET /plans
+        // for the credits-forward plan switcher). It is authenticated, and it
+        // must agree with the enum this test just walked — a switcher that
+        // offers a code the transition endpoint rejects is the bug worth
+        // catching here.
+        const plansAnon = await request.get(`${API_BASE}/api/subscriptions/plans`);
+        expect(plansAnon.status(), 'plans catalogue is not public').toBe(401);
+
         const plans = await request.get(`${API_BASE}/api/subscriptions/plans`, {
             headers: authedHeaders(u.access_token),
         });
-        expect(plans.status(), 'plans catalogue not exposed in this build').toBe(404);
+        expect(plans.status(), 'plans catalogue is readable when authed').toBe(200);
+        const catalogue = (await plans.json()) as {
+            plans?: Array<{ code?: string; isCurrent?: boolean }>;
+            currentPlanCode?: string;
+        };
+        expect(Array.isArray(catalogue.plans), 'catalogue returns a plans array').toBe(true);
+        const offered = (catalogue.plans ?? []).map((p) => p.code);
+        expect(offered.length, 'catalogue is non-empty').toBeGreaterThan(0);
+        for (const code of offered) {
+            expect(PLAN_CODES, `catalogue offers unknown plan code '${code}'`).toContain(code);
+        }
+        // Exactly one row is flagged current, and it is the one just set.
+        const current = (catalogue.plans ?? []).filter((p) => p.isCurrent);
+        expect(current.length, 'exactly one plan is flagged current').toBe(1);
+        expect(current[0].code).toBe(catalogue.currentPlanCode);
 
         // Wrong body key (the web/REST shape uses `planCode`, not `code`) is whitelisted out.
         const wrongKey = await request.post(`${API_BASE}/api/subscriptions/plan`, {

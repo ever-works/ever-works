@@ -1536,6 +1536,51 @@ describe('AccountImportService', () => {
             );
         });
 
+        it('NEVER turns the research opt-out OFF from the payload (privacy ratchet)', async () => {
+            const { service, mocks } = makeService();
+            mocks.userRepository.findById.mockResolvedValue({
+                id: 'user-1',
+                username: 'octocat',
+                userResearchOptOut: true,
+            });
+
+            await service.applyImport(
+                'user-1',
+                payloadWithProfile({
+                    preferences: {
+                        emailAgentAlerts: false,
+                        userResearchOptOut: false,
+                    },
+                }),
+                [],
+            );
+
+            // An import is commonly SOMEBODY ELSE'S export, and the payload is
+            // attacker-editable JSON. Applying `userResearchOptOut: false`
+            // symmetrically would reverse a consent decision through an action
+            // nobody framed as a privacy change, so the opt-out only ratchets
+            // one way. Every other preference still round-trips its `false`.
+            const patch = mocks.userRepository.update.mock.calls[0][1];
+            expect(patch).not.toHaveProperty('userResearchOptOut');
+            expect(patch.emailAgentAlerts).toBe(false);
+        });
+
+        it('still APPLIES an opt-out of true (the ratchet only blocks weakening)', async () => {
+            const { service, mocks } = makeService();
+            mocks.userRepository.findById.mockResolvedValue({ id: 'user-1', username: 'octocat' });
+
+            await service.applyImport(
+                'user-1',
+                payloadWithProfile({ preferences: { userResearchOptOut: true } }),
+                [],
+            );
+
+            expect(mocks.userRepository.update).toHaveBeenCalledWith(
+                'user-1',
+                expect.objectContaining({ userResearchOptOut: true }),
+            );
+        });
+
         it('never applies identity or privileged columns from the payload', async () => {
             const { service, mocks } = makeService();
             mocks.userRepository.findById.mockResolvedValue({ id: 'user-1', username: 'octocat' });
