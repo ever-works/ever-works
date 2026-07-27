@@ -73,6 +73,11 @@ module.exports = {
         '^@ever-works/agent$': '<rootDir>/../../../packages/agent/src/index.ts',
         '^@ever-works/agent/(.*)$': '<rootDir>/../../../packages/agent/src/$1/index.ts',
         '^@ever-works/monitoring$': '<rootDir>/../../../packages/monitoring/src/index.ts',
+        // Desktop PRD M4 — the `node` job-runtime plugin, source-mapped
+        // so the fleet dispatch specs exercise the real
+        // NodeDispatcherFactory / NodeJobRuntimePlugin rather than a stub.
+        '^@ever-works/job-runtime-node-plugin$':
+            '<rootDir>/../../../packages/plugins/job-runtime-node/src/index.ts',
         // EW-637 — storage plugins source-mapped for tests.
         '^@ever-works/local-fs-plugin$':
             '<rootDir>/../../../packages/plugins/local-fs/src/index.ts',

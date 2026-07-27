@@ -76,7 +76,7 @@ export interface AcceptanceChecksOutcome extends Record<string, unknown> {
 }
 
 /** One check as it arrives on the wire. Validated before anything is spawned. */
-interface WireCheck {
+export interface WireCheck {
 	id: string;
 	command: string;
 	cwd?: string;
@@ -293,6 +293,23 @@ function executeCheck(check: WireCheck, rootCwd: string, io: AcceptanceChecksIo)
 			}
 		});
 	});
+}
+
+/**
+ * THE command runner every node job kind goes through.
+ *
+ * Exported so a second kind (`agent-task`) executes its steps with the
+ * SAME env scrub, the same timeout policy and the same exit-code
+ * semantics as an acceptance check. A node that ran the two kinds
+ * through two subtly-different runners would be a node whose verdicts
+ * depend on which queue the work arrived on.
+ */
+export function runNodeCommandStep(
+	step: WireCheck,
+	rootCwd: string,
+	io: AcceptanceChecksIo = {}
+): Promise<NodeCheckResult> {
+	return executeCheck(step, rootCwd, io);
 }
 
 /**

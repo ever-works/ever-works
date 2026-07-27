@@ -81,11 +81,20 @@ export function isFleetJobActive(status: FleetJobStatus): boolean {
  * It is self-contained (a command and an exit code), needs no model
  * access or platform credentials on the node, and its verdict rules are
  * already specified by `TaskAcceptanceCheck` / `TaskCheckResult`.
+ *
+ * `agent-task` is the general one: "execute this platform Task's run on
+ * the node". It is what makes an enrolled machine capacity for ORDINARY
+ * work rather than for the gate alone — the agent-run dispatch path
+ * enqueues it whenever the resolved job runtime for the owner is the
+ * fleet. Its payload carries the platform ids plus the ordered commands
+ * the node is asked to run, because a fleet node has no model access and
+ * no platform credentials: everything it executes has to be expressed as
+ * a command and an exit code, exactly like `acceptance-checks`.
  */
-export type FleetJobKind = 'acceptance-checks';
+export type FleetJobKind = 'acceptance-checks' | 'agent-task';
 
 /** Canonical job-kind list. */
-export const FLEET_JOB_KINDS: readonly FleetJobKind[] = ['acceptance-checks'];
+export const FLEET_JOB_KINDS: readonly FleetJobKind[] = ['acceptance-checks', 'agent-task'];
 
 /** Type guard for a job kind arriving off the wire. */
 export function isFleetJobKind(value: unknown): value is FleetJobKind {
@@ -195,6 +204,63 @@ export interface FleetAcceptanceChecksPayload {
 	workspacePath: string;
 	/** The dispatch-frozen `TaskAcceptanceCheck[]`, carried verbatim. */
 	checks: unknown[];
+}
+
+/** Upper bound on how many command steps one `agent-task` job may carry. */
+export const FLEET_AGENT_TASK_MAX_STEPS = 16;
+
+/**
+ * One command the node runs for an `agent-task` job. Deliberately the
+ * same shape as a `TaskAcceptanceCheck` so the node executes both kinds
+ * through ONE command runner (same env scrub, same timeout policy, same
+ * exit-code semantics) instead of growing a second, subtly-different one.
+ */
+export interface FleetAgentTaskStep {
+	/** Stable id echoed back in the result so a caller can correlate. */
+	id: string;
+	/** Shell command, run in `workspacePath` (or `cwd` beneath it). */
+	command: string;
+	/** Directory relative to the job's `workspacePath`. */
+	cwd?: string;
+	/** Wall-clock budget; the node clamps it to its own ceiling. */
+	timeoutSec?: number;
+	/** `false` means a nonzero exit does not fail the job. Default true. */
+	required?: boolean;
+	/** Extra env names this step may see; never platform-owned ones. */
+	envPassthrough?: string[];
+}
+
+/**
+ * Executor input for `agent-task`.
+ *
+ * `taskId` / `runId` are the platform identities the node reports
+ * against — they are carried so the result can be correlated back to an
+ * `AgentRun` without the node ever holding a platform credential.
+ *
+ * `steps` is REQUIRED to be non-empty for the job to do anything: a
+ * fleet node cannot run a model-driven agent loop, so the platform has
+ * to hand it commands. A job that arrives with no steps is failed by the
+ * node naming the operator knob that would have supplied them, rather
+ * than silently succeeding at nothing.
+ */
+export interface FleetAgentTaskPayload {
+	/** Platform Task this run belongs to. */
+	taskId: string;
+	/** Platform `AgentRun` id the node's result correlates to. */
+	runId?: string;
+	/** Agent the run was dispatched for. */
+	agentId?: string;
+	/** Owner the run was dispatched for (reporting only). */
+	userId?: string;
+	/**
+	 * Directory ON THE NODE the steps run in. Optional: unlike
+	 * `acceptance-checks` (whose workspace is the checked-out Task
+	 * worktree) an agent task may legitimately run wherever the node
+	 * service was installed. When present it must be absolute and exist.
+	 */
+	workspacePath?: string;
+	/** Ordered commands the node executes for this run. */
+	steps?: FleetAgentTaskStep[];
 }
 
 /** Request body for `POST /api/fleet/jobs/lease`. */

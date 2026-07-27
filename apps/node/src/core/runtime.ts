@@ -4,6 +4,7 @@ import { FleetJobClient } from './job-client';
 import { HeartbeatLoop, type Scheduler } from './heartbeat';
 import { WorkerLoop } from './worker-loop';
 import { runAcceptanceChecksJob } from './executors/acceptance-checks';
+import { runAgentTaskJob } from './executors/agent-task';
 import type { Logger } from './logger';
 import {
 	DEFAULT_HEARTBEAT_INTERVAL_MS,
@@ -118,6 +119,12 @@ export interface CreateNodeRuntimeOptions {
 	concurrency?: number;
 	leaseTtlSec?: number;
 	idlePollMs?: number;
+	/**
+	 * Directory `agent-task` steps run in when the job itself carries no
+	 * `workspacePath`. Absent lets the executor fall back to the node
+	 * service's own working directory.
+	 */
+	agentTaskWorkspacePath?: string;
 }
 
 /**
@@ -170,6 +177,17 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		// the executor seam: a second job kind is one more `register` call
 		// against the same protocol — no new endpoint, no new credential.
 		worker.register('acceptance-checks', (job) => runAcceptanceChecksJob(job));
+		// The general kind. Without it an enrolled machine could only ever
+		// score a gate; with it a Task's run can actually EXECUTE here when
+		// the owner's resolved job runtime is the fleet. Same seam, same
+		// protocol, same credential — exactly as the header above promised.
+		worker.register('agent-task', (job) =>
+			runAgentTaskJob(job, {
+				...(options.agentTaskWorkspacePath !== undefined
+					? { defaultWorkspacePath: options.agentTaskWorkspacePath }
+					: {})
+			})
+		);
 		runtime.worker = worker;
 		runtime.jobClient = jobClient;
 	}

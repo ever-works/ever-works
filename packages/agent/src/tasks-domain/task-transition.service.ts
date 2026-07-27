@@ -429,6 +429,13 @@ export class TaskTransitionService {
                     taskId: task.id,
                     dedupKey,
                     runId: run?.id,
+                    // Scope carriers so a routing adapter can resolve the
+                    // TENANT's job runtime (tenant_job_runtime_config) and
+                    // not just the instance-global selector — that is how a
+                    // run reaches an owner's Fleet instead of the platform
+                    // default. Ignored by adapters that don't route.
+                    tenantId: task.tenantId ?? null,
+                    organizationId: task.organizationId ?? null,
                 });
                 // Stamp the Trigger.dev id so a cancel arriving before the
                 // worker starts can still reach the remote run. Swallowed
