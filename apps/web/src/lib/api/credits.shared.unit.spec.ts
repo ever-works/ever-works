@@ -3,16 +3,24 @@
 import { describe, expect, it } from 'vitest';
 import {
     buildLedgerQuery,
+    buildUsageExportQuery,
     buildUsageSummaryQuery,
     CREDIT_LEDGER_KINDS,
     CREDIT_TOPUP_PRESETS_CENTS,
     creditsForTopupCents,
+    currentUsageMonth,
     formatCents,
     formatCreditsAsDollars,
     formatMonthlyPrice,
     formatSignedCredits,
+    formatUsageMonthLabel,
     isFreePlan,
+    isUsageMonthPeriod,
+    isUsagePeriod,
     ledgerKindTone,
+    parseUsagePeriod,
+    recentUsageMonths,
+    USAGE_ROLLING_PERIODS,
 } from './credits.shared';
 
 describe('formatCreditsAsDollars / formatCents', () => {
@@ -94,6 +102,75 @@ describe('buildUsageSummaryQuery', () => {
         expect(buildUsageSummaryQuery({ groupBy: 'model', period: '2026-07' })).toBe(
             '?groupBy=model&period=2026-07',
         );
+    });
+});
+
+describe('B20 — usage period grammar (7d / 30d / YYYY-MM)', () => {
+    it('recognises both rolling ranges AND calendar months', () => {
+        for (const rolling of USAGE_ROLLING_PERIODS) {
+            expect(isUsagePeriod(rolling)).toBe(true);
+            expect(isUsageMonthPeriod(rolling)).toBe(false);
+        }
+        for (const month of ['2026-01', '2026-07', '2026-12', '1999-09']) {
+            expect(isUsageMonthPeriod(month)).toBe(true);
+            expect(isUsagePeriod(month)).toBe(true);
+        }
+    });
+
+    it('rejects everything the API would 400 on', () => {
+        for (const bad of ['2026-13', '2026-00', '2026-7', '90d', '7D', 'last-month', '']) {
+            expect(isUsagePeriod(bad)).toBe(false);
+        }
+    });
+
+    it('parseUsagePeriod normalizes untrusted input instead of throwing', () => {
+        expect(parseUsagePeriod('2026-06')).toBe('2026-06');
+        expect(parseUsagePeriod('7d')).toBe('7d');
+        // Next.js hands repeated query params through as an array.
+        expect(parseUsagePeriod(['30d', '7d'])).toBe('30d');
+        expect(parseUsagePeriod('nonsense')).toBeUndefined();
+        expect(parseUsagePeriod(undefined)).toBeUndefined();
+        expect(parseUsagePeriod(42)).toBeUndefined();
+    });
+});
+
+describe('currentUsageMonth / recentUsageMonths', () => {
+    it('formats the current UTC month zero-padded', () => {
+        expect(currentUsageMonth(new Date('2026-07-25T12:00:00.000Z'))).toBe('2026-07');
+        expect(currentUsageMonth(new Date('2026-01-01T00:00:00.000Z'))).toBe('2026-01');
+        // Late-UTC-day instants must not roll into the next month.
+        expect(currentUsageMonth(new Date('2026-11-30T23:59:59.000Z'))).toBe('2026-11');
+    });
+
+    it('lists the N most recent months newest-first, crossing the year boundary', () => {
+        const months = recentUsageMonths(4, new Date('2026-02-10T00:00:00.000Z'));
+        expect(months).toEqual(['2026-02', '2026-01', '2025-12', '2025-11']);
+        // Every generated option is a period the API accepts.
+        for (const month of months) {
+            expect(isUsagePeriod(month)).toBe(true);
+        }
+        expect(recentUsageMonths(0, new Date('2026-02-10T00:00:00.000Z'))).toEqual([]);
+    });
+});
+
+describe('formatUsageMonthLabel', () => {
+    it('renders a human month label in UTC', () => {
+        expect(formatUsageMonthLabel('2026-07')).toBe('July 2026');
+        expect(formatUsageMonthLabel('2025-12')).toBe('December 2025');
+    });
+
+    it('passes non-month values (7d / 30d) through untouched', () => {
+        expect(formatUsageMonthLabel('7d')).toBe('7d');
+        expect(formatUsageMonthLabel('30d')).toBe('30d');
+    });
+});
+
+describe('buildUsageExportQuery', () => {
+    it('serializes the period only, and omits it when absent', () => {
+        expect(buildUsageExportQuery()).toBe('');
+        expect(buildUsageExportQuery({})).toBe('');
+        expect(buildUsageExportQuery({ period: '2026-06' })).toBe('?period=2026-06');
+        expect(buildUsageExportQuery({ period: '7d' })).toBe('?period=7d');
     });
 });
 

@@ -33,6 +33,7 @@ import { RunCostSettlementService } from './credits/run-cost-settlement.service'
 import {
     InvalidUsagePeriodError,
     resolveUsageSummaryWindow,
+    USAGE_EXPORT_COLUMNS,
     USAGE_SUMMARY_GROUP_BYS,
     UsageSummaryService,
 } from './credits/usage-summary.service';
@@ -85,6 +86,27 @@ describe('SubscriptionsModule + barrel re-exports', () => {
             expect(subscriptionsBarrel.resolveUsageSummaryWindow).toBe(resolveUsageSummaryWindow);
             expect(subscriptionsBarrel.InvalidUsagePeriodError).toBe(InvalidUsagePeriodError);
             expect(subscriptionsBarrel.USAGE_SUMMARY_GROUP_BYS).toBe(USAGE_SUMMARY_GROUP_BYS);
+        });
+
+        it('re-exports the account-wide CSV export column contract (B29)', () => {
+            expect(subscriptionsBarrel.USAGE_EXPORT_COLUMNS).toBe(USAGE_EXPORT_COLUMNS);
+            // Pinned column order — the CSV header is a wire format the
+            // downloaded file's consumers (spreadsheets, finance tooling)
+            // depend on; reordering silently breaks them.
+            expect(USAGE_EXPORT_COLUMNS).toEqual([
+                'occurredAt',
+                'pluginId',
+                'capability',
+                'units',
+                'costCents',
+                'currency',
+                'modelId',
+                'workId',
+                'agentId',
+                'taskId',
+                'runId',
+                'requestId',
+            ]);
         });
 
         it('re-exports the money path (billing PRD B5)', () => {
@@ -170,6 +192,8 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                     'resolveUsageSummaryWindow',
                     'InvalidUsagePeriodError',
                     'USAGE_SUMMARY_GROUP_BYS',
+                    // Account-wide usage CSV export (B29)
+                    'USAGE_EXPORT_COLUMNS',
                 ].sort(),
             );
         });
