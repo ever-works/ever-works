@@ -53,6 +53,17 @@ export interface TerminalSessionHandle {
 	/** True PTY (resizable) vs `child_process` pipe floor (no resize —
 	 *  the UI renders an honest `isPty:false` banner). */
 	readonly isPty: boolean;
+	/**
+	 * Provider-minted identifier for THIS hosted session — the value the
+	 * platform persists on the run as `cliSessionId` (its resume key).
+	 *
+	 * Optional by design: a provider with no addressable session concept
+	 * simply omits it and nothing is written. It is an INTERNAL handle —
+	 * API responses expose its PRESENCE only (`hasCliSession`), never the
+	 * value, so a leaked status payload can never be replayed into
+	 * somebody else's session.
+	 */
+	readonly sessionId?: string;
 	write(data: Uint8Array): void;
 	resize(cols: number, rows: number): void;
 	kill(signal?: string): void;
