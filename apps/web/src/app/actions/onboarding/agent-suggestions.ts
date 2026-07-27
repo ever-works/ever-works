@@ -1,6 +1,11 @@
 'use server';
 
 import { agentsAPI, type Agent, type AgentTemplateSummary } from '@/lib/api/agents';
+import { onboardingSuggestionsAPI } from '@/lib/api/onboarding-suggestions';
+import type {
+    OnboardingSeedResponse,
+    OnboardingSeedSuggestionsResponse,
+} from '@ever-works/contracts/api';
 import type { ActionResult } from '@/app/actions/plugins';
 
 /**
@@ -40,5 +45,45 @@ export async function createAgentFromTemplateForOnboarding(
     } catch (error) {
         console.error('Failed to create agent from template:', error);
         return { success: false, error: 'Failed to create the agent' };
+    }
+}
+
+/**
+ * A55 — resolve the SERVER-side starter kit for `roles`.
+ *
+ * Supersedes the browser-side catalog filter the ProfileStep used: the
+ * mapping covers every role in `ROLE_OPTIONS` (not the three that
+ * happened to be tagged on a template) and returns skills as well as
+ * agents. Best-effort, like the list call above — the block hides
+ * itself rather than blocking the wizard on a suggestion.
+ */
+export async function getRoleSeedSuggestions(
+    roles: readonly string[],
+): Promise<ActionResult<OnboardingSeedSuggestionsResponse>> {
+    try {
+        const data = await onboardingSuggestionsAPI.suggest(roles);
+        return { success: true, data };
+    } catch (error) {
+        console.error('Failed to resolve onboarding role suggestions:', error);
+        return { success: false, error: 'Failed to load suggestions' };
+    }
+}
+
+/**
+ * A55 — create the whole starter kit server-side in one call.
+ *
+ * Idempotent per template: re-running the step reports the already
+ * activated ones instead of creating duplicates, which the old
+ * one-create-per-card client flow could not do.
+ */
+export async function seedRoleStarterAgents(
+    roles: readonly string[],
+): Promise<ActionResult<OnboardingSeedResponse>> {
+    try {
+        const data = await onboardingSuggestionsAPI.seed(roles);
+        return { success: true, data };
+    } catch (error) {
+        console.error('Failed to seed onboarding starter agents:', error);
+        return { success: false, error: 'Failed to set up your starter agents' };
     }
 }

@@ -1,3 +1,6 @@
+import { FLEET_BROWSER_CAPABILITY, FLEET_GPU_CAPABILITY } from '@ever-works/contracts';
+import type { BrowserProbeIo } from './browser-probe';
+import { detectGpu } from './gpu-probe';
 import {
 	MAX_CAPABILITY_TAG_LENGTH,
 	MAX_CAPABILITY_TAGS,
@@ -33,6 +36,13 @@ export interface CapabilityEnvironment {
 	nodeVersion: string;
 	/** Whether a graphical display is available (headed browser automation). */
 	hasDisplay: boolean;
+	/**
+	 * Absolute path of a browser executable this machine can actually
+	 * launch, or null. Resolved by {@link resolveBrowserPath} — the SAME
+	 * function `browser-check` uses to spawn — so the `browser` tag and
+	 * the executor can never disagree about what is installed.
+	 */
+	browserPath?: string | null;
 }
 
 /**
@@ -75,19 +85,38 @@ export function detectDisplay(platform: string, env: Record<string, string | und
 	return Boolean(env.DISPLAY || env.WAYLAND_DISPLAY);
 }
 
-/** Build a {@link CapabilityEnvironment} from a process-like object. */
-export function readEnvironment(processLike: {
-	platform: string;
-	arch: string;
-	version: string;
-	env: Record<string, string | undefined>;
-}): CapabilityEnvironment {
-	return {
+/**
+ * Build a {@link CapabilityEnvironment} from a process-like object.
+ *
+ * `browserProbe` is optional so pure-logic callers (and every test) can
+ * skip filesystem access; when it is supplied the resolved executable
+ * path is what turns the `browser` tag on.
+ */
+export function readEnvironment(
+	processLike: {
+		platform: string;
+		arch: string;
+		version: string;
+		env: Record<string, string | undefined>;
+	},
+	browserProbe?: (io: BrowserProbeIo) => string | null,
+	probeIo?: Pick<BrowserProbeIo, 'fileExists' | 'lookupOnPath'>
+): CapabilityEnvironment {
+	const environment: CapabilityEnvironment = {
 		platform: processLike.platform,
 		arch: processLike.arch,
 		nodeVersion: processLike.version,
 		hasDisplay: detectDisplay(processLike.platform, processLike.env)
 	};
+	if (browserProbe && probeIo) {
+		environment.browserPath = browserProbe({
+			platform: processLike.platform,
+			env: processLike.env,
+			fileExists: probeIo.fileExists,
+			...(probeIo.lookupOnPath ? { lookupOnPath: probeIo.lookupOnPath } : {})
+		});
+	}
+	return environment;
 }
 
 /**
@@ -127,11 +156,27 @@ async function hasTool(runner: CommandRunner, command: string): Promise<boolean>
 /**
  * Detect this machine's capability tags:
  * `os:<platform>`, `arch:<arch>`, `node:<major>`, the always-on
- * `terminal`/`workspace`, plus `docker`, `git` and `display` when present.
+ * `terminal`/`workspace`, plus `docker`, `git`, `display`, `browser`,
+ * `gpu` and `gpu:<vendor>` when present.
+ *
+ * Two rules govern what may appear here:
+ *
+ *   1. **A tag is a promise the node can keep.** `browser` is emitted
+ *      only when a browser executable was actually resolved — the same
+ *      path the `browser-check` executor will spawn. A tag nothing
+ *      backs would route real work to a machine that cannot do it.
+ *   2. **Detection never fails the beat.** Every probe swallows its own
+ *      errors; a missing tool means a missing tag, not a missing
+ *      heartbeat.
  */
 export async function detectCapabilities(runner: CommandRunner, environment: CapabilityEnvironment): Promise<string[]> {
-	const [docker, git] = await Promise.all([hasTool(runner, 'docker'), hasTool(runner, 'git')]);
+	const [docker, git, gpu] = await Promise.all([
+		hasTool(runner, 'docker'),
+		hasTool(runner, 'git'),
+		detectGpu(runner, environment.platform)
+	]);
 	const major = nodeMajor(environment.nodeVersion);
+	const hasBrowser = typeof environment.browserPath === 'string' && environment.browserPath.length > 0;
 
 	return normalizeCapabilities([
 		`os:${environment.platform}`,
@@ -140,7 +185,13 @@ export async function detectCapabilities(runner: CommandRunner, environment: Cap
 		...BASE_CAPABILITIES,
 		docker ? 'docker' : null,
 		git ? 'git' : null,
-		environment.hasDisplay ? 'display' : null
+		environment.hasDisplay ? 'display' : null,
+		hasBrowser ? FLEET_BROWSER_CAPABILITY : null,
+		gpu ? FLEET_GPU_CAPABILITY : null,
+		// Vendor is a second, narrower tag rather than a replacement:
+		// a job that needs "any accelerator" must not have to enumerate
+		// vendors, and one that needs CUDA must be able to say so.
+		gpu ? `${FLEET_GPU_CAPABILITY}:${gpu.vendor}` : null
 	]);
 }
 

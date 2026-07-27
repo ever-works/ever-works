@@ -14,7 +14,7 @@ import { ChoiceStep } from './steps/ChoiceStep';
 import { ConfigStep } from './steps/ConfigStep';
 import { PluginsCatalogStep } from './steps/PluginsCatalogStep';
 import { ProfileStep } from './steps/ProfileStep';
-import { CommunicationStep } from './steps/CommunicationStep';
+import { CommunicationStep, SLACK_CONNECTOR_PLUGIN_ID } from './steps/CommunicationStep';
 import { CreateWorkStep } from './steps/CreateWorkStep';
 import { useTurnstile } from './use-turnstile';
 import { AI_ICONS, DB_ICONS, DEPLOY_ICONS, STORAGE_ICONS } from './brand-icons';
@@ -240,6 +240,7 @@ export function EverWorksOnboardingWizard({
                                 isStatusLoading={isStatusLoading}
                                 turnstile={turnstile}
                                 correlationId={correlationId}
+                                onPluginConnected={(pluginId) => void refreshConnections(pluginId)}
                             />
                         </div>
                         <WizardFooter
@@ -372,6 +373,7 @@ function StepBody({
     isStatusLoading,
     turnstile,
     correlationId,
+    onPluginConnected,
 }: {
     step: WizardStep;
     flow: ReturnType<typeof useOnboardingFlow>;
@@ -382,6 +384,7 @@ function StepBody({
     isStatusLoading: boolean;
     turnstile: ReturnType<typeof useTurnstile>;
     correlationId: string;
+    onPluginConnected: (pluginId: string) => void;
 }) {
     switch (step.kind) {
         case 'welcome':
@@ -508,7 +511,18 @@ function StepBody({
                 />
             );
         case 'communication':
-            return <CommunicationStep />;
+            // Audit item (b) — connect in place. The connector plugin is
+            // passed in so the card can render its settings panel + enable
+            // action inline; when the image ships without it the step
+            // degrades to the Settings → Plugins link it used to be.
+            return (
+                <CommunicationStep
+                    slackPlugin={pluginsById[SLACK_CONNECTOR_PLUGIN_ID] ?? null}
+                    slackConnection={connections[SLACK_CONNECTOR_PLUGIN_ID] ?? null}
+                    isStatusLoading={isStatusLoading}
+                    onConnected={onPluginConnected}
+                />
+            );
         case 'plugins-catalog':
             return (
                 <PluginsCatalogStep

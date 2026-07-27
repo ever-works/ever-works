@@ -1,72 +1,109 @@
 /**
- * Wire types and limits shared with the platform Fleet API.
+ * Node-local types, plus the node's view of the shared Fleet contract.
  *
- * These MIRROR the server contract (`apps/api/src/fleet/dto/fleet.dto.ts` +
- * `packages/agent/src/fleet/fleet.service.ts`) — they are a client-side copy so
- * the node apps stay dependency-free, and they must not drift from it. The
- * server re-validates and sanitizes everything anyway; the limits below exist
- * so the node never sends a value the server would silently truncate or drop.
+ * The enroll/heartbeat wire shapes and their protocol bounds are NOT
+ * defined here any more — they live in `@ever-works/contracts`
+ * (`fleet/fleet-node.types.ts`), the zero-dependency package the API,
+ * the web tier and this app all already depend on. This file re-exports
+ * them under the names the node code has always used, so a change to
+ * the contract now breaks the node at COMPILE time instead of at 3am on
+ * a machine nobody is watching (which is the entire reason the mirror
+ * that used to live here was a bug).
+ *
+ * What is still genuinely local: {@link NodeConfig} — how THIS app
+ * persists its enrollment on disk. That is not a wire shape and the
+ * server has no opinion about it.
  */
 
-/** App shapes a machine can enroll as (server: `FLEET_ENROLLABLE_KINDS`). */
-export type FleetNodeKind = 'desktop-node' | 'node';
+import {
+	FLEET_CREDENTIAL_MAX_LENGTH,
+	FLEET_CREDENTIAL_MIN_LENGTH,
+	FLEET_DEFAULT_MAX_CAPABILITY_TAG_LENGTH,
+	FLEET_DEFAULT_MAX_CAPABILITY_TAGS,
+	FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS,
+	FLEET_MAX_PLATFORM_LENGTH,
+	FLEET_MAX_VERSION_LENGTH,
+	type FleetEnrollableNodeKind,
+	type FleetNodeSelfDescription
+} from '@ever-works/contracts';
 
-/** Node lifecycle as reported by the platform. */
-export type FleetNodeStatus = 'enrolling' | 'online' | 'offline' | 'disabled';
+export type {
+	FleetEnrollableNodeKind,
+	FleetEnrollRequest,
+	FleetEnrollResponse,
+	FleetHeartbeatRequest,
+	FleetHeartbeatResponse,
+	FleetNodeKind,
+	FleetNodeSelfDescription,
+	FleetNodeStatus,
+	FleetNodeView
+} from '@ever-works/contracts';
+/**
+ * Node lifecycle as reported by the platform.
+ *
+ * `paused` is a drain, not a cut: the platform stops leasing new work
+ * onto the node while its in-flight jobs keep reporting, and heartbeats
+ * stay accepted so a drained machine remains visible in Fleet.
+ */
+export type FleetNodeStatus = 'enrolling' | 'online' | 'offline' | 'paused' | 'disabled';
 
-/** Wire view of one fleet node — never carries credentials. */
-export interface FleetNodeView {
-	id: string;
-	name: string;
-	kind: FleetNodeKind;
-	status: FleetNodeStatus;
-	platform: string | null;
-	version: string | null;
-	capabilities: string[];
-	lastHeartbeatAt: string | null;
-	createdAt: string | null;
-	persisted: boolean;
-}
+export { FLEET_ENROLLABLE_NODE_KINDS, isFleetEnrollableNodeKind } from '@ever-works/contracts';
 
-/** Self-description sent on enroll and refreshed on every heartbeat. */
-export interface NodeSelfDescription {
-	platform?: string;
-	version?: string;
-	capabilities?: string[];
-}
+/**
+ * The node's historical name for the shared
+ * {@link FleetNodeSelfDescription}. Kept as an alias so the whole app
+ * did not have to be renamed to adopt the shared contract.
+ */
+export type NodeSelfDescription = FleetNodeSelfDescription;
 
-/** Server: `FLEET_MAX_CAPABILITY_TAGS`. */
-export const MAX_CAPABILITY_TAGS = 16;
-/** Server: `FLEET_MAX_CAPABILITY_TAG_LENGTH`. */
-export const MAX_CAPABILITY_TAG_LENGTH = 32;
-/** Server: `sanitizeText(input.platform, 64)`. */
-export const MAX_PLATFORM_LENGTH = 64;
-/** Server: `sanitizeText(input.version, 32)`. */
-export const MAX_VERSION_LENGTH = 32;
-/** Server: `CREDENTIAL_MIN_LENGTH` / `CREDENTIAL_MAX_LENGTH`. */
-export const MIN_CREDENTIAL_LENGTH = 16;
-export const MAX_CREDENTIAL_LENGTH = 256;
+/**
+ * Server-side caps, re-exported under the node's short names.
+ *
+ * The tag caps are operator-tunable on the server (`config.fleet.*`);
+ * these are the DEFAULTS, which is the best a node can assume — it
+ * normalizes to them so what it reports is what the platform stores. A
+ * server configured with a LOWER cap still truncates authoritatively;
+ * one configured higher simply accepts everything the node sends.
+ */
+export const MAX_CAPABILITY_TAGS = FLEET_DEFAULT_MAX_CAPABILITY_TAGS;
+export const MAX_CAPABILITY_TAG_LENGTH = FLEET_DEFAULT_MAX_CAPABILITY_TAG_LENGTH;
+export const MAX_PLATFORM_LENGTH = FLEET_MAX_PLATFORM_LENGTH;
+export const MAX_VERSION_LENGTH = FLEET_MAX_VERSION_LENGTH;
+export const MIN_CREDENTIAL_LENGTH = FLEET_CREDENTIAL_MIN_LENGTH;
+export const MAX_CREDENTIAL_LENGTH = FLEET_CREDENTIAL_MAX_LENGTH;
 
-/** Default heartbeat cadence — comfortably inside the server's 5-minute stale window. */
+/** Default heartbeat cadence — comfortably inside the server's stale window. */
 export const DEFAULT_HEARTBEAT_INTERVAL_MS = 60_000;
 
 /**
- * Backoff ceiling. Capped at the server's `FLEET_NODE_OFFLINE_AFTER_MS`
- * (5 minutes): once the platform has already flipped us to `offline` there is
- * nothing to gain from backing off further, and a longer ceiling would leave a
- * recovered node dark for many extra minutes.
+ * Backoff ceiling. Capped at the server's DEFAULT offline window
+ * (5 minutes): once the platform has already flipped us to `offline`
+ * there is nothing to gain from backing off further, and a longer
+ * ceiling would leave a recovered node dark for many extra minutes.
  */
-export const MAX_HEARTBEAT_BACKOFF_MS = 5 * 60_000;
+export const MAX_HEARTBEAT_BACKOFF_MS = FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS;
 
 /** Floor/ceiling for the operator-configurable heartbeat interval. */
 export const MIN_HEARTBEAT_INTERVAL_MS = 5_000;
 export const MAX_HEARTBEAT_INTERVAL_MS = 15 * 60_000;
 
 /**
- * Everything the node needs to resume operating after a restart. Persisted to
- * the OS config directory with 0600 permissions where the platform supports
- * them — `secret` is a credential and must never be logged or sent to a
- * renderer process.
+ * Where the heartbeat secret physically lives.
+ *
+ * - `keychain` — the OS credential store (Keychain / Credential Manager /
+ *   Secret Service) holds it; the config file carries no credential at all.
+ * - `file`     — fallback: the secret is inline in the config file, which is
+ *   then locked down to the owner (0600 on POSIX, an inheritance-stripped
+ *   owner-only ACL on Windows). Always announced with a loud warning.
+ */
+export type NodeSecretStorage = 'keychain' | 'file';
+
+/**
+ * Everything the node needs to resume operating after a restart.
+ *
+ * `secret` is a credential and must never be logged or sent to a renderer
+ * process. It is held in the OS keychain when one is available and only
+ * falls back to the config file otherwise — see {@link NodeSecretStorage}.
  */
 export interface NodeConfig {
 	/** Platform API origin, no trailing slash (e.g. `https://api.ever.works`). */
@@ -74,25 +111,39 @@ export interface NodeConfig {
 	nodeId: string;
 	/** Heartbeat credential, minted once at enroll. NEVER log this. */
 	secret: string;
-	kind: FleetNodeKind;
+	kind: FleetEnrollableNodeKind;
 	capabilities: string[];
 	/** Local display label; the authoritative name lives on the platform. */
 	name?: string;
 	heartbeatIntervalMs: number;
 	enrolledAt: string;
+	/**
+	 * Where {@link NodeConfig.secret} is stored. Absent means `file`, so
+	 * configs written before keychain support still load unchanged.
+	 */
+	secretStorage?: NodeSecretStorage;
+	/**
+	 * Operator drain flag set by `ever-works-node pause`. A paused node
+	 * still heartbeats (so it stays observable) but leases no new work.
+	 */
+	paused?: boolean;
 }
 
 /** Credential-free projection of {@link NodeConfig}, safe to log or render. */
 export interface RedactedNodeConfig {
 	apiUrl: string;
 	nodeId: string;
-	kind: FleetNodeKind;
+	kind: FleetEnrollableNodeKind;
 	capabilities: string[];
 	name?: string;
 	heartbeatIntervalMs: number;
 	enrolledAt: string;
 	/** True when a heartbeat secret is stored — the value itself never leaves the config store. */
 	hasSecret: boolean;
+	/** Where the secret is kept. Safe to show: it names a location, not a value. */
+	secretStorage: NodeSecretStorage;
+	/** True when the operator has drained this node locally. */
+	paused: boolean;
 }
 
 /** Drop the credential from a config so it can cross a log or IPC boundary. */
@@ -104,7 +155,9 @@ export function redactConfig(config: NodeConfig): RedactedNodeConfig {
 		capabilities: [...config.capabilities],
 		heartbeatIntervalMs: config.heartbeatIntervalMs,
 		enrolledAt: config.enrolledAt,
-		hasSecret: typeof config.secret === 'string' && config.secret.length > 0
+		hasSecret: typeof config.secret === 'string' && config.secret.length > 0,
+		secretStorage: config.secretStorage ?? 'file',
+		paused: config.paused === true
 	};
 	if (config.name !== undefined) {
 		redacted.name = config.name;

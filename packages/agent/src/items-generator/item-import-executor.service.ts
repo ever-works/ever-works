@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import pMap from 'p-map';
 import { format } from 'date-fns';
 import type { MutableItemData } from '@ever-works/contracts';
@@ -9,6 +9,7 @@ import { DataRepository } from '../generators/data-generator/data-repository';
 import { slugifyText } from '../utils/text.utils';
 import { config as appConfig } from '../config';
 import { ItemImportService } from './item-import.service';
+import { PullRequestGateService } from '../policy/pull-request-gate.service';
 import type {
     ImportDuplicateStrategy,
     ImportResult,
@@ -51,6 +52,13 @@ export interface ExecuteImportResult extends ImportResult {
     pr_url?: string;
     pr_number?: number;
     direct_commit?: boolean;
+    /**
+     * Quality gates (audit W3 M3) — set when the rows were written, committed
+     * and pushed but the Work's checks policy withheld the pull request.
+     * Absent on every other path, so a caller that ignores it sees exactly
+     * the pre-gate result shape.
+     */
+    pr_withheld_reason?: string;
 }
 
 /**
@@ -69,6 +77,10 @@ export class ItemImportExecutorService {
     constructor(
         private readonly gitFacade: GitFacadeService,
         private readonly itemImportService: ItemImportService,
+        // Quality gates (audit W3 M3) — @Optional() and APPENDED LAST so
+        // existing positional constructions keep working; absent behaves as
+        // `checksPolicy: 'off'`, i.e. the pre-gate behaviour.
+        @Optional() private readonly prGate?: PullRequestGateService,
     ) {}
 
     async executeImport(
@@ -263,6 +275,29 @@ export class ItemImportExecutorService {
                 errors,
                 direct_commit: true,
             };
+        }
+
+        // Quality gates (audit W3 M3) — the rows are committed and pushed on
+        // the import branch; the PR is what the gate can withhold.
+        if (this.prGate) {
+            const decision = await this.prGate.evaluate({
+                work,
+                cwd: dest,
+                context: `item-import work=${work.id}`,
+            });
+            if (!decision.allowed) {
+                return {
+                    total: input.rows.length,
+                    created: createdCount,
+                    updated: updatedCount,
+                    skipped: skippedCount,
+                    errors,
+                    pr_withheld_reason:
+                        `No pull request was opened: the Work's quality gate is ` +
+                        `'${decision.gateStatus}'. ${decision.reason ?? ''} The imported rows are ` +
+                        `committed on branch \`${branchName}\`.`,
+                };
+            }
         }
 
         const prTitle = `${commitTitle} - ${format(new Date(), 'MM/dd/yyyy HH:mm')}`;

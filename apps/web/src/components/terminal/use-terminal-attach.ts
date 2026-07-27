@@ -55,6 +55,17 @@ export interface TerminalAttachDeps {
     webSocketImpl?: typeof WebSocket;
 }
 
+export interface TerminalAttachOptions {
+    /**
+     * Attach read-only (mints a `viewer` token instead of a `driver`
+     * one). The relay refuses viewer stdin/resize server-side, so this
+     * is a real role, not a UI-only affordance — a second participant
+     * can watch a live session without fighting the driver for the
+     * keyboard.
+     */
+    readOnly?: boolean;
+}
+
 /** Bound on rehydration paging so a huge transcript cannot spin forever. */
 const TRANSCRIPT_MAX_PAGES = 20;
 
@@ -70,7 +81,9 @@ export function useTerminalAttach(
     runId: string,
     callbacks: TerminalAttachCallbacks,
     deps: TerminalAttachDeps = {},
+    options: TerminalAttachOptions = {},
 ): TerminalAttachApi {
+    const readOnly = options.readOnly === true;
     const [state, setState] = useState<TerminalAttachState>('starting');
     const [endedReason, setEndedReason] = useState<string | null>(null);
     const [role, setRole] = useState<'driver' | 'viewer' | null>(null);
@@ -145,7 +158,9 @@ export function useTerminalAttach(
             let wsUrl: string;
             try {
                 const res = await doFetch(
-                    `/api/agents/${agentId}/runs/${runId}/terminal/attach-token`,
+                    `/api/agents/${agentId}/runs/${runId}/terminal/attach-token${
+                        readOnly ? '?role=viewer' : ''
+                    }`,
                     { method: 'POST' },
                 );
                 if (res.status === 401 || res.status === 403 || res.status === 404) {
@@ -250,7 +265,7 @@ export function useTerminalAttach(
             }
         };
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [agentId, runId, nonce]);
+    }, [agentId, runId, nonce, readOnly]);
 
     const sendInput = useCallback(
         (data: string) => {

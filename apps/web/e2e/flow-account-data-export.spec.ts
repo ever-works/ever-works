@@ -1,5 +1,6 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
 import { API_BASE, authedHeaders, createWorkViaAPI, registerUserViaAPI } from './helpers/api';
+import { clickUntil } from './helpers/nav';
 import { enablePluginViaAPI } from './helpers/plugins';
 import { createAgentViaAPI } from './helpers/agents-tasks';
 
@@ -442,7 +443,10 @@ test.describe('Account data export — UI surface (seeded auth)', () => {
         await expect(secretToggle, 'a secrets/feature checkbox exists').toBeVisible({
             timeout: 10_000,
         });
-        await secretToggle.check();
+        // `check()` throws when the click lands before React attaches the
+        // handler ("Clicking the checkbox did not change its state"). Click
+        // until it is actually checked instead.
+        await clickUntil(secretToggle, async () => secretToggle.isChecked().catch(() => false));
         await expect(secretToggle).toBeChecked();
         // The masking warning copy ("masked values") should appear when the
         // secrets toggle is on. Best-effort: assert the warning OR that the

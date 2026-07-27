@@ -11,11 +11,13 @@ import type {
 	ChannelVerification,
 	EventSourcePullInput,
 	EventSourcePullResult,
+	EventSourceBackfillInput,
+	EventSourceBackfillResult,
 	PluginCategory,
 	PluginSettings,
 	JsonSchema
 } from '@ever-works/plugin';
-import { PLUGIN_CAPABILITIES, EventSourceNotConfiguredError } from '@ever-works/plugin';
+import { PLUGIN_CAPABILITIES, EventSourceNotConfiguredError, clampEventSourceBackfillDays } from '@ever-works/plugin';
 import type { IngestedEventEnvelope } from '@ever-works/contracts';
 
 /**
@@ -45,11 +47,15 @@ export const ZOOM_BACKFILL_MAX_PAGES = 10;
 
 const DAY_MS = 86_400_000;
 
-/** Clamp the opt-in backfill window to the supported 0–90 day range. */
+/**
+ * Clamp the opt-in backfill window to the supported 0–90 day range.
+ *
+ * Delegates to the shared capability helper so the bound is stated once
+ * for the whole connector fabric; the local export stays because it is
+ * part of this plugin's published surface.
+ */
 export function clampBackfillDays(value: unknown): number {
-	const num = typeof value === 'number' ? value : Number(value);
-	if (!Number.isFinite(num) || num <= 0) return 0;
-	return Math.min(Math.floor(num), 90);
+	return clampEventSourceBackfillDays(value);
 }
 
 /**
@@ -464,6 +470,66 @@ export class ZoomConnectorPlugin implements IConnectorPlugin, IEventSourcePlugin
 		}
 
 		return next ? { events, nextCursor: JSON.stringify(next) } : { events };
+	}
+
+	/**
+	 * Bounded HISTORICAL sweep over an explicit `[since, until]` window —
+	 * the capability's opt-in `backfill()` method.
+	 *
+	 * Before this method existed, history was reachable only as a side
+	 * effect of the FIRST pull (`settings.backfillDays` widening the
+	 * initial window), so a user who activated the connector without the
+	 * setting could never go back and fetch it. `backfill()` runs the same
+	 * chunked sweep out-of-band, on a caller-chosen window, as many times
+	 * as wanted — re-delivery is free because the ingest pipeline dedupes
+	 * on `(source, sourceEventId)`.
+	 *
+	 * The per-chunk page bound (`ZOOM_BACKFILL_MAX_PAGES`) applies here
+	 * too: one call fetches ONE page and hands back a cursor, so a
+	 * recording-heavy account can never turn a backfill into an
+	 * unbounded crawl.
+	 */
+	async backfill(input: EventSourceBackfillInput): Promise<EventSourceBackfillResult> {
+		const sinceMs = Date.parse(input.since);
+		if (!Number.isFinite(sinceMs)) {
+			throw new EventSourceNotConfiguredError(
+				`zoom-connector: backfill requires a valid ISO 8601 "since" (received ${JSON.stringify(input.since)})`
+			);
+		}
+		const untilMs = input.until ? Date.parse(input.until) : Date.now();
+		if (!Number.isFinite(untilMs)) {
+			throw new EventSourceNotConfiguredError(
+				`zoom-connector: backfill "until" must be a valid ISO 8601 timestamp (received ${JSON.stringify(input.until)})`
+			);
+		}
+		// An inverted or empty window is a no-op, not an error — callers
+		// derive windows from user input and clock skew is real.
+		if (untilMs <= sinceMs) {
+			return { events: [], complete: true };
+		}
+
+		// Resume the caller's cursor, or open the sweep on the first
+		// ≤30-day chunk of the requested window. `f: 1` marks it as a
+		// backfill sweep so the per-chunk page bound engages.
+		const cursor =
+			input.cursor ??
+			JSON.stringify({
+				from: new Date(sinceMs).toISOString(),
+				to: new Date(Math.min(sinceMs + ZOOM_WINDOW_MAX_DAYS * DAY_MS, untilMs)).toISOString(),
+				w: new Date(untilMs).toISOString(),
+				f: 1 as const,
+				b: 0
+			} satisfies ZoomPullCursor);
+
+		const page = await this.pullEvents({
+			since: input.since,
+			cursor,
+			...(input.settings ? { settings: input.settings } : {})
+		});
+
+		return page.nextCursor
+			? { events: page.events, nextCursor: page.nextCursor }
+			: { events: page.events, complete: true };
 	}
 
 	/**

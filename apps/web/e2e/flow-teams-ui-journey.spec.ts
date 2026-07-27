@@ -47,6 +47,7 @@ import {
     type APIRequestContext,
 } from '@playwright/test';
 import { API_BASE, authedHeaders, loginViaAPI, createWorkViaAPI } from './helpers/api';
+import { clickAndExpectUrl, clickUntil } from './helpers/nav';
 import { loadSeededTestUser } from './helpers/seeded-test-user';
 
 const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
@@ -193,9 +194,12 @@ test.describe('Teams UI — list page', () => {
         await page.goto('/en/teams', { waitUntil: 'domcontentloaded' });
 
         const card = page.getByTestId(`team-card-${team.slug}`);
-        await expect(card).toBeVisible({ timeout: 30_000 });
-        await card.click();
-        await page.waitForURL(new RegExp(`/teams/${team.id}(?:\\?|$)`), { timeout: 30_000 });
+        // Post-condition = the detail URL. The card is a <Link>: a click that
+        // lands before hydration is silently swallowed (no navigation ever
+        // starts), and the App Router soft nav fires no `load` event, so
+        // click + waitForURL times out twice over. Poll the URL, re-click only
+        // while it has not changed.
+        await clickAndExpectUrl(page, card, new RegExp(`/teams/${team.id}(?:\\?|$)`));
         await expect(page.getByTestId('team-detail')).toBeVisible({ timeout: 30_000 });
         await expect(page.getByRole('heading', { name: team.name })).toBeVisible();
     });
@@ -206,13 +210,18 @@ test.describe('Teams UI — list page', () => {
         await page.goto('/en/teams', { waitUntil: 'domcontentloaded' });
         await expect(page.getByTestId('teams-new-link')).toBeVisible({ timeout: 30_000 });
 
-        await page.getByTestId('teams-new-link').click();
-        await page.waitForURL(/\/teams\/new(?:\?|$)/, { timeout: 30_000 });
+        // Post-condition = /teams/new in the URL. Both CTAs are client <Link>s,
+        // so a pre-hydration click is swallowed with no navigation at all.
+        await clickAndExpectUrl(page, page.getByTestId('teams-new-link'), /\/teams\/new(?:\?|$)/);
         await expect(page.getByTestId('team-create-name')).toBeVisible({ timeout: 30_000 });
 
         await page.goto('/en/teams', { waitUntil: 'domcontentloaded' });
-        await page.getByTestId('teams-org-chart-link').click();
-        await page.waitForURL(/\/teams\/org-chart(?:\?|$)/, { timeout: 30_000 });
+        // Post-condition = /teams/org-chart in the URL (same swallow hazard).
+        await clickAndExpectUrl(
+            page,
+            page.getByTestId('teams-org-chart-link'),
+            /\/teams\/org-chart(?:\?|$)/,
+        );
         await expect(page.getByRole('heading', { name: 'Org Chart' })).toBeVisible({
             timeout: 30_000,
         });
@@ -246,7 +255,18 @@ test.describe('Teams UI — create form (/teams/new)', () => {
         await expect(submit).toBeVisible({ timeout: 30_000 });
         await expect(submit).toBeDisabled();
 
-        await page.getByTestId('team-create-name').fill(`Enabler ${stamp()}`);
+        // Post-condition = the submit ENABLES (NewTeamDialog gates it on the
+        // `name` React state). A fill() landing before hydration writes the DOM
+        // value but never reaches onChange, so the state — and the button —
+        // never move; re-fill only while the button is still disabled.
+        const nameInput = page.getByTestId('team-create-name');
+        const enablerName = `Enabler ${stamp()}`;
+        await expect(async () => {
+            if (!(await submit.isEnabled())) {
+                await nameInput.fill(enablerName).catch(() => undefined);
+            }
+            expect(await submit.isEnabled()).toBe(true);
+        }).toPass({ timeout: 30_000 });
         await expect(submit).toBeEnabled();
     });
 
@@ -267,10 +287,22 @@ test.describe('Teams UI — create form (/teams/new)', () => {
         const name = `UI Created ${stamp()}`;
         await page.goto('/en/teams/new', { waitUntil: 'domcontentloaded' });
 
-        await page.getByTestId('team-create-name').fill(name);
-        await page.getByTestId('team-create-submit').click();
+        const nameInput = page.getByTestId('team-create-name');
+        const submit = page.getByTestId('team-create-submit');
+        // Step 1 post-condition = submit ENABLED, which proves the typed name
+        // reached React state (a pre-hydration fill sets only the DOM value and
+        // leaves the button disabled forever).
+        await expect(async () => {
+            if (!(await submit.isEnabled())) {
+                await nameInput.fill(name).catch(() => undefined);
+            }
+            expect(await submit.isEnabled()).toBe(true);
+        }).toPass({ timeout: 30_000 });
 
-        await page.waitForURL(DETAIL_URL_RE, { timeout: 45_000 });
+        // Step 2 post-condition = the /teams/:uuid detail URL. A swallowed
+        // submit click creates nothing and never router.push()es; re-clicking is
+        // safe because the handler disables the button while it is in flight.
+        await clickAndExpectUrl(page, submit, DETAIL_URL_RE, 45_000);
         await expect(page.getByTestId('team-detail')).toBeVisible({ timeout: 30_000 });
         await expect(page.getByRole('heading', { name })).toBeVisible();
 
@@ -406,10 +438,14 @@ test.describe('Teams UI — detail page (/teams/:id)', () => {
             .getByTestId('team-detail')
             .getByRole('link', { name: 'Settings' });
         await expect(settingsLink).toBeVisible({ timeout: 30_000 });
-        await settingsLink.click();
-        await page.waitForURL(new RegExp(`/teams/${team.id}/settings(?:\\?|$)`), {
-            timeout: 30_000,
-        });
+        // Post-condition = the /teams/:id/settings URL. Client <Link> → a click
+        // that beats hydration is swallowed and the soft nav never emits a
+        // `load`, so the old click + waitForURL pair hung on both counts.
+        await clickAndExpectUrl(
+            page,
+            settingsLink,
+            new RegExp(`/teams/${team.id}/settings(?:\\?|$)`),
+        );
         await expect(page.getByRole('heading', { name: 'Team Settings' })).toBeVisible({
             timeout: 30_000,
         });
@@ -468,23 +504,36 @@ test.describe('Teams UI — settings page (/teams/:id/settings)', () => {
 
         const nameInput = page.getByRole('textbox', { name: 'Name' });
         await expect(nameInput).toHaveValue(team.name, { timeout: 30_000 });
-        await nameInput.fill(newName);
-        await page.getByTestId('team-settings-save').click();
+        const saveBtn = page.getByTestId('team-settings-save');
+        await expect(saveBtn).toBeVisible({ timeout: 30_000 });
 
-        // The server action persists then router.refresh()es; poll the API to
-        // confirm the write landed, then assert the detail page shows it.
-        await expect
-            .poll(
-                async () => {
-                    const r = await ctx.api.get(
-                        `${API_BASE}/api/organizations/${ctx.orgId}/teams/${team.id}`,
-                        { headers: ctx.headers },
-                    );
-                    return (await r.json()).name as string;
-                },
-                { timeout: 30_000 },
-            )
-            .toBe(newName);
+        /** Server-side truth for the persisted team name. */
+        const persistedName = async (): Promise<string> => {
+            const r = await ctx.api.get(
+                `${API_BASE}/api/organizations/${ctx.orgId}/teams/${team.id}`,
+                { headers: ctx.headers },
+            );
+            return r.ok() ? ((await r.json()).name as string) : '';
+        };
+
+        // Post-condition = the API returns the NEW name. Two pre-hydration
+        // swallows to beat, so drive both steps to that persisted state:
+        //   1. a fill() before hydration shows newName in the DOM but leaves
+        //      TeamSettingsClient's `name` state on the old value — the save
+        //      would then PATCH the old name;
+        //   2. a save click before hydration runs no action at all.
+        // Re-driving only while the server still lacks newName means a save that
+        // DID land is never repeated. The button self-disables while submitting,
+        // so a retry click during an in-flight save is a no-op.
+        await expect(async () => {
+            if ((await persistedName()) !== newName) {
+                await nameInput.fill(newName).catch(() => undefined);
+                await saveBtn.click({ timeout: 5_000, noWaitAfter: true }).catch(() => undefined);
+                // Headroom for the server action + router.refresh() round trip.
+                await page.waitForTimeout(1_500);
+            }
+            expect(await persistedName()).toBe(newName);
+        }).toPass({ timeout: 60_000 });
 
         await page.goto(`/en/teams/${team.id}`, { waitUntil: 'domcontentloaded' });
         await expect(page.getByRole('heading', { name: newName })).toBeVisible({ timeout: 30_000 });
@@ -497,12 +546,23 @@ test.describe('Teams UI — settings page (/teams/:id/settings)', () => {
         const team = await seedTeam({ name: `Delete Me ${stamp()}` });
         await page.goto(`/en/teams/${team.id}/settings`, { waitUntil: 'domcontentloaded' });
 
-        await expect(page.getByTestId('team-settings-delete')).toBeVisible({ timeout: 30_000 });
-        // The delete handler goes through window.confirm — auto-accept it.
-        page.once('dialog', (dialog) => dialog.accept());
-        await page.getByTestId('team-settings-delete').click();
+        const deleteBtn = page.getByTestId('team-settings-delete');
+        await expect(deleteBtn).toBeVisible({ timeout: 30_000 });
+        // The delete handler goes through window.confirm — auto-accept EVERY
+        // dialog (not just the first): a click swallowed before hydration fires
+        // no dialog at all, so a `once` handler would be consumed by nothing and
+        // the retry click would then hang on an unhandled confirm.
+        page.on('dialog', (dialog) => void dialog.accept().catch(() => undefined));
 
-        await page.waitForURL(/\/teams(?:\?|$)/, { timeout: 30_000 });
+        // Retry the click until the delete actually navigates us back to the
+        // list — same pre-hydration swallowed-click hazard as elsewhere.
+        const listUrl = /\/teams(?:\?|$)/;
+        await expect(async () => {
+            if (!listUrl.test(page.url())) {
+                await deleteBtn.click({ timeout: 5_000, noWaitAfter: true }).catch(() => undefined);
+            }
+            await expect(page).toHaveURL(listUrl, { timeout: 5_000 });
+        }).toPass({ timeout: 60_000 });
         // The deleted team is gone from the API (404) — its card can't reappear.
         await expect
             .poll(
@@ -549,8 +609,30 @@ test.describe('Teams UI — org chart (/teams/org-chart)', () => {
         await expect(page.getByTestId('org-chart-zoom-in')).toBeVisible();
         await expect(page.getByTestId('org-chart-zoom-out')).toBeVisible();
         await expect(page.getByTestId('org-chart-fit-view')).toBeVisible();
-        // Zooming must not tear down the canvas.
-        await page.getByTestId('org-chart-zoom-in').click();
+        // Zooming must actually zoom, and must not tear down the canvas.
+        // Post-condition = the pan/zoom pane's `scale()` grew; "the canvas is
+        // still visible" alone would also hold for a click swallowed before
+        // hydration, which is exactly the failure we are guarding against.
+        const pane = page.getByTestId('org-chart-canvas').locator('div[style*="scale("]').first();
+        const paneScale = async (): Promise<number> => {
+            const style = (await pane.getAttribute('style').catch(() => null)) ?? '';
+            const matched = style.match(/scale\(([0-9.]+)\)/);
+            return matched ? Number(matched[1]) : NaN;
+        };
+        // Re-read the baseline on every failed check: the fitView() effect
+        // re-scales the pane once at hydration, so a scale captured before that
+        // is not a valid "before" for the click.
+        let scaleBefore = await paneScale();
+        await clickUntil(
+            page.getByTestId('org-chart-zoom-in'),
+            async () => {
+                const now = await paneScale();
+                if (now > scaleBefore) return true;
+                scaleBefore = now;
+                return false;
+            },
+            30_000,
+        );
         await expect(page.getByTestId('org-chart-canvas')).toBeVisible();
 
         const node = page.getByTestId(`org-chart-node-${team.id}`);

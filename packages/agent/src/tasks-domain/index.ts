@@ -6,6 +6,7 @@ export * from './tasks.module';
 export * from './tasks.service';
 export * from './task-gates';
 export * from './task-gate-runner.service';
+export * from './task-gate-judge.service';
 export * from './check-env';
 export * from './task-transition.service';
 export * from './task-chat.service';
@@ -49,6 +50,8 @@ export {
     UserTaskCounterRepository,
 } from '../database/repositories/task-side.repositories';
 export * from './task-review-rejection.service';
+// Git activity ingestion (audit item j) — branch/PR → Task resolver.
+export * from './task-git-link.service';
 export {
     TaskReviewRejectionRepository,
     type RecordTaskReviewRejectionInput,

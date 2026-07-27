@@ -453,14 +453,21 @@ test.describe('SEC PIN: github-app sync plane — rawPayload-free responses and 
 
         const anon = await playwright.request.newContext();
         try {
-            // Rung 1 — unsigned: refused with the static signature message.
+            // Rung 1 — unsigned: refused with a STATIC message. The receiver
+            // fails closed through two doors — "not configured" when nothing
+            // is registered anywhere, the HMAC once a binding exists — and
+            // which one fires is deployment state, not request shape. Either
+            // way the message is a constant, which is the security property
+            // here: it carries nothing the caller supplied.
             const unsigned = await anon.post(`${GH_APP}/webhooks`, {
                 headers: { 'x-github-event': 'installation' },
                 data: payload,
             });
             expect(unsigned.status(), 'unsigned webhook → 401').toBe(401);
             const unsignedText = await unsigned.text();
-            expect(JSON.parse(unsignedText).message).toBe('Invalid GitHub webhook signature');
+            expect(JSON.parse(unsignedText).message).toMatch(
+                /^(Invalid GitHub webhook signature|GitHub events receiver is not configured)$/,
+            );
             // No part of the attacker-controlled payload is reflected.
             expect(unsignedText, 'unsigned refusal echoes no payload marker').not.toContain(marker);
             expect(unsignedText, 'unsigned refusal echoes no installation id').not.toContain(

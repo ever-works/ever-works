@@ -23,7 +23,11 @@ import {
 import { AgentRunRepository } from '@ever-works/agent/database';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
-import { TerminalAttachService } from './terminal-attach.service';
+import {
+    TerminalAttachService,
+    resolveRequestedAttachRole,
+    type TerminalRequestedRole,
+} from './terminal-attach.service';
 import { TerminalRelayRegistry } from './terminal-relay.registry';
 
 /**
@@ -34,9 +38,11 @@ import { TerminalRelayRegistry } from './terminal-relay.registry';
  * ownership (`AgentsService.getOne`) + user-scoped run lookup + agentId
  * match — cross-user or cross-agent runIds 404 with no existence leak.
  *
- * Role v1: the run's owner attaches as `driver`. The richer matrix
- * (work-member viewers, agent guardrail flag) rides the policy-matrix
- * milestone — fail-closed until then: non-owners simply 404.
+ * Roles: the run's owner attaches as `driver` by default and may ask
+ * for a read-only `viewer` attach (`?role=viewer`) — a downgrade of a
+ * right it already holds, which is why it needs no extra check. WHO
+ * else may attach (work-member viewers, agent guardrail flag) is the
+ * policy-matrix milestone — fail-closed until then: non-owners 404.
  */
 @ApiTags('terminal')
 @Controller('api/agents/:id/runs/:runId/terminal')
@@ -66,26 +72,46 @@ export class TerminalAttachController {
         return run;
     }
 
+    /**
+     * Mint an attach token for this run's terminal socket.
+     *
+     * `?role=viewer` mints a READ-ONLY attach: the relay refuses viewer
+     * stdin/resize (answering the sender an `error` frame) and the pane
+     * renders its read-only badge. That is how a second participant —
+     * or a second tab that must not fight the driver for the keyboard —
+     * watches a live session. Anything else, including the internal
+     * `worker` role, resolves to `driver`: a request may downgrade
+     * itself, never upgrade.
+     */
     @Post('attach-token')
     @ApiOperation({
         summary:
             'Mint a short-lived signed attach token for this run’s terminal WebSocket. ' +
-            'Present it in the FIRST WebSocket message (never in the URL).',
+            'Present it in the FIRST WebSocket message (never in the URL). ' +
+            '`?role=viewer` mints a read-only attach.',
     })
+    @ApiQuery({ name: 'role', required: false, enum: ['driver', 'viewer'] })
     @HttpCode(HttpStatus.CREATED)
     @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async mintAttachToken(
         @CurrentUser() auth: AuthenticatedUser,
         @Param('id', ParseUUIDPipe) agentId: string,
         @Param('runId', ParseUUIDPipe) runId: string,
-    ): Promise<{ token: string; wsPath: string; role: string; expiresInSec: number }> {
+        @Query('role') requestedRole?: string,
+    ): Promise<{
+        token: string;
+        wsPath: string;
+        role: TerminalRequestedRole;
+        expiresInSec: number;
+    }> {
         await this.authorizeRun(auth.userId, agentId, runId);
+        const role = resolveRequestedAttachRole(requestedRole);
         const { token, expiresInSec } = this.attach.mint({
             userId: auth.userId,
             runId,
-            role: 'driver',
+            role,
         });
-        return { token, wsPath: `/ws/terminal/${runId}`, role: 'driver', expiresInSec };
+        return { token, wsPath: `/ws/terminal/${runId}`, role, expiresInSec };
     }
 
     /**

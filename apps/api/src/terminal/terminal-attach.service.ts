@@ -27,6 +27,28 @@ export interface TerminalAttachClaims {
 
 export const TERMINAL_ATTACH_TOKEN_TTL_SECONDS = 60;
 
+/** Roles a BROWSER may ever be minted. `worker` is internal-only. */
+export type TerminalRequestedRole = Extract<TerminalClientRole, 'driver' | 'viewer'>;
+
+/**
+ * Resolve the role an attach-token request asks for.
+ *
+ * The relay has always understood `viewer` (read-only: its inbound leg
+ * refuses viewer stdin with an error frame answered to the sender) and
+ * the pane has always rendered a read-only badge for it — but nothing
+ * ever MINTED one, so the role was decorative. This is the mint side:
+ * a second participant opens the same run read-only by asking for
+ * `role=viewer`.
+ *
+ * Fail-closed in the only direction that matters: `worker` (the
+ * internally-brokered publish role) and every unknown value collapse to
+ * `driver`, which the caller has already been authorized for — a
+ * request can DOWNGRADE itself, never upgrade.
+ */
+export function resolveRequestedAttachRole(raw?: string | null): TerminalRequestedRole {
+    return typeof raw === 'string' && raw.trim().toLowerCase() === 'viewer' ? 'viewer' : 'driver';
+}
+
 @Injectable()
 export class TerminalAttachService {
     private secret(): Buffer | null {

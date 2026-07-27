@@ -3,13 +3,29 @@
 import { useCallback, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
-import { AlertCircle, CreditCard, FileText, RefreshCw, Wallet, Zap, Check } from 'lucide-react';
+import {
+    AlertCircle,
+    AlertTriangle,
+    ArrowRight,
+    CreditCard,
+    FileText,
+    RefreshCw,
+    Wallet,
+    Zap,
+    Check,
+} from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
 import { Select } from '@/components/ui/select';
+import { Link } from '@/i18n/navigation';
+import { ROUTES } from '@/lib/constants';
 import {
+    cancelSubscriptionAction,
     changePlanAction,
+    openBillingPortalAction,
+    resumeSubscriptionAction,
     startCreditCheckoutAction,
+    startPlanCheckoutAction,
     updateAutoRechargeAction,
 } from '@/app/actions/dashboard/billing';
 import {
@@ -28,13 +44,21 @@ import {
 } from '@/lib/api/credits.shared';
 import {
     canBuyCredits,
+    canCancelSubscription,
     canConfigureAutoRecharge,
+    canUpgradePlan,
+    canResumeSubscription,
     formatCardExpiry,
     formatPaymentMethod,
     invoiceStatusTone,
+    isSubscriptionPastDue,
     packBonusPercent,
+    subscriptionState,
+    subscriptionStatusLabelKey,
+    subscriptionStatusTone,
     type BillingOverview,
     type InvoiceListPage,
+    type SubscriptionState,
 } from '@/lib/api/billing.shared';
 
 interface BillingSettingsProps {
@@ -57,6 +81,23 @@ const KIND_TONE_CLASSES: Record<ReturnType<typeof ledgerKindTone>, string> = {
     neutral:
         'bg-surface-secondary dark:bg-surface-secondary-dark text-text-muted dark:text-text-muted-dark border border-border dark:border-border-dark',
 };
+
+/** Subscription status chip tones (audit B08) — one extra `warning` bucket. */
+const STATUS_TONE_CLASSES: Record<ReturnType<typeof subscriptionStatusTone>, string> = {
+    ...KIND_TONE_CLASSES,
+    warning: 'bg-amber-500/10 text-amber-600 dark:text-amber-400 border border-amber-500/20',
+};
+
+/** `Aug 12, 2026`, or null when the provider gave us no period end. */
+function formatPeriodDate(value: string | null): string | null {
+    if (!value) {
+        return null;
+    }
+    const date = new Date(value);
+    return Number.isNaN(date.getTime())
+        ? null
+        : date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' });
+}
 
 function SectionCard({
     icon: Icon,
@@ -94,6 +135,24 @@ function SectionCard({
     );
 }
 
+/**
+ * Entry point to the manage-payment-methods route (billing PRD §3.3,
+ * audit B10 + B25). Purely additive: the summary above stays read-only,
+ * this just gives it somewhere to go.
+ */
+function PaymentMethodManageLink({ label }: { label: string }) {
+    return (
+        <Link
+            href={ROUTES.DASHBOARD_SETTINGS_PAYMENT_METHOD}
+            data-testid="billing-payment-method-manage"
+            className="mt-2 inline-flex items-center gap-1 text-xs font-medium text-primary hover:underline"
+        >
+            {label}
+            <ArrowRight className="w-3 h-3" />
+        </Link>
+    );
+}
+
 export function BillingSettings({
     paymentsEnabled,
     initialPlan,
@@ -126,6 +185,12 @@ export function BillingSettings({
     const [selectedPackId, setSelectedPackId] = useState<string | null>(packs[0]?.id ?? null);
     const [checkoutPending, setCheckoutPending] = useState(false);
 
+    // Paid-tier purchase (audit B24). Same two gates as buying credits,
+    // plus subscriptions being enabled — an upgrade the deployment can't
+    // apply must not be offered as a live button.
+    const upgradeEnabled = canUpgradePlan(overview, paymentsEnabled, subscriptionsEnabled);
+    const [upgradingPlanCode, setUpgradingPlanCode] = useState<string | null>(null);
+
     const [autoRechargeOn, setAutoRechargeOn] = useState(overview?.autoRecharge.enabled ?? false);
     const [autoRechargeThreshold, setAutoRechargeThreshold] = useState(
         overview?.autoRecharge.thresholdCredits != null
@@ -140,6 +205,67 @@ export function BillingSettings({
     const invoices = initialInvoices?.invoices ?? [];
     const paymentMethodLabel = formatPaymentMethod(overview?.paymentMethod ?? null);
     const paymentMethodExpiry = formatCardExpiry(overview?.paymentMethod ?? null);
+
+    // ── Subscription lifecycle (audit B07/B08) ────────────────────────
+    // The server snapshot is the source of truth; a successful mutation
+    // swaps in what the provider just confirmed so the chip and the
+    // buttons flip immediately, before the revalidated page arrives.
+    const [subscription, setSubscription] = useState<SubscriptionState>(() =>
+        subscriptionState(initialOverview),
+    );
+    const [lifecyclePending, setLifecyclePending] = useState(false);
+    // Re-derive the gates from the live state rather than the initial
+    // fetch, so cancel → resume swaps without a page refresh.
+    const overviewWithLiveSubscription = overview ? { ...overview, subscription } : null;
+    const showPastDue = isSubscriptionPastDue(overviewWithLiveSubscription);
+    const showCancel = canCancelSubscription(overviewWithLiveSubscription, paymentsEnabled);
+    const showResume = canResumeSubscription(overviewWithLiveSubscription, paymentsEnabled);
+    const statusToneClass = STATUS_TONE_CLASSES[subscriptionStatusTone(subscription.status)];
+    const periodEndLabel = formatPeriodDate(subscription.currentPeriodEnd);
+
+    const handleCancelSubscription = useCallback(async () => {
+        setLifecyclePending(true);
+        try {
+            const result = await cancelSubscriptionAction();
+            if (result.success && result.subscription) {
+                setSubscription(result.subscription);
+                toast.success(t('currentPlan.cancelSuccess'));
+                return;
+            }
+            toast.error(result.error ?? t('currentPlan.cancelError'));
+        } finally {
+            setLifecyclePending(false);
+        }
+    }, [t]);
+
+    const handleResumeSubscription = useCallback(async () => {
+        setLifecyclePending(true);
+        try {
+            const result = await resumeSubscriptionAction();
+            if (result.success && result.subscription) {
+                setSubscription(result.subscription);
+                toast.success(t('currentPlan.resumeSuccess'));
+                return;
+            }
+            toast.error(result.error ?? t('currentPlan.resumeError'));
+        } finally {
+            setLifecyclePending(false);
+        }
+    }, [t]);
+
+    const handleOpenPortal = useCallback(async () => {
+        setLifecyclePending(true);
+        try {
+            const result = await openBillingPortalAction();
+            if (result.success && result.url) {
+                window.location.assign(result.url);
+                return;
+            }
+            toast.error(result.error ?? t('pastDue.error'));
+        } finally {
+            setLifecyclePending(false);
+        }
+    }, [t]);
 
     const handleBuyCredits = useCallback(async () => {
         if (!selectedPackId) {
@@ -158,6 +284,30 @@ export function BillingSettings({
             setCheckoutPending(false);
         }
     }, [selectedPackId, t]);
+
+    const handleUpgradePlan = useCallback(
+        async (plan: SubscriptionPlanListItem) => {
+            if (!upgradeEnabled) {
+                // Degraded deployment: keep the pre-payments affordance
+                // rather than a button that always errors.
+                toast.info(t('plans.upgradeHint'));
+                return;
+            }
+            setUpgradingPlanCode(plan.code);
+            try {
+                // Only a PLAN CODE crosses the wire — the server prices it.
+                const result = await startPlanCheckoutAction(plan.code);
+                if (result.success && result.url) {
+                    window.location.assign(result.url);
+                    return;
+                }
+                toast.error(result.error ?? t('credits.checkoutError'));
+            } finally {
+                setUpgradingPlanCode(null);
+            }
+        },
+        [upgradeEnabled, t],
+    );
 
     const handleSaveAutoRecharge = useCallback(async () => {
         setAutoRechargeSaving(true);
@@ -263,13 +413,40 @@ export function BillingSettings({
                 </div>
             ) : null}
 
+            {/* ── PAST_DUE recovery banner (audit B08) ─────────────── */}
+            {showPastDue ? (
+                <div
+                    data-testid="billing-past-due-banner"
+                    role="alert"
+                    className="flex flex-wrap items-center gap-3 rounded-lg border border-rose-500/40 bg-rose-500/5 p-4"
+                >
+                    <AlertTriangle className="w-4 h-4 shrink-0 text-rose-600 dark:text-rose-400" />
+                    <div className="flex-1 min-w-48">
+                        <p className="text-sm font-medium text-text dark:text-text-dark">
+                            {t('pastDue.title')}
+                        </p>
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                            {t('pastDue.body')}
+                        </p>
+                    </div>
+                    <Button
+                        className="text-xs"
+                        disabled={lifecyclePending}
+                        data-testid="billing-past-due-action"
+                        onClick={() => void handleOpenPortal()}
+                    >
+                        {t('pastDue.action')}
+                    </Button>
+                </div>
+            ) : null}
+
             {/* ── Current plan ─────────────────────────────────────── */}
             <SectionCard
                 icon={CreditCard}
                 title={t('currentPlan.title')}
                 testId="billing-current-plan"
             >
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between gap-3">
                     <div>
                         <p className="text-lg font-semibold text-text dark:text-text-dark">
                             {currentPlan?.name ?? initialPlan?.plan?.name ?? 'Free'}
@@ -283,15 +460,65 @@ export function BillingSettings({
                         </p>
                     </div>
                     {subscriptionsEnabled ? (
+                        // The REAL lifecycle status (audit B08) — this chip
+                        // used to be hardcoded to "active" no matter what
+                        // the provider said.
                         <span
                             data-testid="billing-plan-status"
-                            className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 border border-emerald-500/20 px-2.5 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400"
+                            data-status={subscription.status}
+                            className={cn(
+                                'inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium',
+                                statusToneClass,
+                            )}
                         >
-                            <Check className="w-3 h-3" />
-                            {t('currentPlan.statusActive')}
+                            {subscriptionStatusTone(subscription.status) === 'positive' ? (
+                                <Check className="w-3 h-3" />
+                            ) : (
+                                <AlertCircle className="w-3 h-3" />
+                            )}
+                            {t(subscriptionStatusLabelKey(subscription.status))}
                         </span>
                     ) : null}
                 </div>
+
+                {/* Cancel / resume (audit B07) — only ever rendered for a
+                    subscription the provider can actually act on. */}
+                {subscription.cancelAtPeriodEnd ? (
+                    <p
+                        className="text-xs text-text-muted dark:text-text-muted-dark"
+                        data-testid="billing-cancel-scheduled"
+                    >
+                        {periodEndLabel
+                            ? t('currentPlan.cancelScheduledOn', { date: periodEndLabel })
+                            : t('currentPlan.cancelScheduled')}
+                    </p>
+                ) : null}
+
+                {showCancel || showResume ? (
+                    <div className="flex flex-wrap gap-2">
+                        {showResume ? (
+                            <Button
+                                className="text-xs"
+                                disabled={lifecyclePending}
+                                data-testid="billing-subscription-resume"
+                                onClick={() => void handleResumeSubscription()}
+                            >
+                                {t('currentPlan.resume')}
+                            </Button>
+                        ) : null}
+                        {showCancel ? (
+                            <Button
+                                variant="secondary"
+                                className="text-xs"
+                                disabled={lifecyclePending}
+                                data-testid="billing-subscription-cancel"
+                                onClick={() => void handleCancelSubscription()}
+                            >
+                                {t('currentPlan.cancel')}
+                            </Button>
+                        ) : null}
+                    </div>
+                ) : null}
             </SectionCard>
 
             {/* ── Plan switcher (credits-forward, PRD §3.1) ─────────── */}
@@ -363,14 +590,19 @@ export function BillingSettings({
                                     </Button>
                                 ) : (
                                     // Paid tiers activate through a billing-verified
-                                    // path only (EW-711 #23) — until the payment
-                                    // provider lands this is a contact affordance.
+                                    // path only (EW-711 #23): this starts a hosted
+                                    // plan checkout (audit B24). On a deployment
+                                    // without payments it degrades to the original
+                                    // coming-soon hint rather than erroring.
                                     <Button
                                         className="text-xs w-full"
                                         data-testid={`billing-plan-upgrade-${plan.code}`}
-                                        onClick={() => toast.info(t('plans.upgradeHint'))}
+                                        disabled={upgradingPlanCode !== null}
+                                        onClick={() => void handleUpgradePlan(plan)}
                                     >
-                                        {t('plans.upgrade')}
+                                        {upgradingPlanCode === plan.code
+                                            ? t('credits.redirecting')
+                                            : t('plans.upgrade')}
                                     </Button>
                                 )}
                             </div>
@@ -485,6 +717,7 @@ export function BillingSettings({
                             <p className="mt-2 text-xs text-text-muted dark:text-text-muted-dark">
                                 {t('paymentMethod.managedAtCheckout')}
                             </p>
+                            <PaymentMethodManageLink label={t('paymentMethod.manage')} />
                         </div>
                     ) : (
                         <div data-testid="billing-payment-method-empty">
@@ -494,6 +727,7 @@ export function BillingSettings({
                             <p className="mt-1 text-xs text-text-muted dark:text-text-muted-dark">
                                 {t('paymentMethod.addAtCheckout')}
                             </p>
+                            <PaymentMethodManageLink label={t('paymentMethod.addCta')} />
                         </div>
                     )}
                 </SectionCard>

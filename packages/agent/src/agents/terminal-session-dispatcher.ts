@@ -23,6 +23,15 @@ export interface TerminalSessionDispatchPayload {
     /** Extra env for the child. NEVER credentials — those resolve job-side. */
     env?: Record<string, string>;
     persistent?: boolean;
+    /**
+     * The `terminal-stream` provider the facade resolved for this scope,
+     * forwarded to the worker as its `providerOverride` so both sides
+     * host the SAME provider. Absent when no provider resolved — the
+     * worker then resolves (or falls back) on its own.
+     */
+    providerId?: string;
+    /** Work scope, when the run has one — feeds the facade's settings hierarchy. */
+    workId?: string;
 }
 
 export interface TerminalSessionDispatcher {

@@ -1,7 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { BillingProfile } from '@src/entities/billing-profile.entity';
+import {
+    BillingProfile,
+    type BillingSubscriptionStatus,
+} from '@src/entities/billing-profile.entity';
 
 /** Columns a caller may set when creating a profile lazily. */
 export interface BillingProfileUpsert {
@@ -25,6 +28,19 @@ export interface AutoRechargeWrite {
     autoRechargeEnabled: boolean;
     autoRechargeThresholdCredits?: number | null;
     autoRechargePackId?: string | null;
+}
+
+/**
+ * Subscription lifecycle write (audit B07/B08). Every field is optional:
+ * a webhook that only reports a status change must not blank the period
+ * end, and a cancel that only flips the flag must not blank the id.
+ */
+export interface SubscriptionStateWrite {
+    providerSubscriptionId?: string | null;
+    subscriptionStatus?: BillingSubscriptionStatus | null;
+    cancelAtPeriodEnd?: boolean;
+    currentPeriodEnd?: Date | null;
+    subscriptionCanceledAt?: Date | null;
 }
 
 /**
@@ -109,6 +125,41 @@ export class BillingProfileRepository {
                 autoRechargePackId: settings.autoRechargePackId ?? null,
             },
         );
+        return this.findByUserId(userId);
+    }
+
+    /**
+     * Persist the subscription lifecycle (audit B07/B08).
+     *
+     * PARTIAL by construction: only the keys the caller actually supplied
+     * are written, so a `subscription.updated` webhook that carries just a
+     * status cannot wipe `currentPeriodEnd`, and a cancel that only flips
+     * the flag cannot wipe `providerSubscriptionId`. An explicit `null`
+     * IS a write (that is how a finished subscription clears its period).
+     */
+    async updateSubscriptionState(
+        userId: string,
+        state: SubscriptionStateWrite,
+    ): Promise<BillingProfile | null> {
+        const patch: SubscriptionStateWrite = {};
+        if ('providerSubscriptionId' in state) {
+            patch.providerSubscriptionId = state.providerSubscriptionId ?? null;
+        }
+        if ('subscriptionStatus' in state) {
+            patch.subscriptionStatus = state.subscriptionStatus ?? null;
+        }
+        if ('cancelAtPeriodEnd' in state) {
+            patch.cancelAtPeriodEnd = state.cancelAtPeriodEnd ?? false;
+        }
+        if ('currentPeriodEnd' in state) {
+            patch.currentPeriodEnd = state.currentPeriodEnd ?? null;
+        }
+        if ('subscriptionCanceledAt' in state) {
+            patch.subscriptionCanceledAt = state.subscriptionCanceledAt ?? null;
+        }
+        if (Object.keys(patch).length > 0) {
+            await this.repository.update({ userId }, patch);
+        }
         return this.findByUserId(userId);
     }
 

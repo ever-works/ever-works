@@ -1,6 +1,7 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
 import { API_BASE, authedHeaders } from './helpers/api';
 import { loadSeededTestUser } from './helpers/seeded-test-user';
+import { clickAndExpectUrl } from './helpers/nav';
 
 /**
  * Missions + Ideas — authenticated UI journey (/en/missions + /en/ideas).
@@ -288,11 +289,11 @@ test.describe('Missions catalog — /en/missions UI', () => {
         await page.goto(`/en/missions?search=${encodeURIComponent(title)}`, {
             waitUntil: 'domcontentloaded',
         });
+        // Client-side (soft) nav: the URL must be POLLED (no document 'load' is
+        // fired, so waitForURL would hang) and the click must be RETRIED (under CI
+        // load it can land before hydration wires the router and do nothing).
         const heading = page.getByRole('heading', { name: title });
-        await expect(heading).toBeVisible({ timeout: 30_000 });
-        await heading.click();
-
-        await page.waitForURL(/\/missions\/[0-9a-f-]{36}/, { timeout: 30_000 });
+        await clickAndExpectUrl(page, heading, /\/missions\/[0-9a-f-]{36}/);
         await expect(page).toHaveURL(new RegExp(`/missions/${mission.id}`));
         await expect(page.getByRole('heading', { name: title, level: 1 })).toBeVisible({
             timeout: 30_000,
@@ -365,9 +366,7 @@ test.describe('Mission detail — /en/missions/[id] UI', () => {
 
         await page.goto(`/en/missions/${mission.id}`, { waitUntil: 'domcontentloaded' });
         const back = page.getByRole('link', { name: 'Back to Missions' });
-        await expect(back).toBeVisible({ timeout: 30_000 });
-        await back.click();
-        await page.waitForURL(/\/missions(\?|$)/, { timeout: 30_000 });
+        await clickAndExpectUrl(page, back, /\/missions(\?|$)/);
         await expect(page.getByRole('heading', { name: 'Missions' }).first()).toBeVisible();
     });
 
@@ -492,10 +491,7 @@ test.describe('Ideas catalog — /en/ideas UI', () => {
         await page.goto('/en/ideas', { waitUntil: 'domcontentloaded' });
         // The whole card is an overlay <a> whose accessible name is the title.
         const link = page.getByRole('link', { name: title, exact: true });
-        await expect(link).toBeVisible({ timeout: 30_000 });
-        await link.click();
-
-        await page.waitForURL(/\/ideas\/[0-9a-f-]{36}/, { timeout: 30_000 });
+        await clickAndExpectUrl(page, link, /\/ideas\/[0-9a-f-]{36}/);
         await expect(page).toHaveURL(new RegExp(`/ideas/${idea.id}`));
     });
 });

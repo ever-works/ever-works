@@ -110,6 +110,7 @@ import { UserNotificationSubscription } from '../entities/user-notification-subs
 import { UserNotificationPreference } from '../entities/user-notification-preference.entity';
 import { UserNotificationCategoryMute } from '../entities/user-notification-category-mute.entity';
 import { OrganizationNotificationDefault } from '../entities/organization-notification-default.entity';
+import { OrganizationOnboardingProfile } from '../entities/organization-onboarding-profile.entity';
 import { ComposioTriggerSubscription } from '../entities/composio-trigger-subscription.entity';
 import { TenantJobRuntimeConfig } from '../entities/tenant-job-runtime-config.entity';
 import { TenantJobRuntimeAudit } from '../entities/tenant-job-runtime-audit.entity';
@@ -119,6 +120,7 @@ import { InboundTrigger } from '../entities/inbound-trigger.entity';
 import { IngestedEvent } from '../entities/ingested-event.entity';
 import { IngestCursor } from '../entities/ingest-cursor.entity';
 import { IngestInstallBinding } from '../entities/ingest-install-binding.entity';
+import { ExternalIssueLink } from '../entities/external-issue-link.entity';
 import { Meeting } from '../entities/meeting.entity';
 import { CreditLedgerEntry } from '../entities/credit-ledger-entry.entity';
 import { PlanEntitlement } from '../entities/plan-entitlement.entity';
@@ -260,6 +262,8 @@ export const ENTITIES = [
     UserNotificationPreference,
     UserNotificationCategoryMute,
     OrganizationNotificationDefault,
+    // Onboarding "What do you do" answers, mirrored at org level (A53)
+    OrganizationOnboardingProfile,
     // Tenant-scoped job-runtime overlay (EW-742 P1)
     TenantJobRuntimeConfig,
     TenantJobRuntimeAudit,
@@ -283,6 +287,10 @@ export const ENTITIES = [
     // binding, so Slack/GitHub deliveries are attributed to the account
     // that actually owns the workspace instead of the oldest install.
     IngestInstallBinding,
+    // Event-ingest spine — external tracker issue → platform Task
+    // mapping, so an ingested Linear/Jira/GitHub issue can be bound to
+    // the Task that mirrors it.
+    ExternalIssueLink,
     // Meetings v1 (Wave 8, feature a) — captured meetings with
     // transcripts, summaries and provider dedupe.
     Meeting,

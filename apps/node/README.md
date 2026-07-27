@@ -13,19 +13,34 @@ headless and desktop shells can never drift apart (PRD §3.3).
 ```bash
 ever-works-node enroll --api-url <url> --token <one-time-token> [--name <label>] [-i <seconds>]
 ever-works-node start [-i <seconds>] [--work] [--concurrency <count>]
+ever-works-node pause [--local-only]
+ever-works-node resume [--local-only]
+ever-works-node unenroll [--local-only]
 ever-works-node status
 ever-works-node capabilities
 ```
 
 - **`enroll`** consumes a one-time token from the platform's Fleet page (`POST /api/fleet/enroll`)
-  and writes `{apiUrl, nodeId, secret, capabilities, …}` to the OS config directory.
+  and writes `{apiUrl, nodeId, capabilities, …}` to the OS config directory, with the credential
+  itself going to the OS keychain where one exists.
 - **`start`** runs the heartbeat loop (`POST /api/fleet/heartbeat`, default every 60s) with
   exponential backoff on failure, refreshing capability tags on every beat, until SIGINT/SIGTERM.
   With **`--work`** it also runs the worker host: lease → execute → report against
   `POST /api/fleet/jobs/*`. This is opt-in on purpose — enrolling a machine and letting it run the
   owner's commands are two different consents.
-- **`status`** prints the local enrollment with the credential reported but never shown.
+- **`pause` / `resume`** drain and undrain this machine. Pausing stops leasing **immediately** and
+  lets in-flight jobs finish and report — it is not a kill. It tells the platform
+  (`POST /api/fleet/pause`, so the scheduler stops offering work) _and_ records the intent locally,
+  so a service restart comes back paused. A paused node keeps heartbeating: a drained machine that
+  vanishes from Fleet is indistinguishable from a dead one.
+- **`unenroll`** retires the machine — `POST /api/fleet/unenroll` deletes the registration, then the
+  local credential is erased. The local erase happens **even if the API call fails**: a
+  decommissioned laptop holding a live fleet secret is the worse outcome.
+- **`status`** prints the local enrollment with the credential reported but never shown, including
+  where it is stored and whether the node is paused.
 - **`capabilities`** prints the tags this machine would report, without enrolling.
+
+`--local-only` skips the API call, for a machine being drained or decommissioned offline.
 
 Exit codes: `0` ok, `1` failure, `3` not enrolled (so provisioning scripts can branch on it).
 
@@ -37,18 +52,43 @@ Exit codes: `0` ok, `1` failure, `3` not enrolled (so provisioning scripts can b
 | macOS    | `~/Library/Application Support/ever-works-node/node-config.json`     |
 | Linux    | `$XDG_CONFIG_HOME/ever-works-node/node-config.json` (or `~/.config`) |
 
-`EVER_WORKS_NODE_CONFIG` overrides the path entirely. The file is created with mode **0600** and
-re-chmod'ed after write on POSIX; on Windows the chmod is skipped rather than faked (no POSIX mode
-bits — the file inherits the user profile's ACL).
+`EVER_WORKS_NODE_CONFIG` overrides the path entirely.
+
+**The credential does not live in this file when it does not have to.** With an OS keychain
+available (macOS Keychain, Windows Credential Manager, Linux Secret Service — all reached through
+the `@napi-rs/keyring` SDK) the secret is stored there and the file records only
+`"secretStorage": "keychain"`. Where no keychain exists — headless servers, containers — it falls
+back into the file and **says so loudly**, on every load and every save.
+
+Either way the file is locked to its owner: mode **0600** at creation and re-chmod'ed after write on
+POSIX, and on Windows an inheritance-stripped owner-only ACL applied with `icacls`. Windows is no
+longer skipped.
+
+`EVER_WORKS_NODE_DISABLE_KEYCHAIN=1` forces the file fallback (the container image sets it, because
+a container never has a keychain and a surprise warning is worse than a declared choice).
 
 ## Capability tags
 
 Detected at enroll and re-detected on **every heartbeat**, so installing Docker or Git on a running
 node shows up in Fleet without a restart:
 
-`os:<platform>` · `arch:<arch>` · `node:<major>` · `terminal` · `workspace` · plus `docker`, `git`
-and `display` when present. Tags are normalized with the same rules the server applies
-(trim → 32 chars → dedupe → max 16), so what the node reports is exactly what Fleet stores.
+`os:<platform>` · `arch:<arch>` · `node:<major>` · `terminal` · `workspace` · plus `docker`, `git`,
+`display`, `browser`, `gpu` and `gpu:<vendor>` when present. Tags are normalized with the same rules
+the server applies (trim → 32 chars → dedupe → max 16), so what the node reports is exactly what
+Fleet stores.
+
+Two rules govern what may appear:
+
+1. **A tag is a promise the node can keep.** `browser` is emitted only when a browser executable was
+   actually resolved — the same path `browser-check` will spawn — and the `browser-check` executor is
+   registered by that same fact. A tag with nothing behind it routes real work to a machine that
+   cannot do it.
+2. **Detection never fails the beat.** Every probe swallows its own errors: a missing tool is a
+   missing tag, not a missing heartbeat.
+
+`EVER_WORKS_NODE_BROWSER` pins the browser executable explicitly. A pinned path that does not exist
+disables the tag rather than falling through to some other browser — silently launching a different
+engine than the one an operator chose is how a check passes for the wrong reason.
 
 ## Layout
 
@@ -59,8 +99,12 @@ and `display` when present. Tags are normalized with the same rules the server a
     - `config-store.ts` persistence over an injected filesystem
     - `logger.ts` redacting logger — credentials are `protect()`ed once and scrubbed everywhere
     - `job-client.ts` lease/heartbeat/complete HTTP over the same injected `fetch`
-    - `worker-loop.ts` the lease → execute → report loop (backoff, keep-alive, draining shutdown)
+    - `worker-loop.ts` the lease → execute → report loop (backoff, keep-alive, draining shutdown
+      **and draining pause**)
+    - `browser-probe.ts` / `gpu-probe.ts` the `browser` and `gpu` capability probes
+    - `secret-store.ts` OS keychain over an injected SDK loader, with a loud file fallback
     - `executors/acceptance-checks.ts` the v1 job kind, with its own scrubbed subprocess env
+    - `executors/browser-check.ts` the v2 job kind — a real browser in a throwaway profile
     - `runtime.ts` composition root (`enrollNode`, `createNodeRuntime`, shutdown handlers)
     - `types.ts` wire types + the server's limits, mirrored (the job protocol instead comes from
       `@ever-works/contracts`, which is where drift would actually hurt: it carries executable work)
@@ -97,16 +141,22 @@ pnpm --filter ever-works-node test    # vitest unit tests (no network, no disk, 
 - **Excluded from the default root build**: like `apps/docs` and `apps/desktop`, this app is
   filtered out of root `pnpm build` / `pnpm build:apps`; build it explicitly with
   `pnpm build:node` (root `pnpm build:all` includes it).
-- **Publishing is a follow-up.** The package is `private` today; the npm/container/systemd
-  packaging of PRD §3.3 lands with the packaging milestone.
+- **Running it unattended** — systemd unit, Windows service / scheduled task, container image — is
+  documented in [`packaging/README.md`](packaging/README.md).
 
 ## What a node can and cannot run
 
 The worker host resolves an executor by `job.kind`. Today exactly one kind is registered:
 
-| Kind                | Status                                                                                                                                                                                                               |
-| ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `acceptance-checks` | **Working end to end.** Runs a Task's dispatch-frozen acceptance checks in a workspace directory on this machine and reports each exit code, with verdict rules identical to the platform's `TaskGateRunnerService`. |
+| Kind                | Status                                                                                                                                                                                                                                                                 |
+| ------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `acceptance-checks` | **Working end to end.** Runs a Task's dispatch-frozen acceptance checks in a workspace directory on this machine and reports each exit code, with verdict rules identical to the platform's `TaskGateRunnerService`.                                                   |
+| `browser-check`     | **Working end to end, on a node that resolved a browser.** Drives the machine's real browser against a URL in a throwaway profile and reports what it rendered (DOM bytes, `<title>`, an optional `expectText`). Registered only when the `browser` tag is advertised. |
+
+`browser-check` runs headless by default (`--headless=new --dump-dom`), which is what makes its
+verdict a real observation rather than "the process did not crash". `headed: true` opens a visible
+window on a node that also advertises `display`; because Chrome exposes no DOM outside headless, a
+headed job that asks for `expectText` is **refused** rather than quietly downgraded.
 
 A leased job of any other kind is completed as a **failure naming the kind** — never silently
 dropped, which would leave it to expire and retry forever on the same incapable node.
@@ -119,4 +169,5 @@ dropped, which would leave it to expire and retry forever on the same incapable 
 - Workspace **provisioning** on the node: today `acceptance-checks` requires the workspace to
   already exist on this machine (it refuses a path it cannot resolve), so the end-to-end cloud
   path still wants a checkout step.
-- `pause` / `unenroll` CLI verbs (PRD §3.3) follow the corresponding Fleet API surface.
+- **Publishing to npm.** The package is still `private`, and the packaging scripts therefore refuse
+  to install a service unless `ever-works-node` is already on `PATH`.

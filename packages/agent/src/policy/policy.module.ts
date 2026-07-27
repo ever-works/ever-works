@@ -7,6 +7,7 @@ import { Work } from '../entities/work.entity';
 import { MERGE_POLICY_ENFORCER } from './merge-policy.enforcer';
 import { MergePolicyScopeRepository } from './merge-policy.repository';
 import { MergePolicyService } from './merge-policy.service';
+import { PullRequestGateService } from './pull-request-gate.service';
 
 /**
  * Merge-policy matrix (Wave 3, founder decision D4) — agent-side module
@@ -24,6 +25,13 @@ import { MergePolicyService } from './merge-policy.service';
  * EntityMetadataNotFoundError on first query. All four have been
  * registered since their own features landed; this module adds no new
  * entity.
+ *
+ * It also owns `PullRequestGateService` — the quality-gate decision the
+ * non-worker pull-request callers route through. It lives here (not in
+ * `tasks-domain`) for the same leaf reason: the generator / item-submission
+ * / import modules must be able to ask "may this PR open?" without pulling
+ * the whole Tasks domain into their graph. It has NO injected dependency,
+ * so adding it costs the module nothing.
  */
 @Module({
     imports: [TypeOrmModule.forFeature([Agent, Work, Organization, Tenant])],
@@ -31,7 +39,13 @@ import { MergePolicyService } from './merge-policy.service';
         MergePolicyScopeRepository,
         MergePolicyService,
         { provide: MERGE_POLICY_ENFORCER, useExisting: MergePolicyService },
+        PullRequestGateService,
     ],
-    exports: [MergePolicyScopeRepository, MergePolicyService, MERGE_POLICY_ENFORCER],
+    exports: [
+        MergePolicyScopeRepository,
+        MergePolicyService,
+        MERGE_POLICY_ENFORCER,
+        PullRequestGateService,
+    ],
 })
 export class PolicyModule {}

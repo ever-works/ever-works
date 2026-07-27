@@ -168,6 +168,19 @@ export const JOB_RUNTIMES: RuntimeDescriptor[] = [
 				required: false,
 				secret: false,
 				placeholder: 'workspace,git'
+			},
+			{
+				key: 'FLEET_NODE_AGENT_TASK_COMMAND',
+				label: 'Agent task command ({taskId}, {runId}, {agentId})',
+				required: false,
+				secret: false,
+				placeholder: 'ever-works agent run --task {taskId}'
+			},
+			{
+				key: 'FLEET_NODE_AGENT_TASK_WORKSPACE',
+				label: 'Agent task workspace (absolute path on the node, blank = node default)',
+				required: false,
+				secret: false
 			}
 		]
 	}

@@ -47,6 +47,7 @@ flowchart TD
 | `packages/agent/src/facades/ai.facade.ts`                         | AI-specific error class (`AiFacadeError`)                             |
 | `packages/agent/src/pipeline/pipeline-builder.service.ts`         | Pipeline errors (`CircularDependencyError`, `MissingDependencyError`) |
 | `apps/api/src/common/filters/facade-exception.filter.ts`          | Global filter mapping the `FacadeError` hierarchy → HTTP status codes |
+| `apps/api/src/common/filters/insufficient-credits.filter.ts`      | Global filter mapping credit-balance exhaustion → HTTP 402            |
 
 ## HTTP boundary: the FacadeException filter
 
@@ -94,6 +95,50 @@ connected a git provider (`gitFacade.cloneOrPull` → `NoGitCredentialsError`)
 now returns **409** instead of a generic 500. This covers taxonomy writes
 (categories / tags / collections), comparison generation, community-PR
 processing, and `POST /api/templates/fork`.
+
+## HTTP boundary: credit exhaustion → 402
+
+`CreditLedgerService.record()` rejects a debit that would take the balance
+below zero (overdraft off — `CREDITS_ALLOW_OVERDRAFT`, default `false`) with
+`InsufficientCreditsError`. It is a plain `Error`, so before
+`InsufficientCreditsExceptionFilter` existed it reached the client as an
+unmapped **500**, which the billing/usage PRD §6 forbids.
+
+| Credits error (by `.name`)       | HTTP    | Body                                                                          |
+| -------------------------------- | ------- | ----------------------------------------------------------------------------- |
+| `InsufficientCreditsError`       | **402** | `{ statusCode: 402, error: 'InsufficientCredits', message: <constant> }`      |
+| any other name (future subclass) | **500** | Generic `"Internal server error"` — conservative default, **no message leak** |
+
+**Why 402, not 409.** The codebase already answers spend exhaustion with 402:
+`BudgetExceededException` (`packages/agent/src/budgets`) throws
+`HttpStatus.PAYMENT_REQUIRED` with `error: 'BudgetExceeded'` when a Work hits
+its monthly cap. Credit exhaustion is the same condition ("add money / raise
+the cap"), so it reuses that status and the same un-suffixed `error` code
+shape. In the sibling facade filter **409 already means something else** — "a
+precondition you resolve by CONFIGURING something" (no provider enabled, no
+credentials connected) — and overloading it would make the two
+indistinguishable to a client. `apps/web` already treats 402 as the
+credits/quota signal.
+
+**Why the body is a constant.** The thrown error carries `userId`,
+`requestedCredits`, `balanceCredits` and a message interpolating the last two.
+None of it is echoed: the filter cannot prove the HTTP caller owns the balance
+— the signature-authenticated `/internal/trigger/remote/call` worker RPC route
+reaches this filter too. Owners read exact figures from the owner-scoped
+`GET /api/credits/balance`.
+
+**Side benefit on the worker path.** `TriggerInternalApiClient` retries 5xx
+three times with exponential backoff. An exhausted balance is deterministic, so
+the old 500 bought three pointless round-trips; a 402 is terminal for that
+client.
+
+**Spend paths all raise the typed error.** Every credit debit in the platform
+funnels through `CreditLedgerService.record()` (directly, or via
+`consumeForRun`), the only caller of `CreditLedgerRepository.recordAtomic`.
+Both entrypoints are pinned by spec to reject with `InsufficientCreditsError`
+rather than a bare `Error`, because two consumers key off it: this filter (by
+`.name`) and `RunCostSettlementService` (by type — it converts exhaustion into
+a partial debit plus an `AI_CREDITS` notification instead of failing the run).
 
 ## Key Classes
 

@@ -24,6 +24,7 @@ import { AgentEscalationRepository } from '../database/repositories/agent-escala
 import { TaskReviewRejectionRepository } from '../database/repositories/task-review-rejection.repository';
 import { AgentsService } from './agents.service';
 import { AgentTemplatesService } from './agent-templates.service';
+import { OnboardingRoleSeedingService } from './role-seeding.service';
 import { AgentFileService } from './agent-file.service';
 import { AgentScheduleDispatcherService } from './agent-schedule-dispatcher.service';
 import { AgentRunSweeperService } from './agent-run-sweeper.service';
@@ -110,6 +111,9 @@ import { FacadesModule } from '../facades/facades.module';
         // Wave 10 — prebuilt agent-template activation (catalog data +
         // ordinary Agent rows; no new persistence concepts).
         AgentTemplatesService,
+        // A55 — server-side, role-driven starter seeding for onboarding
+        // (all 14 roles, agents AND skills; was a 3-role client filter).
+        OnboardingRoleSeedingService,
         AgentFileService,
         AgentScheduleDispatcherService,
         AgentRunSweeperService,
@@ -146,6 +150,7 @@ import { FacadesModule } from '../facades/facades.module';
         TaskReviewRejectionRepository,
         AgentsService,
         AgentTemplatesService,
+        OnboardingRoleSeedingService,
         AgentFileService,
         AgentScheduleDispatcherService,
         AgentRunSweeperService,

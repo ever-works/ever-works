@@ -1,0 +1,64 @@
+# Template unit: the instance name IS the user the node runs as.
+#   systemctl enable --now ever-works-node@alice
+# A fleet node executes the OWNER'S commands, so it runs as that owner
+# rather than as root or as a shared service account.
+[Unit]
+Description=Ever Works execution node (running as %i)
+Documentation=https://docs.ever.works
+# Enrollment and heartbeat are outbound HTTPS; starting before the
+# network is up just burns the first few backoff intervals.
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=%i
+Group=%i
+
+# `--work` is what makes this machine capacity rather than inventory.
+# Drop it to enroll a node for visibility only.
+ExecStart=/usr/bin/env ever-works-node start --work
+# `pause` drains: leasing stops immediately, in-flight jobs finish and
+# report. Wired to ExecReload so `systemctl reload` is a drain, not a cut.
+ExecReload=/usr/bin/env ever-works-node pause
+
+# The node's own SIGTERM handler stops the heartbeat and then WAITS for
+# in-flight jobs to report their verdicts. TimeoutStopSec must therefore
+# be longer than the longest job you expect, or systemd SIGKILLs the
+# drain half-way through and the platform re-runs the work elsewhere.
+KillSignal=SIGTERM
+TimeoutStopSec=900
+
+Restart=on-failure
+RestartSec=10s
+# A node that crash-loops on a bad config should stop and be visible,
+# not hammer the API forever.
+StartLimitIntervalSec=300
+StartLimitBurst=5
+
+# Hardening. The node executes the OWNER'S commands by design, so this is
+# a blast-radius limit, not a sandbox: it keeps a check from touching the
+# rest of the system, it does not make an untrusted check safe.
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=full
+ProtectHome=read-only
+ProtectKernelTunables=true
+ProtectControlGroups=true
+RestrictSUIDSGID=true
+# Config (credential) and workspaces are the only writable paths.
+StateDirectory=ever-works-node
+ReadWritePaths=/var/lib/ever-works-node
+
+Environment=NODE_ENV=production
+Environment=EVER_WORKS_NODE_CONFIG=/var/lib/ever-works-node/node-config.json
+# Drop-in overrides go in
+# /etc/systemd/system/ever-works-node@.service.d/override.conf
+EnvironmentFile=-/etc/default/ever-works-node
+
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=ever-works-node
+
+[Install]
+WantedBy=multi-user.target

@@ -70,7 +70,7 @@ const ALL_CATEGORIES = [
     'task',
 ] as const;
 const CATEGORY_ENUM_MSG =
-    'category must be one of: ai_credits, subscription, generation, system, security, agent, task';
+    'category must be one of: ai_credits, subscription, generation, system, security, agent, task, digest';
 
 /** Normalise the class-validator (array) vs pipe/service (string) `message` field to one string. */
 function msgText(body: { message?: unknown }): string {

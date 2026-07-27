@@ -105,6 +105,21 @@ export interface OnboardingStateResponse {
 	readonly completedAt: string | null;
 	readonly dismissedAt: string | null;
 	readonly state: OnboardingWizardStateV2;
+	/**
+	 * Audit item A53 — the ORGANIZATION-level mirror of the "What do you
+	 * do" answers, persisted on `organization_onboarding_profiles`.
+	 *
+	 * `state.profile` above stays the per-user answer that drives the
+	 * wizard UI; this field is the org-wide read model (last writer
+	 * inside the organization wins) so team-shaped suggestion surfaces
+	 * can reason about the whole organization rather than one member.
+	 *
+	 * `null` when the request resolved no organization scope (e.g. a
+	 * user who has not created an Organization yet) or when nobody in
+	 * the organization has answered the step. Optional so older clients
+	 * and the web fallback payloads keep type-checking unchanged.
+	 */
+	readonly organizationProfile?: OnboardingProfile | null;
 }
 
 /**

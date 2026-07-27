@@ -37,10 +37,12 @@ import { TaskTransitionService } from './task-transition.service';
 import { TasksService } from './tasks.service';
 import { TaskChatService } from './task-chat.service';
 import { TaskGateRunnerService } from './task-gate-runner.service';
+import { TaskGateJudgeService } from './task-gate-judge.service';
 import { TaskRecurrenceDispatcherService } from './task-recurrence-dispatcher.service';
 import { TaskNotificationService } from './task-notification.service';
 import { TaskRunDenormService } from './task-run-denorm.service';
 import { TaskReviewRejectionService } from './task-review-rejection.service';
+import { TaskGitLinkService } from './task-git-link.service';
 import { TaskWorkspaceService } from './task-workspace.service';
 import { TaskPrStatusService } from './task-pr-status.service';
 import { FacadesModule } from '../facades/facades.module';
@@ -124,6 +126,11 @@ import { NotificationsModule } from '../notifications/notifications.module';
         // TaskReviewRejectionRepository, which AgentsModule (imported
         // above) owns and exports alongside AgentRunRepository.
         TaskReviewRejectionService,
+        // Git activity ingestion (audit item j) — read-only branch/PR →
+        // Task resolver the GitHub receiver stamps onto push / commit /
+        // merge events. Reads TaskRepository + WorkRepository, both
+        // already provided above.
+        TaskGitLinkService,
         // Kanban run cockpit (plan 04 M5/M6) — PR status cache + capped
         // diff reads. Uses the git facade (FacadesModule, imported above)
         // and TaskTransitionService for the merged-PR -> done landing.
@@ -132,6 +139,11 @@ import { NotificationsModule } from '../notifications/notifications.module';
         // AgentRunRepository (exported by AgentsModule above) to persist
         // per-run gate results.
         TaskGateRunnerService,
+        // Judgment layer G2 — the LLM-vs-criteria judge that turns a green
+        // gate into pass/retry/escalate. Consumes AiFacadeService only
+        // (FacadesModule, imported above) and treats it as @Optional(), so
+        // a deployment with no AI provider degrades to "no judge".
+        TaskGateJudgeService,
     ],
     exports: [
         TaskRepository,
@@ -156,8 +168,10 @@ import { NotificationsModule } from '../notifications/notifications.module';
         TaskRunDenormService,
         TaskWorkspaceService,
         TaskReviewRejectionService,
+        TaskGitLinkService,
         TaskPrStatusService,
         TaskGateRunnerService,
+        TaskGateJudgeService,
     ],
 })
 export class TasksDomainModule {}

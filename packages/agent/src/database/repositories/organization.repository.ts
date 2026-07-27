@@ -92,6 +92,27 @@ export class OrganizationRepository {
             .getMany();
     }
 
+    /**
+     * Org-scoped digest briefings — organizations that opted into the
+     * scheduled org digest.
+     *
+     * Same shape (and same reasoning) as
+     * `findWithMemoryConsolidationSettings`: `digest_settings` is a
+     * `simple-json` (TEXT) column on every supported driver, so there is
+     * no portable JSON predicate — the cheap `IS NOT NULL` filter
+     * narrows the scan to configured rows and the `enabled` flag is
+     * asserted in TypeScript. Bounded by `limit` so one cron pass can
+     * never materialize an unbounded org list.
+     */
+    async findWithDigestSettings(limit = 200): Promise<Organization[]> {
+        return this.repository
+            .createQueryBuilder('org')
+            .where('org.digestSettings IS NOT NULL')
+            .orderBy('org.createdAt', 'ASC')
+            .take(limit)
+            .getMany();
+    }
+
     async create(data: Partial<Organization>): Promise<Organization> {
         const entity = this.repository.create(data);
         return this.repository.save(entity);

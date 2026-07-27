@@ -6,6 +6,7 @@ import {
 } from '../terminal-session-dispatcher';
 import type { AgentRunRepository } from '../../database/repositories/agent-run.repository';
 import type { TerminalSessionDispatcher } from '../terminal-session-dispatcher';
+import type { TerminalStreamFacadeService } from '../../facades/terminal-stream.facade';
 
 const USER = 'user-1';
 const AGENT = '11111111-2222-4333-8444-555555555555';
@@ -41,10 +42,11 @@ describe('TerminalSessionLauncher', () => {
         dispatcher = { enqueue: jest.fn().mockResolvedValue({ jobRunId: 'job_run_1' }) };
     });
 
-    function makeLauncher(withDispatcher = true) {
+    function makeLauncher(withDispatcher = true, facade?: { resolveProvider: jest.Mock }) {
         return new TerminalSessionLauncher(
             runs as unknown as AgentRunRepository,
             withDispatcher ? (dispatcher as unknown as TerminalSessionDispatcher) : undefined,
+            facade as unknown as TerminalStreamFacadeService,
         );
     }
 
@@ -199,6 +201,71 @@ describe('TerminalSessionLauncher', () => {
         ).rejects.toThrow('job runtime down');
 
         expect(runs.releaseTerminalSessionClaim).toHaveBeenCalledWith(RUN, 'crashed');
+    });
+
+    /**
+     * The `terminal-stream` facade had ZERO non-test consumers, so its
+     * whole provider-resolution matrix was decoration. The start path is
+     * now one of them: the resolved provider identity rides the dispatch
+     * so the worker hosts the provider the scope actually chose.
+     */
+    describe('terminal-stream provider resolution', () => {
+        it('puts the facade-resolved provider (and work scope) on the dispatch', async () => {
+            runs.findByIdAndUser.mockResolvedValue(makeRun({ workId: 'work-9' }));
+            const facade = {
+                resolveProvider: jest.fn().mockResolvedValue({ id: 'pty-ssh' }),
+            };
+
+            await makeLauncher(true, facade).startForRun({
+                userId: USER,
+                agentId: AGENT,
+                runId: RUN,
+            });
+
+            expect(facade.resolveProvider).toHaveBeenCalledWith({
+                userId: USER,
+                agentId: AGENT,
+                workId: 'work-9',
+            });
+            expect(dispatcher.enqueue).toHaveBeenCalledWith(
+                expect.objectContaining({ providerId: 'pty-ssh', workId: 'work-9' }),
+            );
+        });
+
+        it('still dispatches (without a provider id) when nothing is enabled', async () => {
+            const facade = { resolveProvider: jest.fn().mockResolvedValue(null) };
+
+            const outcome = await makeLauncher(true, facade).startForRun({
+                userId: USER,
+                agentId: AGENT,
+                runId: RUN,
+            });
+
+            // An empty capability registry is allowed; a dead terminal
+            // button is not. The worker falls back to its bundled floor.
+            expect(outcome).toMatchObject({ started: true });
+            expect(dispatcher.enqueue.mock.calls[0][0]).not.toHaveProperty('providerId');
+        });
+
+        it('never lets a resolution failure fail the start', async () => {
+            const facade = {
+                resolveProvider: jest.fn().mockRejectedValue(new Error('registry down')),
+            };
+
+            await expect(
+                makeLauncher(true, facade).startForRun({
+                    userId: USER,
+                    agentId: AGENT,
+                    runId: RUN,
+                }),
+            ).resolves.toMatchObject({ started: true });
+            expect(dispatcher.enqueue.mock.calls[0][0]).not.toHaveProperty('providerId');
+        });
+
+        it('dispatches with no provider id at all when no facade is bound', async () => {
+            await makeLauncher().startForRun({ userId: USER, agentId: AGENT, runId: RUN });
+            expect(dispatcher.enqueue.mock.calls[0][0]).not.toHaveProperty('providerId');
+        });
     });
 
     it('uses the run’s isolated worktree as cwd when it has one', async () => {

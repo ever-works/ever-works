@@ -496,7 +496,22 @@ test.describe('Breadcrumb / nested-route navigation trail', () => {
         // route (/settings/security) already satisfies — that early-true predicate
         // is why CI read a stale page.url() before the client nav had landed.
         const tail = targetHref ? targetHref.replace(/.*(\/settings\/[^/?#]+).*/, '$1') : '';
-        await target.click();
+        // RETRY the crumb click, don't just fire it once. next-intl <Link> is a
+        // client control: a click landing before hydration is silently swallowed
+        // (the anchor is visible and "clickable", the click reports success, and
+        // no navigation is ever started). CI saw exactly that — the URL sat on the
+        // STARTING route /settings/security for the whole 20s budget while the
+        // test waited for /settings/data. Re-click only while the destination tail
+        // is still absent from the URL.
+        const tailRe = tail
+            ? new RegExp(tail.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'))
+            : /\/settings\//;
+        await expect(async () => {
+            if (!tailRe.test(page.url())) {
+                await target.click({ timeout: 5_000, noWaitAfter: true }).catch(() => undefined);
+            }
+            await expect(page).toHaveURL(tailRe, { timeout: 5_000 });
+        }).toPass({ timeout: 60_000 });
         // Wait for the followed crumb's tail to appear in the URL. next-intl Link
         // does a client-side push; in CI that push lands a beat after click, so we
         // poll the real URL (escaping the regex tail) instead of reading it once.

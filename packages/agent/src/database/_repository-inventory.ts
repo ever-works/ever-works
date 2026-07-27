@@ -49,6 +49,7 @@ import { NotificationEventTypeRepository } from './repositories/notification-eve
 import { NotificationRepository } from './repositories/notification.repository';
 import { OnboardingRequestRepository } from './repositories/onboarding-request.repository';
 import { OrganizationNotificationDefaultRepository } from './repositories/organization-notification-default.repository';
+import { OrganizationOnboardingProfileRepository } from './repositories/organization-onboarding-profile.repository';
 import { OrganizationRepository } from './repositories/organization.repository';
 import { PlanEntitlementRepository } from './repositories/plan-entitlement.repository';
 import { PluginUsageRepository } from './repositories/plugin-usage.repository';
@@ -99,6 +100,7 @@ export const REPOSITORY_PROVIDERS: ReadonlyArray<Type<unknown>> = [
     NotificationRepository,
     OnboardingRequestRepository,
     OrganizationNotificationDefaultRepository,
+    OrganizationOnboardingProfileRepository,
     OrganizationRepository,
     PlanEntitlementRepository,
     PluginUsageRepository,

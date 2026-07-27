@@ -1,7 +1,11 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { TerminalFrame } from '@ever-works/contracts';
 import { PtyLocalPlugin } from '@ever-works/pty-local-plugin';
-import { TerminalSessionHost } from './terminal-session-host';
+import {
+    MAX_CLI_SESSION_ID_LENGTH,
+    TerminalSessionHost,
+    normalizeCliSessionId,
+} from './terminal-session-host';
 import type { TerminalTransportClient } from './terminal-transport.client';
 
 const RUN = '2f9d1f2a-9c7e-4b1a-8f0d-0a1b2c3d4e5f';
@@ -120,6 +124,57 @@ describe('TerminalSessionHost (loopback, real processes)', () => {
         });
     });
 
+    /**
+     * `cliSessionId` is the run's resume key. It had a column, an API
+     * whitelist entry and a presence-only status field — and no writer
+     * anywhere, so it was permanently null. The session host is where a
+     * session comes into existence, so it is where the key is written.
+     */
+    it('writes the provider-minted session id on the attached beat', async () => {
+        const { client, heartbeats } = makeLoopbackClient();
+        const host = new TerminalSessionHost(new PtyLocalPlugin(), client, 5000);
+
+        await host.run({
+            runId: RUN,
+            command: [NODE, '-e', 'process.stdout.write("x")'],
+            cwd: process.cwd(),
+            env: {},
+        });
+
+        const attached = heartbeats.find((h) => h.state === 'attached');
+        expect(attached).toBeDefined();
+        expect(typeof attached?.cliSessionId).toBe('string');
+        expect(String(attached?.cliSessionId)).toMatch(new RegExp(`^pty-local:${RUN}:`));
+        expect(String(attached?.cliSessionId).length).toBeLessThanOrEqual(
+            MAX_CLI_SESSION_ID_LENGTH,
+        );
+
+        // The `starting` beat cannot know it yet — the provider mints it
+        // during spawn — so it must not pretend to.
+        expect(heartbeats[0]).not.toHaveProperty('cliSessionId');
+    });
+
+    it('sends NO cliSessionId when the provider mints none', async () => {
+        const { client, heartbeats } = makeLoopbackClient();
+        const sessionless = {
+            providerName: 'sessionless',
+            spawn: vi.fn(async () => ({
+                runId: RUN,
+                isPty: false,
+                write: () => undefined,
+                resize: () => undefined,
+                kill: () => undefined,
+                exited: Promise.resolve({ code: 0, reason: 'completed' as const }),
+            })),
+        };
+        const host = new TerminalSessionHost(sessionless as never, client, 5000);
+
+        await host.run({ runId: RUN, command: ['/bin/true'], cwd: '/', env: {} });
+
+        const attached = heartbeats.find((h) => h.state === 'attached');
+        expect(attached).toEqual({ state: 'attached' });
+    });
+
     it('heartbeats repeat while the session lives', async () => {
         const { client, heartbeats } = makeLoopbackClient();
         const host = new TerminalSessionHost(new PtyLocalPlugin(), client, 40);
@@ -134,5 +189,23 @@ describe('TerminalSessionHost (loopback, real processes)', () => {
 
         const attachedBeats = heartbeats.filter((h) => h.state === 'attached').length;
         expect(attachedBeats).toBeGreaterThanOrEqual(3);
+    });
+});
+
+describe('normalizeCliSessionId', () => {
+    it('accepts a trimmed non-empty id within the API whitelist cap', () => {
+        expect(normalizeCliSessionId('  pty-local:run:42  ')).toBe('pty-local:run:42');
+        expect(normalizeCliSessionId('x'.repeat(MAX_CLI_SESSION_ID_LENGTH))).toHaveLength(
+            MAX_CLI_SESSION_ID_LENGTH,
+        );
+    });
+
+    it('rejects anything the API would silently drop — never truncates', () => {
+        // A truncated resume key is worse than an absent one: it looks
+        // present (hasCliSession: true) and resolves to nothing.
+        expect(normalizeCliSessionId('x'.repeat(MAX_CLI_SESSION_ID_LENGTH + 1))).toBeNull();
+        expect(normalizeCliSessionId('   ')).toBeNull();
+        expect(normalizeCliSessionId(undefined)).toBeNull();
+        expect(normalizeCliSessionId(42)).toBeNull();
     });
 });

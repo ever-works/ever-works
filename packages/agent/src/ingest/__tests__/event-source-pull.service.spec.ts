@@ -59,7 +59,9 @@ describe('EventSourcePullService', () => {
     }
 
     beforeEach(() => {
-        ingestMock = jest.fn().mockResolvedValue({ inserted: 1, duplicates: 0, rejected: 0 });
+        ingestMock = jest
+            .fn()
+            .mockResolvedValue({ inserted: 1, duplicates: 0, rejected: 0, filtered: 0 });
         eventIngestService = { ingest: ingestMock } as unknown as EventIngestService;
 
         cursorRows = new Map();
@@ -115,6 +117,7 @@ describe('EventSourcePullService', () => {
             inserted: 0,
             duplicates: 0,
             rejected: 0,
+            filtered: 0,
             errors: 0,
         });
     });
@@ -293,5 +296,124 @@ describe('EventSourcePullService', () => {
         expect(real.pullEvents).toHaveBeenCalledTimes(1);
         expect(result.pulled).toBe(1);
         expect(result.errors).toBe(0);
+    });
+
+    /**
+     * `backfill()` capability method (audit item (l)) — the out-of-band
+     * historical sibling of `pullSources()`.
+     */
+    describe('backfillSource', () => {
+        const WINDOW = { since: '2026-06-01T00:00:00.000Z', until: '2026-07-01T00:00:00.000Z' };
+
+        function addBackfillSource(id: string): FakePlugin & { backfill: jest.Mock } {
+            const plugin = addSource(id) as FakePlugin & { backfill: jest.Mock };
+            plugin.backfill = jest.fn().mockResolvedValue({ events: [], complete: true });
+            return plugin;
+        }
+
+        it('reports `supported: false` for a connector that does not implement the optional method', async () => {
+            addSource('linear-connector'); // pullEvents only
+
+            const result = await makeService().backfillSource('user-1', 'linear-connector', WINDOW);
+
+            expect(result.supported).toBe(false);
+            expect(result.pages).toBe(0);
+            expect(ingestMock).not.toHaveBeenCalled();
+        });
+
+        it('passes the window + resolved settings through and ingests the returned envelopes', async () => {
+            const plugin = addBackfillSource('zoom-connector');
+            plugin.backfill.mockResolvedValue({
+                events: [makeEnvelope('zoom-connector', 'old-1')],
+                complete: true,
+            });
+
+            const result = await makeService().backfillSource('user-1', 'zoom-connector', WINDOW);
+
+            expect(plugin.backfill).toHaveBeenCalledWith({
+                since: WINDOW.since,
+                until: WINDOW.until,
+                settings: { apiKey: 'secret-key' },
+            });
+            expect(ingestMock).toHaveBeenCalledWith('user-1', [
+                makeEnvelope('zoom-connector', 'old-1'),
+            ]);
+            expect(result).toMatchObject({
+                supported: true,
+                pages: 1,
+                inserted: 1,
+                complete: true,
+            });
+            expect(result.nextCursor).toBeUndefined();
+        });
+
+        it('pages through the window and stops at the budget, returning a resume cursor', async () => {
+            const plugin = addBackfillSource('zoom-connector');
+            plugin.backfill.mockResolvedValue({ events: [], nextCursor: 'more' });
+
+            const result = await makeService().backfillSource('user-1', 'zoom-connector', {
+                ...WINDOW,
+                pageBudget: 3,
+            });
+
+            expect(plugin.backfill).toHaveBeenCalledTimes(3);
+            expect(result.pages).toBe(3);
+            expect(result.complete).toBe(false);
+            expect(result.nextCursor).toBe('more');
+            // The resume cursor is fed back on every subsequent page.
+            expect(plugin.backfill.mock.calls[1][0]).toMatchObject({ cursor: 'more' });
+        });
+
+        it('⭐ never touches the incremental watermark — the cron sweep is left alone', async () => {
+            const plugin = addBackfillSource('zoom-connector');
+            plugin.backfill.mockResolvedValue({
+                events: [makeEnvelope('zoom-connector', 'old-1')],
+                complete: true,
+            });
+
+            await makeService().backfillSource('user-1', 'zoom-connector', WINDOW);
+
+            // Advancing the watermark from a HISTORICAL sweep would skip
+            // everything between the backfill window and now.
+            expect(cursorSaveMock).not.toHaveBeenCalled();
+            expect(cursorRepository.findByUserAndPlugin).not.toHaveBeenCalled();
+        });
+
+        it('refuses to backfill a plugin the user has not enabled', async () => {
+            addBackfillSource('zoom-connector');
+            (registry.isPluginEnabledForScope as unknown as jest.Mock).mockResolvedValue(false);
+
+            const result = await makeService().backfillSource('user-1', 'zoom-connector', WINDOW);
+
+            expect(result.supported).toBe(false);
+            expect(ingestMock).not.toHaveBeenCalled();
+        });
+
+        it('materializes a lazy proxy BEFORE feature-detecting backfill', async () => {
+            const real = {
+                id: 'lazy-connector',
+                capabilities: ['event-source'],
+                pullEvents: jest.fn(),
+                backfill: jest.fn().mockResolvedValue({ events: [], complete: true }),
+            };
+            const lazy = {
+                id: 'lazy-connector',
+                capabilities: ['event-source'],
+                __materialize: jest.fn().mockResolvedValue(real),
+            };
+            registered.push({ plugin: lazy as unknown as FakePlugin, state: 'loaded' });
+
+            const result = await makeService().backfillSource('user-1', 'lazy-connector', WINDOW);
+
+            expect(lazy.__materialize).toHaveBeenCalledTimes(1);
+            expect(real.backfill).toHaveBeenCalledTimes(1);
+            expect(result.supported).toBe(true);
+        });
+
+        it('degrades to an unsupported no-op when the plugin system is not wired', async () => {
+            const service = new EventSourcePullService(eventIngestService, cursorRepository);
+            const result = await service.backfillSource('user-1', 'zoom-connector', WINDOW);
+            expect(result).toMatchObject({ supported: false, pages: 0, complete: false });
+        });
     });
 });

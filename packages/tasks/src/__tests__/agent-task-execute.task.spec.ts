@@ -30,16 +30,21 @@ const {
     TasksServiceToken,
     TaskChatServiceToken,
     TaskGateRunnerServiceToken,
+    TaskGateJudgeServiceToken,
     TaskRunDenormServiceToken,
     TaskWorkspaceServiceToken,
     WorkRepositoryToken,
     AgentEscalationServiceToken,
     TaskReviewRejectionServiceToken,
     resolveAcceptanceChecksMock,
+    resolveAcceptanceCriteriaMock,
     resolveChecksPolicyMock,
+    resolveGateVerdictMock,
     resolveL0ChecksMock,
     resolveMaxGateAttemptsMock,
+    shouldRunGateJudgeMock,
     shouldRunL0PreCheckMock,
+    judgeSwitch,
 } = vi.hoisted(() => {
     class StubInternalModule {}
     class AgentRepositoryToken {}
@@ -49,6 +54,7 @@ const {
     class TasksServiceToken {}
     class TaskChatServiceToken {}
     class TaskGateRunnerServiceToken {}
+    class TaskGateJudgeServiceToken {}
     class TaskRunDenormServiceToken {}
     class TaskWorkspaceServiceToken {}
     class WorkRepositoryToken {}
@@ -68,6 +74,7 @@ const {
         TasksServiceToken,
         TaskChatServiceToken,
         TaskGateRunnerServiceToken,
+        TaskGateJudgeServiceToken,
         TaskRunDenormServiceToken,
         TaskWorkspaceServiceToken,
         WorkRepositoryToken,
@@ -85,6 +92,15 @@ const {
         // THIS suite tests the orchestration around them.
         resolveL0ChecksMock: vi.fn(),
         shouldRunL0PreCheckMock: vi.fn(),
+        // Judgment layer G2 - the acceptance-criteria judge. Same posture:
+        // the resolver's rules are pinned by the agent package's
+        // task-gate-judge.spec; here they are a controllable input so the
+        // RETRY / ESCALATE branches can be driven deterministically.
+        resolveAcceptanceCriteriaMock: vi.fn(),
+        shouldRunGateJudgeMock: vi.fn(),
+        resolveGateVerdictMock: vi.fn(),
+        // Mutable operator switch behind `config.agents.isGateJudgeEnabled()`.
+        judgeSwitch: { on: false },
     };
 });
 
@@ -118,6 +134,10 @@ vi.mock('@ever-works/agent/config', () => ({
         agents: {
             isGateL0PreCheckEnabled: () => false,
             getGateL0PreCheckTimeoutSec: () => 120,
+            // Judgment layer G2 - the acceptance-criteria judge switch,
+            // default OFF so every pre-judge case in this suite keeps its
+            // byte-identical shape.
+            isGateJudgeEnabled: () => judgeSwitch.on,
         },
     },
 }));
@@ -126,13 +146,17 @@ vi.mock('@ever-works/agent/tasks-domain', () => ({
     TasksService: TasksServiceToken,
     TaskChatService: TaskChatServiceToken,
     TaskGateRunnerService: TaskGateRunnerServiceToken,
+    TaskGateJudgeService: TaskGateJudgeServiceToken,
     TaskRunDenormService: TaskRunDenormServiceToken,
     TaskWorkspaceService: TaskWorkspaceServiceToken,
     TaskReviewRejectionService: TaskReviewRejectionServiceToken,
     resolveAcceptanceChecks: resolveAcceptanceChecksMock,
+    resolveAcceptanceCriteria: resolveAcceptanceCriteriaMock,
     resolveChecksPolicy: resolveChecksPolicyMock,
+    resolveGateVerdict: resolveGateVerdictMock,
     resolveL0Checks: resolveL0ChecksMock,
     resolveMaxGateAttempts: resolveMaxGateAttemptsMock,
+    shouldRunGateJudge: shouldRunGateJudgeMock,
     shouldRunL0PreCheck: shouldRunL0PreCheckMock,
 }));
 
@@ -181,6 +205,7 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
     let tasks: { getOne: ReturnType<typeof vi.fn> };
     let taskChat: { post: ReturnType<typeof vi.fn> };
     let gateRunner: { runChecks: ReturnType<typeof vi.fn> };
+    let gateJudge: { judge: ReturnType<typeof vi.fn> };
     let dispatchGate: { drainForWork: ReturnType<typeof vi.fn> };
     let runDenorm: {
         recordQueued: ReturnType<typeof vi.fn>;
@@ -245,6 +270,9 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
         tasks = { getOne: vi.fn() };
         taskChat = { post: vi.fn().mockResolvedValue(undefined) };
         gateRunner = { runChecks: vi.fn() };
+        // Judgment layer G2 — the judge never has an opinion unless a test
+        // gives it one, which is the production default too.
+        gateJudge = { judge: vi.fn().mockResolvedValue(null) };
         dispatchGate = { drainForWork: vi.fn().mockResolvedValue(undefined) };
         runDenorm = {
             recordQueued: vi.fn().mockResolvedValue(undefined),
@@ -272,6 +300,39 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
         // byte-identical pre-G2 first turn.
         resolveL0ChecksMock.mockReturnValue([]);
         shouldRunL0PreCheckMock.mockReturnValue(false);
+        // G2 acceptance-criteria judge OFF by default, at both switches:
+        // the operator env flag and the applicability resolver.
+        judgeSwitch.on = false;
+        resolveAcceptanceCriteriaMock.mockReturnValue('');
+        shouldRunGateJudgeMock.mockReturnValue(false);
+        // Mirrors the real `resolveGateVerdict`. The RULES are pinned by
+        // the agent package's task-gate-judge.spec; this copy exists so
+        // the orchestration cases below read like the production flow
+        // instead of a scripted return sequence.
+        resolveGateVerdictMock.mockImplementation(
+            ({
+                gateStatus,
+                policy,
+                judgement,
+                attemptsRemaining,
+            }: {
+                gateStatus: string;
+                policy: string;
+                judgement?: { verdict: string } | null;
+                attemptsRemaining: boolean;
+            }) => {
+                if (policy === 'off') return 'pass';
+                if (gateStatus === 'red') {
+                    if (policy !== 'required') return 'pass';
+                    return attemptsRemaining ? 'retry' : 'fail';
+                }
+                if (gateStatus !== 'green') return policy === 'required' ? 'fail' : 'pass';
+                if (!judgement) return 'pass';
+                if (judgement.verdict === 'escalate') return 'escalate';
+                if (judgement.verdict === 'retry') return attemptsRemaining ? 'retry' : 'escalate';
+                return 'pass';
+            },
+        );
 
         // The owner owns AGENT_ID and OWNED_TASK_ID. A foreign taskId is
         // rejected by TasksService.getOne exactly like the real
@@ -307,6 +368,7 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
                 if (token === TasksServiceToken) return tasks;
                 if (token === TaskChatServiceToken) return taskChat;
                 if (token === TaskGateRunnerServiceToken) return gateRunner;
+                if (token === TaskGateJudgeServiceToken) return gateJudge;
                 if (token === TaskRunDenormServiceToken) return runDenorm;
                 if (token === TaskWorkspaceServiceToken) return taskWorkspace;
                 if (token === WorkRepositoryToken) return works;
@@ -1074,6 +1136,222 @@ describe('agentTaskExecuteTask — Task ownership IDOR guard', () => {
 
                 expect(escalations.record).not.toHaveBeenCalled();
                 expect(reviewRejections.recordGateRejection).not.toHaveBeenCalled();
+            });
+        });
+
+        describe('acceptance-criteria judge — RETRY / ESCALATE verdicts (G2)', () => {
+            const GREEN = {
+                gateStatus: 'green',
+                results: [{ id: 'build', status: 'green', exitCode: 0, durationMs: 5 }],
+            };
+            const CRITERIA = 'Ship the CSV export.';
+
+            /** required policy + provisioned workspace + a green gate + judge on. */
+            const useJudgedGate = (maxAttempts = 2) => {
+                useWorkTask();
+                taskWorkspace.provisionForRun.mockResolvedValue(WORKSPACE);
+                resolveAcceptanceChecksMock.mockReturnValue([BUILD_CHECK]);
+                resolveChecksPolicyMock.mockReturnValue('required');
+                resolveMaxGateAttemptsMock.mockReturnValue(maxAttempts);
+                gateRunner.runChecks.mockResolvedValue(GREEN);
+                judgeSwitch.on = true;
+                resolveAcceptanceCriteriaMock.mockReturnValue(CRITERIA);
+                shouldRunGateJudgeMock.mockReturnValue(true);
+            };
+
+            it('⭐ never runs with the operator switch off — the byte-identical default', async () => {
+                // THE DEFAULT-OFF TEST. With `AGENT_GATE_JUDGE` unset the
+                // worker must not even resolve the judge service, let alone
+                // spend a model call on a gate the checks already passed.
+                useWorkTask();
+                taskWorkspace.provisionForRun.mockResolvedValue(WORKSPACE);
+                resolveAcceptanceChecksMock.mockReturnValue([BUILD_CHECK]);
+                resolveChecksPolicyMock.mockReturnValue('required');
+                gateRunner.runChecks.mockResolvedValue(GREEN);
+
+                const result = await registeredConfig.run(basePayload(OWNED_TASK_ID));
+
+                expect(gateJudge.judge).not.toHaveBeenCalled();
+                expect(resolveAcceptanceCriteriaMock).not.toHaveBeenCalled();
+                expect(taskWorkspace.finalizeRun).toHaveBeenCalledTimes(1);
+                expect(result).toMatchObject({ status: 'completed' });
+            });
+
+            it('PASS: opens the PR exactly as an unjudged green gate does', async () => {
+                useJudgedGate();
+                gateJudge.judge.mockResolvedValue({ verdict: 'pass', reason: 'done', unmet: [] });
+
+                await registeredConfig.run(basePayload(OWNED_TASK_ID));
+
+                expect(gateJudge.judge).toHaveBeenCalledTimes(1);
+                expect(gateJudge.judge.mock.calls[0][0]).toMatchObject({
+                    userId: OWNER,
+                    taskId: OWNED_TASK_ID,
+                    runId: 'run-1',
+                    workId: WORK_ID,
+                    agentId: AGENT_ID,
+                    criteria: CRITERIA,
+                });
+                expect(taskWorkspace.finalizeRun).toHaveBeenCalledTimes(1);
+                expect(escalations.record).not.toHaveBeenCalled();
+            });
+
+            it('⭐ RETRY feeds the EXISTING iterate loop, with judge-shaped feedback', async () => {
+                // THE RETRY TEST. The judge does not get its own loop: it
+                // produces the same `retry` the red gate does, and the
+                // worker re-executes the SAME run. The message differs
+                // because the checks are green — telling the agent to
+                // "fix the failing checks" would send it to re-run passing
+                // tests instead of closing the named gap.
+                useJudgedGate(2);
+                gateJudge.judge
+                    .mockResolvedValueOnce({
+                        verdict: 'retry',
+                        reason: 'the export writes no rows',
+                        unmet: ['CSV export writes no rows'],
+                    })
+                    .mockResolvedValueOnce({ verdict: 'pass', reason: 'done', unmet: [] });
+
+                const result = await registeredConfig.run(basePayload(OWNED_TASK_ID));
+
+                // Two agent-loop executions: the original + one iterate.
+                expect(runner.execute).toHaveBeenCalledTimes(2);
+                const iterateInput = runner.execute.mock.calls[1][0].immediateInput;
+                expect(iterateInput).toContain('Acceptance review');
+                expect(iterateInput).toContain('every automated check PASSED');
+                expect(iterateInput).toContain('CSV export writes no rows');
+                expect(iterateInput).not.toContain('Quality gate: the task');
+                // Second attempt graded green + judged pass → the PR opens.
+                expect(gateRunner.runChecks).toHaveBeenCalledTimes(2);
+                expect(taskWorkspace.finalizeRun).toHaveBeenCalledTimes(1);
+                expect(result).toMatchObject({ status: 'completed' });
+            });
+
+            it('⭐ ESCALATE writes through AgentEscalationService and withholds the PR', async () => {
+                // THE ESCALATE TEST. An escalation is already the
+                // platform's answer to "an agent stopped and a human has
+                // to decide"; a judge with its own notification path would
+                // be a second inbox nobody watches.
+                useJudgedGate();
+                gateJudge.judge.mockResolvedValue({
+                    verdict: 'escalate',
+                    reason: 'the criteria need a product decision',
+                    unmet: ['which column order is canonical?'],
+                });
+
+                const result = await registeredConfig.run(basePayload(OWNED_TASK_ID));
+
+                expect(escalations.record).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        userId: OWNER,
+                        reasonCode: 'judge-escalated',
+                        taskId: OWNED_TASK_ID,
+                        workId: WORK_ID,
+                        runId: 'run-1',
+                        decisionNeeded: expect.stringContaining('Decide'),
+                        attempted: [
+                            expect.objectContaining({
+                                label: 'criterion-1',
+                                outcome: 'unmet',
+                                detail: 'which column order is canonical?',
+                            }),
+                        ],
+                    }),
+                );
+                // A green gate that the judge blocked must NOT ship.
+                expect(taskWorkspace.finalizeRun).not.toHaveBeenCalled();
+                expect(runs.markCompleted).toHaveBeenCalledTimes(1);
+                expect(result).toMatchObject({
+                    status: 'completed',
+                    reason: 'gate-judge-escalated',
+                    gateVerdict: 'escalate',
+                    gateStatus: 'green',
+                });
+            });
+
+            it('ESCALATE persists judge feedback so a LATER resume replays it', async () => {
+                useJudgedGate();
+                gateJudge.judge.mockResolvedValue({
+                    verdict: 'escalate',
+                    reason: 'needs a product decision',
+                    unmet: ['which column order is canonical?'],
+                });
+
+                await registeredConfig.run(basePayload(OWNED_TASK_ID));
+
+                expect(reviewRejections.recordGateRejection).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        taskId: OWNED_TASK_ID,
+                        runId: 'run-1',
+                        feedback: expect.stringContaining('which column order is canonical?'),
+                    }),
+                );
+            });
+
+            it('ESCALATE tells the human in task chat, without naming a failing check', async () => {
+                useJudgedGate();
+                gateJudge.judge.mockResolvedValue({
+                    verdict: 'escalate',
+                    reason: 'the export is a stub',
+                    unmet: ['CSV export writes no rows'],
+                });
+
+                await registeredConfig.run(basePayload(OWNED_TASK_ID));
+
+                const body = taskChat.post.mock.calls[0][1].body as string;
+                expect(body).toContain('Every acceptance check passed');
+                expect(body).toContain('CSV export writes no rows');
+                expect(body).not.toContain('Failed checks:');
+            });
+
+            it('⭐ a RETRY with no attempts left escalates instead of silently shipping', async () => {
+                // maxGateAttempts=1: there is no second attempt to spend,
+                // and a PR that the review says is not done must not open.
+                useJudgedGate(1);
+                gateJudge.judge.mockResolvedValue({
+                    verdict: 'retry',
+                    reason: 'still a stub',
+                    unmet: ['CSV export writes no rows'],
+                });
+
+                const result = await registeredConfig.run(basePayload(OWNED_TASK_ID));
+
+                expect(runner.execute).toHaveBeenCalledTimes(1);
+                expect(taskWorkspace.finalizeRun).not.toHaveBeenCalled();
+                expect(escalations.record).toHaveBeenCalledWith(
+                    expect.objectContaining({ reasonCode: 'judge-escalated' }),
+                );
+                expect(result).toMatchObject({ gateVerdict: 'escalate' });
+            });
+
+            it('⭐ a judge that throws never blocks a green gate', async () => {
+                // The judge is advisory infrastructure. An RPC that never
+                // landed must not convert a green gate into a withheld PR.
+                useJudgedGate();
+                gateJudge.judge.mockRejectedValue(new Error('RPC timeout'));
+
+                const result = await registeredConfig.run(basePayload(OWNED_TASK_ID));
+
+                expect(taskWorkspace.finalizeRun).toHaveBeenCalledTimes(1);
+                expect(escalations.record).not.toHaveBeenCalled();
+                expect(result).toMatchObject({ status: 'completed' });
+            });
+
+            it('⭐ cannot rescue a RED gate — an exit code is not an opinion', async () => {
+                useJudgedGate(1);
+                gateRunner.runChecks.mockResolvedValue({
+                    gateStatus: 'red',
+                    results: [{ id: 'build', status: 'red', exitCode: 1, durationMs: 9 }],
+                });
+                // `shouldRunGateJudge` is forced true here on purpose: even
+                // if a future caller ran the judge on a red gate, a `pass`
+                // must not open the PR.
+                gateJudge.judge.mockResolvedValue({ verdict: 'pass', reason: 'fine', unmet: [] });
+
+                const result = await registeredConfig.run(basePayload(OWNED_TASK_ID));
+
+                expect(taskWorkspace.finalizeRun).not.toHaveBeenCalled();
+                expect(result).toMatchObject({ reason: 'gate-red', gateVerdict: 'fail' });
             });
         });
     });

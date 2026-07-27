@@ -27,8 +27,13 @@
 
 import { readFileSync, writeFileSync, readdirSync } from 'node:fs';
 import { join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-const messagesDir = new URL('../messages', import.meta.url).pathname.replace(/^\//, '');
+// `fileURLToPath` (not `.pathname`): a URL pathname is percent-encoded, so a
+// checkout under a directory with a space in it resolved to a literal
+// `...Ever%20Works...` path and the script died with ENOENT before reading
+// en.json. It also strips the Windows leading-slash drive prefix correctly.
+const messagesDir = fileURLToPath(new URL('../messages', import.meta.url));
 
 // Deep walk en.json. Returns the count of leaves added. Mutates
 // `target` in place. Treats arrays as opaque leaves — we do not

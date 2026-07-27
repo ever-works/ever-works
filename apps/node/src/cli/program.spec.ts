@@ -3,6 +3,7 @@ import type { CapabilityEnvironment, CommandRunner } from '../core/capabilities'
 import { parseConfig, type ConfigFileSystem } from '../core/config-store';
 import type { FetchLike } from '../core/fleet-client';
 import { createLogger, type LogEntry } from '../core/logger';
+import type { SecretStore } from '../core/secret-store';
 import { DEFAULT_HEARTBEAT_INTERVAL_MS } from '../core/types';
 import {
 	CliError,
@@ -46,15 +47,30 @@ const apiNode = {
 	persisted: true
 };
 
+/** In-memory {@link SecretStore} so keychain paths are testable. */
+function fakeKeychain(seed: Record<string, string> = {}) {
+	const entries = new Map<string, string>(Object.entries(seed));
+	const store: SecretStore = {
+		label: 'test keychain',
+		get: async (account) => entries.get(account) ?? null,
+		set: async (account, secret) => void entries.set(account, secret),
+		delete: async (account) => void entries.delete(account)
+	};
+	return { store, entries };
+}
+
 function harness(
 	options: {
 		fetchFn?: FetchLike;
 		files?: Record<string, string>;
 		platform?: string;
+		secrets?: SecretStore | null;
 	} = {}
 ) {
 	const files = new Map<string, string>(Object.entries(options.files ?? {}));
 	const chmods: Array<{ path: string; mode: number }> = [];
+	const restricted: string[] = [];
+	const removed: string[] = [];
 	const stdout: string[] = [];
 	const entries: LogEntry[] = [];
 	const logger = createLogger({ sink: (entry) => entries.push(entry) });
@@ -64,6 +80,11 @@ function harness(
 		writeFile: async (filePath, content) => void files.set(filePath, content),
 		mkdir: async () => undefined,
 		chmod: async (filePath, mode) => void chmods.push({ path: filePath, mode }),
+		remove: async (filePath) => {
+			removed.push(filePath);
+			files.delete(filePath);
+		},
+		restrict: async (filePath) => void restricted.push(filePath),
 		dirname: (filePath) => filePath.replace(/\/[^/]*$/, '')
 	};
 
@@ -78,13 +99,16 @@ function harness(
 		fs,
 		configPath: CONFIG_PATH,
 		platform: options.platform ?? 'linux',
-		out: (line) => stdout.push(line)
+		out: (line) => stdout.push(line),
+		...(options.secrets !== undefined ? { secrets: options.secrets } : {})
 	};
 
 	return {
 		deps,
 		files,
 		chmods,
+		restricted,
+		removed,
 		stdout,
 		entries,
 		output: () => stdout.join('\n'),
@@ -276,6 +300,233 @@ describe('ever-works-node start', () => {
 		h.deps.waitForShutdown = () => Promise.resolve();
 
 		expect(await runCli(['start', '--heartbeat-interval', '99999'], h.deps)).toBe(EXIT_FAILURE);
+	});
+});
+
+describe('ever-works-node pause / resume', () => {
+	/** Capture what the CLI actually sent to the platform. */
+	function recordingFetch(status = 200) {
+		const calls: Array<{ url: string; body: Record<string, unknown> }> = [];
+		const fetchFn: FetchLike = async (url, init) => {
+			calls.push({ url, body: JSON.parse(init.body) as Record<string, unknown> });
+			return {
+				ok: status < 400,
+				status,
+				text: async () => JSON.stringify({ ok: true, node: { ...apiNode, status: 'paused' } })
+			};
+		};
+		return { calls, fetchFn };
+	}
+
+	it('tells the platform to drain AND records the intent locally', async () => {
+		const { calls, fetchFn } = recordingFetch();
+		const h = harness({ files: { [CONFIG_PATH]: storedConfig }, fetchFn });
+
+		expect(await runCli(['pause'], h.deps)).toBe(EXIT_OK);
+
+		expect(calls).toHaveLength(1);
+		expect(calls[0].url).toBe('https://api.ever.works/api/fleet/pause');
+		expect(calls[0].body).toMatchObject({ nodeId: NODE_ID, secret: SECRET, paused: true });
+		// Local flag matters independently: a restart must come back paused.
+		expect(parseConfig(h.files.get(CONFIG_PATH) ?? null)?.paused).toBe(true);
+		expect(h.output()).toContain("the platform now reports status 'paused'");
+		expect(h.output()).toContain('In-flight jobs keep running');
+	});
+
+	it('resume clears both the platform pause and the local flag', async () => {
+		const { calls, fetchFn } = recordingFetch();
+		const paused = JSON.stringify({ ...JSON.parse(storedConfig), paused: true });
+		const h = harness({ files: { [CONFIG_PATH]: paused }, fetchFn });
+
+		expect(await runCli(['resume'], h.deps)).toBe(EXIT_OK);
+
+		expect(calls[0].body).toMatchObject({ paused: false });
+		expect(parseConfig(h.files.get(CONFIG_PATH) ?? null)?.paused).toBe(false);
+	});
+
+	it('still records the drain locally when the platform is unreachable', async () => {
+		const h = harness({
+			files: { [CONFIG_PATH]: storedConfig },
+			fetchFn: async () => {
+				throw new Error('getaddrinfo ENOTFOUND api.ever.works');
+			}
+		});
+
+		// Not a failure exit: the operator's intent was recorded and the
+		// node WILL stop leasing. The gap is reported, not swallowed.
+		expect(await runCli(['pause'], h.deps)).toBe(EXIT_OK);
+		expect(parseConfig(h.files.get(CONFIG_PATH) ?? null)?.paused).toBe(true);
+		expect(h.logged()).toContain('Could not reach the platform to pause');
+		expect(h.output()).toContain('The platform still believes it is available');
+	});
+
+	it('--local-only never touches the network', async () => {
+		const { calls, fetchFn } = recordingFetch();
+		const h = harness({ files: { [CONFIG_PATH]: storedConfig }, fetchFn });
+
+		expect(await runCli(['pause', '--local-only'], h.deps)).toBe(EXIT_OK);
+
+		expect(calls).toHaveLength(0);
+		expect(parseConfig(h.files.get(CONFIG_PATH) ?? null)?.paused).toBe(true);
+		expect(h.output()).toContain('The platform was NOT told');
+	});
+
+	it('requires enrollment', async () => {
+		const h = harness();
+		expect(await runCli(['pause'], h.deps)).toBe(EXIT_NOT_ENROLLED);
+	});
+
+	it('never prints the credential', async () => {
+		const { fetchFn } = recordingFetch();
+		const h = harness({ files: { [CONFIG_PATH]: storedConfig }, fetchFn });
+		await runCli(['pause'], h.deps);
+		expect(h.output()).not.toContain(SECRET);
+		expect(h.logged()).not.toContain(SECRET);
+	});
+
+	it('start comes back paused when the config says so, and says so loudly', async () => {
+		const paused = JSON.stringify({ ...JSON.parse(storedConfig), paused: true });
+		const h = harness({
+			files: { [CONFIG_PATH]: paused },
+			fetchFn: async () => ({
+				ok: true,
+				status: 200,
+				text: async () => JSON.stringify({ ok: true, node: apiNode })
+			})
+		});
+		h.deps.waitForShutdown = () => Promise.resolve();
+
+		expect(await runCli(['start', '--work'], h.deps)).toBe(EXIT_OK);
+		expect(h.output()).toContain('Worker host PAUSED');
+	});
+});
+
+describe('ever-works-node unenroll', () => {
+	it('retires the registration and erases the local credential', async () => {
+		const calls: string[] = [];
+		const h = harness({
+			files: { [CONFIG_PATH]: storedConfig },
+			fetchFn: async (url) => {
+				calls.push(url);
+				return { ok: true, status: 200, text: async () => JSON.stringify({ ok: true }) };
+			}
+		});
+
+		expect(await runCli(['unenroll'], h.deps)).toBe(EXIT_OK);
+
+		expect(calls).toEqual(['https://api.ever.works/api/fleet/unenroll']);
+		expect(h.removed).toEqual([CONFIG_PATH]);
+		expect(h.files.has(CONFIG_PATH)).toBe(false);
+		expect(h.output()).toContain('The registration and the local credential are both gone');
+	});
+
+	it('erases the local credential even when the platform call fails', async () => {
+		const h = harness({
+			files: { [CONFIG_PATH]: storedConfig },
+			fetchFn: async () => ({ ok: false, status: 500, text: async () => '{}' })
+		});
+
+		expect(await runCli(['unenroll'], h.deps)).toBe(EXIT_OK);
+
+		// A decommissioned machine holding a live secret is the worse
+		// outcome — the erase is unconditional, the gap is reported.
+		expect(h.files.has(CONFIG_PATH)).toBe(false);
+		expect(h.output()).toContain('the platform was NOT told');
+	});
+
+	it('also deletes the keychain entry', async () => {
+		const keychain = fakeKeychain({ [NODE_ID]: SECRET });
+		const keychainConfig = JSON.stringify({
+			...JSON.parse(storedConfig),
+			secret: '',
+			secretStorage: 'keychain'
+		});
+		const h = harness({
+			files: { [CONFIG_PATH]: keychainConfig },
+			secrets: keychain.store,
+			fetchFn: async () => ({ ok: true, status: 200, text: async () => JSON.stringify({ ok: true }) })
+		});
+
+		expect(await runCli(['unenroll'], h.deps)).toBe(EXIT_OK);
+		expect(keychain.entries.has(NODE_ID)).toBe(false);
+	});
+
+	it('--local-only leaves the platform registration alone', async () => {
+		const calls: string[] = [];
+		const h = harness({
+			files: { [CONFIG_PATH]: storedConfig },
+			fetchFn: async (url) => {
+				calls.push(url);
+				return { ok: true, status: 200, text: async () => '{}' };
+			}
+		});
+
+		expect(await runCli(['unenroll', '--local-only'], h.deps)).toBe(EXIT_OK);
+		expect(calls).toHaveLength(0);
+		expect(h.files.has(CONFIG_PATH)).toBe(false);
+		expect(h.output()).toContain('The platform still lists this node');
+	});
+});
+
+describe('credential storage (audit A45)', () => {
+	it('enroll puts the secret in the keychain and keeps it out of the file', async () => {
+		const keychain = fakeKeychain();
+		const h = harness({ fetchFn: enrollOk, secrets: keychain.store });
+
+		expect(await runCli(['enroll', '--api-url', 'https://api.ever.works', '--token', TOKEN], h.deps)).toBe(EXIT_OK);
+
+		const raw = h.files.get(CONFIG_PATH) ?? '';
+		expect(raw).not.toContain(SECRET);
+		expect(raw).toContain('"secretStorage": "keychain"');
+		expect(keychain.entries.get(NODE_ID)).toBe(SECRET);
+		expect(h.output()).toContain('credential   test keychain');
+	});
+
+	it('a keychain-backed config is rehydrated on load', async () => {
+		const keychain = fakeKeychain({ [NODE_ID]: SECRET });
+		const keychainConfig = JSON.stringify({
+			...JSON.parse(storedConfig),
+			secret: '',
+			secretStorage: 'keychain'
+		});
+		const h = harness({ files: { [CONFIG_PATH]: keychainConfig }, secrets: keychain.store });
+
+		expect(await runCli(['status'], h.deps)).toBe(EXIT_OK);
+		expect(h.output()).toContain('credential   stored (keychain)');
+	});
+
+	it('a keychain-backed config whose secret vanished reads as not enrolled', async () => {
+		const keychain = fakeKeychain();
+		const keychainConfig = JSON.stringify({
+			...JSON.parse(storedConfig),
+			secret: '',
+			secretStorage: 'keychain'
+		});
+		const h = harness({ files: { [CONFIG_PATH]: keychainConfig }, secrets: keychain.store });
+
+		// Beating forever with a blank credential would just farm 401s.
+		expect(await runCli(['status'], h.deps)).toBe(EXIT_NOT_ENROLLED);
+		expect(h.logged()).toContain('No credential for node');
+	});
+
+	it('without a keychain the secret lands in the file, loudly, and the file is tightened', async () => {
+		const h = harness({ fetchFn: enrollOk, secrets: null });
+
+		expect(await runCli(['enroll', '--api-url', 'https://api.ever.works', '--token', TOKEN], h.deps)).toBe(EXIT_OK);
+
+		expect(h.files.get(CONFIG_PATH) ?? '').toContain(SECRET);
+		expect(h.chmods).toEqual([{ path: CONFIG_PATH, mode: 0o600 }]);
+		expect(h.output()).toContain('credential   config file (no OS keychain available)');
+	});
+
+	it('on Windows the file gets an owner-only ACL instead of a skipped chmod', async () => {
+		const h = harness({ fetchFn: enrollOk, secrets: null, platform: 'win32' });
+
+		expect(await runCli(['enroll', '--api-url', 'https://api.ever.works', '--token', TOKEN], h.deps)).toBe(EXIT_OK);
+
+		expect(h.restricted).toEqual([CONFIG_PATH]);
+		// chmod is meaningless on win32 and must NOT be the fallback.
+		expect(h.chmods).toEqual([]);
 	});
 });
 

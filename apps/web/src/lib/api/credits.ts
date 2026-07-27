@@ -8,6 +8,7 @@ import {
     type CreditsLedgerPage,
     type SubscriptionPlanList,
     type SubscriptionPlanSummary,
+    type UsagePeriod,
     type UsageSummaryGroupBy,
     type UsageSummaryGrouped,
     type UsageSummaryTotals,
@@ -19,6 +20,7 @@ export type {
     CreditsLedgerPage,
     SubscriptionPlanList,
     SubscriptionPlanSummary,
+    UsagePeriod,
     UsageSummaryGroupBy,
     UsageSummaryGrouped,
     UsageSummaryTotals,
@@ -51,8 +53,11 @@ export const creditsAPI = {
         });
     },
 
-    /** §4.1/§4.2 stat-tile totals for a period (default: current month). */
-    async usageSummary(params: { period?: string } = {}): Promise<UsageSummaryTotals> {
+    /**
+     * §4.1/§4.2 stat-tile totals for a period (default: current month).
+     * B20 — `period` accepts `7d` / `30d` AND any `YYYY-MM` month.
+     */
+    async usageSummary(params: { period?: UsagePeriod } = {}): Promise<UsageSummaryTotals> {
         return serverFetch<UsageSummaryTotals>(
             `/credits/usage-summary${buildUsageSummaryQuery(params)}`,
             { method: 'GET' },
@@ -62,7 +67,7 @@ export const creditsAPI = {
     /** §4.3 grouped chart rows (day / model / agent / work). */
     async usageGrouped(params: {
         groupBy: UsageSummaryGroupBy;
-        period?: string;
+        period?: UsagePeriod;
     }): Promise<UsageSummaryGrouped> {
         return serverFetch<UsageSummaryGrouped>(
             `/credits/usage-summary${buildUsageSummaryQuery(params)}`,

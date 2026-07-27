@@ -1,6 +1,6 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import type { IEventSourcePlugin, IPlugin } from '@ever-works/plugin';
-import { PLUGIN_CAPABILITIES } from '@ever-works/plugin';
+import { PLUGIN_CAPABILITIES, supportsEventSourceBackfill } from '@ever-works/plugin';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { UserPluginRepository } from '../plugins/repositories/user-plugin.repository';
@@ -20,8 +20,41 @@ export interface PullSourcesResult {
     duplicates: number;
     /** Envelopes rejected by the ingest floor (shape/size). */
     rejected: number;
+    /** Envelopes dropped by the salience filter (0 when it is off). */
+    filtered: number;
     /** (plugin, user) pairs that failed — never fail the batch. */
     errors: number;
+}
+
+/** Options for one out-of-band historical backfill run. */
+export interface BackfillSourceOptions {
+    /** ISO 8601 lower bound of the window to import. */
+    since: string;
+    /** ISO 8601 upper bound; the connector defaults it to "now". */
+    until?: string;
+    /** Continuation cursor from a previous `backfillSource` result. */
+    cursor?: string;
+    /** Pages this run may fetch before handing the cursor back. */
+    pageBudget?: number;
+}
+
+export interface BackfillSourceResult {
+    /** True when the plugin implements the optional `backfill()` method. */
+    supported: boolean;
+    /** `backfill()` pages fetched this run. */
+    pages: number;
+    /** New `ingested_events` rows written. */
+    inserted: number;
+    /** Envelopes dropped as duplicates by the dedupe insert. */
+    duplicates: number;
+    /** Envelopes rejected by the ingest floor (shape/size). */
+    rejected: number;
+    /** Envelopes dropped by the salience filter (0 when it is off). */
+    filtered: number;
+    /** True when the connector reported the window fully drained. */
+    complete: boolean;
+    /** Present when the budget ran out mid-window — pass back to resume. */
+    nextCursor?: string;
 }
 
 /**
@@ -30,6 +63,14 @@ export interface PullSourcesResult {
  * a single noisy source can never monopolize the cron slot.
  */
 export const EVENT_SOURCE_PULL_PAGE_BUDGET = 5;
+
+/**
+ * Per-run page budget for an out-of-band historical backfill. Higher
+ * than the cron budget (a backfill is a deliberate, user-initiated
+ * import, not a shared cron slot) but still bounded — the caller
+ * resumes with the returned cursor.
+ */
+export const EVENT_SOURCE_BACKFILL_PAGE_BUDGET = 20;
 
 /** `since` handed to a source that has never completed a sweep. */
 const EPOCH_ISO = new Date(0).toISOString();
@@ -57,6 +98,10 @@ const EPOCH_ISO = new Date(0).toISOString();
  *     (never "now"), so events landing mid-sweep are re-covered next
  *     tick — overlap is free, the pipeline dedupes on
  *     `(source, sourceEventId)`.
+ *
+ * `backfillSource()` is the out-of-band sibling: an explicit historical
+ * window through the capability's optional `backfill()` method, with no
+ * watermark side effects. See its doc for why the two are separate.
  *
  * Isolation: every (plugin, user) pair is pulled inside its own
  * try/catch — one broken connector (or one user's revoked credentials)
@@ -90,6 +135,7 @@ export class EventSourcePullService {
             inserted: 0,
             duplicates: 0,
             rejected: 0,
+            filtered: 0,
             errors: 0,
         };
 
@@ -193,6 +239,7 @@ export class EventSourcePullService {
                 result.inserted += ingest.inserted;
                 result.duplicates += ingest.duplicates;
                 result.rejected += ingest.rejected;
+                result.filtered += ingest.filtered;
             }
 
             cursor = pull.nextCursor;
@@ -220,6 +267,104 @@ export class EventSourcePullService {
             });
         }
         return true;
+    }
+
+    /**
+     * Run one out-of-band HISTORICAL backfill for a (plugin, user) pair
+     * through the capability's optional `backfill()` method.
+     *
+     * Deliberately separate from `pullSources()`:
+     *   - it is user/caller initiated, not cron-driven;
+     *   - it targets an EXPLICIT window instead of the watermark;
+     *   - it NEVER touches `ingest_cursors`. Moving the watermark from a
+     *     historical sweep would skip everything between the backfill
+     *     window and now, so the incremental sweep is left exactly as it
+     *     was. Re-delivery across the two is free — the pipeline dedupes
+     *     on `(source, sourceEventId)`.
+     *
+     * Bounded: at most `pageBudget` pages per run; a window that needs
+     * more comes back with `nextCursor` for the caller to resume.
+     * `supported: false` (not an error) is the answer for a connector
+     * that does not implement the optional method.
+     */
+    async backfillSource(
+        userId: string,
+        pluginId: string,
+        options: BackfillSourceOptions,
+    ): Promise<BackfillSourceResult> {
+        const result: BackfillSourceResult = {
+            supported: false,
+            pages: 0,
+            inserted: 0,
+            duplicates: 0,
+            rejected: 0,
+            filtered: 0,
+            complete: false,
+        };
+
+        if (!this.registry || !this.settingsService) {
+            this.logger.debug('Plugin system not wired in this runtime — skipping backfill');
+            return result;
+        }
+
+        const enabled = await this.registry.isPluginEnabledForScope(pluginId, undefined, userId);
+        if (!enabled) {
+            this.logger.debug(
+                `Backfill skipped: event-source plugin ${pluginId} is not enabled for user ${userId}`,
+            );
+            return result;
+        }
+
+        const registered = this.registry
+            .getByCapability(PLUGIN_CAPABILITIES.EVENT_SOURCE)
+            .find((reg) => reg.plugin.id === pluginId && reg.state === 'loaded');
+        if (!registered) return result;
+
+        // Materialize FIRST: a cold lazy proxy's synchronous surface is
+        // empty, so feature-detecting `backfill` on it would fail-closed
+        // for a connector that does implement it.
+        const plugin = await this.materializeForUse(registered.plugin);
+        if (!supportsEventSourceBackfill(plugin)) return result;
+        result.supported = true;
+
+        const settings = await this.settingsService.getSettings(pluginId, {
+            userId,
+            includeSecrets: true,
+        });
+
+        const pageBudget = options.pageBudget ?? EVENT_SOURCE_BACKFILL_PAGE_BUDGET;
+        let cursor = options.cursor;
+
+        for (let page = 0; page < pageBudget; page += 1) {
+            const sweep = await plugin.backfill({
+                since: options.since,
+                ...(options.until ? { until: options.until } : {}),
+                ...(cursor ? { cursor } : {}),
+                settings,
+            });
+            result.pages += 1;
+
+            if (sweep.events.length > 0) {
+                const ingest = await this.eventIngestService.ingest(userId, sweep.events);
+                result.inserted += ingest.inserted;
+                result.duplicates += ingest.duplicates;
+                result.rejected += ingest.rejected;
+                result.filtered += ingest.filtered;
+            }
+
+            cursor = sweep.nextCursor;
+            if (!cursor) {
+                // No continuation cursor = the window is drained. A
+                // connector that also sets `complete` agrees; one that
+                // omits it still means the same thing, since there is
+                // nothing left to resume from.
+                result.complete = true;
+                break;
+            }
+        }
+
+        if (cursor) result.nextCursor = cursor;
+        return result;
     }
 
     /**

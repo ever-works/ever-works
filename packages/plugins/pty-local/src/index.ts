@@ -1,4 +1,4 @@
-import { PtyLocalPlugin } from './pty-local.plugin.js';
+import { PtyLocalPlugin, makePtyLocalSessionId } from './pty-local.plugin.js';
 
-export { PtyLocalPlugin };
+export { PtyLocalPlugin, makePtyLocalSessionId };
 export default PtyLocalPlugin;

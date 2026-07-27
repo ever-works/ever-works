@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import * as fs from 'node:fs/promises';
 import { GitFacadeService } from '../../facades/git.facade';
 import type { Category, Identifiable, ItemData, Tag } from '@ever-works/contracts';
@@ -14,6 +14,7 @@ import { cloneFreshRepository } from '../../utils/fresh-repository-clone.utils';
 import { assertCreatedRepositoryTarget } from '../../utils/git-repository.utils';
 import { throwIfGenerationCancelled } from '../../utils/generation-cancellation.utils';
 import { redactSecrets } from '../../utils/secret-scan';
+import { PullRequestGateService } from '../../policy/pull-request-gate.service';
 
 type InitializeOptions = {
     generation_method?: GenerationMethod;
@@ -58,6 +59,10 @@ export class MarkdownGeneratorService {
     constructor(
         private readonly gitFacade: GitFacadeService,
         private readonly workOperations: WorkOperationsService,
+        // Quality gates (audit W3 M3) — @Optional() and APPENDED LAST so
+        // existing positional constructions keep working; absent behaves as
+        // `checksPolicy: 'off'`, i.e. the pre-gate behaviour.
+        @Optional() private readonly prGate?: PullRequestGateService,
     ) {}
 
     async initialize(
@@ -322,7 +327,26 @@ export class MarkdownGeneratorService {
             );
 
             throwIfGenerationCancelled(options.signal);
-            if (canCreatePR && defaultBranch) {
+            // Quality gates (audit W3 M3) — the render is already committed
+            // and pushed on the PR branch; the gate decides whether it may be
+            // proposed for merge. A refusal is loud (logger.error) and leaves
+            // `lastPullRequest` untouched, so nothing downstream reports a PR
+            // that does not exist.
+            const prGateDecision =
+                canCreatePR && defaultBranch && this.prGate
+                    ? await this.prGate.evaluate({
+                          work,
+                          cwd: markdownPath,
+                          context: `markdown-generator work=${work.id}`,
+                      })
+                    : null;
+            if (prGateDecision && !prGateDecision.allowed) {
+                this.logger.error(
+                    `No pull request opened for ${work.slug}: the Work's quality gate is ` +
+                        `'${prGateDecision.gateStatus}'. ${prGateDecision.reason ?? ''} ` +
+                        `The render is committed on branch ${pr_update.branch}.`,
+                );
+            } else if (canCreatePR && defaultBranch) {
                 this.logger.log(
                     `Creating PR from ${pr_update.branch} to ${defaultBranch} for ${work.slug}`,
                 );
