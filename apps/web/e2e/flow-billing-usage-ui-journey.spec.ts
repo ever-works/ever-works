@@ -147,4 +147,55 @@ test.describe('/settings/usage', () => {
         await expect(page.getByTestId('usage-by-day-loading')).toHaveCount(0, { timeout: 20_000 });
         await expect(page.getByTestId('usage-by-day-error')).toHaveCount(0);
     });
+
+    test('B20 — the month picker offers calendar months and selecting one refetches', async ({
+        page,
+    }) => {
+        await gotoSettings(page, 'usage', 'usage-credits-settings');
+
+        const monthPicker = page.getByTestId('usage-period-month');
+        await expect(monthPicker).toBeVisible();
+
+        // The picker must actually be populated with `YYYY-MM` values —
+        // the whole point of B20 is that the month option is reachable.
+        const values = await monthPicker
+            .locator('option')
+            .evaluateAll((options) =>
+                options.map((option) => (option as HTMLOptionElement).value).filter(Boolean),
+            );
+        expect(values.length).toBeGreaterThan(1);
+        for (const value of values) {
+            expect(value).toMatch(/^\d{4}-(0[1-9]|1[0-2])$/);
+        }
+
+        // Picking a past month refetches every panel through the proxy;
+        // the loading state is transient, the ERROR state is not.
+        await monthPicker.selectOption(values[1]);
+        await expect(page.getByTestId('usage-by-day-loading')).toHaveCount(0, { timeout: 20_000 });
+        await expect(page.getByTestId('usage-by-day-error')).toHaveCount(0);
+        await expect(page.getByTestId('usage-load-error')).toHaveCount(0);
+    });
+
+    test('B21/B29 — the CSV export control points at the account-wide export endpoint', async ({
+        page,
+    }) => {
+        await gotoSettings(page, 'usage', 'usage-credits-settings');
+
+        const exportLink = page.getByTestId('usage-export-csv');
+        await expect(exportLink).toBeVisible();
+        await expect(exportLink).toHaveAttribute(
+            'href',
+            /^\/api\/credits\/usage\/export\?period=(\d{4}-(0[1-9]|1[0-2])|7d|30d)$/,
+        );
+
+        // The proxy must answer with a CSV attachment, not an HTML error
+        // page — a broken export is otherwise invisible from the UI.
+        const href = await exportLink.getAttribute('href');
+        const response = await page.request.get(href as string);
+        expect(response.status()).toBe(200);
+        expect(response.headers()['content-type']).toContain('text/csv');
+        expect(response.headers()['content-disposition']).toContain('attachment');
+        // Header row is the pinned column contract.
+        expect(await response.text()).toContain('occurredAt,pluginId,capability');
+    });
 });

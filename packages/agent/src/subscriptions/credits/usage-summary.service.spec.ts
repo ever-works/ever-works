@@ -1,10 +1,13 @@
 import {
     InvalidUsagePeriodError,
     resolveUsageSummaryWindow,
+    USAGE_EXPORT_COLUMNS,
     UsageSummaryService,
 } from './usage-summary.service';
 import type { CreditLedgerRepository } from '@src/database/repositories/credit-ledger.repository';
 import type { PluginUsageRepository } from '@src/database/repositories/plugin-usage.repository';
+import { BudgetOwnerType } from '@src/entities/_types';
+import type { PluginUsageEvent } from '@src/entities/plugin-usage-event.entity';
 
 describe('resolveUsageSummaryWindow', () => {
     const now = new Date('2026-07-25T12:00:00.000Z');
@@ -52,6 +55,7 @@ describe('UsageSummaryService', () => {
             | 'getSpendByWorkForUser'
             | 'getAgentNames'
             | 'getWorkNames'
+            | 'findPageForUserExport'
         >
     >;
     let creditLedgerRepository: jest.Mocked<
@@ -84,6 +88,7 @@ describe('UsageSummaryService', () => {
                 .mockResolvedValue([{ key: 'work-1', units: 6, costCents: 240 }]),
             getAgentNames: jest.fn().mockResolvedValue(new Map([['agent-1', 'Research Agent']])),
             getWorkNames: jest.fn().mockResolvedValue(new Map([['work-1', 'My Directory']])),
+            findPageForUserExport: jest.fn().mockResolvedValue([]),
         } as any;
         creditLedgerRepository = {
             getBalance: jest.fn().mockResolvedValue(500),
@@ -179,5 +184,167 @@ describe('UsageSummaryService', () => {
         );
         expect(creditLedgerRepository.getBalance).not.toHaveBeenCalled();
         expect(pluginUsageRepository.getDailySpendForUser).not.toHaveBeenCalled();
+    });
+
+    describe('createExport (B29 — account-wide CSV export)', () => {
+        // Typed as the real entity so the fixture cannot drift away
+        // from it silently — the previous untyped literal is exactly
+        // how it ended up missing four required columns.
+        function event(overrides: Partial<PluginUsageEvent> = {}): PluginUsageEvent {
+            return {
+                id: 'evt-1',
+                occurredAt: new Date('2026-06-04T10:00:00.000Z'),
+                pluginId: 'openrouter',
+                capability: 'ai',
+                units: 2,
+                costCents: 31,
+                currency: 'usd',
+                modelId: 'model-a',
+                workId: 'work-1',
+                // Owner columns + the two relations the entity declares.
+                // The export reads none of them, but `PluginUsageEvent`
+                // requires them, so a fixture without them does not
+                // typecheck — and an untyped fixture would stop pinning
+                // that the export omits exactly these.
+                userId: 'user-1',
+                ownerType: BudgetOwnerType.WORK,
+                work: null as never,
+                user: null as never,
+                agentId: null,
+                taskId: null,
+                runId: null,
+                requestId: 'req-1',
+                // Scope + free-form columns that must NOT reach the wire.
+                tenantId: 'tenant-1',
+                organizationId: 'org-a',
+                metadata: { secret: 'nope' },
+                ...overrides,
+            } as PluginUsageEvent;
+        }
+
+        async function drain(chunks: AsyncIterable<unknown[]>) {
+            const rows: unknown[] = [];
+            for await (const chunk of chunks) {
+                rows.push(...chunk);
+            }
+            return rows;
+        }
+
+        it('passes the active organizationId into every repository page (org scope)', async () => {
+            pluginUsageRepository.findPageForUserExport.mockResolvedValue([event()]);
+
+            const stream = service.createExport('user-1', {
+                period: '2026-06',
+                organizationId: 'org-a',
+            });
+            await drain(stream.chunks);
+
+            expect(stream.organizationId).toBe('org-a');
+            expect(pluginUsageRepository.findPageForUserExport).toHaveBeenCalledWith(
+                'user-1',
+                new Date('2026-06-01T00:00:00.000Z'),
+                new Date('2026-07-01T00:00:00.000Z'),
+                expect.objectContaining({ organizationId: 'org-a' }),
+            );
+        });
+
+        it('passes organizationId: null when the request has no active Organization', async () => {
+            pluginUsageRepository.findPageForUserExport.mockResolvedValue([]);
+
+            const stream = service.createExport('user-1', { period: '2026-06' });
+            await drain(stream.chunks);
+
+            expect(stream.organizationId).toBeNull();
+            expect(pluginUsageRepository.findPageForUserExport).toHaveBeenCalledWith(
+                'user-1',
+                expect.any(Date),
+                expect.any(Date),
+                expect.objectContaining({ organizationId: null }),
+            );
+        });
+
+        it('a YYYY-MM period returns THAT month rows (half-open UTC window)', async () => {
+            pluginUsageRepository.findPageForUserExport.mockResolvedValue([
+                event({ occurredAt: new Date('2026-06-01T00:00:00.000Z') }),
+                event({ id: 'evt-2', occurredAt: new Date('2026-06-30T23:59:59.000Z') }),
+            ]);
+
+            const stream = service.createExport('user-1', { period: '2026-06' });
+            const rows = (await drain(stream.chunks)) as { occurredAt: string }[];
+
+            expect(stream.window).toMatchObject({ period: '2026-06' });
+            expect(stream.window.from.toISOString()).toBe('2026-06-01T00:00:00.000Z');
+            expect(stream.window.to.toISOString()).toBe('2026-07-01T00:00:00.000Z');
+            expect(rows.map((r) => r.occurredAt)).toEqual([
+                '2026-06-01T00:00:00.000Z',
+                '2026-06-30T23:59:59.000Z',
+            ]);
+        });
+
+        it('projects only the wire columns — scope + metadata never leave the service', async () => {
+            pluginUsageRepository.findPageForUserExport.mockResolvedValue([event()]);
+
+            const [row] = (await drain(
+                service.createExport('user-1', { period: '2026-06' }).chunks,
+            )) as Record<string, unknown>[];
+
+            expect(Object.keys(row).sort()).toEqual([...USAGE_EXPORT_COLUMNS].sort());
+            expect(row).not.toHaveProperty('tenantId');
+            expect(row).not.toHaveProperty('organizationId');
+            expect(row).not.toHaveProperty('metadata');
+        });
+
+        it('pages until a short page arrives — never buffers the whole period', async () => {
+            pluginUsageRepository.findPageForUserExport
+                .mockResolvedValueOnce([event(), event({ id: 'evt-2' })])
+                .mockResolvedValueOnce([event({ id: 'evt-3' })]);
+
+            const rows = await drain(
+                service.createExport('user-1', { period: '2026-06', pageSize: 2 }).chunks,
+            );
+
+            expect(rows).toHaveLength(3);
+            expect(pluginUsageRepository.findPageForUserExport).toHaveBeenNthCalledWith(
+                1,
+                'user-1',
+                expect.any(Date),
+                expect.any(Date),
+                { organizationId: null, limit: 2, offset: 0 },
+            );
+            expect(pluginUsageRepository.findPageForUserExport).toHaveBeenNthCalledWith(
+                2,
+                'user-1',
+                expect.any(Date),
+                expect.any(Date),
+                { organizationId: null, limit: 2, offset: 2 },
+            );
+        });
+
+        it('stops immediately on an empty first page (no runaway paging)', async () => {
+            pluginUsageRepository.findPageForUserExport.mockResolvedValue([]);
+
+            const rows = await drain(service.createExport('user-1').chunks);
+
+            expect(rows).toHaveLength(0);
+            expect(pluginUsageRepository.findPageForUserExport).toHaveBeenCalledTimes(1);
+        });
+
+        it('clamps an absurd page size and rejects a malformed period up front', async () => {
+            pluginUsageRepository.findPageForUserExport.mockResolvedValue([]);
+
+            await drain(service.createExport('user-1', { pageSize: 10_000_000 }).chunks);
+            expect(pluginUsageRepository.findPageForUserExport).toHaveBeenCalledWith(
+                'user-1',
+                expect.any(Date),
+                expect.any(Date),
+                expect.objectContaining({ limit: 5000 }),
+            );
+
+            pluginUsageRepository.findPageForUserExport.mockClear();
+            expect(() => service.createExport('user-1', { period: 'nope' })).toThrow(
+                InvalidUsagePeriodError,
+            );
+            expect(pluginUsageRepository.findPageForUserExport).not.toHaveBeenCalled();
+        });
     });
 });

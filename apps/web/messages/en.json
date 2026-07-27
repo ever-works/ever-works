@@ -2668,6 +2668,15 @@
                     "loading": "Loading…",
                     "error": "Failed to load chart data.",
                     "unattributed": "Unattributed"
+                },
+                "period": {
+                    "label": "Reporting period",
+                    "monthLabel": "Calendar month",
+                    "monthPlaceholder": "Pick a month"
+                },
+                "export": {
+                    "csv": "Export CSV",
+                    "csvHint": "Download every usage event in {period} as a CSV file"
                 }
             },
             "digest": {

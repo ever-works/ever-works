@@ -58,6 +58,28 @@ export interface CreditsLedgerPage {
 
 export type UsageSummaryGroupBy = 'day' | 'model' | 'agent' | 'work';
 
+/** Rolling windows offered by the Usage & Credits period selector. */
+export const USAGE_ROLLING_PERIODS = ['7d', '30d'] as const;
+export type UsageRollingPeriod = (typeof USAGE_ROLLING_PERIODS)[number];
+
+/**
+ * B20 — a `YYYY-MM` calendar month.
+ *
+ * The period selector used to be hard-typed `'7d' | '30d'`, which made
+ * the month option the API has always accepted unreachable from the UI.
+ * Modelled as a template-literal type (rather than a bare `string`) so a
+ * random string still can't be passed where a period is expected; the
+ * two-arm split (`-0x` / `-1x`) keeps `2026-07` assignable without
+ * relying on `${number}` matching a zero-padded segment. The type can't
+ * express "01…12", so `isUsageMonthPeriod` validates at runtime.
+ */
+export type UsageMonthPeriod = `${number}-0${number}` | `${number}-1${number}`;
+
+/** Everything `GET /credits/usage-summary?period=` accepts. */
+export type UsagePeriod = UsageRollingPeriod | UsageMonthPeriod;
+
+const USAGE_MONTH_RE = /^\d{4}-(0[1-9]|1[0-2])$/;
+
 export interface UsageSummaryTotals {
     status: string;
     period: string;
@@ -204,12 +226,85 @@ export function buildLedgerQuery(params: {
 /** Build the `/credits/usage-summary` query string. */
 export function buildUsageSummaryQuery(params: {
     groupBy?: UsageSummaryGroupBy;
-    period?: string;
+    period?: UsagePeriod;
 }): string {
     const search = new URLSearchParams();
     if (params.groupBy) {
         search.set('groupBy', params.groupBy);
     }
+    if (params.period) {
+        search.set('period', params.period);
+    }
+    const qs = search.toString();
+    return qs ? `?${qs}` : '';
+}
+
+// ── B20 period helpers (unit-tested in credits.shared.unit.spec.ts) ──
+
+/** `2026-07` → true; `2026-13` / `7d` / `2026-7` → false. */
+export function isUsageMonthPeriod(value: string): value is UsageMonthPeriod {
+    return USAGE_MONTH_RE.test(value);
+}
+
+/** Runtime guard for anything the selector / a `?period=` deep link yields. */
+export function isUsagePeriod(value: string): value is UsagePeriod {
+    return (
+        (USAGE_ROLLING_PERIODS as readonly string[]).includes(value) || isUsageMonthPeriod(value)
+    );
+}
+
+/**
+ * Normalize an untrusted value (URL param, storage) to a period.
+ * Returns `undefined` rather than throwing so callers can fall back to
+ * their own default — a bad `?period=` must never blank the page.
+ */
+export function parseUsagePeriod(value: unknown): UsagePeriod | undefined {
+    if (Array.isArray(value)) {
+        return parseUsagePeriod(value[0]);
+    }
+    return typeof value === 'string' && isUsagePeriod(value) ? value : undefined;
+}
+
+/** Current UTC calendar month as `YYYY-MM` (matches the API's default). */
+export function currentUsageMonth(now: Date = new Date()): UsageMonthPeriod {
+    const month = `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+    return month as UsageMonthPeriod;
+}
+
+/**
+ * The `count` most recent calendar months, newest first — the option
+ * list for the month picker. UTC throughout so it agrees with the API's
+ * window resolution regardless of the viewer's timezone.
+ */
+export function recentUsageMonths(count = 12, now: Date = new Date()): UsageMonthPeriod[] {
+    const months: UsageMonthPeriod[] = [];
+    for (let offset = 0; offset < Math.max(0, count); offset += 1) {
+        const cursor = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - offset, 1));
+        months.push(currentUsageMonth(cursor));
+    }
+    return months;
+}
+
+/** `2026-07` → `July 2026`. Falls back to the raw value if unformattable. */
+export function formatUsageMonthLabel(month: string, locale = 'en-US'): string {
+    if (!isUsageMonthPeriod(month)) {
+        return month;
+    }
+    const [year, monthNumber] = month.split('-').map(Number);
+    try {
+        return new Intl.DateTimeFormat(locale, {
+            month: 'long',
+            year: 'numeric',
+            timeZone: 'UTC',
+        }).format(new Date(Date.UTC(year, monthNumber - 1, 1)));
+    } catch {
+        return month;
+    }
+}
+
+/** Build the `/credits/usage/export` query string (B29 CSV download). */
+export function buildUsageExportQuery(params: { period?: UsagePeriod } = {}): string {
+    const search = new URLSearchParams();
     if (params.period) {
         search.set('period', params.period);
     }
