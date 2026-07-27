@@ -22,6 +22,10 @@ import { PortableDateColumn } from './_types';
  *      that hash (fail-closed) and server-stamps `lastHeartbeatAt`.
  *   4. List reads sweep `online` nodes with no heartbeat for 5 minutes
  *      to `offline` (no dedicated cron).
+ *   5. `rotateCredentialForUser` puts an enrolled node BACK to
+ *      `enrolling` with a freshly minted one-time token: the old
+ *      heartbeat secret stops working the instant the hash is replaced,
+ *      and the operator re-enrolls the machine with the new token.
  *
  * Cluster boundary: rows only ever describe user-enrolled machines.
  * Nodes of user-configured clusters (`clusterSource:
@@ -90,9 +94,35 @@ export class FleetNode {
     @PortableDateColumn({ nullable: true })
     lastHeartbeatAt?: Date | null;
 
+    /**
+     * When the CURRENT credential was issued.
+     *
+     * Enrollment-token expiry is measured from here rather than from
+     * `createdAt`, because a credential ROTATION mints a fresh token on
+     * an existing row: judging that token by the row's creation date
+     * would make every rotated token instantly expired. NULL on rows
+     * written before rotation existed — the service falls back to
+     * `createdAt` for those, so the pre-rotation behaviour is unchanged.
+     */
+    @PortableDateColumn({ nullable: true })
+    credentialIssuedAt?: Date | null;
+
     /** Capability tags ('terminal', 'workspace', 'docker', ...). */
     @Column({ type: 'simple-json' })
     capabilities: string[];
+
+    /**
+     * True once an admin has hand-edited {@link capabilities}.
+     *
+     * Tags are normally the NODE's self-description, refreshed on every
+     * heartbeat. Pinning is what makes them admin-editable in a way that
+     * survives: while pinned, an incoming heartbeat no longer overwrites
+     * the tag set, so an operator can add (or withhold) a capability
+     * without the machine silently reverting it seconds later. Unpinning
+     * hands ownership back to the node.
+     */
+    @Column({ type: 'boolean', default: false })
+    capabilitiesPinned: boolean;
 
     /** os/arch self-description, e.g. 'linux/x64' (sanitized at enroll). */
     @Column({ type: 'varchar', length: 64, nullable: true })

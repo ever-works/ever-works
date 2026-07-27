@@ -460,7 +460,13 @@
             "slack": {
                 "name": "Slack",
                 "description": "Install the Ever Works app for Slack: mention the bot to chat with the platform, ingest channel activity into Memory and Activities, and get replies in-thread.",
-                "action": "Connect Slack"
+                "action": "Connect Slack",
+                "close": "Close",
+                "enable": "Enable Slack",
+                "enabled": "Slack is connected",
+                "enabledToast": "Slack connected",
+                "enableFailed": "Could not enable Slack. Please try again.",
+                "advancedSettings": "Advanced settings"
             },
             "discord": {
                 "name": "Discord",
@@ -546,7 +552,14 @@
                 "creating": "Creating…",
                 "created": "Created",
                 "createdToast": "Agent created — find it under Agents.",
-                "createFailed": "Failed to create the agent. Try again."
+                "createFailed": "Failed to create the agent. Try again.",
+                "skillsTitle": "Skills that pair with these",
+                "seedAll": "Set up my starter agents",
+                "seeding": "Setting up…",
+                "seedDone": "Set up {count} starter agents — find them under Agents.",
+                "seedAlreadyDone": "Your starter agents are already set up.",
+                "seedPartial": "Set up {created} agents; {failed} could not be created.",
+                "seedFailed": "Could not set up your starter agents. Try again."
             },
             "skipHint": "Optional — skip if you'd rather not say. Your answers only improve suggestions and can be changed later."
         }
@@ -1824,7 +1837,8 @@
                 "billing": "Billing",
                 "usageCredits": "Usage & Credits",
                 "fleet": "Fleet",
-                "jobRuntime": "Job Runtime"
+                "jobRuntime": "Job Runtime",
+                "digest": "Digest"
             },
             "githubApp": {
                 "title": "GitHub App-installaties",
@@ -2200,7 +2214,24 @@
                 "loadError": "Some billing data could not be loaded. Refresh the page to try again.",
                 "currentPlan": {
                     "title": "Current plan",
-                    "statusActive": "Active"
+                    "statusActive": "Active",
+                    "statuses": {
+                        "trialing": "Trial",
+                        "past_due": "Past due",
+                        "unpaid": "Unpaid",
+                        "paused": "Paused",
+                        "canceled": "Canceled",
+                        "incomplete": "Incomplete",
+                        "incomplete_expired": "Expired"
+                    },
+                    "cancel": "Cancel subscription",
+                    "cancelSuccess": "Your subscription will end at the end of the current period.",
+                    "cancelError": "Failed to cancel the subscription.",
+                    "cancelScheduled": "Your subscription ends at the end of the current period.",
+                    "cancelScheduledOn": "Your subscription ends on {date}.",
+                    "resume": "Resume subscription",
+                    "resumeSuccess": "Your subscription will continue as normal.",
+                    "resumeError": "Failed to resume the subscription."
                 },
                 "plans": {
                     "title": "Plans",
@@ -2239,7 +2270,27 @@
                     "empty": "No payment method on file.",
                     "expires": "Expires {expiry}",
                     "managedAtCheckout": "Card details are held by the payment provider — we only store the brand, last four digits and expiry.",
-                    "addAtCheckout": "A card is saved automatically the first time you buy credits."
+                    "addAtCheckout": "A card is saved automatically the first time you buy credits.",
+                    "manage": "Manage payment methods",
+                    "addCta": "Add a payment method",
+                    "manageTitle": "Payment methods",
+                    "manageSubtitle": "Add, replace or remove the cards on your account.",
+                    "backToBilling": "Back to billing",
+                    "storedTitle": "Stored cards",
+                    "add": "Add card",
+                    "redirecting": "Redirecting…",
+                    "card": "Card",
+                    "default": "Default",
+                    "makeDefault": "Make default",
+                    "remove": "Remove",
+                    "removed": "Payment method removed.",
+                    "removeError": "Could not remove the payment method.",
+                    "defaultUpdated": "Default payment method updated.",
+                    "defaultError": "Could not update the default payment method.",
+                    "addError": "Could not start card setup.",
+                    "loadError": "Your payment methods could not be loaded. Refresh the page to try again.",
+                    "lastOnPaidPlan": "Add another card before removing the last one while a paid plan is active.",
+                    "hostedNotice": "Card details are entered on the payment provider's secure page and never reach our servers. We only ever store the brand, last four digits and expiry."
                 },
                 "autoRecharge": {
                     "title": "Auto-recharge",
@@ -2292,6 +2343,12 @@
                     "pagePrev": "Previous",
                     "pageNext": "Next",
                     "pageInfo": "Page {page} of {pages}"
+                },
+                "pastDue": {
+                    "title": "We could not collect your latest payment",
+                    "body": "Update your payment method to keep your plan active. Your card details are handled by the payment provider.",
+                    "action": "Update payment method",
+                    "error": "Could not open the billing portal."
                 }
             },
             "usage": {
@@ -2319,6 +2376,15 @@
                     "loading": "Loading…",
                     "error": "Failed to load chart data.",
                     "unattributed": "Unattributed"
+                },
+                "period": {
+                    "label": "Reporting period",
+                    "monthLabel": "Calendar month",
+                    "monthPlaceholder": "Pick a month"
+                },
+                "export": {
+                    "csv": "Export CSV",
+                    "csvHint": "Download every usage event in {period} as a CSV file"
                 }
             },
             "fleet": {
@@ -2382,7 +2448,8 @@
                     "rename": "Rename",
                     "disable": "Disable",
                     "enable": "Enable",
-                    "remove": "Remove"
+                    "remove": "Remove",
+                    "details": "Details"
                 },
                 "rename": {
                     "title": "Rename node",
@@ -2405,6 +2472,66 @@
                     "idle": "Idle",
                     "busy": "{count} running",
                     "currentJob": "Current job: {kind}"
+                },
+                "tokens": {
+                    "title": "Outstanding enrollment tokens",
+                    "description": "Tokens that have been minted but not yet used. The token itself was shown once at mint time and cannot be read again — revoke and re-issue if it was lost.",
+                    "empty": "No outstanding tokens.",
+                    "loading": "Loading tokens…",
+                    "refresh": "Refresh",
+                    "issuedAt": "Issued",
+                    "expiresAt": "Expires",
+                    "expired": "Expired",
+                    "revoke": "Revoke",
+                    "rotated": "Credential rotated. The replacement token is shown once — copy it now.",
+                    "revoked": "Enrollment token revoked.",
+                    "revokeTitle": "Revoke this enrollment token?",
+                    "revokeDescription": "The token stops working immediately. The machine it was minted for will not be able to enroll until you issue a new one.",
+                    "revokeCancel": "Keep token"
+                },
+                "controls": {
+                    "rotatedTitle": "Credential rotated",
+                    "rotated": "Copy the replacement token now — it is shown once and cannot be read again.",
+                    "undrained": "Node returned to service.",
+                    "title": "Controls",
+                    "rotate": "Rotate credential",
+                    "rotateHint": "Issues a replacement enrollment token and invalidates the current credential. The machine must re-enroll.",
+                    "drain": "Drain",
+                    "drainHint": "Disables the node and returns its in-flight work to the queue so it is picked up elsewhere immediately.",
+                    "drained": "Node drained.",
+                    "undrain": "Return to service",
+                    "undrainHint": "Re-enables the node so it can lease work again."
+                },
+                "capabilities": {
+                    "title": "Capability tags",
+                    "placeholder": "Add a tag, e.g. workspace",
+                    "add": "Add",
+                    "remove": "Remove",
+                    "save": "Save tags",
+                    "saved": "Capability tags saved.",
+                    "none": "No tags. This node is eligible for any work that names no requirements.",
+                    "pinned": "Pinned",
+                    "pinnedHint": "You own these tags — the node's heartbeats will not overwrite them.",
+                    "unpinned": "Reported by the node",
+                    "unpinnedHint": "The node reports these on every heartbeat. Editing them hands ownership to you."
+                },
+                "handoff": {
+                    "qrLabel": "Scan to enrol",
+                    "qrHint": "Scan this from the machine you are adding. The code carries the one-time token — treat it like a password.",
+                    "commandTitle": "Or run this on the machine",
+                    "copyCommand": "Copy command",
+                    "downloadsTitle": "Downloads",
+                    "downloadFile": "Download config file",
+                    "downloadDesktop": "Desktop app",
+                    "downloadNode": "Headless node"
+                },
+                "history": {
+                    "failuresTitle": "Recent failures",
+                    "noFailures": "No failures in the recent history.",
+                    "recentCount": "{count} recent jobs",
+                    "attempts": "{count} attempts",
+                    "loading": "Loading history…",
+                    "unavailable": "Job history is unavailable right now. The node itself is fine."
                 }
             },
             "jobRuntime": {
@@ -2498,6 +2625,42 @@
                     "requiredFieldsMissing": "Required credential fields are empty: {fields}",
                     "providerNoLongerAllowed": "Provider {provider} is no longer enabled by the operator. Revert to inherit or pick an allowed provider before saving.",
                     "noProvidersAvailable": "The operator has not enabled any job-runtime providers for tenant overlays. Switch to inherit mode or contact your operator."
+                }
+            },
+            "digest": {
+                "title": "Digest",
+                "subtitle": "Scheduled activity briefings: agent runs, task movement, pull requests, connected-source events and goal progress, delivered on the cadence you choose. Your personal digest and your organization’s digest are separate settings — turning one on never changes the other.",
+                "scopes": {
+                    "personal": "Personal",
+                    "organization": "Organization"
+                },
+                "cadences": {
+                    "daily": "Daily",
+                    "weekly": "Weekly"
+                },
+                "fields": {
+                    "scopeLabel": "Scope",
+                    "scopeHelper": "Personal covers only your own activity. Organization covers everything happening across your organization. Both can be on at the same time.",
+                    "orgContext": "Editing the digest for {name}.",
+                    "enabledLabel": "Send me a personal digest",
+                    "enabledHelper": "Delivered in-app and to any notification channel you have connected. Quiet windows are skipped instead of sending an empty briefing.",
+                    "orgEnabledLabel": "Send an organization digest",
+                    "orgEnabledHelper": "One shared briefing covering the whole organization, delivered to the organization owner. Members keep receiving their own personal digests.",
+                    "cadenceLabel": "Cadence",
+                    "cadenceHelper": "Daily covers the last 24 hours; weekly covers the last 7 days.",
+                    "narrativeLabel": "Include an AI summary",
+                    "narrativeHelper": "Adds a short written summary on top of the counts. The counts are always computed exactly; if no AI provider is available the summary is skipped and the digest says so.",
+                    "lastRunAt": "Last sent {when}"
+                },
+                "actions": {
+                    "save": "Save",
+                    "saving": "Saving..."
+                },
+                "messages": {
+                    "saveSuccess": "Digest settings saved",
+                    "saveError": "Failed to save the digest settings",
+                    "noOrg": "No active organization for this session, so there is no organization digest to configure. Create or switch to an organization first.",
+                    "noAiProvider": "No AI provider is configured, so digests will arrive without the written summary. Every count is still computed and delivered."
                 }
             }
         },

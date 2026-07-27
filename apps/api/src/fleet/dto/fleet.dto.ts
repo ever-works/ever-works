@@ -75,6 +75,47 @@ export class UpdateFleetNodeDto {
     @IsOptional()
     @IsBoolean()
     disabled?: boolean;
+
+    @ApiProperty({
+        required: false,
+        type: [String],
+        description:
+            "Admin-edited capability tags, e.g. ['terminal', 'workspace']. Writing them PINS the set so the node's heartbeats stop overwriting it; send capabilitiesPinned:false in the same call to hand ownership back to the node.",
+    })
+    @IsOptional()
+    @IsArray()
+    // The SAME configurable caps the enroll DTO uses. Hardcoding 16/32
+    // here would let an operator who raised FLEET_MAX_CAPABILITY_TAGS
+    // enroll a node with more tags than they could subsequently edit.
+    @MaxConfiguredCapabilityTags()
+    @IsString({ each: true })
+    @MaxConfiguredCapabilityTagLength({ each: true })
+    capabilities?: string[];
+
+    @ApiProperty({
+        required: false,
+        description:
+            'Whether the admin-edited tag set is authoritative. Only meaningful alongside `capabilities`; defaults to true.',
+    })
+    @IsOptional()
+    @IsBoolean()
+    capabilitiesPinned?: boolean;
+}
+
+/**
+ * Request body for `POST /api/fleet/nodes/:id/drain`.
+ *
+ * Explicit boolean rather than two verbs: draining and undraining are
+ * one idempotent control, and an operator retrying a drain must not
+ * accidentally toggle a node back into service.
+ */
+export class DrainFleetNodeDto {
+    @ApiProperty({
+        description:
+            'true drains the node (disables it AND requeues its in-flight claims); false returns it to service as offline until its next heartbeat.',
+    })
+    @IsBoolean()
+    drain: boolean;
 }
 
 /** Node self-description shared by enroll + heartbeat refresh. */

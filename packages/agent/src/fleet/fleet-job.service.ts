@@ -344,6 +344,42 @@ export class FleetJobService {
     }
 
     /**
+     * One node's recent job history, newest first (node-detail drawer).
+     * Owner-scoped in the query itself, not just by convention at the
+     * edge — a node id is a travelling value.
+     */
+    async historyForNode(userId: string, nodeId: string, limit = 20): Promise<FleetJobView[]> {
+        const rows = await this.jobs.findByNodeForUser(
+            userId,
+            nodeId,
+            Math.min(Math.max(limit, 1), 100),
+        );
+        return rows.map(toJobView);
+    }
+
+    /**
+     * Requeue everything a node currently holds — the work half of a
+     * DRAIN. Returns how many claims went back to the pool.
+     *
+     * Best-effort by contract: the caller has already disabled the node
+     * (which is what actually stops it receiving work), so a failure
+     * here must degrade to "the leases lapse on their own" rather than
+     * un-draining the node.
+     */
+    async releaseClaimsForNode(userId: string, nodeId: string): Promise<number> {
+        try {
+            return await this.jobs.releaseClaimsForNode(userId, nodeId);
+        } catch (error) {
+            this.logger.warn(
+                `fleet drain could not requeue claims for node ${nodeId}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return 0;
+        }
+    }
+
+    /**
      * Resolve + verify a node credential. Fail-closed on every path:
      * malformed ids, unknown nodes, disabled nodes (drained — they must
      * stop receiving work immediately), still-enrolling nodes (whose

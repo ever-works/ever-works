@@ -72,6 +72,35 @@ export type { FleetNodeView };
  */
 const PLATFORM_MANAGED_KUBECONFIG_SENTINEL = '__ever-works-platform-managed-kubeconfig__';
 
+/**
+ * One OUTSTANDING enrollment token — a node row that has been minted but
+ * never enrolled.
+ *
+ * There is no separate token table by design: while a node is
+ * `enrolling`, the row IS the token (its `enrollmentTokenHash` holds the
+ * token's sha256). Listing the outstanding set is therefore a read of
+ * the `enrolling` rows, and revoking one pre-use is a delete of that
+ * row. The plaintext token is NOT here and can never be re-read — it was
+ * returned exactly once at mint time.
+ */
+export interface FleetEnrollmentTokenView {
+    /** Id of the node the token was minted for (the revoke handle). */
+    nodeId: string;
+    name: string;
+    kind: FleetNodeKind;
+    /** When the token was issued (ISO). */
+    issuedAt: string | null;
+    /** When it stops being consumable (ISO). */
+    expiresAt: string | null;
+    /** True once `expiresAt` has passed — still revocable, never usable. */
+    expired: boolean;
+    /**
+     * True when the token was minted by a credential ROTATION on an
+     * already-enrolled node rather than by a fresh "add node".
+     */
+    rotated: boolean;
+}
+
 export interface CreateEnrollmentTokenInput {
     name: string;
     kind: FleetNodeKind;
@@ -163,6 +192,7 @@ export class FleetService {
             kind: input.kind,
             status: 'enrolling',
             enrollmentTokenHash: sha256Hex(token),
+            credentialIssuedAt: new Date(),
             capabilities: [],
         });
 
@@ -199,7 +229,12 @@ export class FleetService {
         if (!constantTimeEquals(node.enrollmentTokenHash, tokenHash)) {
             return null;
         }
-        const issuedAt = node.createdAt instanceof Date ? node.createdAt.getTime() : NaN;
+        // `credentialIssuedAtMs` (not `node.createdAt`): once a
+        // credential can be ROTATED, its age must be measured from the
+        // rotation, not from when the row was first created — and it
+        // also copes with the string dates sqlite hands back. The TTL
+        // itself stays the configurable, clamped one.
+        const issuedAt = credentialIssuedAtMs(node);
         if (
             !Number.isFinite(issuedAt) ||
             Date.now() - issuedAt > config.fleet.getEnrollmentTokenTtlMs()
@@ -266,7 +301,10 @@ export class FleetService {
             // Server-stamped — the node never supplies its own clock.
             lastHeartbeatAt: new Date(),
         };
-        if (refresh.capabilities !== undefined) {
+        // A PINNED tag set is the operator's, not the machine's: an
+        // admin edit that a heartbeat silently reverted seconds later
+        // would not be an edit at all. Unpinning hands the tags back.
+        if (refresh.capabilities !== undefined && !node.capabilitiesPinned) {
             patch.capabilities = sanitizeCapabilities(refresh.capabilities);
         }
         const platform = sanitizeText(refresh.platform, FLEET_MAX_PLATFORM_LENGTH);
@@ -292,6 +330,131 @@ export class FleetService {
         const rows = await this.repository.findByUser(userId);
         const clusterNodes = await this.listOwnClusterNodes(userId);
         return [...rows.map((row) => this.toView(row)), ...clusterNodes];
+    }
+
+    /**
+     * One enrolled node (owner-scoped, no existence leak). Backs the
+     * node-detail drawer; the failure history shown alongside it is
+     * composed at the API edge from `FleetJobService`, so the registry
+     * stays independent of the job runtime.
+     */
+    async getForUser(userId: string, nodeId: string): Promise<FleetNodeView> {
+        return this.toView(await this.getOwnedNode(userId, nodeId));
+    }
+
+    /**
+     * Every OUTSTANDING enrollment token of this owner — i.e. every node
+     * still sitting in `enrolling`, whether the token is fresh, about to
+     * expire, or already expired.
+     *
+     * Expired entries are deliberately still listed: "there is a stale
+     * credential row for a machine I never finished setting up" is
+     * exactly the thing an operator wants to see and clean up, and
+     * hiding it would make the registry quietly disagree with the node
+     * list. Nothing here can reconstruct the plaintext token.
+     */
+    async listOutstandingTokensForUser(userId: string): Promise<FleetEnrollmentTokenView[]> {
+        const rows = await this.repository.findByUser(userId);
+        const now = Date.now();
+        return rows
+            .filter((row) => row.status === 'enrolling')
+            .map((row) => {
+                const issuedAtMs = credentialIssuedAtMs(row);
+                const hasIssuedAt = Number.isFinite(issuedAtMs);
+                const expiresAtMs = issuedAtMs + FLEET_ENROLLMENT_TOKEN_TTL_MS;
+                return {
+                    nodeId: row.id,
+                    name: row.name,
+                    kind: row.kind,
+                    issuedAt: hasIssuedAt ? new Date(issuedAtMs).toISOString() : null,
+                    expiresAt: hasIssuedAt ? new Date(expiresAtMs).toISOString() : null,
+                    // A row we cannot date is treated as expired — the
+                    // enroll path refuses it for the same reason.
+                    expired: !hasIssuedAt || expiresAtMs <= now,
+                    // A rotation mints a token on a row that already
+                    // beat once; a fresh "add node" never has.
+                    rotated: Boolean(row.lastHeartbeatAt),
+                };
+            });
+    }
+
+    /**
+     * Revoke an outstanding enrollment token BEFORE it is used.
+     *
+     * Only `enrolling` rows qualify: once a token has been consumed the
+     * row's hash is a heartbeat secret, and destroying that silently
+     * would be a node deletion wearing a token-revocation label. For an
+     * enrolled node the operator wants {@link rotateCredentialForUser}
+     * (mint a replacement) or `deleteForUser` (remove the machine) —
+     * both explicit, both already surfaced.
+     *
+     * Revoking a never-enrolled row deletes it, because the row exists
+     * only to carry the token: there is no machine behind it yet.
+     */
+    async revokeEnrollmentTokenForUser(userId: string, nodeId: string): Promise<void> {
+        const node = await this.getOwnedNode(userId, nodeId);
+        if (node.status !== 'enrolling') {
+            throw new BadRequestException(
+                'Only an unused enrollment token can be revoked; rotate the node credential instead',
+            );
+        }
+        await this.repository.delete(node.id);
+    }
+
+    /**
+     * Rotate a node's credential: mint a fresh one-time enrollment token
+     * and put the node back to `enrolling`.
+     *
+     * The old heartbeat secret dies the instant the hash is replaced —
+     * that is the entire point, and it is why rotation is a drain as
+     * well as a re-key: the machine stops being able to report or lease
+     * until it re-enrolls with the new token. Returned exactly once,
+     * like every other Fleet credential.
+     */
+    async rotateCredentialForUser(
+        userId: string,
+        nodeId: string,
+    ): Promise<CreateEnrollmentTokenResult> {
+        const node = await this.getOwnedNode(userId, nodeId);
+        const token = randomBytes(32).toString('base64url');
+        const patch: Partial<FleetNode> = {
+            enrollmentTokenHash: sha256Hex(token),
+            credentialIssuedAt: new Date(),
+            status: 'enrolling',
+        };
+        await this.repository.update(node.id, patch);
+        return {
+            node: this.toView({ ...node, ...patch } as FleetNode),
+            token,
+            expiresInSec: Math.floor(FLEET_ENROLLMENT_TOKEN_TTL_MS / 1000),
+        };
+    }
+
+    /**
+     * Hand-edit a node's capability tags (owner-scoped).
+     *
+     * Writing tags PINS them, so the node's next heartbeat no longer
+     * overwrites the operator's set. Passing `pinned: false` clears the
+     * pin and hands ownership of the tags back to the machine — the tags
+     * written in the same call still land, they simply stop being
+     * authoritative from the next beat onwards.
+     */
+    async setCapabilitiesForUser(
+        userId: string,
+        nodeId: string,
+        capabilities: unknown,
+        pinned = true,
+    ): Promise<FleetNodeView> {
+        if (!Array.isArray(capabilities)) {
+            throw new BadRequestException('Capabilities must be an array of tags');
+        }
+        const node = await this.getOwnedNode(userId, nodeId);
+        const patch: Partial<FleetNode> = {
+            capabilities: sanitizeCapabilities(capabilities),
+            capabilitiesPinned: pinned,
+        };
+        await this.repository.update(node.id, patch);
+        return this.toView({ ...node, ...patch } as FleetNode);
     }
 
     /** Rename an enrolled node (owner-scoped, no existence leak). */
@@ -412,6 +575,9 @@ export class FleetService {
             lastHeartbeatAt: null,
             createdAt: null,
             persisted: false,
+            // Cluster roles are read live from the cluster on every list;
+            // there is no row to pin them onto.
+            capabilitiesPinned: false,
         };
     }
 
@@ -428,8 +594,23 @@ export class FleetService {
             lastHeartbeatAt: node.lastHeartbeatAt ? toIso(node.lastHeartbeatAt) : null,
             createdAt: node.createdAt ? toIso(node.createdAt) : null,
             persisted: true,
+            capabilitiesPinned: Boolean(node.capabilitiesPinned),
         };
     }
+}
+
+/**
+ * When the row's CURRENT credential was issued, in epoch ms.
+ *
+ * Falls back to `createdAt` for rows written before rotation existed —
+ * for those the two are the same instant by construction. `NaN` when
+ * neither is a usable date, which every caller treats as "expired".
+ */
+function credentialIssuedAtMs(node: FleetNode): number {
+    const issued = node.credentialIssuedAt ?? node.createdAt;
+    if (issued instanceof Date) return issued.getTime();
+    if (typeof issued === 'string') return new Date(issued).getTime();
+    return NaN;
 }
 
 function sanitizeText(value: unknown, maxLength: number): string | null {

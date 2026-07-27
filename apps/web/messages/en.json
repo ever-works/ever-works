@@ -2388,7 +2388,8 @@
                     "rename": "Rename",
                     "disable": "Disable",
                     "enable": "Enable",
-                    "remove": "Remove"
+                    "remove": "Remove",
+                    "details": "Details"
                 },
                 "rename": {
                     "title": "Rename node",
@@ -2411,6 +2412,66 @@
                     "idle": "Idle",
                     "busy": "{count} running",
                     "currentJob": "Current job: {kind}"
+                },
+                "tokens": {
+                    "title": "Outstanding enrollment tokens",
+                    "description": "Tokens that have been minted but not yet used. The token itself was shown once at mint time and cannot be read again — revoke and re-issue if it was lost.",
+                    "empty": "No outstanding tokens.",
+                    "loading": "Loading tokens…",
+                    "refresh": "Refresh",
+                    "issuedAt": "Issued",
+                    "expiresAt": "Expires",
+                    "expired": "Expired",
+                    "revoke": "Revoke",
+                    "rotated": "Rotated",
+                    "revoked": "Enrollment token revoked.",
+                    "revokeTitle": "Revoke this enrollment token?",
+                    "revokeDescription": "The token stops working immediately. The machine it was minted for will not be able to enroll until you issue a new one.",
+                    "revokeCancel": "Keep token"
+                },
+                "controls": {
+                    "rotatedTitle": "Credential rotated",
+                    "rotated": "Copy the replacement token now — it is shown once and cannot be read again.",
+                    "undrained": "Node returned to service.",
+                    "title": "Controls",
+                    "rotate": "Rotate credential",
+                    "rotateHint": "Issues a replacement enrollment token and invalidates the current credential. The machine must re-enroll.",
+                    "drain": "Drain",
+                    "drainHint": "Disables the node and returns its in-flight work to the queue so it is picked up elsewhere immediately.",
+                    "drained": "Node drained.",
+                    "undrain": "Return to service",
+                    "undrainHint": "Re-enables the node so it can lease work again."
+                },
+                "capabilities": {
+                    "title": "Capability tags",
+                    "placeholder": "Add a tag, e.g. workspace",
+                    "add": "Add",
+                    "remove": "Remove",
+                    "save": "Save tags",
+                    "saved": "Capability tags saved.",
+                    "none": "No tags. This node is eligible for any work that names no requirements.",
+                    "pinned": "Pinned",
+                    "pinnedHint": "You own these tags — the node's heartbeats will not overwrite them.",
+                    "unpinned": "Reported by the node",
+                    "unpinnedHint": "The node reports these on every heartbeat. Editing them hands ownership to you."
+                },
+                "handoff": {
+                    "qrLabel": "Scan to enrol",
+                    "qrHint": "Scan this from the machine you are adding. The code carries the one-time token — treat it like a password.",
+                    "commandTitle": "Or run this on the machine",
+                    "copyCommand": "Copy command",
+                    "downloadsTitle": "Downloads",
+                    "downloadFile": "Download config file",
+                    "downloadDesktop": "Desktop app",
+                    "downloadNode": "Headless node"
+                },
+                "history": {
+                    "failuresTitle": "Recent failures",
+                    "noFailures": "No failures in the recent history.",
+                    "recentCount": "{count} recent jobs",
+                    "attempts": "{count} attempts",
+                    "loading": "Loading history…",
+                    "unavailable": "Job history is unavailable right now. The node itself is fine."
                 }
             },
             "jobRuntime": {

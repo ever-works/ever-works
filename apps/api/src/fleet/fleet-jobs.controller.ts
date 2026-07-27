@@ -7,6 +7,7 @@ import {
     ParseUUIDPipe,
     Post,
     UnauthorizedException,
+    UseGuards,
 } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
@@ -18,6 +19,8 @@ import type {
 import { FleetJobService } from '@ever-works/agent/fleet';
 import { Public } from '../auth/decorators/public.decorator';
 import { CompleteFleetJobDto, FleetJobHeartbeatDto, LeaseFleetJobsDto } from './dto/fleet-job.dto';
+import { FleetEnabledGuard } from './guards/fleet-enabled.guard';
+import { FleetNodeAuthGuard } from './guards/fleet-node-auth.guard';
 
 /**
  * Fleet job lease protocol (Desktop PRD §6.2 / M4) — the endpoints an
@@ -44,9 +47,18 @@ import { CompleteFleetJobDto, FleetJobHeartbeatDto, LeaseFleetJobsDto } from './
  * management (owner-scoped, session-authenticated) and the work channel
  * (node-authenticated, public) are two different trust boundaries and
  * should not share a class.
+ *
+ * **Guards.** `FleetEnabledGuard` gates the whole surface on
+ * `FLEET_ENABLED` (404 when off — a disabled deployment does not admit
+ * the channel exists). `FleetNodeAuthGuard` then authenticates the node
+ * credential BEFORE any handler runs, so the trust boundary is
+ * declarative at the edge instead of implicit inside each service call.
+ * The service still re-verifies: the guard is the edge contract, the
+ * service is the invariant, and neither is allowed to be the only check.
  */
 @ApiTags('fleet')
 @Controller('api/fleet/jobs')
+@UseGuards(FleetEnabledGuard, FleetNodeAuthGuard)
 export class FleetJobsController {
     constructor(private readonly service: FleetJobService) {}
 

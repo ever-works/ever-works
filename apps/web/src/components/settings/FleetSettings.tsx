@@ -1,12 +1,12 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useCallback, useMemo, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import {
     Activity,
     AlertTriangle,
-    Copy,
+    Info,
     Laptop,
     Pause,
     Pencil,
@@ -29,18 +29,35 @@ import {
 } from '@/components/ui/dialog';
 import type {
     CreateFleetEnrollmentTokenResponse,
+    FleetEnrollmentTokenView,
+    FleetNodeDetailView,
     FleetNodeKind,
     FleetNodeView,
 } from '@/lib/api/fleet';
 import {
     createFleetEnrollmentTokenAction,
     deleteFleetNodeAction,
+    drainFleetNodeAction,
+    getFleetNodeDetailAction,
+    listFleetEnrollmentTokensAction,
+    revokeFleetEnrollmentTokenAction,
+    rotateFleetNodeCredentialAction,
     updateFleetNodeAction,
 } from '@/app/actions/settings/fleet';
+import { FleetEnrollHandoff } from './FleetEnrollHandoff';
+import { FleetNodeDrawer } from './FleetNodeDrawer';
+import { FleetTokensSection } from './FleetTokensSection';
 
 interface FleetSettingsProps {
     initialNodes: FleetNodeView[];
     loadError: string | null;
+    /** Outstanding (minted, unused) enrollment tokens. */
+    initialTokens: FleetEnrollmentTokenView[];
+    tokensError: string | null;
+    /** Public API base a node should call — used in the CLI one-liner + QR. */
+    apiBaseUrl: string;
+    desktopDownloadUrl: string;
+    nodeDownloadUrl: string;
 }
 
 const ENROLLABLE_KINDS: Exclude<FleetNodeKind, 'k8s'>[] = ['desktop-node', 'node'];
@@ -61,17 +78,30 @@ function formatLastSeen(value: string | null): string {
 }
 
 /**
- * Fleet (Wave 12, slice 1) — settings UI for the node registry:
+ * Fleet — settings UI for the node registry:
  *   - Enrolled-nodes table (name, kind badge, status dot, platform,
- *     capability chips, last-seen) with rename / disable / remove
- *     (confirm) actions.
- *   - "Add node" flow issuing a ONE-TIME enrollment token (copy
- *     button + short install-instructions placeholder — the node apps
- *     themselves are the next slice).
+ *     capability chips, last-seen) with details / rename / disable /
+ *     remove (confirm) actions.
+ *   - "Add node" flow issuing a ONE-TIME enrollment token, handed over
+ *     without retyping: copy button, ready-to-run CLI command, a QR of
+ *     that command, a downloadable handoff file, and links to the node
+ *     app downloads.
+ *   - Outstanding-token list with pre-use revoke, so a minted-but-never
+ *     used credential is visible and killable.
+ *   - Per-node detail drawer: job/failure history, admin-editable
+ *     capability tags, credential rotation and drain.
  *   - Read-only section for live nodes of the user's OWN configured
  *     clusters (never the shared platform clusters, never persisted).
  */
-export function FleetSettings({ initialNodes, loadError }: FleetSettingsProps) {
+export function FleetSettings({
+    initialNodes,
+    loadError,
+    initialTokens,
+    tokensError,
+    apiBaseUrl,
+    desktopDownloadUrl,
+    nodeDownloadUrl,
+}: FleetSettingsProps) {
     const t = useTranslations('dashboard.settings.fleet');
     const [nodes, setNodes] = useState<FleetNodeView[]>(initialNodes);
     const [isPending, startTransition] = useTransition();
@@ -82,12 +112,26 @@ export function FleetSettings({ initialNodes, loadError }: FleetSettingsProps) {
         [nodes],
     );
 
-    // "Add node" dialog: form phase, then the one-time-token phase.
+    // "Add node" dialog: form phase, then the one-time-token phase. The
+    // token phase is shared with credential rotation — both hand over a
+    // one-time token that is shown exactly once.
     const [addOpen, setAddOpen] = useState(false);
     const [addName, setAddName] = useState('');
     const [addKind, setAddKind] = useState<Exclude<FleetNodeKind, 'k8s'>>('desktop-node');
     const [issued, setIssued] = useState<CreateFleetEnrollmentTokenResponse | null>(null);
-    const [copied, setCopied] = useState(false);
+    const [issuedFromRotation, setIssuedFromRotation] = useState(false);
+
+    // Outstanding enrollment tokens.
+    const [tokens, setTokens] = useState<FleetEnrollmentTokenView[]>(initialTokens);
+    const [tokensLoading, setTokensLoading] = useState(false);
+    const [tokensLoadError, setTokensLoadError] = useState<string | null>(tokensError);
+    const [revokeTarget, setRevokeTarget] = useState<FleetEnrollmentTokenView | null>(null);
+
+    // Node-detail drawer.
+    const [drawerNode, setDrawerNode] = useState<FleetNodeView | null>(null);
+    const [drawerDetail, setDrawerDetail] = useState<FleetNodeDetailView | null>(null);
+    const [drawerLoading, setDrawerLoading] = useState(false);
+    const [drawerError, setDrawerError] = useState<string | null>(null);
 
     // Rename dialog.
     const [renameTarget, setRenameTarget] = useState<FleetNodeView | null>(null);
@@ -111,13 +155,27 @@ export function FleetSettings({ initialNodes, loadError }: FleetSettingsProps) {
         }
     };
 
+    const refreshTokens = useCallback(() => {
+        setTokensLoading(true);
+        startTransition(async () => {
+            const result = await listFleetEnrollmentTokensAction();
+            setTokensLoading(false);
+            if (result.success) {
+                setTokens(result.data);
+                setTokensLoadError(null);
+            } else {
+                setTokensLoadError(result.error);
+            }
+        });
+    }, []);
+
     const closeAddDialog = () => {
         setAddOpen(false);
         // The token is shown exactly once — drop it with the dialog.
         setIssued(null);
+        setIssuedFromRotation(false);
         setAddName('');
         setAddKind('desktop-node');
-        setCopied(false);
     };
 
     const handleIssueToken = () => {
@@ -132,23 +190,14 @@ export function FleetSettings({ initialNodes, loadError }: FleetSettingsProps) {
             });
             if (result.success) {
                 setIssued(result.data);
+                setIssuedFromRotation(false);
                 setNodes((prev) => [...prev, result.data.node]);
                 toast.success(t('add.issued'));
+                refreshTokens();
             } else {
                 toast.error(result.error);
             }
         });
-    };
-
-    const handleCopyToken = async () => {
-        if (!issued) return;
-        try {
-            await navigator.clipboard.writeText(issued.token);
-            setCopied(true);
-            setTimeout(() => setCopied(false), 2000);
-        } catch {
-            toast.error(t('add.copyError'));
-        }
     };
 
     const handleRename = () => {
@@ -192,6 +241,111 @@ export function FleetSettings({ initialNodes, loadError }: FleetSettingsProps) {
                 setNodes((prev) => prev.filter((node) => node.id !== target.id));
                 setRemoveTarget(null);
                 toast.success(t('messages.removed'));
+                refreshTokens();
+            } else {
+                toast.error(result.error);
+            }
+        });
+    };
+
+    const openDrawer = (node: FleetNodeView) => {
+        setDrawerNode(node);
+        setDrawerDetail(null);
+        setDrawerError(null);
+        setDrawerLoading(true);
+        startTransition(async () => {
+            const result = await getFleetNodeDetailAction(node.id);
+            setDrawerLoading(false);
+            if (result.success) {
+                setDrawerDetail(result.data);
+                setNodes((prev) =>
+                    prev.map((entry) => (entry.id === node.id ? result.data.node : entry)),
+                );
+                setDrawerNode(result.data.node);
+            } else {
+                setDrawerError(result.error);
+            }
+        });
+    };
+
+    const handleSaveCapabilities = (capabilities: string[], pinned: boolean) => {
+        const target = drawerNode;
+        if (!target) return;
+        startTransition(async () => {
+            const result = await updateFleetNodeAction(target.id, {
+                capabilities,
+                capabilitiesPinned: pinned,
+            });
+            if (result.success) {
+                setNodes((prev) =>
+                    prev.map((entry) => (entry.id === target.id ? result.data : entry)),
+                );
+                setDrawerNode(result.data);
+                setDrawerDetail((prev) => (prev ? { ...prev, node: result.data } : prev));
+                toast.success(t('capabilities.saved'));
+            } else {
+                toast.error(result.error);
+            }
+        });
+    };
+
+    const handleRotate = () => {
+        const target = drawerNode;
+        if (!target) return;
+        startTransition(async () => {
+            const result = await rotateFleetNodeCredentialAction(target.id);
+            if (result.success) {
+                setNodes((prev) =>
+                    prev.map((entry) => (entry.id === target.id ? result.data.node : entry)),
+                );
+                // Close the drawer and surface the replacement token —
+                // it is returned exactly once, so it must not be behind
+                // anything the operator has to go looking for.
+                setDrawerNode(null);
+                setDrawerDetail(null);
+                setIssued(result.data);
+                setIssuedFromRotation(true);
+                setAddOpen(true);
+                toast.success(t('controls.rotated'));
+                refreshTokens();
+            } else {
+                toast.error(result.error);
+            }
+        });
+    };
+
+    const handleDrain = (drain: boolean) => {
+        const target = drawerNode;
+        if (!target) return;
+        startTransition(async () => {
+            const result = await drainFleetNodeAction(target.id, drain);
+            if (result.success) {
+                setNodes((prev) =>
+                    prev.map((entry) => (entry.id === target.id ? result.data.node : entry)),
+                );
+                setDrawerNode(result.data.node);
+                setDrawerDetail((prev) => (prev ? { ...prev, node: result.data.node } : prev));
+                toast.success(
+                    drain
+                        ? t('controls.drained', { count: result.data.releasedJobs })
+                        : t('controls.undrained'),
+                );
+            } else {
+                toast.error(result.error);
+            }
+        });
+    };
+
+    const handleRevokeToken = () => {
+        if (!revokeTarget) return;
+        const target = revokeTarget;
+        startTransition(async () => {
+            const result = await revokeFleetEnrollmentTokenAction(target.nodeId);
+            if (result.success) {
+                setTokens((prev) => prev.filter((token) => token.nodeId !== target.nodeId));
+                setNodes((prev) => prev.filter((node) => node.id !== target.nodeId));
+                setRevokeTarget(null);
+                toast.success(t('tokens.revoked'));
             } else {
                 toast.error(result.error);
             }
@@ -354,6 +508,15 @@ export function FleetSettings({ initialNodes, loadError }: FleetSettingsProps) {
                                         <div className="flex items-center justify-end gap-1">
                                             <Button
                                                 variant="ghost"
+                                                onClick={() => openDrawer(node)}
+                                                disabled={isPending}
+                                                data-testid={`fleet-node-details-${node.id}`}
+                                                title={t('actions.details')}
+                                            >
+                                                <Info className="w-4 h-4" />
+                                            </Button>
+                                            <Button
+                                                variant="ghost"
                                                 onClick={() => {
                                                     setRenameTarget(node);
                                                     setRenameValue(node.name);
@@ -398,6 +561,15 @@ export function FleetSettings({ initialNodes, loadError }: FleetSettingsProps) {
                     </table>
                 </div>
             )}
+
+            <FleetTokensSection
+                tokens={tokens}
+                loading={tokensLoading}
+                error={tokensLoadError}
+                isPending={isPending}
+                onRefresh={refreshTokens}
+                onRevoke={setRevokeTarget}
+            />
 
             <div className="space-y-3" data-testid="fleet-cluster-section">
                 <div className="flex items-center gap-2">
@@ -481,16 +653,16 @@ export function FleetSettings({ initialNodes, loadError }: FleetSettingsProps) {
                 )}
             </div>
 
-            {/* Add node — form phase, then one-time-token phase. */}
+            {/* Add node — form phase, then the one-time-token handoff. */}
             <Dialog
                 open={addOpen}
                 onOpenChange={(open) => (open ? setAddOpen(true) : closeAddDialog())}
             >
-                <DialogContent>
+                <DialogContent className="max-w-2xl">
                     <DialogClose onClose={closeAddDialog} />
                     <DialogHeader>
                         <DialogTitle className="text-lg font-semibold text-text dark:text-text-dark">
-                            {t('add.title')}
+                            {issuedFromRotation ? t('controls.rotatedTitle') : t('add.title')}
                         </DialogTitle>
                     </DialogHeader>
                     {!issued ? (
@@ -546,38 +718,12 @@ export function FleetSettings({ initialNodes, loadError }: FleetSettingsProps) {
                         </div>
                     ) : (
                         <div className="space-y-4">
-                            <p className="text-sm text-text dark:text-text-dark">
-                                {t('add.tokenIntro', {
-                                    minutes: Math.round(issued.expiresInSec / 60),
-                                })}
-                            </p>
-                            <div className="flex items-center gap-2">
-                                <code
-                                    className="flex-1 px-3 py-2 rounded-lg border border-border dark:border-border-dark bg-surface-secondary/40 dark:bg-surface-secondary-dark/40 text-sm break-all select-all"
-                                    data-testid="fleet-enroll-token"
-                                >
-                                    {issued.token}
-                                </code>
-                                <Button
-                                    variant="secondary"
-                                    onClick={handleCopyToken}
-                                    data-testid="fleet-copy-token"
-                                >
-                                    <Copy className="w-4 h-4" />
-                                    {copied ? t('add.copied') : t('add.copy')}
-                                </Button>
-                            </div>
-                            <div className="p-3 rounded-lg bg-info/10 border border-info/20 space-y-1">
-                                <p className="text-sm font-medium text-text dark:text-text-dark">
-                                    {t('add.instructionsTitle')}
-                                </p>
-                                <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                    {t('add.instructionsBody')}
-                                </p>
-                            </div>
-                            <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                                {t('add.tokenOnce')}
-                            </p>
+                            <FleetEnrollHandoff
+                                issued={issued}
+                                apiBaseUrl={apiBaseUrl}
+                                desktopDownloadUrl={desktopDownloadUrl}
+                                nodeDownloadUrl={nodeDownloadUrl}
+                            />
                             <DialogFooter>
                                 <Button onClick={closeAddDialog} data-testid="fleet-add-done">
                                     {t('add.done')}
@@ -587,6 +733,23 @@ export function FleetSettings({ initialNodes, loadError }: FleetSettingsProps) {
                     )}
                 </DialogContent>
             </Dialog>
+
+            {/* Node detail */}
+            <FleetNodeDrawer
+                node={drawerNode}
+                detail={drawerDetail}
+                loading={drawerLoading}
+                error={drawerError}
+                isPending={isPending}
+                onClose={() => {
+                    setDrawerNode(null);
+                    setDrawerDetail(null);
+                    setDrawerError(null);
+                }}
+                onSaveCapabilities={handleSaveCapabilities}
+                onRotate={handleRotate}
+                onDrain={handleDrain}
+            />
 
             {/* Rename */}
             <Dialog
@@ -616,6 +779,37 @@ export function FleetSettings({ initialNodes, loadError }: FleetSettingsProps) {
                             data-testid="fleet-rename-confirm"
                         >
                             {t('rename.confirm')}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* Revoke an outstanding token (confirm) */}
+            <Dialog
+                open={revokeTarget !== null}
+                onOpenChange={(open) => !open && setRevokeTarget(null)}
+            >
+                <DialogContent>
+                    <DialogClose onClose={() => setRevokeTarget(null)} />
+                    <DialogHeader>
+                        <DialogTitle className="text-lg font-semibold text-text dark:text-text-dark">
+                            {t('tokens.revokeTitle')}
+                        </DialogTitle>
+                    </DialogHeader>
+                    <p className="text-sm text-text-muted dark:text-text-muted-dark">
+                        {t('tokens.revokeDescription', { name: revokeTarget?.name ?? '' })}
+                    </p>
+                    <DialogFooter>
+                        <Button variant="secondary" onClick={() => setRevokeTarget(null)}>
+                            {t('tokens.revokeCancel')}
+                        </Button>
+                        <Button
+                            variant="danger"
+                            onClick={handleRevokeToken}
+                            loading={isPending}
+                            data-testid="fleet-token-revoke-confirm"
+                        >
+                            {t('tokens.revoke')}
                         </Button>
                     </DialogFooter>
                 </DialogContent>

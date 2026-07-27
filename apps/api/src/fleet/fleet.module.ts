@@ -12,6 +12,8 @@ import {
     NODE_JOB_RUNTIME_PLUGIN,
     NODE_JOB_RUNTIME_STORE,
 } from './node-job-runtime.providers';
+import { FleetEnabledGuard } from './guards/fleet-enabled.guard';
+import { FleetNodeAuthGuard } from './guards/fleet-node-auth.guard';
 
 /**
  * Fleet (Wave 12, slice 1 + Desktop PRD M4) — thin API module exposing
@@ -34,11 +36,24 @@ import {
  * into an actual `FleetJobService.enqueue`. The `TenantJobRuntimeConfig`
  * feature registration is what lets the router honour a per-tenant
  * overlay row rather than only the instance-global selector.
+ *
+ * Both guards are ordinary providers so Nest can inject them (the node
+ * guard needs `FleetNodeRepository`, which `AgentFleetModule` exports):
+ *   - `FleetEnabledGuard` — the `FLEET_ENABLED` gate on BOTH controllers,
+ *     so the surface cannot end up half-on.
+ *   - `FleetNodeAuthGuard` — node-credential authentication for the work
+ *     channel, at the edge instead of only inside the services.
  */
 @Module({
     imports: [AgentFleetModule, DatabaseModule, TypeOrmModule.forFeature([TenantJobRuntimeConfig])],
     controllers: [FleetController, FleetJobsController],
-    providers: [...buildNodeJobRuntimeProviders(), FleetRunRouterService],
+    providers: [
+        ...buildNodeJobRuntimeProviders(),
+        FleetRunRouterService,
+        // Guards are ordinary providers so Nest can inject them.
+        FleetEnabledGuard,
+        FleetNodeAuthGuard,
+    ],
     exports: [
         AgentFleetModule,
         NODE_JOB_RUNTIME_STORE,
