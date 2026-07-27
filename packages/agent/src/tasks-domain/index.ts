@@ -50,6 +50,8 @@ export {
     UserTaskCounterRepository,
 } from '../database/repositories/task-side.repositories';
 export * from './task-review-rejection.service';
+// Git activity ingestion (audit item j) — branch/PR → Task resolver.
+export * from './task-git-link.service';
 export {
     TaskReviewRejectionRepository,
     type RecordTaskReviewRejectionInput,

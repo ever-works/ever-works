@@ -90,6 +90,25 @@ export class TaskRepository {
             .getMany();
     }
 
+    /**
+     * Git activity ingestion (audit item j) — the Task whose isolated
+     * worktree branch a push landed on.
+     *
+     * Same key shape as {@link findByWorkAndPrNumber} and for the same
+     * reason: `branchRef` holds the SHORT branch name
+     * (`taskBranchName()`), which is only unique within a repository, and
+     * a Work maps to one repository. Newest-updated first, because a
+     * recycled branch name can appear on more than one row and the live
+     * Task is the one that moved last.
+     */
+    async findByWorkAndBranchRef(workId: string, branchRef: string): Promise<Task | null> {
+        if (!branchRef) return null;
+        return this.repository.findOne({
+            where: { workId, branchRef },
+            order: { updatedAt: 'DESC' },
+        });
+    }
+
     async findByUserIdFiltered(
         userId: string,
         filter: ListTasksFilter = {},

@@ -209,6 +209,72 @@ describe('EventIngestService', () => {
             expect(repository.markProcessed).toHaveBeenCalledWith('row-good');
         });
 
+        // Git activity ingestion (audit item j) — three kinds get their
+        // own action type so the feed can tell "someone pushed" apart
+        // from "some connector event landed".
+        describe('git activity action types', () => {
+            it.each([
+                ['github.push', ActivityActionType.GIT_PUSHED],
+                ['github.commit', ActivityActionType.GIT_COMMITTED],
+                ['github.merge', ActivityActionType.GIT_MERGED],
+            ])('%s → %s', async (kind, actionType) => {
+                repository.findUnprocessed.mockResolvedValue([
+                    storedEvent({
+                        kind,
+                        source: 'github',
+                        payload: { repoFullName: 'acme/widgets', taskId: 'task-1' },
+                    }),
+                ]);
+
+                await build().processBatch(10);
+
+                expect(activityLog.log).toHaveBeenCalledWith(
+                    expect.objectContaining({ actionType, action: kind }),
+                    expect.anything(),
+                );
+            });
+
+            it('carries the routing payload into `details` so the row names its Task', async () => {
+                repository.findUnprocessed.mockResolvedValue([
+                    storedEvent({
+                        kind: 'github.push',
+                        source: 'github',
+                        workId: 'work-9',
+                        payload: {
+                            repoFullName: 'acme/widgets',
+                            branch: 'ever/task-t-42',
+                            commitCount: 2,
+                            taskId: 'task-1',
+                        },
+                    }),
+                ]);
+
+                await build().processBatch(10);
+
+                expect(activityLog.log).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        workId: 'work-9',
+                        details: expect.objectContaining({
+                            repoFullName: 'acme/widgets',
+                            branch: 'ever/task-t-42',
+                            taskId: 'task-1',
+                        }),
+                    }),
+                    expect.anything(),
+                );
+            });
+
+            it('leaves every OTHER kind exactly as it was (generic type, no details)', async () => {
+                repository.findUnprocessed.mockResolvedValue([storedEvent()]);
+
+                await build().processBatch(10);
+
+                const [dto] = activityLog.log.mock.calls[0];
+                expect(dto.actionType).toBe(ActivityActionType.EXTERNAL_EVENT_INGESTED);
+                expect(dto.details).toBeUndefined();
+            });
+        });
+
         it('passes the batch limit through to the unprocessed read', async () => {
             repository.findUnprocessed.mockResolvedValue([]);
 
