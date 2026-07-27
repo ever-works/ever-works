@@ -15,6 +15,7 @@ import {
     CreditCard,
     BarChart3,
     Server,
+    Newspaper,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
@@ -93,6 +94,15 @@ export function SettingsLayoutClient({ children, settingsMenu }: SettingsLayoutC
                 label: t('tabs.jobRuntime'),
                 icon: Cpu,
                 href: `${baseSettingsPath}/job-runtime`,
+            },
+            // Digest briefings — the personal cadence AND the org-scoped
+            // one live on one page, since they are two records of the
+            // same thing rather than two features.
+            {
+                id: 'digest',
+                label: t('tabs.digest'),
+                icon: Newspaper,
+                href: `${baseSettingsPath}/digest`,
             },
             // Wave 13 — Billing + Usage & Credits (billing/usage PRD §2):
             // also reachable from the settings shell like api-keys/security.

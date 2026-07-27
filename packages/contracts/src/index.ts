@@ -10,3 +10,4 @@ export * from './ingest/index.js';
 export * from './skills/index.js';
 export * from './agents/index.js';
 export * from './fleet/index.js';
+export * from './digest/index.js';

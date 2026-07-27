@@ -65,6 +65,31 @@ export class TaskRepository {
         });
     }
 
+    /**
+     * Org-scoped digest briefings — the most recently touched Tasks of
+     * one Organization, regardless of which member owns them.
+     *
+     * Deliberately NOT an extra filter on `findByUserIdFiltered`: that
+     * method is owner-scoped by construction (`task.userId = :userId`
+     * is its first predicate and every caller relies on it), and adding
+     * an org filter there would let a caller that forgets the owner
+     * argument read across users. A separate, explicitly org-keyed read
+     * keeps the two scopes impossible to confuse.
+     *
+     * `organizationId` is never NULL-matched: rows with no org stamped
+     * belong to the personal surface and must not leak into an org
+     * briefing.
+     */
+    async findRecentByOrganization(organizationId: string, limit = 200): Promise<Task[]> {
+        const take = Math.min(Math.max(limit, 1), 500);
+        return this.repository
+            .createQueryBuilder('task')
+            .where('task.organizationId = :organizationId', { organizationId })
+            .orderBy('task.updatedAt', 'DESC')
+            .take(take)
+            .getMany();
+    }
+
     async findByUserIdFiltered(
         userId: string,
         filter: ListTasksFilter = {},
