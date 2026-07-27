@@ -35,6 +35,7 @@
         "@ever-works/agent": "workspace:*",
         "@ever-works/contracts": "workspace:*",
         "@ever-works/email-templates": "workspace:*",
+        "@ever-works/job-runtime-node-plugin": "workspace:*",
         "@ever-works/local-fs-plugin": "workspace:*",
         "@ever-works/monitoring": "workspace:*",
         "@ever-works/plugin": "workspace:*",

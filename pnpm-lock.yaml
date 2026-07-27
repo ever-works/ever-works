@@ -126,6 +126,9 @@ importers:
       '@ever-works/email-templates':
         specifier: workspace:*
         version: link:../../packages/email-templates
+      '@ever-works/job-runtime-node-plugin':
+        specifier: workspace:*
+        version: link:../../packages/plugins/job-runtime-node
       '@ever-works/local-fs-plugin':
         specifier: workspace:*
         version: link:../../packages/plugins/local-fs

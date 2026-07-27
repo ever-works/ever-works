@@ -92,6 +92,98 @@ export const config = {
         },
     },
 
+    /**
+     * Desktop PRD §6.2 / M4 — operator knobs for the `node` job runtime
+     * (the `job-runtime-node` plugin, whose "queue" is the owner's Fleet).
+     *
+     * These are the `FLEET_NODE_*` names the plugin already declares in
+     * its manifest + settings schema; reading them HERE is what lets the
+     * API-side producer size a fleet job (lease TTL), narrow which
+     * machines may lease it (capability tags) and know what a node is
+     * actually supposed to run (`FLEET_NODE_AGENT_TASK_COMMAND`) without
+     * every call site re-parsing `process.env`.
+     *
+     * Nothing in this group turns the fleet runtime ON by itself — that
+     * is still `EVER_WORKS_JOB_RUNTIME=node` (or a tenant overlay row).
+     * `FLEET_NODE_RUNTIME_ENABLED=false` is the kill switch that wins
+     * over both.
+     */
+    fleetNode: {
+        /**
+         * Origin the nodes poll for work. Informational on the server
+         * side (the node stores its own `apiUrl` at enrollment); exposed
+         * so the Fleet UI and the installer can render one value.
+         */
+        getApiUrl(): string | undefined {
+            const raw = (process.env.FLEET_NODE_API_URL || '').trim();
+            return raw ? raw : undefined;
+        },
+        /**
+         * Requested claim duration for jobs this install enqueues onto
+         * the fleet. Unset/nonsense → undefined, which lets the server's
+         * own `clampLeaseTtlSec` default apply rather than inventing a
+         * second default here.
+         */
+        getLeaseTtlSeconds(): number | undefined {
+            const raw = parseInt(process.env.FLEET_NODE_LEASE_TTL_SECONDS || '', 10);
+            return Number.isFinite(raw) && raw > 0 ? raw : undefined;
+        },
+        /**
+         * Capability tags a node must advertise to be eligible for this
+         * install's work. Empty (the default) means any enrolled node —
+         * narrowing is opt-in, because an over-narrow tag set produces a
+         * queue nothing can ever lease.
+         */
+        getRequiredCapabilities(): string[] {
+            const raw = process.env.FLEET_NODE_REQUIRED_CAPABILITIES || '';
+            const out: string[] = [];
+            for (const entry of raw.split(',')) {
+                const tag = entry.trim();
+                if (!tag || out.includes(tag)) continue;
+                out.push(tag);
+            }
+            return out;
+        },
+        /**
+         * Kill switch. `false` disables the fleet runtime even when it is
+         * the selected provider — the dispatch path then falls back to
+         * the platform default rather than writing rows nothing runs.
+         * `true` force-enables it for an install that has no dispatcher
+         * factory wired yet (dev). Unset = "decide from the wiring".
+         */
+        isRuntimeEnabled(): boolean | undefined {
+            const raw = (process.env.FLEET_NODE_RUNTIME_ENABLED || '').trim().toLowerCase();
+            if (raw === 'false' || raw === '0') return false;
+            if (raw === 'true' || raw === '1') return true;
+            return undefined;
+        },
+        /**
+         * Command template a node runs for one `agent-task` job.
+         * Supports `{taskId}`, `{runId}` and `{agentId}` placeholders,
+         * each substituted with an id validated against a strict
+         * `[A-Za-z0-9_-]` pattern first (a fleet node runs this through a
+         * shell, so an unvalidated substitution would be a command
+         * injection).
+         *
+         * Unset means the platform has nothing to ask a node to DO for a
+         * general agent run: the producer still enqueues, and the node
+         * fails the job naming this variable. Loud degradation beats a
+         * queue that silently succeeds at nothing.
+         */
+        getAgentTaskCommand(): string | undefined {
+            const raw = (process.env.FLEET_NODE_AGENT_TASK_COMMAND || '').trim();
+            return raw ? raw : undefined;
+        },
+        /**
+         * Absolute directory ON THE NODE that `agent-task` steps run in.
+         * Unset lets the node choose (its own working directory).
+         */
+        getAgentTaskWorkspacePath(): string | undefined {
+            const raw = (process.env.FLEET_NODE_AGENT_TASK_WORKSPACE || '').trim();
+            return raw ? raw : undefined;
+        },
+    },
+
     // Database configuration
     database: {
         getType() {

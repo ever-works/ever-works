@@ -17,6 +17,20 @@ export interface AgentTaskExecuteDispatchPayload {
     taskId: string;
     dedupKey: string;
     runId?: string;
+    /**
+     * Scope of the Task being dispatched. Carried so a dispatcher
+     * adapter can resolve the TENANT's job runtime (the
+     * `tenant_job_runtime_config` overlay) instead of only the
+     * instance-global `EVER_WORKS_JOB_RUNTIME` selector — that is what
+     * lets one tenant route its runs onto its own Fleet while everyone
+     * else stays on the platform default.
+     *
+     * Optional and additive: adapters that don't route per tenant (the
+     * Trigger.dev one) build their own payload explicitly and simply
+     * never read these.
+     */
+    tenantId?: string | null;
+    organizationId?: string | null;
 }
 
 export interface AgentChatReplyDispatchPayload {

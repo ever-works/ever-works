@@ -125,6 +125,20 @@ export class NodeJobRuntimePlugin implements IJobRuntimeProvider {
 				description:
 					'Comma-separated tags a node must advertise to be eligible for this tenant’s work (e.g. `workspace,git`). Blank means any enrolled node.',
 				'x-envVar': 'FLEET_NODE_REQUIRED_CAPABILITIES'
+			},
+			agentTaskCommand: {
+				type: 'string',
+				title: 'Agent task command',
+				description:
+					'Command a node runs for one `agent-task` job. Supports `{taskId}`, `{runId}` and `{agentId}` placeholders. A fleet node has no model access, so this is what running the agent HERE actually means; leaving it blank makes a dispatched run fail on the node naming this setting rather than silently succeeding at nothing.',
+				'x-envVar': 'FLEET_NODE_AGENT_TASK_COMMAND'
+			},
+			agentTaskWorkspace: {
+				type: 'string',
+				title: 'Agent task workspace',
+				description:
+					'Absolute directory ON THE NODE that `agent-task` steps run in. Blank lets the node use its own working directory.',
+				'x-envVar': 'FLEET_NODE_AGENT_TASK_WORKSPACE'
 			}
 		}
 	};

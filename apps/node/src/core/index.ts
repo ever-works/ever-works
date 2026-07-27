@@ -19,3 +19,4 @@ export * from './runtime';
 export * from './types';
 export * from './worker-loop';
 export * from './executors/acceptance-checks';
+export * from './executors/agent-task';
