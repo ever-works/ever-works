@@ -1,4 +1,4 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { GitFacadeService } from '../../facades/git.facade';
 import { Work } from '../../entities/work.entity';
 import { User } from '../../entities/user.entity';
@@ -40,6 +40,7 @@ import { throwIfGenerationCancelled } from '@src/utils';
 import { WorksConfigWriterService } from '@src/works-config/services/works-config-writer.service';
 import type { ResolvedWorksConfig } from '@src/works-config/services/works-config.service';
 import { redactSecrets } from '../../utils/secret-scan';
+import { PullRequestGateService } from '../../policy/pull-request-gate.service';
 
 const PARALLEL_WRITE_CONCURRENCY = 10;
 
@@ -149,7 +150,35 @@ export class DataGeneratorService {
         private readonly workOperations: WorkOperationsService,
         private readonly worksConfigWriter: WorksConfigWriterService,
         private readonly categoryIconService: CategoryIconService,
+        // Quality gates (audit W3 M3) — @Optional() and APPENDED LAST so
+        // existing positional constructions keep working; absent behaves as
+        // `checksPolicy: 'off'`, i.e. the pre-gate behaviour.
+        @Optional() private readonly prGate?: PullRequestGateService,
     ) {}
+
+    /**
+     * Quality gates (audit W3 M3) — may this generation open its update PR?
+     *
+     * The branch is already committed and pushed when this runs, so a
+     * refusal only withholds the pull request: it logs loudly and leaves
+     * `lastPullRequest` untouched, which is what makes the caller's
+     * `prUpdate: null` an honest answer rather than a silent drop.
+     */
+    private async prAllowed(work: Work, cwd: string): Promise<boolean> {
+        if (!this.prGate) return true;
+        const decision = await this.prGate.evaluate({
+            work,
+            cwd,
+            context: `data-generator work=${work.id}`,
+        });
+        if (decision.allowed) return true;
+        this.logger.error(
+            `No pull request opened for ${work.slug}: the Work's quality gate is ` +
+                `'${decision.gateStatus}'. ${decision.reason ?? ''} ` +
+                `The generated changes are committed and pushed on their branch.`,
+        );
+        return false;
+    }
 
     private getWorkOwner(work: Work): User {
         return getWorkOwner(work);
@@ -673,7 +702,7 @@ export class DataGeneratorService {
             let prUpdate: PRUpdate | null = null;
 
             // create PR if we are in update mode and branch was created
-            if (newBranchName && defaultBranch) {
+            if (newBranchName && defaultBranch && (await this.prAllowed(work, dest))) {
                 const pr = await this.gitFacade.createPullRequest(
                     {
                         owner: work.getRepoOwner(),
@@ -2020,7 +2049,7 @@ export class DataGeneratorService {
 
             let prUpdate: PRUpdate | null = null;
 
-            if (newBranchName && defaultBranch) {
+            if (newBranchName && defaultBranch && (await this.prAllowed(work, data.dir))) {
                 const pr = await this.gitFacade.createPullRequest(
                     {
                         owner: repoOwner,

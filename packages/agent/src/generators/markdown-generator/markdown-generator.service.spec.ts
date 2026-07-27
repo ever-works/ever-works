@@ -671,6 +671,88 @@ describe('MarkdownGeneratorService', () => {
             });
         });
 
+        /**
+         * Quality gates (audit W3 M3) — the markdown sync is one of the
+         * non-worker `createPullRequest` callers. The render is committed and
+         * pushed either way; the gate only decides whether it may be proposed
+         * for merge.
+         */
+        describe('pull-request quality gate', () => {
+            const allowingGate = () => ({
+                evaluate: jest.fn().mockResolvedValue({
+                    allowed: true,
+                    policy: 'required',
+                    gateStatus: 'green',
+                    results: [],
+                }),
+            });
+            const refusingGate = () => ({
+                evaluate: jest.fn().mockResolvedValue({
+                    allowed: false,
+                    policy: 'required',
+                    gateStatus: 'red',
+                    results: [],
+                    reason: 'Quality gate red — failing required checks: build (red).',
+                }),
+            });
+
+            it('gate passes → the PR is opened, judged against the markdown checkout', async () => {
+                const gitFacade = createGitFacadeMock();
+                const workOps = createWorkOpsMock();
+                mountDataRepoMock();
+                const gate = allowingGate();
+
+                const service = new MarkdownGeneratorService(gitFacade, workOps, gate as never);
+                await service.initialize(createWork(), createUser(), {
+                    generation_method: GenerationMethod.CREATE_UPDATE,
+                    pr_update: { branch: 'pr-branch', title: 'My PR', body: 'PR body' },
+                });
+
+                expect(gate.evaluate).toHaveBeenCalledWith(
+                    expect.objectContaining({ cwd: '/tmp/markdown-repo' }),
+                );
+                expect(gitFacade.createPullRequest).toHaveBeenCalledTimes(1);
+                expect(workOps.updateLastPullRequest).toHaveBeenCalled();
+            });
+
+            it('gate fails → NO PR, no lastPullRequest write, but the push still happened', async () => {
+                const gitFacade = createGitFacadeMock();
+                const workOps = createWorkOpsMock();
+                mountDataRepoMock();
+
+                const service = new MarkdownGeneratorService(
+                    gitFacade,
+                    workOps,
+                    refusingGate() as never,
+                );
+                await service.initialize(createWork(), createUser(), {
+                    generation_method: GenerationMethod.CREATE_UPDATE,
+                    pr_update: { branch: 'pr-branch', title: 'My PR', body: 'PR body' },
+                });
+
+                expect(gitFacade.createPullRequest).not.toHaveBeenCalled();
+                // A PR that was never opened must not be recorded as the
+                // Work's last pull request.
+                expect(workOps.updateLastPullRequest).not.toHaveBeenCalled();
+                expect(gitFacade.push).toHaveBeenCalled();
+            });
+
+            it('no gate wired → unchanged pre-gate behaviour', async () => {
+                const gitFacade = createGitFacadeMock();
+                const workOps = createWorkOpsMock();
+                mountDataRepoMock();
+
+                const service = new MarkdownGeneratorService(gitFacade, workOps);
+                await service.initialize(createWork(), createUser(), {
+                    generation_method: GenerationMethod.CREATE_UPDATE,
+                    pr_update: { branch: 'pr-branch', title: 'My PR', body: 'PR body' },
+                });
+
+                expect(gitFacade.createPullRequest).toHaveBeenCalledTimes(1);
+                expect(workOps.updateLastPullRequest).toHaveBeenCalled();
+            });
+        });
+
         it('createPullRequest rejection is swallowed; no updateLastPullRequest, no service throw', async () => {
             const gitFacade = createGitFacadeMock();
             gitFacade.createPullRequest.mockRejectedValueOnce(new Error('upstream 500'));

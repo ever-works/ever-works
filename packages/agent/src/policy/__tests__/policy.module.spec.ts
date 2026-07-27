@@ -22,29 +22,36 @@ jest.mock('../merge-policy.repository', () => ({
 jest.mock('../merge-policy.service', () => ({
     MergePolicyService: class MergePolicyService {},
 }));
+jest.mock('../pull-request-gate.service', () => ({
+    PullRequestGateService: class PullRequestGateService {},
+    PullRequestGateRefusedError: class PullRequestGateRefusedError extends Error {},
+}));
 
 import 'reflect-metadata';
 import { PolicyModule } from '../policy.module';
 import { MERGE_POLICY_ENFORCER } from '../merge-policy.enforcer';
 import { MergePolicyScopeRepository } from '../merge-policy.repository';
 import { MergePolicyService } from '../merge-policy.service';
+import { PullRequestGateService } from '../pull-request-gate.service';
 
 describe('PolicyModule', () => {
     const meta = (key: string): unknown[] => Reflect.getMetadata(key, PolicyModule) ?? [];
 
-    it('provides the scope repository, the service and the enforcer binding', () => {
+    it('provides the scope repository, the services and the enforcer binding', () => {
         expect(meta('providers')).toEqual([
             MergePolicyScopeRepository,
             MergePolicyService,
             { provide: MERGE_POLICY_ENFORCER, useExisting: MergePolicyService },
+            PullRequestGateService,
         ]);
     });
 
-    it('exports all three so the facade can consume the TOKEN, not the class', () => {
+    it('exports all four so consumers can take the TOKEN or the PR gate', () => {
         expect(meta('exports')).toEqual([
             MergePolicyScopeRepository,
             MergePolicyService,
             MERGE_POLICY_ENFORCER,
+            PullRequestGateService,
         ]);
     });
 
@@ -63,6 +70,11 @@ describe('policy barrel', () => {
         expect(barrel.MergePolicyScopeRepository).toBe(MergePolicyScopeRepository);
         expect(barrel.MERGE_POLICY_ENFORCER).toBe(MERGE_POLICY_ENFORCER);
         expect(typeof barrel.buildMergePolicyTools).toBe('function');
+    });
+
+    it('re-exports the PR gate service + its refusal error (cross-module consumers)', () => {
+        expect(barrel.PullRequestGateService).toBe(PullRequestGateService);
+        expect(typeof barrel.PullRequestGateRefusedError).toBe('function');
     });
 
     it('re-exports the pure resolution + decision functions (cross-package consumers)', () => {
