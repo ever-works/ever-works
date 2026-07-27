@@ -5728,6 +5728,164 @@
                 "delete": "Delete this Goal? Its observation history and Mission links will be removed. This cannot be undone."
             }
         },
+        "meetingsPage": {
+            "title": "Meetings",
+            "subtitle": "Every meeting the platform captured, newest first. Attach a transcript and it is summarized, remembered, and posted to your activity feed.",
+            "newMeeting": "New meeting",
+            "connectHint": "Zoom recordings and Google Meet transcripts sync automatically once their connector is enabled.",
+            "connectHintLink": "Manage connectors",
+            "sources": {
+                "manual": "Manual",
+                "import": "Import",
+                "zoom": "Zoom",
+                "google-meet": "Google Meet"
+            },
+            "badges": {
+                "transcript": "Transcript",
+                "noTranscript": "No transcript"
+            },
+            "filterBar": {
+                "source": "Source",
+                "anySource": "Any source",
+                "work": "Work",
+                "anyWork": "Any Work",
+                "apply": "Apply",
+                "reset": "Reset"
+            },
+            "loadError": {
+                "title": "Could not load meetings."
+            },
+            "empty": {
+                "title": "No meetings yet.",
+                "subtitle": "Capture a meeting by hand and paste its transcript, or enable a meetings connector so recordings sync on their own."
+            },
+            "pagination": {
+                "showing": "Showing {from}-{to}",
+                "noResults": "No results on this page",
+                "previous": "Previous",
+                "next": "Next"
+            },
+            "card": {
+                "participants": "{count, plural, =0 {No participants} one {# participant} other {# participants}}",
+                "durationPrefix": "Duration:",
+                "durationUnknown": "Still open"
+            }
+        },
+        "meetingNew": {
+            "title": "New meeting",
+            "subtitle": "Capture a meeting the platform did not sync for you. Paste the transcript now and it is summarized, saved to Memory and posted to your activity feed in one step.",
+            "backToMeetings": "Back to Meetings",
+            "created": "Meeting captured",
+            "sections": {
+                "provenance": "Where it came from",
+                "participants": "Participants",
+                "transcript": "Transcript"
+            },
+            "sources": {
+                "manual": "Manual",
+                "import": "Import",
+                "zoom": "Zoom",
+                "google-meet": "Google Meet"
+            },
+            "fields": {
+                "title": "Title",
+                "titlePlaceholder": "e.g. Weekly roadmap review",
+                "startedAt": "Started at",
+                "startedAtHint": "Leave empty to use the current time.",
+                "endedAt": "Ended at (optional)",
+                "source": "Source",
+                "work": "Work",
+                "workNone": "Org-wide (no Work)",
+                "workHint": "Route the meeting to one Work, or leave it org-wide.",
+                "sourceUrl": "Recording link (optional)",
+                "externalId": "Provider meeting ID (optional)",
+                "externalIdHint": "Used to de-duplicate against a later connector sync of the same meeting.",
+                "participants": "Participants",
+                "participantsHint": "One per line. Use \"Name <email>\" to record an address.",
+                "transcript": "Transcript (optional)",
+                "transcriptPlaceholder": "Ada: shipping the gate.\nGrace: reviewing the branch.",
+                "transcriptHint": "Adding a transcript runs the summary, Memory and activity pipeline. You can also attach it later from the meeting page."
+            },
+            "errors": {
+                "titleRequired": "Title is required.",
+                "startedAtInvalid": "Start time is not a valid date.",
+                "endedAtInvalid": "End time is not a valid date.",
+                "endedBeforeStarted": "End time cannot be before the start time.",
+                "createFailed": "Couldn't capture the meeting. Please try again."
+            },
+            "actions": {
+                "create": "Capture meeting",
+                "cancel": "Cancel"
+            }
+        },
+        "meetingDetail": {
+            "backToMeetings": "Back to Meetings",
+            "actions": {
+                "openRecording": "Open recording",
+                "delete": "Delete",
+                "attachTranscript": "Attach transcript",
+                "replaceTranscript": "Replace transcript",
+                "cancelReplace": "Cancel replace",
+                "save": "Save changes"
+            },
+            "sections": {
+                "summary": "Summary",
+                "transcript": "Transcript",
+                "details": "Details",
+                "edit": "Edit meeting"
+            },
+            "summary": {
+                "notGenerated": "No summary was generated for this transcript. Enable an AI provider and re-attach the transcript to try again.",
+                "noTranscript": "Attach a transcript to generate a summary."
+            },
+            "transcript": {
+                "composerLabel": "Transcript text",
+                "composerPlaceholder": "Paste the meeting transcript here.",
+                "pipelineHint": "Stored first, then summarized, remembered and posted to your activity feed — best effort.",
+                "storedElsewhere": "The transcript is stored but was not returned with this view."
+            },
+            "details": {
+                "source": "Source",
+                "startedAt": "Started",
+                "endedAt": "Ended",
+                "openEnded": "Still open",
+                "duration": "Duration",
+                "work": "Work",
+                "orgWide": "Org-wide",
+                "externalId": "Provider ID",
+                "createdAt": "Captured",
+                "participants": "Participants",
+                "noParticipants": "No participants recorded."
+            },
+            "edit": {
+                "hint": "Rename the meeting, close it out, point it at a recording, or re-route it to a Work."
+            },
+            "fields": {
+                "title": "Title",
+                "endedAt": "Ended at",
+                "sourceUrl": "Recording link",
+                "work": "Work",
+                "workNone": "Org-wide (no Work)"
+            },
+            "errors": {
+                "titleRequired": "Title is required.",
+                "endedAtInvalid": "End time is not a valid date.",
+                "endedBeforeStarted": "End time cannot be before the start time.",
+                "transcriptRequired": "Transcript text is required."
+            },
+            "toasts": {
+                "transcriptSaved": "Transcript attached",
+                "transcriptSummarized": "Transcript attached and summarized",
+                "transcriptError": "Couldn't attach the transcript.",
+                "saved": "Meeting updated",
+                "saveError": "Couldn't update the meeting.",
+                "deleted": "Meeting deleted",
+                "deleteError": "Couldn't delete the meeting."
+            },
+            "confirm": {
+                "delete": "Delete this meeting? Its transcript and summary will be removed. This cannot be undone."
+            }
+        },
         "sidebar": {
             "menu": "Menu",
             "aiChat": "AI Chat",
@@ -5744,6 +5902,7 @@
                 "tasks": "Tasks",
                 "agents": "Agents",
                 "memory": "Memory",
+                "meetings": "Meetings",
                 "plugins": "Plugins",
                 "skills": "Skills",
                 "templates": "Templates",

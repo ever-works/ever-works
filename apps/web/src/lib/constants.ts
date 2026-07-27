@@ -117,6 +117,13 @@ export const ROUTES = {
     // documents. Sits BELOW Agents in the sidebar. Session-scoped
     // (`/memory`); the org is resolved from the active scope context.
     DASHBOARD_MEMORY: '/memory',
+    // Meetings (Wave 8, feature a) — owner-scoped captured meetings with
+    // their transcripts + AI summaries. Provider-synced recordings land
+    // through the ingest spine; these routes are the human surface over
+    // the same rows (`/api/meetings`).
+    DASHBOARD_MEETINGS: '/meetings',
+    DASHBOARD_MEETINGS_NEW: '/meetings/new',
+    DASHBOARD_MEETING: (id: string) => `/meetings/${id}`,
     // Templates
     DASHBOARD_TEMPLATES: '/templates',
     // Agents (Agents/Skills/Tasks PR #1017 — Phase 5)
