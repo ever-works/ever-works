@@ -1,11 +1,18 @@
 jest.mock('@ever-works/agent/database', () => ({
     UserRepository: class {},
+    // A53 — the org-level mirror repository is a real DI token on the
+    // service constructor now, so the mocked barrel must expose it too.
+    OrganizationOnboardingProfileRepository: class {},
 }));
 
 import { Test } from '@nestjs/testing';
 import { NotFoundException } from '@nestjs/common';
-import { UserRepository } from '@ever-works/agent/database';
+import {
+    OrganizationOnboardingProfileRepository,
+    UserRepository,
+} from '@ever-works/agent/database';
 import { ONBOARDING_DEFAULT_STATE } from '@ever-works/contracts/api';
+import { ScopeContextService } from '../scope/scope-context.service';
 import { OnboardingStateService, __test__ } from './onboarding-state.service';
 
 interface FakeUser {
@@ -13,6 +20,46 @@ interface FakeUser {
     onboardingCompletedAt?: Date | null;
     onboardingDismissedAt?: Date | null;
     onboardingState?: unknown;
+}
+
+interface FakeOrgProfileRow {
+    organizationId: string;
+    roles?: string[] | null;
+    teamSize?: string | null;
+    updatedByUserId?: string | null;
+}
+
+/**
+ * In-memory stand-in for `OrganizationOnboardingProfileRepository` with
+ * the same field-level upsert semantics as the real one (an omitted
+ * field keeps the persisted value; an explicit `null` clears it).
+ */
+function buildOrgProfileRepository() {
+    const rows = new Map<string, FakeOrgProfileRow>();
+    return {
+        findByOrg: jest.fn(async (organizationId: string) => rows.get(organizationId) ?? null),
+        upsert: jest.fn(
+            async (
+                organizationId: string,
+                input: {
+                    roles?: readonly string[] | null;
+                    teamSize?: string | null;
+                    updatedByUserId?: string | null;
+                },
+            ) => {
+                const existing = rows.get(organizationId) ?? { organizationId };
+                const next: FakeOrgProfileRow = { ...existing };
+                if (input.roles !== undefined) next.roles = input.roles ? [...input.roles] : null;
+                if (input.teamSize !== undefined) next.teamSize = input.teamSize ?? null;
+                if (input.updatedByUserId !== undefined) {
+                    next.updatedByUserId = input.updatedByUserId ?? null;
+                }
+                rows.set(organizationId, next);
+                return next;
+            },
+        ),
+        _peek: (organizationId: string) => rows.get(organizationId) ?? null,
+    };
 }
 
 function buildUserRepository(initial: FakeUser | null) {
@@ -162,6 +209,134 @@ describe('OnboardingStateService', () => {
                 state: { profile: { roles: ['engineering'] } },
             });
             expect(third.state.profile).toEqual({ roles: ['engineering'], teamSize: 'solo' });
+        });
+    });
+
+    // ─── A53: organization-level mirror ─────────────────────────────────
+
+    describe('organization-scoped profile mirror (A53)', () => {
+        let orgRepo: ReturnType<typeof buildOrgProfileRepository>;
+
+        async function makeScopedSvc(organizationId: string | null) {
+            repo = buildUserRepository({ id: 'u1' });
+            orgRepo = buildOrgProfileRepository();
+            const moduleRef = await Test.createTestingModule({
+                providers: [
+                    OnboardingStateService,
+                    { provide: UserRepository, useValue: repo },
+                    {
+                        provide: ScopeContextService,
+                        useValue: { getOrganizationId: () => organizationId },
+                    },
+                    { provide: OrganizationOnboardingProfileRepository, useValue: orgRepo },
+                ],
+            }).compile();
+            svc = moduleRef.get(OnboardingStateService);
+        }
+
+        it('persists the answers on the active organization and echoes them back', async () => {
+            await makeScopedSvc('org-1');
+
+            const res = await svc.patchState('u1', {
+                state: { profile: { roles: ['marketing', 'sales'], teamSize: 'small-2-10' } },
+            });
+
+            expect(orgRepo.upsert).toHaveBeenCalledWith('org-1', {
+                roles: ['marketing', 'sales'],
+                teamSize: 'small-2-10',
+                updatedByUserId: 'u1',
+            });
+            expect(orgRepo._peek('org-1')).toMatchObject({
+                organizationId: 'org-1',
+                roles: ['marketing', 'sales'],
+                teamSize: 'small-2-10',
+                updatedByUserId: 'u1',
+            });
+            expect(res.organizationProfile).toEqual({
+                roles: ['marketing', 'sales'],
+                teamSize: 'small-2-10',
+            });
+        });
+
+        it('mirrors the MERGED profile, so a roles-only patch keeps the org team size', async () => {
+            await makeScopedSvc('org-1');
+            await svc.patchState('u1', {
+                state: { profile: { roles: ['sales'], teamSize: 'mid-11-50' } },
+            });
+
+            const res = await svc.patchState('u1', {
+                state: { profile: { roles: ['engineering'] } },
+            });
+
+            expect(res.organizationProfile).toEqual({
+                roles: ['engineering'],
+                teamSize: 'mid-11-50',
+            });
+        });
+
+        it('does NOT re-stamp the org row for a patch that carries no profile', async () => {
+            await makeScopedSvc('org-1');
+            await svc.patchState('u1', { state: { profile: { roles: ['product'] } } });
+            expect(orgRepo.upsert).toHaveBeenCalledTimes(1);
+
+            await svc.patchState('u1', { state: { lastStep: 4 } });
+            expect(orgRepo.upsert).toHaveBeenCalledTimes(1);
+        });
+
+        it('getState reads the org row back for the active scope', async () => {
+            await makeScopedSvc('org-1');
+            await svc.patchState('u1', {
+                state: { profile: { roles: ['founder-ceo'], teamSize: 'solo' } },
+            });
+
+            const res = await svc.getState('u1');
+            expect(res.organizationProfile).toEqual({ roles: ['founder-ceo'], teamSize: 'solo' });
+        });
+
+        it('is a no-op (organizationProfile null) when no organization scope is resolved', async () => {
+            await makeScopedSvc(null);
+
+            const res = await svc.patchState('u1', {
+                state: { profile: { roles: ['legal'], teamSize: 'solo' } },
+            });
+
+            expect(orgRepo.upsert).not.toHaveBeenCalled();
+            // The per-user answers still persist — the org mirror is additive.
+            expect(res.state.profile).toEqual({ roles: ['legal'], teamSize: 'solo' });
+            expect(res.organizationProfile).toBeNull();
+        });
+
+        it('never fails the save when the org write throws', async () => {
+            await makeScopedSvc('org-1');
+            orgRepo.upsert.mockRejectedValueOnce(new Error('db down'));
+
+            const res = await svc.patchState('u1', {
+                state: { profile: { roles: ['support'] } },
+            });
+
+            expect(res.state.profile).toEqual({ roles: ['support'] });
+            expect(res.organizationProfile).toBeNull();
+        });
+
+        it('skips the mirror entirely when the repository is not wired', async () => {
+            repo = buildUserRepository({ id: 'u1' });
+            const moduleRef = await Test.createTestingModule({
+                providers: [
+                    OnboardingStateService,
+                    { provide: UserRepository, useValue: repo },
+                    {
+                        provide: ScopeContextService,
+                        useValue: { getOrganizationId: () => 'org-1' },
+                    },
+                ],
+            }).compile();
+            svc = moduleRef.get(OnboardingStateService);
+
+            const res = await svc.patchState('u1', {
+                state: { profile: { roles: ['research'] } },
+            });
+            expect(res.state.profile).toEqual({ roles: ['research'] });
+            expect(res.organizationProfile).toBeNull();
         });
     });
 

@@ -94,6 +94,10 @@ export * from './user-notification-preference.entity';
 export * from './user-notification-category-mute.entity';
 export * from './organization-notification-default.entity';
 
+// Onboarding — organization-scoped mirror of the wizard's "What do you
+// do" answers (audit item A53).
+export * from './organization-onboarding-profile.entity';
+
 // Goals & Metrics (PR-8) — measurable targets + samples + Mission link
 export * from './goal.entity';
 export * from './goal-metric-sample.entity';

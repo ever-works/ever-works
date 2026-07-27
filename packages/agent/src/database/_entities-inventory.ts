@@ -110,6 +110,7 @@ import { UserNotificationSubscription } from '../entities/user-notification-subs
 import { UserNotificationPreference } from '../entities/user-notification-preference.entity';
 import { UserNotificationCategoryMute } from '../entities/user-notification-category-mute.entity';
 import { OrganizationNotificationDefault } from '../entities/organization-notification-default.entity';
+import { OrganizationOnboardingProfile } from '../entities/organization-onboarding-profile.entity';
 import { ComposioTriggerSubscription } from '../entities/composio-trigger-subscription.entity';
 import { TenantJobRuntimeConfig } from '../entities/tenant-job-runtime-config.entity';
 import { TenantJobRuntimeAudit } from '../entities/tenant-job-runtime-audit.entity';
@@ -260,6 +261,8 @@ export const ENTITIES = [
     UserNotificationPreference,
     UserNotificationCategoryMute,
     OrganizationNotificationDefault,
+    // Onboarding "What do you do" answers, mirrored at org level (A53)
+    OrganizationOnboardingProfile,
     // Tenant-scoped job-runtime overlay (EW-742 P1)
     TenantJobRuntimeConfig,
     TenantJobRuntimeAudit,

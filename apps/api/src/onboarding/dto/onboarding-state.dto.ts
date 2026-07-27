@@ -17,6 +17,7 @@ import type {
     OnboardingAiChoice,
     OnboardingDbChoice,
     OnboardingDeployChoice,
+    OnboardingProfile,
     OnboardingStorageChoice,
     OnboardingWizardStateV2,
     OnboardingCatalogResponse,
@@ -180,6 +181,12 @@ export class OnboardingStateResponseDto {
 
     @ApiProperty()
     state!: OnboardingWizardStateV2;
+
+    // Audit item A53 — organization-level mirror of `state.profile`,
+    // read from `organization_onboarding_profiles`. `null` when the
+    // request resolved no organization scope or nobody has answered yet.
+    @ApiPropertyOptional({ nullable: true })
+    organizationProfile?: OnboardingProfile | null;
 }
 
 export class OnboardingCatalogResponseDto implements OnboardingCatalogResponse {
