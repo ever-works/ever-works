@@ -1,6 +1,7 @@
 import { Module, OnApplicationBootstrap } from '@nestjs/common';
 import { APP_FILTER, APP_GUARD, APP_INTERCEPTOR } from '@nestjs/core';
 import { FacadeExceptionFilter } from './common/filters/facade-exception.filter';
+import { InsufficientCreditsExceptionFilter } from './common/filters/insufficient-credits.filter';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { ScheduleModule } from '@nestjs/schedule';
 import { AuthModule } from './auth/auth.module';
@@ -299,6 +300,17 @@ import { DatabaseModule } from '@ever-works/agent/database';
         {
             provide: APP_FILTER,
             useClass: FacadeExceptionFilter,
+        },
+        // Maps credit-balance exhaustion (`InsufficientCreditsError`, thrown
+        // by CreditLedgerService when a debit would cross zero and overdraft
+        // is off) to 402 Payment Required instead of the generic 500 Nest's
+        // default filter would emit — matching the 402 the budget cap already
+        // uses (BudgetExceededException). Body is a constant: the error's own
+        // message and fields carry the owner's userId and balance, which are
+        // never echoed. See insufficient-credits.filter.ts.
+        {
+            provide: APP_FILTER,
+            useClass: InsufficientCreditsExceptionFilter,
         },
     ],
     controllers: [APIController],
