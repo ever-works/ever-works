@@ -1,6 +1,6 @@
 import { ConflictException, NotFoundException, ServiceUnavailableException } from '@nestjs/common';
 import { TerminalAttachController } from '../terminal-attach.controller';
-import { TerminalAttachService } from '../terminal-attach.service';
+import { TerminalAttachService, resolveRequestedAttachRole } from '../terminal-attach.service';
 import { TerminalRelayRegistry } from '../terminal-relay.registry';
 import type { AgentsService, TerminalSessionLauncher } from '@ever-works/agent/agents';
 import type { AgentRunRepository } from '@ever-works/agent/database';
@@ -46,6 +46,46 @@ describe('TerminalAttachController — run-scoped authorization', () => {
         expect(claims).toMatchObject({ userId: 'user-1', runId: RUN, role: 'driver' });
     });
 
+    /**
+     * The relay has always refused viewer input and the pane has always
+     * rendered a read-only badge, but nothing ever MINTED a viewer token
+     * — the role was decorative. These pin the mint side.
+     */
+    describe('viewer role', () => {
+        it('mints a read-only viewer token when the caller asks for one', async () => {
+            const result = await controller.mintAttachToken(AUTH, AGENT, RUN, 'viewer');
+
+            expect(result.role).toBe('viewer');
+            expect(new TerminalAttachService().verify(result.token)).toMatchObject({
+                userId: 'user-1',
+                runId: RUN,
+                role: 'viewer',
+            });
+        });
+
+        it('still runs the SAME run-ownership authorization for a viewer mint', async () => {
+            runs.findByIdAndUser.mockResolvedValueOnce(null);
+            await expect(
+                controller.mintAttachToken(AUTH, AGENT, RUN, 'viewer'),
+            ).rejects.toBeInstanceOf(NotFoundException);
+        });
+
+        it('clamps every other requested role to driver — a request can only downgrade', async () => {
+            for (const requested of ['worker', 'admin', 'DRIVER', '', undefined]) {
+                const result = await controller.mintAttachToken(AUTH, AGENT, RUN, requested);
+                expect(result.role).toBe('driver');
+            }
+        });
+
+        it('resolveRequestedAttachRole is case/whitespace tolerant but fail-closed', () => {
+            expect(resolveRequestedAttachRole('viewer')).toBe('viewer');
+            expect(resolveRequestedAttachRole('  VIEWER ')).toBe('viewer');
+            expect(resolveRequestedAttachRole('worker')).toBe('driver');
+            expect(resolveRequestedAttachRole(null)).toBe('driver');
+            expect(resolveRequestedAttachRole(undefined)).toBe('driver');
+        });
+    });
+
     it('404s (no existence leak) when the run is cross-user or cross-agent', async () => {
         runs.findByIdAndUser.mockResolvedValueOnce(null);
         await expect(controller.mintAttachToken(AUTH, AGENT, RUN)).rejects.toBeInstanceOf(
@@ -64,6 +104,28 @@ describe('TerminalAttachController — run-scoped authorization', () => {
 
         runs.findByIdAndUser.mockResolvedValueOnce(null);
         await expect(controller.status(AUTH, AGENT, RUN)).rejects.toBeInstanceOf(NotFoundException);
+    });
+
+    /**
+     * Now that `cliSessionId` actually gets written, the presence-only
+     * exposure rule stops being theoretical: the resume key is a
+     * credential-shaped handle and must never ride a status payload.
+     */
+    it('reports cliSessionId PRESENCE only — never the value', async () => {
+        runs.findByIdAndUser.mockResolvedValue({
+            id: RUN,
+            agentId: AGENT,
+            cliSessionId: 'pty-local:secret-session:4242',
+        });
+
+        const status = await controller.status(AUTH, AGENT, RUN);
+
+        expect(status.run.hasCliSession).toBe(true);
+        expect(JSON.stringify(status)).not.toContain('secret-session');
+        expect(JSON.stringify(status)).not.toContain('cliSessionId');
+
+        runs.findByIdAndUser.mockResolvedValue({ id: RUN, agentId: AGENT, cliSessionId: null });
+        expect((await controller.status(AUTH, AGENT, RUN)).run.hasCliSession).toBe(false);
     });
 
     /**

@@ -1,10 +1,12 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
+import { TerminalStreamFacadeService } from '../facades/terminal-stream.facade';
 import {
     TERMINAL_SESSION_COMMAND_ENV,
     TERMINAL_SESSION_DISPATCHER,
     resolveTerminalSessionCommand,
     type TerminalSessionDispatcher,
+    type TerminalSessionDispatchPayload,
 } from './terminal-session-dispatcher';
 
 /**
@@ -22,6 +24,11 @@ import {
  *  - **Duplicate refusal** — the terminal slot is CAS-claimed
  *    (`casClaimTerminalSession`), so concurrent starts resolve to exactly
  *    one dispatch and the losers report `session-already-live`.
+ *  - **Provider identity** — the `terminal-stream` facade resolves WHICH
+ *    session-host provider applies for the scope and the resolved id
+ *    rides the dispatch payload. Advisory only: an empty capability
+ *    registry still starts a session (the worker falls back to its
+ *    bundled provider), it just does not get to choose.
  *  - **Persistent gate** — `requirePersistent` is what the automatic
  *    dispatch path (task fan-out) passes: a run that never asked for a
  *    long-lived interactive session must not spawn one, and must not pay
@@ -82,6 +89,11 @@ export class TerminalSessionLauncher {
         @Optional()
         @Inject(TERMINAL_SESSION_DISPATCHER)
         private readonly dispatcher?: TerminalSessionDispatcher,
+        // Appended LAST + @Optional() so every positional
+        // `new TerminalSessionLauncher(...)` in the existing specs keeps
+        // compiling, and an install without the facades module still
+        // starts sessions (the worker then resolves the provider itself).
+        @Optional() private readonly terminalStream?: TerminalStreamFacadeService,
     ) {}
 
     /** Whether a job runtime is wired at all (drives the 503 vs 409 split). */
@@ -128,16 +140,28 @@ export class TerminalSessionLauncher {
         // worker's own cwd — `.` resolves job-side, which is the only
         // machine that can answer that question.
         const cwd = run.workspaceMeta?.path ?? '.';
+        const workId = run.workId ?? undefined;
+        const providerId = await this.resolveProviderId(input.userId, run.agentId, workId);
 
         try {
-            const { jobRunId } = await this.dispatcher.enqueue({
+            const payload: TerminalSessionDispatchPayload = {
                 runId: run.id,
                 userId: input.userId,
                 agentId: run.agentId,
                 command,
                 cwd,
                 persistent: input.markPersistent === true || run.persistent === true,
-            });
+            };
+            // Explicit ifs, never a conditional spread: `...x && {k:v}`
+            // widens to `false` and breaks declaration emit for this
+            // package (documented house trap).
+            if (providerId) {
+                payload.providerId = providerId;
+            }
+            if (workId) {
+                payload.workId = workId;
+            }
+            const { jobRunId } = await this.dispatcher.enqueue(payload);
             return { started: true, runId: run.id, jobRunId };
         } catch (error) {
             // The claim outlived its session — hand the slot back so the
@@ -150,6 +174,43 @@ export class TerminalSessionLauncher {
                     ),
                 );
             throw error;
+        }
+    }
+
+    /**
+     * Ask the `terminal-stream` facade WHICH provider this scope should
+     * use, so the dispatch carries a provider identity instead of the
+     * worker silently picking one by import.
+     *
+     * Advisory, never a refusal: `resolveProvider` already answers
+     * `null` instead of throwing when nothing is enabled, and an install
+     * with no facade bound gets `undefined` here. Either way the session
+     * still starts — the worker falls back to its bundled provider. A
+     * capability seam is allowed to be empty; a terminal button is not
+     * allowed to stop working because of it.
+     */
+    private async resolveProviderId(
+        userId: string,
+        agentId: string,
+        workId?: string,
+    ): Promise<string | undefined> {
+        if (!this.terminalStream) {
+            return undefined;
+        }
+        try {
+            const provider = await this.terminalStream.resolveProvider({
+                userId,
+                agentId,
+                workId,
+            });
+            return provider?.id;
+        } catch (error) {
+            this.logger.debug(
+                `terminal-stream provider resolution skipped: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return undefined;
         }
     }
 }

@@ -123,6 +123,31 @@ describe('TerminalInternalController', () => {
         expect('terminalEndedReason' in patch).toBe(false);
     });
 
+    /**
+     * `cliSessionId` is the run's resume key. The session host now sends
+     * it on the attached beat (it had no writer before), so this pins
+     * the persistence half of that contract — plus the cap that keeps a
+     * hostile worker from stuffing the column.
+     */
+    it('heartbeat persists the session-host cliSessionId, capped at 128 chars', async () => {
+        configure();
+        await controller.heartbeat(bearer, undefined, RUN, {
+            state: 'attached',
+            cliSessionId: 'pty-local:run-1:4242',
+        });
+        expect(runsRepo.updateTerminalColumns).toHaveBeenCalledWith(
+            RUN,
+            expect.objectContaining({ cliSessionId: 'pty-local:run-1:4242' }),
+        );
+
+        runsRepo.updateTerminalColumns.mockClear();
+        await controller.heartbeat(bearer, undefined, RUN, {
+            state: 'attached',
+            cliSessionId: 'x'.repeat(129),
+        });
+        expect('cliSessionId' in runsRepo.updateTerminalColumns.mock.calls[0][1]).toBe(false);
+    });
+
     it('heartbeat also honors the x-trigger-secret header (house internal-API convention)', async () => {
         configure();
         await controller.heartbeat(undefined, 'internal-secret-value', RUN, {
