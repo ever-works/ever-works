@@ -11,7 +11,34 @@ export * from './agent-schedule-dispatcher.service';
 export * from './agent-export.service';
 export * from './prompt-assembler.service';
 export * from './agent-run.service';
+// Judgment layer G15 — the pre-run path as a composable middleware chain.
+// Named exports (not `export *`) so the two QUEUED_REASON_* constants have
+// exactly ONE path out of this barrel: `run-dispatch-gate.service`, which
+// re-exports them for every pre-existing importer.
+export {
+    composeRunAdmission,
+    creditsAdmission,
+    orgConcurrencyAdmission,
+    workConcurrencyAdmission,
+    DEFAULT_RUN_ADMISSION_CHAIN,
+    RUN_ADMISSION_ADMITTED,
+    type RunAdmissionContext,
+    type RunAdmissionCounters,
+    type RunAdmissionInput,
+    type RunAdmissionLogger,
+    type RunAdmissionMiddleware,
+    type RunAdmissionNext,
+    type RunAdmissionVerdict,
+} from './run-admission-chain';
 export * from './run-dispatch-gate.service';
+// Judgment layer G5 — workflow graph edges (on_failure / conditional /
+// llm_decide) + input mapping, and the AI-facade-backed decider.
+export * from './workflow-graph.ports';
+export * from './workflow-graph-executor.service';
+export * from './workflow-ai-decision.adapter';
+// Judgment layer G9 — scoped sub-agent delegation with a typed result.
+export * from './sub-agent-delegation.port';
+export * from './sub-agent-delegation.service';
 export * from './run-steering.service';
 export * from './run-credits-precheck';
 export * from './terminal-session-dispatcher';

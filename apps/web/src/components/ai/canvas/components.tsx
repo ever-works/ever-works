@@ -1,5 +1,7 @@
 'use client';
 
+import { describeHitlQuestion, parseHitlAnswer, parseHitlQuestion } from '@ever-works/contracts';
+import type { HitlChoiceOption, HitlQuestion } from '@ever-works/contracts';
 import { cn } from '@/lib/utils/cn';
 import { ChatMarkdown } from '../ChatMarkdown';
 import type { CanvasComponentKey } from './types';
@@ -610,6 +612,189 @@ function Calendar({ props }: { props: Record<string, unknown> }) {
     );
 }
 
+/**
+ * props: a `HitlQuestion` (judgment layer G8s).
+ *
+ * The agent parks on a typed question instead of a free-text "please
+ * advise" line; this renders the question as the control a human would
+ * expect to see. Read-only by design in this increment — answering
+ * happens on the escalation surface that owns the write path — but the
+ * SHAPE is the contract's, so an answer widget can drop straight in.
+ *
+ * Parsed with the contract's own `parseHitlQuestion`, so an unknown or
+ * malformed payload shows a visible "unreadable" state rather than
+ * throwing inside the canvas.
+ */
+function HitlQuestionView({ props }: { props: Record<string, unknown> }) {
+    const question = parseHitlQuestion(props);
+    if (!question) return <Empty label="Unreadable question payload" />;
+    return (
+        <div className="space-y-3">
+            <div>
+                <p className="text-xs font-medium text-text dark:text-text-dark">
+                    {question.prompt}
+                </p>
+                {question.context ? (
+                    <p className="mt-1 whitespace-pre-wrap text-[11px] text-text-muted dark:text-text-muted-dark">
+                        {question.context}
+                    </p>
+                ) : null}
+            </div>
+            <HitlQuestionBody question={question} />
+            <p className="text-[10px] text-text-muted/70 dark:text-text-muted-dark/70">
+                {describeHitlQuestion(question)}
+            </p>
+        </div>
+    );
+}
+
+const HITL_TONE_CLASS: Record<string, string> = {
+    success: 'border-success/40 bg-success/5',
+    warning: 'border-warning/40 bg-warning/5',
+    danger: 'border-danger/40 bg-danger/5',
+};
+
+function HitlOptionList({
+    options,
+    multi,
+}: {
+    options: readonly HitlChoiceOption[];
+    multi: boolean;
+}) {
+    return (
+        <ul className="space-y-1.5">
+            {options.map((option) => (
+                <li
+                    key={option.id}
+                    className={cn(
+                        'flex items-start gap-2 rounded-lg border px-3 py-2',
+                        'border-border dark:border-border-dark',
+                        option.tone ? HITL_TONE_CLASS[option.tone] : undefined,
+                    )}
+                >
+                    <span
+                        aria-hidden
+                        className={cn(
+                            'mt-0.5 h-3 w-3 shrink-0 border border-border dark:border-border-dark',
+                            multi ? 'rounded-[3px]' : 'rounded-full',
+                        )}
+                    />
+                    <span className="min-w-0">
+                        <span className="block text-[11px] font-medium text-text dark:text-text-dark">
+                            {option.label}
+                        </span>
+                        {option.description ? (
+                            <span className="block text-[10px] text-text-muted dark:text-text-muted-dark">
+                                {option.description}
+                            </span>
+                        ) : null}
+                    </span>
+                </li>
+            ))}
+        </ul>
+    );
+}
+
+function HitlQuestionBody({ question }: { question: HitlQuestion }) {
+    switch (question.kind) {
+        case 'confirm':
+            return (
+                <div className="flex gap-2">
+                    <span className="rounded-md border border-border px-2.5 py-1 text-[11px] text-text dark:border-border-dark dark:text-text-dark">
+                        {question.confirmLabel ?? 'Yes'}
+                    </span>
+                    <span className="rounded-md border border-border px-2.5 py-1 text-[11px] text-text-muted dark:border-border-dark dark:text-text-muted-dark">
+                        {question.cancelLabel ?? 'No'}
+                    </span>
+                </div>
+            );
+        case 'choice':
+            return <HitlOptionList options={question.options} multi={false} />;
+        case 'multi_choice':
+            return <HitlOptionList options={question.options} multi />;
+        case 'text':
+            return (
+                <div className="rounded-lg border border-dashed border-border px-3 py-2 text-[11px] text-text-muted dark:border-border-dark dark:text-text-muted-dark">
+                    {question.placeholder ?? 'Free-text answer'}
+                </div>
+            );
+        case 'approval':
+            return (
+                <div className="space-y-2">
+                    <div className="rounded-lg border border-warning/40 bg-warning/5 px-3 py-2">
+                        <p className="text-[11px] font-medium text-text dark:text-text-dark">
+                            {question.action}
+                        </p>
+                        {question.risks?.length ? (
+                            <ul className="mt-1 list-disc space-y-0.5 pl-4">
+                                {question.risks.map((risk, i) => (
+                                    <li
+                                        key={i}
+                                        className="text-[10px] text-text-muted dark:text-text-muted-dark"
+                                    >
+                                        {risk}
+                                    </li>
+                                ))}
+                            </ul>
+                        ) : null}
+                    </div>
+                    {question.preview ? (
+                        <pre className="max-h-56 overflow-auto rounded-lg bg-surface-secondary p-3 text-[10px] leading-relaxed text-text dark:bg-white/[0.04] dark:text-text-dark">
+                            {question.preview}
+                        </pre>
+                    ) : null}
+                </div>
+            );
+        default:
+            return <Empty label="Unsupported question kind" />;
+    }
+}
+
+/** props: a `HitlAnswer` (judgment layer G8s) — what the human decided. */
+function HitlAnswerView({ props }: { props: Record<string, unknown> }) {
+    const answer = parseHitlAnswer(props);
+    if (!answer) return <Empty label="Unreadable answer payload" />;
+    const summary = (() => {
+        switch (answer.kind) {
+            case 'confirm':
+                return answer.confirmed ? 'Confirmed' : 'Declined';
+            case 'choice':
+                return answer.optionId;
+            case 'multi_choice':
+                return answer.optionIds.length ? answer.optionIds.join(', ') : 'Nothing selected';
+            case 'text':
+                return answer.text || '(empty)';
+            case 'approval':
+                return answer.decision === 'approved' ? 'Approved' : 'Rejected';
+            default:
+                return '—';
+        }
+    })();
+    const tone =
+        (answer.kind === 'confirm' && !answer.confirmed) ||
+        (answer.kind === 'approval' && answer.decision === 'rejected')
+            ? 'border-danger/40 bg-danger/5'
+            : 'border-success/40 bg-success/5';
+    return (
+        <div className="space-y-2">
+            <div className={cn('rounded-lg border px-3 py-2', tone)}>
+                <p className="whitespace-pre-wrap text-xs text-text dark:text-text-dark">
+                    {summary}
+                </p>
+            </div>
+            {answer.kind === 'approval' && answer.note ? (
+                <p className="text-[11px] text-text-muted dark:text-text-muted-dark">
+                    {answer.note}
+                </p>
+            ) : null}
+            <p className="text-[10px] text-text-muted/70 dark:text-text-muted-dark/70">
+                Answer to {answer.questionId}
+                {answer.answeredAt ? ` · ${answer.answeredAt}` : ''}
+            </p>
+        </div>
+    );
+}
+
 function Empty({ label }: { label: string }) {
     return (
         <div className="flex h-24 items-center justify-center text-xs text-text-muted dark:text-text-muted-dark">
@@ -641,6 +826,8 @@ const REGISTRY: Record<
     heatmap: Heatmap,
     rating: Rating,
     calendar: Calendar,
+    hitl_question: HitlQuestionView,
+    hitl_answer: HitlAnswerView,
 };
 
 export function renderCanvasComponent(

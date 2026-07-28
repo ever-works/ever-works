@@ -37,6 +37,10 @@ import { TerminalSessionLauncher } from './terminal-session-launcher.service';
 import { AgentToolService } from './agent-tool.service';
 import { AgentEscalationService } from './agent-escalation.service';
 import { EscalationConfidenceService } from './escalation-confidence';
+import { WorkflowGraphExecutorService } from './workflow-graph-executor.service';
+import { WorkflowAiDecisionAdapter } from './workflow-ai-decision.adapter';
+import { WORKFLOW_DECISION_PORT } from './workflow-graph.ports';
+import { SubAgentDelegationService } from './sub-agent-delegation.service';
 import { VisionContextService } from '../services/vision-context.service';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { SkillsModule } from '../skills/skills.module';
@@ -154,6 +158,19 @@ import { FacadesModule } from '../facades/facades.module';
         // table otherwise). FacadesModule is already imported above, so
         // the AiFacadeService it consumes resolves in production.
         EscalationConfidenceService,
+        // Judgment layer G5 - workflow graph execution. The node runner
+        // (WORKFLOW_NODE_RUNNER) stays @Optional() and is bound by the
+        // host that owns node semantics; the decider is bound HERE to the
+        // AI-facade adapter so every llm_decide call goes through the
+        // facade/plugin seam (FacadesModule is already imported above).
+        WorkflowAiDecisionAdapter,
+        { provide: WORKFLOW_DECISION_PORT, useExisting: WorkflowAiDecisionAdapter },
+        WorkflowGraphExecutorService,
+        // Judgment layer G9 - scoped sub-agent delegation. The runner it
+        // dispatches through (SUB_AGENT_DELEGATION_RUNNER) is @Optional()
+        // and bound by the api-side @Global() module, exactly like
+        // RunDispatchGateService's dispatcher.
+        SubAgentDelegationService,
     ],
     exports: [
         AgentRepository,
@@ -179,6 +196,10 @@ import { FacadesModule } from '../facades/facades.module';
         AgentToolService,
         AgentEscalationService,
         EscalationConfidenceService,
+        WorkflowGraphExecutorService,
+        WorkflowAiDecisionAdapter,
+        WORKFLOW_DECISION_PORT,
+        SubAgentDelegationService,
     ],
 })
 export class AgentsModule {}
