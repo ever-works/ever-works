@@ -5895,6 +5895,12 @@
             "feelingLucky": "생성할 워크 제안",
             "errors": {
                 "unableToSend": "메시지 전송 불가"
+            },
+            "attachments": {
+                "attach": "Attach files",
+                "remove": "Remove attachment",
+                "tooLarge": "File is larger than the 25 MB limit",
+                "failed": "Upload failed"
             }
         },
         "plugins": {

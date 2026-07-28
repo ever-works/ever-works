@@ -5895,6 +5895,12 @@
             "feelingLucky": "Gợi ý một công việc để tạo",
             "errors": {
                 "unableToSend": "Không thể gửi tin nhắn"
+            },
+            "attachments": {
+                "attach": "Attach files",
+                "remove": "Remove attachment",
+                "tooLarge": "File is larger than the 25 MB limit",
+                "failed": "Upload failed"
             }
         },
         "plugins": {

@@ -5962,6 +5962,12 @@
             "feelingLucky": "اقترح عملًا لإنشائه",
             "errors": {
                 "unableToSend": "تعذر إرسال الرسالة"
+            },
+            "attachments": {
+                "attach": "Attach files",
+                "remove": "Remove attachment",
+                "tooLarge": "File is larger than the 25 MB limit",
+                "failed": "Upload failed"
             }
         },
         "plugins": {
