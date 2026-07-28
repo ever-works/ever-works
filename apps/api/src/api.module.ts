@@ -58,6 +58,7 @@ import { IngestModule } from './ingest/ingest.module';
 import { MeetingsApiModule } from './meetings/meetings.module';
 import { FleetApiModule } from './fleet/fleet.module';
 import { MergePolicyApiModule } from './merge-policy/merge-policy.module';
+import { ToolGrantsApiModule } from './tool-grants/tool-grants.module';
 import { DigestApiModule } from './digest/digest.module';
 import { EscalationsApiModule } from './escalations/escalations.module';
 import { PrReviewApiModule } from './pr-review/pr-review.module';
@@ -215,6 +216,11 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // agent-side PolicyModule. Writes ride the existing Work / Agent /
         // organization PATCH endpoints.
         MergePolicyApiModule,
+        // Tool-grant matrix (audit item G4) — owner-scoped resolve/check
+        // preview plus the write path for the per-scope grant rows. Same
+        // ownership checks as the merge-policy preview; grants are their
+        // own rows, so unlike a merge policy they need a write path here.
+        ToolGrantsApiModule,
         // Digest read (Wave 7) — GET /api/digest owner-scoped composed
         // digest over the agent-side DigestModule. Cadence stays a
         // profile preference; delivery stays on the digest-dispatcher

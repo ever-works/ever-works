@@ -40,6 +40,7 @@ import { EscalationConfidenceService } from './escalation-confidence';
 import { VisionContextService } from '../services/vision-context.service';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { SkillsModule } from '../skills/skills.module';
+import { PolicyModule } from '../policy/policy.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { FacadesModule } from '../facades/facades.module';
 
@@ -92,6 +93,15 @@ import { FacadesModule } from '../facades/facades.module';
         // Phase 10 — AgentRunService resolves active skills via
         // SkillBindingRepository before assembling the prompt.
         SkillsModule,
+        // Audit items G4 + G12 + G14 — binds TOOL_GRANT_ENFORCER (the
+        // tool-grant matrix consumed by AgentToolService and by
+        // AgentRunService's skill activation) and CREDENTIAL_RESOLVER
+        // (`{{cred.key}}` interpolation). Both are @Optional() at the
+        // consumer, so WITHOUT this import the wiring silently never
+        // fires — the same trap FacadesModule documents just below.
+        // PolicyModule is a leaf (four scope entities + tool_grants), so
+        // this import cannot cycle.
+        PolicyModule,
         // PR #1084 follow-up: AgentRunService injects
         // AgentMemoryFacadeService (@Optional) so it can open + close a
         // memory session per run. Without this import the @Optional()

@@ -12,6 +12,7 @@ import { WorkProposalRepository } from '../user-research/work-proposal.repositor
 import { SkillsService } from './skills.service';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { DatabaseModule } from '../database/database.module';
+import { PolicyModule } from '../policy/policy.module';
 
 /**
  * Skills feature — Phase 8 + 9.
@@ -29,6 +30,11 @@ import { DatabaseModule } from '../database/database.module';
         DatabaseModule,
         TypeOrmModule.forFeature([Skill, SkillBinding, Mission, Agent, WorkProposal]),
         ActivityLogModule,
+        // Audit item G12 — grant-aware activation. Binds
+        // TOOL_GRANT_ENFORCER for `SkillsService.resolveActiveForAgent`,
+        // which is @Optional(): without this import the filter silently
+        // never fires. PolicyModule is a leaf, so this cannot cycle.
+        PolicyModule,
     ],
     providers: [
         SkillRepository,

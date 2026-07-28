@@ -82,6 +82,10 @@ const DOMAIN_TOOL_NAMES = [
     'get_meeting_summary',
     'list_fleet_nodes',
     'resolve_merge_policy',
+    // Tool-grant matrix (audit item G4) — the DoD chat tools ship WITH
+    // the surface, so they are pinned here like every other domain.
+    'resolve_tool_grants',
+    'check_tool_grant',
 ];
 
 describe('AgentToolService — domain chat tool assembly', () => {
@@ -135,6 +139,13 @@ describe('AgentToolService — domain chat tool assembly', () => {
             },
             mergePolicy: {
                 service: { resolve: jest.fn().mockResolvedValue({ source: 'work' }) } as any,
+                authorize: authorize as any,
+            },
+            toolGrants: {
+                service: {
+                    resolve: jest.fn().mockResolvedValue({ source: 'work' }),
+                    decide: jest.fn().mockResolvedValue({ allowed: true }),
+                } as any,
                 authorize: authorize as any,
             },
         };
@@ -274,6 +285,45 @@ describe('AgentToolService — domain chat tool assembly', () => {
 
         expect(result).toEqual({ error: 'Not found or not accessible to the current user.' });
         expect((sources.mergePolicy!.service as any).resolve).not.toHaveBeenCalled();
+    });
+
+    it('authorizes resolve_tool_grants against the agent owner before resolving', async () => {
+        const tools = makeSvc().resolveAllowedTools(makeAgent({ userId: 'owner-9' }));
+        const tool = tools.find((t) => t.name === 'resolve_tool_grants')!;
+
+        await tool.invoke({ agentId: 'a1' });
+
+        expect(authorize).toHaveBeenCalledWith('owner-9', { agentId: 'a1' });
+        expect((sources.toolGrants!.service as any).resolve).toHaveBeenCalled();
+    });
+
+    it('refuses the grant tools for a scope the owner may not reach (no existence leak)', async () => {
+        authorize.mockResolvedValue(null);
+        const tools = makeSvc().resolveAllowedTools(makeAgent());
+
+        const resolveResult = await tools
+            .find((t) => t.name === 'resolve_tool_grants')!
+            .invoke({ workId: 'someone-elses-work' });
+        const checkResult = await tools
+            .find((t) => t.name === 'check_tool_grant')!
+            .invoke({ workId: 'someone-elses-work', toolName: 'commitToRepo' });
+
+        expect(resolveResult).toEqual({
+            error: 'Not found or not accessible to the current user.',
+        });
+        expect(checkResult).toEqual({
+            error: 'Not found or not accessible to the current user.',
+        });
+        expect((sources.toolGrants!.service as any).resolve).not.toHaveBeenCalled();
+        expect((sources.toolGrants!.service as any).decide).not.toHaveBeenCalled();
+    });
+
+    it('requires a tool name before checking a grant', async () => {
+        const tools = makeSvc().resolveAllowedTools(makeAgent());
+        const result = await tools
+            .find((t) => t.name === 'check_tool_grant')!
+            .invoke({ agentId: 'a1' });
+        expect(result).toEqual({ error: 'toolName is required.' });
     });
 
     it('keeps commentOnTask fail-closed on membership', async () => {
