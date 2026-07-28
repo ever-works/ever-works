@@ -943,6 +943,57 @@ export const config = {
             return process.env.AGENT_ESCALATION_LOGGING_ENABLED !== 'false';
         },
         /**
+         * Judgment layer G3 — let the AI judge score escalation
+         * confidence through the AI facade. Default **off**.
+         *
+         * Off by default because it turns a bookkeeping write into a
+         * model call: escalations are rare, but they are also raised at
+         * exactly the moments a deployment is already unhealthy, and a
+         * provider timeout there would slow every give-up path. With it
+         * off, `confidence` is still populated on every row — by the
+         * deterministic reason-code table, which costs nothing and never
+         * fails. Turn it on to get calibrated scores.
+         */
+        isEscalationConfidenceJudgeEnabled() {
+            return (process.env.AGENT_ESCALATION_CONFIDENCE_JUDGE || 'off').toLowerCase() === 'on';
+        },
+        /**
+         * Judgment layer G10 — the doom-loop / retry-storm detector.
+         * Default ON.
+         *
+         * On by default because the thing it prevents (an agent spending
+         * its whole budget failing the same check five times) is pure
+         * waste with no upside, and the detector never fails a run on its
+         * own account — it stops the retry loop early and files an
+         * escalation carrying the evidence. Set
+         * `AGENT_RUN_LOOP_DETECTOR_ENABLED=false` to fall back to the
+         * attempt cap alone.
+         */
+        isRunLoopDetectorEnabled() {
+            return process.env.AGENT_RUN_LOOP_DETECTOR_ENABLED !== 'false';
+        },
+        /**
+         * How many CONSECUTIVE identical failures count as a loop.
+         * Default 3, clamped 2..10 by `resolveLoopThresholds`.
+         *
+         * Three, not two: two identical failures is what a legitimate
+         * "fix it and re-run" attempt looks like when the fix was wrong,
+         * and firing there would make the detector a nuisance rather than
+         * a saving.
+         */
+        getRunLoopRepeatThreshold() {
+            const raw = parseInt(process.env.AGENT_RUN_LOOP_REPEAT_THRESHOLD || '3', 10);
+            return Number.isFinite(raw) ? raw : 3;
+        },
+        /**
+         * Attempt count at which a progress-free trail is called a retry
+         * storm. Default 4, clamped 1..20 by `resolveLoopThresholds`.
+         */
+        getRunLoopMaxRetries() {
+            const raw = parseInt(process.env.AGENT_RUN_LOOP_MAX_RETRIES || '4', 10);
+            return Number.isFinite(raw) ? raw : 4;
+        },
+        /**
          * Run orchestration (Wave 4 M2) — concurrency safety valves for
          * `RunDispatchGateService`. These are operator knobs, NOT product
          * limits: defaults are deliberately generous (10 in-flight runs

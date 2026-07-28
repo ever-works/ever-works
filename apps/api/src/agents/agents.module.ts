@@ -12,6 +12,7 @@ import {
     AGENT_EMAIL_FACADE,
     AGENT_NOTIFY_CHANNEL_FACADE,
     AGENT_DOMAIN_TOOL_SOURCES,
+    AgentEscalationService,
     RunSteeringService,
     type AgentDomainToolSources,
     TERMINAL_SESSION_DISPATCHER,
@@ -742,6 +743,7 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                 WorkOwnershipService,
                 AgentRepository,
                 BrowserAutomationFacadeService,
+                AgentEscalationService,
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -758,6 +760,7 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                 workOwnership: WorkOwnershipService,
                 agents: AgentRepository,
                 browser: BrowserAutomationFacadeService,
+                escalationService: AgentEscalationService,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
@@ -798,6 +801,11 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                         };
                     },
                 },
+                // Judgment layer G3/G10 — the escalation queue. Owner
+                // scope is closed inside the service (every read/write
+                // takes the agent owner's userId), so unlike merge-policy
+                // there is no model-supplied id to authorize.
+                escalations: { service: escalationService },
             }),
         },
     ],

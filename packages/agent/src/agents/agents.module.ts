@@ -36,6 +36,7 @@ import { RunSteeringService } from './run-steering.service';
 import { TerminalSessionLauncher } from './terminal-session-launcher.service';
 import { AgentToolService } from './agent-tool.service';
 import { AgentEscalationService } from './agent-escalation.service';
+import { EscalationConfidenceService } from './escalation-confidence';
 import { VisionContextService } from '../services/vision-context.service';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { SkillsModule } from '../skills/skills.module';
@@ -138,6 +139,11 @@ import { FacadesModule } from '../facades/facades.module';
         AgentToolService,
         // Judgment layer G3 - the one place a give-up becomes a record.
         AgentEscalationService,
+        // Judgment layer G3 - scores the confidence column on every
+        // escalation (AI judge through the AI facade, deterministic
+        // table otherwise). FacadesModule is already imported above, so
+        // the AiFacadeService it consumes resolves in production.
+        EscalationConfidenceService,
     ],
     exports: [
         AgentRepository,
@@ -162,6 +168,7 @@ import { FacadesModule } from '../facades/facades.module';
         TerminalSessionLauncher,
         AgentToolService,
         AgentEscalationService,
+        EscalationConfidenceService,
     ],
 })
 export class AgentsModule {}

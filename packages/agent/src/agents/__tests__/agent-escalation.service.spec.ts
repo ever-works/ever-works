@@ -144,6 +144,13 @@ describe('toAgentEscalationDto', () => {
             resolvedByUserId: null,
             resolutionNote: null,
             resolvedAt: null,
+            // G3 — an escalation written before the scorer ran (or with the
+            // scorer off) carries no confidence, and the DTO says so with
+            // `null` rather than inventing a score. This assertion is
+            // exhaustive on purpose: a new column that silently reaches the
+            // API response should break here.
+            confidence: null,
+            confidenceSource: null,
             createdAt: '2026-07-25T10:00:00.000Z',
         });
     });
