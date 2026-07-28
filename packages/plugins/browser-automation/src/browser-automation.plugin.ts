@@ -293,15 +293,22 @@ export class BrowserAutomationPlugin implements IPlugin, IBrowserAutomationPlugi
 
 	async act(handle: BrowserSessionHandle, steps: readonly BrowserActStep[]): Promise<BrowserActResult> {
 		const session = this.requireSession(handle);
-		if (!Array.isArray(steps) || steps.length === 0) {
+		// Re-bound rather than narrowed in place: `Array.isArray()` on a
+		// `readonly T[]` widens the guarded branch to `any[]`, which would
+		// make `step.kind` `any` and silently defeat the exhaustiveness
+		// check at the bottom of the switch below. The runtime guard still
+		// earns its keep (callers reach this across a plugin boundary and
+		// are not all typed), it just must not be the thing that types it.
+		const actSteps: readonly BrowserActStep[] = Array.isArray(steps) ? steps : [];
+		if (actSteps.length === 0) {
 			return { performed: 0, url: session.page.url(), blockedRequests: this.drainBlocked(session) };
 		}
-		if (steps.length > MAX_ACT_STEPS) {
-			throw new RangeError(`act() accepts at most ${MAX_ACT_STEPS} steps (received ${steps.length}).`);
+		if (actSteps.length > MAX_ACT_STEPS) {
+			throw new RangeError(`act() accepts at most ${MAX_ACT_STEPS} steps (received ${actSteps.length}).`);
 		}
 
 		let performed = 0;
-		for (const step of steps) {
+		for (const step of actSteps) {
 			const timeout = clampTimeout(step.timeoutMs, session.policy.timeoutMs);
 
 			if (step.kind === 'wait' && !step.selector) {
