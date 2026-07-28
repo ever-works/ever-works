@@ -1057,6 +1057,15 @@
                 "scopeWork": "งาน",
                 "scopeMission": "ภารกิจ",
                 "scopeIdea": "ความคิด",
+                "delete": {
+                    "action": "ลบ",
+                    "title": "ลบงานนี้หรือไม่",
+                    "body": "{slug} และทุกอย่างที่เชื่อมโยงกับงานนี้ — บทสนทนา ไฟล์แนบ ผู้รับผิดชอบ และความสัมพันธ์ — จะถูกลบอย่างถาวร การกระทำนี้ไม่สามารถย้อนกลับได้",
+                    "confirm": "ลบงาน",
+                    "cancel": "ยกเลิก",
+                    "deleting": "กำลังลบ…",
+                    "error": "ลบงานไม่สำเร็จ"
+                },
                 "runControls": {
                     "title": "Run controls",
                     "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",

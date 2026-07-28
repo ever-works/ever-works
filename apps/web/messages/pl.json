@@ -1057,6 +1057,15 @@
                 "scopeWork": "Praca",
                 "scopeMission": "Misja",
                 "scopeIdea": "Pomysł",
+                "delete": {
+                    "action": "Usuń",
+                    "title": "Usunąć to zadanie?",
+                    "body": "{slug} i wszystko, co jest z nim powiązane — rozmowa, załączniki, osoby przypisane i relacje — zostanie trwale usunięte. Tej operacji nie można cofnąć.",
+                    "confirm": "Usuń zadanie",
+                    "cancel": "Anuluj",
+                    "deleting": "Usuwanie…",
+                    "error": "Nie udało się usunąć zadania"
+                },
                 "runControls": {
                     "title": "Run controls",
                     "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",

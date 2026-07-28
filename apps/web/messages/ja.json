@@ -1057,6 +1057,15 @@
                 "scopeWork": "作業",
                 "scopeMission": "ミッション",
                 "scopeIdea": "アイデア",
+                "delete": {
+                    "action": "削除",
+                    "title": "このタスクを削除しますか？",
+                    "body": "{slug} と、それに紐づくすべて（会話、添付ファイル、担当者、関連）が完全に削除されます。この操作は取り消せません。",
+                    "confirm": "タスクを削除",
+                    "cancel": "キャンセル",
+                    "deleting": "削除中…",
+                    "error": "タスクを削除できませんでした"
+                },
                 "runControls": {
                     "title": "Run controls",
                     "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",

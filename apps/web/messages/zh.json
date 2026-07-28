@@ -1057,6 +1057,15 @@
                 "scopeWork": "工作",
                 "scopeMission": "任务",
                 "scopeIdea": "想法",
+                "delete": {
+                    "action": "删除",
+                    "title": "确定删除此任务？",
+                    "body": "{slug} 及其关联的所有内容（对话、附件、负责人和关联关系）将被永久删除，此操作无法撤销。",
+                    "confirm": "删除任务",
+                    "cancel": "取消",
+                    "deleting": "删除中…",
+                    "error": "删除任务失败"
+                },
                 "runControls": {
                     "title": "Run controls",
                     "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",

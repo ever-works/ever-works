@@ -1088,6 +1088,15 @@
                 "scopeWork": "Arbeit",
                 "scopeMission": "Mission",
                 "scopeIdea": "Idee",
+                "delete": {
+                    "action": "Löschen",
+                    "title": "Diese Aufgabe löschen?",
+                    "body": "{slug} und alles, was damit verknüpft ist – Konversation, Anhänge, Zuweisungen und Beziehungen – wird dauerhaft gelöscht. Dies kann nicht rückgängig gemacht werden.",
+                    "confirm": "Aufgabe löschen",
+                    "cancel": "Abbrechen",
+                    "deleting": "Wird gelöscht…",
+                    "error": "Aufgabe konnte nicht gelöscht werden"
+                },
                 "runControls": {
                     "title": "Run controls",
                     "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",

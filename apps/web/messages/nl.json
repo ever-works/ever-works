@@ -1057,6 +1057,15 @@
                 "scopeWork": "Werk",
                 "scopeMission": "Missie",
                 "scopeIdea": "Idee",
+                "delete": {
+                    "action": "Verwijderen",
+                    "title": "Deze taak verwijderen?",
+                    "body": "{slug} en alles wat eraan gekoppeld is — gesprek, bijlagen, toegewezen personen en relaties — wordt definitief verwijderd. Dit kan niet ongedaan worden gemaakt.",
+                    "confirm": "Taak verwijderen",
+                    "cancel": "Annuleren",
+                    "deleting": "Bezig met verwijderen…",
+                    "error": "Verwijderen van de taak is mislukt"
+                },
                 "runControls": {
                     "title": "Run controls",
                     "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",

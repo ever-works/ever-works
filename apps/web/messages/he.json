@@ -1088,6 +1088,15 @@
                 "scopeWork": "עבודה",
                 "scopeMission": "משימה",
                 "scopeIdea": "רעיון",
+                "delete": {
+                    "action": "מחיקה",
+                    "title": "למחוק את המשימה הזו?",
+                    "body": "{slug} וכל מה שמקושר אליה — שיחה, קבצים מצורפים, מוקצים וקשרים — יימחק לצמיתות. לא ניתן לבטל פעולה זו.",
+                    "confirm": "מחיקת המשימה",
+                    "cancel": "ביטול",
+                    "deleting": "מוחק…",
+                    "error": "מחיקת המשימה נכשלה"
+                },
                 "runControls": {
                     "title": "Run controls",
                     "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",

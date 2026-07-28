@@ -1057,6 +1057,15 @@
                 "scopeWork": "Karya",
                 "scopeMission": "Misi",
                 "scopeIdea": "Ide",
+                "delete": {
+                    "action": "Hapus",
+                    "title": "Hapus tugas ini?",
+                    "body": "{slug} dan semua yang terkait dengannya — percakapan, lampiran, penerima tugas, dan relasi — akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.",
+                    "confirm": "Hapus tugas",
+                    "cancel": "Batal",
+                    "deleting": "Menghapus…",
+                    "error": "Gagal menghapus tugas"
+                },
                 "runControls": {
                     "title": "Run controls",
                     "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",

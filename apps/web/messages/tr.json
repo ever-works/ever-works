@@ -1057,6 +1057,15 @@
                 "scopeWork": "İş",
                 "scopeMission": "Görev",
                 "scopeIdea": "Fikir",
+                "delete": {
+                    "action": "Sil",
+                    "title": "Bu görev silinsin mi?",
+                    "body": "{slug} ve ona bağlı her şey — sohbet, ekler, atananlar ve ilişkiler — kalıcı olarak silinecek. Bu işlem geri alınamaz.",
+                    "confirm": "Görevi sil",
+                    "cancel": "İptal",
+                    "deleting": "Siliniyor…",
+                    "error": "Görev silinemedi"
+                },
                 "runControls": {
                     "title": "Run controls",
                     "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",

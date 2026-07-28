@@ -1088,6 +1088,15 @@
                 "scopeWork": "Travail",
                 "scopeMission": "Mission",
                 "scopeIdea": "Idée",
+                "delete": {
+                    "action": "Supprimer",
+                    "title": "Supprimer cette tâche ?",
+                    "body": "{slug} et tout ce qui y est rattaché — conversation, pièces jointes, assignés et relations — seront définitivement supprimés. Cette action est irréversible.",
+                    "confirm": "Supprimer la tâche",
+                    "cancel": "Annuler",
+                    "deleting": "Suppression…",
+                    "error": "Échec de la suppression de la tâche"
+                },
                 "runControls": {
                     "title": "Run controls",
                     "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",

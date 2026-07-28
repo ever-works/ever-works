@@ -1148,6 +1148,15 @@
                 "scopeWork": "Work",
                 "scopeMission": "Mission",
                 "scopeIdea": "Idea",
+                "delete": {
+                    "action": "Delete",
+                    "title": "Delete this Task?",
+                    "body": "{slug} and everything attached to it — conversation, attachments, assignees and relations — will be permanently deleted. This cannot be undone.",
+                    "confirm": "Delete Task",
+                    "cancel": "Cancel",
+                    "deleting": "Deleting…",
+                    "error": "Failed to delete Task"
+                },
                 "runControls": {
                     "title": "Run controls",
                     "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",

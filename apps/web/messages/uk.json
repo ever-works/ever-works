@@ -1057,6 +1057,15 @@
                 "scopeWork": "Робота",
                 "scopeMission": "Місія",
                 "scopeIdea": "Ідея",
+                "delete": {
+                    "action": "Видалити",
+                    "title": "Видалити це завдання?",
+                    "body": "{slug} і все, що з ним пов'язано — листування, вкладення, виконавці та зв'язки — буде видалено назавжди. Цю дію не можна скасувати.",
+                    "confirm": "Видалити завдання",
+                    "cancel": "Скасувати",
+                    "deleting": "Видалення…",
+                    "error": "Не вдалося видалити завдання"
+                },
                 "runControls": {
                     "title": "Run controls",
                     "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",

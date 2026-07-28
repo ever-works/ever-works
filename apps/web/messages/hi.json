@@ -1057,6 +1057,15 @@
                 "scopeWork": "काम",
                 "scopeMission": "मिशन",
                 "scopeIdea": "विचार",
+                "delete": {
+                    "action": "हटाएं",
+                    "title": "यह कार्य हटाएं?",
+                    "body": "{slug} और उससे जुड़ी हर चीज़ — बातचीत, अटैचमेंट, असाइनी और संबंध — स्थायी रूप से हटा दी जाएगी। इसे पूर्ववत नहीं किया जा सकता।",
+                    "confirm": "कार्य हटाएं",
+                    "cancel": "रद्द करें",
+                    "deleting": "हटाया जा रहा है…",
+                    "error": "कार्य हटाने में विफल"
+                },
                 "runControls": {
                     "title": "Run controls",
                     "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",

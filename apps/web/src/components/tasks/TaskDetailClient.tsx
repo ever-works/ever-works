@@ -24,6 +24,7 @@ import { TaskRunControls } from './TaskRunControls';
 import { TaskRunsHistory } from './TaskRunsHistory';
 import { RunWithAgentMenu } from './RunWithAgentMenu';
 import { TaskDecisionConflicts } from './TaskDecisionConflicts';
+import { TaskDeleteButton } from './TaskDeleteButton';
 
 // Status tones + dots mirror /tasks (TasksList) so colours stay
 // consistent across the list filter and the detail workflow buttons.
@@ -233,11 +234,16 @@ export function TaskDetailClient({
                             <h1 className="text-2xl font-semibold leading-tight text-text dark:text-text-dark">
                                 {task.title}
                             </h1>
-                            {/* Board dispatch (kanban M3) — run this Task
-                                from its detail page, through the same
-                                gated path the board and a status
-                                transition use. */}
-                            <RunWithAgentMenu taskId={task.id} className="shrink-0" />
+                            <div className="flex items-center gap-1.5 shrink-0">
+                                {/* Board dispatch (kanban M3) — run this Task
+                                    from its detail page, through the same
+                                    gated path the board and a status
+                                    transition use. */}
+                                <RunWithAgentMenu taskId={task.id} />
+                                {/* DELETE /api/tasks/:id — behind a confirm,
+                                    since it cascades to the Task's side rows. */}
+                                <TaskDeleteButton taskId={task.id} taskSlug={task.slug} />
+                            </div>
                         </div>
                         {/* JIRA-style workflow buttons — mirrors the status
                             pills on /tasks. Current status shows active in its

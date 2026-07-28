@@ -1088,6 +1088,15 @@
                 "scopeWork": "Работа",
                 "scopeMission": "Мисия",
                 "scopeIdea": "Идея",
+                "delete": {
+                    "action": "Изтриване",
+                    "title": "Да се изтрие ли тази задача?",
+                    "body": "{slug} и всичко, свързано с нея — разговор, прикачени файлове, изпълнители и връзки — ще бъде изтрито безвъзвратно. Действието не може да бъде отменено.",
+                    "confirm": "Изтриване на задачата",
+                    "cancel": "Отказ",
+                    "deleting": "Изтриване…",
+                    "error": "Изтриването на задачата е неуспешно"
+                },
                 "runControls": {
                     "title": "Run controls",
                     "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",

@@ -1057,6 +1057,15 @@
                 "scopeWork": "작업",
                 "scopeMission": "임무",
                 "scopeIdea": "아이디어",
+                "delete": {
+                    "action": "삭제",
+                    "title": "이 작업을 삭제할까요?",
+                    "body": "{slug} 및 이에 연결된 모든 항목(대화, 첨부 파일, 담당자, 관계)이 영구적으로 삭제됩니다. 이 작업은 되돌릴 수 없습니다.",
+                    "confirm": "작업 삭제",
+                    "cancel": "취소",
+                    "deleting": "삭제 중…",
+                    "error": "작업을 삭제하지 못했습니다"
+                },
                 "runControls": {
                     "title": "Run controls",
                     "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",

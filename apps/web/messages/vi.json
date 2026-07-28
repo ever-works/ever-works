@@ -1057,6 +1057,15 @@
                 "scopeWork": "Công việc",
                 "scopeMission": "Nhiệm vụ",
                 "scopeIdea": "Ý tưởng",
+                "delete": {
+                    "action": "Xóa",
+                    "title": "Xóa nhiệm vụ này?",
+                    "body": "{slug} và mọi thứ gắn với nó — cuộc trò chuyện, tệp đính kèm, người được giao và các liên kết — sẽ bị xóa vĩnh viễn. Không thể hoàn tác.",
+                    "confirm": "Xóa nhiệm vụ",
+                    "cancel": "Hủy",
+                    "deleting": "Đang xóa…",
+                    "error": "Không thể xóa nhiệm vụ"
+                },
                 "runControls": {
                     "title": "Run controls",
                     "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",

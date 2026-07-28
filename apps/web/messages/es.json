@@ -1088,6 +1088,15 @@
                 "scopeWork": "Trabajo",
                 "scopeMission": "Misión",
                 "scopeIdea": "Idea",
+                "delete": {
+                    "action": "Eliminar",
+                    "title": "¿Eliminar esta tarea?",
+                    "body": "{slug} y todo lo asociado a ella — conversación, archivos adjuntos, asignados y relaciones — se eliminarán de forma permanente. Esta acción no se puede deshacer.",
+                    "confirm": "Eliminar tarea",
+                    "cancel": "Cancelar",
+                    "deleting": "Eliminando…",
+                    "error": "No se pudo eliminar la tarea"
+                },
                 "runControls": {
                     "title": "Run controls",
                     "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",

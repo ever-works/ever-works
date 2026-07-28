@@ -1057,6 +1057,15 @@
                 "scopeWork": "Работа",
                 "scopeMission": "Миссия",
                 "scopeIdea": "Идея",
+                "delete": {
+                    "action": "Удалить",
+                    "title": "Удалить эту задачу?",
+                    "body": "{slug} и всё, что с ней связано — переписка, вложения, исполнители и связи — будет удалено безвозвратно. Это действие нельзя отменить.",
+                    "confirm": "Удалить задачу",
+                    "cancel": "Отмена",
+                    "deleting": "Удаление…",
+                    "error": "Не удалось удалить задачу"
+                },
                 "runControls": {
                     "title": "Run controls",
                     "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",

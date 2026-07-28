@@ -1057,6 +1057,15 @@
                 "scopeWork": "Lavoro",
                 "scopeMission": "Missione",
                 "scopeIdea": "Idea",
+                "delete": {
+                    "action": "Elimina",
+                    "title": "Eliminare questa attività?",
+                    "body": "{slug} e tutto ciò che vi è collegato — conversazione, allegati, assegnatari e relazioni — verranno eliminati definitivamente. L'operazione è irreversibile.",
+                    "confirm": "Elimina attività",
+                    "cancel": "Annulla",
+                    "deleting": "Eliminazione…",
+                    "error": "Impossibile eliminare l'attività"
+                },
                 "runControls": {
                     "title": "Run controls",
                     "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",
