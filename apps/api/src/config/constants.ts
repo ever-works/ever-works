@@ -271,6 +271,35 @@ export const config = {
         isPerTenantGatingEnabled: (): boolean =>
             (process.env.EVER_WORKS_TENANT_RUNTIME_PER_TENANT_GATING ?? 'false').toLowerCase() ===
             'true',
+
+        /**
+         * A9 — the job runtime the DESKTOP install wizard collected, read
+         * from the env file the desktop shell generates
+         * (`EVER_WORKS_DESKTOP_JOB_RUNTIME`, written by
+         * `apps/desktop/src/services/runtime-setup.ts`).
+         *
+         * The wizard runs before anybody has signed in, so it cannot call
+         * the tenant-overlay admin API itself. This is the handoff: the
+         * value lands in the env of the API process the desktop shell
+         * supervises, and `TenantJobRuntimeService` materialises the
+         * `tenant_job_runtime_config` row for the tenant once one exists.
+         *
+         * Accepts both the plugin id (`job-runtime-bullmq`) and the bare
+         * provider id (`bullmq`); anything not in the bundled list returns
+         * null so a typo is a no-op rather than a bad row. Unset — i.e.
+         * every non-desktop deployment — is also null, which makes this
+         * whole path invisible to SaaS and k8s installs.
+         */
+        getDesktopWizardProviderId: (): string | null => {
+            const raw = (process.env.EVER_WORKS_DESKTOP_JOB_RUNTIME ?? '').trim().toLowerCase();
+            if (raw === '') {
+                return null;
+            }
+            const providerId = raw.replace(/^job-runtime-/, '');
+            return (BUNDLED_TENANT_JOB_RUNTIME_PROVIDERS as readonly string[]).includes(providerId)
+                ? providerId
+                : null;
+        },
     },
 
     features: {

@@ -38,41 +38,68 @@ async function probe(
 	}
 }
 
+export interface PrereqCheckOptions {
+	/**
+	 * Whether the local stack will be run from a monorepo checkout, which needs
+	 * Node.js + pnpm on PATH. Installs that ship a bundled runtime payload run
+	 * the services on the app's own embedded Node.js, so both tools become
+	 * informational rather than blocking. Defaults to `true` (repo layout).
+	 */
+	requireHostToolchain?: boolean;
+}
+
 /**
  * Check the wizard prerequisites: Node.js >= 22 and pnpm are required to run
- * the platform from source; Docker is optional and only gates the
- * docker-compose infra choice.
+ * the platform from a source checkout; Docker is optional and only gates the
+ * docker-compose infra choice. With a bundled runtime payload the toolchain
+ * checks are reported but not required — see {@link PrereqCheckOptions}.
  */
-export async function checkPrerequisites(runner: CommandRunner): Promise<PrereqCheckResult[]> {
+export async function checkPrerequisites(
+	runner: CommandRunner,
+	options: PrereqCheckOptions = {}
+): Promise<PrereqCheckResult[]> {
+	const requireHostToolchain = options.requireHostToolchain ?? true;
 	const [node, pnpm, docker] = await Promise.all([
 		probe(runner, 'node', ['--version']),
 		probe(runner, 'pnpm', ['--version']),
 		probe(runner, 'docker', ['--version'])
 	]);
 
-	const nodeOk = node.found && nodeVersionSatisfies(node.version);
+	const nodeFound = node.found && nodeVersionSatisfies(node.version);
+	// With a bundled runtime the app supplies its own Node.js, so the host
+	// toolchain never blocks: report it, mark it satisfied, explain why.
+	const nodeOk = requireHostToolchain ? nodeFound : true;
+	const pnpmOk = requireHostToolchain ? pnpm.found : true;
+	const bundledNote = 'not needed — this install runs the bundled platform runtime';
+
 	return [
 		{
 			id: 'node',
-			label: `Node.js >= ${MIN_NODE_MAJOR}`,
-			required: true,
+			label: requireHostToolchain ? `Node.js >= ${MIN_NODE_MAJOR}` : `Node.js >= ${MIN_NODE_MAJOR} (optional)`,
+			required: requireHostToolchain,
 			found: node.found,
 			version: node.version,
 			ok: nodeOk,
-			message: node.found
-				? nodeOk
-					? undefined
-					: `Node.js ${node.version ?? '?'} found but >= ${MIN_NODE_MAJOR} is required`
-				: 'Node.js was not found on PATH'
+			message: !requireHostToolchain
+				? bundledNote
+				: node.found
+					? nodeFound
+						? undefined
+						: `Node.js ${node.version ?? '?'} found but >= ${MIN_NODE_MAJOR} is required`
+					: 'Node.js was not found on PATH'
 		},
 		{
 			id: 'pnpm',
-			label: 'pnpm',
-			required: true,
+			label: requireHostToolchain ? 'pnpm' : 'pnpm (optional)',
+			required: requireHostToolchain,
 			found: pnpm.found,
 			version: pnpm.version,
-			ok: pnpm.found,
-			message: pnpm.found ? undefined : 'pnpm was not found on PATH (npm install -g pnpm)'
+			ok: pnpmOk,
+			message: !requireHostToolchain
+				? bundledNote
+				: pnpm.found
+					? undefined
+					: 'pnpm was not found on PATH (npm install -g pnpm)'
 		},
 		{
 			id: 'docker',

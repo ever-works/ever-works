@@ -82,3 +82,9 @@ apps/api/openapi.json
 api.log
 web.log
 api-mem.log
+
+# Desktop packaging output: electron-builder installers and the staged
+# self-contained runtime payload (apps/desktop/scripts/prepare-bundle.js).
+apps/desktop/release
+apps/desktop/bundle
+apps/desktop-node/release

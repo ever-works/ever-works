@@ -4,6 +4,7 @@ import type { FetchLike } from './fleet-client';
 import { createLogger, type LogEntry } from './logger';
 import { clampHeartbeatInterval, createNodeRuntime, enrollNode, installShutdownHandlers } from './runtime';
 import {
+	clampResourceLimits,
 	DEFAULT_HEARTBEAT_INTERVAL_MS,
 	MAX_HEARTBEAT_INTERVAL_MS,
 	MIN_HEARTBEAT_INTERVAL_MS,
@@ -79,7 +80,11 @@ describe('enrollNode', () => {
 			capabilities: ['os:linux', 'arch:x64', 'node:22', 'terminal', 'workspace', 'git'],
 			name: 'build-box-01',
 			heartbeatIntervalMs: DEFAULT_HEARTBEAT_INTERVAL_MS,
-			enrolledAt: '2026-07-25T10:00:00.000Z'
+			enrolledAt: '2026-07-25T10:00:00.000Z',
+			// Enrollment writes the clamped limits so the very first run
+			// already has a capacity policy on disk rather than inheriting
+			// an implicit default that later drifts.
+			limits: clampResourceLimits(undefined)
 		});
 
 		// The whole enrollment conversation is logged — with neither credential in it.

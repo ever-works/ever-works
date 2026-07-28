@@ -29,6 +29,7 @@ const FALLBACK_CATALOG: OnboardingCatalogResponse = {
     storage: [],
     db: [],
     deploy: [],
+    desktop: [],
     plugins: [],
 };
 const FALLBACK_STATE: OnboardingStateResponse = {

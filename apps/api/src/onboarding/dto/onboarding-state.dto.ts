@@ -18,6 +18,7 @@ import type {
     OnboardingDbChoice,
     OnboardingDeployChoice,
     OnboardingProfile,
+    OnboardingDesktopChoice,
     OnboardingStorageChoice,
     OnboardingWizardStateV2,
     OnboardingCatalogResponse,
@@ -43,6 +44,9 @@ const DEPLOY_CHOICES: readonly OnboardingDeployChoice[] = ['ever-works', 'vercel
 
 const DB_CHOICES: readonly OnboardingDbChoice[] = ['ever-works-db', 'custom'];
 
+// A8 — desktop-first bucket: where the user actually runs Ever Works.
+const DESKTOP_CHOICES: readonly OnboardingDesktopChoice[] = ['cloud', 'desktop', 'own-nodes'];
+
 class AiChoicePatchDto {
     @ApiProperty({ enum: AI_CHOICES })
     @IsIn(AI_CHOICES)
@@ -65,6 +69,12 @@ class DbChoicePatchDto {
     @ApiProperty({ enum: DB_CHOICES })
     @IsIn(DB_CHOICES)
     choice!: OnboardingDbChoice;
+}
+
+class DesktopChoicePatchDto {
+    @ApiProperty({ enum: DESKTOP_CHOICES })
+    @IsIn(DESKTOP_CHOICES)
+    choice!: OnboardingDesktopChoice;
 }
 
 // Wave 11 — "What do you do" profile answers. Ids come from the typed
@@ -125,6 +135,14 @@ export class OnboardingStatePatchInnerDto {
     @ValidateNested()
     @Type(() => DeployChoicePatchDto)
     deploy?: DeployChoicePatchDto;
+
+    // A8 — desktop-first bucket. Additive and optional: a client that never
+    // sends it keeps the persisted value (or the `cloud` default).
+    @ApiPropertyOptional({ type: DesktopChoicePatchDto })
+    @IsOptional()
+    @ValidateNested()
+    @Type(() => DesktopChoicePatchDto)
+    desktop?: DesktopChoicePatchDto;
 
     // Security: bound array size and element length to prevent large-payload DoS writes to onboarding_state column
     @ApiPropertyOptional({ type: [String] })
@@ -203,7 +221,10 @@ export class OnboardingCatalogResponseDto implements OnboardingCatalogResponse {
     deploy!: OnboardingCatalogResponse['deploy'];
 
     @ApiProperty()
+    desktop!: OnboardingCatalogResponse['desktop'];
+
+    @ApiProperty()
     plugins!: OnboardingCatalogResponse['plugins'];
 }
 
-export { AI_CHOICES, STORAGE_CHOICES, DB_CHOICES, DEPLOY_CHOICES };
+export { AI_CHOICES, STORAGE_CHOICES, DB_CHOICES, DEPLOY_CHOICES, DESKTOP_CHOICES };

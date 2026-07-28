@@ -10,6 +10,7 @@ import { resolveConfigPath, type ConfigFileSystem } from './core/config-store';
 import type { FetchLike } from './core/fleet-client';
 import type { Logger } from './core/logger';
 import { keychainDisabledByEnv, resolveSecretStore, type SecretStore } from './core/secret-store';
+import type { ResourceProbe, ResourceSample } from './core/resource-limits';
 
 /**
  * Real IO adapters for the headless node.
@@ -180,6 +181,74 @@ export function createSecretStore(logger?: Logger): SecretStore | null {
 		disabled: keychainDisabledByEnv(process.env),
 		...(logger ? { logger } : {})
 	});
+}
+
+const BYTES_PER_MB = 1024 * 1024;
+
+/** Snapshot of cumulative per-core CPU time, in milliseconds. */
+interface CpuTicks {
+	idleMs: number;
+	totalMs: number;
+}
+
+function readCpuTicks(): CpuTicks {
+	let idleMs = 0;
+	let totalMs = 0;
+	for (const cpu of os.cpus()) {
+		const times = cpu.times;
+		idleMs += times.idle;
+		totalMs += times.user + times.nice + times.sys + times.irq + times.idle;
+	}
+	return { idleMs, totalMs };
+}
+
+/**
+ * Real host sampler for the CPU/memory admission gate.
+ *
+ * CPU has to be measured as a DELTA — `os.cpus()` reports cumulative ticks
+ * since boot, so a single reading tells you the machine's lifetime average,
+ * not what it is doing now. We keep the previous reading and diff against it;
+ * the first call has no predecessor and reports 0%, which admits work. That is
+ * the right bias: a node should not refuse its very first job because it has
+ * not measured anything yet.
+ *
+ * `sampleWindowMs > 0` makes the first call take a real reading by waiting
+ * that long between two snapshots; the default 0 keeps `sample()` synchronous
+ * and relies on the delta between successive polls (which are seconds apart).
+ */
+export function createResourceProbe(options: { sampleWindowMs?: number } = {}): ResourceProbe {
+	const windowMs = Math.max(options.sampleWindowMs ?? 0, 0);
+	let previous: CpuTicks | null = null;
+
+	const measure = (current: CpuTicks, baseline: CpuTicks | null): number => {
+		if (!baseline) return 0;
+		const totalDelta = current.totalMs - baseline.totalMs;
+		const idleDelta = current.idleMs - baseline.idleMs;
+		if (totalDelta <= 0) return 0;
+		const busy = ((totalDelta - idleDelta) / totalDelta) * 100;
+		return Math.min(Math.max(busy, 0), 100);
+	};
+
+	return {
+		sample: async (): Promise<ResourceSample> => {
+			let baseline = previous;
+			if (windowMs > 0) {
+				baseline = readCpuTicks();
+				await new Promise((resolve) => setTimeout(resolve, windowMs));
+			}
+			const current = readCpuTicks();
+			const cpuPercent = measure(current, baseline);
+			previous = current;
+
+			const totalMemoryMb = os.totalmem() / BYTES_PER_MB;
+			const freeMemoryMb = os.freemem() / BYTES_PER_MB;
+			return {
+				cpuPercent,
+				usedMemoryMb: Math.max(totalMemoryMb - freeMemoryMb, 0),
+				totalMemoryMb
+			};
+		}
+	};
 }
 
 /** Node 22 ships a global fetch; the core only needs `ok`/`status`/`text()`. */

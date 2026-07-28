@@ -16,10 +16,14 @@
 		"start": "electron .",
 		"dist": "electron-builder --config electron-builder.yml",
 		"dist:dir": "electron-builder --config electron-builder.yml --dir",
+		"bundle": "node scripts/prepare-bundle.js",
+		"bundle:skip": "node scripts/prepare-bundle.js --skip",
+		"package": "node scripts/package-app.js",
+		"package:dir": "node scripts/package-app.js --dir",
 		"type-check": "tsc --noEmit",
 		"test": "vitest run",
 		"test:watch": "vitest",
-		"clean": "rm -rf dist release"
+		"clean": "rm -rf dist release bundle"
 	},
 	"devDependencies": {
 		"@types/node": "^22.19.11",

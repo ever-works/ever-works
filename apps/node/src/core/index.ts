@@ -10,8 +10,10 @@
  */
 
 export * from './browser-probe';
+export * from './auth-client';
 export * from './capabilities';
 export * from './config-store';
+export * from './resource-limits';
 export * from './fleet-client';
 export * from './gpu-probe';
 export * from './job-client';

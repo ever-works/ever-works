@@ -1,5 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { DesktopBridge, LogEntry, RuntimeSelection, ServiceId, ServiceStatus } from '../shared/ipc-contract';
+import type {
+	DesktopBridge,
+	DesktopMode,
+	LogEntry,
+	RemoteConnectionInput,
+	RuntimeSelection,
+	ServiceId,
+	ServiceStatus
+} from '../shared/ipc-contract';
 
 // IMPORTANT: this preload runs sandboxed — it cannot require local modules,
 // so channel names are inlined as string literals. Keep them in sync with
@@ -11,8 +19,12 @@ const bridge: DesktopBridge = {
 	listRuntimes: () => ipcRenderer.invoke('wizard:list-runtimes'),
 	detectDocker: () => ipcRenderer.invoke('wizard:detect-docker'),
 	applyRuntime: (selection: RuntimeSelection) => ipcRenderer.invoke('wizard:apply-runtime', selection),
+	setMode: (mode: DesktopMode) => ipcRenderer.invoke('wizard:set-mode', mode),
+	testRemote: (input: RemoteConnectionInput) => ipcRenderer.invoke('wizard:test-remote', input),
+	saveRemote: (input: RemoteConnectionInput) => ipcRenderer.invoke('wizard:save-remote', input),
 	completeWizard: () => ipcRenderer.invoke('wizard:complete'),
 	getConfig: () => ipcRenderer.invoke('config:get'),
+	getRuntimeLayout: () => ipcRenderer.invoke('app:runtime-layout'),
 	startServices: () => ipcRenderer.invoke('services:start'),
 	stopServices: () => ipcRenderer.invoke('services:stop'),
 	restartService: (id: ServiceId) => ipcRenderer.invoke('services:restart', id),
