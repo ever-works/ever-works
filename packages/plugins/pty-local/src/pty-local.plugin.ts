@@ -26,6 +26,8 @@ interface PtyProcessLike {
 	write(data: string): void;
 	resize(cols: number, rows: number): void;
 	kill(signal?: string): void;
+	/** node-pty exposes the child pid; typed optional so a stub without it still compiles. */
+	readonly pid?: number;
 }
 
 interface PtyModuleLike {
@@ -44,6 +46,21 @@ interface PtyModuleLike {
 
 const DEFAULT_COLS = 120;
 const DEFAULT_ROWS = 32;
+
+/**
+ * Mint the provider-scoped session id reported on the handle (persisted
+ * by the platform as the run's `cliSessionId`).
+ *
+ * `pty-local:<runId>:<pid>` — provider-prefixed so a value minted by a
+ * DIFFERENT terminal-stream provider can never be mistaken for one of
+ * ours, and pid-scoped so two sessions for the same run (a resume after
+ * a worker restart) are distinguishable. `no-pid` when the platform
+ * reported none rather than pretending to know it.
+ */
+export function makePtyLocalSessionId(runId: string, pid?: number): string {
+	const suffix = typeof pid === 'number' && Number.isFinite(pid) ? String(pid) : 'no-pid';
+	return `pty-local:${runId}:${suffix}`;
+}
 
 /**
  * `pty-local` — first-party `terminal-stream` provider.
@@ -194,6 +211,7 @@ export class PtyLocalPlugin implements IPlugin, ITerminalStreamPlugin {
 		return {
 			runId: input.runId,
 			isPty: true,
+			sessionId: makePtyLocalSessionId(input.runId, proc.pid),
 			write: (data) => proc.write(Buffer.from(data).toString('latin1')),
 			resize: (c, r) => proc.resize(c, r),
 			kill: (signal) => {
@@ -272,6 +290,7 @@ export class PtyLocalPlugin implements IPlugin, ITerminalStreamPlugin {
 		return {
 			runId: input.runId,
 			isPty: false,
+			sessionId: makePtyLocalSessionId(input.runId, child.pid),
 			write: (data) => void child.stdin?.write(Buffer.from(data)),
 			resize: () => undefined,
 			kill: (signal) => {

@@ -32,8 +32,15 @@ export function App() {
 	}
 
 	if (!config.wizardCompleted) {
-		return <WizardView bridge={bridge} onCompleted={() => setConfig({ ...config, wizardCompleted: true })} />;
+		return (
+			<WizardView
+				bridge={bridge}
+				onCompleted={() =>
+					void bridge.getConfig().then((next) => setConfig({ ...next, wizardCompleted: true }))
+				}
+			/>
+		);
 	}
 
-	return <StatusScreen bridge={bridge} />;
+	return <StatusScreen bridge={bridge} config={config} />;
 }

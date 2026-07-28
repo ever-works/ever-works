@@ -22,6 +22,8 @@ jest.mock('@ever-works/agent/agents', () => ({
     AgentsModule: class AgentsModule {},
     AgentRepository: class AgentRepository {},
     RunSteeringService: class RunSteeringService {},
+    // Judgment layer G3/G10 — backs the `escalations` domain tool source.
+    AgentEscalationService: class AgentEscalationService {},
     AGENT_HEARTBEAT_TRIGGER: 'AGENT_HEARTBEAT_TRIGGER',
     AGENT_RUN_CANCELLER: 'AGENT_RUN_CANCELLER',
     AGENT_RUN_CHAT_BACK_POSTER: 'AGENT_RUN_CHAT_BACK_POSTER',
@@ -38,12 +40,14 @@ jest.mock('@ever-works/agent/database', () => ({
     AgentEmailAssignmentRepository: class AgentEmailAssignmentRepository {},
     TenantEmailAddressRepository: class TenantEmailAddressRepository {},
     NotificationChannelRepository: class NotificationChannelRepository {},
+    WorkRepository: class WorkRepository {},
 }));
 jest.mock('@ever-works/agent/facades', () => ({
     FacadesModule: class FacadesModule {},
     NotificationChannelFacadeService: class NotificationChannelFacadeService {},
     SearchFacadeService: class SearchFacadeService {},
     ScreenshotFacadeService: class ScreenshotFacadeService {},
+    BrowserAutomationFacadeService: class BrowserAutomationFacadeService {},
     ContentExtractorFacadeService: class ContentExtractorFacadeService {},
     AiFacadeService: class AiFacadeService {},
     GitFacadeService: class GitFacadeService {},
@@ -84,6 +88,8 @@ jest.mock('@ever-works/agent/pr-review', () => ({
 jest.mock('@ever-works/agent/policy', () => ({
     PolicyModule: class PolicyModule {},
     MergePolicyService: class MergePolicyService {},
+    PullRequestGateService: class PullRequestGateService {},
+    ToolGrantService: class ToolGrantService {},
 }));
 jest.mock('@ever-works/agent/services', () => ({
     WorkOwnershipService: class WorkOwnershipService {},
@@ -118,7 +124,7 @@ import { DigestModule, DigestService } from '@ever-works/agent/digest';
 import { MeetingsModule, MeetingRepository } from '@ever-works/agent/meetings';
 import { FleetModule, FleetService } from '@ever-works/agent/fleet';
 import { PrReviewModule, PrReviewService } from '@ever-works/agent/pr-review';
-import { PolicyModule, MergePolicyService } from '@ever-works/agent/policy';
+import { PolicyModule, MergePolicyService, ToolGrantService } from '@ever-works/agent/policy';
 import { WorkOwnershipService } from '@ever-works/agent/services';
 import {
     TasksService,
@@ -127,7 +133,15 @@ import {
     TaskReviewerRepository,
     TaskApproverRepository,
 } from '@ever-works/agent/tasks-domain';
-import { AgentRepository, AGENT_DOMAIN_TOOL_SOURCES } from '@ever-works/agent/agents';
+import {
+    AgentRepository,
+    AgentEscalationService,
+    AGENT_DOMAIN_TOOL_SOURCES,
+    AGENT_GIT_FACADE,
+} from '@ever-works/agent/agents';
+import { BrowserAutomationFacadeService, GitFacadeService } from '@ever-works/agent/facades';
+import { PullRequestGateService } from '@ever-works/agent/policy';
+import { WorkRepository } from '@ever-works/agent/database';
 
 type FactoryProvider = {
     provide?: unknown;
@@ -157,7 +171,7 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
         expect(findProvider(AGENT_DOMAIN_TOOL_SOURCES)).toBeDefined();
     });
 
-    it('injects exactly the services the six descriptor factories need', () => {
+    it('injects exactly the services the descriptor factories need', () => {
         expect(findProvider(AGENT_DOMAIN_TOOL_SOURCES)?.inject).toEqual([
             TasksService,
             TaskChatService,
@@ -172,6 +186,12 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
             MergePolicyService,
             WorkOwnershipService,
             AgentRepository,
+            // Audit G22 — headless browsing (read-only).
+            BrowserAutomationFacadeService,
+            // Judgment layer G3/G10 — the escalation queue tools.
+            AgentEscalationService,
+            // Tool-grant matrix (audit item G4) — the read-only grant tools.
+            ToolGrantService,
         ]);
     });
 
@@ -205,8 +225,88 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
             'digest',
             'meetings',
             'fleet',
+            // Audit G22 — headless browsing. Bound with only `read`, so the
+            // capability's page-driving `act` is unreachable from chat.
+            'browser',
             'prReview',
             'mergePolicy',
+            'escalations',
+            // Audit G4 — the read-only tool-grant matrix.
+            'toolGrants',
         ]);
+    });
+});
+
+/**
+ * Quality gates (audit W3 M3) — the `openPullRequest` Agent tool is one of
+ * the non-worker `createPullRequest` callers, so its adapter has to consult
+ * `PullRequestGateService`. These build the real factory with stubs and
+ * exercise the three outcomes.
+ */
+describe('api-side AgentsModule — AGENT_GIT_FACADE PR gate', () => {
+    type OpenPrFacade = {
+        openPullRequest: (input: Record<string, unknown>) => Promise<{ number: number }>;
+    };
+
+    const buildFacade = (gate: { assertAllowed: jest.Mock }, git: Record<string, jest.Mock>) => {
+        const factory = findProvider(AGENT_GIT_FACADE);
+        return factory?.useFactory?.(git, { findById: jest.fn() }, gate, {
+            findById: jest.fn().mockResolvedValue({ id: 'work-1', checksPolicy: 'required' }),
+        }) as OpenPrFacade;
+    };
+
+    const makeGit = () => ({
+        getRepoDir: jest.fn().mockResolvedValue('/tmp/work-1'),
+        createPullRequest: jest.fn().mockResolvedValue({ number: 12, url: 'https://pr/12' }),
+    });
+
+    it('injects the PR gate and the Work repository alongside the git facade', () => {
+        expect(findProvider(AGENT_GIT_FACADE)?.inject).toEqual([
+            GitFacadeService,
+            AgentRepository,
+            PullRequestGateService,
+            WorkRepository,
+        ]);
+    });
+
+    it('opens the PR when the gate allows it', async () => {
+        const git = makeGit();
+        const gate = { assertAllowed: jest.fn().mockResolvedValue({ allowed: true }) };
+        const facade = buildFacade(gate, git);
+
+        const pr = await facade.openPullRequest({
+            userId: 'u1',
+            agentId: 'a1',
+            workId: 'work-1',
+            title: 't',
+            body: 'b',
+            head: 'feature',
+        });
+
+        expect(gate.assertAllowed).toHaveBeenCalled();
+        expect(git.createPullRequest).toHaveBeenCalled();
+        expect(pr.number).toBe(12);
+    });
+
+    it('opens NO PR and surfaces the refusal when the gate fails', async () => {
+        const git = makeGit();
+        const gate = {
+            assertAllowed: jest
+                .fn()
+                .mockRejectedValue(new Error('Quality gate red — build (red).')),
+        };
+        const facade = buildFacade(gate, git);
+
+        await expect(
+            facade.openPullRequest({
+                userId: 'u1',
+                agentId: 'a1',
+                workId: 'work-1',
+                title: 't',
+                body: 'b',
+                head: 'feature',
+            }),
+        ).rejects.toThrow('Quality gate red');
+        expect(git.createPullRequest).not.toHaveBeenCalled();
     });
 });

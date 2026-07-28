@@ -8,6 +8,7 @@ import {
 	ZOOM_WINDOW_MAX_DAYS
 } from './zoom-connector-plugin.js';
 import type { ZoomRecordingsPage } from './zoom-connector-plugin.js';
+import { supportsEventSourceBackfill } from '@ever-works/plugin';
 
 const listAllRecordingsMock = vi.fn();
 const downloadTranscriptMock = vi.fn();
@@ -289,5 +290,94 @@ describe('ZoomConnectorPlugin', () => {
 		await expect(
 			plugin.send({ messageRef: 'ref-1', text: 'hello' } as never, { settings: SETTINGS })
 		).rejects.toThrow(/not supported in v1/);
+	});
+
+	// `backfill()` capability method (audit item (l)).
+	describe('backfill', () => {
+		it('is exposed as the capability method, feature-detectable by callers', () => {
+			expect(typeof plugin.backfill).toBe('function');
+			expect(supportsEventSourceBackfill(plugin as never)).toBe(true);
+		});
+
+		it('⭐ sweeps an EXPLICIT window regardless of the settings backfillDays', async () => {
+			listAllRecordingsMock.mockResolvedValue(emptyPage());
+			const since = '2026-05-01T00:00:00.000Z';
+			const until = '2026-05-10T00:00:00.000Z';
+
+			// `backfillDays` is deliberately absent: history used to be
+			// reachable ONLY through that first-pull setting.
+			const result = await plugin.backfill({ since, until, settings: SETTINGS });
+
+			const query = listAllRecordingsMock.mock.calls[0][0];
+			expect(query.from).toBe('2026-05-01');
+			expect(query.to).toBe('2026-05-10');
+			expect(result.complete).toBe(true);
+			expect(result.nextCursor).toBeUndefined();
+		});
+
+		it('chunks a long window and resumes from the returned cursor', async () => {
+			listAllRecordingsMock.mockResolvedValue(emptyPage());
+			const since = '2026-01-01T00:00:00.000Z';
+			const until = new Date(Date.parse(since) + 3 * ZOOM_WINDOW_MAX_DAYS * DAY_MS).toISOString();
+
+			const first = await plugin.backfill({ since, until, settings: SETTINGS });
+			expect(first.nextCursor).toBeDefined();
+			expect(first.complete).toBeUndefined();
+
+			const second = await plugin.backfill({
+				since,
+				until,
+				cursor: first.nextCursor,
+				settings: SETTINGS
+			});
+			// The second call advanced past the first ≤30-day chunk.
+			expect(listAllRecordingsMock.mock.calls[1][0].from).not.toBe(listAllRecordingsMock.mock.calls[0][0].from);
+			expect(second.nextCursor).toBeDefined();
+		});
+
+		it('defaults `until` to now and normalizes an inverted window to a no-op', async () => {
+			listAllRecordingsMock.mockResolvedValue(emptyPage());
+
+			const empty = await plugin.backfill({
+				since: '2026-07-01T00:00:00.000Z',
+				until: '2026-06-01T00:00:00.000Z',
+				settings: SETTINGS
+			});
+			expect(empty).toEqual({ events: [], complete: true });
+			expect(listAllRecordingsMock).not.toHaveBeenCalled();
+
+			await plugin.backfill({ since: new Date(Date.now() - DAY_MS).toISOString(), settings: SETTINGS });
+			expect(listAllRecordingsMock.mock.calls[0][0].to).toBe(new Date().toISOString().slice(0, 10));
+		});
+
+		it('normalizes ingested recordings the same way the incremental sweep does', async () => {
+			listAllRecordingsMock.mockResolvedValue({ meetings: [recordingMeeting()] });
+
+			const result = await plugin.backfill({
+				since: '2026-07-01T00:00:00.000Z',
+				until: '2026-07-20T00:00:00.000Z',
+				settings: SETTINGS
+			});
+
+			expect(result.events).toHaveLength(1);
+			expect(result.events[0]).toMatchObject({
+				source: 'zoom-connector',
+				kind: 'zoom.recording',
+				sourceEventId: 'uuid-1:recording'
+			});
+		});
+
+		it('rejects a malformed window loudly instead of sweeping something arbitrary', async () => {
+			await expect(plugin.backfill({ since: 'yesterday', settings: SETTINGS })).rejects.toThrow(/valid ISO 8601/);
+			await expect(
+				plugin.backfill({ since: '2026-07-01T00:00:00.000Z', until: 'soon', settings: SETTINGS })
+			).rejects.toThrow(/valid ISO 8601/);
+		});
+
+		it('still requires credentials — an unconfigured source fails with the stable error name', async () => {
+			await expect(plugin.backfill({ since: '2026-07-01T00:00:00.000Z', settings: {} })).rejects.toMatchObject({
+				name: 'EventSourceNotConfiguredError'
+			});
+		});
 	});
 });

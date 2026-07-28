@@ -80,3 +80,30 @@ describe('TaskRepository.casClaimRecurrence', () => {
         expect(await svc.casClaimRecurrence('t1', new Date(), null)).toBe(false);
     });
 });
+
+/**
+ * Git activity ingestion (audit item j) — a push names a branch, and the
+ * worktree-per-Task path stamps that branch onto `tasks.branchRef`.
+ */
+describe('TaskRepository.findByWorkAndBranchRef', () => {
+    it('keys on (workId, branchRef) and prefers the most recently updated row', async () => {
+        const findOne = jest.fn().mockResolvedValue({ id: 't1' });
+        const svc = new TaskRepository({ findOne } as any);
+
+        await expect(svc.findByWorkAndBranchRef('w1', 'ever/task-t-42')).resolves.toEqual({
+            id: 't1',
+        });
+        expect(findOne).toHaveBeenCalledWith({
+            where: { workId: 'w1', branchRef: 'ever/task-t-42' },
+            order: { updatedAt: 'DESC' },
+        });
+    });
+
+    it('short-circuits an empty branch instead of matching every branchless Task', async () => {
+        const findOne = jest.fn();
+        const svc = new TaskRepository({ findOne } as any);
+
+        await expect(svc.findByWorkAndBranchRef('w1', '')).resolves.toBeNull();
+        expect(findOne).not.toHaveBeenCalled();
+    });
+});

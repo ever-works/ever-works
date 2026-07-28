@@ -30,9 +30,20 @@ export interface TerminalPaneProps {
     /** Injectable for tests: renderer + network seams. */
     createRenderer?: () => Promise<TerminalRenderer>;
     attachDeps?: TerminalAttachDeps;
+    /**
+     * Attach read-only — mints a `viewer` token, so this pane watches a
+     * session someone else is driving instead of taking the keyboard.
+     */
+    readOnly?: boolean;
 }
 
-export function TerminalPane({ agentId, runId, createRenderer, attachDeps }: TerminalPaneProps) {
+export function TerminalPane({
+    agentId,
+    runId,
+    createRenderer,
+    attachDeps,
+    readOnly,
+}: TerminalPaneProps) {
     const t = useTranslations('dashboard.terminal');
     const hostRef = useRef<HTMLDivElement | null>(null);
     const rendererRef = useRef<TerminalRenderer | null>(null);
@@ -52,6 +63,7 @@ export function TerminalPane({ agentId, runId, createRenderer, attachDeps }: Ter
             },
         },
         attachDeps,
+        { readOnly: readOnly === true },
     );
 
     // Mount the renderer imperatively, once, into the child-free host.

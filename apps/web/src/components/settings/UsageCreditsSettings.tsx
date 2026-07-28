@@ -1,21 +1,41 @@
 'use client';
 
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { AlertCircle } from 'lucide-react';
+import { AlertCircle, Download } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
 import { UsageByDayChart } from '@/components/settings/usage/UsageByDayChart';
 import { UsageBreakdownChart } from '@/components/settings/usage/UsageBreakdownChart';
 import {
+    buildUsageExportQuery,
+    buildUsageSummaryQuery,
+    currentUsageMonth,
     formatCents,
     formatCreditsAsDollars,
+    formatUsageMonthLabel,
+    isUsageMonthPeriod,
+    parseUsagePeriod,
+    recentUsageMonths,
+    USAGE_ROLLING_PERIODS,
+    type UsagePeriod,
     type UsageSummaryGrouped,
     type UsageSummaryTotals,
 } from '@/lib/api/credits.shared';
 import type { AccountWideUsage } from '@/lib/api/usage';
 
+/** Everything the page renders for ONE period. */
+interface UsageSnapshot {
+    totals: UsageSummaryTotals | null;
+    byDay: UsageSummaryGrouped | null;
+    byModel: UsageSummaryGrouped | null;
+    byAgent: UsageSummaryGrouped | null;
+    byWork: UsageSummaryGrouped | null;
+}
+
 interface UsageCreditsSettingsProps {
+    /** Period the server rendered the initial snapshot with (B20). */
+    initialPeriod: UsagePeriod;
     initialTotals: UsageSummaryTotals | null;
     initialByDay: UsageSummaryGrouped | null;
     initialByModel: UsageSummaryGrouped | null;
@@ -24,7 +44,19 @@ interface UsageCreditsSettingsProps {
     accountWide: AccountWideUsage | null;
 }
 
-type DayRange = '7d' | '30d';
+/** How many calendar months the month picker offers (B20). */
+const MONTH_OPTION_COUNT = 12;
+
+async function fetchUsage<T>(query: string): Promise<T> {
+    const response = await fetch(`/api/credits/usage-summary${query}`, {
+        method: 'GET',
+        cache: 'no-store',
+    });
+    if (!response.ok) {
+        throw new Error(`HTTP ${response.status}`);
+    }
+    return (await response.json()) as T;
+}
 
 function StatTile({ label, value, testId }: { label: string; value: string; testId: string }) {
     // Monochrome KPI tiles per the house UI pattern — status colour
@@ -61,6 +93,7 @@ function ChartCard({
 }
 
 export function UsageCreditsSettings({
+    initialPeriod,
     initialTotals,
     initialByDay,
     initialByModel,
@@ -70,54 +103,153 @@ export function UsageCreditsSettings({
 }: UsageCreditsSettingsProps) {
     const t = useTranslations('dashboard.settings.usage');
 
-    // 7d/30d toggle for the by-day chart: refetch through the web
-    // proxy, cache each range so flipping back is instant.
-    const [dayRange, setDayRange] = useState<DayRange>('30d');
-    const [byDayCache, setByDayCache] = useState<Record<DayRange, UsageSummaryGrouped | null>>({
-        '30d': initialByDay,
-        '7d': null,
-    });
-    const [dayLoading, setDayLoading] = useState(false);
-    const [dayError, setDayError] = useState(false);
+    const initialSnapshot = useMemo<UsageSnapshot>(
+        () => ({
+            totals: initialTotals,
+            byDay: initialByDay,
+            byModel: initialByModel,
+            byAgent: initialByAgent,
+            byWork: initialByWork,
+        }),
+        [initialTotals, initialByDay, initialByModel, initialByAgent, initialByWork],
+    );
 
-    const handleRangeChange = async (range: DayRange) => {
-        setDayRange(range);
-        if (byDayCache[range]) {
+    // B20 — one period drives the WHOLE page (tiles + all four charts),
+    // and it accepts a `YYYY-MM` month as well as the rolling ranges.
+    // Each period's snapshot is cached so flipping back is instant.
+    const [period, setPeriod] = useState<UsagePeriod>(initialPeriod);
+    const [snapshot, setSnapshot] = useState<UsageSnapshot>(initialSnapshot);
+    const [cache, setCache] = useState<Record<string, UsageSnapshot>>({
+        [initialPeriod]: initialSnapshot,
+    });
+    const [loading, setLoading] = useState(false);
+    const [loadFailed, setLoadFailed] = useState(false);
+
+    // Newest-first month options; the server-rendered period is included
+    // even when it predates the window (a `?period=` deep link).
+    const monthOptions = useMemo(() => {
+        const months = recentUsageMonths(MONTH_OPTION_COUNT);
+        if (isUsageMonthPeriod(initialPeriod) && !months.includes(initialPeriod)) {
+            months.push(initialPeriod);
+        }
+        return months;
+    }, [initialPeriod]);
+
+    const handlePeriodChange = async (next: UsagePeriod) => {
+        if (next === period) {
             return;
         }
-        setDayLoading(true);
-        setDayError(false);
+        setPeriod(next);
+        setLoadFailed(false);
+
+        const cached = cache[next];
+        if (cached) {
+            setSnapshot(cached);
+            return;
+        }
+
+        setLoading(true);
         try {
-            const response = await fetch(`/api/credits/usage-summary?groupBy=day&period=${range}`, {
-                method: 'GET',
-                cache: 'no-store',
-            });
-            if (!response.ok) {
-                throw new Error(`HTTP ${response.status}`);
-            }
-            const data = (await response.json()) as UsageSummaryGrouped;
-            setByDayCache((cache) => ({ ...cache, [range]: data }));
+            const [totals, byDay, byModel, byAgent, byWork] = await Promise.all([
+                fetchUsage<UsageSummaryTotals>(buildUsageSummaryQuery({ period: next })),
+                fetchUsage<UsageSummaryGrouped>(
+                    buildUsageSummaryQuery({ groupBy: 'day', period: next }),
+                ),
+                fetchUsage<UsageSummaryGrouped>(
+                    buildUsageSummaryQuery({ groupBy: 'model', period: next }),
+                ),
+                fetchUsage<UsageSummaryGrouped>(
+                    buildUsageSummaryQuery({ groupBy: 'agent', period: next }),
+                ),
+                fetchUsage<UsageSummaryGrouped>(
+                    buildUsageSummaryQuery({ groupBy: 'work', period: next }),
+                ),
+            ]);
+            const fresh: UsageSnapshot = { totals, byDay, byModel, byAgent, byWork };
+            setCache((current) => ({ ...current, [next]: fresh }));
+            setSnapshot(fresh);
         } catch {
-            setDayError(true);
+            setLoadFailed(true);
         } finally {
-            setDayLoading(false);
+            setLoading(false);
         }
     };
 
-    const byDay = byDayCache[dayRange];
-    const dataUnavailable =
-        !initialTotals && !initialByDay && !initialByModel && !initialByAgent && !initialByWork;
+    const selectedMonth = isUsageMonthPeriod(period) ? period : '';
+    const exportHref = `/api/credits/usage/export${buildUsageExportQuery({ period })}`;
+    const periodLabel = isUsageMonthPeriod(period) ? formatUsageMonthLabel(period) : period;
+
+    // `accountWide` is the CURRENT month's account-wide spend; it must not
+    // stand in for the tile once the user selects another period.
+    const currentMonth = useMemo(() => currentUsageMonth(), []);
+    const showsCurrentMonth = period === currentMonth;
+
+    const { totals, byDay, byModel, byAgent, byWork } = snapshot;
+    const dataUnavailable = !totals && !byDay && !byModel && !byAgent && !byWork;
 
     return (
         <div className="space-y-8" data-testid="usage-credits-settings">
-            <div>
-                <h2 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
-                    {t('title')}
-                </h2>
-                <p className="text-text-muted dark:text-text-muted-dark text-sm">{t('subtitle')}</p>
+            <div className="flex flex-wrap items-start justify-between gap-4">
+                <div>
+                    <h2 className="text-xl font-semibold text-text dark:text-text-dark mb-2">
+                        {t('title')}
+                    </h2>
+                    <p className="text-text-muted dark:text-text-muted-dark text-sm">
+                        {t('subtitle')}
+                    </p>
+                </div>
+
+                {/* ── B20 period selector + B21 CSV export ─────────── */}
+                <div
+                    role="group"
+                    aria-label={t('period.label')}
+                    className="flex flex-wrap items-center gap-2"
+                    data-testid="usage-period-bar"
+                >
+                    {USAGE_ROLLING_PERIODS.map((range) => (
+                        <Button
+                            key={range}
+                            variant={period === range ? 'primary' : 'secondary'}
+                            className={cn('text-xs px-3 py-1')}
+                            data-testid={`usage-range-${range}`}
+                            onClick={() => handlePeriodChange(range)}
+                        >
+                            {t(`charts.range${range}`)}
+                        </Button>
+                    ))}
+                    <select
+                        aria-label={t('period.monthLabel')}
+                        data-testid="usage-period-month"
+                        value={selectedMonth}
+                        onChange={(event) => {
+                            const next = parseUsagePeriod(event.target.value);
+                            if (next) {
+                                void handlePeriodChange(next);
+                            }
+                        }}
+                        className="rounded-md border border-border dark:border-border-dark bg-transparent px-2 py-1 text-xs text-text dark:text-text-dark"
+                    >
+                        <option value="">{t('period.monthPlaceholder')}</option>
+                        {monthOptions.map((month) => (
+                            <option key={month} value={month}>
+                                {formatUsageMonthLabel(month)}
+                            </option>
+                        ))}
+                    </select>
+                    <a
+                        href={exportHref}
+                        download
+                        data-testid="usage-export-csv"
+                        title={t('export.csvHint', { period: periodLabel })}
+                        className="inline-flex items-center gap-1.5 rounded-md border border-border dark:border-border-dark px-3 py-1.5 text-xs font-medium text-text dark:text-text-dark hover:bg-surface-hover dark:hover:bg-surface-hover-dark"
+                    >
+                        <Download className="w-3.5 h-3.5" aria-hidden="true" />
+                        {t('export.csv')}
+                    </a>
+                </div>
             </div>
 
-            {dataUnavailable ? (
+            {dataUnavailable || loadFailed ? (
                 <div
                     data-testid="usage-load-error"
                     className="flex items-center gap-2 rounded-lg border border-warning/40 bg-warning/5 p-4 text-sm text-text dark:text-text-dark"
@@ -128,83 +260,68 @@ export function UsageCreditsSettings({
             ) : null}
 
             {/* ── §4.1/§4.2 — period summary tiles ─────────────────── */}
-            {initialTotals ? (
+            {totals ? (
                 <div
                     className="grid grid-cols-2 gap-4 sm:grid-cols-3 @5xl/main:grid-cols-7"
                     data-testid="usage-summary-tiles"
                 >
                     <StatTile
                         label={t('tiles.balance')}
-                        value={formatCreditsAsDollars(initialTotals.balanceCredits)}
+                        value={formatCreditsAsDollars(totals.balanceCredits)}
                         testId="usage-tile-balance"
                     />
                     <StatTile
                         label={t('tiles.consumed')}
-                        value={formatCreditsAsDollars(initialTotals.creditsConsumed)}
+                        value={formatCreditsAsDollars(totals.creditsConsumed)}
                         testId="usage-tile-consumed"
                     />
                     <StatTile
                         label={t('tiles.added')}
-                        value={formatCreditsAsDollars(initialTotals.creditsAdded)}
+                        value={formatCreditsAsDollars(totals.creditsAdded)}
                         testId="usage-tile-added"
                     />
                     <StatTile
                         label={t('tiles.spend')}
                         value={formatCents(
-                            accountWide?.currentSpendCents ?? initialTotals.spendCents,
+                            showsCurrentMonth
+                                ? (accountWide?.currentSpendCents ?? totals.spendCents)
+                                : totals.spendCents,
                         )}
                         testId="usage-tile-spend"
                     />
                     <StatTile
                         label={t('tiles.tasksCompleted')}
-                        value={String(initialTotals.tasksCompleted)}
+                        value={String(totals.tasksCompleted)}
                         testId="usage-tile-tasks"
                     />
                     <StatTile
                         label={t('tiles.worksActive')}
-                        value={String(initialTotals.worksActive)}
+                        value={String(totals.worksActive)}
                         testId="usage-tile-works"
                     />
                     <StatTile
                         label={t('tiles.agentRuns')}
-                        value={String(initialTotals.agentRuns)}
+                        value={String(totals.agentRuns)}
                         testId="usage-tile-runs"
                     />
                 </div>
             ) : null}
-            {initialTotals ? (
+            {totals ? (
                 <p className="text-xs text-text-muted dark:text-text-muted-dark -mt-4">
-                    {t('tiles.periodNote', { period: initialTotals.period })}
+                    {t('tiles.periodNote', { period: totals.period })}
                 </p>
             ) : null}
 
-            {/* ── §4.3 — usage per day (7d/30d toggle) ─────────────── */}
-            <ChartCard
-                title={t('charts.byDay')}
-                action={
-                    <div className="flex gap-1">
-                        {(['7d', '30d'] as const).map((range) => (
-                            <Button
-                                key={range}
-                                variant={dayRange === range ? 'primary' : 'secondary'}
-                                className={cn('text-xs px-3 py-1')}
-                                data-testid={`usage-range-${range}`}
-                                onClick={() => handleRangeChange(range)}
-                            >
-                                {t(`charts.range${range}`)}
-                            </Button>
-                        ))}
-                    </div>
-                }
-            >
-                {dayLoading ? (
+            {/* ── §4.3 — usage per day ─────────────────────────────── */}
+            <ChartCard title={t('charts.byDay')}>
+                {loading ? (
                     <p
                         className="py-10 text-center text-xs text-text-muted dark:text-text-muted-dark"
                         data-testid="usage-by-day-loading"
                     >
                         {t('charts.loading')}
                     </p>
-                ) : dayError ? (
+                ) : loadFailed ? (
                     <p
                         className="py-10 text-center text-xs text-danger"
                         data-testid="usage-by-day-error"
@@ -220,7 +337,7 @@ export function UsageCreditsSettings({
             <div className="grid gap-4 @3xl/main:grid-cols-2">
                 <ChartCard title={t('charts.byModel')}>
                     <UsageBreakdownChart
-                        rows={initialByModel?.rows ?? []}
+                        rows={byModel?.rows ?? []}
                         emptyLabel={t('charts.empty')}
                         unattributedLabel={t('charts.unattributed')}
                         testId="usage-by-model-chart"
@@ -228,7 +345,7 @@ export function UsageCreditsSettings({
                 </ChartCard>
                 <ChartCard title={t('charts.byAgent')}>
                     <UsageBreakdownChart
-                        rows={initialByAgent?.rows ?? []}
+                        rows={byAgent?.rows ?? []}
                         emptyLabel={t('charts.empty')}
                         unattributedLabel={t('charts.unattributed')}
                         testId="usage-by-agent-chart"
@@ -237,7 +354,7 @@ export function UsageCreditsSettings({
             </div>
             <ChartCard title={t('charts.byWork')}>
                 <UsageBreakdownChart
-                    rows={initialByWork?.rows ?? []}
+                    rows={byWork?.rows ?? []}
                     emptyLabel={t('charts.empty')}
                     unattributedLabel={t('charts.unattributed')}
                     testId="usage-by-work-chart"

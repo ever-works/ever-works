@@ -7,8 +7,25 @@ import {
     Optional,
 } from '@nestjs/common';
 import type { IPlugin } from '@ever-works/plugin';
-import type { FleetNodeLoadView } from '@ever-works/contracts';
-import { FleetNode, FleetNodeKind, FleetNodeStatus } from '../entities/fleet-node.entity';
+import {
+    FLEET_DEFAULT_ENROLLMENT_TOKEN_TTL_MS,
+    FLEET_DEFAULT_MAX_CAPABILITY_TAG_LENGTH,
+    FLEET_DEFAULT_MAX_CAPABILITY_TAGS,
+    FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS,
+    FLEET_ENROLLABLE_NODE_KINDS,
+    FLEET_MAX_NODE_NAME_LENGTH,
+    FLEET_MAX_PLATFORM_LENGTH,
+    FLEET_MAX_VERSION_LENGTH,
+    FLEET_MIN_NODE_NAME_LENGTH,
+} from '@ever-works/contracts';
+import type { FleetNodeView, FleetNodeLoadView } from '@ever-works/contracts';
+import { config } from '../config';
+import {
+    FleetNode,
+    FleetNodeKind,
+    FleetNodeStatus,
+    FLEET_NODE_STICKY_STATUSES,
+} from '../entities/fleet-node.entity';
 import { PluginRegistryService } from '../plugins/services/plugin-registry.service';
 import { PluginSettingsService } from '../plugins/services/plugin-settings.service';
 import { FleetNodeRepository } from './fleet-node.repository';
@@ -20,18 +37,35 @@ import {
     UUID_RE,
 } from './fleet-node-credential';
 
-/** One-time enrollment tokens expire 15 minutes after issue. */
-export const FLEET_ENROLLMENT_TOKEN_TTL_MS = 15 * 60_000;
+/**
+ * Fleet limits are OPERATOR KNOBS, read through `config.fleet.*` on
+ * every use so an env change lands without a restart-shaped code change
+ * (and so tests can drive both branches). The constants below are the
+ * DEFAULTS those getters fall back to — the same values these used to
+ * be hard-coded at — and they stay exported because the node apps and
+ * the specs legitimately need the default, not the live setting.
+ */
 
-/** An `online` node with no heartbeat for this long sweeps to `offline`. */
-export const FLEET_NODE_OFFLINE_AFTER_MS = 5 * 60_000;
+/** Default one-time enrollment-token lifetime (15 minutes). */
+export const FLEET_ENROLLMENT_TOKEN_TTL_MS = FLEET_DEFAULT_ENROLLMENT_TOKEN_TTL_MS;
+
+/** Default silence after which an `online` node sweeps to `offline` (5 minutes). */
+export const FLEET_NODE_OFFLINE_AFTER_MS = FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS;
 
 /** Kinds a machine can enroll as ('k8s' is list-time only, never a row). */
-export const FLEET_ENROLLABLE_KINDS: readonly FleetNodeKind[] = ['desktop-node', 'node'];
+export const FLEET_ENROLLABLE_KINDS: readonly FleetNodeKind[] = FLEET_ENROLLABLE_NODE_KINDS;
 
-/** Caps on the node self-description (defensive, DTOs cap the edge too). */
-export const FLEET_MAX_CAPABILITY_TAGS = 16;
-export const FLEET_MAX_CAPABILITY_TAG_LENGTH = 32;
+/** Default caps on the node self-description (defensive, DTOs cap the edge too). */
+export const FLEET_MAX_CAPABILITY_TAGS = FLEET_DEFAULT_MAX_CAPABILITY_TAGS;
+export const FLEET_MAX_CAPABILITY_TAG_LENGTH = FLEET_DEFAULT_MAX_CAPABILITY_TAG_LENGTH;
+
+/**
+ * The wire view of one fleet node now lives in `@ever-works/contracts`
+ * so the API, the web tier and the node apps compile against ONE
+ * declaration. Re-exported here because `@ever-works/agent/fleet` is
+ * where every server-side consumer already imports it from.
+ */
+export type { FleetNodeView };
 
 /**
  * Sentinel `DeployFacadeService.getTokenFromSettings` returns for
@@ -43,29 +77,33 @@ export const FLEET_MAX_CAPABILITY_TAG_LENGTH = 32;
  */
 const PLATFORM_MANAGED_KUBECONFIG_SENTINEL = '__ever-works-platform-managed-kubeconfig__';
 
-/** Wire/view shape of one fleet node (never carries credential hashes). */
-export interface FleetNodeView {
-    id: string;
+/**
+ * One OUTSTANDING enrollment token — a node row that has been minted but
+ * never enrolled.
+ *
+ * There is no separate token table by design: while a node is
+ * `enrolling`, the row IS the token (its `enrollmentTokenHash` holds the
+ * token's sha256). Listing the outstanding set is therefore a read of
+ * the `enrolling` rows, and revoking one pre-use is a delete of that
+ * row. The plaintext token is NOT here and can never be re-read — it was
+ * returned exactly once at mint time.
+ */
+export interface FleetEnrollmentTokenView {
+    /** Id of the node the token was minted for (the revoke handle). */
+    nodeId: string;
     name: string;
     kind: FleetNodeKind;
-    status: FleetNodeStatus;
-    platform: string | null;
-    version: string | null;
-    capabilities: string[];
-    lastHeartbeatAt: string | null;
-    createdAt: string | null;
+    /** When the token was issued (ISO). */
+    issuedAt: string | null;
+    /** When it stops being consumable (ISO). */
+    expiresAt: string | null;
+    /** True once `expiresAt` has passed — still revocable, never usable. */
+    expired: boolean;
     /**
-     * True for enrolled rows; false for nodes of the user's own
-     * configured clusters, which are surfaced live and never stored.
+     * True when the token was minted by a credential ROTATION on an
+     * already-enrolled node rather than by a fresh "add node".
      */
-    persisted: boolean;
-    /**
-     * Live execution load (Desktop PRD §4.1 "current load (running
-     * Tasks)"). Populated by the API edge from `FleetJobService`;
-     * `null`/absent means idle. Cluster-sourced rows never carry it —
-     * the platform does not lease work onto them.
-     */
-    load?: FleetNodeLoadView | null;
+    rotated: boolean;
 }
 
 export interface CreateEnrollmentTokenInput {
@@ -140,8 +178,10 @@ export class FleetService {
         input: CreateEnrollmentTokenInput,
     ): Promise<CreateEnrollmentTokenResult> {
         const name = typeof input.name === 'string' ? input.name.trim() : '';
-        if (name.length < 1 || name.length > 200) {
-            throw new BadRequestException('Node name must be 1-200 characters');
+        if (name.length < FLEET_MIN_NODE_NAME_LENGTH || name.length > FLEET_MAX_NODE_NAME_LENGTH) {
+            throw new BadRequestException(
+                `Node name must be ${FLEET_MIN_NODE_NAME_LENGTH}-${FLEET_MAX_NODE_NAME_LENGTH} characters`,
+            );
         }
         if (!FLEET_ENROLLABLE_KINDS.includes(input.kind)) {
             throw new BadRequestException(
@@ -157,13 +197,14 @@ export class FleetService {
             kind: input.kind,
             status: 'enrolling',
             enrollmentTokenHash: sha256Hex(token),
+            credentialIssuedAt: new Date(),
             capabilities: [],
         });
 
         return {
             node: this.toView(node),
             token,
-            expiresInSec: Math.floor(FLEET_ENROLLMENT_TOKEN_TTL_MS / 1000),
+            expiresInSec: Math.floor(config.fleet.getEnrollmentTokenTtlMs() / 1000),
         };
     }
 
@@ -193,8 +234,16 @@ export class FleetService {
         if (!constantTimeEquals(node.enrollmentTokenHash, tokenHash)) {
             return null;
         }
-        const issuedAt = node.createdAt instanceof Date ? node.createdAt.getTime() : NaN;
-        if (!Number.isFinite(issuedAt) || Date.now() - issuedAt > FLEET_ENROLLMENT_TOKEN_TTL_MS) {
+        // `credentialIssuedAtMs` (not `node.createdAt`): once a
+        // credential can be ROTATED, its age must be measured from the
+        // rotation, not from when the row was first created — and it
+        // also copes with the string dates sqlite hands back. The TTL
+        // itself stays the configurable, clamped one.
+        const issuedAt = credentialIssuedAtMs(node);
+        if (
+            !Number.isFinite(issuedAt) ||
+            Date.now() - issuedAt > config.fleet.getEnrollmentTokenTtlMs()
+        ) {
             return null;
         }
 
@@ -204,8 +253,8 @@ export class FleetService {
             enrollmentTokenHash: sha256Hex(secret),
             status: 'online' as FleetNodeStatus,
             lastHeartbeatAt: now,
-            platform: sanitizeText(input.platform, 64),
-            version: sanitizeText(input.version, 32),
+            platform: sanitizeText(input.platform, FLEET_MAX_PLATFORM_LENGTH),
+            version: sanitizeText(input.version, FLEET_MAX_VERSION_LENGTH),
             capabilities: sanitizeCapabilities(input.capabilities),
         };
         // CAS: single-use by construction — a raced duplicate enroll
@@ -225,7 +274,15 @@ export class FleetService {
     /**
      * Authenticated node heartbeat. Constant-time secret check against
      * the stored hash; fail-closed null on any invalid path (unknown
-     * node, disabled node, missing credential, bad secret).
+     * node, still-enrolling node, missing credential, bad secret).
+     *
+     * A PAUSED or DISABLED node is still accepted (audit A29). Draining
+     * a machine must not blind the operator to it: a node that is told
+     * to stop taking work and then vanishes from Fleet is
+     * indistinguishable from one that crashed, which is precisely the
+     * moment its owner most needs to see it. The beat therefore stamps
+     * `lastHeartbeatAt` but PRESERVES the sticky status, so a heartbeat
+     * can never silently un-pause or re-enable a node.
      */
     async heartbeat(
         nodeId: unknown,
@@ -245,24 +302,27 @@ export class FleetService {
 
         const node = await this.repository.findById(nodeId);
         if (!node) return null;
-        // A disabled node must stop reporting; an enrolling node has no
-        // secret yet (the hash column still holds the token hash).
-        if (node.status === 'disabled' || node.status === 'enrolling') return null;
+        // An enrolling node has no secret yet (the hash column still
+        // holds the token hash), so it can never authenticate here.
+        if (node.status === 'enrolling') return null;
         if (!constantTimeEquals(node.enrollmentTokenHash, sha256Hex(secret))) {
             return null;
         }
 
         const patch: Partial<FleetNode> = {
-            status: 'online',
+            status: FLEET_NODE_STICKY_STATUSES.includes(node.status) ? node.status : 'online',
             // Server-stamped — the node never supplies its own clock.
             lastHeartbeatAt: new Date(),
         };
-        if (refresh.capabilities !== undefined) {
+        // A PINNED tag set is the operator's, not the machine's: an
+        // admin edit that a heartbeat silently reverted seconds later
+        // would not be an edit at all. Unpinning hands the tags back.
+        if (refresh.capabilities !== undefined && !node.capabilitiesPinned) {
             patch.capabilities = sanitizeCapabilities(refresh.capabilities);
         }
-        const platform = sanitizeText(refresh.platform, 64);
+        const platform = sanitizeText(refresh.platform, FLEET_MAX_PLATFORM_LENGTH);
         if (platform) patch.platform = platform;
-        const version = sanitizeText(refresh.version, 32);
+        const version = sanitizeText(refresh.version, FLEET_MAX_VERSION_LENGTH);
         if (version) patch.version = version;
 
         await this.repository.update(node.id, patch);
@@ -278,18 +338,148 @@ export class FleetService {
     async listForUser(userId: string): Promise<FleetNodeView[]> {
         await this.repository.sweepOffline(
             userId,
-            new Date(Date.now() - FLEET_NODE_OFFLINE_AFTER_MS),
+            new Date(Date.now() - config.fleet.getNodeOfflineAfterMs()),
         );
         const rows = await this.repository.findByUser(userId);
         const clusterNodes = await this.listOwnClusterNodes(userId);
         return [...rows.map((row) => this.toView(row)), ...clusterNodes];
     }
 
+    /**
+     * One enrolled node (owner-scoped, no existence leak). Backs the
+     * node-detail drawer; the failure history shown alongside it is
+     * composed at the API edge from `FleetJobService`, so the registry
+     * stays independent of the job runtime.
+     */
+    async getForUser(userId: string, nodeId: string): Promise<FleetNodeView> {
+        return this.toView(await this.getOwnedNode(userId, nodeId));
+    }
+
+    /**
+     * Every OUTSTANDING enrollment token of this owner — i.e. every node
+     * still sitting in `enrolling`, whether the token is fresh, about to
+     * expire, or already expired.
+     *
+     * Expired entries are deliberately still listed: "there is a stale
+     * credential row for a machine I never finished setting up" is
+     * exactly the thing an operator wants to see and clean up, and
+     * hiding it would make the registry quietly disagree with the node
+     * list. Nothing here can reconstruct the plaintext token.
+     */
+    async listOutstandingTokensForUser(userId: string): Promise<FleetEnrollmentTokenView[]> {
+        const rows = await this.repository.findByUser(userId);
+        const now = Date.now();
+        return rows
+            .filter((row) => row.status === 'enrolling')
+            .map((row) => {
+                const issuedAtMs = credentialIssuedAtMs(row);
+                const hasIssuedAt = Number.isFinite(issuedAtMs);
+                const expiresAtMs = issuedAtMs + FLEET_ENROLLMENT_TOKEN_TTL_MS;
+                return {
+                    nodeId: row.id,
+                    name: row.name,
+                    kind: row.kind,
+                    issuedAt: hasIssuedAt ? new Date(issuedAtMs).toISOString() : null,
+                    expiresAt: hasIssuedAt ? new Date(expiresAtMs).toISOString() : null,
+                    // A row we cannot date is treated as expired — the
+                    // enroll path refuses it for the same reason.
+                    expired: !hasIssuedAt || expiresAtMs <= now,
+                    // A rotation mints a token on a row that already
+                    // beat once; a fresh "add node" never has.
+                    rotated: Boolean(row.lastHeartbeatAt),
+                };
+            });
+    }
+
+    /**
+     * Revoke an outstanding enrollment token BEFORE it is used.
+     *
+     * Only `enrolling` rows qualify: once a token has been consumed the
+     * row's hash is a heartbeat secret, and destroying that silently
+     * would be a node deletion wearing a token-revocation label. For an
+     * enrolled node the operator wants {@link rotateCredentialForUser}
+     * (mint a replacement) or `deleteForUser` (remove the machine) —
+     * both explicit, both already surfaced.
+     *
+     * Revoking a never-enrolled row deletes it, because the row exists
+     * only to carry the token: there is no machine behind it yet.
+     */
+    async revokeEnrollmentTokenForUser(userId: string, nodeId: string): Promise<void> {
+        const node = await this.getOwnedNode(userId, nodeId);
+        if (node.status !== 'enrolling') {
+            throw new BadRequestException(
+                'Only an unused enrollment token can be revoked; rotate the node credential instead',
+            );
+        }
+        await this.repository.delete(node.id);
+    }
+
+    /**
+     * Rotate a node's credential: mint a fresh one-time enrollment token
+     * and put the node back to `enrolling`.
+     *
+     * The old heartbeat secret dies the instant the hash is replaced —
+     * that is the entire point, and it is why rotation is a drain as
+     * well as a re-key: the machine stops being able to report or lease
+     * until it re-enrolls with the new token. Returned exactly once,
+     * like every other Fleet credential.
+     */
+    async rotateCredentialForUser(
+        userId: string,
+        nodeId: string,
+    ): Promise<CreateEnrollmentTokenResult> {
+        const node = await this.getOwnedNode(userId, nodeId);
+        const token = randomBytes(32).toString('base64url');
+        const patch: Partial<FleetNode> = {
+            enrollmentTokenHash: sha256Hex(token),
+            credentialIssuedAt: new Date(),
+            status: 'enrolling',
+        };
+        await this.repository.update(node.id, patch);
+        return {
+            node: this.toView({ ...node, ...patch } as FleetNode),
+            token,
+            expiresInSec: Math.floor(FLEET_ENROLLMENT_TOKEN_TTL_MS / 1000),
+        };
+    }
+
+    /**
+     * Hand-edit a node's capability tags (owner-scoped).
+     *
+     * Writing tags PINS them, so the node's next heartbeat no longer
+     * overwrites the operator's set. Passing `pinned: false` clears the
+     * pin and hands ownership of the tags back to the machine — the tags
+     * written in the same call still land, they simply stop being
+     * authoritative from the next beat onwards.
+     */
+    async setCapabilitiesForUser(
+        userId: string,
+        nodeId: string,
+        capabilities: unknown,
+        pinned = true,
+    ): Promise<FleetNodeView> {
+        if (!Array.isArray(capabilities)) {
+            throw new BadRequestException('Capabilities must be an array of tags');
+        }
+        const node = await this.getOwnedNode(userId, nodeId);
+        const patch: Partial<FleetNode> = {
+            capabilities: sanitizeCapabilities(capabilities),
+            capabilitiesPinned: pinned,
+        };
+        await this.repository.update(node.id, patch);
+        return this.toView({ ...node, ...patch } as FleetNode);
+    }
+
     /** Rename an enrolled node (owner-scoped, no existence leak). */
     async renameForUser(userId: string, nodeId: string, name: string): Promise<FleetNodeView> {
         const trimmed = typeof name === 'string' ? name.trim() : '';
-        if (trimmed.length < 1 || trimmed.length > 200) {
-            throw new BadRequestException('Node name must be 1-200 characters');
+        if (
+            trimmed.length < FLEET_MIN_NODE_NAME_LENGTH ||
+            trimmed.length > FLEET_MAX_NODE_NAME_LENGTH
+        ) {
+            throw new BadRequestException(
+                `Node name must be ${FLEET_MIN_NODE_NAME_LENGTH}-${FLEET_MAX_NODE_NAME_LENGTH} characters`,
+            );
         }
         const node = await this.getOwnedNode(userId, nodeId);
         await this.repository.update(node.id, { name: trimmed });
@@ -297,10 +487,16 @@ export class FleetService {
     }
 
     /**
-     * Disable (drain) or re-enable a node. Disabling an `enrolling`
-     * node revokes its unused token (the enroll CAS requires status
+     * Disable or re-enable a node. Disabling an `enrolling` node
+     * revokes its unused token (the enroll CAS requires status
      * `enrolling`); re-enabling lands on `offline` until the next
      * accepted heartbeat proves the node alive.
+     *
+     * Disabling DRAINS rather than severs: no further work is leased
+     * onto the node, but the jobs it already holds keep their claims
+     * and still report their verdicts, and the node keeps heartbeating
+     * so it remains observable (see `heartbeat` and
+     * `FleetJobService.authenticateNode`).
      */
     async setDisabledForUser(
         userId: string,
@@ -313,10 +509,106 @@ export class FleetService {
         return this.toView({ ...node, status });
     }
 
+    /**
+     * Pause (drain) or resume a node, owner-scoped.
+     *
+     * Distinct from `setDisabledForUser`: pausing is the SOFT stop an
+     * operator reaches for when a machine is needed for something else
+     * for an hour. New work stops being leased onto it immediately, its
+     * in-flight claims keep running and keep reporting, and it keeps
+     * heartbeating so it stays visible. Resuming lands on `offline`
+     * until the next accepted heartbeat proves the node alive — the
+     * same convention `setDisabledForUser` uses.
+     */
+    async setPausedForUser(
+        userId: string,
+        nodeId: string,
+        paused: boolean,
+    ): Promise<FleetNodeView> {
+        const node = await this.getOwnedNode(userId, nodeId);
+        // Never let "resume" silently undo a disable: a disabled node
+        // has to be re-enabled explicitly.
+        if (!paused && node.status === 'disabled') {
+            return this.toView(node);
+        }
+        const status: FleetNodeStatus = paused ? 'paused' : 'offline';
+        await this.repository.update(node.id, { status });
+        return this.toView({ ...node, status });
+    }
+
+    /**
+     * Node-initiated pause/resume — `ever-works-node pause` on the
+     * machine itself. Authenticated with the node's OWN heartbeat
+     * secret (the same constant-time hash check every node-facing
+     * endpoint uses), so an operator sitting at the keyboard can drain
+     * their machine without a platform session.
+     *
+     * Returns null on every invalid path so the edge answers one
+     * undifferentiated 401. A still-enrolling node cannot pause: its
+     * hash column holds a token, not a secret.
+     */
+    async setPausedByCredential(
+        nodeId: unknown,
+        secret: unknown,
+        paused: boolean,
+    ): Promise<{ node: FleetNodeView } | null> {
+        const node = await this.authenticateNodeByCredential(nodeId, secret);
+        if (!node) return null;
+        // A node may drain ITSELF, but must not be able to lift an
+        // owner-imposed disable by asking nicely.
+        if (!paused && node.status === 'disabled') {
+            return { node: this.toView(node) };
+        }
+        const status: FleetNodeStatus = paused ? 'paused' : 'offline';
+        await this.repository.update(node.id, { status });
+        return { node: this.toView({ ...node, status }) };
+    }
+
+    /**
+     * Node-initiated unenrollment — `ever-works-node unenroll`. Deletes
+     * the registration the presented credential belongs to, which is
+     * what makes the credential itself worthless from that moment on.
+     *
+     * Deliberately a DELETE rather than a status flip: the machine is
+     * telling the platform it is leaving, and leaving a dangling row
+     * whose secret still lives on a decommissioned laptop is the worse
+     * outcome. Returns false on every invalid path (one 401 at the edge).
+     */
+    async unenrollByCredential(nodeId: unknown, secret: unknown): Promise<boolean> {
+        const node = await this.authenticateNodeByCredential(nodeId, secret);
+        if (!node) return false;
+        await this.repository.delete(node.id);
+        return true;
+    }
+
     /** Delete a node registration (owner-scoped, no existence leak). */
     async deleteForUser(userId: string, nodeId: string): Promise<void> {
         const node = await this.getOwnedNode(userId, nodeId);
         await this.repository.delete(node.id);
+    }
+
+    /**
+     * Resolve + verify a node by its own heartbeat credential. Shares
+     * the heartbeat posture exactly: shape guards before any read,
+     * constant-time hash compare, null on every failure.
+     */
+    private async authenticateNodeByCredential(
+        nodeId: unknown,
+        secret: unknown,
+    ): Promise<FleetNode | null> {
+        if (typeof nodeId !== 'string' || !UUID_RE.test(nodeId)) return null;
+        if (
+            typeof secret !== 'string' ||
+            secret.length < CREDENTIAL_MIN_LENGTH ||
+            secret.length > CREDENTIAL_MAX_LENGTH
+        ) {
+            return null;
+        }
+        const node = await this.repository.findById(nodeId);
+        if (!node) return null;
+        if (node.status === 'enrolling') return null;
+        if (!constantTimeEquals(node.enrollmentTokenHash, sha256Hex(secret))) return null;
+        return node;
     }
 
     private async getOwnedNode(userId: string, nodeId: string): Promise<FleetNode> {
@@ -392,12 +684,15 @@ export class FleetService {
             name,
             kind: 'k8s',
             status: node.ready ? 'online' : 'offline',
-            platform: sanitizeText(node.platform, 64),
-            version: sanitizeText(node.version, 32),
+            platform: sanitizeText(node.platform, FLEET_MAX_PLATFORM_LENGTH),
+            version: sanitizeText(node.version, FLEET_MAX_VERSION_LENGTH),
             capabilities: sanitizeCapabilities(node.roles),
             lastHeartbeatAt: null,
             createdAt: null,
             persisted: false,
+            // Cluster roles are read live from the cluster on every list;
+            // there is no row to pin them onto.
+            capabilitiesPinned: false,
         };
     }
 
@@ -414,8 +709,23 @@ export class FleetService {
             lastHeartbeatAt: node.lastHeartbeatAt ? toIso(node.lastHeartbeatAt) : null,
             createdAt: node.createdAt ? toIso(node.createdAt) : null,
             persisted: true,
+            capabilitiesPinned: Boolean(node.capabilitiesPinned),
         };
     }
+}
+
+/**
+ * When the row's CURRENT credential was issued, in epoch ms.
+ *
+ * Falls back to `createdAt` for rows written before rotation existed —
+ * for those the two are the same instant by construction. `NaN` when
+ * neither is a usable date, which every caller treats as "expired".
+ */
+function credentialIssuedAtMs(node: FleetNode): number {
+    const issued = node.credentialIssuedAt ?? node.createdAt;
+    if (issued instanceof Date) return issued.getTime();
+    if (typeof issued === 'string') return new Date(issued).getTime();
+    return NaN;
 }
 
 function sanitizeText(value: unknown, maxLength: number): string | null {
@@ -425,15 +735,22 @@ function sanitizeText(value: unknown, maxLength: number): string | null {
     return trimmed.slice(0, maxLength);
 }
 
+/**
+ * Truncate + dedupe capability tags to the CONFIGURED caps. Read per
+ * call rather than captured at module load so an operator override is
+ * honoured by the running process and both branches are testable.
+ */
 function sanitizeCapabilities(value: unknown): string[] {
     if (!Array.isArray(value)) return [];
+    const maxTags = config.fleet.getMaxCapabilityTags();
+    const maxTagLength = config.fleet.getMaxCapabilityTagLength();
     const out: string[] = [];
     for (const entry of value) {
         if (typeof entry !== 'string') continue;
-        const tag = entry.trim().slice(0, FLEET_MAX_CAPABILITY_TAG_LENGTH);
+        const tag = entry.trim().slice(0, maxTagLength);
         if (!tag || out.includes(tag)) continue;
         out.push(tag);
-        if (out.length >= FLEET_MAX_CAPABILITY_TAGS) break;
+        if (out.length >= maxTags) break;
     }
     return out;
 }

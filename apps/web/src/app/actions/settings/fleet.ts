@@ -9,6 +9,9 @@ import {
     fleetAPI,
     type CreateFleetEnrollmentTokenPayload,
     type CreateFleetEnrollmentTokenResponse,
+    type FleetEnrollmentTokenView,
+    type FleetNodeDetailView,
+    type FleetNodeDrainResult,
     type FleetNodeView,
     type UpdateFleetNodePayload,
 } from '@/lib/api/fleet';
@@ -93,6 +96,98 @@ export async function deleteFleetNodeAction(
             success: false,
             data: null,
             error: errorMessage(error, 'Failed to remove the node'),
+        };
+    }
+}
+
+/** Node-detail drawer: the node plus its recent job / failure history. */
+export async function getFleetNodeDetailAction(
+    nodeId: string,
+): Promise<FleetActionResult<FleetNodeDetailView>> {
+    await ensureAuth();
+    try {
+        const data = await fleetAPI.nodeDetail(nodeId);
+        return { success: true, data, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Failed to load the node'),
+        };
+    }
+}
+
+/** Outstanding (minted but never used) enrollment tokens. */
+export async function listFleetEnrollmentTokensAction(): Promise<
+    FleetActionResult<FleetEnrollmentTokenView[]>
+> {
+    await ensureAuth();
+    try {
+        const data = await fleetAPI.listOutstandingTokens();
+        return { success: true, data, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Failed to load outstanding enrollment tokens'),
+        };
+    }
+}
+
+/** Revoke an outstanding token BEFORE anyone uses it. */
+export async function revokeFleetEnrollmentTokenAction(
+    nodeId: string,
+): Promise<FleetActionResult<{ revoked: true }>> {
+    await ensureAuth();
+    try {
+        await fleetAPI.revokeEnrollmentToken(nodeId);
+        revalidatePath(SETTINGS_PAGE_PATTERN, 'page');
+        return { success: true, data: { revoked: true }, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Failed to revoke the enrollment token'),
+        };
+    }
+}
+
+/**
+ * Re-key a node. The replacement token comes back exactly once, so the
+ * caller MUST surface it immediately — there is no second read.
+ */
+export async function rotateFleetNodeCredentialAction(
+    nodeId: string,
+): Promise<FleetActionResult<CreateFleetEnrollmentTokenResponse>> {
+    await ensureAuth();
+    try {
+        const data = await fleetAPI.rotateNodeCredential(nodeId);
+        revalidatePath(SETTINGS_PAGE_PATTERN, 'page');
+        return { success: true, data, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Failed to rotate the node credential'),
+        };
+    }
+}
+
+/** Drain (or return to service) a node, requeuing its in-flight claims. */
+export async function drainFleetNodeAction(
+    nodeId: string,
+    drain: boolean,
+): Promise<FleetActionResult<FleetNodeDrainResult>> {
+    await ensureAuth();
+    try {
+        const data = await fleetAPI.drainNode(nodeId, drain);
+        revalidatePath(SETTINGS_PAGE_PATTERN, 'page');
+        return { success: true, data, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Failed to drain the node'),
         };
     }
 }

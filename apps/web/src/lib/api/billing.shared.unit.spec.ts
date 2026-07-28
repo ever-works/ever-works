@@ -6,12 +6,23 @@
 import { describe, expect, it } from 'vitest';
 import {
     canBuyCredits,
+    canCancelSubscription,
     canConfigureAutoRecharge,
+    canResumeSubscription,
+    canUpgradePlan,
     formatCardExpiry,
     formatPaymentMethod,
     invoiceStatusTone,
+    isSubscriptionPastDue,
     packBonusPercent,
+    subscriptionState,
+    subscriptionStatusLabelKey,
+    subscriptionStatusTone,
+    canManagePaymentMethods,
+    canRemovePaymentMethod,
     type BillingOverview,
+    type SubscriptionState,
+    type PaymentMethodRow,
 } from './billing.shared';
 
 function overview(partial: Partial<BillingOverview> = {}): BillingOverview {
@@ -24,6 +35,31 @@ function overview(partial: Partial<BillingOverview> = {}): BillingOverview {
         balanceCredits: 0,
         paymentMethod: null,
         autoRecharge: { enabled: false, thresholdCredits: null, packId: null, failureCount: 0 },
+        ...partial,
+    };
+}
+
+/** A live, manageable subscription unless a test says otherwise. */
+function subscription(partial: Partial<SubscriptionState> = {}): SubscriptionState {
+    return {
+        status: 'active',
+        cancelAtPeriodEnd: false,
+        currentPeriodEnd: '2026-08-01T00:00:00.000Z',
+        canceledAt: null,
+        pastDue: false,
+        manageable: true,
+        ...partial,
+    };
+}
+
+function method(partial: Partial<PaymentMethodRow> = {}): PaymentMethodRow {
+    return {
+        id: 'a'.repeat(32),
+        brand: 'visa',
+        last4: '4242',
+        expMonth: 4,
+        expYear: 2031,
+        isDefault: false,
         ...partial,
     };
 }
@@ -46,32 +82,22 @@ describe('packBonusPercent', () => {
 
 describe('formatPaymentMethod / formatCardExpiry', () => {
     it('renders brand + last4 only', () => {
-        expect(
-            formatPaymentMethod({ brand: 'visa', last4: '4242', expMonth: 4, expYear: 2031 }),
-        ).toBe('Visa •••• 4242');
+        expect(formatPaymentMethod({ brand: 'visa', last4: '4242' })).toBe('Visa •••• 4242');
     });
 
     it('falls back to a generic label without a brand', () => {
-        expect(
-            formatPaymentMethod({ brand: null, last4: '4242', expMonth: null, expYear: null }),
-        ).toBe('Card •••• 4242');
+        expect(formatPaymentMethod({ brand: null, last4: '4242' })).toBe('Card •••• 4242');
     });
 
     it('renders nothing when there is no card on file', () => {
         expect(formatPaymentMethod(null)).toBeNull();
-        expect(
-            formatPaymentMethod({ brand: 'visa', last4: null, expMonth: null, expYear: null }),
-        ).toBeNull();
+        expect(formatPaymentMethod({ brand: 'visa', last4: null })).toBeNull();
     });
 
     it('zero-pads the expiry month', () => {
-        expect(formatCardExpiry({ brand: 'visa', last4: '4242', expMonth: 4, expYear: 2031 })).toBe(
-            '04 / 2031',
-        );
+        expect(formatCardExpiry({ expMonth: 4, expYear: 2031 })).toBe('04 / 2031');
         expect(formatCardExpiry(null)).toBeNull();
-        expect(
-            formatCardExpiry({ brand: 'visa', last4: '4242', expMonth: null, expYear: 2031 }),
-        ).toBeNull();
+        expect(formatCardExpiry({ expMonth: null, expYear: 2031 })).toBeNull();
     });
 });
 
@@ -117,5 +143,212 @@ describe('canConfigureAutoRecharge', () => {
 
     it('is false whenever buying is off', () => {
         expect(canConfigureAutoRecharge(withCard, false)).toBe(false);
+    });
+});
+
+describe('canUpgradePlan — a tier is only sellable when it can also be applied', () => {
+    const configured = overview({ providerConfigured: true });
+
+    it('needs the payments master switch', () => {
+        expect(canUpgradePlan(configured, false, true)).toBe(false);
+    });
+
+    it('needs a configured provider', () => {
+        expect(canUpgradePlan(overview({ providerConfigured: false }), true, true)).toBe(false);
+    });
+
+    it('needs subscriptions to be enabled — an upgrade that cannot apply is not offered', () => {
+        expect(canUpgradePlan(configured, true, false)).toBe(false);
+    });
+
+    it('is false when the overview could not be loaded at all', () => {
+        expect(canUpgradePlan(null, true, true)).toBe(false);
+    });
+
+    it('is true only when all three gates pass', () => {
+        expect(canUpgradePlan(configured, true, true)).toBe(true);
+    });
+});
+
+/**
+ * Subscription lifecycle (audit B07/B08). These helpers ARE the UI rule:
+ * which chip renders, whether the past-due banner shows, and whether the
+ * page offers cancel or resume. Pinning them here keeps the JSX free of
+ * untested conditionals.
+ */
+describe('subscriptionState — a missing block never crashes the page', () => {
+    it('falls back to `none` when the API omitted the subscription', () => {
+        expect(subscriptionState(overview())).toEqual({
+            status: 'none',
+            cancelAtPeriodEnd: false,
+            currentPeriodEnd: null,
+            canceledAt: null,
+            pastDue: false,
+            manageable: false,
+        });
+    });
+
+    it('falls back to `none` when the overview failed to load', () => {
+        expect(subscriptionState(null).status).toBe('none');
+    });
+});
+
+describe('subscriptionStatusTone / subscriptionStatusLabelKey (B08)', () => {
+    it('reads a free account (`none`) as healthy, not broken', () => {
+        expect(subscriptionStatusTone('none')).toBe('positive');
+        expect(subscriptionStatusTone('active')).toBe('positive');
+        expect(subscriptionStatusTone('trialing')).toBe('positive');
+    });
+
+    it('flags the uncollected states as negative', () => {
+        expect(subscriptionStatusTone('past_due')).toBe('negative');
+        expect(subscriptionStatusTone('unpaid')).toBe('negative');
+    });
+
+    it('keeps the pre-existing key for the common case, adds keys for the rest', () => {
+        expect(subscriptionStatusLabelKey('none')).toBe('currentPlan.statusActive');
+        expect(subscriptionStatusLabelKey('active')).toBe('currentPlan.statusActive');
+        expect(subscriptionStatusLabelKey('past_due')).toBe('currentPlan.statuses.past_due');
+        expect(subscriptionStatusLabelKey('canceled')).toBe('currentPlan.statuses.canceled');
+    });
+});
+
+describe('isSubscriptionPastDue — when the recovery banner shows', () => {
+    it('shows for past_due and unpaid', () => {
+        expect(
+            isSubscriptionPastDue(overview({ subscription: subscription({ status: 'past_due' }) })),
+        ).toBe(true);
+        expect(
+            isSubscriptionPastDue(overview({ subscription: subscription({ status: 'unpaid' }) })),
+        ).toBe(true);
+    });
+
+    it('does not show for a healthy or absent subscription', () => {
+        expect(isSubscriptionPastDue(overview({ subscription: subscription() }))).toBe(false);
+        expect(isSubscriptionPastDue(overview())).toBe(false);
+        expect(isSubscriptionPastDue(null)).toBe(false);
+    });
+
+    it('trusts the server-computed flag even if the token set later grows', () => {
+        expect(
+            isSubscriptionPastDue(
+                overview({ subscription: subscription({ status: 'active', pastDue: true }) }),
+            ),
+        ).toBe(true);
+    });
+});
+
+describe('canCancelSubscription / canResumeSubscription (B07)', () => {
+    it('offers cancel on a live, manageable subscription', () => {
+        expect(canCancelSubscription(overview({ subscription: subscription() }), true)).toBe(true);
+        expect(canResumeSubscription(overview({ subscription: subscription() }), true)).toBe(false);
+    });
+
+    it('swaps to resume once a cancellation is pending', () => {
+        const pending = overview({ subscription: subscription({ cancelAtPeriodEnd: true }) });
+        expect(canCancelSubscription(pending, true)).toBe(false);
+        expect(canResumeSubscription(pending, true)).toBe(true);
+    });
+
+    it('offers neither once the subscription has actually ended', () => {
+        const ended = overview({
+            subscription: subscription({ status: 'canceled', cancelAtPeriodEnd: true }),
+        });
+        expect(canCancelSubscription(ended, true)).toBe(false);
+        expect(canResumeSubscription(ended, true)).toBe(false);
+    });
+
+    it('still offers cancel while the subscription is past due', () => {
+        expect(
+            canCancelSubscription(
+                overview({ subscription: subscription({ status: 'past_due' }) }),
+                true,
+            ),
+        ).toBe(true);
+    });
+
+    it('offers nothing on a free account with no provider subscription', () => {
+        expect(canCancelSubscription(overview(), true)).toBe(false);
+        expect(canResumeSubscription(overview(), true)).toBe(false);
+    });
+
+    it('offers nothing when the subscription is not manageable', () => {
+        const unmanageable = overview({ subscription: subscription({ manageable: false }) });
+        expect(canCancelSubscription(unmanageable, true)).toBe(false);
+        expect(canResumeSubscription(unmanageable, true)).toBe(false);
+    });
+
+    it('respects the deployment master switch and the provider gate', () => {
+        const live = overview({ subscription: subscription() });
+        expect(canCancelSubscription(live, false)).toBe(false);
+        expect(
+            canCancelSubscription(
+                overview({ providerConfigured: false, subscription: subscription() }),
+                true,
+            ),
+        ).toBe(false);
+    });
+});
+
+describe('canManagePaymentMethods — same two gates as buying', () => {
+    it('is false when the deployment flag is off', () => {
+        expect(canManagePaymentMethods({ providerConfigured: true }, false)).toBe(false);
+    });
+
+    it('is false when the provider is not configured', () => {
+        expect(canManagePaymentMethods({ providerConfigured: false }, true)).toBe(false);
+    });
+
+    it('is false when the list could not be loaded at all', () => {
+        expect(canManagePaymentMethods(null, true)).toBe(false);
+    });
+
+    it('is true only when both gates pass', () => {
+        expect(canManagePaymentMethods({ providerConfigured: true }, true)).toBe(true);
+    });
+});
+
+describe('canRemovePaymentMethod — the last card on a paid plan is protected', () => {
+    it('refuses the last card while a paid plan is active', () => {
+        expect(canRemovePaymentMethod([method()], true)).toBe(false);
+    });
+
+    it('allows the last card on a free plan', () => {
+        expect(canRemovePaymentMethod([method()], false)).toBe(true);
+    });
+
+    it('allows removing when a replacement exists, paid plan or not', () => {
+        const two = [method(), method({ id: 'b'.repeat(32) })];
+        expect(canRemovePaymentMethod(two, true)).toBe(true);
+        expect(canRemovePaymentMethod(two, false)).toBe(true);
+    });
+
+    it('stays conservative on an empty list — a state the server never sees', () => {
+        // The helper is a faithful mirror of the server guard, which is
+        // `all.length <= 1 && hasActivePaidSubscription` — so an empty
+        // list answers the same way a single-card list does.
+        //
+        // That case is unreachable in practice: `remove()` runs
+        // `requireOwnedMethod` first, so a card that does not exist is a
+        // 404 long before the last-card rule is consulted, and `all`
+        // therefore always holds at least the card being removed. With
+        // zero cards the UI renders no remove button at all, so the value
+        // is never read. Pinned as false because mirroring the server
+        // exactly matters more than a nicer answer to a question nobody
+        // asks.
+        expect(canRemovePaymentMethod([], true)).toBe(false);
+        expect(canRemovePaymentMethod([], false)).toBe(true);
+    });
+});
+
+describe('formatters accept a payment-method row (no provider reference needed)', () => {
+    it('formats brand + last four', () => {
+        expect(formatPaymentMethod(method({ brand: 'amex', last4: '1881' }))).toBe(
+            'Amex •••• 1881',
+        );
+    });
+
+    it('formats the expiry', () => {
+        expect(formatCardExpiry(method({ expMonth: 9, expYear: 2030 }))).toBe('09 / 2030');
     });
 });

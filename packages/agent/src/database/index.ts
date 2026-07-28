@@ -74,4 +74,5 @@ export * from './repositories/user-notification-subscription.repository';
 export * from './repositories/user-notification-preference.repository';
 export * from './repositories/user-notification-category-mute.repository';
 export * from './repositories/organization-notification-default.repository';
+export * from './repositories/organization-onboarding-profile.repository';
 export * from './database-init.service';

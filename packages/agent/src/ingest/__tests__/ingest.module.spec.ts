@@ -43,9 +43,22 @@ jest.mock('../event-source-pull.service', () => ({
 jest.mock('../ingest-install-binding.repository', () => ({
     IngestInstallBindingRepository: class IngestInstallBindingRepository {},
 }));
+jest.mock('../../entities/external-issue-link.entity', () => ({
+    ExternalIssueLink: class ExternalIssueLink {},
+}));
+jest.mock('../ingest-salience.service', () => ({
+    IngestSalienceService: class IngestSalienceService {},
+}));
+jest.mock('../external-issue-link.repository', () => ({
+    ExternalIssueLinkRepository: class ExternalIssueLinkRepository {},
+}));
+jest.mock('../external-issue-link.service', () => ({
+    ExternalIssueLinkService: class ExternalIssueLinkService {},
+}));
 
 import 'reflect-metadata';
 import { WorkRepository } from '../../database/repositories/work.repository';
+import { TaskRepository } from '../../database/repositories/task.repository';
 import { WorkHintResolverService } from '../work-hint-resolver.service';
 import { EventIngestModule } from '../ingest.module';
 import { IngestedEventRepository } from '../ingested-event.repository';
@@ -53,43 +66,48 @@ import { EventIngestService } from '../event-ingest.service';
 import { IngestCursorRepository } from '../ingest-cursor.repository';
 import { EventSourcePullService } from '../event-source-pull.service';
 import { IngestInstallBindingRepository } from '../ingest-install-binding.repository';
+import { IngestSalienceService } from '../ingest-salience.service';
+import { ExternalIssueLinkRepository } from '../external-issue-link.repository';
+import { ExternalIssueLinkService } from '../external-issue-link.service';
 import { ActivityLogModule } from '../../activity-log/activity-log.module';
 import { FacadesModule } from '../../facades/facades.module';
+
+const EXPECTED_PROVIDERS = [
+    IngestedEventRepository,
+    EventIngestService,
+    IngestCursorRepository,
+    EventSourcePullService,
+    WorkRepository,
+    WorkHintResolverService,
+    IngestInstallBindingRepository,
+    // Salience filter (audit item (k)) + external-issue ↔ Task mapping
+    // (audit item (i)). `TaskRepository` backs the ownership check the
+    // link service runs before every write.
+    IngestSalienceService,
+    ExternalIssueLinkRepository,
+    ExternalIssueLinkService,
+    TaskRepository,
+];
 
 describe('EventIngestModule', () => {
     const meta = (key: string): unknown[] => Reflect.getMetadata(key, EventIngestModule) ?? [];
 
     it('provides the repositories, the ingest service and the pull service', () => {
-        expect(meta('providers')).toEqual([
-            IngestedEventRepository,
-            EventIngestService,
-            IngestCursorRepository,
-            EventSourcePullService,
-            WorkRepository,
-            WorkHintResolverService,
-            IngestInstallBindingRepository,
-        ]);
+        expect(meta('providers')).toEqual(EXPECTED_PROVIDERS);
     });
 
-    it('exports all five for the API surface + trigger-internal RPC wiring', () => {
-        expect(meta('exports')).toEqual([
-            IngestedEventRepository,
-            EventIngestService,
-            IngestCursorRepository,
-            EventSourcePullService,
-            WorkRepository,
-            WorkHintResolverService,
-            IngestInstallBindingRepository,
-        ]);
+    it('exports every provider for the API surface + trigger-internal RPC wiring', () => {
+        expect(meta('exports')).toEqual(EXPECTED_PROVIDERS);
     });
 
-    it('imports the two processor modules (Activity log + Facades) beside the entity feature', () => {
+    it('imports the two processor modules (Activity log + Facades) beside the entity features', () => {
         const imports = meta('imports');
         expect(imports).toContain(ActivityLogModule);
         expect(imports).toContain(FacadesModule);
-        // Two forFeature() calls now: the ingest entities plus Work, which the
-        // workId-routing resolver reads. Both render as TypeOrmFeatureStub.
-        expect(imports).toHaveLength(4);
+        // Three forFeature() calls now: the ingest entities, Work (read by
+        // the workId-routing resolver), and the external-issue-link pair
+        // (ExternalIssueLink + Task). All render as TypeOrmFeatureStub.
+        expect(imports).toHaveLength(5);
     });
 });
 
@@ -104,6 +122,9 @@ describe('ingest barrel', () => {
         expect(barrel.EventSourcePullService).toBe(EventSourcePullService);
         expect(barrel.IngestCursorRepository).toBe(IngestCursorRepository);
         expect(barrel.IngestInstallBindingRepository).toBe(IngestInstallBindingRepository);
+        expect(barrel.IngestSalienceService).toBe(IngestSalienceService);
+        expect(barrel.ExternalIssueLinkRepository).toBe(ExternalIssueLinkRepository);
+        expect(barrel.ExternalIssueLinkService).toBe(ExternalIssueLinkService);
         expect(typeof barrel.buildIngestEventTools).toBe('function');
     });
 });

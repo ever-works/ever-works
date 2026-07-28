@@ -17,6 +17,21 @@ export class UserSubscriptionRepository {
         });
     }
 
+    /**
+     * Look a subscription up by the PROVIDER's id (audit B24 — plan
+     * checkout). This is how a later `customer.subscription.*` delivery
+     * finds exactly the row the hosted checkout created, without
+     * trusting anything the browser could have supplied.
+     */
+    async findByProviderSubscriptionId(
+        providerSubscriptionId: string,
+    ): Promise<UserSubscription | null> {
+        return this.repository.findOne({
+            where: { providerSubscriptionId },
+            relations: ['plan'],
+        });
+    }
+
     async listByUser(userId: string): Promise<UserSubscription[]> {
         return this.repository.find({
             where: { userId },

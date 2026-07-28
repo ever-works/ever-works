@@ -139,6 +139,118 @@ describe('detectCapabilities matrix', () => {
 	});
 });
 
+describe('detectCapabilities — browser tag (audit A22/A26)', () => {
+	it('advertises `browser` only when an executable was actually resolved', async () => {
+		const withBrowser = await detectCapabilities(runnerWith([]), environment({ browserPath: '/usr/bin/chromium' }));
+		expect(withBrowser).toContain('browser');
+
+		// The tag is a promise the node has to be able to keep: without a
+		// resolved binary there is nothing for `browser-check` to spawn.
+		for (const absent of [null, undefined, '']) {
+			const tags = await detectCapabilities(runnerWith([]), environment({ browserPath: absent }));
+			expect(tags).not.toContain('browser');
+		}
+	});
+
+	it('is independent of `display` — a headless box can still drive a headless browser', async () => {
+		const tags = await detectCapabilities(
+			runnerWith([]),
+			environment({ hasDisplay: false, browserPath: '/usr/bin/chromium' })
+		);
+		expect(tags).toContain('browser');
+		expect(tags).not.toContain('display');
+	});
+});
+
+describe('detectCapabilities — gpu tag (audit A22)', () => {
+	/** Runner that answers one GPU probe and 127s everything else. */
+	function gpuRunner(command: string, stdout: string): CommandRunner {
+		return {
+			run: async (invoked) =>
+				invoked === command ? { code: 0, stdout, stderr: '' } : { code: 127, stdout: '', stderr: 'not found' }
+		};
+	}
+
+	it('reports `gpu` and the vendor when nvidia-smi answers', async () => {
+		const tags = await detectCapabilities(gpuRunner('nvidia-smi', 'NVIDIA GeForce RTX 4090\n'), environment());
+		expect(tags).toContain('gpu');
+		expect(tags).toContain('gpu:nvidia');
+	});
+
+	it('classifies an AMD adapter from lspci on Linux', async () => {
+		const lspci = [
+			'00:1f.3 Audio device: Intel Corporation Cannon Lake PCH cAVS',
+			'01:00.0 VGA compatible controller: Advanced Micro Devices, Inc. [AMD/ATI] Navi 21 [Radeon RX 6800]'
+		].join('\n');
+		const tags = await detectCapabilities(gpuRunner('lspci', lspci), environment());
+		expect(tags).toContain('gpu:amd');
+	});
+
+	it('reports no gpu tags on a machine with no accelerator', async () => {
+		const tags = await detectCapabilities(runnerWith([]), environment());
+		expect(tags.some((tag) => tag.startsWith('gpu'))).toBe(false);
+	});
+
+	it('ignores lspci output with no display controller in it', async () => {
+		const tags = await detectCapabilities(
+			gpuRunner('lspci', '00:1f.3 Audio device: Intel Corporation Cannon Lake PCH cAVS'),
+			environment()
+		);
+		expect(tags.some((tag) => tag.startsWith('gpu'))).toBe(false);
+	});
+
+	it('a probe that throws is a missing tag, never a failed heartbeat', async () => {
+		const tags = await detectCapabilities(
+			{
+				run: async (command) => {
+					if (command === 'nvidia-smi') throw new Error('spawn nvidia-smi ENOENT');
+					if (command === 'git') return { code: 0, stdout: 'git version 2.43', stderr: '' };
+					return { code: 127, stdout: '', stderr: '' };
+				}
+			},
+			environment()
+		);
+		expect(tags).toContain('git');
+		expect(tags.some((tag) => tag.startsWith('gpu'))).toBe(false);
+	});
+
+	it('stays inside the server capability caps with every tag present', async () => {
+		const tags = await detectCapabilities(
+			{
+				run: async (command) => {
+					if (command === 'nvidia-smi') {
+						return { code: 0, stdout: 'NVIDIA RTX A6000', stderr: '' };
+					}
+					return ['docker', 'git'].includes(command)
+						? { code: 0, stdout: 'v1', stderr: '' }
+						: { code: 127, stdout: '', stderr: '' };
+				}
+			},
+			environment({ platform: 'darwin', hasDisplay: true, browserPath: '/Applications/Chromium' })
+		);
+		expect(tags.length).toBeLessThanOrEqual(MAX_CAPABILITY_TAGS);
+		for (const tag of tags) {
+			expect(tag.length).toBeLessThanOrEqual(MAX_CAPABILITY_TAG_LENGTH);
+		}
+	});
+});
+
+describe('readEnvironment browser wiring', () => {
+	it('records the resolved browser path so the tag and the executor agree', () => {
+		const env = readEnvironment(
+			{ platform: 'linux', arch: 'x64', version: 'v22.11.0', env: {} },
+			() => '/usr/bin/google-chrome',
+			{ fileExists: () => true }
+		);
+		expect(env.browserPath).toBe('/usr/bin/google-chrome');
+	});
+
+	it('leaves the path undefined when no probe is supplied (pure-logic callers)', () => {
+		const env = readEnvironment({ platform: 'linux', arch: 'x64', version: 'v22.11.0', env: {} });
+		expect(env.browserPath).toBeUndefined();
+	});
+});
+
 describe('describeSelf', () => {
 	it('bundles platform, version and capabilities, capping the version', async () => {
 		const description = await describeSelf(runnerWith(['git']), environment(), '0.1.0');

@@ -94,6 +94,10 @@ export * from './user-notification-preference.entity';
 export * from './user-notification-category-mute.entity';
 export * from './organization-notification-default.entity';
 
+// Onboarding — organization-scoped mirror of the wizard's "What do you
+// do" answers (audit item A53).
+export * from './organization-onboarding-profile.entity';
+
 // Goals & Metrics (PR-8) — measurable targets + samples + Mission link
 export * from './goal.entity';
 export * from './goal-metric-sample.entity';
@@ -123,6 +127,8 @@ export * from './ingested-event.entity';
 export * from './ingest-cursor.entity';
 // Inbound receivers — external workspace/installation → platform user binding
 export * from './ingest-install-binding.entity';
+// Event-ingest spine — external tracker issue → platform Task mapping
+export * from './external-issue-link.entity';
 // Meetings v1 (Wave 8, feature a) — captured meetings with transcripts
 export * from './meeting.entity';
 // Credits ledger + plan entitlements (pricing Wave 9 M1)
@@ -139,3 +145,5 @@ export * from './fleet-node.entity';
 export * from './terminal-transcript-chunk.entity';
 
 export * from './fleet-job.entity';
+// Tool-grant matrix (audit item G4) — per-scope tool allow/deny rows.
+export * from './tool-grant.entity';

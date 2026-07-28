@@ -95,6 +95,25 @@ const DOMAIN_KEYWORDS: Record<string, string[]> = {
     events: ['event', 'ingest', 'ingested', 'feed', 'happened', 'came in'],
     digest: ['digest', 'recap', 'catch up', 'catch-up', 'summary of', 'daily', 'weekly'],
     prreview: ['pull request', 'pull-request', 'merge request', 'review', 'diff', 'changed files'],
+    // Tool-grant matrix (audit item G4) — keyword slots ship WITH the
+    // surface (program DoD rule). Without a slot, `deriveDomain` drops
+    // these into the `works` catch-all where the `isExplicit` guard keeps
+    // them out of core, so only a `works` keyword could ever reach them.
+    // The phrasings are the ones people actually use when a tool went
+    // missing ("why can't the agent deploy") rather than the entity name.
+    toolgrants: [
+        'tool grant',
+        'tool-grant',
+        'tool access',
+        'grant matrix',
+        'allowed tool',
+        'allowed tools',
+        'tool permission',
+        'which tools',
+        'revoke tool',
+        "why can't the agent",
+        'why cannot the agent',
+    ],
     members: ['member', 'invite', 'invitation', 'team', 'collaborator', 'people'],
     apikeys: ['api key', 'api-key', 'apikey', 'token'],
     budgets: ['budget', 'usage', 'spend', 'spending', 'cost', 'billing'],
@@ -137,6 +156,7 @@ function deriveDomain(path: string): string {
     if (p.includes('/api/ingest')) return 'events';
     if (p.includes('/api/digest')) return 'digest';
     if (p.includes('/api/pr-review')) return 'prreview';
+    if (p.includes('/api/tool-grants')) return 'toolgrants';
     if (p.includes('/members') || p.includes('/invitations')) return 'members';
     if (p.includes('/api-keys')) return 'apikeys';
     if (p.includes('/budgets') || p.includes('/usage')) return 'budgets';

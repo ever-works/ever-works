@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { config } from '@src/config';
+import type { BillingSubscriptionStatus } from '@src/entities/billing-profile.entity';
 import { UsageLedgerEntry } from '@src/entities/usage-ledger-entry.entity';
 import type { CreditPack } from './credit-packs';
 
@@ -77,6 +78,84 @@ export interface CreditCheckoutSession {
     readonly customerId: string;
 }
 
+/**
+ * A subscription plan, priced by the SERVER from `subscription_plans`.
+ *
+ * The seam deliberately takes a flat descriptor rather than the TypeORM
+ * entity: a provider implementation must never reach into our schema,
+ * and the caller must be the one that decided what this plan costs.
+ */
+export interface BillingPlanDescriptor {
+    /** `subscription_plans.code` — echoed back on the provider event. */
+    readonly code: string;
+    /** Display label shown on the hosted checkout page. */
+    readonly label: string;
+    /** Recurring price in cents, from the server plan row. */
+    readonly priceCents: number;
+    readonly currency: string;
+    /** Only monthly today; widened here so the seam does not need a bump. */
+    readonly interval: 'month' | 'year';
+}
+
+/**
+ * Who is subscribing, and to what (audit B24). Same trust posture as
+ * {@link CreditCheckoutRequest}: the caller names a PLAN CODE, never a
+ * price, and the return URLs are built server-side.
+ */
+export interface PlanCheckoutRequest {
+    readonly userId: string;
+    readonly userEmail?: string | null;
+    readonly customerId?: string | null;
+    /** The server-resolved plan — never client-supplied numbers. */
+    readonly plan: BillingPlanDescriptor;
+    /**
+     * Where the provider returns the buyer after a successful payment.
+     *
+     * The IMPLEMENTATION is responsible for appending its own session
+     * identifier to this URL (providers use different template tokens);
+     * the caller supplies a clean, server-built URL and stays
+     * vendor-neutral. The return route needs that identifier to read the
+     * session back — see {@link CheckoutSessionSnapshot}.
+     */
+    readonly successUrl: string;
+    readonly cancelUrl: string;
+    /** `{userId}:{planCode}` — echoed back on the signed provider event. */
+    readonly referenceId: string;
+}
+
+export interface PlanCheckoutSession {
+    /** Redirect the browser here. */
+    readonly url: string;
+    readonly sessionId: string;
+    readonly customerId: string;
+}
+
+/**
+ * A read-back of a hosted checkout session, used by the RETURN route so
+ * a buyer who lands back on the Billing page sees their plan immediately
+ * instead of waiting for the asynchronous webhook.
+ *
+ * `userId` is the value WE stamped into the session metadata at creation
+ * time, so the return route can prove the session belongs to the caller
+ * before acting on it — a session id in a URL is not an authorization.
+ */
+export interface CheckoutSessionSnapshot {
+    readonly sessionId: string;
+    readonly status: 'complete' | 'open' | 'expired';
+    /** True when the provider settled the money (or none was required). */
+    readonly paid: boolean;
+    /** What the session was created for. */
+    readonly purpose: 'plan' | 'credits' | 'other';
+    /** Platform user id from OUR metadata — the ownership check. */
+    readonly userId: string | null;
+    readonly planCode: string | null;
+    readonly packId: string | null;
+    readonly customerId: string | null;
+    /** Provider subscription id, for plan sessions. */
+    readonly subscriptionId: string | null;
+    readonly currentPeriodEnd: Date | null;
+}
+
 /** Off-session charge for auto-recharge (PRD §3.4). */
 export interface OffSessionChargeRequest {
     readonly customerId: string;
@@ -105,6 +184,32 @@ export interface PaymentMethodSummary {
     readonly expYear: number | null;
 }
 
+/**
+ * Ask the provider for a HOSTED card-capture surface (billing PRD §3.3).
+ *
+ * The browser is redirected to a page the PROVIDER serves and renders;
+ * the PAN/CVC are posted straight to them and are tokenized there. No
+ * card datum ever transits our servers, our forms, or our logs — the
+ * only thing that comes back is an opaque payment-method reference.
+ * That is the whole reason this is a redirect and not a form we own.
+ */
+export interface PaymentMethodSetupRequest {
+    readonly userId: string;
+    /** Provider customer the captured method attaches to. Server-resolved. */
+    readonly customerId: string;
+    readonly userEmail?: string | null;
+    /** Where the provider returns the buyer after saving the card. */
+    readonly successUrl: string;
+    /** Where the provider returns the buyer after cancelling. */
+    readonly cancelUrl: string;
+}
+
+export interface PaymentMethodSetupSession {
+    /** Redirect the browser here — the provider's hosted card element. */
+    readonly url: string;
+    readonly sessionId: string;
+}
+
 /** One line on a mirrored invoice. */
 export interface BillingInvoiceLine {
     readonly description: string;
@@ -131,6 +236,43 @@ export interface BillingInvoiceSnapshot {
 }
 
 /**
+ * A subscription's lifecycle as the provider currently reports it
+ * (audit B07/B08). Vendor-neutral: `status` is the shared token set from
+ * {@link BillingSubscriptionStatus}, dates are real `Date`s, and the id
+ * is opaque. Returned by cancel/resume AND carried on the reconciling
+ * webhook, so both paths persist the same shape.
+ */
+export interface BillingSubscriptionSnapshot {
+    readonly subscriptionId: string;
+    readonly status: BillingSubscriptionStatus;
+    /** Cancel requested, paid period still running. */
+    readonly cancelAtPeriodEnd: boolean;
+    /** When a pending cancellation takes effect. */
+    readonly currentPeriodEnd: Date | null;
+    /** When the subscription actually ended. */
+    readonly canceledAt: Date | null;
+}
+
+/** Cancel/resume input. The id is server-resolved, never client-supplied. */
+export interface SubscriptionMutationRequest {
+    readonly subscriptionId: string;
+}
+
+/**
+ * Hosted self-service portal (the PAST_DUE recovery action, B08). The
+ * return URL is always built server-side from the platform's own web
+ * origin — accepting one from the client would be an open redirect.
+ */
+export interface BillingPortalRequest {
+    readonly customerId: string;
+    readonly returnUrl: string;
+}
+
+export interface BillingPortalSession {
+    readonly url: string;
+}
+
+/**
  * The closed set of provider events the money path reacts to. Anything
  * else the provider sends is acknowledged and ignored — an unknown event
  * type must never 500 a webhook (the provider would retry forever).
@@ -144,6 +286,30 @@ export type BillingWebhookEventKind =
     | 'invoice.updated'
     /** The customer's default payment method changed. */
     | 'payment_method.updated'
+    /**
+     * A paid plan is now in force (audit B24) — first checkout, renewal,
+     * or a provider-side change back to an active/trialing state. The
+     * ONLY billing-verified path that may grant a paid tier.
+     */
+    | 'subscription.activated'
+    /** A paid plan lapsed (cancelled, unpaid, or deleted). */
+    | 'subscription.canceled'
+    /**
+     * A subscription's LIFECYCLE moved (audit B07/B08) — dunning, pause,
+     * resume, or a period roll — carrying the full provider snapshot.
+     *
+     * Deliberately NOT a grant or a revoke. Those remain
+     * `subscription.activated` / `subscription.canceled` above, which are
+     * the only two kinds allowed to move a user's tier. This one exists
+     * so the states those two treat as "not actionable" (`past_due`,
+     * `paused`, `incomplete`) still reach the product instead of being
+     * dropped — that is what makes a dunning banner or a resume button
+     * possible without giving the lifecycle path the power to downgrade
+     * anyone.
+     */
+    | 'subscription.updated'
+    /** A stored payment method was detached from the customer. */
+    | 'payment_method.removed'
     /** Recognized envelope, no action for us. */
     | 'ignored';
 
@@ -162,12 +328,26 @@ export interface BillingWebhookEvent {
     readonly currency: string | null;
     /** Populated for `invoice.updated`. */
     readonly invoice?: BillingInvoiceSnapshot;
-    /** Populated for `payment_method.updated`. */
+    /** Populated for `payment_method.updated` and `payment_method.removed`. */
     readonly paymentMethod?: PaymentMethodSummary;
+    /** Populated for `subscription.updated` (audit B07/B08). */
+    readonly subscription?: BillingSubscriptionSnapshot;
     /** Provider payment id, for correlation on refunds. */
     readonly paymentId: string | null;
     /** Raw provider event type, for logging/diagnostics. Never a secret. */
     readonly providerType: string;
+    /**
+     * Plan code echoed from OUR subscription metadata. Populated for
+     * `subscription.*` kinds only. Optional so the existing credit-path
+     * event literals stay valid.
+     */
+    readonly planCode?: string | null;
+    /** Provider subscription id, for `subscription.*` kinds. */
+    readonly subscriptionId?: string | null;
+    /** End of the paid period currently in force. */
+    readonly currentPeriodEnd?: Date | null;
+    /** The provider will not renew at `currentPeriodEnd`. */
+    readonly cancelAtPeriodEnd?: boolean | null;
 }
 
 export abstract class BillingProvider {
@@ -216,8 +396,104 @@ export abstract class BillingProvider {
         throw new BillingProviderNotConfiguredError();
     }
 
+    /**
+     * Hosted checkout for a recurring PLAN subscription (audit B24).
+     * Same posture as the credit checkout: the caller hands over a
+     * server-priced plan descriptor, never a client number.
+     */
+    async createPlanCheckoutSession(_request: PlanCheckoutRequest): Promise<PlanCheckoutSession> {
+        throw new BillingProviderNotConfiguredError();
+    }
+
+    /**
+     * Read one hosted checkout session back, for the return route. The
+     * snapshot carries the metadata WE stamped at creation time so the
+     * caller can verify ownership before acting on it.
+     */
+    async retrieveCheckoutSession(_sessionId: string): Promise<CheckoutSessionSnapshot> {
+        throw new BillingProviderNotConfiguredError();
+    }
+
     /** Off-session charge against a stored payment method (auto-recharge). */
     async chargeOffSession(_request: OffSessionChargeRequest): Promise<OffSessionChargeResult> {
+        throw new BillingProviderNotConfiguredError();
+    }
+
+    // ── Payment-method management (billing PRD §3.3) ─────────────────
+    //
+    // Add / replace / remove, all expressed in terms of an OPAQUE
+    // provider reference. Capture is a redirect to the provider's hosted
+    // element (see {@link PaymentMethodSetupRequest}); nothing in this
+    // seam ever accepts a card number, and no implementation may add a
+    // method that does.
+
+    /** Hosted card-capture session — the ONLY way a card is added. */
+    async createPaymentMethodSetupSession(
+        _request: PaymentMethodSetupRequest,
+    ): Promise<PaymentMethodSetupSession> {
+        throw new BillingProviderNotConfiguredError();
+    }
+
+    /** Every card stored against a provider customer. Display metadata only. */
+    async listPaymentMethods(_customerId: string): Promise<PaymentMethodSummary[]> {
+        throw new BillingProviderNotConfiguredError();
+    }
+
+    /**
+     * Read one stored method, but ONLY if it belongs to `customerId`.
+     * Returns `null` when it does not exist or is owned by somebody else —
+     * the ownership check that keeps a guessed reference from reaching
+     * another account's card. Implementations must not throw for a
+     * foreign reference; a `null` lets the caller answer 404.
+     */
+    async findPaymentMethod(
+        _customerId: string,
+        _paymentMethodRef: string,
+    ): Promise<PaymentMethodSummary | null> {
+        throw new BillingProviderNotConfiguredError();
+    }
+
+    /** Promote a stored method to the customer's default (replace). */
+    async setDefaultPaymentMethod(
+        _customerId: string,
+        _paymentMethodRef: string,
+    ): Promise<PaymentMethodSummary> {
+        throw new BillingProviderNotConfiguredError();
+    }
+
+    /** Detach a stored method from the customer (remove). */
+    async detachPaymentMethod(_customerId: string, _paymentMethodRef: string): Promise<void> {
+        throw new BillingProviderNotConfiguredError();
+    }
+
+    /**
+     * Schedule a cancellation for the end of the paid period (audit B07).
+     *
+     * At-period-end ONLY by design: the owner keeps what they paid for,
+     * and {@link resumeSubscription} can undo it with no gap in service.
+     * There is deliberately no immediate-termination method on this seam.
+     */
+    async cancelSubscriptionAtPeriodEnd(
+        _request: SubscriptionMutationRequest,
+    ): Promise<BillingSubscriptionSnapshot> {
+        throw new BillingProviderNotConfiguredError();
+    }
+
+    /** Undo a pending at-period-end cancellation (audit B07). */
+    async resumeSubscription(
+        _request: SubscriptionMutationRequest,
+    ): Promise<BillingSubscriptionSnapshot> {
+        throw new BillingProviderNotConfiguredError();
+    }
+
+    /**
+     * Hosted self-service portal — the PAST_DUE recovery action (B08).
+     * Card capture stays entirely on the provider's tokenized surface, so
+     * no cardholder datum ever reaches the platform.
+     */
+    async createBillingPortalSession(
+        _request: BillingPortalRequest,
+    ): Promise<BillingPortalSession> {
         throw new BillingProviderNotConfiguredError();
     }
 

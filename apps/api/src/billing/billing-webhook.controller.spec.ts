@@ -129,6 +129,25 @@ describe('BillingWebhookController', () => {
         });
     });
 
+    it('acknowledges a subscription lifecycle delivery (audit B07/B08)', async () => {
+        // A dunning / cancellation delivery reconciles state rather than
+        // moving credits, and must still answer 200 with its action.
+        const controller = new BillingWebhookController(
+            makeService({
+                handleWebhook: jest.fn().mockResolvedValue({
+                    eventId: 'evt_sub',
+                    kind: 'subscription.updated',
+                    action: 'subscription-reconciled',
+                }),
+            }),
+        );
+
+        await expect(controller.receive({ rawBody: '{}' }, 'sig')).resolves.toEqual({
+            ok: true,
+            action: 'subscription-reconciled',
+        });
+    });
+
     it('lets an unexpected internal error surface (not masked as a 401)', async () => {
         const controller = new BillingWebhookController(
             makeService({ handleWebhook: jest.fn().mockRejectedValue(new Error('db down')) }),

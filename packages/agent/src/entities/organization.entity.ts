@@ -6,7 +6,11 @@ import {
     PrimaryGeneratedColumn,
     UpdateDateColumn,
 } from 'typeorm';
-import type { KbMemoryConsolidationSettings, MergePolicyOverride } from '@ever-works/contracts';
+import type {
+    KbMemoryConsolidationSettings,
+    MergePolicyOverride,
+    OrganizationDigestSettings,
+} from '@ever-works/contracts';
 import { PortableDateColumn } from './_types';
 
 /**
@@ -195,6 +199,22 @@ export class Organization {
      */
     @Column('simple-json', { nullable: true, name: 'memory_consolidation' })
     memoryConsolidation?: KbMemoryConsolidationSettings | null;
+
+    /**
+     * Org-scoped digest briefings — the per-organization opt-in the
+     * `digest-dispatcher` cron reads for its ORGANIZATION pass.
+     *
+     * NULL / `{ enabled: false }` ⇒ no org digest for this organization,
+     * which is the default for every existing row. The per-USER digest
+     * (`users.digestFrequency`) is a separate, untouched preference:
+     * turning an org digest on never changes what a member already
+     * receives personally.
+     *
+     * Read through `DigestService` — never inspect this column directly
+     * to decide whether a briefing is due.
+     */
+    @Column('simple-json', { nullable: true, name: 'digest_settings' })
+    digestSettings?: OrganizationDigestSettings | null;
 
     @CreateDateColumn()
     createdAt: Date;

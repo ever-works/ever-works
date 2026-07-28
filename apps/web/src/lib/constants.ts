@@ -117,6 +117,13 @@ export const ROUTES = {
     // documents. Sits BELOW Agents in the sidebar. Session-scoped
     // (`/memory`); the org is resolved from the active scope context.
     DASHBOARD_MEMORY: '/memory',
+    // Meetings (Wave 8, feature a) — owner-scoped captured meetings with
+    // their transcripts + AI summaries. Provider-synced recordings land
+    // through the ingest spine; these routes are the human surface over
+    // the same rows (`/api/meetings`).
+    DASHBOARD_MEETINGS: '/meetings',
+    DASHBOARD_MEETINGS_NEW: '/meetings/new',
+    DASHBOARD_MEETING: (id: string) => `/meetings/${id}`,
     // Templates
     DASHBOARD_TEMPLATES: '/templates',
     // Agents (Agents/Skills/Tasks PR #1017 — Phase 5)
@@ -163,6 +170,8 @@ export const ROUTES = {
     DASHBOARD_SETTINGS_JOB_RUNTIME: '/settings/job-runtime',
     // Wave 13 — Billing + Usage & Credits pages (billing/usage PRD §2).
     DASHBOARD_SETTINGS_BILLING: '/settings/billing',
+    // Payment-method management (billing PRD §3.3, audit B10 + B25).
+    DASHBOARD_SETTINGS_PAYMENT_METHOD: '/settings/billing/payment-method',
     DASHBOARD_USAGE: '/settings/usage',
     // Dynamic plugin settings routes
     DASHBOARD_SETTINGS_PLUGIN_CATEGORY: (category: string) => `/settings/plugins/${category}`,

@@ -12,11 +12,13 @@ import type {
 	ChannelVerification,
 	EventSourcePullInput,
 	EventSourcePullResult,
+	EventSourceBackfillInput,
+	EventSourceBackfillResult,
 	PluginCategory,
 	PluginSettings,
 	JsonSchema
 } from '@ever-works/plugin';
-import { PLUGIN_CAPABILITIES, EventSourceNotConfiguredError } from '@ever-works/plugin';
+import { PLUGIN_CAPABILITIES, EventSourceNotConfiguredError, clampEventSourceBackfillDays } from '@ever-works/plugin';
 import type { IngestedEventEnvelope } from '@ever-works/contracts';
 
 /**
@@ -50,11 +52,15 @@ export const GOOGLE_DOC_MIME_TYPE = 'application/vnd.google-apps.document';
 export const GOOGLE_SURFACES = ['drive', 'calendar'] as const;
 export type GoogleSurface = (typeof GOOGLE_SURFACES)[number];
 
-/** Clamp the opt-in backfill window to the supported 0–90 day range. */
+/**
+ * Clamp the opt-in backfill window to the supported 0–90 day range.
+ *
+ * Delegates to the shared capability helper so the bound is stated once
+ * for the whole connector fabric; the local export stays because it is
+ * part of this plugin's published surface.
+ */
 export function clampBackfillDays(value: unknown): number {
-	const num = typeof value === 'number' ? value : Number(value);
-	if (!Number.isFinite(num) || num <= 0) return 0;
-	return Math.min(Math.floor(num), 90);
+	return clampEventSourceBackfillDays(value);
 }
 
 function truncateText(text: string): string {
@@ -559,6 +565,65 @@ export class GoogleWorkspaceConnectorPlugin implements IConnectorPlugin, IEventS
 		}
 
 		return next ? { events, nextCursor: JSON.stringify(next) } : { events };
+	}
+
+	/**
+	 * Bounded HISTORICAL sweep from an explicit `since` — the
+	 * capability's opt-in `backfill()` method.
+	 *
+	 * Before this method existed, history was reachable only as a side
+	 * effect of the FIRST pull (`settings.backfillDays` widening the
+	 * initial window), so a user who activated the connector without the
+	 * setting could never go back and fetch it. `backfill()` runs the
+	 * same phase sweep (drive → each calendar) out-of-band on a
+	 * caller-chosen window, as many times as wanted — re-delivery is free
+	 * because the ingest pipeline dedupes on `(source, sourceEventId)`.
+	 *
+	 * `until` is accepted for contract symmetry but NOT applied: the
+	 * Drive `q` filter and the Calendar `updatedMin` parameter both bound
+	 * only the near end of the window, so the sweep runs `since → now`.
+	 * An over-wide window costs duplicate deliveries, which the pipeline
+	 * drops — never wrong data.
+	 *
+	 * The per-phase page bound (`GOOGLE_BACKFILL_MAX_PAGES`) applies
+	 * here too: one call fetches ONE page and hands back a cursor, so a
+	 * large Drive can never turn a backfill into an unbounded crawl.
+	 */
+	async backfill(input: EventSourceBackfillInput): Promise<EventSourceBackfillResult> {
+		const sinceMs = Date.parse(input.since);
+		if (!Number.isFinite(sinceMs)) {
+			throw new EventSourceNotConfiguredError(
+				`google-workspace-connector: backfill requires a valid ISO 8601 "since" (received ${JSON.stringify(input.since)})`
+			);
+		}
+
+		const surfaces = resolveSurfaces(input.settings);
+		if (surfaces.length === 0) {
+			return { events: [], complete: true };
+		}
+
+		// Resume the caller's cursor, or open the sweep on the first
+		// configured surface. `f: 1` marks it as a backfill sweep so the
+		// per-phase page bound engages.
+		const cursor =
+			input.cursor ??
+			JSON.stringify({
+				p: surfaces[0],
+				...(surfaces[0] === 'calendar' ? { i: 0 } : {}),
+				s: new Date(sinceMs).toISOString(),
+				f: 1 as const,
+				b: 0
+			} satisfies GooglePullCursor);
+
+		const page = await this.pullEvents({
+			since: input.since,
+			cursor,
+			...(input.settings ? { settings: input.settings } : {})
+		});
+
+		return page.nextCursor
+			? { events: page.events, nextCursor: page.nextCursor }
+			: { events: page.events, complete: true };
 	}
 
 	/**

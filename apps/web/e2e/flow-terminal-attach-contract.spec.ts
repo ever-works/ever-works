@@ -14,6 +14,8 @@ import {
  * ── Routes (apps/api/src/terminal/terminal-attach.controller.ts) ────
  *   POST /api/agents/:id/runs/:runId/terminal/attach-token → 201
  *        { token, wsPath:'/ws/terminal/<runId>', role:'driver', expiresInSec }
+ *        `?role=viewer` mints a READ-ONLY attach (the relay refuses
+ *        viewer stdin); every other requested role clamps to driver.
  *        503 when neither TERMINAL_ATTACH_SECRET nor BETTER_AUTH_SECRET
  *        is set (fail-closed: an unsecured relay refuses attaches).
  *   POST /api/agents/:id/runs/:runId/terminal/start        → 202
@@ -99,6 +101,33 @@ test.describe('terminal attach-token', () => {
         expect(body.expiresInSec).toBeGreaterThan(0);
         // Short-lived by construction — a leak must have a small blast radius.
         expect(body.expiresInSec).toBeLessThanOrEqual(300);
+    });
+
+    test('?role=viewer mints a read-only attach; every other role clamps to driver', async ({
+        request,
+    }) => {
+        const user = await registerUserViaAPI(request);
+        const { agentId, runId } = await seedRun(request, user);
+        test.skip(!runId, 'no AgentRun row was produced by this environment');
+
+        const base = `${API_BASE}${terminalBase(agentId, runId as string)}/attach-token`;
+        const viewer = await request.post(`${base}?role=viewer`, {
+            headers: authedHeaders(user.access_token),
+        });
+        expect([201, 503], `attach-token returned ${viewer.status()}`).toContain(viewer.status());
+        test.skip(viewer.status() === 503, 'no attach-token signing secret on this install');
+
+        expect((await viewer.json()).role).toBe('viewer');
+
+        // A request may DOWNGRADE itself, never upgrade: the internal
+        // `worker` role and anything unknown collapse to driver.
+        for (const requested of ['worker', 'root', 'DRIVER']) {
+            const clamped = await request.post(`${base}?role=${requested}`, {
+                headers: authedHeaders(user.access_token),
+            });
+            expect(clamped.status()).toBe(201);
+            expect((await clamped.json()).role).toBe('driver');
+        }
     });
 
     test('cross-user and cross-agent run ids 404 with no existence leak; anon is 401', async ({

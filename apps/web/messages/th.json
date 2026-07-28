@@ -453,6 +453,115 @@
                     "successDefault": "ยืนยันการเชื่อมต่อ SIM AI แล้ว"
                 }
             }
+        },
+        "communicationStep": {
+            "title": "Communication",
+            "description": "Connect the chat workspaces your team lives in. Mention the Ever Works bot to chat, build, and follow your Works without leaving the conversation.",
+            "slack": {
+                "name": "Slack",
+                "description": "Install the Ever Works app for Slack: mention the bot to chat with the platform, ingest channel activity into Memory and Activities, and get replies in-thread.",
+                "action": "Connect Slack",
+                "close": "Close",
+                "enable": "Enable Slack",
+                "enabled": "Slack is connected",
+                "enabledToast": "Slack connected",
+                "enableFailed": "Could not enable Slack. Please try again.",
+                "advancedSettings": "Advanced settings"
+            },
+            "discord": {
+                "name": "Discord",
+                "description": "The Ever Works app for Discord is on the way.",
+                "comingSoon": "Coming soon"
+            },
+            "skipHint": "You can connect these anytime from Settings → Plugins."
+        },
+        "profileStep": {
+            "title": "What do you do",
+            "description": "Tell us about your role and team so we can suggest better starting points — pick as many roles as apply. Nothing is hidden based on your answers.",
+            "rolesLabel": "Your roles",
+            "teamSizeLabel": "Team size",
+            "roles": {
+                "founder-ceo": {
+                    "label": "Founder / CEO",
+                    "description": "I run the company and wear many hats"
+                },
+                "engineering": {
+                    "label": "Engineering",
+                    "description": "I build and ship software"
+                },
+                "product": {
+                    "label": "Product",
+                    "description": "I define what we build and why"
+                },
+                "marketing": {
+                    "label": "Marketing",
+                    "description": "I grow awareness, content, and campaigns"
+                },
+                "sales": {
+                    "label": "Sales",
+                    "description": "I find, pitch, and close customers"
+                },
+                "consultant": {
+                    "label": "Consultant",
+                    "description": "I deliver projects and advice for clients"
+                },
+                "research": {
+                    "label": "Research",
+                    "description": "I investigate, analyze, and synthesize"
+                },
+                "operations": {
+                    "label": "Operations",
+                    "description": "I keep the business running smoothly"
+                },
+                "support": {
+                    "label": "Support",
+                    "description": "I help customers succeed and resolve issues"
+                },
+                "finance": {
+                    "label": "Finance",
+                    "description": "I manage budgets, billing, and reporting"
+                },
+                "hr": {
+                    "label": "HR",
+                    "description": "I hire, onboard, and support our people"
+                },
+                "legal": {
+                    "label": "Legal",
+                    "description": "I handle contracts, compliance, and policy"
+                },
+                "education": {
+                    "label": "Education",
+                    "description": "I teach, train, or create learning content"
+                },
+                "other": {
+                    "label": "Other",
+                    "description": "Something else — tell us more later"
+                }
+            },
+            "teamSizes": {
+                "solo": "Solo",
+                "small-2-10": "Small (2–10)",
+                "mid-11-50": "Mid (11–50)",
+                "large-51-200": "Large (51–200)",
+                "enterprise-200-plus": "Enterprise (200+)"
+            },
+            "suggestions": {
+                "title": "Suggested agents for you",
+                "description": "Based on your roles — create one now, customize it later from Agents.",
+                "create": "Create agent",
+                "creating": "Creating…",
+                "created": "Created",
+                "createdToast": "Agent created — find it under Agents.",
+                "createFailed": "Failed to create the agent. Try again.",
+                "skillsTitle": "Skills that pair with these",
+                "seedAll": "Set up my starter agents",
+                "seeding": "Setting up…",
+                "seedDone": "Set up {count} starter agents — find them under Agents.",
+                "seedAlreadyDone": "Your starter agents are already set up.",
+                "seedPartial": "Set up {created} agents; {failed} could not be created.",
+                "seedFailed": "Could not set up your starter agents. Try again."
+            },
+            "skipHint": "Optional — skip if you'd rather not say. Your answers only improve suggestions and can be changed later."
         }
     },
     "dashboard": {
@@ -580,7 +689,8 @@
             "newMission": "+ New Mission",
             "empty": {
                 "title": "No Missions yet.",
-                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting."
+                "subtitle": "Start one to give the agent a persistent Goal. Each Mission generates Ideas on a schedule (or one-shot), with its own outstanding-Ideas cap and auto-build setting.",
+                "openNew": "Open the unified creator"
             },
             "card": {
                 "scheduled": "Scheduled",
@@ -617,6 +727,21 @@
                 "minLength": "คำอธิบายต้องมีอย่างน้อย 10 ตัวอักษร",
                 "error": "ไม่สามารถสร้างภารกิจได้ กรุณาลองใหม่อีกครั้ง",
                 "chatUnavailable": "แชทไม่พร้อมใช้งานขณะนี้ — ใช้ \"สร้างด้วยตนเอง\" แทน"
+            },
+            "quickAdd": {
+                "label": "Start a new Mission",
+                "submitTitle": "Create Mission",
+                "minLength": "Description must be at least 10 characters.",
+                "created": "Mission created",
+                "error": "Couldn't create Mission. Please try again."
+            },
+            "filterBar": {
+                "search": "Search",
+                "searchPlaceholder": "Title or description",
+                "anyStatus": "Any status",
+                "apply": "Apply",
+                "reset": "Reset",
+                "status": "Status"
             }
         },
         "memoryPage": {
@@ -697,7 +822,8 @@
                 "instructions": "คำแนะนำ",
                 "skills": "ทักษะ",
                 "budgets": "งบประมาณ",
-                "settings": "การตั้งค่า"
+                "settings": "การตั้งค่า",
+                "terminal": "Terminal"
             },
             "newDialog": {
                 "title": "เอเจนต์ใหม่",
@@ -716,7 +842,17 @@
                 "teamLabel": "ทีม",
                 "teamNone": "ไม่มีทีม",
                 "reportsToLabel": "รายงานต่อ",
-                "reportsToNone": "ไม่มีผู้จัดการ"
+                "reportsToNone": "ไม่มีผู้จัดการ",
+                "parentLabel": "Pick a {scope}",
+                "parentPlaceholder": "Select…",
+                "parentRequired": "Pick a parent to continue.",
+                "noMissions": "You don't have any Missions yet — create one to scope an Agent here.",
+                "noWorks": "You don't have any Works yet — create one to scope an Agent here.",
+                "noIdeas": "You don't have any Ideas yet — add one to scope an Agent here.",
+                "templateStepTitle": "Start from a template (optional)",
+                "startFromScratch": "Start from scratch",
+                "pickParentHint": "Pick a {scope} above to continue, or choose Workspace scope.",
+                "nextDisabledReason": "Pick a parent or choose Workspace scope to continue."
             },
             "settings": {
                 "orgCard": {
@@ -753,6 +889,82 @@
                 "saveSuccess": "บันทึกการ์ดเรลแล้ว",
                 "saveError": "ไม่สามารถบันทึกการ์ดเรลได้",
                 "resetSuccess": "รีเซ็ตการ์ดเรลเป็นค่าเริ่มต้นแล้ว"
+            },
+            "scorecard": {
+                "title": "Scorecard",
+                "empty": "No metrics yet. Add quantified goals so this Agent's output is measurable.",
+                "addMetric": "Add metric",
+                "edit": "Edit",
+                "cancel": "Cancel",
+                "save": "Save scorecard",
+                "statuses": {
+                    "exceeded": "Exceeded",
+                    "onTrack": "On track",
+                    "behind": "Behind",
+                    "critical": "Critical"
+                },
+                "fields": {
+                    "label": "Metric",
+                    "target": "Target",
+                    "current": "Current",
+                    "floor": "Floor",
+                    "stretch": "Stretch",
+                    "period": "Period"
+                },
+                "periods": {
+                    "weekly": "Weekly",
+                    "monthly": "Monthly",
+                    "quarterly": "Quarterly"
+                },
+                "saved": "Scorecard saved",
+                "errors": {
+                    "labelRequired": "Every metric needs a label",
+                    "numbersRequired": "Targets and values must be numbers",
+                    "saveFailed": "Could not save scorecard"
+                }
+            },
+            "orDivider": "Or",
+            "createManually": "Create Agent Manually",
+            "prompt": {
+                "label": "Describe the Agent you want",
+                "minLength": "Describe your Agent in a few more words.",
+                "submitTitle": "Build this Agent"
+            },
+            "chips": {
+                "viewAll": "View All",
+                "ariaLabel": "Pick an Agent template"
+            },
+            "catalog": {
+                "allTemplates": "All templates",
+                "yourTemplates": "Your templates",
+                "yourTemplatesEmpty": "Agents you create will appear here as reusable templates.",
+                "openInWizard": "Open in wizard"
+            },
+            "pageTabs": {
+                "agents": "Agents",
+                "sessions": "Sessions"
+            },
+            "sessions": {
+                "title": "Sessions",
+                "subtitle": "Every agent run across your Agents and Works — live activity, tokens, cost and quality gates in one place.",
+                "status": {
+                    "queued": "Queued",
+                    "running": "Running",
+                    "completed": "Completed",
+                    "failed": "Failed",
+                    "cancelled": "Cancelled"
+                },
+                "awaitingInput": "Awaiting input",
+                "queuedConcurrency": "Waiting for a concurrency slot",
+                "tokens": "{count} tokens",
+                "attach": "Attach",
+                "notStarted": "Not started",
+                "filterStatusAll": "All statuses",
+                "filterWorkAll": "All Works",
+                "groupByWork": "Group by Work",
+                "noWork": "No Work",
+                "emptyTitle": "No sessions yet",
+                "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
             }
         },
         "tasksPage": {
@@ -807,7 +1019,11 @@
                 "priorityP4": "P4 — ต่ำ",
                 "createError": "สร้างงานไม่สำเร็จ",
                 "cancel": "ยกเลิก",
-                "create": "สร้าง"
+                "create": "สร้าง",
+                "acceptanceChecks": "Acceptance checks",
+                "acceptanceChecksHint": "Commands that must exit 0 before this Task's agent work can open a pull request. Leave empty to inherit the Work's default checks.",
+                "maxGateAttempts": "Max gate attempts",
+                "maxGateAttemptsInherit": "Inherit from Work"
             },
             "detail": {
                 "moveTo": "ย้ายไปยัง",
@@ -840,7 +1056,27 @@
                 "updated": "อัปเดตเมื่อ",
                 "scopeWork": "งาน",
                 "scopeMission": "ภารกิจ",
-                "scopeIdea": "ความคิด"
+                "scopeIdea": "ความคิด",
+                "runControls": {
+                    "title": "Run controls",
+                    "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",
+                    "parkedHint": "This run is parked. Resume it to continue the same session, optionally with a new instruction.",
+                    "steerPlaceholder": "Message the running agent…",
+                    "resumePlaceholder": "Optional instruction to resume with…",
+                    "steer": "Steer",
+                    "interrupt": "Interrupt",
+                    "resume": "Resume",
+                    "attach": "Attach",
+                    "attachHint": "Open this run's live terminal session",
+                    "awaitingInput": "Awaiting input",
+                    "confirmInterrupt": "Ask this agent to stop after its current step? It will finish with a summary of the work done so far.",
+                    "steerInjected": "Message delivered to the running agent.",
+                    "steerNeedsNewRun": "That run already finished, so the message was not delivered. Mention the agent in the conversation to start a new run.",
+                    "interruptRequested": "Interrupt requested — the agent will stop after its current step.",
+                    "resumeDispatched": "Resumed — a new run is picking up the same session.",
+                    "resumeQueued": "Resume queued — it starts as soon as a concurrency slot frees up.",
+                    "genericError": "That run control could not be applied."
+                }
             },
             "recurring": {
                 "section": "กำหนดการทำซ้ำ",
@@ -871,6 +1107,94 @@
                 "p2": "ปานกลาง",
                 "p3": "ปกติ",
                 "p4": "ต่ำ"
+            },
+            "runChip": {
+                "queued": "Queued",
+                "running": "Running",
+                "completed": "Completed",
+                "failed": "Failed",
+                "cancelled": "Cancelled",
+                "tokens": "{count} tokens"
+            },
+            "branch": {
+                "section": "Branch",
+                "branch": "Branch",
+                "copy": "Copy branch name",
+                "copied": "Copied",
+                "baseSha": "Base",
+                "state": "State",
+                "pullRequest": "Pull request",
+                "openPr": "Open PR",
+                "conflictTitle": "This branch has merge conflicts",
+                "resolve": "Resolve conflicts",
+                "resolving": "Resolving…",
+                "resolveError": "Failed to resolve conflicts",
+                "discard": "Discard branch",
+                "discardConfirm": "Discard this Task's branch? All unmerged changes on the branch will be permanently lost. This cannot be undone.",
+                "discardError": "Failed to discard branch",
+                "isolationLabel": "Task isolation",
+                "isolationDescription": "Override the Work-level isolation setting for this Task. When off, agents work directly against the Work's repositories.",
+                "isolationInherit": "Inherit from Work",
+                "isolationOn": "On — isolated branch",
+                "isolationOff": "Off — work directly",
+                "isolationSaveError": "Failed to update isolation override"
+            },
+            "gateChip": {
+                "green": "Gate passed",
+                "red": "Gate failed",
+                "skipped": "Gate skipped",
+                "none": "No checks"
+            },
+            "decisionConflicts": {
+                "title": "This may re-open {count} settled decision(s)",
+                "subtitle": "Your organization already recorded a call on this subject.",
+                "overlap": "Shared terms: {terms}",
+                "advisory": "Advisory only — nothing is blocked. Open a decision to read the rationale, or supersede it if the call has changed.",
+                "signal": {
+                    "strong": "Strong match",
+                    "moderate": "Possible match"
+                }
+            },
+            "checks": {
+                "title": "Checks",
+                "edit": "Edit",
+                "cancel": "Cancel",
+                "save": "Save",
+                "saveError": "Failed to save checks",
+                "empty": "No acceptance checks declared. This Task inherits the Work's default checks, if any.",
+                "optional": "optional",
+                "notRun": "not run yet",
+                "exit": "exit {code}",
+                "attempts": "Attempt {count}",
+                "attemptsOf": "Attempt {count} of {max}",
+                "maxAttempts": "Max gate attempts",
+                "maxAttemptsInherit": "Inherit from Work",
+                "result": {
+                    "green": "Passed",
+                    "red": "Failed",
+                    "timeout": "Timeout",
+                    "error": "Error"
+                }
+            },
+            "checksEditor": {
+                "empty": "No checks yet. Add a command whose exit code decides green or red.",
+                "name": "Name",
+                "namePlaceholder": "e.g. Build",
+                "id": "Id",
+                "kind": "Kind",
+                "command": "Command",
+                "commandPlaceholder": "e.g. pnpm build",
+                "timeout": "Timeout (s)",
+                "required": "Required",
+                "remove": "Remove",
+                "addCheck": "Add check",
+                "kinds": {
+                    "build": "Build",
+                    "test": "Test",
+                    "lint": "Lint",
+                    "typecheck": "Type check",
+                    "custom": "Custom"
+                }
             }
         },
         "skillsPage": {
@@ -899,7 +1223,120 @@
                 "mission": "ภารกิจ",
                 "idea": "ความคิด",
                 "work": "งาน",
-                "tenant": "เจ้าของบริษัท"
+                "tenant": "เจ้าของบริษัท",
+                "backToSkills": "Back to Skills",
+                "body": {
+                    "write": "Write",
+                    "preview": "Preview",
+                    "saving": "Saving…",
+                    "saved": "Saved",
+                    "saveFailed": "Save failed",
+                    "placeholder": "# What this Skill does\n\nDescribe the steps, conventions, and examples the Agent should follow when this Skill is pulled into a run.",
+                    "emptyPreview": "Nothing to preview yet — click here to start writing.",
+                    "clickToEdit": "Click to edit",
+                    "markdownHint": "Markdown supported, including tables and task lists (GFM).",
+                    "words": "{count, plural, =1 {1 word} other {# words}}",
+                    "characters": "{count, plural, =1 {1 character} other {# characters}}"
+                },
+                "addBindingTitle": "Add binding",
+                "noBindings": "No bindings yet — attach this Skill to a target below.",
+                "target": "Target",
+                "picker": {
+                    "searchPlaceholder": "Search by name…",
+                    "workspaceWide": "Applies to the entire workspace",
+                    "pasteUuid": "Options unavailable — paste a UUID",
+                    "noOptionsPasteUuid": "Nothing to pick yet — paste a UUID",
+                    "loading": "Loading…",
+                    "noMatches": "No matches"
+                },
+                "agentOff": "Agent: off",
+                "generatorOn": "Generator: on",
+                "add": "Add",
+                "adding": "Adding…"
+            },
+            "tabs": {
+                "label": "Skill sections",
+                "installed": "Installed",
+                "available": "Available",
+                "custom": "Custom"
+            },
+            "search": {
+                "label": "Search skills",
+                "placeholder": "Search skills by title, slug, or description",
+                "submit": "Search",
+                "clear": "Clear"
+            },
+            "errors": {
+                "installed": "Installed skills could not be loaded. Try refreshing the page.",
+                "catalog": "The skills catalog could not be loaded. Installed and custom skills are still available."
+            },
+            "catalog": {
+                "emptyTitle": "No catalog Skills available.",
+                "emptySubtitle": "Enable a skills-provider plugin or adjust the search.",
+                "install": "Install",
+                "installing": "Installing...",
+                "installed": "Installed",
+                "installFailed": "Install failed"
+            },
+            "custom": {
+                "summary": "{count, plural, =0 {No hand-authored Skills yet.} =1 {1 hand-authored Skill.} other {# hand-authored Skills.}}",
+                "new": "New Skill",
+                "formTitle": "New custom Skill",
+                "title": "Title",
+                "titlePlaceholder": "e.g. Code review checklist",
+                "description": "Description (optional)",
+                "descriptionPlaceholder": "One-liner. Body goes on the detail page.",
+                "create": "Create",
+                "creating": "Creating...",
+                "cancel": "Cancel",
+                "titleRequired": "Title is required.",
+                "createFailed": "Failed to create Skill"
+            },
+            "card": {
+                "fromCatalog": "from catalog"
+            },
+            "pagination": {
+                "showing": "Showing {start}-{end} of {total}",
+                "emptyPage": "No results on this page",
+                "previous": "Previous",
+                "next": "Next"
+            },
+            "newPage": {
+                "title": "New Skill",
+                "templateStepTitle": "Start from a template (optional)",
+                "startFromScratch": "Start from scratch",
+                "scopeStepTitle": "Where should this Skill live?",
+                "scopeTenantLabel": "Workspace",
+                "scopeTenantDesc": "Available across your whole workspace.",
+                "scopeMissionDesc": "Scoped to a single Mission.",
+                "scopeWorkDesc": "Scoped to a single Work.",
+                "scopeIdeaDesc": "Scoped to a single Idea.",
+                "scopeAgentDesc": "Owned by a single Agent.",
+                "noMissions": "No Missions yet — create one first, or pick another scope.",
+                "noWorks": "No Works yet — create one first, or pick another scope.",
+                "noIdeas": "No Ideas yet — create one first, or pick another scope.",
+                "noAgents": "No Agents yet — create one first, or pick another scope.",
+                "parentLabel": "Which {scope}?",
+                "parentPlaceholder": "Select…",
+                "pickParentHint": "Pick a {scope} to continue, or choose Workspace scope.",
+                "nextDisabledReason": "Select a parent to continue",
+                "scopeSuffix": "scope —",
+                "detailsStepTitle": "Describe the Skill",
+                "titleLabel": "Title",
+                "titlePlaceholder": "e.g. Code review checklist",
+                "descriptionLabel": "Description (optional)",
+                "descriptionPlaceholder": "One-line summary Agents see when deciding to load this Skill.",
+                "instructionsLabel": "Instructions (Markdown, optional)",
+                "instructionsPlaceholder": "# My Skill\n\nWhat should the Agent know or do?",
+                "instructionsHint": "You can refine the body later on the Skill detail page.",
+                "back": "Back",
+                "next": "Next",
+                "cancel": "Cancel",
+                "create": "Create Skill",
+                "creating": "Creating...",
+                "titleRequired": "Title is required.",
+                "parentRequired": "Pick a parent for this scope.",
+                "createFailed": "Failed to create Skill"
             }
         },
         "templatesPage": {
@@ -1067,7 +1504,8 @@
                 "label": "Add a new Idea",
                 "placeholder": "Describe an Idea — e.g. \"A curated list of the best AI coding agents released this year\"",
                 "submit": "Add",
-                "minLength": "Description must be at least 10 characters."
+                "minLength": "Description must be at least 10 characters.",
+                "submitTitle": "Add Idea"
             },
             "toggles": {
                 "showAccepted": "Show accepted",
@@ -1380,7 +1818,8 @@
                     "failed": "ล้มเหลว",
                     "cancelled": "ยกเลิก"
                 }
-            }
+            },
+            "add": "Add"
         },
         "settings": {
             "title": "การตั้งค่า",
@@ -1396,7 +1835,10 @@
                 "gitProviders": "ผู้ให้บริการ Git",
                 "dangerZone": "โซนอันตราย",
                 "billing": "Billing",
-                "usageCredits": "Usage & Credits"
+                "usageCredits": "Usage & Credits",
+                "fleet": "Fleet",
+                "jobRuntime": "Job Runtime",
+                "digest": "Digest"
             },
             "githubApp": {
                 "title": "การติดตั้ง GitHub App",
@@ -1772,7 +2214,24 @@
                 "loadError": "Some billing data could not be loaded. Refresh the page to try again.",
                 "currentPlan": {
                     "title": "Current plan",
-                    "statusActive": "Active"
+                    "statusActive": "Active",
+                    "statuses": {
+                        "trialing": "Trial",
+                        "past_due": "Past due",
+                        "unpaid": "Unpaid",
+                        "paused": "Paused",
+                        "canceled": "Canceled",
+                        "incomplete": "Incomplete",
+                        "incomplete_expired": "Expired"
+                    },
+                    "cancel": "Cancel subscription",
+                    "cancelSuccess": "Your subscription will end at the end of the current period.",
+                    "cancelError": "Failed to cancel the subscription.",
+                    "cancelScheduled": "Your subscription ends at the end of the current period.",
+                    "cancelScheduledOn": "Your subscription ends on {date}.",
+                    "resume": "Resume subscription",
+                    "resumeSuccess": "Your subscription will continue as normal.",
+                    "resumeError": "Failed to resume the subscription."
                 },
                 "plans": {
                     "title": "Plans",
@@ -1811,7 +2270,27 @@
                     "empty": "No payment method on file.",
                     "expires": "Expires {expiry}",
                     "managedAtCheckout": "Card details are held by the payment provider — we only store the brand, last four digits and expiry.",
-                    "addAtCheckout": "A card is saved automatically the first time you buy credits."
+                    "addAtCheckout": "A card is saved automatically the first time you buy credits.",
+                    "manage": "Manage payment methods",
+                    "addCta": "Add a payment method",
+                    "manageTitle": "Payment methods",
+                    "manageSubtitle": "Add, replace or remove the cards on your account.",
+                    "backToBilling": "Back to billing",
+                    "storedTitle": "Stored cards",
+                    "add": "Add card",
+                    "redirecting": "Redirecting…",
+                    "card": "Card",
+                    "default": "Default",
+                    "makeDefault": "Make default",
+                    "remove": "Remove",
+                    "removed": "Payment method removed.",
+                    "removeError": "Could not remove the payment method.",
+                    "defaultUpdated": "Default payment method updated.",
+                    "defaultError": "Could not update the default payment method.",
+                    "addError": "Could not start card setup.",
+                    "loadError": "Your payment methods could not be loaded. Refresh the page to try again.",
+                    "lastOnPaidPlan": "Add another card before removing the last one while a paid plan is active.",
+                    "hostedNotice": "Card details are entered on the payment provider's secure page and never reach our servers. We only ever store the brand, last four digits and expiry."
                 },
                 "autoRecharge": {
                     "title": "Auto-recharge",
@@ -1864,6 +2343,12 @@
                     "pagePrev": "Previous",
                     "pageNext": "Next",
                     "pageInfo": "Page {page} of {pages}"
+                },
+                "pastDue": {
+                    "title": "We could not collect your latest payment",
+                    "body": "Update your payment method to keep your plan active. Your card details are handled by the payment provider.",
+                    "action": "Update payment method",
+                    "error": "Could not open the billing portal."
                 }
             },
             "usage": {
@@ -1891,6 +2376,291 @@
                     "loading": "Loading…",
                     "error": "Failed to load chart data.",
                     "unattributed": "Unattributed"
+                },
+                "period": {
+                    "label": "Reporting period",
+                    "monthLabel": "Calendar month",
+                    "monthPlaceholder": "Pick a month"
+                },
+                "export": {
+                    "csv": "Export CSV",
+                    "csvHint": "Download every usage event in {period} as a CSV file"
+                }
+            },
+            "fleet": {
+                "title": "Fleet",
+                "subtitle": "The machines that execute your work: enroll desktop or headless nodes with a one-time token, watch their health, and see the nodes of clusters you have configured yourself.",
+                "kinds": {
+                    "desktop-node": "Desktop node",
+                    "node": "Headless node",
+                    "k8s": "Cluster"
+                },
+                "statuses": {
+                    "enrolling": "Enrolling",
+                    "online": "Online",
+                    "offline": "Offline",
+                    "disabled": "Disabled"
+                },
+                "table": {
+                    "name": "Name",
+                    "kind": "Kind",
+                    "status": "Status",
+                    "platform": "Platform",
+                    "capabilities": "Capabilities",
+                    "lastSeen": "Last seen",
+                    "load": "Load"
+                },
+                "empty": {
+                    "title": "No nodes enrolled yet",
+                    "description": "Add a node to lend one of your machines to the platform: a desktop node with a small status UI, or a headless node for servers and CI boxes. Issue a one-time enrollment token here and paste it into the node app during setup."
+                },
+                "cluster": {
+                    "title": "Your cluster nodes",
+                    "description": "Read-only, live node inventory of clusters you configured yourself in deployment settings. Platform-operated shared clusters are never listed here.",
+                    "empty": "No self-configured cluster is connected, or its nodes could not be read right now.",
+                    "roles": "Roles"
+                },
+                "add": {
+                    "button": "Add node",
+                    "title": "Add a node",
+                    "description": "Name the machine and pick its shape. You will get a one-time enrollment token to paste into the node during setup.",
+                    "nameLabel": "Node name",
+                    "namePlaceholder": "e.g. Office workstation",
+                    "nameRequired": "Please name the node first",
+                    "kindLabel": "Node kind",
+                    "kindHelper": {
+                        "desktop-node": "A desktop app that registers this machine and shows node status, logs and controls.",
+                        "node": "A command-line service for servers, CI boxes and scripted fleets — no UI."
+                    },
+                    "cancel": "Cancel",
+                    "submit": "Issue token",
+                    "issued": "Enrollment token issued",
+                    "tokenIntro": "Copy this one-time enrollment token. It expires in {minutes} minutes and can be used exactly once.",
+                    "copy": "Copy",
+                    "copied": "Copied",
+                    "copyError": "Failed to copy to clipboard",
+                    "instructionsTitle": "Install instructions",
+                    "instructionsBody": "Install the node app on the target machine, point it at this platform's API address, and paste the token when the setup asks for it. The node appears here as Online after its first heartbeat. (Node app downloads ship in an upcoming release.)",
+                    "tokenOnce": "For security, the token is shown only once — issue a new one if you lose it.",
+                    "done": "Done"
+                },
+                "actions": {
+                    "rename": "Rename",
+                    "disable": "Disable",
+                    "enable": "Enable",
+                    "remove": "Remove",
+                    "details": "Details"
+                },
+                "rename": {
+                    "title": "Rename node",
+                    "cancel": "Cancel",
+                    "confirm": "Save"
+                },
+                "remove": {
+                    "title": "Remove node",
+                    "description": "Remove \"{name}\" from your fleet? Its credential stops working immediately and the machine will have to be enrolled again.",
+                    "cancel": "Cancel",
+                    "confirm": "Remove"
+                },
+                "messages": {
+                    "renamed": "Node renamed",
+                    "disabled": "Node disabled — it stops accepting work and heartbeats",
+                    "enabled": "Node enabled — it will come back online on its next heartbeat",
+                    "removed": "Node removed"
+                },
+                "load": {
+                    "idle": "Idle",
+                    "busy": "{count} running",
+                    "currentJob": "Current job: {kind}"
+                },
+                "tokens": {
+                    "title": "Outstanding enrollment tokens",
+                    "description": "Tokens that have been minted but not yet used. The token itself was shown once at mint time and cannot be read again — revoke and re-issue if it was lost.",
+                    "empty": "No outstanding tokens.",
+                    "loading": "Loading tokens…",
+                    "refresh": "Refresh",
+                    "issuedAt": "Issued",
+                    "expiresAt": "Expires",
+                    "expired": "Expired",
+                    "revoke": "Revoke",
+                    "rotated": "Credential rotated. The replacement token is shown once — copy it now.",
+                    "revoked": "Enrollment token revoked.",
+                    "revokeTitle": "Revoke this enrollment token?",
+                    "revokeDescription": "The token stops working immediately. The machine it was minted for will not be able to enroll until you issue a new one.",
+                    "revokeCancel": "Keep token"
+                },
+                "controls": {
+                    "rotatedTitle": "Credential rotated",
+                    "rotated": "Copy the replacement token now — it is shown once and cannot be read again.",
+                    "undrained": "Node returned to service.",
+                    "title": "Controls",
+                    "rotate": "Rotate credential",
+                    "rotateHint": "Issues a replacement enrollment token and invalidates the current credential. The machine must re-enroll.",
+                    "drain": "Drain",
+                    "drainHint": "Disables the node and returns its in-flight work to the queue so it is picked up elsewhere immediately.",
+                    "drained": "Node drained.",
+                    "undrain": "Return to service",
+                    "undrainHint": "Re-enables the node so it can lease work again."
+                },
+                "capabilities": {
+                    "title": "Capability tags",
+                    "placeholder": "Add a tag, e.g. workspace",
+                    "add": "Add",
+                    "remove": "Remove",
+                    "save": "Save tags",
+                    "saved": "Capability tags saved.",
+                    "none": "No tags. This node is eligible for any work that names no requirements.",
+                    "pinned": "Pinned",
+                    "pinnedHint": "You own these tags — the node's heartbeats will not overwrite them.",
+                    "unpinned": "Reported by the node",
+                    "unpinnedHint": "The node reports these on every heartbeat. Editing them hands ownership to you."
+                },
+                "handoff": {
+                    "qrLabel": "Scan to enrol",
+                    "qrHint": "Scan this from the machine you are adding. The code carries the one-time token — treat it like a password.",
+                    "commandTitle": "Or run this on the machine",
+                    "copyCommand": "Copy command",
+                    "downloadsTitle": "Downloads",
+                    "downloadFile": "Download config file",
+                    "downloadDesktop": "Desktop app",
+                    "downloadNode": "Headless node"
+                },
+                "history": {
+                    "failuresTitle": "Recent failures",
+                    "noFailures": "No failures in the recent history.",
+                    "recentCount": "{count} recent jobs",
+                    "attempts": "{count} attempts",
+                    "loading": "Loading history…",
+                    "unavailable": "Job history is unavailable right now. The node itself is fine."
+                }
+            },
+            "jobRuntime": {
+                "title": "Job Runtime",
+                "subtitle": "Override the platform-default job-runtime provider with your own credentials. Inherit falls back to the platform default; BYO keeps the same provider with tenant credentials; Override switches both provider and credentials.",
+                "mode": {
+                    "inherit": "Inherit (platform default)",
+                    "byo": "Bring your own credentials",
+                    "override": "Override provider and credentials"
+                },
+                "readout": {
+                    "mode": "Active mode",
+                    "provider": "Active provider",
+                    "providerNone": "Platform default",
+                    "credentialVersion": "Credential version",
+                    "credentialsRef": "Credential pointer",
+                    "noCredentials": "None",
+                    "noOverlay": "No overlay row",
+                    "updatedAt": "Last updated",
+                    "enabled": "Enabled",
+                    "yes": "Yes",
+                    "no": "No"
+                },
+                "fields": {
+                    "providerLabel": "Provider",
+                    "providerHelper": "Picks the worker runtime used to dispatch background jobs for this tenant.",
+                    "modeLabel": "Mode",
+                    "modeHelper": {
+                        "inherit": "Use the platform-default credentials. The dispatcher resolves this tenant to the same runtime as everyone else.",
+                        "byo": "Keep the same provider as the platform default but use your own credentials.",
+                        "override": "Switch to a different provider and supply your own credentials."
+                    },
+                    "enabledLabel": "Enabled",
+                    "enabledHelper": "Soft-disable without dropping the credential pointer. When off, the dispatcher treats this tenant as inherit so operators can quickly fall back."
+                },
+                "credentials": {
+                    "title": "Credentials",
+                    "subtitle": "Provide an opaque pointer into the encrypted secrets store. Plaintext credentials never round-trip through this UI — paste the JSON blob to record what was provisioned; the secret pointer is what the dispatcher resolves.",
+                    "secretRefLabel": "Secret pointer",
+                    "secretRefPlaceholder": "tenant-job-runtime:42a1b8de:trigger:v3",
+                    "jsonLabel": "Credentials JSON (reference only)",
+                    "jsonPlaceholder": "{\n    \"token\": \"...\"\n}",
+                    "jsonHelper": "Per-provider schema-driven forms land in a follow-up sub-story. For now, paste the JSON shape from providers.md as a free-form reference."
+                },
+                "trigger": {
+                    "banner": {
+                        "inherit": "Using the platform's shared Trigger.dev project. No tenant credentials are required — jobs dispatch through the operator-default project.",
+                        "byo": "Bring your own Trigger.dev account + project. Paste the PAT, project secret key, and project ref from your Trigger.dev dashboard.",
+                        "override": "Override the platform default with your own Trigger.dev project. Same credential shape as BYO — choose this when you're explicitly opting out of the platform default rather than supplementing it."
+                    },
+                    "fields": {
+                        "accessTokenLabel": "Personal Access Token (PAT)",
+                        "accessTokenHelper": "Trigger.dev management PAT (tr_pat_…) from your Trigger.dev account. Required for BYO / Override; unused in Inherit mode.",
+                        "secretKeyLabel": "Project Secret Key",
+                        "secretKeyHelper": "Project-scoped server secret (tr_dev_… or tr_prod_…) used by the SDK to authenticate tasks.trigger calls. Required for BYO / Override.",
+                        "projectRefLabel": "Project Ref",
+                        "projectRefHelper": "Trigger.dev project reference (e.g. proj_abc123). Required for BYO / Override.",
+                        "apiUrlLabel": "API URL (self-hosted only)",
+                        "apiUrlHelper": "Override the Trigger.dev API endpoint for a self-hosted instance. Leave blank to use https://api.trigger.dev."
+                    }
+                },
+                "actions": {
+                    "save": "Save",
+                    "rotate": "Rotate credential",
+                    "forceInvalidate": "Force invalidate",
+                    "revert": "Revert to inherit"
+                },
+                "forceInvalidate": {
+                    "title": "Force-invalidate credential",
+                    "description": "Bumps the credential version and emits an audit row. Rate-limited to once per minute. In-flight runs keep their captured version and drain gracefully; new enqueues see the bumped version.",
+                    "cancel": "Cancel",
+                    "confirm": "Force invalidate"
+                },
+                "revert": {
+                    "title": "Revert to inherit",
+                    "description": "Clears the credential pointer, bumps the credential version, and routes future jobs through the platform default. Idempotent — a tenant already in inherit mode is unchanged.",
+                    "cancel": "Cancel",
+                    "confirm": "Revert to inherit"
+                },
+                "messages": {
+                    "saveSuccess": "Job-runtime configuration saved",
+                    "saveError": "Failed to save job-runtime configuration",
+                    "rotateSuccess": "Credential rotated (now v{version})",
+                    "rotateError": "Failed to rotate credential",
+                    "invalidateSuccess": "Credential invalidated (now v{version})",
+                    "invalidateError": "Failed to force-invalidate credential",
+                    "revertSuccess": "Reverted to inherit",
+                    "revertError": "Failed to revert to inherit",
+                    "invalidJson": "Credentials JSON is not valid JSON",
+                    "secretRefRequired": "Secret pointer is required when mode is not inherit",
+                    "requiredFieldsMissing": "Required credential fields are empty: {fields}",
+                    "providerNoLongerAllowed": "Provider {provider} is no longer enabled by the operator. Revert to inherit or pick an allowed provider before saving.",
+                    "noProvidersAvailable": "The operator has not enabled any job-runtime providers for tenant overlays. Switch to inherit mode or contact your operator."
+                }
+            },
+            "digest": {
+                "title": "Digest",
+                "subtitle": "Scheduled activity briefings: agent runs, task movement, pull requests, connected-source events and goal progress, delivered on the cadence you choose. Your personal digest and your organization’s digest are separate settings — turning one on never changes the other.",
+                "scopes": {
+                    "personal": "Personal",
+                    "organization": "Organization"
+                },
+                "cadences": {
+                    "daily": "Daily",
+                    "weekly": "Weekly"
+                },
+                "fields": {
+                    "scopeLabel": "Scope",
+                    "scopeHelper": "Personal covers only your own activity. Organization covers everything happening across your organization. Both can be on at the same time.",
+                    "orgContext": "Editing the digest for {name}.",
+                    "enabledLabel": "Send me a personal digest",
+                    "enabledHelper": "Delivered in-app and to any notification channel you have connected. Quiet windows are skipped instead of sending an empty briefing.",
+                    "orgEnabledLabel": "Send an organization digest",
+                    "orgEnabledHelper": "One shared briefing covering the whole organization, delivered to the organization owner. Members keep receiving their own personal digests.",
+                    "cadenceLabel": "Cadence",
+                    "cadenceHelper": "Daily covers the last 24 hours; weekly covers the last 7 days.",
+                    "narrativeLabel": "Include an AI summary",
+                    "narrativeHelper": "Adds a short written summary on top of the counts. The counts are always computed exactly; if no AI provider is available the summary is skipped and the digest says so.",
+                    "lastRunAt": "Last sent {when}"
+                },
+                "actions": {
+                    "save": "Save",
+                    "saving": "Saving..."
+                },
+                "messages": {
+                    "saveSuccess": "Digest settings saved",
+                    "saveError": "Failed to save the digest settings",
+                    "noOrg": "No active organization for this session, so there is no organization digest to configure. Create or switch to an organization first.",
+                    "noAiProvider": "No AI provider is configured, so digests will arrive without the written summary. Every count is still computed and delivered."
                 }
             }
         },
@@ -1902,7 +2672,12 @@
             "activeWebsites": "เว็บไซต์ที่ใช้งานอยู่",
             "monthSpend": "Month Spend",
             "fromLastMonth": "จากเดือนที่แล้ว",
-            "teams": "ทีม"
+            "teams": "ทีม",
+            "agents": "Agents",
+            "agentsActive": "{count} active",
+            "tasksInFlight": "Tasks in flight",
+            "tasksBlocked": "{count} blocked",
+            "tasksNoBlockers": "no blockers"
         },
         "attention": {
             "title": "ต้องการความสนใจ",
@@ -2068,11 +2843,13 @@
                     "kb": "ฐานความรู้",
                     "generator": "สร้าง Work ครั้งเดียวหรือตามตารางเวลา",
                     "deploy": "ปรับใช้ Work",
-                    "tasks": "งานสำหรับ Work นี้"
+                    "tasks": "งานสำหรับ Work นี้",
+                    "pullRequests": "Open pull requests across this Work's repositories, with the agent's review"
                 },
                 "tasks": "งาน",
                 "posts": "โพสต์",
-                "pages": "หน้า"
+                "pages": "หน้า",
+                "pullRequests": "Pull requests"
             },
             "members": {
                 "title": "สมาชิกทีม",
@@ -3425,7 +4202,81 @@
                 "providerRepoEnabled": "เปิดการสร้างคลัง {provider} แล้ว",
                 "providerRepoDisabled": "ปิดการสร้างคลัง {provider} แล้ว",
                 "providerRepoUpdateFailed": "อัปเดตการตั้งค่าคลังไม่สำเร็จ",
-                "providerRepoDisabledNote": "การสร้างถูกปิดอยู่ คลังที่มีอยู่ยังคงเดิม เพียงแต่จะไม่ถูกอัปเดตอีก"
+                "providerRepoDisabledNote": "การสร้างถูกปิดอยู่ คลังที่มีอยู่ยังคงเดิม เพียงแต่จะไม่ถูกอัปเดตอีก",
+                "taskIsolation": {
+                    "title": "Task isolation",
+                    "subtitle": "Run each isolated Task on its own branch instead of the Work's main line.",
+                    "enableLabel": "Isolate Tasks in worktree branches",
+                    "enableDescription": "When off, agents work directly against the Work's repositories. When on, each Task gets its own branch forked from the base branch.",
+                    "baseBranchLabel": "Base branch",
+                    "baseBranchDescription": "Branch Task branches fork from. Leave empty to use the repository's default branch.",
+                    "baseBranchPlaceholder": "Repository default branch",
+                    "baseBranchSave": "Save",
+                    "targetRepoLabel": "Target repository",
+                    "targetRepoWorkOutput": "Work output repository",
+                    "targetRepoLinked": "Linked repository (coming soon)",
+                    "cleanupLabel": "Branch cleanup",
+                    "cleanupOnMerge": "Delete branch when merged",
+                    "cleanupManual": "Keep branches (clean up manually)",
+                    "saved": "Task isolation settings updated",
+                    "saveFailed": "Failed to update task isolation settings"
+                },
+                "qualityGates": {
+                    "title": "Quality gates",
+                    "subtitle": "Default acceptance checks agent-executed Tasks under this Work must pass before opening a pull request.",
+                    "saved": "Quality gates settings saved",
+                    "saveFailed": "Failed to save quality gates settings",
+                    "policyLabel": "Checks policy",
+                    "policyHint": {
+                        "off": "Checks never run. Existing behavior — the gate is disabled for this Work.",
+                        "warn": "Checks run and report, but a red gate does not block the Task.",
+                        "required": "A red or skipped gate blocks the Task from opening a pull request."
+                    },
+                    "policyOff": "Off — never run checks",
+                    "policyWarn": "Warn — run and report only",
+                    "policyRequired": "Required — red blocks",
+                    "maxAttemptsLabel": "Max gate attempts",
+                    "maxAttemptsDescription": "How many times a run may retry after a red gate before it gives up and asks for help (1–5).",
+                    "defaultsLabel": "Default checks",
+                    "defaultsDescription": "Inherited by every Task under this Work. A Task check with the same id overrides its default.",
+                    "defaultsSave": "Save default checks"
+                },
+                "externalRefs": {
+                    "title": "Ingest routing claims",
+                    "subtitle": "Claim the external containers whose events belong to this Work. Ingested events carrying one of these identifiers are routed here instead of staying account-wide. Repositories are not listed — repository events already route through the repositories this Work declares.",
+                    "add": "Add",
+                    "save": "Save claims",
+                    "saved": "Routing claims saved",
+                    "saveFailed": "Could not save the routing claims",
+                    "remove": "Remove {id}",
+                    "kinds": {
+                        "chat-channel": {
+                            "label": "Chat channels",
+                            "helper": "Chat channel IDs whose messages belong to this Work (for example a Slack channel id like C0123456789).",
+                            "placeholder": "C0123456789"
+                        },
+                        "tracker-team": {
+                            "label": "Tracker teams",
+                            "helper": "Issue-tracker team keys whose issues belong to this Work (for example the team identifier ENG).",
+                            "placeholder": "ENG"
+                        },
+                        "doc-database": {
+                            "label": "Doc databases",
+                            "helper": "Document database IDs whose pages belong to this Work (for example a wiki or docs database id).",
+                            "placeholder": "db_2f19c4a7"
+                        },
+                        "meeting": {
+                            "label": "Meetings",
+                            "helper": "Recurring meeting IDs whose transcripts and notes belong to this Work.",
+                            "placeholder": "meeting-8891"
+                        }
+                    },
+                    "errors": {
+                        "duplicate": "That identifier is already claimed under this kind.",
+                        "tooLong": "Identifiers can be at most {max} characters.",
+                        "tooMany": "At most {max} identifiers per kind."
+                    }
+                }
             },
             "deploy": {
                 "progress": {
@@ -3573,6 +4424,26 @@
                     "dnsName": "ชื่อ:",
                     "dnsValue": "ค่า:",
                     "copyButton": "คัดลอก"
+                },
+                "subdomain": {
+                    "title": "Site URL / Subdomain",
+                    "description": "Your default, managed address on ever.works. Custom domains can be added below.",
+                    "loading": "Loading subdomain…",
+                    "loadFailed": "Failed to load subdomain",
+                    "loadFailedHint": "Current subdomain unavailable — retry to view or change it.",
+                    "notAllocated": "No managed subdomain yet — it will be allocated on the next deploy.",
+                    "currentLabel": "Current address",
+                    "openLink": "Open {url}",
+                    "pendingDnsBadge": "DNS propagating",
+                    "liveBadge": "Live",
+                    "editLabel": "Change subdomain",
+                    "placeholder": "my-directory",
+                    "saveButton": "Save",
+                    "saveSuccess": "Subdomain updated.",
+                    "saveFailed": "Failed to update subdomain",
+                    "invalidFormat": "Use 3-63 lowercase letters, digits, or hyphens (cannot start or end with a hyphen).",
+                    "helperSuffix": ".ever.works",
+                    "readonlyHint": "Managed subdomain is read-only for this Work."
                 }
             },
             "kb": {
@@ -3607,7 +4478,8 @@
                     "personas": "Personas",
                     "research": "Research",
                     "output": "Outputs",
-                    "freeform": "Freeform"
+                    "freeform": "Freeform",
+                    "decision": "Decision"
                 },
                 "inherited": {
                     "bannerLabel": "การแจ้งเตือนเอกสารที่รับช่วงต่อ",
@@ -3628,7 +4500,8 @@
                     "additions-only": "Additions only"
                 },
                 "document": {
-                    "emptyBody": "This document has no body yet."
+                    "emptyBody": "This document has no body yet.",
+                    "tagsLabel": "Tags"
                 },
                 "editor": {
                     "save": "Save",
@@ -3811,6 +4684,299 @@
                     "errorFallback": "ไม่สามารถลบได้ โปรดลองอีกครั้ง",
                     "errorBusy": "กำลังลบ…",
                     "errorPartial": "ลบสำเร็จ {ok}, ล้มเหลว {failed}"
+                },
+                "review": {
+                    "nav": "Review",
+                    "navAria": "Review queue — {count} documents awaiting review",
+                    "metaTitle": "Knowledge Base review queue",
+                    "title": "Review queue",
+                    "subtitle": "Agent-written notes stay out of agent context until you accept them.",
+                    "empty": "Nothing to review. New agent-written documents will appear here.",
+                    "loading": "Loading the review queue…",
+                    "retry": "Try again",
+                    "source": "From {source}",
+                    "accept": "Accept",
+                    "editThenAccept": "Edit & accept",
+                    "supersede": "Supersede",
+                    "supersedePrompt": "Replaced by",
+                    "supersedePlaceholder": "Pick the surviving decision…",
+                    "supersedeConfirm": "Supersede",
+                    "archive": "Archive",
+                    "cancel": "Cancel",
+                    "preview": "Toggle content preview",
+                    "previewLoading": "Loading preview…",
+                    "previewEmpty": "This document has no body yet.",
+                    "bannerMessage": "This document is awaiting review — it is not feeding agent context yet. Edit it if needed, then accept."
+                },
+                "workbench": {
+                    "title": "Knowledge Base workbench",
+                    "metaTitle": "Knowledge Base workbench",
+                    "empty": "Select a document from the tree, or upload a file via drag-and-drop (coming in slice C).",
+                    "tab": {
+                        "kb": "KB",
+                        "originals": "Originals"
+                    },
+                    "originals": {
+                        "placeholder": "Drag-and-drop upload of original files lands in slice C. Use the KB tab to browse documents in the meantime."
+                    },
+                    "editor": {
+                        "preview": "Preview",
+                        "savedAt": "Saved {seconds}s ago",
+                        "saving": "Saving…",
+                        "placeholder": "Start writing…"
+                    },
+                    "wikilink": {
+                        "searching": "Searching documents…",
+                        "noMatches": "No matches — type more.",
+                        "listLabel": "Wikilink suggestions"
+                    },
+                    "mention": {
+                        "searching": "Searching…",
+                        "noMatches": "No matches — type more.",
+                        "listLabel": "Mention suggestions",
+                        "label": {
+                            "doc": "Doc",
+                            "agent": "Agent"
+                        }
+                    },
+                    "conflict": "This document was edited elsewhere. Reload to see the latest.",
+                    "reload": "Reload",
+                    "locked": "This document is locked.",
+                    "upload": {
+                        "dropPrompt": "Drop files here to upload",
+                        "modal": {
+                            "title": "Upload to Knowledge Base",
+                            "targetClass": "Target class",
+                            "tags": "Tags",
+                            "tagsPlaceholder": "Type a tag and press Enter",
+                            "description": "Description",
+                            "descriptionPlaceholder": "Short summary of the file(s) you are uploading",
+                            "autoClassify": "Let the agent reclassify after extraction",
+                            "upload": "Upload",
+                            "cancel": "Cancel"
+                        },
+                        "progress": {
+                            "uploading": "Uploading",
+                            "done": "Done",
+                            "failed": "Failed"
+                        }
+                    },
+                    "metadata": {
+                        "title": "Metadata",
+                        "class": "Class",
+                        "tags": {
+                            "label": "Tags",
+                            "add": "Add tag",
+                            "placeholder": "Type a tag and press Enter",
+                            "remove": "Remove tag {tag}"
+                        },
+                        "description": "Description",
+                        "descriptionPlaceholder": "Short summary of this document",
+                        "status": "Status",
+                        "statusActive": "Active",
+                        "statusArchived": "Archived",
+                        "statusDraft": "Draft",
+                        "lock": {
+                            "toggle": "Locked",
+                            "mode": "Lock mode",
+                            "modeFull": "Full lock",
+                            "modeAdditionsOnly": "Additions only"
+                        },
+                        "language": "Language",
+                        "languagePlaceholder": "BCP-47 code (e.g. en, en-US)",
+                        "source": "Source",
+                        "history": "View Git history",
+                        "historyComingSoon": "Coming in slice E",
+                        "saveFailed": "Save failed",
+                        "lockedBanner": "This document is locked."
+                    },
+                    "viewer": {
+                        "sizeBlocked": {
+                            "title": "Preview unavailable — file too large",
+                            "description": "This file is {size} which exceeds the inline preview cap of {cap}. Download it to view locally.",
+                            "download": "Download original"
+                        },
+                        "unsupported": {
+                            "title": "Preview unavailable for this format",
+                            "description": "No inline viewer is available for {mime}. Download the file to open it in a native application.",
+                            "download": "Download original"
+                        }
+                    },
+                    "contextMenu": {
+                        "rename": "Rename",
+                        "duplicate": "Duplicate",
+                        "lock": "Lock",
+                        "lockFull": "Full lock",
+                        "lockAdditionsOnly": "Additions-only lock",
+                        "unlock": "Unlock",
+                        "archive": "Archive",
+                        "delete": "Delete",
+                        "copyPath": "Copy path",
+                        "copyWikilink": "Copy wikilink",
+                        "lockedDisabledTooltip": "Unlock the document to perform this action.",
+                        "deleteConfirmTitle": "Delete document?",
+                        "deleteConfirmInstruction": "Type \"{name}\" to confirm. This cannot be undone.",
+                        "deleteConfirmInput": "Document name",
+                        "deleteCancel": "Cancel",
+                        "deleteConfirm": "Delete"
+                    },
+                    "search": {
+                        "placeholder": "Search Knowledge Base documents…",
+                        "empty": "Type to search KB documents.",
+                        "noResults": "No documents matched your search.",
+                        "searching": "Searching…",
+                        "filter": {
+                            "class": "Class",
+                            "tags": "Tags",
+                            "status": "Status",
+                            "locked": "Locked only",
+                            "language": "Language"
+                        }
+                    },
+                    "history": {
+                        "title": "Document Git history",
+                        "placeholder": "No commits yet for this document.",
+                        "placeholderDescription": "The Git-mirror background job will populate this list after the next edit lands. If this persists, the backend endpoint may still be rolling out — track follow-up at EW-732.",
+                        "restore": "Restore",
+                        "restored": "Restored",
+                        "failed": "Restore failed",
+                        "close": "Close"
+                    }
+                },
+                "facets": {
+                    "searchLabel": "Search memory",
+                    "searchPlaceholder": "Search titles and content…",
+                    "clear": "Clear filters",
+                    "typeLabel": "Type",
+                    "sourceLabel": "Source",
+                    "noMatches": "No documents match these filters.",
+                    "activeCount": "{count} matching",
+                    "badge": {
+                        "human": "Human",
+                        "agent": "Agent",
+                        "synthesized": "Synthesized",
+                        "connector": "Connector"
+                    },
+                    "badgeAria": {
+                        "human": "Written by a person",
+                        "agent": "Written by an agent run",
+                        "synthesized": "Merged by memory consolidation",
+                        "connector": "Came from a connected tool: {source}"
+                    }
+                },
+                "health": {
+                    "title": "Memory health",
+                    "subtitle": "How well the Knowledge Base is answering the questions agents actually ask.",
+                    "loading": "Measuring memory health…",
+                    "error": "Could not load memory health.",
+                    "retry": "Try again",
+                    "window": "Last {days} days",
+                    "notMeasurable": "Not measurable yet",
+                    "recall": {
+                        "label": "Recall hit rate",
+                        "explainer": "Of the documents we put in front of an agent, how many did it actually use. Low means we are injecting the wrong things.",
+                        "detail": "{cited} of {retrieved} injected documents were cited.",
+                        "noSignal": "Nothing has cited a document yet, so this cannot be measured — a 0% here would be a guess, not a fact."
+                    },
+                    "stale": {
+                        "label": "Stale decisions",
+                        "explainer": "Settled decisions nobody has touched in {days} days. High means the decision log is drifting from how the team actually works.",
+                        "detail": "{stale} of {accepted} accepted decisions are stale.",
+                        "none": "No accepted decisions yet."
+                    },
+                    "backlog": {
+                        "label": "Awaiting review",
+                        "explainer": "Agent-written notes stay out of agent context until a human accepts them. A growing backlog means learning is being captured and then discarded.",
+                        "detail": "Oldest has waited {oldest} days; average {average} days.",
+                        "none": "Nothing is waiting for review."
+                    },
+                    "gaps": {
+                        "label": "Questions we could not answer",
+                        "explainer": "Searches that returned nothing. These are fed into the next consolidation pass as synthesis candidates.",
+                        "occurrences": "asked {count}x",
+                        "none": "Every question in this window returned something."
+                    },
+                    "uncited": {
+                        "label": "Injected but never used",
+                        "retrievals": "injected {count}x",
+                        "none": "Everything injected has been used."
+                    }
+                },
+                "askWhy": {
+                    "trigger": "Ask why",
+                    "title": "Why this document showed up",
+                    "subtitle": "The recorded retrieval trail — no AI, no guessing.",
+                    "loading": "Loading the retrieval trail…",
+                    "error": "Could not load the retrieval trail.",
+                    "empty": "This document has not been retrieved in the last {days} days.",
+                    "alwaysInjected": "Always injected (no query)",
+                    "resultCount": "{count} documents returned",
+                    "citations": "Cited {count}x",
+                    "total": "{count} retrievals in the last {days} days",
+                    "close": "Close"
+                }
+            },
+            "runsSummary": {
+                "running": "running",
+                "queued": "queued",
+                "awaiting": "awaiting input",
+                "failedLast24h": "failed (24h)"
+            },
+            "pullRequests": {
+                "title": "Pull requests",
+                "subtitle": "{count} open across this Work’s repositories",
+                "loading": "Loading pull requests…",
+                "noOpen": "No open pull requests in this repository.",
+                "repoError": "Could not list pull requests: {message}",
+                "openExternal": "Open pull request #{number} on the git provider",
+                "empty": {
+                    "title": "No open pull requests",
+                    "body": "Pull requests opened on this Work’s repositories show up here, together with the agent’s review."
+                },
+                "roles": {
+                    "work": "main repo",
+                    "website": "website repo",
+                    "data": "data repo"
+                },
+                "states": {
+                    "open": "Open",
+                    "merged": "Merged",
+                    "closed": "Closed"
+                },
+                "pills": {
+                    "reviewed": "Reviewed ({count})",
+                    "notReviewed": "Not reviewed"
+                },
+                "detail": {
+                    "loading": "Loading the diff…",
+                    "refresh": "Refresh",
+                    "requestReview": "Request agent review",
+                    "reviews": "Agent reviews",
+                    "noReviews": "No agent review recorded for this pull request yet.",
+                    "fileNotes": "{count} file notes",
+                    "notPosted": "not posted to the pull request",
+                    "diff": "Diff",
+                    "noDiff": "No file changes to show.",
+                    "truncated": "Diff truncated",
+                    "fileTruncated": "truncated"
+                },
+                "errors": {
+                    "list": "Failed to load pull requests",
+                    "diff": "Failed to load the diff",
+                    "review": "Failed to run the agent review"
+                }
+            },
+            "externalEvents": {
+                "title": "External activity",
+                "subtitle": "Events ingested from the connectors for this Work — repos, trackers, docs, chat and meetings.",
+                "loading": "Loading external activity…",
+                "empty": "No external events for this Work yet. Connect a connector and claim its channel, repository or project on this Work.",
+                "emptyFiltered": "No external events from {source} for this Work.",
+                "error": "Failed to load external events",
+                "untitled": "Untitled event",
+                "openSource": "Open the original in the source system",
+                "filters": {
+                    "all": "All sources"
                 }
             }
         },
@@ -3828,7 +4994,9 @@
                 "blog": "Blog",
                 "directory": "Directory",
                 "awesome-repo": "Awesome Repo",
-                "company": "Company"
+                "company": "Company",
+                "agent": "Agent",
+                "task": "Task"
             },
             "chipDescriptions": {
                 "mission": "An ongoing Goal the agent keeps working on — generates Ideas on a schedule or one-shot.",
@@ -3851,7 +5019,9 @@
             "toasts": {
                 "missionCreated": "Mission created",
                 "ideaCreated": "Idea added",
-                "submitError": "Couldn't create. Please try again."
+                "submitError": "Couldn't create. Please try again.",
+                "agentDraft": "Opening Agent setup — finish to create.",
+                "taskDraft": "Opening Task setup — finish to create."
             },
             "cards": {
                 "ai": {
@@ -3869,7 +5039,8 @@
                     "subtitle": "Bring in a Work you already have — repo, items, and provider settings.",
                     "cta": "Import now"
                 }
-            }
+            },
+            "submitTitle": "Create"
         },
         "workCreation": {
             "title": "สร้างงานใหม่",
@@ -3982,7 +5153,10 @@
                 "organizationHelp": "สร้าง repository ภายใต้องค์กรแทนบัญชีส่วนตัวของคุณ",
                 "organizationNameLabel": "ชื่อองค์กร",
                 "organizationNamePlaceholder": "ป้อนชื่อองค์กร",
-                "websiteTemplateHelperText": "เลือกเทมเพลตงานที่จะใช้เมื่อสร้างคลังงานครั้งแรก"
+                "websiteTemplateHelperText": "เลือกเทมเพลตงานที่จะใช้เมื่อสร้างคลังงานครั้งแรก",
+                "slugLabel": "Work Slug",
+                "slugPlaceholder": "awesome-ai-tools",
+                "slugHelp": "URL-friendly identifier. Auto-generated from the name — edit to override."
             },
             "manual": {
                 "title": "สร้างด้วยตนเอง",
@@ -4218,6 +5392,58 @@
                     "description": "Repository ชื่อนี้มีอยู่แล้วในบัญชีของคุณ คุณสามารถใช้ชื่ออื่นหรือยอมรับข้อเสนอแนะ",
                     "useSuggestion": "ใช้ \"{slug}\" แทน"
                 }
+            },
+            "promptLabel": "What kind of Work do you want to build?",
+            "or": "or",
+            "kinds": {
+                "website": "Website",
+                "landing-page": "Landing Page",
+                "blog": "Blog",
+                "directory": "Directory",
+                "awesome-repo": "Awesome Repo"
+            },
+            "kindDescriptions": {
+                "website": "A multi-page site for a business, service, or brand — generated content + code.",
+                "landing-page": "A focused one-pager — waitlists, product launches, webinar signups, lead capture.",
+                "blog": "A blog with categories, RSS, code highlighting, and SEO-ready content.",
+                "directory": "A curated directory site with search, filters, and structured item data.",
+                "awesome-repo": "An awesome-list repo — markdown index, categorized links, and refreshable metadata."
+            },
+            "promptHints": {
+                "minLength": "Add a description (at least 10 characters) to start.",
+                "submitTitle": "Create with AI"
+            },
+            "buttons": {
+                "manual": "Create Work Manually",
+                "import": "Import Existing Work"
+            },
+            "campaign": {
+                "chip": "Start a campaign",
+                "title": "Start a campaign",
+                "subtitle": "Describe the campaign and we provision the whole go-to-market setup: a campaign Work, a goal for the objective, the prebuilt go-to-market agents, and tasks for the first pipeline stages.",
+                "nameLabel": "Campaign name",
+                "namePlaceholder": "Q3 developer launch",
+                "objectiveLabel": "Objective",
+                "objectivePlaceholder": "Book 25 qualified demos with platform engineering teams",
+                "targetLabel": "Target (optional)",
+                "targetValuePlaceholder": "25",
+                "targetUnitPlaceholder": "demos",
+                "channelsLabel": "Channels (optional)",
+                "channelsPlaceholder": "email, linkedin, newsletter",
+                "channelsHelper": "Comma-separated. Recorded as labels on the seeded pipeline tasks.",
+                "submit": "Start campaign",
+                "submitting": "Provisioning your campaign…",
+                "success": "Campaign \"{name}\" is ready",
+                "failed": "Could not start the campaign",
+                "provisions": {
+                    "title": "What this provisions",
+                    "work": "A Work of kind campaign",
+                    "goal": "A goal capturing the objective",
+                    "agents": "The prebuilt go-to-market agents",
+                    "tasks": "Tasks for the first pipeline stages",
+                    "pipeline": "The go-to-market pipeline as this Work's pipeline preference"
+                },
+                "pipelineNotPinned": "The go-to-market pipeline could not be pinned to this Work; runs will auto-detect a pipeline instead."
             }
         },
         "gitProvider": {
@@ -4544,7 +5770,8 @@
                 "skills": "ทักษะ",
                 "templates": "เทมเพลต",
                 "settings": "การตั้งค่า",
-                "teams": "ทีม"
+                "teams": "ทีม",
+                "meetings": "Meetings"
             },
             "tooltips": {
                 "expandSidebar": "ขยายแถบด้านข้าง",
@@ -5161,7 +6388,24 @@
                 "removeMember": "นำออก",
                 "roleLead": "หัวหน้าทีม",
                 "roleMember": "สมาชิก",
-                "emptyRoster": "ยังไม่มีสมาชิก — เพิ่มเอเจนต์หรือเพื่อนร่วมทีมในทีมนี้"
+                "emptyRoster": "ยังไม่มีสมาชิก — เพิ่มเอเจนต์หรือเพื่อนร่วมทีมในทีมนี้",
+                "resourcesTitle": "Resources",
+                "resourcesSubtitle": "Works, agents and more that belong to this team.",
+                "emptyResources": "No resources attached yet — attach Works or Agents this team owns.",
+                "addResourceCta": "Attach a resource",
+                "addResourceTypeLabel": "Type",
+                "addResourceSelectLabel": "Resource",
+                "addResourceSearchPlaceholder": "Search…",
+                "addResourceSubmit": "Attach",
+                "attaching": "Attaching…",
+                "removeResource": "Remove",
+                "resourceTypeWork": "Work",
+                "resourceTypeAgent": "Agent",
+                "resourceGroupWork": "Works",
+                "resourceGroupAgent": "Agents",
+                "resourceGroupMission": "Missions",
+                "resourceGroupIdea": "Ideas",
+                "resourceGroupTask": "Tasks"
             },
             "settings": {
                 "title": "การตั้งค่าทีม",
@@ -5183,7 +6427,9 @@
                 "updateFailed": "ไม่สามารถอัปเดตทีมได้",
                 "deleteFailed": "ไม่สามารถลบทีมได้",
                 "memberAddFailed": "ไม่สามารถเพิ่มสมาชิกได้",
-                "memberRemoveFailed": "ไม่สามารถนำสมาชิกออกได้"
+                "memberRemoveFailed": "ไม่สามารถนำสมาชิกออกได้",
+                "resourceAttachFailed": "Could not attach the resource",
+                "resourceDetachFailed": "Could not remove the resource"
             }
         },
         "orgChartPage": {
@@ -5297,6 +6543,238 @@
             "company": "Company",
             "campaign": "แคมเปญ",
             "default": "Work"
+        },
+        "meetingsPage": {
+            "title": "Meetings",
+            "subtitle": "Every meeting the platform captured, newest first. Attach a transcript and it is summarized, remembered, and posted to your activity feed.",
+            "newMeeting": "New meeting",
+            "connectHint": "Zoom recordings and Google Meet transcripts sync automatically once their connector is enabled.",
+            "connectHintLink": "Manage connectors",
+            "sources": {
+                "manual": "Manual",
+                "import": "Import",
+                "zoom": "Zoom",
+                "google-meet": "Google Meet"
+            },
+            "badges": {
+                "transcript": "Transcript",
+                "noTranscript": "No transcript"
+            },
+            "filterBar": {
+                "source": "Source",
+                "anySource": "Any source",
+                "work": "Work",
+                "anyWork": "Any Work",
+                "apply": "Apply",
+                "reset": "Reset"
+            },
+            "loadError": {
+                "title": "Could not load meetings."
+            },
+            "empty": {
+                "title": "No meetings yet.",
+                "subtitle": "Capture a meeting by hand and paste its transcript, or enable a meetings connector so recordings sync on their own."
+            },
+            "pagination": {
+                "showing": "Showing {from}-{to}",
+                "noResults": "No results on this page",
+                "previous": "Previous",
+                "next": "Next"
+            },
+            "card": {
+                "participants": "{count, plural, =0 {No participants} one {# participant} other {# participants}}",
+                "durationPrefix": "Duration:",
+                "durationUnknown": "Still open"
+            }
+        },
+        "meetingNew": {
+            "title": "New meeting",
+            "subtitle": "Capture a meeting the platform did not sync for you. Paste the transcript now and it is summarized, saved to Memory and posted to your activity feed in one step.",
+            "backToMeetings": "Back to Meetings",
+            "created": "Meeting captured",
+            "sections": {
+                "provenance": "Where it came from",
+                "participants": "Participants",
+                "transcript": "Transcript"
+            },
+            "sources": {
+                "manual": "Manual",
+                "import": "Import",
+                "zoom": "Zoom",
+                "google-meet": "Google Meet"
+            },
+            "fields": {
+                "title": "Title",
+                "titlePlaceholder": "e.g. Weekly roadmap review",
+                "startedAt": "Started at",
+                "startedAtHint": "Leave empty to use the current time.",
+                "endedAt": "Ended at (optional)",
+                "source": "Source",
+                "work": "Work",
+                "workNone": "Org-wide (no Work)",
+                "workHint": "Route the meeting to one Work, or leave it org-wide.",
+                "sourceUrl": "Recording link (optional)",
+                "externalId": "Provider meeting ID (optional)",
+                "externalIdHint": "Used to de-duplicate against a later connector sync of the same meeting.",
+                "participants": "Participants",
+                "participantsHint": "One per line. Use \"Name <email>\" to record an address.",
+                "transcript": "Transcript (optional)",
+                "transcriptPlaceholder": "Ada: shipping the gate.\nGrace: reviewing the branch.",
+                "transcriptHint": "Adding a transcript runs the summary, Memory and activity pipeline. You can also attach it later from the meeting page."
+            },
+            "errors": {
+                "titleRequired": "Title is required.",
+                "startedAtInvalid": "Start time is not a valid date.",
+                "endedAtInvalid": "End time is not a valid date.",
+                "endedBeforeStarted": "End time cannot be before the start time.",
+                "createFailed": "Couldn't capture the meeting. Please try again."
+            },
+            "actions": {
+                "create": "Capture meeting",
+                "cancel": "Cancel"
+            }
+        },
+        "meetingDetail": {
+            "backToMeetings": "Back to Meetings",
+            "actions": {
+                "openRecording": "Open recording",
+                "delete": "Delete",
+                "attachTranscript": "Attach transcript",
+                "replaceTranscript": "Replace transcript",
+                "cancelReplace": "Cancel replace",
+                "save": "Save changes"
+            },
+            "sections": {
+                "summary": "Summary",
+                "transcript": "Transcript",
+                "details": "Details",
+                "edit": "Edit meeting"
+            },
+            "summary": {
+                "notGenerated": "No summary was generated for this transcript. Enable an AI provider and re-attach the transcript to try again.",
+                "noTranscript": "Attach a transcript to generate a summary."
+            },
+            "transcript": {
+                "composerLabel": "Transcript text",
+                "composerPlaceholder": "Paste the meeting transcript here.",
+                "pipelineHint": "Stored first, then summarized, remembered and posted to your activity feed — best effort.",
+                "storedElsewhere": "The transcript is stored but was not returned with this view."
+            },
+            "details": {
+                "source": "Source",
+                "startedAt": "Started",
+                "endedAt": "Ended",
+                "openEnded": "Still open",
+                "duration": "Duration",
+                "work": "Work",
+                "orgWide": "Org-wide",
+                "externalId": "Provider ID",
+                "createdAt": "Captured",
+                "participants": "Participants",
+                "noParticipants": "No participants recorded."
+            },
+            "edit": {
+                "hint": "Rename the meeting, close it out, point it at a recording, or re-route it to a Work."
+            },
+            "fields": {
+                "title": "Title",
+                "endedAt": "Ended at",
+                "sourceUrl": "Recording link",
+                "work": "Work",
+                "workNone": "Org-wide (no Work)"
+            },
+            "errors": {
+                "titleRequired": "Title is required.",
+                "endedAtInvalid": "End time is not a valid date.",
+                "endedBeforeStarted": "End time cannot be before the start time.",
+                "transcriptRequired": "Transcript text is required."
+            },
+            "toasts": {
+                "transcriptSaved": "Transcript attached",
+                "transcriptSummarized": "Transcript attached and summarized",
+                "transcriptError": "Couldn't attach the transcript.",
+                "saved": "Meeting updated",
+                "saveError": "Couldn't update the meeting.",
+                "deleted": "Meeting deleted",
+                "deleteError": "Couldn't delete the meeting."
+            },
+            "confirm": {
+                "delete": "Delete this meeting? Its transcript and summary will be removed. This cannot be undone."
+            }
+        },
+        "agentsPreview": {
+            "title": "Agents",
+            "add": "Add",
+            "viewAll": "View all ({n}) →",
+            "empty": {
+                "title": "No Agents yet.",
+                "subtitleLink": "Create your first Agent",
+                "subtitleSuffix": "to delegate recurring work."
+            },
+            "scope": {
+                "tenant": "Workspace",
+                "mission": "Mission",
+                "work": "Work",
+                "idea": "Idea"
+            },
+            "cadence": "every {cadence}"
+        },
+        "recentTasks": {
+            "title": "Tasks",
+            "add": "Add",
+            "viewAll": "View all ({n}) →",
+            "empty": {
+                "title": "No Tasks yet.",
+                "subtitle": "Create one to start tracking work."
+            },
+            "view": {
+                "label": "Switch task view",
+                "list": "List view",
+                "cards": "Card view"
+            }
+        },
+        "adminTenantRuntimeAllowlist": {
+            "title": "Tenant runtime allow-list",
+            "subtitle": "Operator-scoped per-tenant overlay on the job-runtime provider allow-list. Empty means the tenant inherits the global allow-list. Changes take effect on the next dispatcher resolution and are audited.",
+            "gatingDisabledBanner": "Per-tenant gating is disabled. The list below is preserved but ignored until EVER_WORKS_TENANT_RUNTIME_PER_TENANT_GATING=true.",
+            "emptyInheritBanner": "Tenant inherits the global allow-list (no per-tenant restriction).",
+            "restrictedBanner": "Tenant restricted to: {providers}.",
+            "pickerLabel": "Allowed providers",
+            "pickerHelper": "Select every job-runtime provider this tenant is allowed to choose. Save replaces the whole list atomically. Clear empties the overlay so the tenant falls back to the global allow-list.",
+            "savedListLabel": "Currently saved",
+            "actions": {
+                "save": "Save allow-list",
+                "clear": "Clear (inherit global)",
+                "removeProvider": "Remove {provider}"
+            },
+            "messages": {
+                "saveSuccess": "Tenant runtime allow-list saved",
+                "saveError": "Failed to save tenant runtime allow-list",
+                "deleteSuccess": "Provider removed from tenant allow-list",
+                "deleteError": "Failed to remove provider from tenant allow-list",
+                "noProviders": "No providers in the per-tenant allow-list."
+            }
+        },
+        "terminal": {
+            "stateStarting": "Connecting…",
+            "stateAttached": "Live",
+            "stateEnded": "Session ended ({reason})",
+            "stateCannotConnect": "Cannot connect — terminal streaming is not available for this run.",
+            "stateRefused": "You do not have access to this terminal.",
+            "readOnly": "read-only",
+            "reconnect": "Reconnect",
+            "waitingForOutput": "Waiting for output…",
+            "noRuns": "No runs yet — terminals attach to agent runs.",
+            "runPickerLabel": "Run",
+            "startSession": "Start session",
+            "startingSession": "Starting…",
+            "startFailed": "Could not start a terminal session for this run."
+        },
+        "jobRuntimeBanner": {
+            "title": "Background job runtime is not configured.",
+            "message": "Agent runs cannot execute on this install until a job runtime (e.g. Trigger.dev credentials) is set up.",
+            "docsLink": "Setup guide",
+            "dismiss": "Dismiss"
         }
     },
     "layout": {
@@ -5386,7 +6864,8 @@
             "pluginSettings": "การตั้งค่าปลั๊กอิน",
             "discover": "Discover",
             "billing": "Billing",
-            "usage": "Usage & Credits"
+            "usage": "Usage & Credits",
+            "jobRuntime": "Job Runtime"
         }
     },
     "api": {
@@ -5560,6 +7039,11 @@
         "visibility": {
             "private": "ส่วนตัว",
             "public": "สาธารณะ"
+        },
+        "footer": {
+            "build": "Build",
+            "web": "Web",
+            "api": "API"
         }
     },
     "organizations": {
@@ -5657,6 +7141,109 @@
             "title": "Create your first Organization",
             "description": "Organize your work, share with teammates, and collaborate as a team.",
             "cta": "Create Organization"
+        }
+    },
+    "notifications-v2": {
+        "emails": {
+            "title": "Email Addresses",
+            "subtitle": "Tenant-managed inbound + outbound addresses for agents.",
+            "addAddress": "Add address",
+            "empty": "No email addresses yet. Click Add address to register a Postmark / Resend / Mailgun / Sendgrid / Mailchimp inbox.",
+            "columns": {
+                "address": "Address",
+                "direction": "Direction",
+                "provider": "Provider",
+                "verified": "Verified"
+            },
+            "actions": {
+                "edit": "Edit",
+                "disable": "Disable",
+                "remove": "Remove",
+                "verify": "Resend verification"
+            }
+        },
+        "channels": {
+            "title": "Notification Channels",
+            "subtitle": "Connect Discord, Slack, Telegram, WhatsApp or Novu for multi-channel notification delivery.",
+            "addChannel": "Add channel",
+            "empty": "No channels yet. Add a Discord webhook, Slack incoming webhook, Telegram bot, or Novu workflow to start fanning notifications out beyond in-app.",
+            "columns": {
+                "name": "Name",
+                "provider": "Provider",
+                "verified": "Verified"
+            },
+            "actions": {
+                "test": "Test",
+                "edit": "Edit",
+                "disable": "Disable",
+                "remove": "Remove"
+            },
+            "testResult": {
+                "delivered": "Test delivered ✓",
+                "failed": "Test failed"
+            }
+        },
+        "preferences": {
+            "title": "Notification Preferences",
+            "subtitle": "Pick which channels deliver each event. In-app delivery is always on.",
+            "empty": "No event types registered yet. Producers will populate the registry on first emission.",
+            "columns": {
+                "event": "Event",
+                "inApp": "In-app"
+            },
+            "quietHours": {
+                "title": "Quiet hours",
+                "start": "Start",
+                "end": "End",
+                "timezone": "Timezone"
+            },
+            "mute": {
+                "title": "Mute category",
+                "until": "Mute until",
+                "muted": "Muted",
+                "unmute": "Unmute"
+            }
+        },
+        "inbox": {
+            "title": "Inbox",
+            "subtitleCount": "Inbound + outbound email for this agent. {count} messages.",
+            "compose": "Compose",
+            "empty": "No messages yet. Assign an inbound email address to this agent under Settings → Integrations → Emails to start receiving mail.",
+            "columns": {
+                "direction": "Direction",
+                "from": "From",
+                "subject": "Subject",
+                "when": "When",
+                "status": "Status"
+            },
+            "directionIn": "in",
+            "directionOut": "out",
+            "back": "← Back to inbox"
+        },
+        "detail": {
+            "from": "From",
+            "to": "To",
+            "cc": "Cc",
+            "inbound": "inbound",
+            "outbound": "outbound"
+        },
+        "composer": {
+            "title": "Compose",
+            "to": "To",
+            "toPlaceholder": "recipient@example.com, another@example.com",
+            "cc": "Cc",
+            "ccOptional": "(optional)",
+            "subject": "Subject",
+            "message": "Message",
+            "send": "Send",
+            "sending": "Sending…",
+            "sent": "Sent ✓",
+            "errors": {
+                "recipientRequired": "At least one recipient is required.",
+                "subjectRequired": "Subject is required.",
+                "bodyRequired": "Message body is required.",
+                "sendFailed": "Send failed."
+            }
         }
     }
 }

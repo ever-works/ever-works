@@ -5,7 +5,9 @@ import {
     AGENT_ESCALATION_MAX_ATTEMPT_ENTRIES,
     AGENT_ESCALATION_MAX_DECISION_CHARS,
     AGENT_ESCALATION_MAX_SUMMARY_CHARS,
+    clampEscalationConfidence,
     type AgentEscalationAttempt,
+    type AgentEscalationConfidenceSource,
     type AgentEscalationReasonCode,
     type AgentEscalationStatus,
 } from '@ever-works/contracts';
@@ -28,6 +30,24 @@ export interface RecordEscalationInput {
      * grain for every writer today: one give-up per reason per run.
      */
     dedupKey?: string | null;
+    /**
+     * How sure the platform is that this needs a HUMAN, `0..1`. Normally
+     * supplied by `AgentEscalationService` from the confidence scorer;
+     * a caller may pass its own when it knows better. Clamped here, so
+     * no producer can store a value outside the unit interval.
+     */
+    confidence?: number | null;
+    /** Which scorer produced {@link confidence}. Ignored when it is null. */
+    confidenceSource?: AgentEscalationConfidenceSource | null;
+}
+
+/** Filter for {@link AgentEscalationRepository.listForUser}. */
+export interface ListEscalationsForUserOptions {
+    /** `undefined` = every status (the queue's "all" tab). */
+    status?: AgentEscalationStatus;
+    since?: Date;
+    limit?: number;
+    offset?: number;
 }
 
 /** Per-attempt caps applied before persisting (prompt-log guard). */
@@ -85,6 +105,7 @@ export class AgentEscalationRepository {
             attempted: normalizeAttempts(input.attempted),
             dedupKey,
             ...(input.organizationId !== undefined ? { organizationId: input.organizationId } : {}),
+            ...buildConfidencePatch(input.confidence, input.confidenceSource),
         });
 
         try {
@@ -131,6 +152,56 @@ export class AgentEscalationRepository {
             .getMany();
     }
 
+    /**
+     * The escalation QUEUE read — everything of one user, optionally
+     * narrowed to a status, ordered by CONFIDENCE first and recency
+     * second.
+     *
+     * Confidence-first is the whole point of the column: a queue sorted
+     * only by time makes a human read a self-healing parked run before a
+     * merge that a policy refused.
+     *
+     * `COALESCE(confidence, -1)` rather than a `NULLS LAST` clause
+     * because the two supported drivers disagree about where NULL sorts
+     * under `DESC` (SQLite last, Postgres first) and the e2e stack runs
+     * sqlite while production runs Postgres — a sort order that flips
+     * between them is a bug that only ever reproduces in prod. The
+     * sentinel puts unscored rows (every pre-column row) below scored
+     * ones on both, without pretending they are low-confidence.
+     *
+     * Owner-scoped inside the repository for the same reason
+     * `listOpenForUser` is: this is the shape an HTTP handler reaches
+     * for, so cross-user rows must be unreachable by construction.
+     */
+    async listForUser(
+        userId: string,
+        options: ListEscalationsForUserOptions = {},
+    ): Promise<AgentEscalation[]> {
+        const qb = this.repository
+            .createQueryBuilder('esc')
+            .where('esc.userId = :userId', { userId });
+        if (options.status) {
+            qb.andWhere('esc.status = :status', { status: options.status });
+        }
+        if (options.since) {
+            qb.andWhere('esc.createdAt >= :since', { since: options.since });
+        }
+        return qb
+            .orderBy('COALESCE(esc.confidence, -1)', 'DESC')
+            .addOrderBy('esc.createdAt', 'DESC')
+            .skip(Math.max(0, options.offset ?? 0))
+            .take(Math.max(1, Math.min(100, options.limit ?? 50)))
+            .getMany();
+    }
+
+    /**
+     * One escalation, owner-scoped. Returns `null` for a foreign id
+     * exactly as it does for a missing one — no existence oracle.
+     */
+    async findOwned(id: string, userId: string): Promise<AgentEscalation | null> {
+        return this.repository.findOne({ where: { id, userId } });
+    }
+
     /** Count of open escalations for a Work (per-Work cockpit chip). */
     async countOpenForWork(workId: string): Promise<number> {
         return this.repository.count({ where: { workId, status: 'open' } });
@@ -159,6 +230,27 @@ export class AgentEscalationRepository {
             .execute();
         return (result.affected ?? 0) > 0;
     }
+}
+
+/**
+ * Build the confidence half of an insert.
+ *
+ * Returns `{}` when there is nothing to store, so the column stays NULL
+ * rather than becoming a fabricated `0` — "never scored" and "scored
+ * zero" are opposite claims and only one of them may be inferred from an
+ * absent value. `confidenceSource` is only ever written alongside a real
+ * number: a source with no score describes nothing.
+ */
+export function buildConfidencePatch(
+    confidence: number | null | undefined,
+    source: AgentEscalationConfidenceSource | null | undefined,
+): { confidence?: number; confidenceSource?: AgentEscalationConfidenceSource | null } {
+    const clamped =
+        confidence === null || confidence === undefined
+            ? null
+            : clampEscalationConfidence(confidence);
+    if (clamped === null) return {};
+    return { confidence: clamped, confidenceSource: source ?? null };
 }
 
 /**

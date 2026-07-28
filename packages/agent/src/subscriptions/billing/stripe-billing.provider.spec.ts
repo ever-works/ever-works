@@ -3,6 +3,7 @@ import {
     StripeBillingProvider,
     STRIPE_METADATA_KEYS,
     STRIPE_PURCHASE_KINDS,
+    STRIPE_SETUP_KIND,
 } from './stripe-billing.provider';
 
 /**
@@ -40,20 +41,37 @@ afterEach(() => {
 
 function fakeClient(overrides: Record<string, unknown> = {}) {
     return {
-        customers: { create: jest.fn().mockResolvedValue({ id: 'cus_new' }) },
+        customers: {
+            create: jest.fn().mockResolvedValue({ id: 'cus_new' }),
+            update: jest.fn().mockResolvedValue({ id: 'cus_1' }),
+        },
         checkout: {
             sessions: {
                 create: jest
                     .fn()
                     .mockResolvedValue({ id: 'cs_1', url: 'https://pay.example/cs_1' }),
+                retrieve: jest.fn(),
             },
         },
         paymentIntents: {
             create: jest.fn().mockResolvedValue({ id: 'pi_1', status: 'succeeded' }),
         },
+        paymentMethods: {
+            list: jest.fn().mockResolvedValue({ data: [] }),
+            retrieve: jest.fn().mockResolvedValue({ id: 'pm_1', customer: 'cus_1', card: {} }),
+            detach: jest.fn().mockResolvedValue({ id: 'pm_1' }),
+        },
         webhooks: { constructEvent: jest.fn() },
         ...overrides,
     } as any;
+}
+
+function cardMethod(id: string, customer: string | null, last4 = '4242') {
+    return {
+        id,
+        customer,
+        card: { brand: 'visa', last4, exp_month: 4, exp_year: 2031 },
+    };
 }
 
 function build(client = fakeClient()) {
@@ -217,6 +235,151 @@ describe('StripeBillingProvider — checkout', () => {
         });
 
         expect(result).toEqual({ paymentId: '', status: 'failed', failureCode: 'card_declined' });
+    });
+});
+
+describe('StripeBillingProvider — payment methods (billing PRD §3.3)', () => {
+    beforeEach(() => {
+        process.env.STRIPE_SECRET_KEY = 'sk_test_x';
+    });
+
+    it('captures cards through the provider HOSTED element, never a form of ours', async () => {
+        const { provider, client } = build();
+
+        const session = await provider.createPaymentMethodSetupSession({
+            userId: 'u1',
+            customerId: 'cus_1',
+            successUrl: 'https://app.test/ok',
+            cancelUrl: 'https://app.test/no',
+        });
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        // `mode: setup` is the hosted card element: the PAN is posted to
+        // the provider's page, not to us.
+        expect(params.mode).toBe('setup');
+        expect(params.customer).toBe('cus_1');
+        // No card datum is ever passed out of this process.
+        expect(JSON.stringify(params)).not.toMatch(/card|number|cvc/i);
+        expect(session).toEqual({ url: 'https://pay.example/cs_1', sessionId: 'cs_1' });
+    });
+
+    it('stamps the setup session with a kind that can NEVER credit the ledger', async () => {
+        const { provider, client } = build();
+
+        await provider.createPaymentMethodSetupSession({
+            userId: 'u1',
+            customerId: 'cus_1',
+            successUrl: 'https://app.test/ok',
+            cancelUrl: 'https://app.test/no',
+        });
+
+        const meta = client.checkout.sessions.create.mock.calls[0][0].metadata;
+        expect(meta[STRIPE_METADATA_KEYS.kind]).toBe(STRIPE_SETUP_KIND);
+        expect(Object.values(STRIPE_PURCHASE_KINDS)).not.toContain(meta[STRIPE_METADATA_KEYS.kind]);
+    });
+
+    it('lists only cards attached to the given customer, as display metadata', async () => {
+        const client = fakeClient();
+        client.paymentMethods.list.mockResolvedValue({
+            data: [cardMethod('pm_1', 'cus_1'), cardMethod('pm_2', 'cus_1', '1881')],
+        });
+        const { provider } = build(client);
+
+        const methods = await provider.listPaymentMethods('cus_1');
+
+        expect(client.paymentMethods.list).toHaveBeenCalledWith(
+            expect.objectContaining({ customer: 'cus_1', type: 'card' }),
+        );
+        expect(methods).toEqual([
+            { ref: 'pm_1', brand: 'visa', last4: '4242', expMonth: 4, expYear: 2031 },
+            { ref: 'pm_2', brand: 'visa', last4: '1881', expMonth: 4, expYear: 2031 },
+        ]);
+    });
+
+    it('findPaymentMethod() returns null for a reference owned by ANOTHER customer', async () => {
+        const client = fakeClient();
+        client.paymentMethods.retrieve.mockResolvedValue(cardMethod('pm_x', 'cus_victim'));
+        const { provider } = build(client);
+
+        await expect(provider.findPaymentMethod('cus_attacker', 'pm_x')).resolves.toBeNull();
+    });
+
+    it('findPaymentMethod() returns null (never throws) for an unknown reference', async () => {
+        const client = fakeClient();
+        client.paymentMethods.retrieve.mockRejectedValue(new Error('No such PaymentMethod pm_zzz'));
+        const { provider } = build(client);
+
+        await expect(provider.findPaymentMethod('cus_1', 'pm_zzz')).resolves.toBeNull();
+    });
+
+    it('refuses to make a FOREIGN payment method the default', async () => {
+        const client = fakeClient();
+        client.paymentMethods.retrieve.mockResolvedValue(cardMethod('pm_x', 'cus_victim'));
+        const { provider } = build(client);
+
+        await expect(
+            provider.setDefaultPaymentMethod('cus_attacker', 'pm_x'),
+        ).rejects.toBeInstanceOf(BillingProviderError);
+        expect(client.customers.update).not.toHaveBeenCalled();
+    });
+
+    it('refuses to detach a FOREIGN payment method', async () => {
+        const client = fakeClient();
+        client.paymentMethods.retrieve.mockResolvedValue(cardMethod('pm_x', 'cus_victim'));
+        const { provider } = build(client);
+
+        await expect(provider.detachPaymentMethod('cus_attacker', 'pm_x')).rejects.toBeInstanceOf(
+            BillingProviderError,
+        );
+        expect(client.paymentMethods.detach).not.toHaveBeenCalled();
+    });
+
+    it('sets and detaches an OWNED payment method', async () => {
+        const client = fakeClient();
+        client.paymentMethods.retrieve.mockResolvedValue(cardMethod('pm_1', 'cus_1'));
+        const { provider } = build(client);
+
+        const updated = await provider.setDefaultPaymentMethod('cus_1', 'pm_1');
+        expect(client.customers.update).toHaveBeenCalledWith('cus_1', {
+            invoice_settings: { default_payment_method: 'pm_1' },
+        });
+        expect(updated).toEqual({
+            ref: 'pm_1',
+            brand: 'visa',
+            last4: '4242',
+            expMonth: 4,
+            expYear: 2031,
+        });
+
+        await provider.detachPaymentMethod('cus_1', 'pm_1');
+        expect(client.paymentMethods.detach).toHaveBeenCalledWith('pm_1');
+    });
+
+    it('fails closed on every payment-method method without a secret key', async () => {
+        delete process.env.STRIPE_SECRET_KEY;
+        const { provider, factory } = build();
+
+        await expect(
+            provider.createPaymentMethodSetupSession({
+                userId: 'u1',
+                customerId: 'cus_1',
+                successUrl: 'https://app.test/ok',
+                cancelUrl: 'https://app.test/no',
+            }),
+        ).rejects.toBeInstanceOf(BillingProviderNotConfiguredError);
+        await expect(provider.listPaymentMethods('cus_1')).rejects.toBeInstanceOf(
+            BillingProviderNotConfiguredError,
+        );
+        await expect(provider.findPaymentMethod('cus_1', 'pm_1')).rejects.toBeInstanceOf(
+            BillingProviderNotConfiguredError,
+        );
+        await expect(provider.setDefaultPaymentMethod('cus_1', 'pm_1')).rejects.toBeInstanceOf(
+            BillingProviderNotConfiguredError,
+        );
+        await expect(provider.detachPaymentMethod('cus_1', 'pm_1')).rejects.toBeInstanceOf(
+            BillingProviderNotConfiguredError,
+        );
+        expect(factory).not.toHaveBeenCalled();
     });
 });
 
@@ -505,6 +668,41 @@ describe('StripeBillingProvider — event normalization', () => {
         );
     });
 
+    it('normalizes payment_method.detached to `payment_method.removed`', async () => {
+        const normalized = await parse({
+            id: 'evt_12',
+            type: 'payment_method.detached',
+            data: {
+                object: cardMethod('pm_gone', null),
+                // The object has already lost its customer; attribution
+                // comes from the SIGNED previous_attributes.
+                previous_attributes: { customer: 'cus_1' },
+            },
+        });
+
+        expect(normalized.kind).toBe('payment_method.removed');
+        expect(normalized.customerId).toBe('cus_1');
+        expect(normalized.paymentMethod).toEqual(
+            expect.objectContaining({ ref: 'pm_gone', last4: '4242' }),
+        );
+    });
+
+    it('a hosted CARD-CAPTURE session never credits the ledger', async () => {
+        const normalized = await parse({
+            id: 'evt_13',
+            type: 'checkout.session.completed',
+            data: {
+                object: {
+                    customer: 'cus_1',
+                    payment_status: 'no_payment_required',
+                    metadata: { [STRIPE_METADATA_KEYS.kind]: STRIPE_SETUP_KIND },
+                },
+            },
+        });
+
+        expect(normalized.kind).toBe('ignored');
+    });
+
     it('resolves expanded objects to ids', async () => {
         const normalized = await parse({
             id: 'evt_11',
@@ -520,5 +718,521 @@ describe('StripeBillingProvider — event normalization', () => {
 
         expect(normalized.customerId).toBe('cus_expanded');
         expect(normalized.paymentId).toBe('pi_expanded');
+    });
+
+    // ── Subscription lifecycle (audit B07/B08) ───────────────────────
+
+    function subscriptionObject(overrides: Record<string, unknown> = {}) {
+        return {
+            id: 'sub_1',
+            customer: 'cus_1',
+            currency: 'usd',
+            status: 'active',
+            cancel_at_period_end: false,
+            canceled_at: null,
+            // Only subscriptions WE sold carry this marker, and the
+            // normalizer refuses to speak about any others — a Stripe
+            // account may hold subscriptions this platform never sold, and
+            // projecting their state onto one of our billing profiles
+            // would be wrong. The fixture represents one of ours.
+            metadata: {
+                [STRIPE_METADATA_KEYS.kind]: STRIPE_PURCHASE_KINDS.planSubscription,
+                [STRIPE_METADATA_KEYS.userId]: 'u1',
+                [STRIPE_METADATA_KEYS.planCode]: 'standard',
+                [STRIPE_METADATA_KEYS.referenceId]: 'u1:standard',
+            },
+            // Period end lives on the ITEMS in the current API version.
+            items: { data: [{ id: 'si_1', current_period_end: 1_790_000_000 }] },
+            ...overrides,
+        };
+    }
+
+    it('normalizes a subscription update, reading the period end off the item', async () => {
+        const normalized = await parse({
+            id: 'evt_12',
+            type: 'customer.subscription.updated',
+            data: { object: subscriptionObject({ cancel_at_period_end: true }) },
+        });
+
+        // An ACTIVE subscription re-asserts the tier, so the kind is
+        // `subscription.activated` (idempotent). What this test is really
+        // about is the SNAPSHOT — which now rides on every kind, so a
+        // `cancel_at_period_end` toggle reaches the billing profile.
+        expect(normalized.kind).toBe('subscription.activated');
+        expect(normalized.customerId).toBe('cus_1');
+        expect(normalized.subscription).toEqual({
+            subscriptionId: 'sub_1',
+            status: 'active',
+            cancelAtPeriodEnd: true,
+            currentPeriodEnd: new Date(1_790_000_000 * 1000),
+            canceledAt: null,
+        });
+    });
+
+    it('carries a past_due status straight through (drives the recovery banner)', async () => {
+        const normalized = await parse({
+            id: 'evt_13',
+            type: 'customer.subscription.updated',
+            data: { object: subscriptionObject({ status: 'past_due' }) },
+        });
+
+        expect(normalized.subscription?.status).toBe('past_due');
+    });
+
+    it('treats a delete as terminal regardless of what the object still says', async () => {
+        const normalized = await parse({
+            id: 'evt_14',
+            type: 'customer.subscription.deleted',
+            data: {
+                object: subscriptionObject({
+                    status: 'active',
+                    cancel_at_period_end: true,
+                    canceled_at: 1_789_000_000,
+                }),
+            },
+        });
+
+        expect(normalized.subscription).toEqual(
+            expect.objectContaining({
+                status: 'canceled',
+                cancelAtPeriodEnd: false,
+                canceledAt: new Date(1_789_000_000 * 1000),
+            }),
+        );
+    });
+
+    it('falls back to the legacy top-level period end on an older payload', async () => {
+        const normalized = await parse({
+            id: 'evt_15',
+            type: 'customer.subscription.updated',
+            data: {
+                object: subscriptionObject({
+                    items: { data: [] },
+                    current_period_end: 1_791_000_000,
+                }),
+            },
+        });
+
+        expect(normalized.subscription?.currentPeriodEnd).toEqual(new Date(1_791_000_000 * 1000));
+    });
+
+    it('maps an unrecognized provider status to `none` rather than trusting it', async () => {
+        const normalized = await parse({
+            id: 'evt_16',
+            type: 'customer.subscription.updated',
+            data: { object: subscriptionObject({ status: 'some_future_state' }) },
+        });
+
+        expect(normalized.subscription?.status).toBe('none');
+    });
+});
+
+describe('StripeBillingProvider — subscription mutations + portal (B07/B08)', () => {
+    beforeEach(() => {
+        process.env.STRIPE_SECRET_KEY = 'sk_test_x';
+    });
+
+    function withSubscriptions() {
+        const updated = {
+            id: 'sub_1',
+            status: 'active',
+            cancel_at_period_end: true,
+            canceled_at: null,
+            items: { data: [{ current_period_end: 1_790_000_000 }] },
+        };
+        const client = fakeClient({
+            subscriptions: { update: jest.fn().mockResolvedValue(updated) },
+            billingPortal: {
+                sessions: {
+                    create: jest
+                        .fn()
+                        .mockResolvedValue({ url: 'https://pay.example/portal/bps_1' }),
+                },
+            },
+        });
+        return build(client);
+    }
+
+    it('cancel schedules at period end — it never deletes the subscription', async () => {
+        const { provider, client } = withSubscriptions();
+
+        const snapshot = await provider.cancelSubscriptionAtPeriodEnd({
+            subscriptionId: 'sub_1',
+        });
+
+        expect(client.subscriptions.update).toHaveBeenCalledWith('sub_1', {
+            cancel_at_period_end: true,
+        });
+        // There is no `cancel`/delete call on the fake — if the provider
+        // ever reached for one this spec would throw.
+        expect(client.subscriptions.cancel).toBeUndefined();
+        expect(snapshot).toEqual({
+            subscriptionId: 'sub_1',
+            status: 'active',
+            cancelAtPeriodEnd: true,
+            currentPeriodEnd: new Date(1_790_000_000 * 1000),
+            canceledAt: null,
+        });
+    });
+
+    it('resume clears the pending cancellation flag', async () => {
+        const { provider, client } = withSubscriptions();
+
+        await provider.resumeSubscription({ subscriptionId: 'sub_1' });
+
+        expect(client.subscriptions.update).toHaveBeenCalledWith('sub_1', {
+            cancel_at_period_end: false,
+        });
+    });
+
+    it('creates a portal session with the SERVER-built return URL', async () => {
+        const { provider, client } = withSubscriptions();
+
+        const session = await provider.createBillingPortalSession({
+            customerId: 'cus_1',
+            returnUrl: 'https://app.test/settings/billing',
+        });
+
+        expect(client.billingPortal.sessions.create).toHaveBeenCalledWith({
+            customer: 'cus_1',
+            return_url: 'https://app.test/settings/billing',
+        });
+        expect(session).toEqual({ url: 'https://pay.example/portal/bps_1' });
+    });
+
+    it('fails closed on every lifecycle call without a secret key', async () => {
+        delete process.env.STRIPE_SECRET_KEY;
+        const { provider, factory } = build();
+
+        await expect(
+            provider.cancelSubscriptionAtPeriodEnd({ subscriptionId: 'sub_1' }),
+        ).rejects.toBeInstanceOf(BillingProviderNotConfiguredError);
+        await expect(
+            provider.resumeSubscription({ subscriptionId: 'sub_1' }),
+        ).rejects.toBeInstanceOf(BillingProviderNotConfiguredError);
+        await expect(
+            provider.createBillingPortalSession({
+                customerId: 'cus_1',
+                returnUrl: 'https://app.test/settings/billing',
+            }),
+        ).rejects.toBeInstanceOf(BillingProviderNotConfiguredError);
+        expect(factory).not.toHaveBeenCalled();
+    });
+});
+
+describe('StripeBillingProvider — paid-plan checkout (audit B24)', () => {
+    beforeEach(() => {
+        process.env.STRIPE_SECRET_KEY = 'sk_test_x';
+    });
+
+    const planRequest = {
+        userId: 'u1',
+        customerId: 'cus_1',
+        plan: {
+            code: 'standard',
+            label: 'Standard plan',
+            priceCents: 2900,
+            currency: 'usd',
+            interval: 'month' as const,
+        },
+        successUrl: 'https://app.test/settings/billing?plan=success',
+        cancelUrl: 'https://app.test/settings/billing?plan=cancelled',
+        referenceId: 'u1:standard',
+    };
+
+    it('creates a recurring session priced from the SERVER plan descriptor', async () => {
+        const { provider, client } = build();
+
+        const session = await provider.createPlanCheckoutSession(planRequest);
+
+        expect(session).toEqual({
+            url: 'https://pay.example/cs_1',
+            sessionId: 'cs_1',
+            customerId: 'cus_1',
+        });
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        expect(params.mode).toBe('subscription');
+        expect(params.line_items[0].price_data.unit_amount).toBe(2900);
+        expect(params.line_items[0].price_data.recurring).toEqual({ interval: 'month' });
+    });
+
+    it('mirrors the plan metadata onto the SUBSCRIPTION so renewals stay attributable', async () => {
+        const { provider, client } = build();
+
+        await provider.createPlanCheckoutSession(planRequest);
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        expect(params.metadata[STRIPE_METADATA_KEYS.kind]).toBe(
+            STRIPE_PURCHASE_KINDS.planSubscription,
+        );
+        expect(params.metadata[STRIPE_METADATA_KEYS.planCode]).toBe('standard');
+        // Unlike the credit path, the lifecycle events are a DIFFERENT
+        // decision and must carry the plan themselves.
+        expect(params.subscription_data.metadata).toEqual(params.metadata);
+    });
+
+    it('appends its own session-id token to the caller’s clean success URL', async () => {
+        const { provider, client } = build();
+
+        await provider.createPlanCheckoutSession(planRequest);
+
+        const params = client.checkout.sessions.create.mock.calls[0][0];
+        expect(params.success_url).toBe(
+            'https://app.test/settings/billing?plan=success&session_id={CHECKOUT_SESSION_ID}',
+        );
+        // The cancel URL is passed through untouched.
+        expect(params.cancel_url).toBe('https://app.test/settings/billing?plan=cancelled');
+    });
+
+    it('fails closed with no secret key', async () => {
+        delete process.env.STRIPE_SECRET_KEY;
+        const { provider } = build();
+
+        await expect(provider.createPlanCheckoutSession(planRequest)).rejects.toBeInstanceOf(
+            BillingProviderNotConfiguredError,
+        );
+    });
+
+    it('reads a session back with the metadata WE stamped (the ownership check)', async () => {
+        const client = fakeClient();
+        client.checkout.sessions.retrieve = jest.fn().mockResolvedValue({
+            id: 'cs_plan_1',
+            status: 'complete',
+            payment_status: 'paid',
+            customer: 'cus_1',
+            subscription: { id: 'sub_1', current_period_end: 1790000000 },
+            metadata: {
+                [STRIPE_METADATA_KEYS.kind]: STRIPE_PURCHASE_KINDS.planSubscription,
+                [STRIPE_METADATA_KEYS.userId]: 'u1',
+                [STRIPE_METADATA_KEYS.planCode]: 'standard',
+            },
+        });
+        const { provider } = build(client);
+
+        const snapshot = await provider.retrieveCheckoutSession('cs_plan_1');
+
+        expect(snapshot).toEqual(
+            expect.objectContaining({
+                sessionId: 'cs_plan_1',
+                status: 'complete',
+                paid: true,
+                purpose: 'plan',
+                userId: 'u1',
+                planCode: 'standard',
+                customerId: 'cus_1',
+                subscriptionId: 'sub_1',
+            }),
+        );
+        expect(snapshot.currentPeriodEnd).toEqual(new Date(1790000000 * 1000));
+    });
+
+    it('treats a trial session (no payment required) as settled', async () => {
+        const client = fakeClient();
+        client.checkout.sessions.retrieve = jest.fn().mockResolvedValue({
+            id: 'cs_plan_2',
+            status: 'complete',
+            payment_status: 'no_payment_required',
+            metadata: {
+                [STRIPE_METADATA_KEYS.kind]: STRIPE_PURCHASE_KINDS.planSubscription,
+                [STRIPE_METADATA_KEYS.userId]: 'u1',
+                [STRIPE_METADATA_KEYS.planCode]: 'standard',
+            },
+        });
+        const { provider } = build(client);
+
+        expect((await provider.retrieveCheckoutSession('cs_plan_2')).paid).toBe(true);
+    });
+
+    it('labels a credit session read through this route as `credits`, not `plan`', async () => {
+        const client = fakeClient();
+        client.checkout.sessions.retrieve = jest.fn().mockResolvedValue({
+            id: 'cs_1',
+            status: 'complete',
+            payment_status: 'paid',
+            metadata: {
+                [STRIPE_METADATA_KEYS.kind]: STRIPE_PURCHASE_KINDS.checkout,
+                [STRIPE_METADATA_KEYS.userId]: 'u1',
+                [STRIPE_METADATA_KEYS.packId]: 'credits-1000',
+            },
+        });
+        const { provider } = build(client);
+
+        const snapshot = await provider.retrieveCheckoutSession('cs_1');
+        expect(snapshot.purpose).toBe('credits');
+        expect(snapshot.planCode).toBeNull();
+    });
+
+    it('never echoes the provider message when a session cannot be read', async () => {
+        const client = fakeClient();
+        client.checkout.sessions.retrieve = jest
+            .fn()
+            .mockRejectedValue(new Error('No such checkout.session: cs_secret; req_123'));
+        const { provider } = build(client);
+
+        await expect(provider.retrieveCheckoutSession('cs_missing')).rejects.toMatchObject({
+            name: 'BillingProviderError',
+            message: 'Checkout session could not be read',
+        });
+    });
+});
+
+describe('StripeBillingProvider — subscription event normalization (audit B24)', () => {
+    beforeEach(() => {
+        process.env.STRIPE_SECRET_KEY = 'sk_test_x';
+        process.env.STRIPE_WEBHOOK_SECRET = 'whsec_x';
+    });
+
+    function parse(raw: any) {
+        const client = fakeClient({
+            webhooks: { constructEvent: jest.fn().mockReturnValue(raw) },
+        });
+        const { provider } = build(client);
+        return provider.verifyAndParseWebhook('{}', 'sig');
+    }
+
+    const planMeta = {
+        [STRIPE_METADATA_KEYS.kind]: STRIPE_PURCHASE_KINDS.planSubscription,
+        [STRIPE_METADATA_KEYS.userId]: 'u1',
+        [STRIPE_METADATA_KEYS.planCode]: 'standard',
+        [STRIPE_METADATA_KEYS.referenceId]: 'u1:standard',
+    };
+
+    it('normalizes a paid plan checkout to subscription.activated', async () => {
+        const normalized = await parse({
+            id: 'evt_p1',
+            type: 'checkout.session.completed',
+            data: {
+                object: {
+                    payment_status: 'paid',
+                    customer: 'cus_1',
+                    client_reference_id: 'u1:standard',
+                    subscription: 'sub_1',
+                    amount_total: 2900,
+                    currency: 'usd',
+                    metadata: planMeta,
+                },
+            },
+        });
+
+        expect(normalized).toEqual(
+            expect.objectContaining({
+                kind: 'subscription.activated',
+                planCode: 'standard',
+                subscriptionId: 'sub_1',
+                customerId: 'cus_1',
+                referenceId: 'u1:standard',
+            }),
+        );
+    });
+
+    it('never activates a plan from an unpaid checkout session', async () => {
+        const normalized = await parse({
+            id: 'evt_p2',
+            type: 'checkout.session.completed',
+            data: { object: { payment_status: 'unpaid', metadata: planMeta } },
+        });
+
+        expect(normalized.kind).toBe('ignored');
+    });
+
+    it('does not confuse a plan checkout with a credit top-up', async () => {
+        const normalized = await parse({
+            id: 'evt_p3',
+            type: 'checkout.session.completed',
+            data: {
+                object: { payment_status: 'paid', amount_total: 2900, metadata: planMeta },
+            },
+        });
+
+        // A plan sale must NEVER credit the usage ledger.
+        expect(normalized.kind).not.toBe('credits.purchased');
+        expect(normalized.packId).toBeNull();
+    });
+
+    it('normalizes an active subscription update to subscription.activated', async () => {
+        const normalized = await parse({
+            id: 'evt_p4',
+            type: 'customer.subscription.updated',
+            data: {
+                object: {
+                    id: 'sub_1',
+                    status: 'active',
+                    customer: 'cus_1',
+                    cancel_at_period_end: true,
+                    current_period_end: 1790000000,
+                    metadata: planMeta,
+                },
+            },
+        });
+
+        expect(normalized).toEqual(
+            expect.objectContaining({
+                kind: 'subscription.activated',
+                subscriptionId: 'sub_1',
+                planCode: 'standard',
+                cancelAtPeriodEnd: true,
+            }),
+        );
+        expect(normalized.currentPeriodEnd).toEqual(new Date(1790000000 * 1000));
+    });
+
+    it('reads the period end from the subscription ITEM when the root field is absent', async () => {
+        const normalized = await parse({
+            id: 'evt_p5',
+            type: 'customer.subscription.updated',
+            data: {
+                object: {
+                    id: 'sub_1',
+                    status: 'trialing',
+                    metadata: planMeta,
+                    items: { data: [{ current_period_end: 1790000001 }] },
+                },
+            },
+        });
+
+        expect(normalized.kind).toBe('subscription.activated');
+        expect(normalized.currentPeriodEnd).toEqual(new Date(1790000001 * 1000));
+    });
+
+    it('normalizes a deleted subscription to subscription.canceled', async () => {
+        const normalized = await parse({
+            id: 'evt_p6',
+            type: 'customer.subscription.deleted',
+            data: { object: { id: 'sub_1', status: 'canceled', metadata: planMeta } },
+        });
+
+        expect(normalized.kind).toBe('subscription.canceled');
+        expect(normalized.subscriptionId).toBe('sub_1');
+    });
+
+    it('does NOT revoke a plan on a transient dunning state', async () => {
+        for (const status of ['past_due', 'incomplete']) {
+            const normalized = await parse({
+                id: `evt_p7_${status}`,
+                type: 'customer.subscription.updated',
+                data: { object: { id: 'sub_1', status, metadata: planMeta } },
+            });
+            // The invariant this test is named for: a transient state must
+            // never produce a REVOKING kind. `subscription.canceled` is
+            // the only kind that revokes.
+            expect(normalized.kind).not.toBe('subscription.canceled');
+            // It used to assert `ignored`, which was the proxy for "nothing
+            // happens" back when there was nowhere else for these to go.
+            // Audit B07/B08 gives them a home: they now surface as a
+            // lifecycle snapshot, which is what drives the dunning banner.
+            // The no-revoke guarantee moved to where revoking actually
+            // happens — see plan-subscription.service.spec.
+            expect(normalized.kind).toBe('subscription.updated');
+        }
+    });
+
+    it('ignores a subscription that is not one of ours', async () => {
+        const normalized = await parse({
+            id: 'evt_p8',
+            type: 'customer.subscription.updated',
+            data: { object: { id: 'sub_other', status: 'active', metadata: {} } },
+        });
+
+        expect(normalized.kind).toBe('ignored');
     });
 });

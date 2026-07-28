@@ -1,0 +1,106 @@
+{
+	"name": "@ever-works/hubspot-connector-plugin",
+	"version": "1.0.0",
+	"description": "HubSpot CRM connector plugin for Ever Works platform (outbound notes + record creation via the official @hubspot/api-client, and event-source pull of contact/company/deal changes into the event-ingest pipeline, with opt-in historical backfill)",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"private": false,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"clean": "rm -rf dist",
+		"type-check": "tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	},
+	"dependencies": {
+		"@ever-works/contracts": "workspace:*",
+		"@ever-works/plugin": "workspace:*",
+		"@hubspot/api-client": "^14.0.1"
+	},
+	"devDependencies": {
+		"@types/node": "^22.0.0",
+		"tsup": "^8.0.0",
+		"typescript": "^5.9.3",
+		"vitest": "^4.1.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "hubspot-connector",
+			"name": "HubSpot Connector",
+			"version": "1.0.0",
+			"category": "connector",
+			"capabilities": [
+				"connector",
+				"connector-hubspot",
+				"event-source"
+			],
+			"description": "HubSpot CRM connector. Outbound appends notes to CRM records and creates records (contacts/companies/deals) via the official @hubspot/api-client. Event-source pull ingests records created/updated since the last watermark into the platform event-ingest pipeline, with opt-in historical backfill (backfillDays, max 90).",
+			"systemPlugin": false,
+			"builtIn": true,
+			"isDefault": false,
+			"autoEnable": false,
+			"settings": {
+				"type": "object",
+				"required": [
+					"accessToken"
+				],
+				"properties": {
+					"accessToken": {
+						"type": "string",
+						"title": "HubSpot private-app access token (pat-…)",
+						"x-secret": true,
+						"x-envVar": "HUBSPOT_ACCESS_TOKEN"
+					},
+					"objectTypes": {
+						"type": "string",
+						"title": "CRM object types to ingest (comma-separated; contacts, companies, deals when empty)",
+						"default": "contacts,companies,deals"
+					},
+					"portalId": {
+						"type": "string",
+						"title": "HubSpot portal (hub) id — enables deep links back to each record"
+					},
+					"backfillDays": {
+						"type": "number",
+						"title": "Historical backfill window in days on first pull (0 = off, max 90)",
+						"default": 0,
+						"minimum": 0,
+						"maximum": 90
+					},
+					"defaultObjectType": {
+						"type": "string",
+						"title": "Default CRM object type for record writes",
+						"default": "contacts"
+					},
+					"defaultAssociatedObjectId": {
+						"type": "string",
+						"title": "Default CRM record id outbound notes are attached to"
+					}
+				}
+			}
+		}
+	},
+	"publishConfig": {
+		"access": "restricted",
+		"registry": "https://registry.npmjs.org"
+	}
+}

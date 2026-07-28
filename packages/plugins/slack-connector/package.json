@@ -90,6 +90,14 @@
 					}
 				}
 			},
+			"uiHints": {
+				"includeInOnboarding": true,
+				"onboardingPriority": 1,
+				"completionFields": [
+					"botToken"
+				],
+				"onboardingDescription": "Connect your Slack workspace so the Ever Works bot can chat, build, and report in-channel."
+			},
 			"distribution": "registry"
 		}
 	},

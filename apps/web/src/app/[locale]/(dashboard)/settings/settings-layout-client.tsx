@@ -15,6 +15,7 @@ import {
     CreditCard,
     BarChart3,
     Server,
+    Newspaper,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
@@ -25,6 +26,13 @@ import { getCategoryIcon } from '@/lib/utils/plugin-category-icons';
 interface SettingsLayoutClientProps {
     children: React.ReactNode;
     settingsMenu: SettingsMenuResponse | null;
+    /**
+     * `FLEET_ENABLED`, resolved on the server. Defaults to true so a
+     * caller that has not been updated still shows the tab — the flag
+     * exists to let an operator turn Fleet OFF, never to make the
+     * shipped default depend on someone remembering to pass a prop.
+     */
+    fleetEnabled?: boolean;
 }
 
 interface StaticTab {
@@ -93,6 +101,15 @@ export function SettingsLayoutClient({ children, settingsMenu }: SettingsLayoutC
                 label: t('tabs.jobRuntime'),
                 icon: Cpu,
                 href: `${baseSettingsPath}/job-runtime`,
+            },
+            // Digest briefings — the personal cadence AND the org-scoped
+            // one live on one page, since they are two records of the
+            // same thing rather than two features.
+            {
+                id: 'digest',
+                label: t('tabs.digest'),
+                icon: Newspaper,
+                href: `${baseSettingsPath}/digest`,
             },
             // Wave 13 — Billing + Usage & Credits (billing/usage PRD §2):
             // also reachable from the settings shell like api-keys/security.

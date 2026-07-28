@@ -21,6 +21,69 @@ export type RuntimeId =
 /** Local services supervised by the desktop shell. */
 export type ServiceId = 'api' | 'web';
 
+/**
+ * How this install runs the platform.
+ *
+ * - `local-stack` — the desktop shell supervises its own API + web processes
+ *   (the original all-in-one behavior).
+ * - `remote-client` — no local stack at all: the shell is a native window onto
+ *   an Ever Works instance that already runs somewhere else (self-hosted, a
+ *   colleague's server, the hosted platform).
+ */
+export type DesktopMode = 'local-stack' | 'remote-client';
+
+export const DEFAULT_DESKTOP_MODE: DesktopMode = 'local-stack';
+
+/** User-entered remote instance details, before normalization/validation. */
+export interface RemoteConnectionInput {
+	/** Instance URL the window loads, e.g. `https://app.example.com`. */
+	webUrl: string;
+	/** API base URL. Derived from {@link webUrl} when omitted. */
+	apiUrl?: string;
+	/** Optional display label for the status screen. */
+	label?: string;
+}
+
+/** A normalized, validated remote instance the shell can connect to. */
+export interface RemoteConnection {
+	webUrl: string;
+	apiUrl: string;
+	label?: string;
+}
+
+/** Result of probing a remote instance's health endpoint. */
+export interface RemoteProbeResult {
+	ok: boolean;
+	status?: number;
+	/** Reported platform version, when the health payload exposes one. */
+	version?: string;
+	message?: string;
+}
+
+/**
+ * Where the supervised local services come from.
+ *
+ * - `bundled` — a self-contained runtime payload shipped inside the installer
+ *   (`resources/app-bundle`). No monorepo checkout, Node.js or pnpm needed.
+ * - `repo` — a developer monorepo checkout (dev runs, or `EVER_WORKS_REPO_ROOT`).
+ * - `unavailable` — neither is present; local-stack mode cannot start.
+ */
+export type RuntimeLayoutKind = 'bundled' | 'repo' | 'unavailable';
+
+export interface RuntimeLayoutSummary {
+	kind: RuntimeLayoutKind;
+	/** Absolute root of the bundled payload (`bundled` only). */
+	bundleRoot?: string;
+	/** Absolute monorepo checkout root (`repo` only). */
+	repoRoot?: string;
+	/** Version recorded in the bundle manifest (`bundled` only). */
+	bundleVersion?: string;
+	/** Why the layout resolved this way — always populated for `unavailable`. */
+	reason?: string;
+	/** True when the local stack needs Node.js + pnpm on PATH (repo layout). */
+	requiresHostToolchain: boolean;
+}
+
 /** Lifecycle states of a supervised child process. */
 export type ProcessState = 'stopped' | 'starting' | 'running' | 'stopping' | 'restarting' | 'crashed' | 'failed';
 
@@ -87,8 +150,12 @@ export interface LogEntry {
 
 export interface DesktopConfig {
 	wizardCompleted: boolean;
+	/** Local stack vs. remote client. Defaults to {@link DEFAULT_DESKTOP_MODE}. */
+	mode: DesktopMode;
 	selection?: RuntimeSelection;
 	envFilePath?: string;
+	/** Only meaningful when `mode === 'remote-client'`. */
+	remote?: RemoteConnection;
 }
 
 export const IpcChannels = {
@@ -96,8 +163,12 @@ export const IpcChannels = {
 	listRuntimes: 'wizard:list-runtimes',
 	detectDocker: 'wizard:detect-docker',
 	applyRuntime: 'wizard:apply-runtime',
+	setMode: 'wizard:set-mode',
+	testRemote: 'wizard:test-remote',
+	saveRemote: 'wizard:save-remote',
 	completeWizard: 'wizard:complete',
 	getConfig: 'config:get',
+	getRuntimeLayout: 'app:runtime-layout',
 	startServices: 'services:start',
 	stopServices: 'services:stop',
 	restartService: 'services:restart',
@@ -114,8 +185,16 @@ export interface DesktopBridge {
 	listRuntimes(): Promise<RuntimeDescriptor[]>;
 	detectDocker(): Promise<{ available: boolean; version?: string }>;
 	applyRuntime(selection: RuntimeSelection): Promise<{ envFilePath: string; keys: string[] }>;
+	/** Switch between the local stack and remote-client modes. */
+	setMode(mode: DesktopMode): Promise<DesktopConfig>;
+	/** Validate + probe a remote instance without persisting it. */
+	testRemote(input: RemoteConnectionInput): Promise<RemoteProbeResult>;
+	/** Persist the remote instance the shell should connect to. */
+	saveRemote(input: RemoteConnectionInput): Promise<RemoteConnection>;
 	completeWizard(): Promise<void>;
 	getConfig(): Promise<DesktopConfig>;
+	/** Where the local services come from (bundled payload, repo checkout, or nothing). */
+	getRuntimeLayout(): Promise<RuntimeLayoutSummary>;
 	startServices(): Promise<void>;
 	stopServices(): Promise<void>;
 	restartService(id: ServiceId): Promise<void>;

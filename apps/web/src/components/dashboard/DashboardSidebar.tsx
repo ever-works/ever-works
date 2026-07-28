@@ -32,6 +32,7 @@ import {
     Users,
     CreditCard,
     BarChart3,
+    Video,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
@@ -137,6 +138,11 @@ export function DashboardSidebar({
         // active Organization knows, aggregated across all its Works' KB.
         // Sits directly below Agents per spec §4.1.
         { name: t('navigation.memory'), href: ROUTES.DASHBOARD_MEMORY, icon: Brain },
+        // Meetings (Wave 8, feature a) — captured meetings, transcripts
+        // and their AI summaries. Sits right after Memory: a meeting
+        // transcript is one of the richest things the platform learns
+        // from, and its ingest writes straight into Memory + Activity.
+        { name: t('navigation.meetings'), href: ROUTES.DASHBOARD_MEETINGS, icon: Video },
         // Teams & Prebuilt Companies (teams-and-companies spec §4.1).
         { name: t('navigation.teams'), href: ROUTES.DASHBOARD_TEAMS, icon: Users },
         { name: t('navigation.templates'), href: ROUTES.DASHBOARD_TEMPLATES, icon: LayoutTemplate },

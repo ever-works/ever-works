@@ -9,13 +9,24 @@ import {
     type AgentTaskExecuteDispatcher,
 } from '../tasks-domain/task-dispatcher';
 import { RUN_CREDITS_PRECHECK, type RunCreditsPrecheck } from './run-credits-precheck';
+import {
+    composeRunAdmission,
+    DEFAULT_RUN_ADMISSION_CHAIN,
+    QUEUED_REASON_CONCURRENCY,
+    QUEUED_REASON_INSUFFICIENT_CREDITS,
+    type RunAdmissionMiddleware,
+} from './run-admission-chain';
 
 /**
  * Stable machine token stamped into `agent_runs.queuedReason` when the
  * gate parks a run instead of dispatching it. The drain looks rows up by
  * this exact literal — one shared constant, never three drifting copies.
+ *
+ * Judgment layer G15 — the literal now LIVES in `run-admission-chain.ts`
+ * (the middlewares stamp it) and is re-exported here so every existing
+ * importer of `run-dispatch-gate.service` keeps working unchanged.
  */
-export const QUEUED_REASON_CONCURRENCY = 'concurrency-limit' as const;
+export { QUEUED_REASON_CONCURRENCY };
 
 /**
  * Pricing Wave 9 M2 — stamped when the soft credits precheck parks a run
@@ -26,7 +37,7 @@ export const QUEUED_REASON_CONCURRENCY = 'concurrency-limit' as const;
  * documented Wave 9 follow-up; until then the run stays visibly queued
  * with this reason in the Sessions view.
  */
-export const QUEUED_REASON_INSUFFICIENT_CREDITS = 'insufficient-credits' as const;
+export { QUEUED_REASON_INSUFFICIENT_CREDITS };
 
 export interface RunDispatchAdmitInput {
     userId: string;
@@ -116,10 +127,37 @@ export function runAdmissionLockScope(input: RunDispatchAdmitInput): string {
  *     the row is bookkeeping for work in flight, not a new admission;
  *   - `TerminalSessionLauncher` — attaches a shell to an ALREADY-admitted
  *     live run; it enqueues no AgentRun.
+ *
+ * Judgment layer G15 — the pre-run decision itself is no longer an
+ * imperative ladder inside `evaluate()`. It is a COMPOSED chain of
+ * admission middlewares (`run-admission-chain.ts`): Work valve, then
+ * org/user valve, then the ship-dark credits precheck. Behaviour is
+ * byte-identical to the ladder it replaced; what changed is that a new
+ * pre-run policy is now a new middleware in a list instead of another
+ * branch in a growing method.
  */
 @Injectable()
 export class RunDispatchGateService {
     private readonly logger = new Logger(RunDispatchGateService.name);
+
+    /**
+     * The composed pre-run chain. A field, not a ctor param: the
+     * middleware list is code-level policy, not an injectable, so the
+     * gate's constructor arity (which unit specs construct positionally)
+     * stays exactly as it was. Subclasses / tests that need a different
+     * order call {@link withAdmissionChain}.
+     */
+    private admissionChain = composeRunAdmission(DEFAULT_RUN_ADMISSION_CHAIN);
+
+    /**
+     * Swap the pre-run chain. Exists so a test — or a future install
+     * that adds, say, a maintenance-window middleware — can compose a
+     * different order without reaching into `evaluate()`.
+     */
+    withAdmissionChain(chain: readonly RunAdmissionMiddleware[]): this {
+        this.admissionChain = composeRunAdmission(chain);
+        return this;
+    }
 
     constructor(
         private readonly runs: AgentRunRepository,
@@ -200,61 +238,22 @@ export class RunDispatchGateService {
             : run();
     }
 
+    /**
+     * Run the composed pre-run chain. Every policy — the Work valve, the
+     * org/user valve, the ship-dark credits precheck — is a middleware
+     * in `DEFAULT_RUN_ADMISSION_CHAIN`; this method only supplies the
+     * context they read (counters, limit thunks, logger, precheck).
+     */
     private async evaluate(input: RunDispatchAdmitInput): Promise<RunDispatchAdmitResult> {
-        const workLimit = this.resolveWorkLimit();
-        if (input.workId && workLimit > 0) {
-            const inFlight = await this.runs.countInFlightForWork(input.workId);
-            if (inFlight >= workLimit) {
-                this.logger.log(
-                    `Dispatch gate: Work ${input.workId} at ${inFlight}/${workLimit} in-flight runs — queueing.`,
-                );
-                return { admitted: false, queuedReason: QUEUED_REASON_CONCURRENCY };
-            }
-        }
-
-        const orgLimit = this.resolveOrgLimit();
-        if (orgLimit > 0) {
-            const inFlight = input.organizationId
-                ? await this.runs.countInFlightForOrganization(input.organizationId)
-                : await this.runs.countInFlightForUser(input.userId);
-            if (inFlight >= orgLimit) {
-                this.logger.log(
-                    `Dispatch gate: ${
-                        input.organizationId
-                            ? `org ${input.organizationId}`
-                            : `user ${input.userId}`
-                    } at ${inFlight}/${orgLimit} in-flight runs — queueing.`,
-                );
-                return { admitted: false, queuedReason: QUEUED_REASON_CONCURRENCY };
-            }
-        }
-
-        // Pricing Wave 9 M2 — soft credits enforcement (ship-dark). Runs
-        // ONLY when the CREDITS_ENFORCEMENT kill-switch is on AND the
-        // precheck token is bound. Fail-open on any error: a broken
-        // billing check must never stop work (same posture as a broken
-        // concurrency valve).
-        if (this.creditsPrecheck && config.billing.credits.isEnforcementEnabled()) {
-            try {
-                if (await this.creditsPrecheck.shouldQueueForCredits(input.userId)) {
-                    this.logger.log(
-                        `Dispatch gate: user ${input.userId} is credit-limited with an ` +
-                            `exhausted balance — queueing.`,
-                    );
-                    return {
-                        admitted: false,
-                        queuedReason: QUEUED_REASON_INSUFFICIENT_CREDITS,
-                    };
-                }
-            } catch (err) {
-                this.logger.warn(
-                    `Dispatch gate: credits precheck failed for user ${input.userId} ` +
-                        `(fail-open): ${err}`,
-                );
-            }
-        }
-
-        return { admitted: true };
+        return this.admissionChain({
+            input,
+            counters: this.runs,
+            logger: this.logger,
+            resolveWorkLimit: () => this.resolveWorkLimit(),
+            resolveOrgLimit: () => this.resolveOrgLimit(),
+            isCreditsEnforcementEnabled: () => config.billing.credits.isEnforcementEnabled(),
+            ...(this.creditsPrecheck ? { creditsPrecheck: this.creditsPrecheck } : {}),
+        });
     }
 
     /**

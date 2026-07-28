@@ -1,6 +1,35 @@
+import {
+    FLEET_DEFAULT_ENROLLMENT_TOKEN_TTL_MS,
+    FLEET_DEFAULT_MAX_CAPABILITY_TAG_LENGTH,
+    FLEET_DEFAULT_MAX_CAPABILITY_TAGS,
+    FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS,
+    FLEET_MAX_CAPABILITY_TAG_LENGTH_CEILING,
+    FLEET_MAX_CAPABILITY_TAGS_CEILING,
+    FLEET_MIN_ENROLLMENT_TOKEN_TTL_MS,
+    FLEET_MIN_NODE_OFFLINE_AFTER_MS,
+} from '@ever-works/contracts';
 import { DatabaseType } from '@src/database';
 
 type AppType = 'cli' | 'api';
+
+/**
+ * Parse an integer env var into a clamped range, falling back to
+ * `fallback` when unset/unparseable. Used by the Fleet knobs, where a
+ * deploy-manifest typo must degrade to the documented default rather
+ * than to `NaN` (which silently expires every enrollment token).
+ */
+function clampedIntEnv(
+    raw: string | undefined,
+    fallback: number,
+    min: number,
+    max: number,
+): number {
+    const parsed = parseInt(raw ?? '', 10);
+    if (!Number.isFinite(parsed)) {
+        return fallback;
+    }
+    return Math.min(Math.max(parsed, min), max);
+}
 
 export const config = {
     getEnvironment() {
@@ -89,6 +118,172 @@ export const config = {
          */
         isExperimentalProvider(): boolean {
             return this.getActiveProviderId() !== 'trigger';
+        },
+    },
+
+    /**
+     * Desktop PRD §6.2 / M4 — operator knobs for the `node` job runtime
+     * (the `job-runtime-node` plugin, whose "queue" is the owner's Fleet).
+     *
+     * These are the `FLEET_NODE_*` names the plugin already declares in
+     * its manifest + settings schema; reading them HERE is what lets the
+     * API-side producer size a fleet job (lease TTL), narrow which
+     * machines may lease it (capability tags) and know what a node is
+     * actually supposed to run (`FLEET_NODE_AGENT_TASK_COMMAND`) without
+     * every call site re-parsing `process.env`.
+     *
+     * Nothing in this group turns the fleet runtime ON by itself — that
+     * is still `EVER_WORKS_JOB_RUNTIME=node` (or a tenant overlay row).
+     * `FLEET_NODE_RUNTIME_ENABLED=false` is the kill switch that wins
+     * over both.
+     */
+    fleetNode: {
+        /**
+         * Origin the nodes poll for work. Informational on the server
+         * side (the node stores its own `apiUrl` at enrollment); exposed
+         * so the Fleet UI and the installer can render one value.
+         */
+        getApiUrl(): string | undefined {
+            const raw = (process.env.FLEET_NODE_API_URL || '').trim();
+            return raw ? raw : undefined;
+        },
+        /**
+         * Requested claim duration for jobs this install enqueues onto
+         * the fleet. Unset/nonsense → undefined, which lets the server's
+         * own `clampLeaseTtlSec` default apply rather than inventing a
+         * second default here.
+         */
+        getLeaseTtlSeconds(): number | undefined {
+            const raw = parseInt(process.env.FLEET_NODE_LEASE_TTL_SECONDS || '', 10);
+            return Number.isFinite(raw) && raw > 0 ? raw : undefined;
+        },
+        /**
+         * Capability tags a node must advertise to be eligible for this
+         * install's work. Empty (the default) means any enrolled node —
+         * narrowing is opt-in, because an over-narrow tag set produces a
+         * queue nothing can ever lease.
+         */
+        getRequiredCapabilities(): string[] {
+            const raw = process.env.FLEET_NODE_REQUIRED_CAPABILITIES || '';
+            const out: string[] = [];
+            for (const entry of raw.split(',')) {
+                const tag = entry.trim();
+                if (!tag || out.includes(tag)) continue;
+                out.push(tag);
+            }
+            return out;
+        },
+        /**
+         * Kill switch. `false` disables the fleet runtime even when it is
+         * the selected provider — the dispatch path then falls back to
+         * the platform default rather than writing rows nothing runs.
+         * `true` force-enables it for an install that has no dispatcher
+         * factory wired yet (dev). Unset = "decide from the wiring".
+         */
+        isRuntimeEnabled(): boolean | undefined {
+            const raw = (process.env.FLEET_NODE_RUNTIME_ENABLED || '').trim().toLowerCase();
+            if (raw === 'false' || raw === '0') return false;
+            if (raw === 'true' || raw === '1') return true;
+            return undefined;
+        },
+        /**
+         * Command template a node runs for one `agent-task` job.
+         * Supports `{taskId}`, `{runId}` and `{agentId}` placeholders,
+         * each substituted with an id validated against a strict
+         * `[A-Za-z0-9_-]` pattern first (a fleet node runs this through a
+         * shell, so an unvalidated substitution would be a command
+         * injection).
+         *
+         * Unset means the platform has nothing to ask a node to DO for a
+         * general agent run: the producer still enqueues, and the node
+         * fails the job naming this variable. Loud degradation beats a
+         * queue that silently succeeds at nothing.
+         */
+        getAgentTaskCommand(): string | undefined {
+            const raw = (process.env.FLEET_NODE_AGENT_TASK_COMMAND || '').trim();
+            return raw ? raw : undefined;
+        },
+        /**
+         * Absolute directory ON THE NODE that `agent-task` steps run in.
+         * Unset lets the node choose (its own working directory).
+         */
+        getAgentTaskWorkspacePath(): string | undefined {
+            const raw = (process.env.FLEET_NODE_AGENT_TASK_WORKSPACE || '').trim();
+            return raw ? raw : undefined;
+        },
+    },
+
+    /**
+     * Fleet — the owner's own machines (desktop nodes, headless nodes,
+     * their configured clusters) and the job-lease channel that runs
+     * work on them.
+     *
+     * ONE switch for the whole surface: the `/api/fleet/**` controllers
+     * (registry, admin and the node work channel), the Fleet settings
+     * page and its nav entry. Turning it off is a deployment saying "my
+     * users have no machines of their own" — the platform's own runtimes
+     * are untouched.
+     *
+     * **Default ON**, deliberately, and that is not a style choice: the
+     * Fleet surface already ships, so a default-off flag would silently
+     * REMOVE a working feature from every existing deployment on
+     * upgrade. Operators who want it gone set `FLEET_ENABLED=false`
+     * explicitly, exactly like `SCHEDULED_UPDATES_ENABLED`.
+     *
+     * Off is a hard gate, not a hint: the API answers 404 (not 403) on
+     * every fleet route, so a disabled deployment does not even confirm
+     * the surface exists, and an enrolled node's credential buys nothing.
+     */
+    fleet: {
+        isEnabled(): boolean {
+            return process.env.FLEET_ENABLED !== 'false';
+        },
+        /**
+         * How long a one-time enrollment token stays redeemable.
+         * Default 15 minutes (`FLEET_ENROLLMENT_TOKEN_TTL_MS`), floored
+         * at 30s so a token can always actually be typed in.
+         */
+        getEnrollmentTokenTtlMs(): number {
+            return clampedIntEnv(
+                process.env.FLEET_ENROLLMENT_TOKEN_TTL_MS,
+                FLEET_DEFAULT_ENROLLMENT_TOKEN_TTL_MS,
+                FLEET_MIN_ENROLLMENT_TOKEN_TTL_MS,
+                Number.MAX_SAFE_INTEGER,
+            );
+        },
+        /**
+         * Silence after which an `online` node is swept to `offline` by
+         * the next owner-scoped list read. Default 5 minutes.
+         *
+         * Shortening this below a node's heartbeat cadence makes healthy
+         * nodes flap; the 30s floor stops the value becoming nonsense,
+         * it does not stop it becoming unwise.
+         */
+        getNodeOfflineAfterMs(): number {
+            return clampedIntEnv(
+                process.env.FLEET_NODE_OFFLINE_AFTER_MS,
+                FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS,
+                FLEET_MIN_NODE_OFFLINE_AFTER_MS,
+                Number.MAX_SAFE_INTEGER,
+            );
+        },
+        /** Max capability tags one node may advertise. Default 16, hard ceiling 64. */
+        getMaxCapabilityTags(): number {
+            return clampedIntEnv(
+                process.env.FLEET_MAX_CAPABILITY_TAGS,
+                FLEET_DEFAULT_MAX_CAPABILITY_TAGS,
+                1,
+                FLEET_MAX_CAPABILITY_TAGS_CEILING,
+            );
+        },
+        /** Max length of one capability tag. Default 32, hard ceiling 128. */
+        getMaxCapabilityTagLength(): number {
+            return clampedIntEnv(
+                process.env.FLEET_MAX_CAPABILITY_TAG_LENGTH,
+                FLEET_DEFAULT_MAX_CAPABILITY_TAG_LENGTH,
+                1,
+                FLEET_MAX_CAPABILITY_TAG_LENGTH_CEILING,
+            );
         },
     },
 
@@ -725,12 +920,78 @@ export const config = {
             return Number.isFinite(raw) && raw > 0 ? raw : 120;
         },
         /**
+         * Judgment layer G2 — grade a GREEN gate against the Task's
+         * acceptance criteria with an LLM judge before the PR is opened.
+         * Default **off**.
+         *
+         * Off by default because it can withhold a PR that every
+         * deterministic check approved: that is the whole point of the
+         * feature, and also exactly why an operator has to opt into it.
+         * With it off (or with no AI provider wired, or with a Task that
+         * declares no criteria) the gate is byte-for-byte what it is
+         * today — see `shouldRunGateJudge`.
+         */
+        isGateJudgeEnabled() {
+            return (process.env.AGENT_GATE_JUDGE || 'off').toLowerCase() === 'on';
+        },
+        /**
          * Judgment layer G3 — kill switch for structured escalation
          * records. Default ON: when an agent gives up, a human needs a
          * card saying so. Off falls back to log-lines-only.
          */
         isEscalationLoggingEnabled() {
             return process.env.AGENT_ESCALATION_LOGGING_ENABLED !== 'false';
+        },
+        /**
+         * Judgment layer G3 — let the AI judge score escalation
+         * confidence through the AI facade. Default **off**.
+         *
+         * Off by default because it turns a bookkeeping write into a
+         * model call: escalations are rare, but they are also raised at
+         * exactly the moments a deployment is already unhealthy, and a
+         * provider timeout there would slow every give-up path. With it
+         * off, `confidence` is still populated on every row — by the
+         * deterministic reason-code table, which costs nothing and never
+         * fails. Turn it on to get calibrated scores.
+         */
+        isEscalationConfidenceJudgeEnabled() {
+            return (process.env.AGENT_ESCALATION_CONFIDENCE_JUDGE || 'off').toLowerCase() === 'on';
+        },
+        /**
+         * Judgment layer G10 — the doom-loop / retry-storm detector.
+         * Default ON.
+         *
+         * On by default because the thing it prevents (an agent spending
+         * its whole budget failing the same check five times) is pure
+         * waste with no upside, and the detector never fails a run on its
+         * own account — it stops the retry loop early and files an
+         * escalation carrying the evidence. Set
+         * `AGENT_RUN_LOOP_DETECTOR_ENABLED=false` to fall back to the
+         * attempt cap alone.
+         */
+        isRunLoopDetectorEnabled() {
+            return process.env.AGENT_RUN_LOOP_DETECTOR_ENABLED !== 'false';
+        },
+        /**
+         * How many CONSECUTIVE identical failures count as a loop.
+         * Default 3, clamped 2..10 by `resolveLoopThresholds`.
+         *
+         * Three, not two: two identical failures is what a legitimate
+         * "fix it and re-run" attempt looks like when the fix was wrong,
+         * and firing there would make the detector a nuisance rather than
+         * a saving.
+         */
+        getRunLoopRepeatThreshold() {
+            const raw = parseInt(process.env.AGENT_RUN_LOOP_REPEAT_THRESHOLD || '3', 10);
+            return Number.isFinite(raw) ? raw : 3;
+        },
+        /**
+         * Attempt count at which a progress-free trail is called a retry
+         * storm. Default 4, clamped 1..20 by `resolveLoopThresholds`.
+         */
+        getRunLoopMaxRetries() {
+            const raw = parseInt(process.env.AGENT_RUN_LOOP_MAX_RETRIES || '4', 10);
+            return Number.isFinite(raw) ? raw : 4;
         },
         /**
          * Run orchestration (Wave 4 M2) — concurrency safety valves for
@@ -768,6 +1029,23 @@ export const config = {
             return (process.env.AGENT_MERGE_POLICY_ENFORCEMENT || 'on').toLowerCase() !== 'off';
         },
     },
+
+    /**
+     * Fleet (Wave 12) — operator knobs for the node registry.
+     *
+     * These four values shipped as hard-coded constants in
+     * `FleetService`, which made them un-tunable for anyone running the
+     * platform: a fleet of slow-to-provision machines could not lengthen
+     * the enrollment window, and an operator whose nodes advertise a
+     * richer capability vocabulary could not raise the tag caps without
+     * a code change. Defaults are EXACTLY the previous constants, so an
+     * environment that sets nothing behaves byte-for-byte as before.
+     *
+     * Every getter clamps into a documented range rather than trusting
+     * the env: `capabilities` is a stored JSON column and a lease-time
+     * filter input, so an unbounded knob would be a denial-of-service
+     * surface, and a zero/NaN TTL would expire every token instantly.
+     */
 
     /**
      * Streaming-terminal M9 / founder decision D1 — persisted terminal
@@ -948,4 +1226,67 @@ export const config = {
             return process.env.KB_EMBEDDING_MODE || 'auto';
         },
     },
+
+    /**
+     * Event-ingest spine — salience filter knobs.
+     *
+     * The ingest pipeline used to write EVERY envelope a connector
+     * produced straight into the feed, so a chatty source (bot pings,
+     * presence changes, reaction spam) could drown the signal a user
+     * actually connected the source for.
+     *
+     * All three knobs default to OFF, which reproduces the previous
+     * behaviour byte for byte: min score `0` admits everything, and both
+     * mute lists are empty. An operator opts in per deployment.
+     */
+    ingest: {
+        /**
+         * Minimum salience score (0–100) an envelope must reach to be
+         * stored. `0` (default) = filter disabled, everything is kept.
+         * Values outside 0–100 and unparseable input fall back to `0` —
+         * a typo must never start silently dropping a customer's events.
+         */
+        getSalienceMinScore(): number {
+            const raw = Number.parseInt(process.env.INGEST_SALIENCE_MIN_SCORE || '', 10);
+            if (!Number.isFinite(raw) || raw <= 0) return 0;
+            return Math.min(raw, 100);
+        },
+        /**
+         * Comma-separated event kinds to drop outright, e.g.
+         * `slack.presence,github.watch`. Matched case-insensitively
+         * against the envelope `kind`; a trailing `.*` makes it a
+         * prefix match (`slack.*`). Empty (default) = nothing muted.
+         */
+        getSalienceMutedKinds(): string[] {
+            return parseCsvList(process.env.INGEST_SALIENCE_MUTED_KINDS);
+        },
+        /**
+         * Comma-separated actor names to drop outright (noisy bots and
+         * automations). Matched case-insensitively as a SUBSTRING of the
+         * envelope actor name, so `dependabot` mutes
+         * `dependabot[bot]`. Empty (default) = nothing muted.
+         */
+        getSalienceMutedActors(): string[] {
+            return parseCsvList(process.env.INGEST_SALIENCE_MUTED_ACTORS);
+        },
+        /** True when any knob is set — i.e. the filter can drop something. */
+        isSalienceFilterEnabled(): boolean {
+            return (
+                this.getSalienceMinScore() > 0 ||
+                this.getSalienceMutedKinds().length > 0 ||
+                this.getSalienceMutedActors().length > 0
+            );
+        },
+    },
 };
+
+/** Comma-separated env list → trimmed, lowercased, blank-dropped, deduped. */
+function parseCsvList(raw: string | undefined): string[] {
+    if (typeof raw !== 'string' || raw.trim().length === 0) return [];
+    const seen = new Set<string>();
+    for (const part of raw.split(',')) {
+        const value = part.trim().toLowerCase();
+        if (value.length > 0) seen.add(value);
+    }
+    return [...seen];
+}

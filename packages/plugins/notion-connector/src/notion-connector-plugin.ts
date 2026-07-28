@@ -11,11 +11,13 @@ import type {
 	ChannelVerification,
 	EventSourcePullInput,
 	EventSourcePullResult,
+	EventSourceBackfillInput,
+	EventSourceBackfillResult,
 	PluginCategory,
 	PluginSettings,
 	JsonSchema
 } from '@ever-works/plugin';
-import { PLUGIN_CAPABILITIES, EventSourceNotConfiguredError } from '@ever-works/plugin';
+import { PLUGIN_CAPABILITIES, EventSourceNotConfiguredError, clampEventSourceBackfillDays } from '@ever-works/plugin';
 import type { IngestedEventEnvelope } from '@ever-works/contracts';
 
 /**
@@ -35,11 +37,15 @@ export const NOTION_PULL_PAGE_SIZE = 50;
  */
 export const NOTION_BACKFILL_MAX_PAGES = 10;
 
-/** Clamp the opt-in backfill window to the supported 0–90 day range. */
+/**
+ * Clamp the opt-in backfill window to the supported 0–90 day range.
+ *
+ * Delegates to the shared capability helper so the bound is stated once
+ * for the whole connector fabric; the local export stays because it is
+ * part of this plugin's published surface.
+ */
 export function clampBackfillDays(value: unknown): number {
-	const num = typeof value === 'number' ? value : Number(value);
-	if (!Number.isFinite(num) || num <= 0) return 0;
-	return Math.min(Math.floor(num), 90);
+	return clampEventSourceBackfillDays(value);
 }
 
 function truncateText(text: string): string {
@@ -462,6 +468,62 @@ export class NotionConnectorPlugin implements IConnectorPlugin, IEventSourcePlug
 			};
 		}
 		return next ? { events, nextCursor: JSON.stringify(next) } : { events };
+	}
+
+	/**
+	 * Bounded HISTORICAL sweep from an explicit `since` — the
+	 * capability's opt-in `backfill()` method.
+	 *
+	 * Before this method existed, history was reachable only as a side
+	 * effect of the FIRST pull (`settings.backfillDays` widening the
+	 * initial window), so a user who activated the connector without the
+	 * setting could never go back and fetch it. `backfill()` runs the
+	 * same sweep (configured databases, else workspace search)
+	 * out-of-band on a caller-chosen window, as many times as wanted —
+	 * re-delivery is free because the ingest pipeline dedupes on
+	 * `(source, sourceEventId)`.
+	 *
+	 * `until` is accepted for contract symmetry but NOT applied: the
+	 * Notion filter bounds only the near end
+	 * (`last_edited_time on_or_after`). An over-wide window costs
+	 * duplicate deliveries, which the pipeline drops — never wrong data.
+	 *
+	 * The per-phase page bound (`NOTION_BACKFILL_MAX_PAGES`) applies here
+	 * too: one call fetches ONE page and hands back a cursor, so a large
+	 * workspace can never turn a backfill into an unbounded crawl.
+	 */
+	async backfill(input: EventSourceBackfillInput): Promise<EventSourceBackfillResult> {
+		const sinceMs = Date.parse(input.since);
+		if (!Number.isFinite(sinceMs)) {
+			throw new EventSourceNotConfiguredError(
+				`notion-connector: backfill requires a valid ISO 8601 "since" (received ${JSON.stringify(input.since)})`
+			);
+		}
+
+		// Resume the caller's cursor, or open the sweep the same way a
+		// first pull does: configured databases when present, otherwise
+		// the workspace search. `f: 1` marks it a backfill sweep so the
+		// page bound engages.
+		const databaseIds = resolveDatabaseIds(input.settings);
+		const cursor =
+			input.cursor ??
+			JSON.stringify({
+				m: databaseIds.length > 0 ? 'db' : 'search',
+				...(databaseIds[0] ? { d: databaseIds[0] } : {}),
+				s: new Date(sinceMs).toISOString(),
+				f: 1 as const,
+				b: 0
+			} satisfies NotionPullCursor);
+
+		const page = await this.pullEvents({
+			since: input.since,
+			cursor,
+			...(input.settings ? { settings: input.settings } : {})
+		});
+
+		return page.nextCursor
+			? { events: page.events, nextCursor: page.nextCursor }
+			: { events: page.events, complete: true };
 	}
 
 	private normalizePage(page: NotionPageObject, since: string, databaseId?: string): IngestedEventEnvelope | null {

@@ -209,6 +209,87 @@ describe('agent/config', () => {
         });
     });
 
+    describe('config.fleetNode (Desktop PRD M4 — FLEET_NODE_* operator knobs)', () => {
+        describe('getApiUrl', () => {
+            it('returns undefined when unset', () => {
+                expect(config.fleetNode.getApiUrl()).toBeUndefined();
+            });
+
+            it('trims and returns the configured origin', () => {
+                process.env.FLEET_NODE_API_URL = '  https://api.example.test  ';
+                expect(config.fleetNode.getApiUrl()).toBe('https://api.example.test');
+            });
+
+            it('treats a whitespace-only value as unset', () => {
+                process.env.FLEET_NODE_API_URL = '   ';
+                expect(config.fleetNode.getApiUrl()).toBeUndefined();
+            });
+        });
+
+        describe('getLeaseTtlSeconds', () => {
+            it('returns undefined when unset so the server default applies', () => {
+                expect(config.fleetNode.getLeaseTtlSeconds()).toBeUndefined();
+            });
+
+            it('parses a positive integer', () => {
+                process.env.FLEET_NODE_LEASE_TTL_SECONDS = '900';
+                expect(config.fleetNode.getLeaseTtlSeconds()).toBe(900);
+            });
+
+            it.each(['0', '-5', 'soon', ''])(
+                "falls back to undefined for nonsense value '%s'",
+                (raw) => {
+                    process.env.FLEET_NODE_LEASE_TTL_SECONDS = raw;
+                    expect(config.fleetNode.getLeaseTtlSeconds()).toBeUndefined();
+                },
+            );
+        });
+
+        describe('getRequiredCapabilities', () => {
+            it('defaults to an empty list (any enrolled node is eligible)', () => {
+                expect(config.fleetNode.getRequiredCapabilities()).toEqual([]);
+            });
+
+            it('splits, trims and de-duplicates the comma-separated list', () => {
+                process.env.FLEET_NODE_REQUIRED_CAPABILITIES = ' git , docker ,git, ';
+                expect(config.fleetNode.getRequiredCapabilities()).toEqual(['git', 'docker']);
+            });
+        });
+
+        describe('isRuntimeEnabled', () => {
+            it('returns undefined when unset (decide from the wiring)', () => {
+                expect(config.fleetNode.isRuntimeEnabled()).toBeUndefined();
+            });
+
+            it.each(['false', 'FALSE', '0'])("returns false for '%s'", (raw) => {
+                process.env.FLEET_NODE_RUNTIME_ENABLED = raw;
+                expect(config.fleetNode.isRuntimeEnabled()).toBe(false);
+            });
+
+            it.each(['true', 'TRUE', '1'])("returns true for '%s'", (raw) => {
+                process.env.FLEET_NODE_RUNTIME_ENABLED = raw;
+                expect(config.fleetNode.isRuntimeEnabled()).toBe(true);
+            });
+        });
+
+        describe('getAgentTaskCommand / getAgentTaskWorkspacePath', () => {
+            it('both default to undefined', () => {
+                expect(config.fleetNode.getAgentTaskCommand()).toBeUndefined();
+                expect(config.fleetNode.getAgentTaskWorkspacePath()).toBeUndefined();
+            });
+
+            it('returns the trimmed command template', () => {
+                process.env.FLEET_NODE_AGENT_TASK_COMMAND = '  ever-works run {taskId}  ';
+                expect(config.fleetNode.getAgentTaskCommand()).toBe('ever-works run {taskId}');
+            });
+
+            it('returns the trimmed workspace path', () => {
+                process.env.FLEET_NODE_AGENT_TASK_WORKSPACE = ' /srv/work ';
+                expect(config.fleetNode.getAgentTaskWorkspacePath()).toBe('/srv/work');
+            });
+        });
+    });
+
     describe('config.database', () => {
         describe('getType', () => {
             it("defaults to 'better-sqlite3' when DATABASE_TYPE is unset", () => {
@@ -758,6 +839,20 @@ describe('agent/config', () => {
                 'branding',
                 'database',
                 'everWorks',
+                // Fleet — ONE group covering both halves of the surface:
+                // the `FLEET_ENABLED` switch that gates the whole thing
+                // (registry + admin + node work channel + settings page,
+                // default ON because the surface already shipped), and
+                // the clamped limits shared with the node (token TTL,
+                // offline-after window, capability-tag ceilings).
+                // Pinned alphabetically, before `fleetNode`.
+                'fleet',
+                // Desktop PRD M4 — `fleetNode.*` group reads the
+                // `FLEET_NODE_*` operator knobs for the `node` job
+                // runtime (lease TTL, capability tags, kill switch and
+                // the agent-task command template). Pinned
+                // alphabetically.
+                'fleetNode',
                 'getAppType',
                 'getEnvironment',
                 'git',
@@ -768,6 +863,13 @@ describe('agent/config', () => {
                 // (EVER_WORKS_IDEA_BUILD_EXECUTOR_ENABLED, default off, +
                 // DRY_RUN default on). Pinned alphabetically.
                 'ideaBuildExecutor',
+                // Audit item (k) — `ingest.*` group adds the event-ingest
+                // salience filter knobs (INGEST_SALIENCE_MIN_SCORE,
+                // INGEST_SALIENCE_MUTED_KINDS,
+                // INGEST_SALIENCE_MUTED_ACTORS). All default to OFF so
+                // ingest behaviour is unchanged when unset. Pinned
+                // alphabetically.
+                'ingest',
                 'isCli',
                 // EW-683 / EW-685 P0 T3 — `jobRuntime.*` group adds the
                 // `EVER_WORKS_JOB_RUNTIME` selector for the pluggable

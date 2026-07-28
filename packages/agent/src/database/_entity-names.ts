@@ -70,6 +70,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'CreditLedgerEntry',
     'EmailConversation',
     'EmailMessage',
+    // Event-ingest spine — external tracker issue → platform Task mapping
+    'ExternalIssueLink',
     // Fleet job runtime (Desktop PRD M4) — lease-able work for nodes
     'FleetJob',
     // Fleet (Wave 12, slice 1) — enrolled execution nodes w/ heartbeat
@@ -107,6 +109,7 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'OnboardingRequest',
     'Organization',
     'OrganizationNotificationDefault',
+    'OrganizationOnboardingProfile',
     // Plan entitlements (pricing Wave 9 M1)
     'PlanEntitlement',
     'PluginUsageEvent',
@@ -146,6 +149,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     // ──────────────────────────────────────────────────────────
     // Streaming-terminal M9 / D1 — persisted terminal transcripts.
     'TerminalTranscriptChunk',
+    // Tool-grant matrix (audit item G4) — per-scope tool allow/deny rows.
+    'ToolGrant',
     'UsageLedgerEntry',
     'User',
     'UserNotificationCategoryMute',

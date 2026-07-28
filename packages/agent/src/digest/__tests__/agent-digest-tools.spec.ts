@@ -2,6 +2,12 @@ import { buildDigestTools } from '../agent-digest-tools';
 import type { ComposedDigest } from '../digest.types';
 
 const composed = (period: 'daily' | 'weekly'): ComposedDigest => ({
+    // Org-scoped digests (audit item c) widened `ComposedDigest` with
+    // `scope` / `subjectId`. This fixture stays PERSONAL, because that is
+    // what these chat-tool specs are about — the tool answers for the
+    // calling user, and the org pass is exercised in digest.service.spec.
+    scope: 'personal',
+    subjectId: 'user-1',
     period,
     since: '2026-07-24T07:15:00.000Z',
     until: '2026-07-25T07:15:00.000Z',
@@ -22,6 +28,11 @@ const composed = (period: 'daily' | 'weekly'): ComposedDigest => ({
         // ordinary, non-blocking digest.
         escalationsOpen: 0,
     },
+    // The narrative outcome is ALWAYS present and is usually not
+    // `generated` — an install with no AI provider degrades here rather
+    // than failing the digest. `disabled` is the honest default for a
+    // fixture that never configures one.
+    narrative: { status: 'disabled', text: null, reason: 'No AI provider configured' },
 });
 
 describe('buildDigestTools — get_digest', () => {

@@ -154,4 +154,61 @@ describe('BillingProfileRepository', () => {
             where: { provider: 'stripe', providerCustomerId: 'cus_1' },
         });
     });
+
+    /**
+     * Subscription lifecycle (audit B07/B08). The write is PARTIAL by
+     * construction so a webhook carrying one field cannot blank the rest.
+     */
+    describe('updateSubscriptionState', () => {
+        it('writes only the fields the caller supplied', async () => {
+            const { repository, repo } = makeHarness({ existing: { id: 'bp-1' } });
+
+            await repository.updateSubscriptionState('u1', { cancelAtPeriodEnd: true });
+
+            const [where, values] = repo.update.mock.calls[0];
+            expect(where).toEqual({ userId: 'u1' });
+            expect(Object.keys(values)).toEqual(['cancelAtPeriodEnd']);
+            expect(values.cancelAtPeriodEnd).toBe(true);
+        });
+
+        it('treats an explicit null as a real write (a finished period clears)', async () => {
+            const { repository, repo } = makeHarness({ existing: { id: 'bp-1' } });
+
+            await repository.updateSubscriptionState('u1', { currentPeriodEnd: null });
+
+            const [, values] = repo.update.mock.calls[0];
+            expect(Object.keys(values)).toEqual(['currentPeriodEnd']);
+            expect(values.currentPeriodEnd).toBeNull();
+        });
+
+        it('persists the full snapshot the provider returned', async () => {
+            const { repository, repo } = makeHarness({ existing: { id: 'bp-1' } });
+            const periodEnd = new Date('2026-08-01T00:00:00Z');
+
+            await repository.updateSubscriptionState('u1', {
+                providerSubscriptionId: 'sub_1',
+                subscriptionStatus: 'past_due',
+                cancelAtPeriodEnd: false,
+                currentPeriodEnd: periodEnd,
+                subscriptionCanceledAt: null,
+            });
+
+            const [, values] = repo.update.mock.calls[0];
+            expect(values).toEqual({
+                providerSubscriptionId: 'sub_1',
+                subscriptionStatus: 'past_due',
+                cancelAtPeriodEnd: false,
+                currentPeriodEnd: periodEnd,
+                subscriptionCanceledAt: null,
+            });
+        });
+
+        it('does not issue an UPDATE when the caller supplied nothing', async () => {
+            const { repository, repo } = makeHarness({ existing: { id: 'bp-1' } });
+
+            await repository.updateSubscriptionState('u1', {});
+
+            expect(repo.update).not.toHaveBeenCalled();
+        });
+    });
 });

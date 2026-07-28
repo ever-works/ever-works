@@ -4,7 +4,7 @@ jest.mock('@ever-works/agent/plugins', () => ({
 
 import { Test } from '@nestjs/testing';
 import { PluginRegistryService } from '@ever-works/agent/plugins';
-import { OnboardingCatalogService } from './onboarding-catalog.service';
+import { COMMUNICATION_PLUGIN_IDS, OnboardingCatalogService } from './onboarding-catalog.service';
 
 interface FakeRegisteredPlugin {
     manifest: {
@@ -173,6 +173,41 @@ describe('OnboardingCatalogService', () => {
             const cat = svc.getCatalog();
             const ids = cat.plugins.map((p) => p.pluginId);
             expect(ids).toEqual(['make', 'zapier']);
+        });
+
+        // Audit item (b) — the Communication step now connects Slack /
+        // Discord IN PLACE, so those connectors must not also show up as
+        // generic "Plugins & Integrations" cards.
+        it('excludes the Communication-step connectors even when they opt into onboarding', async () => {
+            const svc = await makeSvc([
+                {
+                    manifest: {
+                        id: 'slack-connector',
+                        name: 'Slack Connector',
+                        category: 'connector',
+                        uiHints: { includeInOnboarding: true, onboardingPriority: 1 },
+                    },
+                },
+                {
+                    manifest: {
+                        id: 'discord-connector',
+                        name: 'Discord Connector',
+                        category: 'connector',
+                        uiHints: { includeInOnboarding: true, onboardingPriority: 1 },
+                    },
+                },
+                {
+                    manifest: {
+                        id: 'zapier',
+                        name: 'Zapier',
+                        category: 'pipeline',
+                        uiHints: { includeInOnboarding: true, onboardingPriority: 2 },
+                    },
+                },
+            ]);
+
+            expect(svc.getCatalog().plugins.map((p) => p.pluginId)).toEqual(['zapier']);
+            expect(COMMUNICATION_PLUGIN_IDS).toEqual(['slack-connector', 'discord-connector']);
         });
 
         it('sorts plugins by onboardingPriority ascending', async () => {

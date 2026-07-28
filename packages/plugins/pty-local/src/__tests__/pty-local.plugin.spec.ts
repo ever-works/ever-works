@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { TerminalFrame, TerminalTransport } from '@ever-works/plugin';
-import { PtyLocalPlugin } from '../pty-local.plugin.js';
+import { PtyLocalPlugin, makePtyLocalSessionId } from '../pty-local.plugin.js';
 
 /**
  * The suite exercises the full pump contract against PLAIN child
@@ -105,6 +105,39 @@ describe('PtyLocalPlugin', () => {
 			.map((f) => f.seq);
 		expect(seqs).toEqual([...seqs].sort((a, b) => a - b));
 		expect(seqs[0]).toBe(0);
+	});
+
+	/**
+	 * The handle's `sessionId` is what the platform persists as the run's
+	 * `cliSessionId` — the column had no writer at all before this, so a
+	 * provider that mints nothing leaves the whole resume story dead.
+	 */
+	it('mints a provider-scoped session id on the handle (the run’s resume key)', async () => {
+		const plugin = new PtyLocalPlugin();
+		const h = makeTransport();
+		const runId = '2f9d1f2a-9c7e-4b1a-8f0d-0a1b2c3d4e5f';
+
+		const handle = await plugin.spawn(
+			{
+				runId,
+				command: [NODE, '-e', 'process.exit(0)'],
+				cwd: process.cwd(),
+				env: {}
+			},
+			h.transport
+		);
+
+		expect(handle.sessionId).toMatch(new RegExp(`^pty-local:${runId}:(\\d+|no-pid)$`));
+		// Stays inside the API's 128-char whitelist cap, so it is never
+		// silently dropped on the heartbeat.
+		expect(handle.sessionId!.length).toBeLessThanOrEqual(128);
+		await handle.exited;
+	});
+
+	it('makePtyLocalSessionId is provider-prefixed and honest about a missing pid', () => {
+		expect(makePtyLocalSessionId('run-1', 4242)).toBe('pty-local:run-1:4242');
+		expect(makePtyLocalSessionId('run-1', undefined)).toBe('pty-local:run-1:no-pid');
+		expect(makePtyLocalSessionId('run-1', Number.NaN)).toBe('pty-local:run-1:no-pid');
 	});
 
 	it('a non-zero exit is reported as crashed', async () => {
