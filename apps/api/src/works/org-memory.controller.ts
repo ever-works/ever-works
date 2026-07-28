@@ -1,17 +1,44 @@
 import {
+    BadRequestException,
     Body,
     Controller,
     Get,
     HttpCode,
     HttpStatus,
+    Logger,
     Post,
     Query,
+    UnprocessableEntityException,
+    UploadedFile,
     UseGuards,
+    UseInterceptors,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import {
+    ApiBearerAuth,
+    ApiBody,
+    ApiConsumes,
+    ApiOperation,
+    ApiQuery,
+    ApiResponse,
+    ApiTags,
+} from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { Transform } from 'class-transformer';
-import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import { Transform, Type } from 'class-transformer';
+import { CreateKbUploadDto } from '@ever-works/agent/dto';
+import {
+    ArrayMaxSize,
+    IsArray,
+    IsBoolean,
+    IsIn,
+    IsInt,
+    IsOptional,
+    IsString,
+    Matches,
+    Max,
+    MaxLength,
+    Min,
+} from 'class-validator';
 import {
     KnowledgeBaseService,
     MemoryConsolidationService,
@@ -29,6 +56,8 @@ import {
     KB_DOCUMENT_STATUSES,
     type KbMemoryHealth,
 } from '@ever-works/contracts';
+import { UserUploadRepository } from '@ever-works/agent/database';
+import { UploadsService } from '../uploads/uploads.service';
 import { OrganizationMembershipService } from '../organizations/organization-membership.service';
 import { ScopeContextService } from '../scope';
 import { AuthSessionGuard, CurrentUser } from '../auth';
@@ -142,6 +171,43 @@ export class MemoryConsolidateDto {
 }
 
 /**
+ * Same cap, same env var, as the per-Work KB upload route — Memory is a
+ * different destination for the same bytes, so a file that is acceptable
+ * to one and rejected by the other would be arbitrary.
+ */
+const MEMORY_UPLOAD_MAX_BYTES = Number(process.env.KB_UPLOAD_MAX_BYTES) || 200 * 1024 * 1024;
+
+/**
+ * Body for `POST /api/memory/uploads/from-attachments`.
+ *
+ * The ids are content hashes the client already holds from the chat
+ * composer — the same `<sha256>` segment of an `/api/uploads/...` URL.
+ */
+export class IngestAttachmentsDto {
+    @IsArray()
+    @ArrayMaxSize(20)
+    @IsString({ each: true })
+    @Matches(/^[a-f0-9]{64}$/, { each: true })
+    attachmentIds: string[];
+}
+
+/** Query for `GET /api/memory/uploads`. */
+export class ListMemoryUploadsDto {
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(200)
+    limit?: number;
+
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(0)
+    offset?: number;
+}
+
+/**
  * Org-wide Memory (Cortex P1) — the aggregation surface over the
  * per-Work Knowledge Base, fanned in across the active Organization.
  *
@@ -172,7 +238,11 @@ export class OrgMemoryController {
         private readonly membership: OrganizationMembershipService,
         private readonly scopeContext: ScopeContextService,
         private readonly health: MemoryHealthService,
+        private readonly uploads: UploadsService,
+        private readonly userUploads: UserUploadRepository,
     ) {}
+
+    private readonly logger = new Logger(OrgMemoryController.name);
 
     @Get('memory/health')
     @HttpCode(HttpStatus.OK)
@@ -316,5 +386,177 @@ export class OrgMemoryController {
             { organizationId, userId: auth.userId },
             { apply },
         );
+    }
+
+    @Post('memory/uploads')
+    @HttpCode(HttpStatus.CREATED)
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
+    @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MEMORY_UPLOAD_MAX_BYTES } }))
+    @ApiConsumes('multipart/form-data')
+    @ApiOperation({
+        summary: 'Upload a file into global Memory',
+        description:
+            'Multipart upload of a file into the active Organization’s global Memory, rather than into a single Work’s Knowledge Base. The server computes SHA-256, dedups against existing Memory originals, persists the bytes via the configured storage plugin, extracts the text to markdown where an extractor route exists, and materializes an organization-scoped document. The Organization comes from the request scope context, not a param.',
+    })
+    @ApiBody({
+        schema: {
+            type: 'object',
+            required: ['file'],
+            properties: {
+                file: { type: 'string', format: 'binary' },
+                targetClass: { type: 'string' },
+                title: { type: 'string' },
+                description: { type: 'string' },
+                tags: { type: 'array', items: { type: 'string' } },
+                autoClassify: { type: 'boolean' },
+            },
+        },
+    })
+    @ApiResponse({ status: 201, description: 'Upload accepted; returns the upload row + document' })
+    @ApiResponse({ status: 400, description: 'Missing file or invalid metadata' })
+    @ApiResponse({ status: 422, description: 'No active Organization on the request scope' })
+    @ApiResponse({ status: 503, description: 'Storage plugin not configured' })
+    async createMemoryUpload(
+        @CurrentUser() auth: AuthenticatedUser,
+        @UploadedFile() file: Express.Multer.File | undefined,
+        @Body() body: CreateKbUploadDto,
+    ) {
+        if (!file) {
+            throw new BadRequestException({
+                status: 'error',
+                message: "Multipart field 'file' is required",
+            });
+        }
+
+        const organizationId = this.scopeContext.getOrganizationId();
+        if (!organizationId) {
+            // Deliberately NOT the empty-payload treatment the read paths
+            // give this case. A read with no active Organization has an
+            // honest answer ("nothing"); a write does not — silently
+            // accepting bytes that belong to no Organization would report
+            // success for a file the user could never retrieve.
+            throw new UnprocessableEntityException({
+                status: 'error',
+                message: 'No active Organization — select one before uploading to Memory',
+            });
+        }
+
+        await this.membership.ensureMember(organizationId, auth.userId);
+
+        return this.kb.createOrgUpload({
+            organizationId,
+            userId: auth.userId,
+            file: {
+                buffer: file.buffer,
+                originalFilename: file.originalname,
+                mimeType: file.mimetype,
+                size: file.size,
+            },
+            // Same cast the per-Work upload route makes: the DTO types
+            // this against the contracts' KbDocumentClass while the
+            // service signature uses the entities' one. Identical unions,
+            // two declarations.
+            targetClass: body.targetClass as KbDocumentClass | undefined,
+            title: body.title,
+            description: body.description ?? null,
+            tags: body.tags,
+            autoClassify: body.autoClassify,
+        });
+    }
+
+    @Post('memory/uploads/from-attachments')
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
+    @ApiOperation({
+        summary: 'Ingest already-uploaded chat attachments into global Memory',
+        description:
+            'Takes content hashes of files the caller previously uploaded through `/api/uploads` — the ids the chat composer already holds — and copies them into the active Organization’s Memory. The bytes are read back from the storage spine that wrote them rather than being re-uploaded from the browser. Each id is resolved against the CALLER’s own uploads, so an id belonging to someone else resolves to nothing. Per-attachment failures are reported in the response rather than failing the batch, because this runs alongside a chat message that must not be lost.',
+    })
+    @ApiResponse({ status: 200, description: '{ results: [{ attachmentId, status, uploadId? }] }' })
+    @ApiResponse({ status: 422, description: 'No active Organization on the request scope' })
+    async ingestAttachmentsIntoMemory(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() body: IngestAttachmentsDto,
+    ) {
+        const organizationId = this.scopeContext.getOrganizationId();
+        if (!organizationId) {
+            throw new UnprocessableEntityException({
+                status: 'error',
+                message: 'No active Organization — cannot ingest attachments into Memory',
+            });
+        }
+        await this.membership.ensureMember(organizationId, auth.userId);
+
+        const results: Array<{ attachmentId: string; status: string; uploadId?: string }> = [];
+        for (const attachmentId of body.attachmentIds) {
+            // Ownership is the lookup: `findOwnedByUser` scopes to the
+            // caller, so a hash belonging to another user simply is not
+            // found. No separate authorization check to forget.
+            const record = await this.userUploads.findOwnedByUser(attachmentId, auth.userId);
+            if (!record) {
+                results.push({ attachmentId, status: 'not_found' });
+                continue;
+            }
+
+            try {
+                // The stored object's basename is what `readFile` keys on;
+                // deriving it from `storagePath` rather than rebuilding
+                // `<sha>.<ext>` keeps this correct for every backend's own
+                // path shape.
+                const filename = record.storagePath.split('/').pop() ?? '';
+                const { buffer, mimeType } = await this.uploads.readFile(auth.userId, filename, {
+                    workId: record.workId ?? undefined,
+                });
+
+                const { upload } = await this.kb.createOrgUpload({
+                    organizationId,
+                    userId: auth.userId,
+                    file: {
+                        buffer,
+                        originalFilename: record.originalFilename ?? filename,
+                        mimeType: record.mimeType ?? mimeType,
+                        size: buffer.length,
+                    },
+                    autoClassify: true,
+                });
+                results.push({ attachmentId, status: 'ingested', uploadId: upload.id });
+            } catch (error) {
+                // Best-effort by design: this is triggered by sending a
+                // chat message, and a storage hiccup on one attachment
+                // must not fail the others or the message itself.
+                this.logger.warn(
+                    `Memory ingest failed for attachment ${attachmentId}: ${
+                        (error as Error).message
+                    }`,
+                );
+                results.push({ attachmentId, status: 'failed' });
+            }
+        }
+
+        return { results };
+    }
+
+    @Get('memory/uploads')
+    @ApiOperation({
+        summary: 'List global-Memory originals',
+        description:
+            'Paginated list of the uploaded source files backing the active Organization’s Memory, with their extraction status. Work-scoped uploads are excluded.',
+    })
+    @ApiQuery({ name: 'limit', required: false, type: Number })
+    @ApiQuery({ name: 'offset', required: false, type: Number })
+    @ApiResponse({ status: 200, description: '{ items, total }' })
+    async listMemoryUploads(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Query() query: ListMemoryUploadsDto,
+    ) {
+        const organizationId = this.scopeContext.getOrganizationId();
+        if (!organizationId) {
+            return { items: [], total: 0 };
+        }
+        await this.membership.ensureMember(organizationId, auth.userId);
+        return this.kb.listOrgUploads(organizationId, {
+            limit: query.limit ?? 50,
+            offset: query.offset ?? 0,
+        });
     }
 }

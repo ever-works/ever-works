@@ -26,10 +26,11 @@ export async function POST(_request: NextRequest, { params }: RouteContext) {
         headers.set('Authorization', `Bearer ${token}`);
     }
 
-    const upstream = await fetch(
-        `${API_URL}/works/${id}/kb/uploads/${uploadId}/retry-extraction`,
-        { method: 'POST', headers, cache: 'no-store' },
-    );
+    const upstream = await fetch(`${API_URL}/works/${id}/kb/uploads/${uploadId}/retry-extraction`, {
+        method: 'POST',
+        headers,
+        cache: 'no-store',
+    });
 
     const upstreamContentType = upstream.headers.get('content-type') ?? 'application/json';
     if (!upstream.ok) {

@@ -27,6 +27,7 @@ import { NotificationsModule } from './notifications/notifications.module';
 import { BudgetsModule } from './budgets/budgets.module';
 import { ScreenshotModule } from './plugins-capabilities/screenshot/screenshot.module';
 import { SearchModule } from './plugins-capabilities/search/search.module';
+import { TranscriptionModule } from './plugins-capabilities/transcription/transcription.module';
 import { PluginsModule } from './plugins/plugins.module';
 import { ComposioApiModule } from './plugins/composio/composio.module';
 import { ComposioTriggersModule } from './plugins/composio-triggers/composio-triggers.module';
@@ -126,6 +127,7 @@ import { DatabaseModule } from '@ever-works/agent/database';
         BudgetsModule,
         ScreenshotModule,
         SearchModule,
+        TranscriptionModule,
         AgentPluginsModule.forRootAsync({
             imports: [DatabaseModule],
             // EW-693 — wire dynamic-distribution config into the plugins

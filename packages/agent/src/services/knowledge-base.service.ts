@@ -2092,6 +2092,27 @@ export class KnowledgeBaseService {
         organizationId: string,
         userId: string,
         input: Omit<CreateDocumentInput, 'workId' | 'userId'>,
+        options: {
+            /**
+             * Permit a class outside `KB_ORG_INHERITABLE_CLASSES`.
+             *
+             * Only global-Memory uploads pass this. Memory is org-wide
+             * storage — a research PDF or a meeting transcript belongs
+             * there — but the inheritable set exists to answer a
+             * different question: "which org docs OVERLAY into every
+             * Work?". Those are two different concerns that happened to
+             * share one gate because org docs could previously only be
+             * created for overlay purposes.
+             *
+             * A doc admitted through this flag is inert with respect to
+             * Works: `resolveInheritableDocuments` hard-filters to
+             * `KB_ORG_INHERITABLE_CLASSES`, so it can never reach a
+             * Work's prompt context, and the overlay fanout below is
+             * likewise class-gated so it is never written into a Work's
+             * repo.
+             */
+            allowNonInheritableClass?: boolean;
+        } = {},
     ): Promise<KbDocumentBodyDto> {
         // Security: object-level authorization (caller's tenant must own
         // `organizationId`) is enforced at the controller layer via
@@ -2103,7 +2124,10 @@ export class KnowledgeBaseService {
         // `/api/organizations/:orgId/...` route bypasses the global scope
         // guards, so that explicit controller check is the authoritative
         // gate for this method.
-        if (!(KB_ORG_INHERITABLE_CLASSES as ReadonlyArray<KbDocumentClass>).includes(input.class)) {
+        const isInheritable = (
+            KB_ORG_INHERITABLE_CLASSES as ReadonlyArray<KbDocumentClass>
+        ).includes(input.class);
+        if (!isInheritable && !options.allowNonInheritableClass) {
             throw new BadRequestException(
                 `Organization-scoped KB documents must have class in [${KB_ORG_INHERITABLE_CLASSES.join(', ')}], got '${input.class}'`,
             );
@@ -2150,13 +2174,25 @@ export class KnowledgeBaseService {
         // is NOT used here — that path writes to `.content/kb/<path>`
         // (work-owned), which would collide with overlay precedence
         // semantics in spec §7.6.
-        await this.enqueueOrgOverlayFanout(
-            organizationId,
-            doc.id,
-            'upsert',
-            doc.path,
-            doc.kbDocumentClass,
-        );
+        //
+        // Gated on `isInheritable`, NOT on reaching this line. The fanout
+        // helper itself does no class filtering — it writes whatever it is
+        // handed into EVERY Work's data repo — and was safe only because
+        // the class check above used to reject everything else outright.
+        // Now that global-Memory uploads can legitimately create org docs
+        // of any class, an ungated call here would commit every file a
+        // user drops on the Memory page into every Work repository in the
+        // organization. Overlay membership is a property of the CLASS, so
+        // that is what decides.
+        if (isInheritable) {
+            await this.enqueueOrgOverlayFanout(
+                organizationId,
+                doc.id,
+                'upsert',
+                doc.path,
+                doc.kbDocumentClass,
+            );
+        }
 
         return this.toBodyDto(doc);
     }
@@ -2505,6 +2541,177 @@ export class KnowledgeBaseService {
      *     extractor routing (PDF/DOCX/HTML/etc.) lands in Phase 1B/c.
      *  7. Emit the activity-log kinds per spec §19.1.
      */
+    /**
+     * Upload an original into GLOBAL MEMORY (organization-scoped) rather
+     * than into one Work's KB.
+     *
+     * Why this is a sibling of `createUpload` and not a flag on it: that
+     * method is Work-coupled at every step — `ownershipService.ensureCanEdit`,
+     * per-Work sha256 dedup, and `extractAndMaterialize`, which threads
+     * `workId` through activity logging, the viewable-stub fallback and
+     * `createDocument`. Making all of that nullable would put the working
+     * Work-upload path at risk to save maybe sixty lines here. The
+     * expensive, genuinely shared parts — the buffer extractor and
+     * document materialization — ARE reused.
+     *
+     * Extraction failure does not fail the request, matching the Work
+     * path: the bytes are already durably in storage, so the row is marked
+     * FAILED and stays retryable rather than 500-ing and stranding them.
+     */
+    async createOrgUpload(input: {
+        organizationId: string;
+        userId: string;
+        file: { buffer: Buffer; originalFilename: string; mimeType: string; size: number };
+        targetClass?: KbDocumentClass;
+        tags?: string[];
+        description?: string | null;
+        title?: string;
+        autoClassify?: boolean;
+    }): Promise<{ upload: WorkKnowledgeUpload; document: KbDocumentBodyDto | null }> {
+        if (!this.storage) {
+            throw new ServiceUnavailableException(
+                'Memory uploads require a storage plugin — not configured in this deployment',
+            );
+        }
+
+        const sha256 = createHash('sha256').update(input.file.buffer).digest('hex');
+
+        const existing = await this.uploadRepository.findBySha256ForOrg(
+            input.organizationId,
+            sha256,
+        );
+        if (existing) {
+            return { upload: existing, document: null };
+        }
+
+        const fallbackClass = (input.targetClass ??
+            ('freeform' as KbDocumentClass)) as KbDocumentClass;
+        const storageKey = await this.persistUploadToStorage(
+            input.organizationId,
+            input.userId,
+            input.file,
+            sha256,
+            fallbackClass,
+        );
+
+        const upload = await this.uploadRepository.create({
+            // NULL `workId` IS what makes this row org-scoped. The
+            // `organizationId` beside it is written by the scope-stamping
+            // subscriber for tenancy and is present on Work rows too, so
+            // it cannot carry that meaning on its own.
+            workId: null,
+            organizationId: input.organizationId,
+            storageProvider: this.storage.providerName,
+            storagePath: storageKey,
+            originalFilename: input.file.originalFilename,
+            mimeType: input.file.mimeType,
+            fileSize: input.file.size,
+            sha256,
+            extractionStatus: KbUploadExtractionStatus.RUNNING,
+            extractionStartedAt: new Date(),
+            uploadedById: input.userId,
+            tags: input.tags ?? null,
+        });
+
+        // No `recordUploadActivity` here: the activity log is keyed on a
+        // Work (`workId` is non-null in its schema) and there is no
+        // org-level activity stream yet. Inventing one as a side quest of
+        // an upload endpoint would be the wrong place to decide its shape.
+
+        let body: string | null = null;
+        let extractedVia: string | null = null;
+        if (this.bufferExtractor) {
+            try {
+                const extracted = await this.bufferExtractor.extract(
+                    input.file.buffer,
+                    input.file.mimeType,
+                );
+                if (extracted) {
+                    body = extracted.markdown;
+                    extractedVia = extracted.via;
+                }
+            } catch (error) {
+                const reason = sanitizeDescription((error as Error).message, 500);
+                this.logger.warn(
+                    `Memory extractor threw for upload=${upload.id} mime=${input.file.mimeType}: ${reason}`,
+                );
+                await this.uploadRepository.update(upload.id, {
+                    extractionStatus: KbUploadExtractionStatus.FAILED,
+                    extractionFinishedAt: new Date(),
+                    extractionError: reason,
+                });
+                const failed = await this.uploadRepository.findByIdForOrg(
+                    input.organizationId,
+                    upload.id,
+                );
+                return { upload: failed ?? upload, document: null };
+            }
+        }
+
+        if (body === null) {
+            body = this.bodyForTextMimeType(input.file.buffer, input.file.mimeType);
+            if (body !== null) extractedVia = 'text-passthrough-fallback';
+        }
+
+        if (body === null) {
+            await this.uploadRepository.update(upload.id, {
+                extractionStatus: KbUploadExtractionStatus.SKIPPED,
+                extractionFinishedAt: new Date(),
+                extractionError: `No extractor route for ${input.file.mimeType}`,
+            });
+            const skipped = await this.uploadRepository.findByIdForOrg(
+                input.organizationId,
+                upload.id,
+            );
+            return { upload: skipped ?? upload, document: null };
+        }
+
+        const klass = input.autoClassify
+            ? await this.classifyFromBody(body, fallbackClass, { userId: input.userId })
+            : fallbackClass;
+
+        const title = input.title ?? input.file.originalFilename.replace(/\.[^.]+$/, '');
+        const doc = await this.createOrgDocument(
+            input.organizationId,
+            input.userId,
+            {
+                path: `memory/${sha256.slice(0, 12)}-${this.slugFromFilename(
+                    input.file.originalFilename,
+                )}.md`,
+                title,
+                description: input.description ?? null,
+                class: klass,
+                tags: input.tags ?? null,
+                body,
+                source: 'user' as KbDocumentSource,
+            },
+            // Memory holds anything the org uploads; the inheritable-class
+            // gate governs Work overlays, which this deliberately is not.
+            { allowNonInheritableClass: true },
+        );
+
+        await this.uploadRepository.update(upload.id, {
+            extractionStatus: KbUploadExtractionStatus.SUCCEEDED,
+            extractionFinishedAt: new Date(),
+            extractionPluginId: extractedVia,
+            extractedDocumentId: doc.id,
+        });
+
+        const refreshed = await this.uploadRepository.findByIdForOrg(
+            input.organizationId,
+            upload.id,
+        );
+        return { upload: refreshed ?? upload, document: doc };
+    }
+
+    /** Org-scoped originals list backing the Memory page's Originals tab. */
+    async listOrgUploads(
+        organizationId: string,
+        opts: { status?: KbUploadExtractionStatus; limit?: number; offset?: number } = {},
+    ): Promise<{ items: WorkKnowledgeUpload[]; total: number }> {
+        return this.uploadRepository.listPagedForOrg({ organizationId, ...opts });
+    }
+
     async createUpload(input: {
         workId: string;
         userId: string;
@@ -2670,7 +2877,14 @@ export class KnowledgeBaseService {
      * here — the platform owns the convention, not the plugin.
      */
     private async persistUploadToStorage(
-        workId: string,
+        // Named for what it IS rather than where it came from: this value
+        // only ever becomes the storage `ownerId` path segment. Work
+        // uploads pass a workId, global-Memory uploads pass an
+        // organizationId, and both are correct — org originals simply
+        // land under their own `<prefix>/<organizationId>/` namespace.
+        // (Repo resolution in `github-storage` data-repo mode keys off a
+        // separate `workId` field, which this call site does not set.)
+        ownerId: string,
         userId: string,
         file: { buffer: Buffer; originalFilename: string; mimeType: string; size: number },
         sha256: string,
@@ -2686,7 +2900,7 @@ export class KnowledgeBaseService {
             filename: `kb-originals/${klass}/${filename}`,
             mimeType: file.mimeType,
             size: file.size,
-            ownerId: workId,
+            ownerId,
         });
         return key;
     }
@@ -2965,7 +3179,10 @@ export class KnowledgeBaseService {
     private async classifyFromBody(
         body: string,
         fallback: KbDocumentClass,
-        scope: { userId: string; workId: string },
+        // `workId` is absent for global-Memory uploads — it only rides
+        // along as AI-facade context and log detail, so it is optional
+        // rather than a reason to duplicate this classifier.
+        scope: { userId: string; workId?: string },
     ): Promise<KbDocumentClass> {
         if (!this.aiFacade) {
             return fallback;

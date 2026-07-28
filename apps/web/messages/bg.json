@@ -822,7 +822,23 @@
                 "noResults": "Няма документи, съответстващи на вашето търсене и филтри."
             },
             "orgScoped": "Организация",
-            "openInWork": "Отвори в Работа"
+            "openInWork": "Отвори в Работа",
+            "uploads": {
+                "action": "Качване на файлове",
+                "dropHint": "Пуснете файловете тук",
+                "empty": "Все още няма файлове в Паметта.",
+                "failed": "Неуспешно качване",
+                "noOrg": "Изберете организация преди качване.",
+                "retry": "Опитайте отново",
+                "statusFailed": "Неуспешно извличане",
+                "statusPending": "Изчаква",
+                "statusRunning": "Извличане…",
+                "statusSkipped": "Няма извлечен текст",
+                "statusSucceeded": "Извлечен",
+                "subtitle": "Файлове, качени в Паметта. Текстът им се извлича за агентите.",
+                "title": "Оригинали",
+                "uploading": "Качване…"
+            }
         },
         "agentsPage": {
             "title": "Агенти",
@@ -5968,6 +5984,11 @@
                 "remove": "Remove attachment",
                 "tooLarge": "File is larger than the 25 MB limit",
                 "failed": "Upload failed"
+            },
+            "dictation": {
+                "start": "Диктуване",
+                "stop": "Спри записа",
+                "transcribing": "Транскрибиране…"
             }
         },
         "plugins": {

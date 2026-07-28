@@ -72,8 +72,14 @@ const securityHeaders = [
     { key: 'X-Frame-Options', value: 'DENY' },
     { key: 'Referrer-Policy', value: 'strict-origin-when-cross-origin' },
     {
+        // `microphone=(self)`, not `()`: voice dictation in chat calls
+        // `getUserMedia`, and a bare `()` denies it to our own origin as
+        // well as to embeds — the control would be dead on arrival with
+        // no console error the user could act on. `(self)` is the
+        // narrowest value that permits it: same-origin only, still denied
+        // to every iframe. Camera and geolocation stay fully denied.
         key: 'Permissions-Policy',
-        value: 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
+        value: 'camera=(), microphone=(self), geolocation=(), interest-cohort=()',
     },
     // HSTS: 6 months + subdomains. preload requires submission to
     // https://hstspreload.org/ — leave that opt-in.

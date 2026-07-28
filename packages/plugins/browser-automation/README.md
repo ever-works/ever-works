@@ -18,8 +18,8 @@ Headless browser automation for Ever Works — navigate, extract, screenshot and
 
 Drives a headless Chromium and exposes exactly four verbs through the `browser-automation` capability:
 
-| Verb         | Purpose                                                                              |
-| ------------ | ------------------------------------------------------------------------------------ |
+| Verb         | Purpose                                                                                |
+| ------------ | -------------------------------------------------------------------------------------- |
 | `navigate`   | Go to a URL; returns the final URL, HTTP status, title and the **full redirect chain** |
 | `extract`    | Pull `text` / `html` / `attribute` values out of the rendered DOM by CSS selector      |
 | `screenshot` | Capture the viewport, the full page, or one element as base64 PNG/JPEG                 |
@@ -34,7 +34,7 @@ A headless browser reachable from server-side code is an SSRF engine with a Java
 - **Headless by default.** Only an explicit `headless: false` in settings produces a headed browser.
 - **Default-deny allowlist.** An empty `allowedHosts` refuses **every** navigation. There is no implicit "allow anything" path.
 - **Redirects are re-checked on every hop.** A Playwright route guard aborts any document request outside the allowlist, and a post-navigation audit walks the `redirectedFrom()` chain — a hop that somehow got through still fails the call rather than returning attacker-controlled content. The final landing URL is verified too, including after an `act()` step navigates.
-- **SSRF guard underneath the allowlist.** Private, loopback, link-local, CGNAT and cloud-metadata targets (including `169.254.169.254` and its DNS aliases) are refused on both the literal URL and the DNS resolution, so an allowlisted hostname that *resolves* to `127.0.0.1` is refused (DNS-rebinding defence).
+- **SSRF guard underneath the allowlist.** Private, loopback, link-local, CGNAT and cloud-metadata targets (including `169.254.169.254` and its DNS aliases) are refused on both the literal URL and the DNS resolution, so an allowlisted hostname that _resolves_ to `127.0.0.1` is refused (DNS-rebinding defence).
 - **Fail closed.** An unresolvable host, an unparseable resolved address, and a URL carrying embedded `user:password@` credentials are all refusals — never optimistic retries.
 - **Configurable timeout** applied to navigation and to every action, clamped to 1 000–120 000 ms.
 
@@ -42,12 +42,12 @@ Every refusal throws `BrowserNavigationBlockedError` with a stable `code`: `inva
 
 ## Allowlist syntax
 
-| Pattern             | Matches                                                                  |
-| ------------------- | ------------------------------------------------------------------------ |
-| `example.com`       | that host exactly (**not** its subdomains), on any port                  |
-| `*.example.com`     | any subdomain (`a.example.com`, `a.b.example.com`) but **not** the apex  |
-| `example.com:8443`  | that host, only on port 8443                                             |
-| `*`                 | any **public** host — private/internal targets stay blocked              |
+| Pattern            | Matches                                                                 |
+| ------------------ | ----------------------------------------------------------------------- |
+| `example.com`      | that host exactly (**not** its subdomains), on any port                 |
+| `*.example.com`    | any subdomain (`a.example.com`, `a.b.example.com`) but **not** the apex |
+| `example.com:8443` | that host, only on port 8443                                            |
+| `*`                | any **public** host — private/internal targets stay blocked             |
 
 Anything else (a scheme, a path, an `@`, an embedded wildcard) is rejected as a configuration error rather than interpreted loosely.
 
@@ -67,14 +67,14 @@ Anything else (a scheme, a path, an `@`, an embedded wildcard) is rejected as a 
 
 ## Troubleshooting
 
-| Symptom                                                   | Likely cause                                              | Fix                                                                             |
-| --------------------------------------------------------- | --------------------------------------------------------- | ------------------------------------------------------------------------------- |
-| `BrowserNavigationBlockedError` with `not_allowlisted`    | The host (or a redirect hop) is not in `allowedHosts`     | Add the host — including any host the site redirects through                     |
-| `BrowserNavigationBlockedError` with `private_address`    | Target is loopback/private/link-local/cloud-metadata      | Intentional. Use `allowPrivateNetwork` with an explicit host list if you must    |
-| `BrowserNavigationBlockedError` with `dns_private_ip`     | An allowlisted name resolves to an internal address       | Intentional (rebinding defence). Verify the DNS record                          |
-| `BrowserAutomationNotProvisionedError` at `open()`        | `playwright-core` or the Chromium binary is missing       | Install `playwright-core` and a Chromium build, or set `executablePath`         |
-| Screenshot renders without styling                        | Assets were blocked by `subresourcePolicy: 'allowlist'`   | Switch to `public-only`, or allowlist the asset hosts                           |
-| Timeouts on slow pages                                    | 30 s default budget                                       | Raise `timeoutMs` (max 120 000)                                                 |
+| Symptom                                                | Likely cause                                            | Fix                                                                           |
+| ------------------------------------------------------ | ------------------------------------------------------- | ----------------------------------------------------------------------------- |
+| `BrowserNavigationBlockedError` with `not_allowlisted` | The host (or a redirect hop) is not in `allowedHosts`   | Add the host — including any host the site redirects through                  |
+| `BrowserNavigationBlockedError` with `private_address` | Target is loopback/private/link-local/cloud-metadata    | Intentional. Use `allowPrivateNetwork` with an explicit host list if you must |
+| `BrowserNavigationBlockedError` with `dns_private_ip`  | An allowlisted name resolves to an internal address     | Intentional (rebinding defence). Verify the DNS record                        |
+| `BrowserAutomationNotProvisionedError` at `open()`     | `playwright-core` or the Chromium binary is missing     | Install `playwright-core` and a Chromium build, or set `executablePath`       |
+| Screenshot renders without styling                     | Assets were blocked by `subresourcePolicy: 'allowlist'` | Switch to `public-only`, or allowlist the asset hosts                         |
+| Timeouts on slow pages                                 | 30 s default budget                                     | Raise `timeoutMs` (max 120 000)                                               |
 
 ## Local development
 
