@@ -791,7 +791,23 @@
                 "noResults": "Żadne dokumenty nie pasują do Twojego wyszukiwania i filtrów."
             },
             "orgScoped": "Organizacja",
-            "openInWork": "Otwórz w Pracy"
+            "openInWork": "Otwórz w Pracy",
+            "uploads": {
+                "action": "Prześlij pliki",
+                "dropHint": "Upuść pliki, aby je przesłać",
+                "empty": "Brak plików w Pamięci.",
+                "failed": "Przesyłanie nie powiodło się",
+                "noOrg": "Wybierz organizację przed przesłaniem.",
+                "retry": "Ponów",
+                "statusFailed": "Błąd wyodrębniania",
+                "statusPending": "Oczekuje",
+                "statusRunning": "Wyodrębnianie…",
+                "statusSkipped": "Nie wyodrębniono tekstu",
+                "statusSucceeded": "Wyodrębniono",
+                "subtitle": "Pliki przesłane do Pamięci. Ich tekst jest wyodrębniany dla agentów.",
+                "title": "Oryginały",
+                "uploading": "Przesyłanie…"
+            }
         },
         "agentsPage": {
             "title": "Agenci",

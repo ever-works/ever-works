@@ -874,7 +874,23 @@
                 "noResults": "No documents match your search and filters."
             },
             "orgScoped": "Organization",
-            "openInWork": "Open in Work"
+            "openInWork": "Open in Work",
+            "uploads": {
+                "action": "Upload files",
+                "dropHint": "Drop files to upload",
+                "empty": "No files uploaded to Memory yet.",
+                "failed": "Upload failed",
+                "noOrg": "Select an Organization before uploading.",
+                "retry": "Retry",
+                "statusFailed": "Extraction failed",
+                "statusPending": "Pending",
+                "statusRunning": "Extracting…",
+                "statusSkipped": "No text extracted",
+                "statusSucceeded": "Extracted",
+                "subtitle": "Files uploaded to Memory. Their text is extracted so agents can use it.",
+                "title": "Originals",
+                "uploading": "Uploading…"
+            }
         },
         "agentsPage": {
             "title": "Agents",

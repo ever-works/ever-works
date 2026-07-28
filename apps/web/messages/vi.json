@@ -791,7 +791,23 @@
                 "noResults": "Không có tài liệu nào khớp với tìm kiếm và bộ lọc của bạn."
             },
             "orgScoped": "Tổ chức",
-            "openInWork": "Mở trong Công việc"
+            "openInWork": "Mở trong Công việc",
+            "uploads": {
+                "action": "Tải tệp lên",
+                "dropHint": "Thả tệp vào đây để tải lên",
+                "empty": "Chưa có tệp nào trong Bộ nhớ.",
+                "failed": "Tải lên thất bại",
+                "noOrg": "Chọn một tổ chức trước khi tải lên.",
+                "retry": "Thử lại",
+                "statusFailed": "Trích xuất thất bại",
+                "statusPending": "Đang chờ",
+                "statusRunning": "Đang trích xuất…",
+                "statusSkipped": "Không trích xuất được văn bản",
+                "statusSucceeded": "Đã trích xuất",
+                "subtitle": "Tệp đã tải lên Bộ nhớ. Văn bản được trích xuất cho tác nhân.",
+                "title": "Bản gốc",
+                "uploading": "Đang tải lên…"
+            }
         },
         "agentsPage": {
             "title": "Agents",

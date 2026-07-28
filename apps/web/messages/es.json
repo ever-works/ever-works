@@ -822,7 +822,23 @@
                 "noResults": "Ningún documento coincide con tu búsqueda y filtros."
             },
             "orgScoped": "Organización",
-            "openInWork": "Abrir en el Trabajo"
+            "openInWork": "Abrir en el Trabajo",
+            "uploads": {
+                "action": "Subir archivos",
+                "dropHint": "Suelta los archivos para subirlos",
+                "empty": "Aún no hay archivos en la Memoria.",
+                "failed": "Error al subir",
+                "noOrg": "Selecciona una organización antes de subir.",
+                "retry": "Reintentar",
+                "statusFailed": "Error de extracción",
+                "statusPending": "Pendiente",
+                "statusRunning": "Extrayendo…",
+                "statusSkipped": "Sin texto extraído",
+                "statusSucceeded": "Extraído",
+                "subtitle": "Archivos subidos a la Memoria. Su texto se extrae para los agentes.",
+                "title": "Originales",
+                "uploading": "Subiendo…"
+            }
         },
         "agentsPage": {
             "title": "Agentes",

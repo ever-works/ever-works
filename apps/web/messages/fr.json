@@ -822,7 +822,23 @@
                 "noResults": "Aucun document ne correspond à votre recherche et à vos filtres."
             },
             "orgScoped": "Organisation",
-            "openInWork": "Ouvrir dans le Travail"
+            "openInWork": "Ouvrir dans le Travail",
+            "uploads": {
+                "action": "Téléverser des fichiers",
+                "dropHint": "Déposez les fichiers à téléverser",
+                "empty": "Aucun fichier dans la Mémoire.",
+                "failed": "Échec du téléversement",
+                "noOrg": "Sélectionnez une organisation avant de téléverser.",
+                "retry": "Réessayer",
+                "statusFailed": "Échec de l’extraction",
+                "statusPending": "En attente",
+                "statusRunning": "Extraction…",
+                "statusSkipped": "Aucun texte extrait",
+                "statusSucceeded": "Extrait",
+                "subtitle": "Fichiers téléversés dans la Mémoire. Leur texte est extrait pour les agents.",
+                "title": "Originaux",
+                "uploading": "Téléversement…"
+            }
         },
         "agentsPage": {
             "title": "Agents",

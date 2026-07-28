@@ -1,4 +1,5 @@
 import {
+    BadRequestException,
     Body,
     Controller,
     Get,
@@ -6,11 +7,24 @@ import {
     HttpStatus,
     Post,
     Query,
+    UnprocessableEntityException,
+    UploadedFile,
     UseGuards,
+    UseInterceptors,
 } from '@nestjs/common';
-import { ApiBearerAuth, ApiOperation, ApiQuery, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import {
+    ApiBearerAuth,
+    ApiBody,
+    ApiConsumes,
+    ApiOperation,
+    ApiQuery,
+    ApiResponse,
+    ApiTags,
+} from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { Transform } from 'class-transformer';
+import { Transform, Type } from 'class-transformer';
+import { CreateKbUploadDto } from '@ever-works/agent/dto';
 import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
 import {
     KnowledgeBaseService,
@@ -139,6 +153,29 @@ export class MemoryConsolidateDto {
     @IsOptional()
     @IsBoolean()
     apply?: boolean;
+}
+
+/**
+ * Same cap, same env var, as the per-Work KB upload route — Memory is a
+ * different destination for the same bytes, so a file that is acceptable
+ * to one and rejected by the other would be arbitrary.
+ */
+const MEMORY_UPLOAD_MAX_BYTES = Number(process.env.KB_UPLOAD_MAX_BYTES) || 200 * 1024 * 1024;
+
+/** Query for `GET /api/memory/uploads`. */
+export class ListMemoryUploadsDto {
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(1)
+    @Max(200)
+    limit?: number;
+
+    @IsOptional()
+    @Type(() => Number)
+    @IsInt()
+    @Min(0)
+    offset?: number;
 }
 
 /**
@@ -316,5 +353,105 @@ export class OrgMemoryController {
             { organizationId, userId: auth.userId },
             { apply },
         );
+    }
+
+    @Post('memory/uploads')
+    @HttpCode(HttpStatus.CREATED)
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
+    @UseInterceptors(FileInterceptor('file', { limits: { fileSize: MEMORY_UPLOAD_MAX_BYTES } }))
+    @ApiConsumes('multipart/form-data')
+    @ApiOperation({
+        summary: 'Upload a file into global Memory',
+        description:
+            'Multipart upload of a file into the active Organization’s global Memory, rather than into a single Work’s Knowledge Base. The server computes SHA-256, dedups against existing Memory originals, persists the bytes via the configured storage plugin, extracts the text to markdown where an extractor route exists, and materializes an organization-scoped document. The Organization comes from the request scope context, not a param.',
+    })
+    @ApiBody({
+        schema: {
+            type: 'object',
+            required: ['file'],
+            properties: {
+                file: { type: 'string', format: 'binary' },
+                targetClass: { type: 'string' },
+                title: { type: 'string' },
+                description: { type: 'string' },
+                tags: { type: 'array', items: { type: 'string' } },
+                autoClassify: { type: 'boolean' },
+            },
+        },
+    })
+    @ApiResponse({ status: 201, description: 'Upload accepted; returns the upload row + document' })
+    @ApiResponse({ status: 400, description: 'Missing file or invalid metadata' })
+    @ApiResponse({ status: 422, description: 'No active Organization on the request scope' })
+    @ApiResponse({ status: 503, description: 'Storage plugin not configured' })
+    async createMemoryUpload(
+        @CurrentUser() auth: AuthenticatedUser,
+        @UploadedFile() file: Express.Multer.File | undefined,
+        @Body() body: CreateKbUploadDto,
+    ) {
+        if (!file) {
+            throw new BadRequestException({
+                status: 'error',
+                message: "Multipart field 'file' is required",
+            });
+        }
+
+        const organizationId = this.scopeContext.getOrganizationId();
+        if (!organizationId) {
+            // Deliberately NOT the empty-payload treatment the read paths
+            // give this case. A read with no active Organization has an
+            // honest answer ("nothing"); a write does not — silently
+            // accepting bytes that belong to no Organization would report
+            // success for a file the user could never retrieve.
+            throw new UnprocessableEntityException({
+                status: 'error',
+                message: 'No active Organization — select one before uploading to Memory',
+            });
+        }
+
+        await this.membership.ensureMember(organizationId, auth.userId);
+
+        return this.kb.createOrgUpload({
+            organizationId,
+            userId: auth.userId,
+            file: {
+                buffer: file.buffer,
+                originalFilename: file.originalname,
+                mimeType: file.mimetype,
+                size: file.size,
+            },
+            // Same cast the per-Work upload route makes: the DTO types
+            // this against the contracts' KbDocumentClass while the
+            // service signature uses the entities' one. Identical unions,
+            // two declarations.
+            targetClass: body.targetClass as KbDocumentClass | undefined,
+            title: body.title,
+            description: body.description ?? null,
+            tags: body.tags,
+            autoClassify: body.autoClassify,
+        });
+    }
+
+    @Get('memory/uploads')
+    @ApiOperation({
+        summary: 'List global-Memory originals',
+        description:
+            'Paginated list of the uploaded source files backing the active Organization’s Memory, with their extraction status. Work-scoped uploads are excluded.',
+    })
+    @ApiQuery({ name: 'limit', required: false, type: Number })
+    @ApiQuery({ name: 'offset', required: false, type: Number })
+    @ApiResponse({ status: 200, description: '{ items, total }' })
+    async listMemoryUploads(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Query() query: ListMemoryUploadsDto,
+    ) {
+        const organizationId = this.scopeContext.getOrganizationId();
+        if (!organizationId) {
+            return { items: [], total: 0 };
+        }
+        await this.membership.ensureMember(organizationId, auth.userId);
+        return this.kb.listOrgUploads(organizationId, {
+            limit: query.limit ?? 50,
+            offset: query.offset ?? 0,
+        });
     }
 }

@@ -791,7 +791,23 @@
                 "noResults": "没有与您的搜索和筛选条件匹配的文档。"
             },
             "orgScoped": "组织",
-            "openInWork": "在作品中打开"
+            "openInWork": "在作品中打开",
+            "uploads": {
+                "action": "上传文件",
+                "dropHint": "将文件拖放到此处",
+                "empty": "记忆中还没有文件。",
+                "failed": "上传失败",
+                "noOrg": "上传前请先选择组织。",
+                "retry": "重试",
+                "statusFailed": "提取失败",
+                "statusPending": "等待中",
+                "statusRunning": "提取中…",
+                "statusSkipped": "未提取到文本",
+                "statusSucceeded": "已提取",
+                "subtitle": "上传到记忆的文件。系统会提取其文本供智能体使用。",
+                "title": "原件",
+                "uploading": "上传中…"
+            }
         },
         "agentsPage": {
             "title": "代理",

@@ -822,7 +822,23 @@
                 "noResults": "Keine Dokumente entsprechen Ihrer Suche und Ihren Filtern."
             },
             "orgScoped": "Organisation",
-            "openInWork": "Im Werk öffnen"
+            "openInWork": "Im Werk öffnen",
+            "uploads": {
+                "action": "Dateien hochladen",
+                "dropHint": "Dateien zum Hochladen ablegen",
+                "empty": "Noch keine Dateien im Speicher.",
+                "failed": "Upload fehlgeschlagen",
+                "noOrg": "Wählen Sie vor dem Hochladen eine Organisation aus.",
+                "retry": "Erneut versuchen",
+                "statusFailed": "Extraktion fehlgeschlagen",
+                "statusPending": "Ausstehend",
+                "statusRunning": "Wird extrahiert…",
+                "statusSkipped": "Kein Text extrahiert",
+                "statusSucceeded": "Extrahiert",
+                "subtitle": "In den Speicher hochgeladene Dateien. Ihr Text wird für Agenten extrahiert.",
+                "title": "Originale",
+                "uploading": "Wird hochgeladen…"
+            }
         },
         "agentsPage": {
             "title": "Agenten",

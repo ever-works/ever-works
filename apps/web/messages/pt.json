@@ -791,7 +791,23 @@
                 "noResults": "Nenhum documento corresponde à sua pesquisa e filtros."
             },
             "orgScoped": "Organização",
-            "openInWork": "Abrir no Trabalho"
+            "openInWork": "Abrir no Trabalho",
+            "uploads": {
+                "action": "Carregar ficheiros",
+                "dropHint": "Largue os ficheiros para carregar",
+                "empty": "Ainda não há ficheiros na Memória.",
+                "failed": "Falha no carregamento",
+                "noOrg": "Selecione uma organização antes de carregar.",
+                "retry": "Tentar novamente",
+                "statusFailed": "Falha na extração",
+                "statusPending": "Pendente",
+                "statusRunning": "A extrair…",
+                "statusSkipped": "Nenhum texto extraído",
+                "statusSucceeded": "Extraído",
+                "subtitle": "Ficheiros carregados na Memória. O texto é extraído para os agentes.",
+                "title": "Originais",
+                "uploading": "A carregar…"
+            }
         },
         "agentsPage": {
             "title": "Agentes",
