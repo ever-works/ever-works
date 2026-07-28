@@ -1,0 +1,104 @@
+{
+	"name": "@ever-works/mastodon-connector-plugin",
+	"version": "1.0.0",
+	"description": "Mastodon social connector plugin for Ever Works platform (outbound statuses via the masto SDK, and event-source pull of mentions/notifications plus the account's own statuses into the event-ingest pipeline, with opt-in historical backfill)",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"private": false,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"clean": "rm -rf dist",
+		"type-check": "tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	},
+	"dependencies": {
+		"@ever-works/contracts": "workspace:*",
+		"@ever-works/plugin": "workspace:*",
+		"masto": "^7.12.0"
+	},
+	"devDependencies": {
+		"@types/node": "^22.0.0",
+		"tsup": "^8.0.0",
+		"typescript": "^5.9.3",
+		"vitest": "^4.1.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "mastodon-connector",
+			"name": "Mastodon Connector",
+			"version": "1.0.0",
+			"category": "connector",
+			"capabilities": [
+				"connector",
+				"connector-mastodon",
+				"event-source"
+			],
+			"description": "Mastodon social connector. Outbound publishes statuses and threaded replies via the masto SDK against the operator's own instance (SSRF-guarded instance URL). Event-source pull ingests mention notifications and the connected account's own statuses since the last watermark into the platform event-ingest pipeline, with opt-in historical backfill (backfillDays, max 90).",
+			"systemPlugin": false,
+			"builtIn": true,
+			"isDefault": false,
+			"autoEnable": false,
+			"settings": {
+				"type": "object",
+				"required": [
+					"instanceUrl",
+					"accessToken"
+				],
+				"properties": {
+					"instanceUrl": {
+						"type": "string",
+						"title": "Mastodon instance URL (e.g. https://mastodon.social)"
+					},
+					"accessToken": {
+						"type": "string",
+						"title": "Mastodon application access token",
+						"x-secret": true,
+						"x-envVar": "MASTODON_ACCESS_TOKEN"
+					},
+					"defaultVisibility": {
+						"type": "string",
+						"title": "Visibility applied to outbound statuses",
+						"default": "public",
+						"enum": [
+							"public",
+							"unlisted",
+							"private",
+							"direct"
+						]
+					},
+					"backfillDays": {
+						"type": "number",
+						"title": "Historical backfill window in days on first pull (0 = off, max 90)",
+						"default": 0,
+						"minimum": 0,
+						"maximum": 90
+					}
+				}
+			}
+		}
+	},
+	"publishConfig": {
+		"access": "restricted",
+		"registry": "https://registry.npmjs.org"
+	}
+}

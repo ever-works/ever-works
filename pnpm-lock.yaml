@@ -1524,6 +1524,31 @@ importers:
         specifier: ^4.1.0
         version: 4.1.0(@opentelemetry/api@1.9.0)(@types/node@22.19.11)(jsdom@29.1.1(@noble/hashes@2.2.0))(msw@2.12.10(@types/node@22.19.11)(typescript@5.9.3))(vite@8.0.16(@types/node@22.19.11)(esbuild@0.28.1)(jiti@2.6.1)(terser@5.46.1)(yaml@2.8.3))
 
+  packages/plugins/bluesky-connector:
+    dependencies:
+      '@atproto/api':
+        specifier: ^0.20.34
+        version: 0.20.34
+      '@ever-works/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+      '@ever-works/plugin':
+        specifier: workspace:*
+        version: link:../../plugin
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.11
+      tsup:
+        specifier: ^8.0.0
+        version: 8.5.1(@swc/core@1.15.33(@swc/helpers@0.5.21))(jiti@2.6.1)(postcss@8.5.20)(typescript@5.9.3)(yaml@2.8.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.0
+        version: 4.1.0(@opentelemetry/api@1.9.0)(@types/node@22.19.11)(jsdom@29.1.1(@noble/hashes@2.2.0))(msw@2.12.10(@types/node@22.19.11)(typescript@5.9.3))(vite@8.0.16(@types/node@22.19.11)(esbuild@0.28.1)(jiti@2.6.1)(terser@5.46.1)(yaml@2.8.3))
+
   packages/plugins/brave:
     devDependencies:
       '@ever-works/plugin':
@@ -2088,6 +2113,31 @@ importers:
         specifier: ^4.1.0
         version: 4.1.0(@opentelemetry/api@1.9.0)(@types/node@22.19.11)(jsdom@29.1.1(@noble/hashes@2.2.0))(msw@2.12.10(@types/node@22.19.11)(typescript@5.9.3))(vite@8.0.16(@types/node@22.19.11)(esbuild@0.28.1)(jiti@2.6.1)(terser@5.46.1)(yaml@2.8.3))
 
+  packages/plugins/hubspot-connector:
+    dependencies:
+      '@ever-works/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+      '@ever-works/plugin':
+        specifier: workspace:*
+        version: link:../../plugin
+      '@hubspot/api-client':
+        specifier: ^14.0.1
+        version: 14.0.1
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.11
+      tsup:
+        specifier: ^8.0.0
+        version: 8.5.1(@swc/core@1.15.33(@swc/helpers@0.5.21))(jiti@2.6.1)(postcss@8.5.20)(typescript@5.9.3)(yaml@2.8.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.0
+        version: 4.1.0(@opentelemetry/api@1.9.0)(@types/node@22.19.11)(jsdom@29.1.1(@noble/hashes@2.2.0))(msw@2.12.10(@types/node@22.19.11)(typescript@5.9.3))(vite@8.0.16(@types/node@22.19.11)(esbuild@0.28.1)(jiti@2.6.1)(terser@5.46.1)(yaml@2.8.3))
+
   packages/plugins/jina:
     devDependencies:
       '@ever-works/plugin':
@@ -2513,6 +2563,31 @@ importers:
         specifier: ^4.1.0
         version: 4.1.0(@opentelemetry/api@1.9.0)(@types/node@22.19.11)(jsdom@29.1.1(@noble/hashes@2.2.0))(msw@2.12.10(@types/node@22.19.11)(typescript@5.9.3))(vite@8.0.16(@types/node@22.19.11)(esbuild@0.28.1)(jiti@2.6.1)(terser@5.46.1)(yaml@2.8.3))
 
+  packages/plugins/mastodon-connector:
+    dependencies:
+      '@ever-works/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+      '@ever-works/plugin':
+        specifier: workspace:*
+        version: link:../../plugin
+      masto:
+        specifier: ^7.12.0
+        version: 7.12.0
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.11
+      tsup:
+        specifier: ^8.0.0
+        version: 8.5.1(@swc/core@1.15.33(@swc/helpers@0.5.21))(jiti@2.6.1)(postcss@8.5.20)(typescript@5.9.3)(yaml@2.8.3)
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.0
+        version: 4.1.0(@opentelemetry/api@1.9.0)(@types/node@22.19.11)(jsdom@29.1.1(@noble/hashes@2.2.0))(msw@2.12.10(@types/node@22.19.11)(typescript@5.9.3))(vite@8.0.16(@types/node@22.19.11)(esbuild@0.28.1)(jiti@2.6.1)(terser@5.46.1)(yaml@2.8.3))
+
   packages/plugins/memory-pipeline-modifier:
     devDependencies:
       '@ever-works/plugin':
@@ -2843,6 +2918,31 @@ importers:
       typeorm:
         specifier: 0.3.29
         version: 0.3.29(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.17.1)(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3))
+      typescript:
+        specifier: ^5.9.3
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.0
+        version: 4.1.0(@opentelemetry/api@1.9.0)(@types/node@22.19.11)(jsdom@29.1.1(@noble/hashes@2.2.0))(msw@2.12.10(@types/node@22.19.11)(typescript@5.9.3))(vite@8.0.16(@types/node@22.19.11)(esbuild@0.28.1)(jiti@2.6.1)(terser@5.46.1)(yaml@2.8.3))
+
+  packages/plugins/pipedrive-connector:
+    dependencies:
+      '@ever-works/contracts':
+        specifier: workspace:*
+        version: link:../../contracts
+      '@ever-works/plugin':
+        specifier: workspace:*
+        version: link:../../plugin
+      pipedrive:
+        specifier: ^33.5.0
+        version: 33.5.0
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.11
+      tsup:
+        specifier: ^8.0.0
+        version: 8.5.1(@swc/core@1.15.33(@swc/helpers@0.5.21))(jiti@2.6.1)(postcss@8.5.20)(typescript@5.9.3)(yaml@2.8.3)
       typescript:
         specifier: ^5.9.3
         version: 5.9.3
@@ -3861,6 +3961,34 @@ packages:
 
   '@asamuzakjp/nwsapi@2.3.9':
     resolution: {integrity: sha512-n8GuYSrI9bF7FFZ/SjhwevlHc8xaVlb/7HmHelnc/PZXBD2ZR49NnN9sMMuDdEGPeeRQ5d0hqlSlEpgCX3Wl0Q==}
+
+  '@atproto/api@0.20.34':
+    resolution: {integrity: sha512-nKfCLkH2Al58YupLGtoVIucZ5XjtN9sU5oOTI70lp8J4nxl52C/Tk7AktcWe+Nx7st3I0fUgf+C5cHePgvwT0w==}
+    engines: {node: '>=22'}
+
+  '@atproto/common-web@0.5.6':
+    resolution: {integrity: sha512-5Y4MIK9dpkJPiKiE6u7iEHitxj+g3aAU2GfGL686JlKE2zDKD4y18BJb+uVek6nXQKb5XOdNVvw+7BHarpn8Fw==}
+    engines: {node: '>=22'}
+
+  '@atproto/lex-data@0.1.5':
+    resolution: {integrity: sha512-TEM6GHuYpNm4O90LjNgbYq1Gmcr875S+BHrDxkg4PB5w/nlsz4HlbkGQG/WP/xbIV5O8TF5nNHDpCZ5ezTRrFA==}
+    engines: {node: '>=22'}
+
+  '@atproto/lex-json@0.1.4':
+    resolution: {integrity: sha512-ENR2cWkVrES+UL6TovbCRdX9BJOyHHJUS8jYx3Lxp3j4vEphjn/u+DW7bWloST2O8ID2OuVlt6+28ftNEEjmQQ==}
+    engines: {node: '>=22'}
+
+  '@atproto/lexicon@0.7.7':
+    resolution: {integrity: sha512-92VH2oEsJdrIVNy7WY8rGn99ANNVglyUffoN7GJc0mxKi+fXN5iVlJ2cOyTfYABhr2ldSiptZWXEPEdBaIR9/A==}
+    engines: {node: '>=22'}
+
+  '@atproto/syntax@0.7.2':
+    resolution: {integrity: sha512-tZ1Tr0R9pK4bI4Zs69t29cjMlCFQvRNBeNkqJC5pGeNuCt64D0eoF7s/AlqeVmYppClmQ0xJquggGgsMDP6j7w==}
+    engines: {node: '>=22'}
+
+  '@atproto/xrpc@0.8.6':
+    resolution: {integrity: sha512-yVfKrlwZBBm44Ft9jDvHcTCwQ1ElqSlzXHWhT/KcqE+u24EAhWVFosfABfGbUByB/PmN8eLJ06FsWo5pUQcMNQ==}
+    engines: {node: '>=22'}
 
   '@aws-crypto/crc32@5.2.0':
     resolution: {integrity: sha512-nLbCWqQNgUiwwtFsen1AdzAtvuLRsQS8rYgMuxCrdKf9kOssamGLuPwyTY9wyYblNr9+1XM8v6zoDTPPSIeANg==}
@@ -6297,6 +6425,10 @@ packages:
     engines: {node: '>=20'}
     peerDependencies:
       hono: '>=4.12.25'
+
+  '@hubspot/api-client@14.0.1':
+    resolution: {integrity: sha512-+2/9e3DguqVXB/htjQ5yxWkLD4fGdS1MNsOVYlc05a4TAGx0PGt+EgvW8o5P9GwQsMIGHCCiR6CJpNYNQtbiqw==}
+    engines: {node: '>=22.0.0'}
 
   '@humanfs/core@0.19.1':
     resolution: {integrity: sha512-5DyQ4+1JEUzejeK1JGICcideyfUbGixgS9jNgex5nqkW+cY7WZhxBigmieN5Qnw9ZosSNVC9KQKyb+GUaGyKUA==}
@@ -12400,6 +12532,9 @@ packages:
     resolution: {integrity: sha512-wvUjBtSGN7+7SjNpq/9M2Tg350UZD3q62IFZLbRAR1bSMlCo1ZaeW+BJ+D090e4hIIZLBcTDWe4Mh4jvUDajzQ==}
     engines: {node: '>= 0.4'}
 
+  await-lock@3.0.0:
+    resolution: {integrity: sha512-eO6fLiSnrJrMdjWMNK8zbVRXPs2TKJg78iKZd9wDpN3na5tcoV6EoeiOlMgk2QaAQ1gIrK1YuMsJHXWqz89tSA==}
+
   aws-ssl-profiles@1.1.2:
     resolution: {integrity: sha512-NZKeq9AfyQvEeNlN0zSYAaWrmBffJh3IELMZfRpJVWgrpEbtEpnjvzqBPf+mxoI287JohRDoa+/nsfqqiZmF6g==}
     engines: {node: '>= 6.0.0'}
@@ -12958,6 +13093,9 @@ packages:
   chalk@5.6.2:
     resolution: {integrity: sha512-7NzBL0rN6fMUW+f7A6Io4h40qQlG+xGmtMxfbnH/K7TAtt8JQWVQK+6g0UXKMeVJoyV5EkkNsErQ8pVD3bLHbA==}
     engines: {node: ^12.17.0 || ^14.13 || >=16.0.0}
+
+  change-case@5.4.4:
+    resolution: {integrity: sha512-HRQyTk2/YPEkt9TnUPbOpr64Uw3KOicFWPVBb+xiHvd6eBx/qPr9xqfBFDT8P2vWsvvz4jbEkfDe71W3VyNu2w==}
 
   char-regex@1.0.2:
     resolution: {integrity: sha512-kWWXztvZ5SBQV+eRgKFeh8q5sLuZY2+8WUIzlxWVTg+oGwY14qylx1KbKzHd8P6ZYkAg0xyIDU9JMHhyJMZ1jw==}
@@ -14410,6 +14548,9 @@ packages:
   es6-error@4.1.1:
     resolution: {integrity: sha512-Um/+FxMr9CISWh0bi5Zv0iOD+4cFh5qLeks1qhAopKVAJw3drgKbKySikp7wGhDL0HPeaja0P5ULZrxLkniUVg==}
 
+  es6-promise@4.2.8:
+    resolution: {integrity: sha512-HJDGx5daxeIvxdBxvG2cb9g4tEvwIk3i8+nhX0yGrYmZUzbkdg8QbDevheDB8gd0//uPj4c1EQua8Q+MViT0/w==}
+
   esast-util-from-estree@2.0.0:
     resolution: {integrity: sha512-4CyanoAudUSBAn5K13H4JhsMH6L9ZP7XbLVe/dKybkxMO7eDyLsT8UHl9TRNrU2Gr9nz+FovfSIjuXWJ81uVwQ==}
 
@@ -14679,6 +14820,9 @@ packages:
 
   eventemitter3@5.0.4:
     resolution: {integrity: sha512-mlsTRyGaPBjPedk6Bvw+aqbsXDtoAyAzm5MO7JgU+yVRyMQ5O8bD4Kcci7BS85f93veegeCPkL8R4GLClnjLFw==}
+
+  events-to-async@2.0.2:
+    resolution: {integrity: sha512-WzI6m/SU+F38t2tejHh6IQuQkNZ0dMOmSEmODJb9czaeMYtQ5FVZ+b6DOHr3hC6hNKNnn9CwDUN8mJiAkWSI9Q==}
 
   events-universal@1.0.1:
     resolution: {integrity: sha512-LUd5euvbMLpwOF8m6ivPCbhQeSiYVNb8Vs0fQ8QjXo0JTkEHpz8pxdQf0gStltaPpw0Cca8b39KxvK9cfKRiAw==}
@@ -16267,6 +16411,9 @@ packages:
     resolution: {integrity: sha512-FFUtZMpoZ8RqHS3XeXEmHWLA4thH+ZxCv2lOiPIn1Xc7CxrqhWzNSDzD+/chS/zbYezmiwWLdQC09JdQKmthOw==}
     engines: {node: '>=20'}
 
+  iso-datestring-validator@2.2.2:
+    resolution: {integrity: sha512-yLEMkBbLZTlVQqOnQ4FiMujR6T4DEcCb1xizmvXS+OxuhwcbtynoosRzdMA69zZCShCNAbi+gJ71FxZBBXx1SA==}
+
   isobject@3.0.1:
     resolution: {integrity: sha512-WhB9zCku7EGTj/HQQRz5aUQEUeoQZH2bWcltRErOpymJ4boYE6wL9Tbr23krRPSZ+C5zqNSrSw+Cc7sZZ4b7vg==}
     engines: {node: '>=0.10.0'}
@@ -17214,6 +17361,9 @@ packages:
     engines: {node: '>= 16'}
     hasBin: true
 
+  masto@7.12.0:
+    resolution: {integrity: sha512-hSqRfaqVhtaRB3+lSJ4YusqBZ/tj4/gtzS0PXZgrg2JLiDFLmsBdmuyVVF2c+QlKSMEKo7grVh3dN8TX1TECVw==}
+
   matcher@3.0.0:
     resolution: {integrity: sha512-OkeDaAZ/bQCxeFAozM55PKcKU0yJMPGifLwV4Qgjitu+5MoAfSQN4lsLJeXZ1b8w0x+/Emda6MZgXS1jvsapng==}
     engines: {node: '>=10'}
@@ -17776,6 +17926,9 @@ packages:
   multicast-dns@7.2.5:
     resolution: {integrity: sha512-2eznPJP8z2BFLX50tf0LuODrpINqP1RVIm/CObbTcBRITQgmC/TjcREF1NeTBzIcR5XO/ukWo+YHOjBbFwIupg==}
     hasBin: true
+
+  multiformats@13.4.2:
+    resolution: {integrity: sha512-eh6eHCrRi1+POZ3dA+Dq1C6jhP1GNtr9CRINMb67OKzqW9I5DUuZM/3jLPlzhgpGeiNUlEGEbkCYChXMCc/8DQ==}
 
   mustache@4.2.0:
     resolution: {integrity: sha512-71ippSywq5Yb7/tVYyGbkBggbU8H3u5Rz56fH60jGFgr8uHwxs+aSKeqmluIVzM0m0kB7xQjKS6qPfd0b2ZoqQ==}
@@ -18635,6 +18788,9 @@ packages:
   pify@4.0.1:
     resolution: {integrity: sha512-uB80kBFb/tfd68bVleG9T5GGsGPjJrLAUpR5PZIrhBnIaRTQRjqdJSsIKkOP6OAIFbj7GOrcudc5pNjZ+geV2g==}
     engines: {node: '>=6'}
+
+  pipedrive@33.5.0:
+    resolution: {integrity: sha512-X8zWVagv9GE28x7xl+y2vucSTTByEAqFVYz2e/LT8W4pLyaeDSjawqn8neKwkyJpvq0cqAybRkge4tdCTEfISg==}
 
   pirates@4.0.7:
     resolution: {integrity: sha512-TfySrs/5nm8fQJDcBDuUng3VOUKsd7S+zqvbOTiGXHfxX4wK31ard+hoNuvkicM/2YFzlpDgABOevKSsB4G/FA==}
@@ -21260,6 +21416,10 @@ packages:
     peerDependencies:
       typescript: '>=4.8.4'
 
+  ts-custom-error@3.3.1:
+    resolution: {integrity: sha512-5OX1tzOjxWEgsr/YEUWSuPrQ00deKLh6D7OTWcvNHm12/7QPyRh8SYpyWvA4IZv8H/+GQWQEh/kwo95Q9OVW1A==}
+    engines: {node: '>=14.0.0'}
+
   ts-dedent@2.2.0:
     resolution: {integrity: sha512-q5W7tVM71e2xjHZTlgfTDoPF/SmqKG5hddq9SzR49CH2hayqRKJtQ4mtRlSxKaJlR/+9rEM+mnBHf7I2/BQcpQ==}
     engines: {node: '>=6.10'}
@@ -21619,6 +21779,9 @@ packages:
   unicode-property-aliases-ecmascript@2.2.0:
     resolution: {integrity: sha512-hpbDzxUY9BFwX+UeBnxv3Sh1q7HFxj48DTmXchNgRa46lO8uj3/1iEn3MiNUYTg1g9ctIqXCCERn8gYZhHC5lQ==}
     engines: {node: '>=4'}
+
+  unicode-segmenter@0.14.5:
+    resolution: {integrity: sha512-jHGmj2LUuqDcX3hqY12Ql+uhUTn8huuxNZGq7GvtF6bSybzH3aFgedYu/KTzQStEgt1Ra2F3HxadNXsNjb3m3g==}
 
   unicorn-magic@0.1.0:
     resolution: {integrity: sha512-lRfVq8fE8gz6QMBuDM6a+LO3IAzTi05H6gCVaUpir2E1Rwpo4ZUog45KpNXKC/Mn3Yb9UDuHumeFTo9iV/D9FQ==}
@@ -22656,6 +22819,52 @@ snapshots:
   '@asamuzakjp/generational-cache@1.0.1': {}
 
   '@asamuzakjp/nwsapi@2.3.9': {}
+
+  '@atproto/api@0.20.34':
+    dependencies:
+      '@atproto/common-web': 0.5.6
+      '@atproto/lexicon': 0.7.7
+      '@atproto/syntax': 0.7.2
+      '@atproto/xrpc': 0.8.6
+      await-lock: 3.0.0
+      multiformats: 13.4.2
+      tlds: 1.261.0
+      zod: 3.25.76
+
+  '@atproto/common-web@0.5.6':
+    dependencies:
+      '@atproto/lex-data': 0.1.5
+      '@atproto/lex-json': 0.1.4
+      '@atproto/syntax': 0.7.2
+      zod: 3.25.76
+
+  '@atproto/lex-data@0.1.5':
+    dependencies:
+      multiformats: 13.4.2
+      tslib: 2.8.1
+      unicode-segmenter: 0.14.5
+
+  '@atproto/lex-json@0.1.4':
+    dependencies:
+      '@atproto/lex-data': 0.1.5
+      tslib: 2.8.1
+
+  '@atproto/lexicon@0.7.7':
+    dependencies:
+      '@atproto/common-web': 0.5.6
+      '@atproto/syntax': 0.7.2
+      multiformats: 13.4.2
+      zod: 3.25.76
+
+  '@atproto/syntax@0.7.2':
+    dependencies:
+      iso-datestring-validator: 2.2.2
+      tslib: 2.8.1
+
+  '@atproto/xrpc@0.8.6':
+    dependencies:
+      '@atproto/lexicon': 0.7.7
+      zod: 3.25.76
 
   '@aws-crypto/crc32@5.2.0':
     dependencies:
@@ -26163,6 +26372,14 @@ snapshots:
   '@hono/node-server@2.0.1(hono@4.12.25)':
     dependencies:
       hono: 4.12.25
+
+  '@hubspot/api-client@14.0.1':
+    dependencies:
+      '@types/node': 22.19.11
+      bottleneck: 2.19.5
+      es6-promise: 4.2.8
+      form-data: 4.0.6
+      lodash.merge: 4.6.2
 
   '@humanfs/core@0.19.1': {}
 
@@ -33422,6 +33639,8 @@ snapshots:
     dependencies:
       possible-typed-array-names: 1.1.0
 
+  await-lock@3.0.0: {}
+
   aws-ssl-profiles@1.1.2: {}
 
   axe-core@4.11.2: {}
@@ -34091,6 +34310,8 @@ snapshots:
       supports-color: 7.2.0
 
   chalk@5.6.2: {}
+
+  change-case@5.4.4: {}
 
   char-regex@1.0.2: {}
 
@@ -35767,6 +35988,8 @@ snapshots:
   es6-error@4.1.1:
     optional: true
 
+  es6-promise@4.2.8: {}
+
   esast-util-from-estree@2.0.0:
     dependencies:
       '@types/estree-jsx': 1.0.5
@@ -36178,6 +36401,8 @@ snapshots:
   eventemitter3@4.0.7: {}
 
   eventemitter3@5.0.4: {}
+
+  events-to-async@2.0.2: {}
 
   events-universal@1.0.1:
     dependencies:
@@ -38058,6 +38283,8 @@ snapshots:
 
   isexe@4.0.0: {}
 
+  iso-datestring-validator@2.2.2: {}
+
   isobject@3.0.1: {}
 
   isomorphic-git@1.37.1:
@@ -39221,6 +39448,17 @@ snapshots:
   marked@16.4.2: {}
 
   marked@7.0.4: {}
+
+  masto@7.12.0:
+    dependencies:
+      change-case: 5.4.4
+      events-to-async: 2.0.2
+      isomorphic-ws: 5.0.0(ws@8.21.0)
+      ts-custom-error: 3.3.1
+      ws: 8.21.0
+    transitivePeerDependencies:
+      - bufferutil
+      - utf-8-validate
 
   matcher@3.0.0:
     dependencies:
@@ -40545,6 +40783,8 @@ snapshots:
       dns-packet: 5.6.1
       thunky: 1.1.0
 
+  multiformats@13.4.2: {}
+
   mustache@4.2.0: {}
 
   mute-stream@0.0.8: {}
@@ -41511,6 +41751,14 @@ snapshots:
   picomatch@4.0.5: {}
 
   pify@4.0.1: {}
+
+  pipedrive@33.5.0:
+    dependencies:
+      axios: 1.18.1
+      qs: 6.15.2
+    transitivePeerDependencies:
+      - debug
+      - supports-color
 
   pirates@4.0.7: {}
 
@@ -44743,8 +44991,7 @@ snapshots:
       markdown-it-task-lists: 2.1.1
       prosemirror-markdown: 1.13.4
 
-  tlds@1.261.0:
-    optional: true
+  tlds@1.261.0: {}
 
   tldts-core@7.0.24: {}
 
@@ -44905,6 +45152,8 @@ snapshots:
   ts-api-utils@2.4.0(typescript@5.9.3):
     dependencies:
       typescript: 5.9.3
+
+  ts-custom-error@3.3.1: {}
 
   ts-dedent@2.2.0: {}
 
@@ -45247,6 +45496,8 @@ snapshots:
   unicode-match-property-value-ecmascript@2.2.1: {}
 
   unicode-property-aliases-ecmascript@2.2.0: {}
+
+  unicode-segmenter@0.14.5: {}
 
   unicorn-magic@0.1.0: {}
 

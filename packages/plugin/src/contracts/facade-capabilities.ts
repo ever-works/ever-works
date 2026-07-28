@@ -57,6 +57,16 @@ export const PLUGIN_CAPABILITIES = {
 	CONNECTOR_LINEAR: 'connector-linear',
 	CONNECTOR_NOTION: 'connector-notion',
 	CONNECTOR_MICROSOFT_365: 'connector-microsoft-365',
+	// CRM / enrichment connectors — first-party native connectors over
+	// the vendors' own Node SDKs. Outbound writes CRM records/notes,
+	// the event-source leg streams record changes into the ingest spine.
+	CONNECTOR_HUBSPOT: 'connector-hubspot',
+	CONNECTOR_PIPEDRIVE: 'connector-pipedrive',
+	// Social connectors — public-timeline surfaces. Outbound publishes a
+	// post; the event-source leg streams mentions/replies + the account's
+	// own timeline into the ingest spine.
+	CONNECTOR_BLUESKY: 'connector-bluesky',
+	CONNECTOR_MASTODON: 'connector-mastodon',
 	// Pluggable persistent memory for AI coding / generation agents.
 	// First-party implementation: `@ever-works/agentmemory-plugin`
 	// (talks to the `agentmemory` standalone Node server on :3111 —
