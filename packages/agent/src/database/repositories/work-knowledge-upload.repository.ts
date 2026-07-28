@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { LessThan, Repository } from 'typeorm';
+import { IsNull, LessThan, Repository } from 'typeorm';
 import { WorkKnowledgeUpload } from '../../entities/work-knowledge-upload.entity';
 import { KbUploadExtractionStatus } from '../../entities/kb-types';
 
@@ -17,6 +17,59 @@ export class WorkKnowledgeUploadRepository {
 
     async findBySha256(workId: string, sha256: string): Promise<WorkKnowledgeUpload | null> {
         return this.repository.findOne({ where: { workId, sha256 } });
+    }
+
+    /**
+     * Global-Memory (organization-scoped) originals.
+     *
+     * EVERY query below pins `workId: IsNull()`, and that is load-bearing,
+     * not defensive. `organizationId` on this table is a Tier C tenancy
+     * column that `ScopeStampingSubscriber` stamps on every insert, so
+     * Work-scoped rows carry the org id too. A plain
+     * `where { organizationId, sha256 }` would therefore happily return a
+     * row belonging to some Work — which for `findBySha256ForOrg` means a
+     * Memory upload silently deduping against a Work's file and handing
+     * the caller back an upload it does not own. `workId IS NULL` is the
+     * scope discriminator (see the entity's JSDoc for why it is not an
+     * XOR), so it is what these must filter on.
+     */
+    async findByIdForOrg(
+        organizationId: string,
+        uploadId: string,
+    ): Promise<WorkKnowledgeUpload | null> {
+        return this.repository.findOne({
+            where: { id: uploadId, organizationId, workId: IsNull() },
+        });
+    }
+
+    async findBySha256ForOrg(
+        organizationId: string,
+        sha256: string,
+    ): Promise<WorkKnowledgeUpload | null> {
+        return this.repository.findOne({
+            where: { organizationId, sha256, workId: IsNull() },
+        });
+    }
+
+    async listPagedForOrg(opts: {
+        organizationId: string;
+        status?: KbUploadExtractionStatus;
+        limit?: number;
+        offset?: number;
+    }): Promise<{ items: WorkKnowledgeUpload[]; total: number }> {
+        const qb = this.repository.createQueryBuilder('upload');
+        qb.where('upload.organizationId = :organizationId', {
+            organizationId: opts.organizationId,
+        }).andWhere('upload.workId IS NULL');
+        if (opts.status) {
+            qb.andWhere('upload.extractionStatus = :status', { status: opts.status });
+        }
+        qb.orderBy('upload.createdAt', 'DESC');
+        const total = await qb.getCount();
+        if (opts.limit !== undefined) qb.take(opts.limit);
+        if (opts.offset !== undefined) qb.skip(opts.offset);
+        const items = await qb.getMany();
+        return { items, total };
     }
 
     /**

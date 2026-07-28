@@ -791,7 +791,23 @@
                 "noResults": "Нет документов, соответствующих вашему поиску и фильтрам."
             },
             "orgScoped": "Организация",
-            "openInWork": "Открыть в Работе"
+            "openInWork": "Открыть в Работе",
+            "uploads": {
+                "action": "Загрузить файлы",
+                "dropHint": "Перетащите файлы сюда",
+                "empty": "В Памяти пока нет файлов.",
+                "failed": "Ошибка загрузки",
+                "noOrg": "Выберите организацию перед загрузкой.",
+                "retry": "Повторить",
+                "statusFailed": "Ошибка извлечения",
+                "statusPending": "В ожидании",
+                "statusRunning": "Извлечение…",
+                "statusSkipped": "Текст не извлечён",
+                "statusSucceeded": "Извлечено",
+                "subtitle": "Файлы, загруженные в Память. Их текст извлекается для агентов.",
+                "title": "Оригиналы",
+                "uploading": "Загрузка…"
+            }
         },
         "agentsPage": {
             "title": "Агенты",
@@ -5901,6 +5917,11 @@
                 "remove": "Remove attachment",
                 "tooLarge": "File is larger than the 25 MB limit",
                 "failed": "Upload failed"
+            },
+            "dictation": {
+                "start": "Диктовать",
+                "stop": "Остановить запись",
+                "transcribing": "Расшифровка…"
             }
         },
         "plugins": {

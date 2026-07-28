@@ -1,6 +1,8 @@
 import { consumeStream, type UIMessage } from 'ai';
+import { after } from 'next/server';
 import { z } from 'zod';
 import { runAgent } from '@/lib/ai/agent';
+import { API_URL } from '@/lib/constants';
 import { getAuthAccessCookie } from '@/lib/auth/cookies';
 import { saveConversationMessages, type MessageUsage } from '@/lib/ai/persistence';
 
@@ -113,12 +115,32 @@ export async function POST(request: Request) {
             currentPageUrl?: string;
             attachmentIds?: string[];
         };
-    // Referenced so the validated ids are not silently discarded by an
-    // unused-var rule before the consumer lands. They are validated and
-    // available here; wiring them to conversation-scoped storage is the
-    // next slice, and doing it now without the storage column would just
-    // move the gap rather than close it.
-    void attachmentIds;
+    // Files attached in chat also land in global Memory, so the org keeps
+    // them after the conversation scrolls away.
+    //
+    // Scheduled with `after()` rather than awaited: ingest reads each file
+    // back out of storage and extracts its text, which is far too slow to
+    // sit in front of the first streamed token. It is also strictly
+    // best-effort — a failure here must never cost the user their message,
+    // so nothing about the chat response depends on the outcome.
+    if (attachmentIds && attachmentIds.length > 0) {
+        after(async () => {
+            try {
+                await fetch(`${API_URL}/memory/uploads/from-attachments`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({ attachmentIds }),
+                    cache: 'no-store',
+                });
+            } catch {
+                // Deliberately silent: Memory ingest is an enhancement of
+                // the chat turn, not part of it.
+            }
+        });
+    }
 
     if (!providerOverride) {
         return new Response('providerOverride is required', { status: 400 });

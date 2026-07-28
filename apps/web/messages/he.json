@@ -822,7 +822,23 @@
                 "noResults": "אין מסמכים שתואמים את החיפוש והמסננים שלך."
             },
             "orgScoped": "ארגון",
-            "openInWork": "פתח בעבודה"
+            "openInWork": "פתח בעבודה",
+            "uploads": {
+                "action": "העלאת קבצים",
+                "dropHint": "גרור קבצים לכאן",
+                "empty": "אין עדיין קבצים בזיכרון.",
+                "failed": "ההעלאה נכשלה",
+                "noOrg": "בחר ארגון לפני ההעלאה.",
+                "retry": "נסה שוב",
+                "statusFailed": "ההפקה נכשלה",
+                "statusPending": "ממתין",
+                "statusRunning": "מפיק…",
+                "statusSkipped": "לא הופק טקסט",
+                "statusSucceeded": "הופק",
+                "subtitle": "קבצים שהועלו לזיכרון. הטקסט שלהם מופק עבור הסוכנים.",
+                "title": "קבצים מקוריים",
+                "uploading": "מעלה…"
+            }
         },
         "agentsPage": {
             "title": "סוכנים",
@@ -5968,6 +5984,11 @@
                 "remove": "Remove attachment",
                 "tooLarge": "File is larger than the 25 MB limit",
                 "failed": "Upload failed"
+            },
+            "dictation": {
+                "start": "הכתבה בדיבור",
+                "stop": "עצור הקלטה",
+                "transcribing": "מתמלל…"
             }
         },
         "plugins": {

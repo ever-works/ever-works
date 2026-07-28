@@ -15,6 +15,7 @@ import {
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
+import { MemoryUploadsPanel } from './MemoryUploadsPanel';
 import {
     buildMemoryQuery,
     type MemoryConsolidationReport,
@@ -251,6 +252,9 @@ export function MemoryShell({ initial }: MemoryShellProps) {
                     {t('consolidation.action')}
                 </button>
             </div>
+
+            {/* Originals — upload files into org-wide Memory */}
+            <MemoryUploadsPanel />
 
             {/* Memory Consolidation — dry-run confirm surface / applied summary */}
             {consolidateFailed && (
