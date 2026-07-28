@@ -306,6 +306,28 @@ export class CreateKbUploadDto {
     @IsString({ each: true })
     @MaxLength(KB_TAG_SLUG_MAX, { each: true })
     tags?: string[];
+
+    /**
+     * Ask the platform to pick the document class from the EXTRACTED TEXT
+     * instead of trusting `targetClass`.
+     *
+     * This field previously existed only on the client: the workbench
+     * modal has always had an "auto-classify" checkbox and
+     * `uploadKbFile` has always appended `autoClassify=true` — but the
+     * DTO never declared it, and the global ValidationPipe runs
+     * `forbidNonWhitelisted: true`. Ticking the box therefore 400'd the
+     * upload outright. Declaring it here is half the fix; the other half
+     * is `KnowledgeBaseService` actually classifying, so the checkbox
+     * does what it says rather than being accepted and ignored.
+     *
+     * Multipart carries no booleans, so the value arrives as the string
+     * `'true'` — hence the same `@Transform` the other boolean form
+     * fields in this file use.
+     */
+    @IsOptional()
+    @Transform(({ value }) => value === true || value === 'true' || value === '1')
+    @IsBoolean()
+    autoClassify?: boolean;
 }
 
 export class OrgKbDocumentScopeDto {
