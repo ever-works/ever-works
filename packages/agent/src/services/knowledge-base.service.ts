@@ -2877,7 +2877,14 @@ export class KnowledgeBaseService {
      * here — the platform owns the convention, not the plugin.
      */
     private async persistUploadToStorage(
-        workId: string,
+        // Named for what it IS rather than where it came from: this value
+        // only ever becomes the storage `ownerId` path segment. Work
+        // uploads pass a workId, global-Memory uploads pass an
+        // organizationId, and both are correct — org originals simply
+        // land under their own `<prefix>/<organizationId>/` namespace.
+        // (Repo resolution in `github-storage` data-repo mode keys off a
+        // separate `workId` field, which this call site does not set.)
+        ownerId: string,
         userId: string,
         file: { buffer: Buffer; originalFilename: string; mimeType: string; size: number },
         sha256: string,
@@ -2893,7 +2900,7 @@ export class KnowledgeBaseService {
             filename: `kb-originals/${klass}/${filename}`,
             mimeType: file.mimeType,
             size: file.size,
-            ownerId: workId,
+            ownerId,
         });
         return key;
     }
