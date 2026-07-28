@@ -2853,7 +2853,7 @@
                 "deploy": "Distribuzione",
                 "members": "Membri",
                 "settings": "Impostazioni",
-                "kb": "Base di conoscenza",
+                "kb": "Memory",
                 "tooltips": {
                     "activity": "Feed attività",
                     "kb": "Base di conoscenza",
@@ -4729,7 +4729,7 @@
                     "metaTitle": "Knowledge Base workbench",
                     "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
-                        "kb": "KB",
+                        "kb": "Base di conoscenza",
                         "originals": "Originals"
                     },
                     "originals": {

@@ -2853,7 +2853,7 @@
                 "deploy": "배포",
                 "members": "멤버",
                 "settings": "설정",
-                "kb": "지식 베이스",
+                "kb": "Memory",
                 "tooltips": {
                     "activity": "활동 피드",
                     "kb": "지식 베이스",
@@ -4729,7 +4729,7 @@
                     "metaTitle": "Knowledge Base workbench",
                     "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
-                        "kb": "KB",
+                        "kb": "지식 베이스",
                         "originals": "Originals"
                     },
                     "originals": {

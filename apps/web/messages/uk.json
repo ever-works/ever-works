@@ -2853,7 +2853,7 @@
                 "deploy": "Розгортання",
                 "members": "Учасники",
                 "settings": "Налаштування",
-                "kb": "База знань",
+                "kb": "Memory",
                 "tooltips": {
                     "activity": "Стрічка активності",
                     "kb": "База знань",
@@ -4729,7 +4729,7 @@
                     "metaTitle": "Knowledge Base workbench",
                     "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
-                        "kb": "KB",
+                        "kb": "База знань",
                         "originals": "Originals"
                     },
                     "originals": {

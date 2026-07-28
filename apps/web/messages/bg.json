@@ -2921,7 +2921,7 @@
                 "deploy": "Разполагане",
                 "members": "Членове",
                 "settings": "Настройки",
-                "kb": "База знания",
+                "kb": "Memory",
                 "tooltips": {
                     "activity": "Поток на активността",
                     "kb": "База знания",
@@ -4797,7 +4797,7 @@
                     "metaTitle": "Knowledge Base workbench",
                     "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
-                        "kb": "KB",
+                        "kb": "База знания",
                         "originals": "Originals"
                     },
                     "originals": {
