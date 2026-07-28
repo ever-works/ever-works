@@ -791,7 +791,23 @@
                 "noResults": "Nessun documento corrisponde alla tua ricerca e ai filtri."
             },
             "orgScoped": "Organizzazione",
-            "openInWork": "Apri nel Lavoro"
+            "openInWork": "Apri nel Lavoro",
+            "uploads": {
+                "action": "Carica file",
+                "dropHint": "Trascina i file da caricare",
+                "empty": "Nessun file nella Memoria.",
+                "failed": "Caricamento non riuscito",
+                "noOrg": "Seleziona un’organizzazione prima di caricare.",
+                "retry": "Riprova",
+                "statusFailed": "Estrazione non riuscita",
+                "statusPending": "In attesa",
+                "statusRunning": "Estrazione…",
+                "statusSkipped": "Nessun testo estratto",
+                "statusSucceeded": "Estratto",
+                "subtitle": "File caricati nella Memoria. Il testo viene estratto per gli agenti.",
+                "title": "Originali",
+                "uploading": "Caricamento…"
+            }
         },
         "agentsPage": {
             "title": "Agenti",
@@ -5901,6 +5917,11 @@
                 "remove": "Remove attachment",
                 "tooLarge": "File is larger than the 25 MB limit",
                 "failed": "Upload failed"
+            },
+            "dictation": {
+                "start": "Detta",
+                "stop": "Interrompi registrazione",
+                "transcribing": "Trascrizione…"
             }
         },
         "plugins": {

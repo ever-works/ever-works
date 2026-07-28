@@ -791,7 +791,23 @@
                 "noResults": "आपकी खोज और फ़िल्टर से कोई दस्तावेज़ मेल नहीं खाता।"
             },
             "orgScoped": "संगठन",
-            "openInWork": "कार्य में खोलें"
+            "openInWork": "कार्य में खोलें",
+            "uploads": {
+                "action": "फ़ाइलें अपलोड करें",
+                "dropHint": "अपलोड के लिए फ़ाइलें यहाँ छोड़ें",
+                "empty": "मेमोरी में अभी कोई फ़ाइल नहीं है।",
+                "failed": "अपलोड विफल",
+                "noOrg": "अपलोड से पहले एक संगठन चुनें।",
+                "retry": "पुनः प्रयास",
+                "statusFailed": "निकालना विफल",
+                "statusPending": "लंबित",
+                "statusRunning": "निकाला जा रहा है…",
+                "statusSkipped": "कोई पाठ नहीं मिला",
+                "statusSucceeded": "निकाला गया",
+                "subtitle": "मेमोरी में अपलोड की गई फ़ाइलें। एजेंटों के लिए उनका पाठ निकाला जाता है।",
+                "title": "मूल फ़ाइलें",
+                "uploading": "अपलोड हो रहा है…"
+            }
         },
         "agentsPage": {
             "title": "एजेंट",
@@ -5901,6 +5917,11 @@
                 "remove": "Remove attachment",
                 "tooLarge": "File is larger than the 25 MB limit",
                 "failed": "Upload failed"
+            },
+            "dictation": {
+                "start": "बोलकर लिखें",
+                "stop": "रिकॉर्डिंग रोकें",
+                "transcribing": "लिप्यंतरण हो रहा है…"
             }
         },
         "plugins": {
