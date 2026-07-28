@@ -5917,6 +5917,11 @@
                 "remove": "Remove attachment",
                 "tooLarge": "File is larger than the 25 MB limit",
                 "failed": "Upload failed"
+            },
+            "dictation": {
+                "start": "बोलकर लिखें",
+                "stop": "रिकॉर्डिंग रोकें",
+                "transcribing": "लिप्यंतरण हो रहा है…"
             }
         },
         "plugins": {

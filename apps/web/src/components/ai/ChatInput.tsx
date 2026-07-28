@@ -10,6 +10,7 @@ import {
     filesFromDataTransfer,
     useChatAttachments,
 } from './ChatAttachments';
+import { ChatDictation } from './ChatDictation';
 import type { ChatAttachmentRef } from '@/lib/ai/attachments';
 
 interface ChatInputProps {
@@ -49,6 +50,24 @@ export function ChatInput({ isStreaming, onSubmit, onStop }: ChatInputProps) {
     // while an upload is in flight — that would drop the file silently,
     // which is the failure this surface exists to prevent.
     const canSend = !isStreaming && !uploading && (hasText || items.some((i) => i.ref));
+
+    // Dictated text is APPENDED to whatever is already typed, never sent
+    // on its own — the user still reads it and presses send. The textarea
+    // is uncontrolled, so the DOM value and `inputRef` are updated
+    // together and `hasText` re-enables the send button.
+    const appendDictated = (text: string) => {
+        const el = textareaRef.current;
+        const existing = inputRef.current;
+        const next = existing ? `${existing.replace(/\s*$/, '')} ${text}` : text;
+        inputRef.current = next;
+        setHasText(next.trim().length > 0);
+        if (el) {
+            el.value = next;
+            el.style.height = 'auto';
+            el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+            el.focus();
+        }
+    };
 
     const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
         event.preventDefault();
@@ -133,6 +152,7 @@ export function ChatInput({ isStreaming, onSubmit, onStop }: ChatInputProps) {
                     <div className="flex items-center justify-between px-3 pb-2.5 pt-1">
                         <div className="flex items-center gap-1">
                             <ChatAttachButton onFiles={addFiles} disabled={isStreaming} />
+                            <ChatDictation onText={appendDictated} disabled={isStreaming} />
                             <span className="text-[10px] text-text-muted dark:text-white/20 select-none">
                                 {t('sendHint')}
                             </span>

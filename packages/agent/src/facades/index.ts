@@ -22,7 +22,7 @@ export {
 export type { FacadeOptions } from '@ever-works/plugin';
 
 // AI Facade
-export { AiFacadeService, AiFacadeError } from './ai.facade';
+export { AiFacadeService, AiFacadeError, TranscriptionNotConfiguredError } from './ai.facade';
 
 // Search Facade
 export { SearchFacadeService, SearchFacadeError } from './search.facade';

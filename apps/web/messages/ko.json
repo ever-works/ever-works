@@ -5917,6 +5917,11 @@
                 "remove": "Remove attachment",
                 "tooLarge": "File is larger than the 25 MB limit",
                 "failed": "Upload failed"
+            },
+            "dictation": {
+                "start": "받아쓰기",
+                "stop": "녹음 중지",
+                "transcribing": "변환 중…"
             }
         },
         "plugins": {

@@ -5917,6 +5917,11 @@
                 "remove": "Remove attachment",
                 "tooLarge": "File is larger than the 25 MB limit",
                 "failed": "Upload failed"
+            },
+            "dictation": {
+                "start": "Đọc chính tả",
+                "stop": "Dừng ghi âm",
+                "transcribing": "Đang chuyển thành văn bản…"
             }
         },
         "plugins": {

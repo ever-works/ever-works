@@ -5984,6 +5984,11 @@
                 "remove": "Remove attachment",
                 "tooLarge": "File is larger than the 25 MB limit",
                 "failed": "Upload failed"
+            },
+            "dictation": {
+                "start": "إملاء صوتي",
+                "stop": "إيقاف التسجيل",
+                "transcribing": "جارٍ التفريغ…"
             }
         },
         "plugins": {
