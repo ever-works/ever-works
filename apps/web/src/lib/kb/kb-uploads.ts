@@ -31,13 +31,15 @@ export interface UploadKbFileOptions {
     /** Optional plaintext description. */
     readonly description?: string;
     /**
-     * Optional "auto-classify" hint. When `true` the server is allowed to
-     * re-classify the document via its routing/classification plugin chain
-     * instead of locking it to `targetClass`.
+     * Optional "auto-classify" hint. When `true` the server derives the
+     * class from the EXTRACTED TEXT (one small structured AI call over a
+     * closed enum) and `class` above becomes the fallback used when the
+     * classifier is unavailable or returns something unrecognised.
      *
-     * Wire shape: `autoClassify=true|false` as a multipart string. The
-     * Create DTO accepts it as a boolean — class-validator's
-     * `@Type(() => Boolean)` parses the string back.
+     * Wire shape: `autoClassify=true` as a multipart string, because
+     * multipart carries no booleans. `CreateKbUploadDto` declares a
+     * matching `@Transform` — until it did, sending this field 400'd the
+     * whole upload under `forbidNonWhitelisted`.
      */
     readonly autoClassify?: boolean;
     /**
@@ -166,4 +168,61 @@ export function uploadKbFile(opts: UploadKbFileOptions): Promise<KbUploadRespons
 
         xhr.send(form);
     });
+}
+
+/**
+ * List a Work's KB uploads — the "Originals" tab's data source.
+ *
+ * Goes through the Next.js proxy (`/api/works/:id/kb/uploads`) rather than
+ * the API directly so the session cookie is exchanged for a bearer token
+ * server-side; the browser never holds the API token.
+ */
+export async function listKbUploads(
+    workId: string,
+    opts?: { signal?: AbortSignal },
+): Promise<{ items: KbUploadDto[]; total: number }> {
+    const res = await fetch(`/api/works/${workId}/kb/uploads`, {
+        method: 'GET',
+        headers: { Accept: 'application/json' },
+        cache: 'no-store',
+        signal: opts?.signal,
+    });
+    if (!res.ok) {
+        const body = await res.json().catch(() => null);
+        throw new KbUploadError(
+            (body as { message?: string } | null)?.message ??
+                `Failed to list uploads (${res.status})`,
+            res.status,
+            body,
+        );
+    }
+    const body = (await res.json().catch(() => null)) as {
+        items?: KbUploadDto[];
+        total?: number;
+    } | null;
+    return { items: body?.items ?? [], total: body?.total ?? 0 };
+}
+
+/**
+ * Re-run extraction for an upload whose first attempt FAILED. The bytes are
+ * already stored, so this takes no body — see the proxy route for why.
+ */
+export async function retryKbUploadExtraction(
+    workId: string,
+    uploadId: string,
+): Promise<KbUploadResponse> {
+    const res = await fetch(`/api/works/${workId}/kb/uploads/${uploadId}/retry-extraction`, {
+        method: 'POST',
+        headers: { Accept: 'application/json' },
+        cache: 'no-store',
+    });
+    const body = await res.json().catch(() => null);
+    if (!res.ok) {
+        throw new KbUploadError(
+            (body as { message?: string } | null)?.message ?? `Retry failed (${res.status})`,
+            res.status,
+            body,
+        );
+    }
+    return body as KbUploadResponse;
 }
