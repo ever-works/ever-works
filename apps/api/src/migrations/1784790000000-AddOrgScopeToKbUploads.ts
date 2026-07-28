@@ -39,6 +39,12 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  *   No FK is added on `organizationId`: it is a raw uuid column with no
  *   entity relation, per the EW-654 cycle-avoidance rule the other Tier C
  *   columns follow.
+ *
+ * REVERT
+ *   `down()` refuses to run while org-scoped rows exist rather than
+ *   deleting them to satisfy the restored NOT NULL. Those rows are files
+ *   users uploaded to Memory; losing them should never be a side effect
+ *   of a schema rollback.
  */
 export class AddOrgScopeToKbUploads1784790000000 implements MigrationInterface {
     name = 'AddOrgScopeToKbUploads1784790000000';
@@ -87,7 +93,28 @@ export class AddOrgScopeToKbUploads1784790000000 implements MigrationInterface {
         );
         // Restoring NOT NULL is only possible once org-scoped rows are
         // gone — they have a NULL `workId` by definition.
-        await queryRunner.query(`DELETE FROM "work_knowledge_uploads" WHERE "workId" IS NULL`);
+        //
+        // REFUSE rather than delete. The obvious implementation here is
+        // `DELETE FROM ... WHERE "workId" IS NULL`, and it would quietly
+        // destroy every file anyone uploaded to global Memory — real user
+        // data, gone as a side effect of a schema rollback. A revert run
+        // shortly after deploy (the realistic case) has no such rows and
+        // still completes; anything else stops and tells the operator
+        // exactly what is in the way, so removing that data stays a
+        // deliberate decision rather than a footnote of this migration.
+        const [{ count }] = (await queryRunner.query(
+            `SELECT COUNT(*)::int AS count FROM "work_knowledge_uploads" WHERE "workId" IS NULL`,
+        )) as Array<{ count: number }>;
+
+        if (count > 0) {
+            throw new Error(
+                `Cannot revert AddOrgScopeToKbUploads: ${count} organization-scoped Memory upload(s) ` +
+                    `have a NULL "workId" and would have to be deleted to restore the NOT NULL constraint. ` +
+                    `Export or delete them deliberately first ` +
+                    `(SELECT * FROM "work_knowledge_uploads" WHERE "workId" IS NULL), then re-run the revert.`,
+            );
+        }
+
         await queryRunner.query(
             `ALTER TABLE "work_knowledge_uploads" ALTER COLUMN "workId" SET NOT NULL`,
         );
