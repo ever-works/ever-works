@@ -822,7 +822,23 @@
                 "noResults": "لا توجد مستندات تطابق بحثك والفلاتر."
             },
             "orgScoped": "المنظمة",
-            "openInWork": "فتح في العمل"
+            "openInWork": "فتح في العمل",
+            "uploads": {
+                "action": "رفع ملفات",
+                "dropHint": "أفلت الملفات هنا للرفع",
+                "empty": "لا توجد ملفات في الذاكرة بعد.",
+                "failed": "فشل الرفع",
+                "noOrg": "اختر مؤسسة قبل الرفع.",
+                "retry": "إعادة المحاولة",
+                "statusFailed": "فشل الاستخراج",
+                "statusPending": "قيد الانتظار",
+                "statusRunning": "جارٍ الاستخراج…",
+                "statusSkipped": "لم يُستخرج نص",
+                "statusSucceeded": "تم الاستخراج",
+                "subtitle": "ملفات مرفوعة إلى الذاكرة. يُستخرج نصّها ليستخدمه الوكلاء.",
+                "title": "الملفات الأصلية",
+                "uploading": "جارٍ الرفع…"
+            }
         },
         "agentsPage": {
             "title": "الوكلاء",
@@ -5968,6 +5984,11 @@
                 "remove": "Remove attachment",
                 "tooLarge": "File is larger than the 25 MB limit",
                 "failed": "Upload failed"
+            },
+            "dictation": {
+                "start": "إملاء صوتي",
+                "stop": "إيقاف التسجيل",
+                "transcribing": "جارٍ التفريغ…"
             }
         },
         "plugins": {

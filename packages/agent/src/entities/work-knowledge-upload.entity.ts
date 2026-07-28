@@ -1,5 +1,6 @@
 import {
     Entity,
+    Check,
     Column,
     PrimaryGeneratedColumn,
     ManyToOne,
@@ -29,19 +30,35 @@ import { TimestampColumn } from './_types';
  * (see spec §8.3).
  */
 @Entity({ name: 'work_knowledge_uploads' })
+@Check('work_knowledge_uploads_has_scope', '"workId" IS NOT NULL OR "organizationId" IS NOT NULL')
 @Index(['workId', 'extractionStatus'])
 @Index(['workId', 'sha256'])
 @Index(['workId', 'createdAt'])
+@Index(['organizationId', 'sha256'])
+@Index(['organizationId', 'createdAt'])
 export class WorkKnowledgeUpload {
     @PrimaryGeneratedColumn('uuid')
     id: string;
 
-    @Column()
-    workId: string;
+    /**
+     * Work-level scope, or NULL when this original belongs to global
+     * Memory (organization-wide) rather than to one Work.
+     *
+     * `workId IS NULL` IS the discriminator — deliberately NOT an XOR
+     * against `organizationId`, the way `work_knowledge_documents` does
+     * it. That table predates Tier C scope stamping; here
+     * `organizationId` is a tenancy column that `ScopeStampingSubscriber`
+     * populates on EVERY insert, Work-scoped rows included. An
+     * `organizationId IS NULL` half would therefore be false for existing
+     * rows, and a CHECK added over them would fail validation and abort
+     * the migration on boot.
+     */
+    @Column({ type: 'uuid', nullable: true })
+    workId?: string | null;
 
-    @ManyToOne(() => Work, { onDelete: 'CASCADE' })
+    @ManyToOne(() => Work, { onDelete: 'CASCADE', nullable: true })
     @JoinColumn({ name: 'workId' })
-    work: ClassToObject<Work>;
+    work?: ClassToObject<Work> | null;
 
     /** Plugin ID of the Storage plugin that holds the file bytes. */
     @Column({ type: 'varchar', length: 64, name: 'storage_provider' })

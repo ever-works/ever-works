@@ -59,6 +59,8 @@ describe('OrgMemoryController — memory health', () => {
             membership as unknown as OrganizationMembershipService,
             scopeContext as unknown as ScopeContextService,
             health as unknown as MemoryHealthService,
+            {} as never,
+            {} as never,
         );
     });
 
