@@ -102,9 +102,13 @@ export class AddOrgScopeToKbUploads1784790000000 implements MigrationInterface {
         // still completes; anything else stops and tells the operator
         // exactly what is in the way, so removing that data stays a
         // deliberate decision rather than a footnote of this migration.
-        const [{ count }] = (await queryRunner.query(
-            `SELECT COUNT(*)::int AS count FROM "work_knowledge_uploads" WHERE "workId" IS NULL`,
-        )) as Array<{ count: number }>;
+        // `rows[0]?.cnt ?? 0` rather than destructuring: matches the
+        // convention in the sibling FK-upgrade migrations, and `Number()`
+        // covers Postgres returning COUNT as a bigint *string*.
+        const rows = (await queryRunner.query(
+            `SELECT COUNT(*) AS cnt FROM "work_knowledge_uploads" WHERE "workId" IS NULL`,
+        )) as Array<{ cnt: number | string }>;
+        const count = Number(rows[0]?.cnt ?? 0);
 
         if (count > 0) {
             throw new Error(
