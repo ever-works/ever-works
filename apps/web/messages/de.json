@@ -5962,6 +5962,12 @@
             "feelingLucky": "Schlage ein zu erstellendes Werk vor",
             "errors": {
                 "unableToSend": "Nachricht konnte nicht gesendet werden"
+            },
+            "attachments": {
+                "attach": "Attach files",
+                "remove": "Remove attachment",
+                "tooLarge": "File is larger than the 25 MB limit",
+                "failed": "Upload failed"
             }
         },
         "plugins": {

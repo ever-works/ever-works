@@ -5895,6 +5895,12 @@
             "feelingLucky": "建议一个要创建的作品",
             "errors": {
                 "unableToSend": "无法发送消息"
+            },
+            "attachments": {
+                "attach": "Attach files",
+                "remove": "Remove attachment",
+                "tooLarge": "File is larger than the 25 MB limit",
+                "failed": "Upload failed"
             }
         },
         "plugins": {

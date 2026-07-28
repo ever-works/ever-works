@@ -65,6 +65,22 @@ const chatBodySchema = z.object({
     workId: z.string().min(1).max(128).optional(),
     conversationId: z.string().min(1).max(128).optional(),
     currentPageUrl: z.string().max(2048).optional(),
+    /**
+     * Upload ids for files attached in the composer.
+     *
+     * The model already sees the attachments as a fenced block inside the
+     * user turn; this is the PLATFORM's copy, so nothing downstream has to
+     * re-parse a model-facing string to recover ids. Constrained to the
+     * sha256 shape the uploads spine issues — an id is a lookup key, and a
+     * free-form string here would be one.
+     *
+     * Bounded at 20: the composer allows multi-select, and an unbounded
+     * array is a cheap way to make a request expensive.
+     */
+    attachmentIds: z
+        .array(z.string().regex(/^[a-f0-9]{64}$/))
+        .max(20)
+        .optional(),
 });
 
 export async function POST(request: Request) {
@@ -88,13 +104,21 @@ export async function POST(request: Request) {
             { status: 400 },
         );
     }
-    const { messages, providerOverride, workId, conversationId, currentPageUrl } = parsed.data as {
-        messages: UIMessage[];
-        providerOverride: string;
-        workId?: string;
-        conversationId?: string;
-        currentPageUrl?: string;
-    };
+    const { messages, providerOverride, workId, conversationId, currentPageUrl, attachmentIds } =
+        parsed.data as {
+            messages: UIMessage[];
+            providerOverride: string;
+            workId?: string;
+            conversationId?: string;
+            currentPageUrl?: string;
+            attachmentIds?: string[];
+        };
+    // Referenced so the validated ids are not silently discarded by an
+    // unused-var rule before the consumer lands. They are validated and
+    // available here; wiring them to conversation-scoped storage is the
+    // next slice, and doing it now without the storage column would just
+    // move the gap rather than close it.
+    void attachmentIds;
 
     if (!providerOverride) {
         return new Response('providerOverride is required', { status: 400 });
