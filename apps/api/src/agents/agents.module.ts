@@ -84,6 +84,7 @@ import {
     ContentExtractorFacadeService,
     AiFacadeService,
     GitFacadeService,
+    BrowserAutomationFacadeService,
 } from '@ever-works/agent/facades';
 // FU-2 — `AgentsController` injects `SkillBindingRepository` (for the
 // `GET /api/agents/:id/skills` rollup) and `PluginUsageRepository` (for
@@ -740,6 +741,7 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                 MergePolicyService,
                 WorkOwnershipService,
                 AgentRepository,
+                BrowserAutomationFacadeService,
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -755,6 +757,7 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                 mergePolicy: MergePolicyService,
                 workOwnership: WorkOwnershipService,
                 agents: AgentRepository,
+                browser: BrowserAutomationFacadeService,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
@@ -764,6 +767,9 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                 digest: { digestService: digest },
                 meetings: { repository: meetings },
                 fleet: { service: fleet },
+                // Audit G22 — headless browsing. Only `read` is passed, so the
+                // capability's page-driving `act` is unreachable from chat.
+                browser: { facade: browser },
                 prReview: { prReviewService: prReview },
                 mergePolicy: {
                     service: mergePolicy,

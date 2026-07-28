@@ -214,6 +214,9 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
             'digest',
             'meetings',
             'fleet',
+            // Audit G22 — headless browsing. Bound with only `read`, so the
+            // capability's page-driving `act` is unreachable from chat.
+            'browser',
             'prReview',
             'mergePolicy',
         ]);

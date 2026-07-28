@@ -12,6 +12,7 @@ import type { FleetService } from '../fleet/fleet.service';
 import type { PrReviewToolService } from '../pr-review/agent-pr-review-tools';
 import type { MergePolicyResolveInput, MergePolicyService } from '../policy/merge-policy.service';
 import type { ResolveMergePolicyArgs } from '../policy/agent-merge-policy-tools';
+import type { BrowserAutomationFacadeService } from '../facades/browser-automation.facade';
 
 /**
  * Domain chat-tool sources — the ONE injection seam that lets
@@ -97,6 +98,15 @@ export interface AgentMergePolicyToolSource {
  * reach, and `resolveAllowedTools` registers exactly the corresponding
  * tools.
  */
+/**
+ * Headless browsing (audit item G22). Read-only by construction — the
+ * source carries only `read`, so no wiring mistake can hand the model the
+ * capability's page-driving `act` method.
+ */
+export interface AgentBrowserToolSource {
+    facade: Pick<BrowserAutomationFacadeService, 'read'>;
+}
+
 export interface AgentDomainToolSources {
     tasks?: AgentTaskToolSource;
     ingest?: AgentIngestToolSource;
@@ -105,4 +115,5 @@ export interface AgentDomainToolSources {
     fleet?: AgentFleetToolSource;
     prReview?: AgentPrReviewToolSource;
     mergePolicy?: AgentMergePolicyToolSource;
+    browser?: AgentBrowserToolSource;
 }
