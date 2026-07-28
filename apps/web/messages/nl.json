@@ -791,7 +791,23 @@
                 "noResults": "Geen documenten komen overeen met je zoekopdracht en filters."
             },
             "orgScoped": "Organisatie",
-            "openInWork": "Openen in Werk"
+            "openInWork": "Openen in Werk",
+            "uploads": {
+                "action": "Bestanden uploaden",
+                "dropHint": "Sleep bestanden hierheen",
+                "empty": "Nog geen bestanden in Geheugen.",
+                "failed": "Uploaden mislukt",
+                "noOrg": "Selecteer een organisatie voordat je uploadt.",
+                "retry": "Opnieuw",
+                "statusFailed": "Extractie mislukt",
+                "statusPending": "In afwachting",
+                "statusRunning": "Extraheren…",
+                "statusSkipped": "Geen tekst geëxtraheerd",
+                "statusSucceeded": "Geëxtraheerd",
+                "subtitle": "Bestanden geüpload naar Geheugen. De tekst wordt geëxtraheerd voor agents.",
+                "title": "Originelen",
+                "uploading": "Uploaden…"
+            }
         },
         "agentsPage": {
             "title": "Agenten",
@@ -5901,6 +5917,11 @@
                 "remove": "Remove attachment",
                 "tooLarge": "File is larger than the 25 MB limit",
                 "failed": "Upload failed"
+            },
+            "dictation": {
+                "start": "Dicteren",
+                "stop": "Opname stoppen",
+                "transcribing": "Transcriberen…"
             }
         },
         "plugins": {

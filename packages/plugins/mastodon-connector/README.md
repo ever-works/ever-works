@@ -33,12 +33,12 @@ Capabilities: `connector`, `connector-mastodon`, `event-source`.
 
 ## Settings
 
-| Key                 | Notes                                                     |
-| ------------------- | --------------------------------------------------------- |
-| `instanceUrl`       | Instance base URL — SSRF-guarded before every call.       |
-| `accessToken`       | Application token — secret, env `MASTODON_ACCESS_TOKEN`.  |
-| `defaultVisibility` | `public` \| `unlisted` \| `private` \| `direct`.          |
-| `backfillDays`      | Opt-in first-pull history window (0 = off, max 90).       |
+| Key                 | Notes                                                    |
+| ------------------- | -------------------------------------------------------- |
+| `instanceUrl`       | Instance base URL — SSRF-guarded before every call.      |
+| `accessToken`       | Application token — secret, env `MASTODON_ACCESS_TOKEN`. |
+| `defaultVisibility` | `public` \| `unlisted` \| `private` \| `direct`.         |
+| `backfillDays`      | Opt-in first-pull history window (0 = off, max 90).      |
 
 No credential is hardcoded, logged, or written into an ingested envelope.
 

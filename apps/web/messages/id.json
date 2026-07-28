@@ -791,7 +791,23 @@
                 "noResults": "Tidak ada dokumen yang cocok dengan pencarian dan filter Anda."
             },
             "orgScoped": "Organisasi",
-            "openInWork": "Buka di Karya"
+            "openInWork": "Buka di Karya",
+            "uploads": {
+                "action": "Unggah berkas",
+                "dropHint": "Lepaskan berkas untuk diunggah",
+                "empty": "Belum ada berkas di Memori.",
+                "failed": "Gagal mengunggah",
+                "noOrg": "Pilih organisasi sebelum mengunggah.",
+                "retry": "Coba lagi",
+                "statusFailed": "Ekstraksi gagal",
+                "statusPending": "Menunggu",
+                "statusRunning": "Mengekstrak…",
+                "statusSkipped": "Tidak ada teks diekstrak",
+                "statusSucceeded": "Diekstrak",
+                "subtitle": "Berkas yang diunggah ke Memori. Teksnya diekstrak untuk agen.",
+                "title": "Berkas Asli",
+                "uploading": "Mengunggah…"
+            }
         },
         "agentsPage": {
             "title": "Agen",
@@ -5901,6 +5917,11 @@
                 "remove": "Remove attachment",
                 "tooLarge": "File is larger than the 25 MB limit",
                 "failed": "Upload failed"
+            },
+            "dictation": {
+                "start": "Dikte",
+                "stop": "Hentikan perekaman",
+                "transcribing": "Mentranskripsi…"
             }
         },
         "plugins": {

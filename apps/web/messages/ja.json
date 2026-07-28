@@ -791,7 +791,23 @@
                 "noResults": "検索とフィルターに一致するドキュメントはありません。"
             },
             "orgScoped": "組織",
-            "openInWork": "ワークで開く"
+            "openInWork": "ワークで開く",
+            "uploads": {
+                "action": "ファイルをアップロード",
+                "dropHint": "ファイルをここにドロップ",
+                "empty": "メモリにファイルはまだありません。",
+                "failed": "アップロードに失敗しました",
+                "noOrg": "アップロード前に組織を選択してください。",
+                "retry": "再試行",
+                "statusFailed": "抽出に失敗",
+                "statusPending": "待機中",
+                "statusRunning": "抽出中…",
+                "statusSkipped": "テキストなし",
+                "statusSucceeded": "抽出済み",
+                "subtitle": "メモリにアップロードされたファイル。テキストはエージェント用に抽出されます。",
+                "title": "オリジナル",
+                "uploading": "アップロード中…"
+            }
         },
         "agentsPage": {
             "title": "エージェント",
@@ -5901,6 +5917,11 @@
                 "remove": "Remove attachment",
                 "tooLarge": "File is larger than the 25 MB limit",
                 "failed": "Upload failed"
+            },
+            "dictation": {
+                "start": "音声入力",
+                "stop": "録音を停止",
+                "transcribing": "文字起こし中…"
             }
         },
         "plugins": {

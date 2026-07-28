@@ -32,13 +32,13 @@ Capabilities: `connector`, `connector-pipedrive`, `event-source`.
 
 ## Settings
 
-| Key             | Notes                                                                |
-| --------------- | --------------------------------------------------------------------- |
-| `apiToken`      | API token — secret, env `PIPEDRIVE_API_TOKEN`.                       |
+| Key             | Notes                                                                  |
+| --------------- | ---------------------------------------------------------------------- |
+| `apiToken`      | API token — secret, env `PIPEDRIVE_API_TOKEN`.                         |
 | `entityTypes`   | Comma-separated sweep list (deals, persons, organizations by default). |
-| `companyDomain` | `acme` for `acme.pipedrive.com` — enables record deep links.         |
-| `backfillDays`  | Opt-in first-pull history window (0 = off, max 90).                  |
-| `defaultDealId` | Default deal outbound notes attach to.                               |
+| `companyDomain` | `acme` for `acme.pipedrive.com` — enables record deep links.           |
+| `backfillDays`  | Opt-in first-pull history window (0 = off, max 90).                    |
+| `defaultDealId` | Default deal outbound notes attach to.                                 |
 
 Envelope payloads carry a per-entity field whitelist only — custom fields and
 nested expansions never ride along, and no credential is hardcoded, logged, or

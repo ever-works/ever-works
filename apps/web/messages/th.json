@@ -791,7 +791,23 @@
                 "noResults": "ไม่มีเอกสารที่ตรงกับการค้นหาและตัวกรองของคุณ"
             },
             "orgScoped": "องค์กร",
-            "openInWork": "เปิดในงาน"
+            "openInWork": "เปิดในงาน",
+            "uploads": {
+                "action": "อัปโหลดไฟล์",
+                "dropHint": "วางไฟล์ที่นี่เพื่ออัปโหลด",
+                "empty": "ยังไม่มีไฟล์ในหน่วยความจำ",
+                "failed": "อัปโหลดไม่สำเร็จ",
+                "noOrg": "เลือกองค์กรก่อนอัปโหลด",
+                "retry": "ลองอีกครั้ง",
+                "statusFailed": "ดึงข้อความไม่สำเร็จ",
+                "statusPending": "รอดำเนินการ",
+                "statusRunning": "กำลังดึงข้อความ…",
+                "statusSkipped": "ไม่มีข้อความที่ดึงได้",
+                "statusSucceeded": "ดึงข้อความแล้ว",
+                "subtitle": "ไฟล์ที่อัปโหลดไปยังหน่วยความจำ ระบบจะดึงข้อความออกมาให้เอเจนต์ใช้",
+                "title": "ไฟล์ต้นฉบับ",
+                "uploading": "กำลังอัปโหลด…"
+            }
         },
         "agentsPage": {
             "title": "เอเจนต์",
@@ -5901,6 +5917,11 @@
                 "remove": "Remove attachment",
                 "tooLarge": "File is larger than the 25 MB limit",
                 "failed": "Upload failed"
+            },
+            "dictation": {
+                "start": "พูดเพื่อพิมพ์",
+                "stop": "หยุดบันทึก",
+                "transcribing": "กำลังถอดความ…"
             }
         },
         "plugins": {

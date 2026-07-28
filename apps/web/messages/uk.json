@@ -791,7 +791,23 @@
                 "noResults": "Немає документів, що відповідають вашому пошуку та фільтрам."
             },
             "orgScoped": "Організація",
-            "openInWork": "Відкрити в Роботі"
+            "openInWork": "Відкрити в Роботі",
+            "uploads": {
+                "action": "Завантажити файли",
+                "dropHint": "Перетягніть файли сюди",
+                "empty": "У Пам’яті ще немає файлів.",
+                "failed": "Не вдалося завантажити",
+                "noOrg": "Виберіть організацію перед завантаженням.",
+                "retry": "Повторити",
+                "statusFailed": "Помилка витягання",
+                "statusPending": "Очікує",
+                "statusRunning": "Витягання…",
+                "statusSkipped": "Текст не витягнуто",
+                "statusSucceeded": "Витягнуто",
+                "subtitle": "Файли, завантажені до Пам’яті. Їхній текст витягується для агентів.",
+                "title": "Оригінали",
+                "uploading": "Завантаження…"
+            }
         },
         "agentsPage": {
             "title": "Агенти",
@@ -5901,6 +5917,11 @@
                 "remove": "Remove attachment",
                 "tooLarge": "File is larger than the 25 MB limit",
                 "failed": "Upload failed"
+            },
+            "dictation": {
+                "start": "Диктувати",
+                "stop": "Зупинити запис",
+                "transcribing": "Розшифрування…"
             }
         },
         "plugins": {

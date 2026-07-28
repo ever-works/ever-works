@@ -791,7 +791,23 @@
                 "noResults": "Aramanız ve filtrelerinizle eşleşen belge yok."
             },
             "orgScoped": "Kuruluş",
-            "openInWork": "İşte aç"
+            "openInWork": "İşte aç",
+            "uploads": {
+                "action": "Dosya yükle",
+                "dropHint": "Yüklemek için dosyaları bırakın",
+                "empty": "Bellekte henüz dosya yok.",
+                "failed": "Yükleme başarısız",
+                "noOrg": "Yüklemeden önce bir organizasyon seçin.",
+                "retry": "Yeniden dene",
+                "statusFailed": "Çıkarma başarısız",
+                "statusPending": "Bekliyor",
+                "statusRunning": "Çıkarılıyor…",
+                "statusSkipped": "Metin çıkarılmadı",
+                "statusSucceeded": "Çıkarıldı",
+                "subtitle": "Belleğe yüklenen dosyalar. Metinleri ajanlar için çıkarılır.",
+                "title": "Orijinaller",
+                "uploading": "Yükleniyor…"
+            }
         },
         "agentsPage": {
             "title": "Ajanlar",
@@ -5901,6 +5917,11 @@
                 "remove": "Remove attachment",
                 "tooLarge": "File is larger than the 25 MB limit",
                 "failed": "Upload failed"
+            },
+            "dictation": {
+                "start": "Dikte et",
+                "stop": "Kaydı durdur",
+                "transcribing": "Yazıya dökülüyor…"
             }
         },
         "plugins": {
