@@ -47,6 +47,7 @@ import { buildDigestTools } from '../digest/agent-digest-tools';
 import { buildMeetingTools } from '../meetings/agent-meeting-tools';
 import { buildFleetTools } from '../fleet/agent-fleet-tools';
 import { buildBrowserTools } from '../facades/agent-browser-tools';
+import { buildEscalationTools } from './agent-escalation-tools';
 import { buildPrReviewTools } from '../pr-review/agent-pr-review-tools';
 import { buildMergePolicyTools } from '../policy/agent-merge-policy-tools';
 // Security: lexical SSRF guard reused by the model-controlled URL tools
@@ -386,6 +387,17 @@ export class AgentToolService {
             const browser = sources.browser;
             add('browser', () =>
                 buildBrowserTools({ userId: agent.userId, facade: browser.facade }),
+            );
+        }
+
+        // Judgment layer G3/G10 — "what is waiting on me?" and the
+        // matching close. Ungated by agent permissions on purpose: these
+        // read and close the OWNER'S OWN escalation queue, which is
+        // exactly the surface an assistant should be able to answer from.
+        if (sources.escalations) {
+            const escalations = sources.escalations;
+            add('escalations', () =>
+                buildEscalationTools({ userId: agent.userId, service: escalations.service }),
             );
         }
 

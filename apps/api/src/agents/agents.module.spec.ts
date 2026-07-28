@@ -22,6 +22,8 @@ jest.mock('@ever-works/agent/agents', () => ({
     AgentsModule: class AgentsModule {},
     AgentRepository: class AgentRepository {},
     RunSteeringService: class RunSteeringService {},
+    // Judgment layer G3/G10 — backs the `escalations` domain tool source.
+    AgentEscalationService: class AgentEscalationService {},
     AGENT_HEARTBEAT_TRIGGER: 'AGENT_HEARTBEAT_TRIGGER',
     AGENT_RUN_CANCELLER: 'AGENT_RUN_CANCELLER',
     AGENT_RUN_CHAT_BACK_POSTER: 'AGENT_RUN_CHAT_BACK_POSTER',
@@ -45,6 +47,7 @@ jest.mock('@ever-works/agent/facades', () => ({
     NotificationChannelFacadeService: class NotificationChannelFacadeService {},
     SearchFacadeService: class SearchFacadeService {},
     ScreenshotFacadeService: class ScreenshotFacadeService {},
+    BrowserAutomationFacadeService: class BrowserAutomationFacadeService {},
     ContentExtractorFacadeService: class ContentExtractorFacadeService {},
     AiFacadeService: class AiFacadeService {},
     GitFacadeService: class GitFacadeService {},
@@ -131,10 +134,11 @@ import {
 } from '@ever-works/agent/tasks-domain';
 import {
     AgentRepository,
+    AgentEscalationService,
     AGENT_DOMAIN_TOOL_SOURCES,
     AGENT_GIT_FACADE,
 } from '@ever-works/agent/agents';
-import { GitFacadeService } from '@ever-works/agent/facades';
+import { BrowserAutomationFacadeService, GitFacadeService } from '@ever-works/agent/facades';
 import { PullRequestGateService } from '@ever-works/agent/policy';
 import { WorkRepository } from '@ever-works/agent/database';
 
@@ -166,7 +170,7 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
         expect(findProvider(AGENT_DOMAIN_TOOL_SOURCES)).toBeDefined();
     });
 
-    it('injects exactly the services the six descriptor factories need', () => {
+    it('injects exactly the services the descriptor factories need', () => {
         expect(findProvider(AGENT_DOMAIN_TOOL_SOURCES)?.inject).toEqual([
             TasksService,
             TaskChatService,
@@ -181,6 +185,10 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
             MergePolicyService,
             WorkOwnershipService,
             AgentRepository,
+            // Audit G22 — headless browsing (read-only).
+            BrowserAutomationFacadeService,
+            // Judgment layer G3/G10 — the escalation queue tools.
+            AgentEscalationService,
         ]);
     });
 
@@ -219,6 +227,7 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
             'browser',
             'prReview',
             'mergePolicy',
+            'escalations',
         ]);
     });
 });

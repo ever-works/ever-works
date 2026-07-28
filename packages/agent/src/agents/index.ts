@@ -81,8 +81,17 @@ export { PluginUsageRepository } from '../database/repositories/plugin-usage.rep
 export { WorkRepository } from '../database/repositories/work.repository';
 // Judgment layer G3 - escalation records.
 export * from './agent-escalation.service';
+// Judgment layer G3 - the confidence scorer behind the column.
+export * from './escalation-confidence';
+// Judgment layer G3/G10 - escalation chat tools (DoD: every entity
+// ships with chat tools + keyword slots, not just REST).
+export * from './agent-escalation-tools';
+// Judgment layer G10 - the doom-loop / retry-storm detector. Pure, so
+// the worker's gate loop can consult it without a service round-trip.
+export * from './loop-detector';
 export {
     AgentEscalationRepository,
+    type ListEscalationsForUserOptions,
     type RecordEscalationInput,
 } from '../database/repositories/agent-escalation.repository';
 export { AgentEscalation } from '../entities/agent-escalation.entity';
