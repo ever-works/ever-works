@@ -39,10 +39,13 @@ The **slack-connector** plugin is bidirectional:
 
 - **Outbound** — Agents post messages to channels.
 - **Inbound** — the Slack Events API points at `POST /api/ingest/slack/events`.
+- **Slash command** — the app's slash command (e.g. `/works`) points at `POST /api/ingest/slack/commands`.
 
 Mention `@works` in a channel and the message is routed to the same platform chat the web app uses; the reply is posted back into the thread.
 
-Security: every delivery is verified with the app's signing secret (HMAC v0 over `v0:{timestamp}:{rawBody}`, ±300s timestamp tolerance, constant-time compare) and the endpoint **fails closed** — with no configured install, everything is rejected, including Slack's own `url_verification` handshake.
+Typing `/works <your question>` takes the **same** path: the endpoint acks instantly with a private "on it" message (Slack gives a slash command three seconds to respond), then posts the answer into the channel when the model is done. A bare `/works` answers with a usage hint instead of an empty prompt, and each invocation is recorded in your Activity feed as a `slack.command` event.
+
+Security: every delivery — events and slash commands alike — is verified with the app's signing secret (HMAC v0 over `v0:{timestamp}:{rawBody}`, ±300s timestamp tolerance, constant-time compare) and the endpoints **fail closed** — with no configured install, everything is rejected, including Slack's own `url_verification` handshake. Deliveries are attributed per workspace, so a command from a workspace no account has connected is refused rather than guessed.
 
 ## GitHub pull-request review
 
