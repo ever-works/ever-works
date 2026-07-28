@@ -7,14 +7,11 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils/cn';
 import { Button } from '@/components/ui/button';
 import { ROLE_OPTIONS, TEAM_SIZE_OPTIONS } from '@ever-works/contracts/api';
-import {
-    filterSuggestedTemplates,
-    shouldShowSuggestions,
-    type SuggestableAgentTemplate,
-} from '../profile-suggestions';
+import type { OnboardingSeedSuggestionsResponse } from '@ever-works/contracts/api';
 import {
     createAgentFromTemplateForOnboarding,
-    listAgentTemplatesForOnboarding,
+    getRoleSeedSuggestions,
+    seedRoleStarterAgents,
 } from '@/app/actions/onboarding/agent-suggestions';
 
 export interface ProfileStepProps {
@@ -133,27 +130,44 @@ export function ProfileStep({ roles, teamSize, onToggleRole, onSelectTeamSize }:
     );
 }
 
-// ─── Suggested agents (best-effort) ─────────────────────────────────────────
+// ─── Suggested starter kit (server-resolved, best-effort) ───────────────────
 
+/**
+ * A55 — the suggestion block.
+ *
+ * Resolution moved to the API: this component no longer downloads the
+ * agent catalog and filters it locally (which covered 3 of the 14 roles
+ * and knew nothing about skills). It asks
+ * `GET /api/onboarding/suggestions` for the kit that matches the
+ * selected roles and renders what comes back, so every role produces a
+ * starting point and the mapping is the same everywhere.
+ *
+ * Still best-effort: a failed resolve hides the block for the rest of
+ * the wizard session rather than retrying, and nothing here gates the
+ * step.
+ */
 function SuggestedAgents({ roles }: { readonly roles: readonly string[] }) {
     const t = useTranslations('onboarding.profileStep.suggestions');
-    const show = shouldShowSuggestions(roles);
+    const roleKey = [...roles].sort().join(',');
 
-    const [templates, setTemplates] = useState<SuggestableAgentTemplate[] | null>(null);
+    const [kit, setKit] = useState<OnboardingSeedSuggestionsResponse | null>(null);
     const [failed, setFailed] = useState(false);
     const [creating, setCreating] = useState<string | null>(null);
     const [created, setCreated] = useState<readonly string[]>([]);
+    const [seeding, setSeeding] = useState(false);
 
-    // Fetch the catalog once, lazily, the first time a trigger role is
-    // selected. Best-effort: a failed fetch marks the block hidden for
-    // the rest of the wizard session (no retry storm mid-onboarding).
+    // Re-resolve whenever the selected roles change: the kit is a
+    // function of the answers, and the previous kit would be stale.
     useEffect(() => {
-        if (!show || failed || templates !== null) return;
+        if (failed || roleKey === '') {
+            setKit(null);
+            return;
+        }
         let cancelled = false;
-        void listAgentTemplatesForOnboarding().then((result) => {
+        void getRoleSeedSuggestions(roleKey.split(',')).then((result) => {
             if (cancelled) return;
             if (result.success && result.data) {
-                setTemplates(result.data);
+                setKit(result.data);
             } else {
                 setFailed(true);
             }
@@ -161,12 +175,9 @@ function SuggestedAgents({ roles }: { readonly roles: readonly string[] }) {
         return () => {
             cancelled = true;
         };
-    }, [show, failed, templates]);
+    }, [roleKey, failed]);
 
-    if (!show || failed || templates === null) return null;
-
-    const suggested = filterSuggestedTemplates(templates, roles);
-    if (suggested.length === 0) return null;
+    if (failed || kit === null || kit.agents.length === 0) return null;
 
     const handleCreate = async (slug: string) => {
         setCreating(slug);
@@ -183,6 +194,38 @@ function SuggestedAgents({ roles }: { readonly roles: readonly string[] }) {
         }
     };
 
+    // One call creates the whole kit server-side. Idempotent, so a
+    // second click reports "already set up" instead of duplicating.
+    const handleSeedAll = async () => {
+        setSeeding(true);
+        try {
+            const result = await seedRoleStarterAgents(kit.roles);
+            if (!result.success || !result.data) {
+                toast.error(result.error ?? t('seedFailed'));
+                return;
+            }
+            const { createdCount, skippedCount, failedCount, agents } = result.data;
+            setCreated((prev) => {
+                const next = new Set(prev);
+                for (const entry of agents) {
+                    if (entry.outcome === 'created' || entry.outcome === 'already-exists') {
+                        next.add(entry.slug);
+                    }
+                }
+                return [...next];
+            });
+            if (failedCount > 0) {
+                toast.warning(t('seedPartial', { created: createdCount, failed: failedCount }));
+            } else if (createdCount === 0 && skippedCount > 0) {
+                toast.success(t('seedAlreadyDone'));
+            } else {
+                toast.success(t('seedDone', { count: createdCount }));
+            }
+        } finally {
+            setSeeding(false);
+        }
+    };
+
     return (
         <section data-testid="onboarding-profile-suggestions">
             <h4 className="flex items-center gap-1.5 text-sm font-semibold text-text dark:text-text-dark mb-1">
@@ -193,7 +236,7 @@ function SuggestedAgents({ roles }: { readonly roles: readonly string[] }) {
                 {t('description')}
             </p>
             <div className="space-y-2">
-                {suggested.map((template) => {
+                {kit.agents.map((template) => {
                     const isCreated = created.includes(template.slug);
                     const isCreating = creating === template.slug;
                     return (
@@ -216,7 +259,7 @@ function SuggestedAgents({ roles }: { readonly roles: readonly string[] }) {
                                 <Button
                                     size="sm"
                                     variant="secondary"
-                                    disabled={isCreated || isCreating}
+                                    disabled={isCreated || isCreating || seeding}
                                     data-testid={`onboarding-profile-suggestion-create-${template.slug}`}
                                     onClick={() => void handleCreate(template.slug)}
                                 >
@@ -241,6 +284,49 @@ function SuggestedAgents({ roles }: { readonly roles: readonly string[] }) {
                         </div>
                     );
                 })}
+            </div>
+
+            {kit.skills.length > 0 ? (
+                <div className="mt-3">
+                    <p className="text-xs font-semibold text-text dark:text-text-dark mb-1.5">
+                        {t('skillsTitle')}
+                    </p>
+                    <div
+                        className="flex flex-wrap gap-1.5"
+                        data-testid="onboarding-profile-suggested-skills"
+                    >
+                        {kit.skills.map((skill) => (
+                            <span
+                                key={skill.slug}
+                                title={skill.description}
+                                className="inline-flex items-center rounded-full border border-border dark:border-border-dark px-2.5 py-1 text-xs text-text-secondary dark:text-text-secondary-dark"
+                            >
+                                {skill.title}
+                            </span>
+                        ))}
+                    </div>
+                </div>
+            ) : null}
+
+            <div className="mt-3">
+                <Button
+                    size="sm"
+                    disabled={seeding}
+                    data-testid="onboarding-profile-suggestion-seed-all"
+                    onClick={() => void handleSeedAll()}
+                >
+                    {seeding ? (
+                        <>
+                            <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
+                            {t('seeding')}
+                        </>
+                    ) : (
+                        <>
+                            <Sparkles className="mr-1.5 h-3.5 w-3.5" />
+                            {t('seedAll')}
+                        </>
+                    )}
+                </Button>
             </div>
         </section>
     );

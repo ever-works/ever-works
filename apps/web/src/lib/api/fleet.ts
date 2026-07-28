@@ -1,4 +1,5 @@
 import 'server-only';
+import type { FleetEnrollableNodeKind, FleetNodeView } from '@ever-works/contracts';
 import { serverFetch, serverMutation } from './server-api';
 
 /**
@@ -13,43 +14,32 @@ import { serverFetch, serverMutation } from './server-api';
  * is never readable again.
  */
 
-export type FleetNodeKind = 'desktop-node' | 'node' | 'k8s';
+/**
+ * Node kind/status and the node view are the SHARED contract
+ * (`@ever-works/contracts`), re-exported here so this tier, the API and
+ * the node apps compile against ONE declaration. This file used to
+ * hand-copy them, which is exactly how the three copies drifted.
+ */
+import type {
+    FleetNodeDetailView,
+    FleetNodeDrainResult,
+    FleetEnrollmentTokenView,
+} from '@ever-works/contracts';
 
-export type FleetNodeStatus = 'enrolling' | 'online' | 'offline' | 'disabled';
-
-export interface FleetNodeView {
-    id: string;
-    name: string;
-    kind: FleetNodeKind;
-    status: FleetNodeStatus;
-    platform: string | null;
-    version: string | null;
-    capabilities: string[];
-    lastHeartbeatAt: string | null;
-    createdAt: string | null;
-    /** False for live nodes of the user's own configured clusters. */
-    persisted: boolean;
-    /**
-     * Live execution load (Desktop PRD §4.1 "current load (running
-     * Tasks)"). `null`/absent means idle. Cluster-sourced rows never
-     * carry it — the platform does not lease work onto them.
-     */
-    load?: FleetNodeLoadView | null;
-}
-
-/** Per-node execution summary merged into the node list by the API edge. */
-export interface FleetNodeLoadView {
-    /** Jobs this node currently holds a live claim on. */
-    activeJobCount: number;
-    /** Kind of the oldest live claim, or null when idle. */
-    currentJobKind: string | null;
-    /** Id of the oldest live claim, or null when idle. */
-    currentJobId: string | null;
-}
+export type {
+    FleetNodeKind,
+    FleetNodeStatus,
+    FleetNodeView,
+    FleetNodeLoadView,
+    FleetEnrollableNodeKind,
+    FleetNodeDetailView,
+    FleetNodeDrainResult,
+    FleetEnrollmentTokenView,
+} from '@ever-works/contracts';
 
 export interface CreateFleetEnrollmentTokenPayload {
     name: string;
-    kind: Exclude<FleetNodeKind, 'k8s'>;
+    kind: FleetEnrollableNodeKind;
 }
 
 export interface CreateFleetEnrollmentTokenResponse {
@@ -62,6 +52,10 @@ export interface CreateFleetEnrollmentTokenResponse {
 export interface UpdateFleetNodePayload {
     name?: string;
     disabled?: boolean;
+    /** Admin-edited tags. Writing them pins the set by default. */
+    capabilities?: string[];
+    /** `false` hands tag ownership back to the node's heartbeats. */
+    capabilitiesPinned?: boolean;
 }
 
 // NOTE: no leading `/api` here — `serverFetch`/`serverMutation` prepend
@@ -97,6 +91,42 @@ export const fleetAPI = {
             endpoint: `${BASE}/nodes/${nodeId}`,
             data: {},
             method: 'DELETE',
+            wrapInData: false,
+        });
+    },
+
+    nodeDetail: async (nodeId: string) => {
+        return serverFetch<FleetNodeDetailView>(`${BASE}/nodes/${nodeId}`);
+    },
+
+    listOutstandingTokens: async () => {
+        return serverFetch<FleetEnrollmentTokenView[]>(`${BASE}/enrollment-tokens`);
+    },
+
+    revokeEnrollmentToken: async (nodeId: string) => {
+        return serverMutation<void>({
+            endpoint: `${BASE}/enrollment-tokens/${nodeId}`,
+            data: {},
+            method: 'DELETE',
+            wrapInData: false,
+        });
+    },
+
+    /** Re-key a node. The replacement token is returned exactly once. */
+    rotateNodeCredential: async (nodeId: string) => {
+        return serverMutation<CreateFleetEnrollmentTokenResponse>({
+            endpoint: `${BASE}/nodes/${nodeId}/rotate`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    drainNode: async (nodeId: string, drain: boolean) => {
+        return serverMutation<FleetNodeDrainResult>({
+            endpoint: `${BASE}/nodes/${nodeId}/drain`,
+            data: { drain },
+            method: 'POST',
             wrapInData: false,
         });
     },

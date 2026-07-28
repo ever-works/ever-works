@@ -3,16 +3,22 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { IngestedEvent } from '../entities/ingested-event.entity';
 import { IngestCursor } from '../entities/ingest-cursor.entity';
 import { Work } from '../entities/work.entity';
+import { Task } from '../entities/task.entity';
 import { IngestInstallBinding } from '../entities/ingest-install-binding.entity';
+import { ExternalIssueLink } from '../entities/external-issue-link.entity';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { FacadesModule } from '../facades/facades.module';
 import { WorkRepository } from '../database/repositories/work.repository';
+import { TaskRepository } from '../database/repositories/task.repository';
 import { IngestedEventRepository } from './ingested-event.repository';
 import { EventIngestService } from './event-ingest.service';
 import { IngestCursorRepository } from './ingest-cursor.repository';
 import { EventSourcePullService } from './event-source-pull.service';
 import { WorkHintResolverService } from './work-hint-resolver.service';
 import { IngestInstallBindingRepository } from './ingest-install-binding.repository';
+import { IngestSalienceService } from './ingest-salience.service';
+import { ExternalIssueLinkRepository } from './external-issue-link.repository';
+import { ExternalIssueLinkService } from './external-issue-link.service';
 
 /**
  * Event-ingest spine (Wave 6, pull path Wave 8) — agent-side module
@@ -32,9 +38,16 @@ import { IngestInstallBindingRepository } from './ingest-install-binding.reposit
  * event is attributed to the account that actually owns the workspace
  * instead of "the oldest enabled install platform-wide".
  *
- * `IngestedEvent` + `IngestCursor` + `IngestInstallBinding` MUST also
- * stay registered in the DataSource ENTITIES array
- * (`database/_entities-inventory.ts`) — this repo has no
+ * Also owns the two later ingest-side stages:
+ *   - `IngestSalienceService` — the configurable low-value-event filter
+ *     applied at `ingest()` time (audit item (k)); off by default.
+ *   - `ExternalIssueLinkRepository` / `ExternalIssueLinkService` — the
+ *     external tracker issue → platform Task mapping (audit item (i)),
+ *     with `TaskRepository` backing the ownership check on every write.
+ *
+ * `IngestedEvent` + `IngestCursor` + `IngestInstallBinding` +
+ * `ExternalIssueLink` MUST also stay registered in the DataSource
+ * ENTITIES array (`database/_entities-inventory.ts`) — this repo has no
  * `autoLoadEntities`, so a forFeature'd-but-unregistered entity throws
  * EntityMetadataNotFoundError on first query.
  */
@@ -46,6 +59,12 @@ import { IngestInstallBindingRepository } from './ingest-install-binding.reposit
         // EntityMetadataNotFoundError on first query.
         TypeOrmModule.forFeature([IngestedEvent, IngestCursor, Work]),
         TypeOrmModule.forFeature([IngestedEvent, IngestCursor, IngestInstallBinding]),
+        // External-issue ↔ Task mapping. `Task` backs the ownership check
+        // that guards every link write; `ExternalIssueLink` is the join
+        // itself. Both MUST also be in the DataSource ENTITIES array —
+        // a forFeature'd-but-unregistered entity throws
+        // EntityMetadataNotFoundError on first query.
+        TypeOrmModule.forFeature([ExternalIssueLink, Task]),
         // Processor 1 — Activity-log rows with sourceUrl provenance.
         ActivityLogModule,
         // Processor 2 — best-effort Memory observations via
@@ -60,6 +79,10 @@ import { IngestInstallBindingRepository } from './ingest-install-binding.reposit
         WorkRepository,
         WorkHintResolverService,
         IngestInstallBindingRepository,
+        IngestSalienceService,
+        ExternalIssueLinkRepository,
+        ExternalIssueLinkService,
+        TaskRepository,
     ],
     exports: [
         IngestedEventRepository,
@@ -69,6 +92,10 @@ import { IngestInstallBindingRepository } from './ingest-install-binding.reposit
         WorkRepository,
         WorkHintResolverService,
         IngestInstallBindingRepository,
+        IngestSalienceService,
+        ExternalIssueLinkRepository,
+        ExternalIssueLinkService,
+        TaskRepository,
     ],
 })
 export class EventIngestModule {}

@@ -77,3 +77,14 @@ packages/tasks/plugins
 
 # Generated OpenAPI artifact (pnpm generate:openapi) — never commit
 apps/api/openapi.json
+
+# Local dev server logs (run-api.ps1 / run-web.ps1 redirect here)
+api.log
+web.log
+api-mem.log
+
+# Desktop packaging output: electron-builder installers and the staged
+# self-contained runtime payload (apps/desktop/scripts/prepare-bundle.js).
+apps/desktop/release
+apps/desktop/bundle
+apps/desktop-node/release

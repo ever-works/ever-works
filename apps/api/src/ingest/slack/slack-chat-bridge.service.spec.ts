@@ -463,4 +463,179 @@ describe('SlackChatBridgeService', () => {
             );
         });
     });
+
+    /**
+     * Slash commands (`/works …`) take the SAME chat leg a mention does,
+     * so the two entry points cannot drift: one completion call, one
+     * connector reply, one ingest identity namespace.
+     */
+    describe('slash commands', () => {
+        function commandBody(overrides: Record<string, unknown> = {}) {
+            return {
+                team_id: 'T1',
+                channel_id: 'C1',
+                channel_name: 'general',
+                user_id: 'U7',
+                user_name: 'ada',
+                command: '/works',
+                text: 'what shipped today?',
+                trigger_id: 'TRIG-1',
+                ...overrides,
+            };
+        }
+
+        describe('toCommandEnvelope', () => {
+            it('normalizes an invocation into a slack.command envelope keyed on trigger_id', () => {
+                const { service } = createService();
+                const envelope = service.toCommandEnvelope(commandBody() as any);
+                expect(envelope).toMatchObject({
+                    source: 'slack-connector',
+                    sourceEventId: 'command:TRIG-1',
+                    kind: 'slack.command',
+                    subject: { type: 'channel', externalId: 'C1', title: 'general' },
+                    actor: { name: 'ada', externalId: 'U7' },
+                    workHint: { kind: 'chat-channel', externalId: 'C1' },
+                });
+                expect(envelope!.payload).toMatchObject({
+                    channel: 'C1',
+                    command: '/works',
+                    triggerId: 'TRIG-1',
+                    teamId: 'T1',
+                    text: 'what shipped today?',
+                });
+            });
+
+            it('namespaces the identity so it can never collide with a message channel:ts', () => {
+                const { service } = createService();
+                const envelope = service.toCommandEnvelope(
+                    commandBody({ trigger_id: 'C1:1700000000.000100' }) as any,
+                );
+                expect(envelope!.sourceEventId).toBe('command:C1:1700000000.000100');
+                expect(service.toEnvelope(mentionBody() as any)!.sourceEventId).toBe(
+                    'C1:1700000000.000100',
+                );
+            });
+
+            it('skips a payload with no channel or no command name', () => {
+                const { service } = createService();
+                expect(
+                    service.toCommandEnvelope(commandBody({ channel_id: '' }) as any),
+                ).toBeNull();
+                expect(service.toCommandEnvelope(commandBody({ command: '' }) as any)).toBeNull();
+                expect(service.toCommandEnvelope({} as any)).toBeNull();
+            });
+
+            it('caps the ingested text like every other Slack payload', () => {
+                const { service } = createService();
+                const envelope = service.toCommandEnvelope(
+                    commandBody({ text: 'x'.repeat(5000) }) as any,
+                );
+                expect((envelope!.payload.text as string).length).toBe(4000);
+            });
+        });
+
+        describe('handleSlashCommand', () => {
+            it('ingests the invocation, answers via platform chat and posts into the channel', async () => {
+                const { service, eventIngestService, openAiCompatService, slackPlugin } =
+                    createService();
+
+                const result = await service.handleSlashCommand(BINDING, commandBody() as any);
+
+                expect(result.ingested).toMatchObject({ inserted: 1 });
+                expect(eventIngestService.ingest).toHaveBeenCalledWith('user-1', [
+                    expect.objectContaining({ kind: 'slack.command' }),
+                ]);
+                // Same chat surface, same bound user as the mention path.
+                expect(openAiCompatService.handleCompletion).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        model: 'auto',
+                        messages: [{ role: 'user', content: 'what shipped today?' }],
+                    }),
+                    { userId: 'user-1' },
+                );
+                // A command has no thread, so the reply lands at the channel root.
+                expect(slackPlugin.reply).toHaveBeenCalledWith(
+                    expect.objectContaining({
+                        externalConversationId: 'C1',
+                        text: 'All green.',
+                    }),
+                    expect.objectContaining({
+                        userId: 'user-1',
+                        target: { botToken: 'xoxb-test' },
+                    }),
+                );
+            });
+
+            it('does NOT answer a duplicate delivery twice (dedupe gates the chat leg)', async () => {
+                const { service, eventIngestService, openAiCompatService, slackPlugin } =
+                    createService();
+                eventIngestService.ingest.mockResolvedValue({
+                    inserted: 0,
+                    duplicates: 1,
+                    rejected: 0,
+                });
+
+                await service.handleSlashCommand(BINDING, commandBody() as any);
+
+                expect(openAiCompatService.handleCompletion).not.toHaveBeenCalled();
+                expect(slackPlugin.reply).not.toHaveBeenCalled();
+            });
+
+            it('still answers when the ingest spine is down — the audit trail is not the answer', async () => {
+                const { service, eventIngestService, slackPlugin } = createService();
+                eventIngestService.ingest.mockRejectedValue(new Error('db down'));
+
+                await expect(
+                    service.handleSlashCommand(BINDING, commandBody() as any),
+                ).resolves.toMatchObject({ ingested: null });
+                expect(slackPlugin.reply).toHaveBeenCalled();
+            });
+
+            it('swallows chat-engine failures — logs, never throws, never posts', async () => {
+                const { service, openAiCompatService, slackPlugin } = createService();
+                openAiCompatService.handleCompletion.mockRejectedValue(new Error('no provider'));
+
+                await expect(
+                    service.handleSlashCommand(BINDING, commandBody() as any),
+                ).resolves.toBeDefined();
+                expect(slackPlugin.reply).not.toHaveBeenCalled();
+            });
+
+            it('swallows reply failures too (Slack was acked long ago)', async () => {
+                const { service, slackPlugin } = createService();
+                slackPlugin.reply.mockRejectedValue(new Error('slack down'));
+
+                await expect(
+                    service.handleSlashCommand(BINDING, commandBody() as any),
+                ).resolves.toBeDefined();
+            });
+
+            it('does not call the chat engine for an empty prompt', async () => {
+                const { service, openAiCompatService } = createService();
+                await service.handleSlashCommand(BINDING, commandBody({ text: '   ' }) as any);
+                expect(openAiCompatService.handleCompletion).not.toHaveBeenCalled();
+            });
+
+            it('falls back to send() at the channel root when the plugin has no reply()', async () => {
+                const { service, slackPlugin } = createService();
+                (slackPlugin as any).reply = undefined;
+
+                await service.handleSlashCommand(BINDING, commandBody() as any);
+
+                const [payload] = slackPlugin.send.mock.calls[0];
+                expect(payload.target).toMatchObject({ channelId: 'C1' });
+                expect(payload.target.threadTs).toBeUndefined();
+            });
+        });
+
+        describe('extractSlackWorkspaceRef (shared with the events receiver)', () => {
+            it('reads the workspace off a form-encoded command payload', () => {
+                expect(
+                    extractSlackWorkspaceRef(
+                        commandBody({ enterprise_id: 'E1', team_id: 'T9' }) as any,
+                    ),
+                ).toEqual({ teamId: 'T9', enterpriseId: 'E1' });
+            });
+        });
+    });
 });

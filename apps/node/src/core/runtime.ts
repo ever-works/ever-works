@@ -1,16 +1,23 @@
+import { PlatformAuthClient } from './auth-client';
 import { describeSelf, type CapabilityEnvironment, type CommandRunner } from './capabilities';
 import { FleetClient, type FetchLike } from './fleet-client';
 import { FleetJobClient } from './job-client';
 import { HeartbeatLoop, type Scheduler } from './heartbeat';
+import type { ResourceProbe } from './resource-limits';
 import { WorkerLoop } from './worker-loop';
 import { runAcceptanceChecksJob } from './executors/acceptance-checks';
+import { runAgentTaskJob } from './executors/agent-task';
+import { runBrowserCheckJob } from './executors/browser-check';
 import type { Logger } from './logger';
 import {
+	clampResourceLimits,
 	DEFAULT_HEARTBEAT_INTERVAL_MS,
 	MAX_HEARTBEAT_INTERVAL_MS,
 	MIN_HEARTBEAT_INTERVAL_MS,
-	type FleetNodeKind,
-	type NodeConfig
+	type FleetEnrollableNodeKind,
+	type FleetNodeView,
+	type NodeConfig,
+	type NodeResourceLimits
 } from './types';
 
 /**
@@ -36,10 +43,17 @@ export interface NodeIo {
 export interface EnrollNodeOptions extends NodeIo {
 	apiUrl: string;
 	token: string;
-	kind: FleetNodeKind;
+	kind: FleetEnrollableNodeKind;
 	/** Local display label. Optional — defaults to the platform-assigned name. */
 	name?: string;
 	heartbeatIntervalMs?: number;
+	/**
+	 * Operator's capability opt-in (wizard step 3). Omitted means "advertise
+	 * everything detected"; supplied, it can only shrink the offer.
+	 */
+	capabilitySelection?: readonly string[];
+	/** Operator's resource ceilings (wizard step 4). Clamped before storage. */
+	limits?: Partial<NodeResourceLimits>;
 }
 
 /** Clamp an operator-supplied heartbeat interval into the supported range. */
@@ -70,28 +84,86 @@ export async function enrollNode(options: EnrollNodeOptions): Promise<NodeConfig
 		userAgent: options.userAgent ?? `ever-works-node/${options.version}`
 	});
 
-	const description = await describeSelf(options.runner, options.environment, options.version);
+	const description = await describeSelf(
+		options.runner,
+		options.environment,
+		options.version,
+		options.capabilitySelection ?? null
+	);
 	logger.info(`Enrolling with ${client.baseUrl} as ${description.platform} [${description.capabilities.join(', ')}]`);
 
 	const result = await client.enroll({ token: options.token, ...description });
 	logger.protect(result.secret);
 
+	const limits = clampResourceLimits(options.limits);
 	const config: NodeConfig = {
 		apiUrl: client.baseUrl,
 		nodeId: result.nodeId,
 		secret: result.secret,
 		kind: options.kind,
 		capabilities: description.capabilities,
+		limits,
 		heartbeatIntervalMs: clampHeartbeatInterval(options.heartbeatIntervalMs),
 		enrolledAt: new Date(options.now ? options.now() : Date.now()).toISOString()
 	};
+	if (options.capabilitySelection) {
+		config.capabilitySelection = [...options.capabilitySelection];
+	}
 	const label = options.name?.trim() || result.node.name;
 	if (label) {
 		config.name = label;
 	}
 
-	logger.info(`Enrolled as node ${result.nodeId} ("${config.name ?? 'unnamed'}")`);
+	logger.info(
+		`Enrolled as node ${result.nodeId} ("${config.name ?? 'unnamed'}") — ` +
+			`max ${limits.maxConcurrentJobs} concurrent job(s)`
+	);
 	return config;
+}
+
+export interface EnrollWithCredentialsOptions extends Omit<EnrollNodeOptions, 'token'> {
+	email: string;
+	/** Used for exactly one request; never stored, never logged. */
+	password: string;
+	/** Name registered with the platform when minting the token. */
+	nodeName: string;
+}
+
+/**
+ * The authenticate leg (A14): sign in, mint a one-time enrollment token, then
+ * run the ordinary {@link enrollNode} path with it.
+ *
+ * The single-use token still exists and is still consumed exactly once — this
+ * removes the clipboard from the loop, not the protocol step. The password
+ * lives only in this call frame; only the resulting heartbeat secret is ever
+ * persisted, by the caller's `saveConfig`.
+ */
+export async function enrollNodeWithCredentials(options: EnrollWithCredentialsOptions): Promise<NodeConfig> {
+	const { logger } = options;
+	const auth = new PlatformAuthClient({
+		apiUrl: options.apiUrl,
+		fetchFn: options.fetchFn,
+		logger,
+		userAgent: options.userAgent ?? `ever-works-node/${options.version}`
+	});
+
+	const session = await auth.signIn(options.email, options.password);
+	logger.info(`Signed in to ${auth.baseUrl}${session.email ? ` as ${session.email}` : ''}`);
+
+	const token = await auth.createEnrollmentToken(session.sessionToken, {
+		name: options.nodeName,
+		kind: options.kind
+	});
+	logger.info('Enrollment token minted for this machine');
+
+	const { email: _email, password: _password, nodeName, ...rest } = options;
+	return enrollNode({
+		...rest,
+		token,
+		// The local label defaults to the name we just registered, so the
+		// status window and the Fleet page agree without a second prompt.
+		...(rest.name ? {} : { name: nodeName })
+	});
 }
 
 export interface NodeRuntime {
@@ -114,10 +186,33 @@ export interface CreateNodeRuntimeOptions {
 	 * commands are two different consents, and the second is opt-in.
 	 */
 	workerEnabled?: boolean;
-	/** Max jobs in flight on this node. */
+	/**
+	 * Max jobs in flight on this node. Superseded by the stored
+	 * `config.limits.maxConcurrentJobs` when the node has limits.
+	 */
 	concurrency?: number;
+	/**
+	 * Override the stored resource ceilings. Normally omitted — the node's
+	 * own `config.limits` is the source of truth.
+	 */
+	limits?: Partial<NodeResourceLimits>;
+	/** Host sampler backing the CPU/memory admission gate. */
+	resourceProbe?: ResourceProbe;
 	leaseTtlSec?: number;
 	idlePollMs?: number;
+	/**
+	 * Directory `agent-task` steps run in when the job itself carries no
+	 * `workspacePath`. Absent lets the executor fall back to the node
+	 * service's own working directory.
+	 */
+	agentTaskWorkspacePath?: string;
+
+	/**
+	 * Start the worker drained. The node still heartbeats (so it stays
+	 * observable in Fleet) but leases nothing until it is resumed —
+	 * how `ever-works-node pause` survives a service restart.
+	 */
+	startPaused?: boolean;
 }
 
 /**
@@ -136,11 +231,14 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		userAgent
 	});
 
+	// Re-detection stays intersected with the operator's opt-in, so a tool
+	// installed after enrollment never silently widens what this node offers.
+	const selection = config.capabilitySelection ?? null;
 	const loopOptions = {
 		client,
 		nodeId: config.nodeId,
 		secret: config.secret,
-		describe: () => describeSelf(io.runner, io.environment, io.version),
+		describe: () => describeSelf(io.runner, io.environment, io.version, selection),
 		intervalMs: clampHeartbeatInterval(config.heartbeatIntervalMs),
 		logger: io.logger,
 		...(io.scheduler ? { scheduler: io.scheduler } : {}),
@@ -158,23 +256,94 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			logger: io.logger,
 			userAgent
 		});
+		// Precedence: explicit override → the node's stored limits → the
+		// legacy `concurrency` option → defaults.
+		const limits = clampResourceLimits(
+			options.limits ??
+				config.limits ??
+				(options.concurrency !== undefined ? { maxConcurrentJobs: options.concurrency } : null)
+		);
 		const worker = new WorkerLoop({
 			client: jobClient,
 			logger: io.logger,
-			...(options.concurrency !== undefined ? { concurrency: options.concurrency } : {}),
+			limits,
+			...(options.resourceProbe ? { resourceProbe: options.resourceProbe } : {}),
 			...(options.leaseTtlSec !== undefined ? { leaseTtlSec: options.leaseTtlSec } : {}),
 			...(options.idlePollMs !== undefined ? { idlePollMs: options.idlePollMs } : {}),
+			...(options.startPaused !== undefined ? { startPaused: options.startPaused } : {}),
 			...(io.scheduler ? { scheduler: io.scheduler } : {})
 		});
-		// The v1 executor. Registering it HERE (not inside WorkerLoop) is
-		// the executor seam: a second job kind is one more `register` call
+		// The executor seam: a job kind is one more `register` call
 		// against the same protocol — no new endpoint, no new credential.
 		worker.register('acceptance-checks', (job) => runAcceptanceChecksJob(job));
+		// The general kind. Without it an enrolled machine could only ever
+		// score a gate; with it a Task's run can actually EXECUTE here when
+		// the owner's resolved job runtime is the fleet. Same seam, same
+		// protocol, same credential — exactly as the header above promised.
+		worker.register('agent-task', (job) =>
+			runAgentTaskJob(job, {
+				...(options.agentTaskWorkspacePath !== undefined
+					? { defaultWorkspacePath: options.agentTaskWorkspacePath }
+					: {})
+			})
+		);
+		// `browser-check` is registered ONLY when this machine actually
+		// resolved a browser executable (audit A26). A node advertising
+		// the `browser` capability with no executor behind it would fail
+		// every job that tag invited, so the tag and the executor are
+		// switched on by the SAME fact.
+		if (io.environment.browserPath) {
+			const browserPath = io.environment.browserPath;
+			worker.register('browser-check', (job) =>
+				runBrowserCheckJob(job, {
+					resolveBrowser: () => browserPath,
+					hasDisplay: io.environment.hasDisplay
+				})
+			);
+		}
 		runtime.worker = worker;
 		runtime.jobClient = jobClient;
 	}
 
 	return runtime;
+}
+
+/**
+ * Tell the platform to drain (or resume) this node, using the node's own
+ * heartbeat credential.
+ *
+ * Returns the refreshed node view so the caller can report the status
+ * the platform actually settled on rather than the one it asked for.
+ */
+export async function pauseNode(config: NodeConfig, io: NodeIo, paused: boolean): Promise<FleetNodeView> {
+	io.logger.protect(config.secret);
+	const client = new FleetClient({
+		apiUrl: config.apiUrl,
+		fetchFn: io.fetchFn,
+		logger: io.logger,
+		userAgent: io.userAgent ?? `ever-works-node/${io.version}`
+	});
+	const result = await client.pause({ nodeId: config.nodeId, secret: config.secret, paused });
+	return result.node;
+}
+
+/**
+ * Retire this node's registration on the platform.
+ *
+ * The local credential is erased by the CALLER (`clearConfig`), always,
+ * even when this call fails — an operator decommissioning a machine
+ * must not be left with a live secret on it because the API was
+ * unreachable.
+ */
+export async function unenrollNode(config: NodeConfig, io: NodeIo): Promise<void> {
+	io.logger.protect(config.secret);
+	const client = new FleetClient({
+		apiUrl: config.apiUrl,
+		fetchFn: io.fetchFn,
+		logger: io.logger,
+		userAgent: io.userAgent ?? `ever-works-node/${io.version}`
+	});
+	await client.unenroll({ nodeId: config.nodeId, secret: config.secret });
 }
 
 /** Process-signal abstraction so shutdown wiring is testable. */

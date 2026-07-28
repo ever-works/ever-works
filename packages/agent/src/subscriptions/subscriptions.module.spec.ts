@@ -9,8 +9,23 @@ import {
     ManualBillingProvider,
 } from './billing/billing.provider';
 import { StripeBillingProvider, STRIPE_METADATA_KEYS } from './billing/stripe-billing.provider';
-import { BillingService, UnknownCreditPackError } from './billing/billing.service';
+import {
+    BillingService,
+    NoActiveSubscriptionError,
+    UnknownCreditPackError,
+} from './billing/billing.service';
 import { AutoRechargeService } from './billing/auto-recharge.service';
+import {
+    LastPaymentMethodError,
+    PaymentMethodNotFoundError,
+    PaymentMethodService,
+} from './billing/payment-method.service';
+import {
+    CheckoutSessionNotFoundError,
+    PlanNotPurchasableError,
+    PlanSubscriptionService,
+    UnknownSubscriptionPlanError,
+} from './billing/plan-subscription.service';
 import { CREDIT_PACKS, CREDIT_PACK_IDS } from './billing/credit-packs';
 import { CreditLedgerService, InsufficientCreditsError } from './credits/credit-ledger.service';
 import { ENTITLEMENT_KEYS, EntitlementsService } from './credits/entitlements.service';
@@ -18,6 +33,7 @@ import { RunCostSettlementService } from './credits/run-cost-settlement.service'
 import {
     InvalidUsagePeriodError,
     resolveUsageSummaryWindow,
+    USAGE_EXPORT_COLUMNS,
     USAGE_SUMMARY_GROUP_BYS,
     UsageSummaryService,
 } from './credits/usage-summary.service';
@@ -72,16 +88,54 @@ describe('SubscriptionsModule + barrel re-exports', () => {
             expect(subscriptionsBarrel.USAGE_SUMMARY_GROUP_BYS).toBe(USAGE_SUMMARY_GROUP_BYS);
         });
 
+        it('re-exports the account-wide CSV export column contract (B29)', () => {
+            expect(subscriptionsBarrel.USAGE_EXPORT_COLUMNS).toBe(USAGE_EXPORT_COLUMNS);
+            // Pinned column order — the CSV header is a wire format the
+            // downloaded file's consumers (spreadsheets, finance tooling)
+            // depend on; reordering silently breaks them.
+            expect(USAGE_EXPORT_COLUMNS).toEqual([
+                'occurredAt',
+                'pluginId',
+                'capability',
+                'units',
+                'costCents',
+                'currency',
+                'modelId',
+                'workId',
+                'agentId',
+                'taskId',
+                'runId',
+                'requestId',
+            ]);
+        });
+
         it('re-exports the money path (billing PRD B5)', () => {
             expect(subscriptionsBarrel.BillingService).toBe(BillingService);
             expect(subscriptionsBarrel.AutoRechargeService).toBe(AutoRechargeService);
             expect(subscriptionsBarrel.StripeBillingProvider).toBe(StripeBillingProvider);
             expect(subscriptionsBarrel.CREDIT_PACKS).toBe(CREDIT_PACKS);
             expect(subscriptionsBarrel.UnknownCreditPackError).toBe(UnknownCreditPackError);
+            // Subscription lifecycle (audit B07/B08) — cancel/resume and
+            // the portal recovery action map this to a 409 at the API.
+            expect(subscriptionsBarrel.NoActiveSubscriptionError).toBe(NoActiveSubscriptionError);
             expect(subscriptionsBarrel.BillingProviderNotConfiguredError).toBe(
                 BillingProviderNotConfiguredError,
             );
             expect(subscriptionsBarrel.BillingProviderError).toBe(BillingProviderError);
+        });
+
+        it('re-exports the paid-plan purchase path (audit B24)', () => {
+            expect(subscriptionsBarrel.PlanSubscriptionService).toBe(PlanSubscriptionService);
+            expect(subscriptionsBarrel.PaymentMethodService).toBe(PaymentMethodService);
+            expect(subscriptionsBarrel.PaymentMethodNotFoundError).toBe(PaymentMethodNotFoundError);
+            expect(subscriptionsBarrel.LastPaymentMethodError).toBe(LastPaymentMethodError);
+            expect(subscriptionsBarrel.UnknownSubscriptionPlanError).toBe(
+                UnknownSubscriptionPlanError,
+            );
+            expect(subscriptionsBarrel.PlanNotPurchasableError).toBe(PlanNotPurchasableError);
+            expect(subscriptionsBarrel.CheckoutSessionNotFoundError).toBe(
+                CheckoutSessionNotFoundError,
+            );
         });
 
         it('exposes the documented runtime symbols only (no extras silently appearing)', () => {
@@ -107,7 +161,22 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                     'BillingService',
                     'BILLING_PAYMENT_REF_TYPE',
                     'UnknownCreditPackError',
+                    // Subscription lifecycle (audit B07/B08)
+                    'NoActiveSubscriptionError',
                     'AutoRechargeService',
+                    // Paid-plan purchase (audit B24)
+                    'PlanSubscriptionService',
+                    'UnknownSubscriptionPlanError',
+                    'PlanNotPurchasableError',
+                    'CheckoutSessionNotFoundError',
+                    // Payment methods (audit B10/B25)
+                    'PaymentMethodService',
+                    'PaymentMethodNotFoundError',
+                    'LastPaymentMethodError',
+                    // Provider-side setup-session marker + the handle
+                    // helper the payment-method routes share.
+                    'STRIPE_SETUP_KIND',
+                    'paymentMethodHandle',
                     // Credits ledger + plan entitlements (pricing Wave 9 M1)
                     'CreditLedgerService',
                     'InsufficientCreditsError',
@@ -123,6 +192,8 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                     'resolveUsageSummaryWindow',
                     'InvalidUsagePeriodError',
                     'USAGE_SUMMARY_GROUP_BYS',
+                    // Account-wide usage CSV export (B29)
+                    'USAGE_EXPORT_COLUMNS',
                 ].sort(),
             );
         });
@@ -194,6 +265,12 @@ describe('SubscriptionsModule + barrel re-exports', () => {
             expect(exports).toContain(AutoRechargeService);
         });
 
+        it('declares + exports PlanSubscriptionService (audit B24 — paid-plan checkout)', () => {
+            expect(getMeta('providers')).toContain(PlanSubscriptionService);
+            expect(getMeta('providers')).toContain(PaymentMethodService);
+            expect(getMeta('exports')).toContain(PlanSubscriptionService);
+        });
+
         it('pins the credit-pack table to the packs published on the website', () => {
             expect(CREDIT_PACK_IDS).toEqual(['credits-1000', 'credits-5500', 'credits-25000']);
             expect(CREDIT_PACKS.map((p) => [p.priceCents, p.credits])).toEqual([
@@ -209,6 +286,9 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                 userId: 'ever_works_user_id',
                 packId: 'ever_works_pack_id',
                 referenceId: 'ever_works_reference_id',
+                // Audit B24 — mirrored onto subscription_data.metadata so
+                // renewals/cancels stay attributable to a tier.
+                planCode: 'ever_works_plan_code',
             });
         });
 

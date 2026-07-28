@@ -1,28 +1,50 @@
-import type { PrereqCheckResult, RuntimeSelection } from '../../shared/ipc-contract';
+import type { DesktopMode, PrereqCheckResult, RemoteConnection, RuntimeSelection } from '../../shared/ipc-contract';
 import { getRuntime } from '../../shared/runtimes';
 import { requiredPrereqsOk } from '../../services/prereq-check';
 
 /**
- * Pure sequencing logic for the pre-boot install wizard:
- * welcome → prereq check → runtime select → env write → boot → open app.
+ * Pure sequencing logic for the pre-boot install wizard.
+ *
+ * The wizard branches on the deployment mode chosen in the `mode` step:
+ *
+ * - `local-stack`  welcome → mode → prereq → runtime → env → boot → open
+ * - `remote-client` welcome → mode → remote → open
+ *
  * Mirrors the web onboarding's computeStepList pattern so desktop-only steps
  * can slot in later without new machinery.
  */
 
-export const WIZARD_STEPS = ['welcome', 'prereq', 'runtime', 'env', 'boot', 'open'] as const;
-export type WizardStepId = (typeof WIZARD_STEPS)[number];
+/** Steps of the all-in-one local install. */
+export const LOCAL_WIZARD_STEPS = ['welcome', 'mode', 'prereq', 'runtime', 'env', 'boot', 'open'] as const;
+
+/** Steps of the client-mode install (connect to an instance that already runs elsewhere). */
+export const REMOTE_WIZARD_STEPS = ['welcome', 'mode', 'remote', 'open'] as const;
+
+/** Default (local-stack) flow. */
+export const WIZARD_STEPS = LOCAL_WIZARD_STEPS;
+
+export type WizardStepId = (typeof LOCAL_WIZARD_STEPS)[number] | (typeof REMOTE_WIZARD_STEPS)[number];
 
 export interface WizardProgress {
+	/** Undefined until the user picks a mode in the `mode` step. */
+	mode?: DesktopMode;
 	prereqResults?: PrereqCheckResult[];
 	selection?: RuntimeSelection;
 	envWritten: boolean;
 	servicesHealthy: boolean;
+	/** Remote instance the user entered (client mode only). */
+	remoteConnection?: RemoteConnection;
+	/** True once the remote instance answered its health probe. */
+	remoteVerified?: boolean;
 }
 
-export function computeStepList(_progress: WizardProgress): WizardStepId[] {
-	// All steps always apply today; conditional runtime-config sub-steps hook
-	// in here later (same extension point the web wizard uses).
-	return [...WIZARD_STEPS];
+/** Which flow a progress snapshot is on. Local is the default until a mode is chosen. */
+export function isRemoteMode(progress: WizardProgress): boolean {
+	return progress.mode === 'remote-client';
+}
+
+export function computeStepList(progress: WizardProgress): WizardStepId[] {
+	return isRemoteMode(progress) ? [...REMOTE_WIZARD_STEPS] : [...LOCAL_WIZARD_STEPS];
 }
 
 /** A selection is valid when the runtime exists, required fields resolve to a value, and the DB choice is coherent. */
@@ -52,11 +74,20 @@ export function selectionValid(selection: RuntimeSelection | undefined): boolean
 	return true;
 }
 
+/** A remote step is complete once a connection was resolved AND its health probe succeeded. */
+export function remoteReady(progress: WizardProgress): boolean {
+	return Boolean(progress.remoteConnection) && progress.remoteVerified === true;
+}
+
 /** Whether the given step's completion condition is met (i.e. the user may advance past it). */
 export function canAdvance(step: WizardStepId, progress: WizardProgress): boolean {
 	switch (step) {
 		case 'welcome':
 			return true;
+		case 'mode':
+			return progress.mode !== undefined;
+		case 'remote':
+			return remoteReady(progress);
 		case 'prereq':
 			return requiredPrereqsOk(progress.prereqResults);
 		case 'runtime':

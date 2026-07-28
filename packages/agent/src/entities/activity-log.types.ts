@@ -219,6 +219,20 @@ export enum ActivityActionType {
     // chat can link back to the original message / PR / page. Additive
     // member — storage is a plain varchar.
     EXTERNAL_EVENT_INGESTED = 'external_event_ingested',
+
+    // Git activity ingestion (audit item j). Commits, pushes and merges
+    // arrive on the consolidated GitHub receiver, are normalized into
+    // `github.push` / `github.commit` / `github.merge` envelopes and
+    // drained by the SAME spine that writes EXTERNAL_EVENT_INGESTED —
+    // these three kinds simply resolve to their own action type
+    // (`INGEST_ACTIVITY_ACTION_BY_KIND`) so the feed can tell "someone
+    // pushed" apart from "some connector event landed". `details`
+    // carries the routing block (repoFullName / ref / sha / prNumber /
+    // taskId) the row was built from. Additive members — storage is a
+    // plain varchar, so no migration is needed.
+    GIT_PUSHED = 'git_pushed',
+    GIT_COMMITTED = 'git_committed',
+    GIT_MERGED = 'git_merged',
 }
 
 export enum ActivityStatus {

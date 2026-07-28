@@ -1,0 +1,86 @@
+{
+	"name": "@ever-works/browser-automation-plugin",
+	"version": "1.0.0",
+	"description": "Headless browser automation for Ever Works - navigate, extract, screenshot and act on web pages via Playwright, behind a default-deny navigation allowlist that is re-checked on every redirect hop",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"type-check": "tsc --noEmit",
+		"clean": "rm -rf dist",
+		"test": "vitest run --passWithNoTests",
+		"test:watch": "vitest",
+		"test:coverage": "vitest run --coverage"
+	},
+	"peerDependencies": {
+		"@ever-works/plugin": "workspace:*"
+	},
+	"optionalDependencies": {
+		"playwright-core": "^1.59.1"
+	},
+	"devDependencies": {
+		"@ever-works/plugin": "workspace:*",
+		"@types/node": "^22.0.0",
+		"tsup": "^8.4.0",
+		"typescript": "^5.7.3",
+		"vitest": "^4.1.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "browser-automation",
+			"name": "Browser Automation",
+			"version": "1.0.0",
+			"category": "utility",
+			"capabilities": [
+				"browser-automation"
+			],
+			"description": "Drives a headless Chromium via Playwright: navigate, extract text/HTML/attributes by CSS selector, capture screenshots, and run bounded interaction steps. Every navigation and every redirect hop is checked against a default-deny host allowlist and an SSRF guard, so the browser can never be pointed at internal hosts.",
+			"author": {
+				"name": "Ever Works Team"
+			},
+			"license": "AGPL-3.0",
+			"systemPlugin": false,
+			"builtIn": false,
+			"visibility": "public",
+			"defaultForCapabilities": [
+				"browser-automation"
+			],
+			"envVars": [
+				{
+					"name": "PLUGIN_BROWSER_AUTOMATION_ALLOWED_HOSTS",
+					"required": false,
+					"secret": false,
+					"description": "Comma-separated navigation allowlist (e.g. 'example.com,*.example.org'). Empty means every navigation is refused."
+				},
+				{
+					"name": "PLUGIN_BROWSER_AUTOMATION_EXECUTABLE_PATH",
+					"required": false,
+					"secret": false,
+					"description": "Absolute path to a Chromium binary. Defaults to the Playwright-managed browser."
+				}
+			],
+			"distribution": "registry"
+		}
+	},
+	"private": false,
+	"publishConfig": {
+		"access": "restricted",
+		"registry": "https://registry.npmjs.org"
+	}
+}

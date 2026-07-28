@@ -295,11 +295,26 @@ test.describe('Flow: subscription billing grace / past-due / dunning / reactivat
             expect(res.status(), `${path} should be 404 (no billing-lifecycle route)`).toBe(404);
         }
 
-        // The catalogue endpoint is likewise absent (asserted by sibling specs too).
+        // The catalogue endpoint DOES exist (Wave 13 billing added GET /plans
+        // for the plan switcher) — but it is a catalogue, not a lifecycle
+        // route, so it must not become a back door onto the very subscription
+        // state the routes above refuse to expose. Pin that: it answers 200
+        // and carries plan/pricing rows only, no status/grace/dunning fields.
         const plans = await request.get(`${API_BASE}/api/subscriptions/plans`, {
             headers: authedHeaders(user.access_token),
         });
-        expect(plans.status(), '/api/subscriptions/plans not exposed').toBe(404);
+        expect(plans.status(), '/api/subscriptions/plans is the catalogue').toBe(200);
+        const plansText = await plans.text();
+        for (const leak of [
+            'pastDue',
+            'past_due',
+            'gracePeriodEnd',
+            'currentPeriodEnd',
+            'cancelAtPeriodEnd',
+            'dunning',
+        ]) {
+            expect(plansText, `catalogue leaks lifecycle field '${leak}'`).not.toContain(leak);
+        }
 
         // Unauthenticated read of the one real route is rejected.
         expect((await request.get(`${API_BASE}/api/subscriptions/plan`)).status()).toBe(401);

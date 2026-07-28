@@ -78,6 +78,27 @@ describe('checkPrerequisites', () => {
 		expect(requiredPrereqsOk(results)).toBe(true);
 	});
 
+	it('stops requiring the host toolchain when the install ships a bundled runtime', async () => {
+		const results = await checkPrerequisites(
+			runnerWith({
+				node: new Error('ENOENT'),
+				pnpm: new Error('ENOENT'),
+				docker: new Error('ENOENT')
+			}),
+			{ requireHostToolchain: false }
+		);
+		const node = results.find((result) => result.id === 'node');
+		const pnpm = results.find((result) => result.id === 'pnpm');
+		expect(node?.required).toBe(false);
+		expect(node?.found).toBe(false);
+		expect(node?.ok).toBe(true);
+		expect(node?.message).toContain('bundled platform runtime');
+		expect(pnpm?.required).toBe(false);
+		expect(pnpm?.ok).toBe(true);
+		// A machine with no Node.js and no pnpm can still complete the wizard.
+		expect(requiredPrereqsOk(results)).toBe(true);
+	});
+
 	it('treats a non-zero exit code as not found', async () => {
 		const results = await checkPrerequisites(
 			runnerWith({

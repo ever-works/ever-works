@@ -24,6 +24,7 @@ import { SourceRepoAnalyzerService, ImportExecutorService } from '@ever-works/ag
 import { WorksConfigService, WorksConfigWriterService } from '@ever-works/agent/works-config';
 import { TemplateCustomizationService } from '@ever-works/agent/template-catalog';
 import { CategoryIconService, KnowledgeBaseGitMirrorService } from '@ever-works/agent/services';
+import { PullRequestGateService } from '@ever-works/agent/policy';
 import { TriggerPluginsModule } from './trigger-plugins.module';
 import { TriggerFacadesModule } from './trigger-facades.module';
 import { TriggerPipelineModule } from './trigger-pipeline.module';
@@ -125,6 +126,13 @@ import { TriggerImportOrchestrator } from '../orchestrators/trigger-import.orche
             inject: [TriggerInternalApiClient],
         },
         CategoryIconService,
+        // Quality gates (audit W3 M3) — the worker hosts DataGenerator +
+        // MarkdownGenerator as DIRECT providers (not via their agent-side
+        // modules), so their @Optional() PR-gate dependency has to be
+        // provided here too. Without it the generator PRs would open
+        // ungated in the Trigger runtime while being gated in the API.
+        // The service has no injected dependency of its own.
+        PullRequestGateService,
         DataGeneratorService,
         MarkdownGeneratorService,
         WebsiteGeneratorService,

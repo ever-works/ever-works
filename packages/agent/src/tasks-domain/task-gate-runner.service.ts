@@ -1,6 +1,4 @@
 import { Injectable, Logger } from '@nestjs/common';
-import { spawn } from 'child_process';
-import { join } from 'path';
 import type {
     GateStatus,
     TaskAcceptanceCheck,
@@ -9,19 +7,17 @@ import type {
 } from '@ever-works/contracts';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
 import { config } from '../config';
-import { buildCheckEnv } from './check-env';
+import {
+    computeGateStatus,
+    executeAcceptanceCheck,
+    DEFAULT_CHECK_TIMEOUT_SEC,
+    MAX_CHECK_TIMEOUT_SEC,
+    CHECK_LOG_TAIL_BYTES,
+} from './acceptance-check-executor';
 
-/** Wall-clock budget applied when a check declares no `timeoutSec`. */
-export const DEFAULT_CHECK_TIMEOUT_SEC = 600;
-
-/**
- * Hard per-check ceiling. A hostile/typo'd `timeoutSec` on a simple-json
- * column must never let one check eat the whole Trigger.dev `maxDuration`.
- */
-export const MAX_CHECK_TIMEOUT_SEC = 1800;
-
-/** Last-N-bytes window of combined stdout/stderr kept as `logTail`. */
-export const CHECK_LOG_TAIL_BYTES = 4096;
+// Re-exported from their new home so existing importers of this module
+// (specs, worker steps) keep resolving the same symbols.
+export { DEFAULT_CHECK_TIMEOUT_SEC, MAX_CHECK_TIMEOUT_SEC, CHECK_LOG_TAIL_BYTES };
 
 export interface RunChecksInput {
     /** The dispatch-frozen check set (`agent_runs.resolvedChecks`). */
@@ -145,10 +141,7 @@ export class TaskGateRunnerService {
             results.push(await this.executeCheck(check, input.cwd));
         }
 
-        const failedRequired = checks.filter(
-            (check, index) => check.required !== false && results[index].status !== 'green',
-        );
-        const gateStatus: GateStatus = failedRequired.length > 0 ? 'red' : 'green';
+        const gateStatus: GateStatus = computeGateStatus(checks, results);
 
         // Attempt counter threaded from the M5 iterate loop; clamped so a
         // bad caller value can never write a nonsense counter. Defaults to
@@ -191,17 +184,9 @@ export class TaskGateRunnerService {
     /**
      * Spawn one check command and observe its real exit code.
      *
-     * `shell: true` — a check is "a command and an exit code", authored the
-     * way package scripts are (`pnpm build`, `npm test -- --ci`), so it gets
-     * the platform shell. This adds no privilege beyond the status quo:
-     * pipeline agents already run arbitrary commands in the same checkout,
-     * and only Work members with settings/Task-edit rights author checks.
-     *
-     * The child env is SCRUBBED (`buildCheckEnv`), never inherited: the
-     * command is user-authored, so `env`/`printenv` in a check must not be
-     * able to read the platform's database, auth, Trigger or plugin
-     * credentials. A check that genuinely needs one more variable names it
-     * in `envPassthrough`.
+     * Thin delegation to {@link executeAcceptanceCheck} — the shared
+     * executor the non-worker `PullRequestGateService` uses too, so both
+     * gate consumers observe identical process/timeout/env semantics.
      */
     private executeCheck(
         check: TaskAcceptanceCheck,
@@ -213,98 +198,6 @@ export class TaskGateRunnerService {
          */
         ceilingSec?: number,
     ): Promise<TaskCheckResult> {
-        const cwd = check.cwd ? join(rootCwd, check.cwd) : rootCwd;
-        const ceiling =
-            typeof ceilingSec === 'number' && ceilingSec > 0
-                ? Math.min(ceilingSec, MAX_CHECK_TIMEOUT_SEC)
-                : MAX_CHECK_TIMEOUT_SEC;
-        const timeoutSec = Math.min(
-            typeof check.timeoutSec === 'number' && check.timeoutSec > 0
-                ? check.timeoutSec
-                : DEFAULT_CHECK_TIMEOUT_SEC,
-            ceiling,
-        );
-        const startedAt = Date.now();
-
-        return new Promise<TaskCheckResult>((resolve) => {
-            let settled = false;
-            let timedOut = false;
-            let tail = '';
-            let timer: ReturnType<typeof setTimeout> | undefined;
-
-            const finish = (status: TaskCheckResult['status'], exitCode: number | null) => {
-                if (settled) return;
-                settled = true;
-                if (timer) clearTimeout(timer);
-                resolve({
-                    id: check.id,
-                    exitCode,
-                    status,
-                    durationMs: Date.now() - startedAt,
-                    ...(tail.length > 0 ? { logTail: tail } : {}),
-                });
-            };
-
-            let child: ReturnType<typeof spawn>;
-            try {
-                child = spawn(check.command, {
-                    cwd,
-                    shell: true,
-                    windowsHide: true,
-                    env: buildCheckEnv({ passthrough: check.envPassthrough }),
-                });
-            } catch (error) {
-                tail = error instanceof Error ? error.message : String(error);
-                finish('error', null);
-                return;
-            }
-
-            timer = setTimeout(() => {
-                timedOut = true;
-                try {
-                    child.kill('SIGKILL');
-                } catch {
-                    // Process already gone — the close handler settles.
-                }
-            }, timeoutSec * 1000);
-
-            const append = (chunk: Buffer | string) => {
-                tail = (tail + chunk.toString()).slice(-CHECK_LOG_TAIL_BYTES);
-            };
-            child.stdout?.on('data', append);
-            child.stderr?.on('data', append);
-
-            // Spawn failures (nonexistent cwd, missing shell) surface here,
-            // not as a throw — 'error' status keeps infra problems from
-            // reading as code problems.
-            child.on('error', (error) => {
-                append(`\n${error.message}`);
-                finish('error', null);
-            });
-
-            // On timeout, settle on 'exit' (process death) instead of
-            // 'close' (stdio drain): a killed shell can leave a grandchild
-            // holding the pipes open, and the gate must not wait for it.
-            // Destroying our read ends releases those handles immediately.
-            child.on('exit', () => {
-                if (timedOut) {
-                    child.stdout?.destroy();
-                    child.stderr?.destroy();
-                    finish('timeout', null);
-                }
-            });
-
-            child.on('close', (code) => {
-                if (timedOut) {
-                    finish('timeout', null);
-                } else if (code === 0) {
-                    finish('green', 0);
-                } else {
-                    // Killed by an external signal (code null) is still not
-                    // a pass — red, with the null exit code preserved.
-                    finish('red', code);
-                }
-            });
-        });
+        return executeAcceptanceCheck(check, rootCwd, ceilingSec);
     }
 }

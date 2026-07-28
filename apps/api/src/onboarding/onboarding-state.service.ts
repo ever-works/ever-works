@@ -1,5 +1,8 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
-import { UserRepository } from '@ever-works/agent/database';
+import { Injectable, Logger, NotFoundException, Optional } from '@nestjs/common';
+import {
+    OrganizationOnboardingProfileRepository,
+    UserRepository,
+} from '@ever-works/agent/database';
 import {
     ONBOARDING_DEFAULT_STATE,
     ROLE_OPTIONS,
@@ -9,6 +12,11 @@ import {
     type OnboardingStatePatchRequest,
     type OnboardingWizardStateV2,
 } from '@ever-works/contracts/api';
+// Concrete path (not the `../scope` barrel): the barrel re-exports
+// `ScopeModule`, and pulling a module into a service's import graph is
+// how circular-module init bugs start. The service itself is provided
+// globally, so only the class is needed here.
+import { ScopeContextService } from '../scope/scope-context.service';
 
 /**
  * Owns reads + writes for the v2 onboarding wizard's server-side state.
@@ -17,12 +25,28 @@ import {
  * timestamp columns (`onboardingCompletedAt`, `onboardingDismissedAt`). All
  * three default to NULL — `getState` synthesises the version-2 default
  * payload until the user makes their first choice.
+ *
+ * Audit item A53 — the "What do you do" answers (`state.profile`) are
+ * ALSO mirrored onto `organization_onboarding_profiles` whenever the
+ * request resolves an organization scope, so the answers are visible to
+ * the whole organization instead of being trapped on one user row. The
+ * user blob stays the source of truth for the wizard UI; the org row is
+ * a read model surfaced back as `organizationProfile`.
  */
 @Injectable()
 export class OnboardingStateService {
     private readonly logger = new Logger(OnboardingStateService.name);
 
-    constructor(private readonly userRepository: UserRepository) {}
+    constructor(
+        private readonly userRepository: UserRepository,
+        // Both @Optional(): the org mirror is a best-effort enrichment, and
+        // keeping them optional lets unit specs construct the service with
+        // just the user repository (and keeps non-HTTP callers — CLI,
+        // workers — working outside any request scope).
+        @Optional() private readonly scopeContext?: ScopeContextService,
+        @Optional()
+        private readonly orgProfileRepository?: OrganizationOnboardingProfileRepository,
+    ) {}
 
     async getState(userId: string): Promise<OnboardingStateResponse> {
         const user = await this.userRepository.findById(userId);
@@ -37,6 +61,7 @@ export class OnboardingStateService {
                 ? user.onboardingDismissedAt.toISOString()
                 : null,
             state: normaliseState(user.onboardingState),
+            organizationProfile: await this.readOrganizationProfile(),
         };
     }
 
@@ -52,7 +77,11 @@ export class OnboardingStateService {
         const current = normaliseState(user.onboardingState);
         const next = mergeState(current, patch.state ?? {});
 
-        // Idempotent: skip the write if nothing actually changed.
+        // Idempotent: skip the USER write if nothing actually changed. The
+        // org mirror still runs when the patch carried a profile — another
+        // member may have overwritten the org row since, and this request
+        // is an explicit re-statement of this user's answers (last writer
+        // inside the organization wins).
         if (deepEqual(current, next)) {
             return {
                 completedAt: user.onboardingCompletedAt
@@ -62,12 +91,22 @@ export class OnboardingStateService {
                     ? user.onboardingDismissedAt.toISOString()
                     : null,
                 state: current,
+                organizationProfile: patch.state?.profile
+                    ? await this.mirrorOrganizationProfile(userId, current.profile)
+                    : await this.readOrganizationProfile(),
             };
         }
 
         const updated = await this.userRepository.update(userId, {
             onboardingState: next,
         });
+
+        // A53 — mirror the answers at org level. Only when the patch
+        // actually carried a `profile` (an unrelated step transition must
+        // not re-stamp the org row) and only inside a resolved org scope.
+        const organizationProfile = patch.state?.profile
+            ? await this.mirrorOrganizationProfile(userId, next.profile)
+            : await this.readOrganizationProfile();
 
         return {
             completedAt: updated?.onboardingCompletedAt
@@ -77,7 +116,78 @@ export class OnboardingStateService {
                 ? updated.onboardingDismissedAt.toISOString()
                 : null,
             state: next,
+            organizationProfile,
         };
+    }
+
+    // ─── Organization-scoped mirror (A53) ───────────────────────────────
+
+    /**
+     * Resolve the organization the current request runs in, or `null`
+     * when there is none (no scope service wired, called outside a
+     * request, or a user who has not created an Organization yet).
+     */
+    private currentOrganizationId(): string | null {
+        if (!this.scopeContext || !this.orgProfileRepository) return null;
+        return this.scopeContext.getOrganizationId();
+    }
+
+    /** Read the org-level profile for the active scope; `null` when absent. */
+    private async readOrganizationProfile(): Promise<OnboardingProfile | null> {
+        const organizationId = this.currentOrganizationId();
+        if (!organizationId) return null;
+        try {
+            const row = await this.orgProfileRepository!.findByOrg(organizationId);
+            if (!row) return null;
+            return (
+                normaliseProfile({
+                    roles: row.roles ?? undefined,
+                    teamSize: row.teamSize ?? undefined,
+                }) ?? null
+            );
+        } catch (error) {
+            // Best-effort enrichment — a read failure must never turn a
+            // successful onboarding save into a 500.
+            this.logger.warn(
+                `Failed to read organization onboarding profile for ${organizationId}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return null;
+        }
+    }
+
+    /**
+     * Persist the merged profile onto the active organization. Values are
+     * already id-validated by `OnboardingStatePatchInnerDto` and merged by
+     * `mergeProfile`, so the row simply follows the user's latest answers.
+     */
+    private async mirrorOrganizationProfile(
+        userId: string,
+        profile: OnboardingProfile | undefined,
+    ): Promise<OnboardingProfile | null> {
+        const organizationId = this.currentOrganizationId();
+        if (!organizationId) return null;
+        try {
+            const row = await this.orgProfileRepository!.upsert(organizationId, {
+                roles: profile?.roles ? [...profile.roles] : null,
+                teamSize: profile?.teamSize ?? null,
+                updatedByUserId: userId,
+            });
+            return (
+                normaliseProfile({
+                    roles: row.roles ?? undefined,
+                    teamSize: row.teamSize ?? undefined,
+                }) ?? null
+            );
+        } catch (error) {
+            this.logger.warn(
+                `Failed to persist organization onboarding profile for ${organizationId}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return null;
+        }
     }
 
     async markCompleted(userId: string): Promise<OnboardingStateResponse> {
@@ -104,6 +214,7 @@ export class OnboardingStateService {
                 ? updated.onboardingDismissedAt.toISOString()
                 : null,
             state: normaliseState(updated?.onboardingState),
+            organizationProfile: await this.readOrganizationProfile(),
         };
     }
 
@@ -128,6 +239,7 @@ export class OnboardingStateService {
                 : null,
             dismissedAt: now.toISOString(),
             state: normaliseState(updated?.onboardingState),
+            organizationProfile: await this.readOrganizationProfile(),
         };
     }
 }
@@ -154,6 +266,12 @@ function normaliseState(raw: OnboardingWizardStateV2 | null | undefined): Onboar
         storage: { choice: raw.storage?.choice ?? ONBOARDING_DEFAULT_STATE.storage.choice },
         db: { choice: raw.db?.choice ?? ONBOARDING_DEFAULT_STATE.db.choice },
         deploy: { choice: raw.deploy?.choice ?? ONBOARDING_DEFAULT_STATE.deploy.choice },
+        // A8 — desktop-first bucket. A state blob written before this bucket
+        // existed has no `desktop` key and reads as the `cloud` default, so
+        // upgrading never changes an existing user's first-run path.
+        desktop: {
+            choice: raw.desktop?.choice ?? ONBOARDING_DEFAULT_STATE.desktop?.choice ?? 'cloud',
+        },
         skippedSteps: Array.isArray(raw.skippedSteps) ? [...raw.skippedSteps] : [],
         pluginsReviewed: raw.pluginsReviewed === true,
         // EW-722: contract-declared optional `prompt` (EW-617 G4) round-trips
@@ -208,6 +326,18 @@ function mergeState(
             choice: patch.db?.choice ?? current.db?.choice ?? ONBOARDING_DEFAULT_STATE.db.choice,
         },
         deploy: { choice: patch.deploy?.choice ?? current.deploy.choice },
+        // A8 — desktop bucket. It has to be merged here as well as
+        // normalised on read: a merge that omitted it would drop the user's
+        // choice on the next unrelated patch, and — because the idempotence
+        // check compares the normalised current against the merged next —
+        // would also make every no-op patch write.
+        desktop: {
+            choice:
+                patch.desktop?.choice ??
+                current.desktop?.choice ??
+                ONBOARDING_DEFAULT_STATE.desktop?.choice ??
+                'cloud',
+        },
         skippedSteps: Array.isArray(patch.skippedSteps)
             ? [...patch.skippedSteps]
             : [...current.skippedSteps],

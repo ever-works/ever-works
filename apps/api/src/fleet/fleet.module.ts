@@ -1,7 +1,19 @@
 import { Module } from '@nestjs/common';
+import { TypeOrmModule } from '@nestjs/typeorm';
+import { DatabaseModule } from '@ever-works/agent/database';
 import { FleetModule as AgentFleetModule } from '@ever-works/agent/fleet';
+import { TenantJobRuntimeConfig } from '@ever-works/agent/entities';
 import { FleetController } from './fleet.controller';
 import { FleetJobsController } from './fleet-jobs.controller';
+import { FleetRunRouterService } from './fleet-run-router.service';
+import {
+    buildNodeJobRuntimeProviders,
+    NODE_JOB_RUNTIME_DISPATCHER_FACTORY,
+    NODE_JOB_RUNTIME_PLUGIN,
+    NODE_JOB_RUNTIME_STORE,
+} from './node-job-runtime.providers';
+import { FleetEnabledGuard } from './guards/fleet-enabled.guard';
+import { FleetNodeAuthGuard } from './guards/fleet-node-auth.guard';
 
 /**
  * Fleet (Wave 12, slice 1 + Desktop PRD M4) — thin API module exposing
@@ -16,10 +28,38 @@ import { FleetJobsController } from './fleet-jobs.controller';
  *   - `FleetJobsController` — the node work channel (lease / job
  *     heartbeat / complete), node-secret authenticated, public,
  *     fail-closed to one undifferentiated 401.
+ *
+ * It is ALSO the operator-side construction site for the `node` job
+ * runtime (see `node-job-runtime.providers.ts`): the plugin's dispatcher
+ * factory is bound to the real `fleet_jobs` store here, and
+ * `FleetRunRouterService` turns "this tenant's runtime is the fleet"
+ * into an actual `FleetJobService.enqueue`. The `TenantJobRuntimeConfig`
+ * feature registration is what lets the router honour a per-tenant
+ * overlay row rather than only the instance-global selector.
+ *
+ * Both guards are ordinary providers so Nest can inject them (the node
+ * guard needs `FleetNodeRepository`, which `AgentFleetModule` exports):
+ *   - `FleetEnabledGuard` — the `FLEET_ENABLED` gate on BOTH controllers,
+ *     so the surface cannot end up half-on.
+ *   - `FleetNodeAuthGuard` — node-credential authentication for the work
+ *     channel, at the edge instead of only inside the services.
  */
 @Module({
-    imports: [AgentFleetModule],
+    imports: [AgentFleetModule, DatabaseModule, TypeOrmModule.forFeature([TenantJobRuntimeConfig])],
     controllers: [FleetController, FleetJobsController],
-    exports: [AgentFleetModule],
+    providers: [
+        ...buildNodeJobRuntimeProviders(),
+        FleetRunRouterService,
+        // Guards are ordinary providers so Nest can inject them.
+        FleetEnabledGuard,
+        FleetNodeAuthGuard,
+    ],
+    exports: [
+        AgentFleetModule,
+        NODE_JOB_RUNTIME_STORE,
+        NODE_JOB_RUNTIME_DISPATCHER_FACTORY,
+        NODE_JOB_RUNTIME_PLUGIN,
+        FleetRunRouterService,
+    ],
 })
 export class FleetApiModule {}

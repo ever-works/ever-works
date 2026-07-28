@@ -4,6 +4,8 @@ import { createLogger } from './core/logger';
 import {
 	createCommandRunner,
 	createConfigFileSystem,
+	createSecretStore,
+	createResourceProbe,
 	currentEnvironment,
 	defaultConfigPath,
 	systemFetch
@@ -31,6 +33,12 @@ function buildDeps(): CliDeps {
 		fs: createConfigFileSystem(),
 		configPath: defaultConfigPath(),
 		platform: process.platform,
+		// Null when this host has no keychain — `resolveSecretStore`
+		// warns on that path rather than downgrading in silence.
+		secrets: createSecretStore(logger),
+		// Backs the CPU/memory admission gate. Harmless when no ceilings are
+		// configured — the worker loop skips sampling entirely in that case.
+		resourceProbe: createResourceProbe(),
 		out: (line) => process.stdout.write(`${line}\n`),
 		signals: {
 			on: (signal, handler) => {

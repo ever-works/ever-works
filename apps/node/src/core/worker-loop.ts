@@ -3,6 +3,8 @@ import { FLEET_JOB_DEFAULT_LEASE_TTL_SEC, FLEET_JOB_MAX_LEASE_BATCH } from '@eve
 import type { Logger } from './logger';
 import type { Scheduler } from './heartbeat';
 import { systemScheduler } from './heartbeat';
+import { admitByResourceLimits, hasAdmissionCeilings, type ResourceProbe } from './resource-limits';
+import { clampResourceLimits, type NodeResourceLimits } from './types';
 
 /**
  * The node worker host: lease → execute → report, forever, until stopped.
@@ -26,6 +28,10 @@ import { systemScheduler } from './heartbeat';
  * - **Graceful shutdown drains.** `stop()` stops leasing at once, then
  *   awaits in-flight jobs so their results are REPORTED rather than
  *   abandoned to a lease expiry. A second stop while draining is a no-op.
+ * - **So does pausing.** `pause()` is the same drain without the
+ *   teardown: leasing halts synchronously, in-flight work runs to a
+ *   verdict, and the loop keeps ticking so `resume()` needs no restart.
+ *   Pausing is a state a running node is in, not a way to kill it.
  * - **Backoff is exponential with a ceiling**, so an API outage produces
  *   a slow retry rather than a hot loop against a dead endpoint.
  *
@@ -74,9 +80,35 @@ export interface JobLeaseCapableClient {
 /** One registered executor: "this is how a job of kind X gets run here". */
 export type JobExecutor = (job: FleetJobView) => Promise<Record<string, unknown> | void>;
 
-export type WorkerState = 'idle' | 'polling' | 'working' | 'retrying' | 'unauthorized' | 'stopped';
+/**
+ * `draining` is the state a paused-but-still-busy node is in: leasing
+ * has stopped, the jobs already running have not. It is distinct from
+ * `paused` (drained, nothing left in flight) so an operator watching
+ * `ever-works-node pause` can tell "still finishing two builds" apart
+ * from "safe to reboot".
+ */
+export type WorkerState =
+	| 'idle'
+	| 'polling'
+	| 'working'
+	| 'retrying'
+	| 'unauthorized'
+	| 'draining'
+	// Over an operator-set CPU/memory ceiling: the loop keeps running and
+	// keeps its in-flight jobs, it just does not lease MORE. Distinct from
+	// `paused`, which is a deliberate operator stop rather than the host
+	// protecting itself.
+	| 'throttled'
+	| 'paused'
+	| 'stopped';
 
 export interface WorkerLoopState {
+	/**
+	 * Why leasing is currently withheld by a resource ceiling, or null.
+	 * Surfaced so an idle-looking node can explain itself instead of
+	 * appearing broken.
+	 */
+	throttleReason?: string | null;
 	state: WorkerState;
 	/** Jobs currently executing on this node. */
 	activeJobIds: string[];
@@ -85,9 +117,15 @@ export interface WorkerLoopState {
 	failed: number;
 	/** Human-readable last failure (already redacted), or null. */
 	lastError: string | null;
+	/** True once `pause()` has been called and until `resume()` is. */
+	paused: boolean;
 }
 
 export interface WorkerLoopOptions {
+	/** Operator-set CPU/memory ceilings. Wins over `concurrency`. */
+	limits?: NodeResourceLimits;
+	/** Host sampler backing the admission gate. Absent = no ceilings. */
+	resourceProbe?: ResourceProbe;
 	client: JobLeaseCapableClient;
 	/** Max jobs in flight on this node at once. */
 	concurrency?: number;
@@ -98,6 +136,8 @@ export interface WorkerLoopOptions {
 	logger?: Logger;
 	/** Capability tags advertised per poll; omitted uses the node's stored tags. */
 	capabilities?: string[];
+	/** Start drained: heartbeat only, lease nothing until `resume()`. */
+	startPaused?: boolean;
 }
 
 export class WorkerLoop {
@@ -108,9 +148,12 @@ export class WorkerLoop {
 	private readonly concurrency: number;
 	private readonly leaseTtlSec: number;
 	private readonly idlePollMs: number;
+	private readonly limits: NodeResourceLimits;
+	private readonly resourceProbe: ResourceProbe | undefined;
 
 	private running = false;
 	private stopping = false;
+	private paused = false;
 	private timer: unknown = null;
 	private state: WorkerLoopState = {
 		state: 'idle',
@@ -118,7 +161,9 @@ export class WorkerLoop {
 		consecutiveFailures: 0,
 		completed: 0,
 		failed: 0,
-		lastError: null
+		lastError: null,
+		paused: false,
+		throttleReason: null
 	};
 
 	constructor(private readonly options: WorkerLoopOptions) {
@@ -126,12 +171,31 @@ export class WorkerLoop {
 		this.concurrency = Math.min(Math.max(options.concurrency ?? 1, 1), FLEET_JOB_MAX_LEASE_BATCH);
 		this.leaseTtlSec = options.leaseTtlSec ?? FLEET_JOB_DEFAULT_LEASE_TTL_SEC;
 		this.idlePollMs = options.idlePollMs ?? DEFAULT_IDLE_POLL_MS;
+		// `limits` wins over the legacy `concurrency` option so there is
+		// exactly one number in play once an operator has set limits.
+		this.limits = clampResourceLimits(options.limits ?? { maxConcurrentJobs: this.concurrency });
+		this.resourceProbe = options.resourceProbe;
+		this.paused = options.startPaused === true;
+		this.state.paused = this.paused;
+		if (this.paused) {
+			this.state.state = 'paused';
+		}
 	}
 
 	/** Register the executor for one job kind. Last registration wins. */
 	register(kind: FleetJobKind, executor: JobExecutor): this {
 		this.executors.set(kind, executor);
 		return this;
+	}
+
+	/** The ceilings this loop is enforcing (already clamped). */
+	get resourceLimits(): NodeResourceLimits {
+		return { ...this.limits };
+	}
+
+	/** Max jobs this loop will ever run at once. */
+	get maxConcurrency(): number {
+		return this.limits.maxConcurrentJobs;
 	}
 
 	get registeredKinds(): FleetJobKind[] {
@@ -174,15 +238,98 @@ export class WorkerLoop {
 		this.patch({ state: 'stopped', activeJobIds: [] });
 	}
 
+	/** True while the loop is drained (leasing stopped by `pause()`). */
+	isPaused(): boolean {
+		return this.paused;
+	}
+
+	/**
+	 * DRAIN, not cut (audit A29).
+	 *
+	 * Stops leasing at once — the next poll claims nothing — while every
+	 * job already in flight keeps running, keeps its lease alive and
+	 * still reports its verdict. Killing them instead would throw away
+	 * work that is minutes from done, let the claims lapse, and re-run
+	 * the same jobs on another node: strictly worse for the operator who
+	 * asked for a quiet machine, and strictly worse for the platform.
+	 *
+	 * The returned promise resolves when the drain is COMPLETE (nothing
+	 * left in flight), so `pause()` can be awaited by an operator who
+	 * actually wants the machine idle. Callers who just want new work to
+	 * stop can ignore it — the leasing halt is synchronous.
+	 *
+	 * The loop keeps ticking while paused: it is how a `resume()` takes
+	 * effect without a restart, and it costs one no-op timer.
+	 */
+	async pause(): Promise<void> {
+		this.paused = true;
+		this.patch({
+			paused: true,
+			state: this.inFlight.size > 0 ? 'draining' : 'paused'
+		});
+		await this.drained();
+		if (this.paused) {
+			this.patch({ state: this.running ? 'paused' : this.state.state });
+		}
+	}
+
+	/** Resume leasing. Polls immediately rather than waiting out the idle gap. */
+	resume(): void {
+		if (!this.paused) return;
+		this.paused = false;
+		this.patch({ paused: false, state: this.inFlight.size > 0 ? 'working' : 'idle' });
+		if (this.running && !this.stopping) {
+			this.cancelTimer();
+			void this.tick();
+		}
+	}
+
+	/** Await every in-flight job. Resolves immediately when there are none. */
+	async drained(): Promise<void> {
+		// Re-read `inFlight` each pass: a job settling can be what frees
+		// capacity for one that was already leased in the same batch.
+		while (this.inFlight.size > 0) {
+			await Promise.allSettled([...this.inFlight.values()]);
+		}
+	}
+
 	/** Run one poll now. Exposed so a UI can offer "check for work" and tests can step. */
 	async tick(): Promise<void> {
 		if (!this.running || this.stopping) return;
 		this.cancelTimer();
 
-		const capacity = this.concurrency - this.inFlight.size;
+		if (this.paused) {
+			// Drained: no lease call at all. Still re-arm, so `resume()`
+			// takes effect without restarting the process, and so the
+			// state keeps reflecting in-flight progress while draining.
+			this.patch({ state: this.inFlight.size > 0 ? 'draining' : 'paused' });
+			this.scheduleNext(this.idlePollMs);
+			return;
+		}
+
+		// `limits.maxConcurrentJobs` — not the legacy `concurrency` field.
+		// `limits` supersedes it (and is clamped), so reading the raw
+		// option here would silently ignore an operator's ceiling.
+		const capacity = this.limits.maxConcurrentJobs - this.inFlight.size;
 		if (capacity <= 0) {
 			this.scheduleNext(this.idlePollMs);
 			return;
+		}
+
+		// Admission gate: CPU / memory ceilings. Evaluated BEFORE the lease
+		// call so an over-loaded machine never claims work it then has to
+		// run badly — the platform re-offers it to a node with headroom.
+		const admission = await this.checkResourceAdmission();
+		if (!admission.admit) {
+			this.patch({
+				state: this.inFlight.size > 0 ? 'working' : 'throttled',
+				throttleReason: admission.reason
+			});
+			this.scheduleNext(this.idlePollMs);
+			return;
+		}
+		if (this.state.throttleReason != null) {
+			this.patch({ throttleReason: null });
 		}
 
 		this.patch({ state: this.inFlight.size > 0 ? 'working' : 'polling' });
@@ -223,10 +370,44 @@ export class WorkerLoop {
 			this.inFlight.delete(job.id);
 			this.patch({
 				activeJobIds: [...this.inFlight.keys()],
-				state: this.inFlight.size > 0 ? 'working' : this.running ? 'idle' : 'stopped'
+				state: this.nextIdleState()
 			});
 		});
 		this.inFlight.set(job.id, task);
+	}
+
+	/** What the loop settles into once a job finishes. */
+	/**
+	 * Sample the host and decide whether more work may be admitted.
+	 *
+	 * A probe that throws or is absent ADMITS: the ceilings are a courtesy to
+	 * the machine's owner, and a broken sampler must degrade to "behave like
+	 * there were no ceiling", never to "this node is permanently idle".
+	 */
+	private async checkResourceAdmission(): Promise<{ admit: boolean; reason: string | null }> {
+		if (!this.resourceProbe || !hasAdmissionCeilings(this.limits)) {
+			return { admit: true, reason: null };
+		}
+		try {
+			const sample = await this.resourceProbe.sample();
+			return admitByResourceLimits(this.limits, sample);
+		} catch (error) {
+			const raw = error instanceof Error ? error.message : String(error);
+			this.options.logger?.warn(
+				`Resource probe failed, admitting work anyway: ${this.options.logger?.redact(raw) ?? raw}`
+			);
+			return { admit: true, reason: null };
+		}
+	}
+
+	private nextIdleState(): WorkerState {
+		if (this.paused) {
+			return this.inFlight.size > 0 ? 'draining' : 'paused';
+		}
+		if (this.inFlight.size > 0) {
+			return 'working';
+		}
+		return this.running ? 'idle' : 'stopped';
 	}
 
 	/**

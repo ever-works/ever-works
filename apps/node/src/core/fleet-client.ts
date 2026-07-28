@@ -1,11 +1,22 @@
 import type { Logger } from './logger';
-import { MAX_CREDENTIAL_LENGTH, MIN_CREDENTIAL_LENGTH, type FleetNodeView, type NodeSelfDescription } from './types';
+import {
+	MAX_CREDENTIAL_LENGTH,
+	MIN_CREDENTIAL_LENGTH,
+	type FleetEnrollRequest,
+	type FleetEnrollResponse,
+	type FleetHeartbeatRequest,
+	type FleetHeartbeatResponse,
+	type FleetNodeView,
+	type NodeSelfDescription
+} from './types';
 
 /**
- * HTTP client for the two public Fleet endpoints the node apps use:
+ * HTTP client for the public Fleet endpoints the node apps use:
  *
  *   POST /api/fleet/enroll      one-time token  → { nodeId, secret, node }
  *   POST /api/fleet/heartbeat   nodeId + secret → { ok, node }
+ *   POST /api/fleet/pause       nodeId + secret → { ok, node }   (drain/resume)
+ *   POST /api/fleet/unenroll    nodeId + secret → { ok }         (retire)
  *
  * Both are `@Public()` and self-authenticating: the credential IS the body.
  * The server answers every invalid credential path with one undifferentiated
@@ -55,22 +66,30 @@ export interface FetchRequestInit {
 
 export type FetchLike = (url: string, init: FetchRequestInit) => Promise<FetchResponseLike>;
 
-export interface EnrollRequest extends NodeSelfDescription {
-	token: string;
-}
+/**
+ * The four enroll/heartbeat wire shapes, aliased to the SHARED contract
+ * in `@ever-works/contracts` under the names this app has always used.
+ *
+ * These are deliberately aliases and not re-declarations: adding or
+ * renaming a field server-side now fails this app's `tsc` instead of
+ * silently producing a request the API rejects at runtime.
+ */
+export type EnrollRequest = FleetEnrollRequest;
+export type EnrollResponse = FleetEnrollResponse;
+export type HeartbeatRequest = FleetHeartbeatRequest;
+export type HeartbeatResponse = FleetHeartbeatResponse;
 
-export interface EnrollResponse {
+export interface NodeCredentialRequest {
 	nodeId: string;
 	secret: string;
-	node: FleetNodeView;
 }
 
-export interface HeartbeatRequest extends NodeSelfDescription {
-	nodeId: string;
-	secret: string;
+export interface PauseRequest extends NodeCredentialRequest {
+	/** true drains this node; false resumes it. */
+	paused: boolean;
 }
 
-export interface HeartbeatResponse {
+export interface PauseResponse {
 	ok: true;
 	node: FleetNodeView;
 }
@@ -213,6 +232,47 @@ export class FleetClient {
 			throw new FleetClientError('malformed', 'Heartbeat response did not contain a node');
 		}
 		return { ok: true, node };
+	}
+
+	/**
+	 * Ask the platform to drain (or resume) this node, authenticated
+	 * with the node's own heartbeat secret.
+	 *
+	 * Draining is a platform-side decision — it is the scheduler that
+	 * must stop handing out work — so `ever-works-node pause` cannot be
+	 * purely local. The local flag exists too (so a restart comes back
+	 * drained), but this call is what actually stops the leases.
+	 */
+	async pause(request: PauseRequest): Promise<PauseResponse> {
+		assertCredentialShape(request.secret, 'Node secret');
+		this.logger?.protect(request.secret);
+
+		const payload = await this.post('api/fleet/pause', 'pause', {
+			nodeId: request.nodeId,
+			secret: request.secret,
+			paused: request.paused
+		});
+
+		const node = readNode(payload);
+		if (!node) {
+			throw new FleetClientError('malformed', 'Pause response did not contain a node');
+		}
+		return { ok: true, node };
+	}
+
+	/**
+	 * Retire this node's registration. The platform deletes the row,
+	 * which is what makes the credential we just presented worthless —
+	 * the local config is then safe to erase.
+	 */
+	async unenroll(request: NodeCredentialRequest): Promise<void> {
+		assertCredentialShape(request.secret, 'Node secret');
+		this.logger?.protect(request.secret);
+
+		await this.post('api/fleet/unenroll', 'unenroll', {
+			nodeId: request.nodeId,
+			secret: request.secret
+		});
 	}
 
 	private async post(path: string, operation: string, body: Record<string, unknown>): Promise<unknown> {

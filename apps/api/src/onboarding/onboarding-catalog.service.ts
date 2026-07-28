@@ -8,8 +8,21 @@ import type {
     OnboardingStorageChoice,
     OnboardingDbChoice,
     OnboardingDeployChoice,
+    OnboardingDesktopChoice,
     OnboardingPluginCard,
 } from '@ever-works/contracts/api';
+
+/**
+ * Audit item (b) — connector plugins the dedicated "Communication"
+ * wizard step owns. The step now connects them IN PLACE (settings form
+ * + enable) instead of linking out to Settings → Plugins, so they are
+ * reserved out of the generic "Plugins & Integrations" list below; a
+ * user should never be offered the same connector twice in one wizard.
+ *
+ * Exported so the reservation is assertable from a spec rather than
+ * being an invisible literal inside `getCatalog`.
+ */
+export const COMMUNICATION_PLUGIN_IDS: readonly string[] = ['slack-connector', 'discord-connector'];
 
 /**
  * Builds the catalog payload the web wizard renders:
@@ -188,18 +201,53 @@ export class OnboardingCatalogService {
             },
         ];
 
+        // A8 — the desktop-first bucket. Unlike the four above it names no
+        // provider and reserves no plugin id: it records WHERE Ever Works
+        // runs, which is what decides the guidance the wizard's last step
+        // gives (see `ONBOARDING_DESKTOP_NEXT_STEPS`). All three are always
+        // available — none of them depends on a feature flag or a key.
+        const desktop: ReadonlyArray<OnboardingCard<OnboardingDesktopChoice>> = [
+            {
+                choice: 'cloud',
+                title: 'The hosted platform',
+                description: 'Everything runs on Ever Works. Nothing to install.',
+                default: true,
+                available: true,
+                badges: ['default'],
+            },
+            {
+                choice: 'desktop',
+                title: 'On my machine',
+                description:
+                    'Ever Works Desktop runs the API and web app locally and supervises them for you.',
+                default: false,
+                available: true,
+                badges: [],
+            },
+            {
+                choice: 'own-nodes',
+                title: 'On my own machines',
+                description:
+                    'The platform runs wherever you like, but your machines execute the work — enroll them as Fleet nodes.',
+                default: false,
+                available: true,
+                badges: [],
+            },
+        ];
+
         const reservedPluginIds = new Set<string>(
             [
                 ...ai.map((c) => c.pluginId),
                 ...storage.map((c) => c.pluginId),
                 ...db.map((c) => c.pluginId),
                 ...deploy.map((c) => c.pluginId),
+                ...COMMUNICATION_PLUGIN_IDS,
             ].filter((id): id is string => Boolean(id)),
         );
 
         const plugins = this.collectPluginsStepCards(reservedPluginIds);
 
-        return { ai, storage, db, deploy, plugins };
+        return { ai, storage, db, deploy, desktop, plugins };
     }
 
     private collectPluginsStepCards(reservedPluginIds: Set<string>): OnboardingPluginCard[] {

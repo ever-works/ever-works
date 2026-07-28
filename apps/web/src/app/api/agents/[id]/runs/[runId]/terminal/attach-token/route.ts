@@ -22,7 +22,7 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
  * response (never a URL) and the browser presents it as the first WS
  * message.
  */
-export async function POST(_request: NextRequest, ctx: RouteContext) {
+export async function POST(request: NextRequest, ctx: RouteContext) {
     const { id, runId } = await ctx.params;
     if (!UUID.test(id) || !UUID.test(runId)) {
         return NextResponse.json({ error: 'Invalid id' }, { status: 400 });
@@ -33,11 +33,19 @@ export async function POST(_request: NextRequest, ctx: RouteContext) {
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
     }
 
-    const upstream = await fetch(`${API_URL}/agents/${id}/runs/${runId}/terminal/attach-token`, {
-        method: 'POST',
-        headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
-        cache: 'no-store',
-    });
+    // Only the read-only downgrade is forwarded — never a raw
+    // caller-supplied role. The API clamps too; this keeps the proxy
+    // from being the place a new role could be smuggled in.
+    const roleQuery = request.nextUrl.searchParams.get('role') === 'viewer' ? '?role=viewer' : '';
+
+    const upstream = await fetch(
+        `${API_URL}/agents/${id}/runs/${runId}/terminal/attach-token${roleQuery}`,
+        {
+            method: 'POST',
+            headers: { Accept: 'application/json', Authorization: `Bearer ${token}` },
+            cache: 'no-store',
+        },
+    );
 
     if (!upstream.ok) {
         const text = await upstream.text().catch(() => '');

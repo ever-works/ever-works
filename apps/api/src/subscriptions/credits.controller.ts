@@ -2,9 +2,12 @@ import {
     BadRequestException,
     Controller,
     Get,
+    Header,
     HttpCode,
     HttpStatus,
+    Logger,
     Query,
+    Res,
     UseGuards,
 } from '@nestjs/common';
 import { ApiBearerAuth, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
@@ -12,14 +15,30 @@ import { Type } from 'class-transformer';
 import { IsIn, IsInt, IsOptional, IsString, Matches, Max, Min } from 'class-validator';
 import { AuthSessionGuard, CurrentUser } from '@src/auth';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
+import { ScopeContextService } from '@src/scope';
 import {
     CreditLedgerService,
     InvalidUsagePeriodError,
+    USAGE_EXPORT_COLUMNS,
     USAGE_SUMMARY_GROUP_BYS,
     UsageSummaryService,
+    type UsageExportRow,
+    type UsageExportStream,
     type UsageSummaryGroupBy,
 } from '@ever-works/agent/subscriptions';
 import { CreditLedgerEntry, CreditLedgerKind } from '@ever-works/agent/entities';
+
+/**
+ * Minimal Response surface for the streamed CSV. Mirrors the convention
+ * in budgets/usage.controller.ts and activity-log.controller.ts (avoids
+ * pulling the full `import('express').Response` type), extended with
+ * `write`/`end` because this export streams instead of buffering.
+ */
+type StreamingCsvResponse = {
+    setHeader(name: string, value: string): void;
+    write(chunk: string): unknown;
+    end(): unknown;
+};
 
 export class CreditsUsageSummaryQueryDto {
     /**
@@ -37,6 +56,21 @@ export class CreditsUsageSummaryQueryDto {
         message: 'period must be YYYY-MM, 7d, or 30d',
     })
     period?: string;
+}
+
+/** B29 — query contract for the account-wide usage CSV export. */
+export class CreditsUsageExportQueryDto {
+    /** `YYYY-MM` calendar month (default: current), or rolling `7d`/`30d`. */
+    @IsOptional()
+    @Matches(/^(\d{4}-(0[1-9]|1[0-2])|7d|30d)$/, {
+        message: 'period must be YYYY-MM, 7d, or 30d',
+    })
+    period?: string;
+
+    /** Only `csv` is supported — mirrors the per-Work export's contract. */
+    @IsOptional()
+    @IsIn(['csv'], { message: "Unsupported format. Only 'csv' is supported." })
+    format?: string;
 }
 
 class CreditsLedgerQueryDto {
@@ -77,11 +111,16 @@ const VALID_KINDS = new Set<string>(Object.values(CreditLedgerKind));
 @Controller('api/credits')
 @UseGuards(AuthSessionGuard)
 export class CreditsController {
+    private readonly logger = new Logger(CreditsController.name);
+
     constructor(
         private readonly creditLedgerService: CreditLedgerService,
         // Wave 13 — account-wide usage aggregations for the Usage &
         // Credits page (`usage-summary` below).
         private readonly usageSummaryService: UsageSummaryService,
+        // B29 — the active Organization for the CSV export's scope
+        // filter. Read from the request scope context, never a param.
+        private readonly scopeContext: ScopeContextService,
     ) {}
 
     @Get('balance')
@@ -163,6 +202,104 @@ export class CreditsController {
             }
             throw error;
         }
+    }
+
+    @Get('usage/export')
+    @HttpCode(HttpStatus.OK)
+    @Header('Cache-Control', 'no-store')
+    @ApiOperation({
+        summary: 'Download account-wide usage events as CSV',
+        description:
+            'Streams every metered usage event attributed to the authenticated user inside the ' +
+            "period as CSV. Scoped to the request's active Organization when there is one, so a " +
+            "user acting inside one Org never exports another Org's spend. period accepts " +
+            'YYYY-MM (default: current month), 7d, or 30d.',
+    })
+    @ApiResponse({ status: 200, description: 'CSV stream of usage events' })
+    @ApiResponse({ status: 400, description: 'Invalid period or format' })
+    async exportUsageCsv(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Res() res: StreamingCsvResponse,
+        @Query() query: CreditsUsageExportQueryDto,
+    ): Promise<void> {
+        // Scope filter comes from the request context ONLY — accepting an
+        // orgId param here would be a cross-org billing read.
+        const organizationId = this.scopeContext.getOrganizationId();
+
+        let stream: UsageExportStream;
+        try {
+            stream = this.usageSummaryService.createExport(auth.userId, {
+                period: query.period,
+                organizationId,
+            });
+        } catch (error) {
+            // Defence-in-depth: the DTO regex already rejects bad periods.
+            if (error instanceof InvalidUsagePeriodError) {
+                throw new BadRequestException(error.message);
+            }
+            throw error;
+        }
+
+        // Headers + the CSV header row are written LAZILY, on the first
+        // chunk (or once the stream completes empty). A repository error
+        // on the very first page therefore still maps to a normal HTTP
+        // error response instead of a half-written 200.
+        let started = false;
+        const start = () => {
+            if (started) {
+                return;
+            }
+            started = true;
+            // Security: strip `"`/CR/LF before interpolating into the
+            // quoted Content-Disposition header so a quote/newline can't
+            // terminate the quoted-string and inject additional header
+            // parameters or split the response. Mirrors
+            // budgets/usage.controller.ts. The period is already
+            // regex-validated, so valid inputs are unchanged.
+            const filename = `usage-${stream.window.period}.csv`.replace(/["\r\n]/g, '_');
+            res.setHeader('Content-Type', 'text/csv; charset=utf-8');
+            res.setHeader('Content-Disposition', `attachment; filename="${filename}"`);
+            res.write(`${USAGE_EXPORT_COLUMNS.join(',')}\n`);
+        };
+
+        try {
+            // Streamed, not buffered: each repository page is written out
+            // and dropped, so a long period costs one page of rows in
+            // memory rather than the whole period.
+            for await (const chunk of stream.chunks) {
+                start();
+                res.write(chunk.map((row) => this.toCsvLine(row)).join(''));
+            }
+            start();
+        } catch (error) {
+            if (!started) {
+                // Nothing on the wire yet — let the exception filters map it.
+                throw error;
+            }
+            // Mid-stream failure: the response is already committed, so all
+            // we can do is log and close rather than hang the download.
+            this.logger.error(
+                `Account-wide usage export failed mid-stream for period ${stream.window.period}`,
+                error instanceof Error ? error.stack : String(error),
+            );
+        }
+        res.end();
+    }
+
+    /** One CSV record (RFC 4180 escaping), newline included. */
+    private toCsvLine(row: UsageExportRow): string {
+        return `${USAGE_EXPORT_COLUMNS.map((column) => this.escapeCsv(row[column])).join(',')}\n`;
+    }
+
+    private escapeCsv(value: unknown): string {
+        if (value === null || value === undefined) {
+            return '';
+        }
+        const str = typeof value === 'string' ? value : String(value);
+        if (/[",\n\r]/.test(str)) {
+            return `"${str.replace(/"/g, '""')}"`;
+        }
+        return str;
     }
 
     private parseKinds(raw?: string): CreditLedgerKind[] | undefined {

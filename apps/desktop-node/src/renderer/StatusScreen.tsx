@@ -31,6 +31,10 @@ export function StatusScreen({ bridge, identity, onUnenrolled }: StatusScreenPro
 	}, [bridge]);
 
 	const live = isLive(status);
+	// A18 — driven off the worker loop's real state, not a local UI flag, so
+	// the button always agrees with what the node is actually doing.
+	const worker = status?.worker;
+	const paused = worker?.paused === true;
 
 	return (
 		<div className="shell">
@@ -42,6 +46,11 @@ export function StatusScreen({ bridge, identity, onUnenrolled }: StatusScreenPro
 				</span>
 				<span className="muted">{identity.name ?? identity.nodeId}</span>
 				{status?.platformStatus && <span className="muted">platform: {status.platformStatus}</span>}
+				{worker?.enabled && (
+					<span className={`badge ${paused ? 'warn' : 'ok'}`}>
+						{paused ? 'work paused' : `work ${worker.state}`}
+					</span>
+				)}
 			</div>
 
 			<div className="panel">
@@ -66,8 +75,27 @@ export function StatusScreen({ bridge, identity, onUnenrolled }: StatusScreenPro
 							))}
 						</div>
 					</dd>
+					<dt>Resource limits</dt>
+					<dd>
+						{identity.limits.maxConcurrentJobs} job(s) at once
+						{identity.limits.maxCpuPercent === null
+							? ', no CPU ceiling'
+							: `, CPU below ${identity.limits.maxCpuPercent}%`}
+						{identity.limits.maxMemoryMb === null
+							? ', no memory ceiling'
+							: `, memory in use below ${identity.limits.maxMemoryMb}MB`}
+					</dd>
+					{worker?.enabled && (
+						<>
+							<dt>Work</dt>
+							<dd>
+								{worker.activeJobCount} running · {worker.completed} completed · {worker.failed} failed
+							</dd>
+						</>
+					)}
 				</dl>
 
+				{worker?.throttleReason && <p className="muted">Not leasing new work: {worker.throttleReason}.</p>}
 				{status?.lastError && <div className="error-note">{status.lastError}</div>}
 			</div>
 
@@ -78,6 +106,13 @@ export function StatusScreen({ bridge, identity, onUnenrolled }: StatusScreenPro
 				<button className="secondary" disabled={!live} onClick={() => void bridge.disconnect()}>
 					Disconnect
 				</button>
+				{paused ? (
+					<button onClick={() => void bridge.resume()}>Resume work</button>
+				) : (
+					<button className="secondary" onClick={() => void bridge.pause()}>
+						Pause work
+					</button>
+				)}
 				<button
 					className="secondary"
 					onClick={() => {
@@ -88,8 +123,9 @@ export function StatusScreen({ bridge, identity, onUnenrolled }: StatusScreenPro
 				</button>
 			</div>
 			<p className="muted">
-				Un-enrolling only forgets the local credential — the node stays in the Fleet page until it is revoked
-				there.
+				Pausing stops this machine leasing NEW work — the node stays online and jobs already running still
+				finish and report. Un-enrolling only forgets the local credential; the node stays in the Fleet page
+				until it is revoked there.
 			</p>
 
 			<div className="panel">

@@ -58,6 +58,16 @@ export class UserSubscription {
     @Column({ type: 'varchar', default: SubscriptionBillingProvider.STRIPE })
     billingProvider: SubscriptionBillingProvider;
 
+    /**
+     * Provider subscription id (audit B24 — plan checkout). Opaque
+     * reference, NEVER a secret: it is what lets a later
+     * `customer.subscription.*` delivery update or revoke exactly the row
+     * the hosted checkout created, and what a future manage/cancel
+     * surface would address. NULL on manually-granted rows.
+     */
+    @Column({ type: 'varchar', length: 128, nullable: true })
+    providerSubscriptionId?: string | null;
+
     @TimestampColumn()
     currentPeriodEnd?: Date | null;
 

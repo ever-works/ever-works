@@ -14,6 +14,8 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *   POST /api/ingest/slack/events  (@Public) signature-verified, FAILS
  *        CLOSED — with no configured install everything is 401,
  *        INCLUDING the url_verification handshake (Slack signs it too).
+ *   POST /api/ingest/slack/commands (@Public) the slash-command twin:
+ *        form-encoded, same v0 HMAC, same fail-closed posture.
  *   POST /api/ingest/github/events (@Public) signature-verified, fails
  *        closed the same way; a missing `x-github-event` header is 400.
  *
@@ -202,6 +204,58 @@ test.describe('POST /api/ingest/slack/events — fail-closed signature verificat
                 'x-slack-request-timestamp': String(Math.floor(Date.now() / 1000) - 3600),
             },
             data: { type: 'event_callback', event: { type: 'app_mention', text: '@works hi' } },
+        });
+        expect(res.status()).toBeGreaterThanOrEqual(400);
+        expect(res.status()).toBeLessThan(500);
+    });
+});
+
+/**
+ * The slash command is the second Slack route. It is form-encoded rather
+ * than JSON and its response body is user-visible, but its guard is the
+ * SAME v0 HMAC — so the same invariant applies: no unsigned or
+ * wrongly-signed invocation is ever accepted.
+ */
+test.describe('POST /api/ingest/slack/commands — fail-closed signature verification', () => {
+    /** Slack delivers slash commands as `application/x-www-form-urlencoded`. */
+    const commandForm = {
+        team_id: 'T-E2E',
+        channel_id: 'C-E2E',
+        user_id: 'U-E2E',
+        command: '/works',
+        text: 'what shipped today?',
+        trigger_id: `e2e-${Date.now()}`,
+    };
+
+    test('an unsigned slash command is refused (never 2xx, never a 500)', async ({ request }) => {
+        const res = await request.post(`${API_BASE}/api/ingest/slack/commands`, {
+            form: commandForm,
+        });
+        expect(res.status(), `slack commands returned ${res.status()}`).toBeGreaterThanOrEqual(400);
+        expect(res.status()).toBeLessThan(500);
+    });
+
+    test('a garbage signature is refused', async ({ request }) => {
+        const res = await request.post(`${API_BASE}/api/ingest/slack/commands`, {
+            headers: {
+                'x-slack-signature': 'v0=deadbeef',
+                'x-slack-request-timestamp': String(Math.floor(Date.now() / 1000)),
+            },
+            form: commandForm,
+        });
+        expect(res.status()).toBeGreaterThanOrEqual(400);
+        expect(res.status()).toBeLessThan(500);
+    });
+
+    test('a STALE timestamp is refused even with a signature header present', async ({
+        request,
+    }) => {
+        const res = await request.post(`${API_BASE}/api/ingest/slack/commands`, {
+            headers: {
+                'x-slack-signature': 'v0=deadbeef',
+                'x-slack-request-timestamp': String(Math.floor(Date.now() / 1000) - 3600),
+            },
+            form: commandForm,
         });
         expect(res.status()).toBeGreaterThanOrEqual(400);
         expect(res.status()).toBeLessThan(500);

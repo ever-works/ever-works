@@ -1,0 +1,101 @@
+{
+	"name": "@ever-works/pipedrive-connector-plugin",
+	"version": "1.0.0",
+	"description": "Pipedrive CRM connector plugin for Ever Works platform (outbound notes + record creation via the official pipedrive Node SDK, and event-source pull of deal/person/organization changes into the event-ingest pipeline, with opt-in historical backfill)",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"private": false,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"clean": "rm -rf dist",
+		"type-check": "tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	},
+	"dependencies": {
+		"@ever-works/contracts": "workspace:*",
+		"@ever-works/plugin": "workspace:*",
+		"pipedrive": "^33.5.0"
+	},
+	"devDependencies": {
+		"@types/node": "^22.0.0",
+		"tsup": "^8.0.0",
+		"typescript": "^5.9.3",
+		"vitest": "^4.1.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "pipedrive-connector",
+			"name": "Pipedrive Connector",
+			"version": "1.0.0",
+			"category": "connector",
+			"capabilities": [
+				"connector",
+				"connector-pipedrive",
+				"event-source"
+			],
+			"description": "Pipedrive CRM connector. Outbound appends notes to deals/persons/organizations and creates records via the official pipedrive Node SDK. Event-source pull ingests records created/updated since the last watermark into the platform event-ingest pipeline, with opt-in historical backfill (backfillDays, max 90).",
+			"systemPlugin": false,
+			"builtIn": true,
+			"isDefault": false,
+			"autoEnable": false,
+			"settings": {
+				"type": "object",
+				"required": [
+					"apiToken"
+				],
+				"properties": {
+					"apiToken": {
+						"type": "string",
+						"title": "Pipedrive API token",
+						"x-secret": true,
+						"x-envVar": "PIPEDRIVE_API_TOKEN"
+					},
+					"entityTypes": {
+						"type": "string",
+						"title": "Entity types to ingest (comma-separated; deals, persons, organizations when empty)",
+						"default": "deals,persons,organizations"
+					},
+					"companyDomain": {
+						"type": "string",
+						"title": "Pipedrive company domain (e.g. `acme` for acme.pipedrive.com) — enables deep links"
+					},
+					"backfillDays": {
+						"type": "number",
+						"title": "Historical backfill window in days on first pull (0 = off, max 90)",
+						"default": 0,
+						"minimum": 0,
+						"maximum": 90
+					},
+					"defaultDealId": {
+						"type": "string",
+						"title": "Default deal id outbound notes are attached to"
+					}
+				}
+			}
+		}
+	},
+	"publishConfig": {
+		"access": "restricted",
+		"registry": "https://registry.npmjs.org"
+	}
+}

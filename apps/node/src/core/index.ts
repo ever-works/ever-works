@@ -9,13 +9,20 @@
  * runner), so both shells stay thin and the whole surface is unit-testable.
  */
 
+export * from './browser-probe';
+export * from './auth-client';
 export * from './capabilities';
 export * from './config-store';
+export * from './resource-limits';
 export * from './fleet-client';
+export * from './gpu-probe';
 export * from './job-client';
 export * from './heartbeat';
 export * from './logger';
 export * from './runtime';
+export * from './secret-store';
 export * from './types';
 export * from './worker-loop';
 export * from './executors/acceptance-checks';
+export * from './executors/agent-task';
+export * from './executors/browser-check';

@@ -202,20 +202,48 @@ describe('FleetService', () => {
             ).resolves.toBeNull();
         });
 
-        it('refuses disabled and still-enrolling nodes even with a matching secret', async () => {
+        it('refuses a still-enrolling node even with a matching secret', async () => {
             const secret = 'sec_'.padEnd(43, 'e');
             const service = build();
 
-            repository.findById.mockResolvedValue(enrolled(secret, { status: 'disabled' }));
-            await expect(
-                service.heartbeat('11111111-1111-4111-8111-111111111111', secret),
-            ).resolves.toBeNull();
-
+            // An enrolling node has no heartbeat secret yet — the hash
+            // column still holds the ENROLLMENT TOKEN hash — so it can
+            // never authenticate here regardless of what it presents.
             repository.findById.mockResolvedValue(enrolled(secret, { status: 'enrolling' }));
             await expect(
                 service.heartbeat('11111111-1111-4111-8111-111111111111', secret),
             ).resolves.toBeNull();
         });
+
+        it.each(['disabled', 'paused'] as const)(
+            'accepts a %s node but can never un-stick its status',
+            async (status) => {
+                const secret = 'sec_'.padEnd(43, 'e');
+                const service = build();
+                repository.findById.mockResolvedValue(enrolled(secret, { status }));
+
+                const result = await service.heartbeat(
+                    '11111111-1111-4111-8111-111111111111',
+                    secret,
+                );
+
+                // Drained is NOT severed. A stopped node that also goes
+                // dark disappears from Fleet at the moment its owner most
+                // needs to see it, and its in-flight claims lose the only
+                // channel that could report their verdicts. Revocation is
+                // DELETE, not disable.
+                expect(result).not.toBeNull();
+                // The security property this replaces the old refusal
+                // with, and the one that actually matters: a beat may
+                // stamp liveness but must never promote the node back to
+                // a leasable state.
+                expect(repository.update).toHaveBeenCalledWith(
+                    '11111111-1111-4111-8111-111111111111',
+                    expect.objectContaining({ status }),
+                );
+                expect(result?.node.status).toBe(status);
+            },
+        );
 
         it('fails closed on malformed node ids / secrets without repository reads', async () => {
             const service = build();

@@ -8,7 +8,8 @@ import {
 } from '@ever-works/agent/ingest';
 import { PrReviewService } from '@ever-works/agent/pr-review';
 import { PluginSettingsService, UserPluginRepository } from '@ever-works/agent/plugins';
-import { TaskReviewRejectionService } from '@ever-works/agent/tasks-domain';
+import { TaskGitLinkService, TaskReviewRejectionService } from '@ever-works/agent/tasks-domain';
+import type { TaskGitLink } from '@ever-works/agent/tasks-domain';
 import type { IngestBindingMatch, IngestBindingResolution } from '../install-binding.types';
 
 export const GITHUB_PLUGIN_ID = 'github';
@@ -21,6 +22,35 @@ export const EVER_WORKS_MENTION = '@ever-works';
 
 /** Payload text cap for envelopes built from webhook deliveries. */
 export const GITHUB_EVENT_TEXT_MAX_CHARS = 4000;
+
+/**
+ * Per-push cap on the `github.commit` envelopes one delivery produces.
+ *
+ * GitHub itself truncates `commits[]` at 20 entries (`head_commit` plus
+ * the `size`/`distinct_size` counters carry the true totals), so this is
+ * the provider's own ceiling restated locally rather than a policy of
+ * ours — a monster push cannot turn into an unbounded Activity burst.
+ */
+export const GITHUB_PUSH_COMMITS_MAX = 20;
+
+/**
+ * `ingested_events.sourceEventId` is `varchar(200)`.
+ *
+ * Only the git-activity ids need the guard: a branch name may be 255
+ * characters on its own, so `push:<repo>@<sha>:<branch>` is the one id
+ * shape that can realistically overflow the column. The SHA sits BEFORE
+ * the branch on purpose — truncation then trims the branch tail and
+ * keeps the part that actually makes the id unique.
+ */
+export const GITHUB_SOURCE_EVENT_ID_MAX_CHARS = 200;
+
+/**
+ * `ingested_events.subjectExternalId` is `varchar(200)` too, and a push
+ * subject is `<owner/repo>@<branch>` — the same 255-character branch name
+ * can overflow it. An oversized value would abort the INSERT and lose
+ * the whole delivery, so the subject is capped at the column width.
+ */
+export const GITHUB_SUBJECT_EXTERNAL_ID_MAX_CHARS = 200;
 
 /**
  * The external installation identity a GitHub delivery carries, as an
@@ -69,6 +99,23 @@ export interface GitHubBindingLookup {
     readonly verifySignature?: (webhookSecret: string) => boolean;
 }
 
+/**
+ * One commit as a `push` delivery reports it (git activity ingestion,
+ * audit item j). `distinct` is false for commits that already reached the
+ * repository on another ref — those are re-announcements, not new work.
+ */
+export interface GitHubPushCommit {
+    id?: string;
+    message?: string;
+    url?: string;
+    distinct?: boolean;
+    timestamp?: string;
+    author?: { name?: string; username?: string; email?: string };
+    added?: string[];
+    removed?: string[];
+    modified?: string[];
+}
+
 /** The subset of GitHub webhook payloads the bridge consumes. */
 export interface GitHubWebhookBody {
     action?: string;
@@ -95,7 +142,30 @@ export interface GitHubWebhookBody {
         head?: { sha?: string; ref?: string };
         base?: { ref?: string };
         user?: { login?: string; type?: string };
+        /**
+         * Git activity ingestion (audit item j) — `closed` fires for both
+         * "merged" and "abandoned", and only `merged` tells them apart.
+         */
+        merged?: boolean;
+        merged_at?: string | null;
+        merge_commit_sha?: string | null;
+        merged_by?: { login?: string; type?: string } | null;
     };
+    /**
+     * Git activity ingestion (audit item j) — `push` deliveries. `ref` is
+     * the FULL ref (`refs/heads/<branch>`); `commits[]` is capped by
+     * GitHub at 20 entries while `head_commit` always carries the tip.
+     */
+    ref?: string;
+    before?: string;
+    after?: string;
+    created?: boolean;
+    deleted?: boolean;
+    forced?: boolean;
+    compare?: string;
+    pusher?: { name?: string; email?: string };
+    commits?: GitHubPushCommit[];
+    head_commit?: GitHubPushCommit | null;
     issue?: {
         number?: number;
         title?: string;
@@ -151,6 +221,64 @@ export function extractGitHubWorkspaceRef(
 }
 
 /**
+ * True for the deliveries git-activity ingestion owns (audit item j).
+ *
+ * `push` is unconditional. A pull request only qualifies on
+ * `closed` + `merged: true` — GitHub fires the same `closed` action for
+ * an abandoned PR, and an abandoned PR merged nothing.
+ */
+export function isGitActivityDelivery(
+    eventName: string,
+    body: GitHubWebhookBody | undefined,
+): boolean {
+    if (eventName === 'push') return true;
+    return (
+        eventName === 'pull_request' &&
+        body?.action === 'closed' &&
+        body?.pull_request?.merged === true
+    );
+}
+
+/** First line of a commit message — the subject, in git's own vocabulary. */
+function commitSubject(message: string | undefined): string {
+    return (message ?? '').split('\n')[0]?.trim() ?? '';
+}
+
+/** Keep a value inside its `ingested_events` column width. */
+function capped(value: string, max: number): string {
+    return value.length > max ? value.slice(0, max) : value;
+}
+
+/** Keep a git-activity id inside `ingested_events.sourceEventId`. */
+function cappedEventId(value: string): string {
+    return capped(value, GITHUB_SOURCE_EVENT_ID_MAX_CHARS);
+}
+
+/**
+ * A source-reported timestamp when it parses, otherwise now.
+ *
+ * The spine REJECTS an envelope whose `occurredAt` will not parse, so a
+ * malformed provider timestamp must never reach it — losing the true
+ * commit time is a much smaller loss than losing the event.
+ */
+function isoOrNow(value: string | null | undefined): string {
+    if (typeof value === 'string' && value.length > 0) {
+        const parsed = new Date(value);
+        if (!Number.isNaN(parsed.getTime())) return parsed.toISOString();
+    }
+    return new Date().toISOString();
+}
+
+/** The `taskId`/`taskSlug` payload block, or nothing when unlinked. */
+function taskFields(link: TaskGitLink | null): Record<string, unknown> {
+    if (!link) return {};
+    return {
+        taskId: link.taskId,
+        ...(link.taskSlug ? { taskSlug: link.taskSlug } : {}),
+    };
+}
+
+/**
  * GitHub PR review loop (Wave 7, feature g) — ONE service bridging
  * GitHub webhook deliveries into the platform:
  *
@@ -174,6 +302,17 @@ export function extractGitHubWorkspaceRef(
  *
  * Bot-authored comments (including our own review replies) are never
  * ingested — the loop must not echo its own output.
+ *
+ * ## Git activity (audit item j)
+ *
+ * `push` and merged `pull_request` deliveries were previously dropped on
+ * the floor, so commits, pushes and merges never reached the Activity
+ * feed at all. They now normalize into `github.push` / `github.commit` /
+ * `github.merge` envelopes on the SAME path (dedupe-insert → spine drain
+ * → Activity row), and the spine gives those three kinds their own
+ * `ActivityActionType` instead of the generic ingested-event one. They
+ * are deliberately kept OUT of the review loop: the code has already
+ * landed, so there is nothing left to review.
  */
 @Injectable()
 export class GitHubPrReviewBridgeService {
@@ -191,6 +330,11 @@ export class GitHubPrReviewBridgeService {
         // silently-unbound rejection recorder would be a feature that
         // looks wired and does nothing.
         private readonly rejections: TaskReviewRejectionService,
+        // Git activity ingestion (audit item j) - branch/PR -> Task
+        // resolution for push / commit / merge envelopes. Appended LAST
+        // and, like `rejections`, deliberately NOT @Optional(): the same
+        // TasksDomainModule provides it.
+        private readonly taskLinks: TaskGitLinkService,
     ) {}
 
     /**
@@ -374,6 +518,19 @@ export class GitHubPrReviewBridgeService {
             return { ingested: null };
         }
 
+        // Git activity ingestion (audit item j) - pushes, the commits
+        // inside them and merged pull requests. They take the SAME path
+        // every other kind takes (envelope -> dedupe-insert -> spine
+        // drain -> Activity row), but they never enter the review loop:
+        // the code has already landed, there is nothing left to review.
+        if (isGitActivityDelivery(eventName, body)) {
+            const envelopes = await this.gitActivityEnvelopes(binding, eventName, body);
+            if (envelopes.length === 0) {
+                return { ingested: null };
+            }
+            return { ingested: await this.eventIngestService.ingest(binding.userId, envelopes) };
+        }
+
         const normalized = this.normalize(eventName, body);
         if (!normalized) {
             return { ingested: null };
@@ -438,6 +595,193 @@ export class GitHubPrReviewBridgeService {
                 }`,
             );
         }
+    }
+
+    /**
+     * Git activity ingestion (audit item j) — every envelope one push /
+     * merge delivery produces, in ingest order.
+     *
+     * A push yields one `github.push` envelope for the ref plus one
+     * `github.commit` envelope per new commit; a merged pull request
+     * yields a single `github.merge`. An empty array means "nothing to
+     * ingest" (unattributable repo, a tag ref, a branch deletion) and is
+     * an ORDINARY outcome — the delivery still answers 200.
+     */
+    private async gitActivityEnvelopes(
+        binding: GitHubEventsBinding,
+        eventName: string,
+        body: GitHubWebhookBody,
+    ): Promise<IngestedEventEnvelope[]> {
+        return eventName === 'push'
+            ? this.pushEnvelopes(binding, body)
+            : this.mergeEnvelopes(binding, body);
+    }
+
+    /** `push` → the ref envelope + one envelope per NEW commit. */
+    private async pushEnvelopes(
+        binding: GitHubEventsBinding,
+        body: GitHubWebhookBody,
+    ): Promise<IngestedEventEnvelope[]> {
+        const fullName = body.repository?.full_name ?? '';
+        const [owner, repo] = fullName.split('/');
+        if (!owner || !repo) return [];
+
+        const ref = typeof body.ref === 'string' ? body.ref : '';
+        // Branch pushes only. Tag and note refs are release/annotation
+        // bookkeeping, not "someone pushed work to this repository".
+        if (!ref.startsWith('refs/heads/')) return [];
+        // A branch DELETION carries the all-zero `after` sha and no
+        // commits. It is a cleanup, not a push of work.
+        if (body.deleted === true) return [];
+        const branch = ref.slice('refs/heads/'.length);
+        const after = typeof body.after === 'string' ? body.after : '';
+        if (!branch || !after) return [];
+
+        // Task routing, where the payload allows it: the worktree-per-Task
+        // path stamps `tasks.branchRef`, so the branch IS the Task key.
+        const link = await this.taskLinks.findByBranch({
+            userId: binding.userId,
+            owner,
+            repo,
+            branch,
+        });
+
+        // `distinct: false` commits already reached the repository on
+        // another ref — ingesting them again would re-announce work the
+        // feed has shown once.
+        const commits = (Array.isArray(body.commits) ? body.commits : [])
+            .filter((commit) => typeof commit?.id === 'string' && commit.id.length > 0)
+            .filter((commit) => commit.distinct !== false)
+            .slice(0, GITHUB_PUSH_COMMITS_MAX);
+        const pusher = body.pusher?.name ?? body.sender?.login ?? 'unknown';
+        const headTimestamp = body.head_commit?.timestamp ?? commits[commits.length - 1]?.timestamp;
+
+        const pushEnvelope: IngestedEventEnvelope = {
+            id: randomUUID(),
+            source: GITHUB_PLUGIN_ID,
+            sourceEventId: cappedEventId(`push:${fullName}@${after}:${branch}`),
+            kind: 'github.push',
+            occurredAt: isoOrNow(headTimestamp),
+            actor: { name: pusher },
+            subject: {
+                type: 'branch',
+                externalId: capped(`${fullName}@${branch}`, GITHUB_SUBJECT_EXTERNAL_ID_MAX_CHARS),
+                title: `${branch} (${commits.length} commit${commits.length === 1 ? '' : 's'})`,
+            },
+            workHint: { kind: 'repo', externalId: fullName },
+            ...(body.compare ? { sourceUrl: body.compare } : {}),
+            payload: {
+                repoFullName: fullName,
+                ref,
+                branch,
+                ...(body.before ? { before: body.before } : {}),
+                after,
+                commitCount: commits.length,
+                ...(body.created === true ? { created: true } : {}),
+                ...(body.forced === true ? { forced: true } : {}),
+                ...taskFields(link),
+                commits: commits.map((commit) => ({
+                    sha: commit.id,
+                    message: commitSubject(commit.message).slice(0, 500),
+                })),
+            },
+        };
+
+        const commitEnvelopes = commits.map<IngestedEventEnvelope>((commit) => {
+            const sha = commit.id as string;
+            const subject = commitSubject(commit.message);
+            const author = commit.author?.username ?? commit.author?.name ?? pusher;
+            const filesChanged =
+                (commit.added?.length ?? 0) +
+                (commit.removed?.length ?? 0) +
+                (commit.modified?.length ?? 0);
+            return {
+                id: randomUUID(),
+                source: GITHUB_PLUGIN_ID,
+                // A commit's identity is its SHA — a rebase produces a new
+                // one, a re-delivery or a second ref carrying the same
+                // commit dedupes to zero.
+                sourceEventId: cappedEventId(`commit:${fullName}@${sha}`),
+                kind: 'github.commit',
+                occurredAt: isoOrNow(commit.timestamp),
+                actor: { name: author },
+                subject: {
+                    type: 'commit',
+                    externalId: sha,
+                    ...(subject ? { title: subject.slice(0, 500) } : {}),
+                },
+                workHint: { kind: 'repo', externalId: fullName },
+                ...(commit.url ? { sourceUrl: commit.url } : {}),
+                payload: {
+                    repoFullName: fullName,
+                    ref,
+                    branch,
+                    sha,
+                    ...(commit.message
+                        ? { message: commit.message.slice(0, GITHUB_EVENT_TEXT_MAX_CHARS) }
+                        : {}),
+                    ...(filesChanged > 0 ? { filesChanged } : {}),
+                    ...taskFields(link),
+                },
+            };
+        });
+
+        return [pushEnvelope, ...commitEnvelopes];
+    }
+
+    /** `pull_request` closed+merged → one `github.merge` envelope. */
+    private async mergeEnvelopes(
+        binding: GitHubEventsBinding,
+        body: GitHubWebhookBody,
+    ): Promise<IngestedEventEnvelope[]> {
+        const fullName = body.repository?.full_name ?? '';
+        const [owner, repo] = fullName.split('/');
+        if (!owner || !repo) return [];
+
+        const pr = body.pull_request;
+        const prNumber = pr?.number;
+        if (!pr || typeof prNumber !== 'number') return [];
+
+        // Task routing: the agent-merge path stamps `tasks.prNumber`, so
+        // `(Work, prNumber)` is the Task key — the same one the PR
+        // rejection recorder uses.
+        const link = await this.taskLinks.findByPullRequest({
+            userId: binding.userId,
+            owner,
+            repo,
+            prNumber,
+        });
+
+        const mergeCommitSha = pr.merge_commit_sha ?? '';
+        return [
+            {
+                id: randomUUID(),
+                source: GITHUB_PLUGIN_ID,
+                sourceEventId: cappedEventId(
+                    `merge:${fullName}#${prNumber}@${mergeCommitSha || 'merged'}`,
+                ),
+                kind: 'github.merge',
+                occurredAt: isoOrNow(pr.merged_at),
+                actor: { name: pr.merged_by?.login ?? body.sender?.login ?? 'unknown' },
+                subject: {
+                    type: 'pull_request',
+                    externalId: `${fullName}#${prNumber}`,
+                    ...(pr.title ? { title: pr.title } : {}),
+                },
+                workHint: { kind: 'repo', externalId: fullName },
+                ...(pr.html_url ? { sourceUrl: pr.html_url } : {}),
+                payload: {
+                    repoFullName: fullName,
+                    prNumber,
+                    ...(mergeCommitSha ? { mergeCommitSha } : {}),
+                    ...(pr.base?.ref ? { baseRef: pr.base.ref } : {}),
+                    ...(pr.head?.ref ? { headRef: pr.head.ref } : {}),
+                    ...(pr.title ? { title: pr.title.slice(0, 500) } : {}),
+                    ...(pr.merged_by?.login ? { mergedBy: pr.merged_by.login } : {}),
+                    ...taskFields(link),
+                },
+            },
+        ];
     }
 
     /** Normalize a delivery into an envelope + review coordinates (or skip it). */

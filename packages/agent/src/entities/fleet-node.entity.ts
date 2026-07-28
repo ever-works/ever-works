@@ -1,4 +1,5 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
+import type { FleetNodeKind, FleetNodeStatus } from '@ever-works/contracts';
 import { PortableDateColumn } from './_types';
 
 /**
@@ -21,6 +22,10 @@ import { PortableDateColumn } from './_types';
  *      that hash (fail-closed) and server-stamps `lastHeartbeatAt`.
  *   4. List reads sweep `online` nodes with no heartbeat for 5 minutes
  *      to `offline` (no dedicated cron).
+ *   5. `rotateCredentialForUser` puts an enrolled node BACK to
+ *      `enrolling` with a freshly minted one-time token: the old
+ *      heartbeat secret stops working the instant the hash is replaced,
+ *      and the operator re-enrolls the machine with the new token.
  *
  * Cluster boundary: rows only ever describe user-enrolled machines.
  * Nodes of user-configured clusters (`clusterSource:
@@ -38,11 +43,29 @@ import { PortableDateColumn } from './_types';
  * entity throws EntityMetadataNotFoundError on first query.
  */
 
-/** App shape of the node ('k8s' is list-time only — never persisted). */
-export type FleetNodeKind = 'desktop-node' | 'node' | 'k8s';
+/**
+ * The kind/status unions are the SHARED contract's
+ * (`@ever-works/contracts`), re-exported here so the entity, the API
+ * edge, the web tier and the node apps cannot drift: adding a status
+ * server-side is a compile error everywhere that switches on it.
+ *
+ * `k8s` is list-time only — never persisted as a row.
+ */
+export type { FleetNodeKind, FleetNodeStatus } from '@ever-works/contracts';
+/** Statuses in which the platform will NOT lease new work onto a node. */
+export const FLEET_NODE_NON_LEASABLE_STATUSES: readonly FleetNodeStatus[] = [
+    'enrolling',
+    'paused',
+    'disabled',
+];
 
-/** Heartbeat-derived lifecycle state. */
-export type FleetNodeStatus = 'enrolling' | 'online' | 'offline' | 'disabled';
+/**
+ * Statuses that must be PRESERVED by an accepted heartbeat instead of
+ * being overwritten with `online`. A drained node that goes dark is
+ * indistinguishable from a dead one, so it keeps beating — but a beat
+ * must never silently un-pause it.
+ */
+export const FLEET_NODE_STICKY_STATUSES: readonly FleetNodeStatus[] = ['paused', 'disabled'];
 
 @Entity({ name: 'fleet_nodes' })
 @Index('idx_fleet_nodes_user', ['userId'])
@@ -65,7 +88,7 @@ export class FleetNode {
     @Column({ type: 'varchar', length: 16 })
     kind: FleetNodeKind;
 
-    /** 'enrolling' | 'online' | 'offline' | 'disabled'. */
+    /** 'enrolling' | 'online' | 'offline' | 'paused' | 'disabled'. */
     @Column({ type: 'varchar', length: 16 })
     status: FleetNodeStatus;
 
@@ -85,9 +108,35 @@ export class FleetNode {
     @PortableDateColumn({ nullable: true })
     lastHeartbeatAt?: Date | null;
 
+    /**
+     * When the CURRENT credential was issued.
+     *
+     * Enrollment-token expiry is measured from here rather than from
+     * `createdAt`, because a credential ROTATION mints a fresh token on
+     * an existing row: judging that token by the row's creation date
+     * would make every rotated token instantly expired. NULL on rows
+     * written before rotation existed — the service falls back to
+     * `createdAt` for those, so the pre-rotation behaviour is unchanged.
+     */
+    @PortableDateColumn({ nullable: true })
+    credentialIssuedAt?: Date | null;
+
     /** Capability tags ('terminal', 'workspace', 'docker', ...). */
     @Column({ type: 'simple-json' })
     capabilities: string[];
+
+    /**
+     * True once an admin has hand-edited {@link capabilities}.
+     *
+     * Tags are normally the NODE's self-description, refreshed on every
+     * heartbeat. Pinning is what makes them admin-editable in a way that
+     * survives: while pinned, an incoming heartbeat no longer overwrites
+     * the tag set, so an operator can add (or withhold) a capability
+     * without the machine silently reverting it seconds later. Unpinning
+     * hands ownership back to the node.
+     */
+    @Column({ type: 'boolean', default: false })
+    capabilitiesPinned: boolean;
 
     /** os/arch self-description, e.g. 'linux/x64' (sanitized at enroll). */
     @Column({ type: 'varchar', length: 64, nullable: true })

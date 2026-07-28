@@ -55,6 +55,7 @@ import {
 } from '@ever-works/agent/agents';
 import {
     TaskChatService,
+    TaskGateJudgeService,
     TaskGateRunnerService,
     TaskReviewRejectionService,
     TaskPrStatusService,
@@ -355,6 +356,13 @@ export class TriggerInternalController implements OnModuleInit {
         // here where the git-provider plugins + credentials are wired.
         // Appended LAST + @Optional() per the arity rule above.
         private readonly taskPrStatusService?: TaskPrStatusService,
+        // Judgment layer G2 — backs the acceptance-criteria judge call
+        // from `agent-task-execute` after a GREEN gate. Lands here where
+        // the AI provider plugins, the budget guard and the usage ledger
+        // behind `AiFacadeService` are wired. Appended LAST + @Optional()
+        // per the arity rule above.
+        @Optional()
+        private readonly taskGateJudgeService?: TaskGateJudgeService,
     ) {}
 
     onModuleInit() {
@@ -409,6 +417,9 @@ export class TriggerInternalController implements OnModuleInit {
             // Wave 3 M2 — agent-task-execute calls `runChecks` here after the
             // agent loop (quality gates; allow-list auto-derived).
             TaskGateRunnerService: this.taskGateRunnerService,
+            // Judgment layer G2 — agent-task-execute calls `judge` here
+            // after a green gate (allow-list auto-derived).
+            TaskGateJudgeService: this.taskGateJudgeService,
             // Kanban run cockpit (Wave 2) — agent-task-execute calls
             // recordQueued/recordStarted/recordTerminal here.
             TaskRunDenormService: this.taskRunDenormService,

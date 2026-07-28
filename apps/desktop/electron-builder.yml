@@ -1,8 +1,14 @@
 # electron-builder configuration for the Ever Works Desktop App.
 #
-# Deliberately unsigned: no codeSign / notarize / certificate settings here.
-# Signing + auto-update channels are a follow-up hardening milestone (PRD M9);
-# CI packaging wires signing secrets outside the repo when that lands.
+# Code signing is NOT configured in this file on purpose — certificates never
+# live in the repository. `scripts/package-app.js` resolves a signing plan from
+# the environment (repository secrets, exported by
+# `.github/workflows/desktop-build.yml`) and hands electron-builder the right
+# CSC_* variables plus `-c.mac.notarize=<bool>`. With no secrets present the
+# build degrades to an UNSIGNED installer and prints a loud warning, so forks
+# and pull requests still produce artifacts.
+#
+# See `src/services/signing-plan.ts` for the exact secret names and rules.
 appId: works.ever.desktop
 productName: Ever Works Desktop
 copyright: Copyright © 2026 Ever Co. LTD
@@ -15,9 +21,23 @@ files:
   - dist/**
   - package.json
 
+# Self-contained runtime payload (see `scripts/prepare-bundle.js`): the built
+# API and the Next.js standalone web server together with their production
+# dependencies. Copied to `resources/app-bundle`, where
+# `src/services/runtime-layout.ts` finds it via `bundle-manifest.json`. The
+# app runs both entry points on Electron's own Node.js, so an installed app
+# needs no monorepo checkout, Node.js or pnpm on the user's machine.
+#
+# `prepare-bundle.js` ALWAYS creates `bundle/` (with a `bundled: false`
+# manifest when the platform build output was not staged), so this copy never
+# breaks packaging.
+extraResources:
+  - from: bundle
+    to: app-bundle
+
 asar: true
-# The desktop app spawns the platform's own workspace processes; nothing in
-# this package needs a native rebuild at package time.
+# The desktop shell itself has no native dependencies; the bundled runtime
+# payload is prepared outside electron-builder.
 npmRebuild: false
 
 win:
@@ -33,6 +53,9 @@ mac:
     - dmg
     - zip
   category: public.app-category.developer-tools
+  # Overridden to `true` by the packaging script when Apple notarization
+  # credentials are present in the environment.
+  notarize: false
 
 linux:
   target:

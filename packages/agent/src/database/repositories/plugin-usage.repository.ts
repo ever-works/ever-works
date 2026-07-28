@@ -479,6 +479,55 @@ export class PluginUsageRepository {
         }));
     }
 
+    /**
+     * B29 (account-wide usage CSV export) — ONE page of the user's
+     * metered events inside the window, ordered deterministically so the
+     * caller can keyset/offset its way through an arbitrarily long
+     * period without ever materializing it all in memory.
+     *
+     * Scope contract:
+     *   - `userId` is always applied (owner scope — a caller only ever
+     *     reads their OWN events, never another account's).
+     *   - `organizationId`, when a non-empty string, restricts the rows
+     *     to that Organization. It comes from the request SCOPE CONTEXT
+     *     at the API boundary, never from a caller-supplied param, so a
+     *     user acting inside Org A cannot export Org B's spend. When the
+     *     request has no active Organization the filter is omitted and
+     *     the export is the user's full account-wide history — their own
+     *     rows either way.
+     *
+     * Half-open `[start, end)` window, matching every other aggregation
+     * on this repository (see `findForExport`'s note about the inclusive
+     * `Between()` regression).
+     */
+    async findPageForUserExport(
+        userId: string,
+        periodStart: Date,
+        periodEnd: Date,
+        options: { organizationId?: string | null; limit: number; offset: number },
+    ): Promise<PluginUsageEvent[]> {
+        const qb = this.repository
+            .createQueryBuilder('e')
+            .where('e.userId = :userId', { userId })
+            .andWhere('e.occurredAt >= :start', { start: periodStart })
+            .andWhere('e.occurredAt < :end', { end: periodEnd });
+
+        if (options.organizationId) {
+            qb.andWhere('e.organizationId = :organizationId', {
+                organizationId: options.organizationId,
+            });
+        }
+
+        // `id` is the tie-breaker: `occurredAt` alone is not unique, and
+        // an unstable sort would duplicate/skip rows across pages.
+        return qb
+            .orderBy('e.occurredAt', 'ASC')
+            .addOrderBy('e.id', 'ASC')
+            .skip(options.offset)
+            .take(options.limit)
+            .getMany();
+    }
+
     async findForExport(
         workId: string,
         periodStart: Date,

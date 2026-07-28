@@ -191,4 +191,40 @@ export class FleetJobRepository {
             take: limit,
         });
     }
+
+    /**
+     * One node's job history, newest first — what the node-detail drawer
+     * renders (including the failures an operator is usually there for).
+     *
+     * `userId` is in the WHERE clause and not merely assumed from the
+     * caller: this is the only read keyed by a node id, and a node id is
+     * exactly the kind of value that travels. Owner-scoping it here
+     * means a mistake at the edge cannot turn into a cross-owner read.
+     */
+    async findByNodeForUser(userId: string, nodeId: string, limit: number): Promise<FleetJob[]> {
+        return this.repository.find({
+            where: { userId, nodeId },
+            order: { createdAt: 'DESC' },
+            take: limit,
+        });
+    }
+
+    /**
+     * Return every live claim held by one node to the pool — the write
+     * half of DRAINING a node.
+     *
+     * Draining without this leaves the node's in-flight work stranded
+     * until each lease lapses: the machine is already refusing to
+     * heartbeat, so nothing will ever complete those jobs, and the fleet
+     * sits idle for up to a full lease TTL per job. Requeuing them makes
+     * the drain immediate. `attempts` is deliberately NOT incremented —
+     * the operator withdrew the node, the job did not fail.
+     */
+    async releaseClaimsForNode(userId: string, nodeId: string): Promise<number> {
+        const result = await this.repository.update(
+            { userId, nodeId, status: In([...FLEET_JOB_ACTIVE_STATUSES]) },
+            { status: 'queued', nodeId: null, leaseExpiresAt: null },
+        );
+        return result.affected ?? 0;
+    }
 }

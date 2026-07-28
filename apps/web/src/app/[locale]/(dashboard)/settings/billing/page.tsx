@@ -26,7 +26,26 @@ export async function generateMetadata(): Promise<Metadata> {
  * ledger paging/filtering through the `/api/credits/ledger` proxy.
  * Static page by design — no polling; refresh on navigation.
  */
-export default async function BillingSettingsPage() {
+interface BillingSettingsPageProps {
+    /** `session_id` is appended by the payment provider on return. */
+    searchParams: Promise<{ session_id?: string; plan?: string }>;
+}
+
+export default async function BillingSettingsPage({ searchParams }: BillingSettingsPageProps) {
+    // Paid-plan checkout return (audit B24). The provider redirects here
+    // with its session id; finalizing BEFORE the snapshot fetch means the
+    // page renders the new tier immediately instead of the old one.
+    //
+    // This is a convenience, not the source of truth — the
+    // signature-verified webhook activates the plan regardless, and both
+    // paths funnel into the same idempotent activation. The API scopes
+    // the call to the session user, so a session id pasted from another
+    // account's redirect resolves to a 404 and is swallowed here.
+    const params = await searchParams;
+    if (params.session_id) {
+        await billingAPI.completePlanCheckout(params.session_id).catch(() => null);
+    }
+
     // Each fetch degrades independently: a failed call renders that
     // section's error/empty state instead of failing the whole page.
     const [plan, plans, balance, ledger, overview, invoices] = await Promise.all([

@@ -1260,6 +1260,28 @@ export class AgentRunRepository {
     }
 
     /**
+     * Org-scoped digest briefings — the most recent runs of one
+     * Organization, regardless of which member started them.
+     *
+     * A sibling of `listSessionsForUser` rather than a filter on it:
+     * that method's first predicate is `run.userId = :userId` and every
+     * caller depends on the owner scope, so an org filter bolted on
+     * there would be one forgotten argument away from a cross-user read.
+     *
+     * Rows with no `organizationId` stamped belong to the personal
+     * surface and are never matched here.
+     */
+    async listRecentForOrganization(organizationId: string, limit = 100): Promise<AgentRun[]> {
+        const take = Math.min(Math.max(limit, 1), 500);
+        return this.repository
+            .createQueryBuilder('run')
+            .where('run.organizationId = :organizationId', { organizationId })
+            .orderBy('run.createdAt', 'DESC')
+            .take(take)
+            .getMany();
+    }
+
+    /**
      * Per-Work session summary (Wave 4 M3) — one grouped scan over
      * `(workId, status)` instead of four counts. CASE/SUM is portable
      * across Postgres and sqlite (the e2e suite runs on sqlite);

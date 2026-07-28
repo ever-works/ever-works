@@ -209,13 +209,11 @@ describe('AutoRechargeService', () => {
 
     it('releases the guard and counts the failure when the provider declines', async () => {
         const provider = makeProvider({
-            chargeOffSession: jest
-                .fn()
-                .mockResolvedValue({
-                    paymentId: '',
-                    status: 'failed',
-                    failureCode: 'card_declined',
-                }),
+            chargeOffSession: jest.fn().mockResolvedValue({
+                paymentId: '',
+                status: 'failed',
+                failureCode: 'card_declined',
+            }),
         });
         const profiles = makeProfileRepository();
         const service = new AutoRechargeService(provider, profiles, makeLedgerService(0));

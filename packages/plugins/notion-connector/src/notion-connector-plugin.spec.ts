@@ -5,6 +5,7 @@ import {
 	extractPageTitle,
 	NOTION_BACKFILL_MAX_PAGES
 } from './notion-connector-plugin.js';
+import { supportsEventSourceBackfill } from '@ever-works/plugin';
 
 const usersMeMock = vi.fn();
 const searchMock = vi.fn();
@@ -316,6 +317,62 @@ describe('NotionConnectorPlugin', () => {
 			});
 			expect(searchMock).toHaveBeenCalledTimes(1);
 			expect(res.events).toEqual([]);
+		});
+	});
+
+	// `backfill()` capability method (audit item (l)).
+	describe('backfill', () => {
+		it('is exposed as the capability method, feature-detectable by callers', () => {
+			expect(typeof plugin.backfill).toBe('function');
+			expect(supportsEventSourceBackfill(plugin as never)).toBe(true);
+		});
+
+		it('⭐ sweeps an EXPLICIT window regardless of the settings backfillDays', async () => {
+			searchMock.mockResolvedValue({ results: [], has_more: false, next_cursor: null });
+
+			// `backfillDays` deliberately absent: history used to be
+			// reachable ONLY through that first-pull setting.
+			const result = await plugin.backfill({ since: '2026-05-01T00:00:00.000Z', settings: SETTINGS });
+
+			expect(searchMock).toHaveBeenCalledTimes(1);
+			expect(result.complete).toBe(true);
+			expect(result.nextCursor).toBeUndefined();
+		});
+
+		it('opens on the configured databases when there are any, else workspace search', async () => {
+			databasesQueryMock.mockResolvedValue({ results: [], has_more: false, next_cursor: null });
+			await plugin.backfill({
+				since: '2026-05-01T00:00:00.000Z',
+				settings: { ...SETTINGS, databaseIds: 'db-1' }
+			});
+			expect(databasesQueryMock.mock.calls[0][0].database_id).toBe('db-1');
+			expect(searchMock).not.toHaveBeenCalled();
+		});
+
+		it('marks the sweep as a backfill so the page bound engages, and resumes from its cursor', async () => {
+			searchMock.mockResolvedValue({ results: [], has_more: true, next_cursor: 'more' });
+
+			const first = await plugin.backfill({ since: '2026-05-01T00:00:00.000Z', settings: SETTINGS });
+			const parsed = JSON.parse(first.nextCursor as string);
+			expect(parsed.f).toBe(1);
+			expect(first.complete).toBeUndefined();
+
+			await plugin.backfill({
+				since: '2026-05-01T00:00:00.000Z',
+				cursor: first.nextCursor,
+				settings: SETTINGS
+			});
+			expect(searchMock.mock.calls[1][0].start_cursor).toBe('more');
+		});
+
+		it('rejects a malformed window loudly instead of sweeping something arbitrary', async () => {
+			await expect(plugin.backfill({ since: 'last week', settings: SETTINGS })).rejects.toThrow(/valid ISO 8601/);
+		});
+
+		it('still requires credentials — an unconfigured source fails with the stable error name', async () => {
+			await expect(plugin.backfill({ since: '2026-05-01T00:00:00.000Z', settings: {} })).rejects.toMatchObject({
+				name: 'EventSourceNotConfiguredError'
+			});
 		});
 	});
 });

@@ -58,6 +58,29 @@ When a required check is red, the run does not fail; the Agent is handed the fai
 
 When the budget is spent, the Task stops with the gate red and the failure recorded, rather than looping forever. The budget is also consulted against the Task's spend guardrails, so an expensive iterate loop stops when the budget does.
 
+## Every pull request the platform opens, not just the Agent's
+
+Agent Task runs are not the only place Ever Works opens a pull request. Item
+submit / remove / update, the CSV/Excel bulk import, the data-repo generation
+and source-sync flows, the markdown sync and the `openPullRequest` Agent tool
+all propose changes the same way — and they consult the same gate before they
+do.
+
+The rules are the Work-level ones you already configured, with no Task in the
+picture (so only `checkDefaults` apply):
+
+| Policy     | What happens to a non-Task pull request                                                        |
+| ---------- | ---------------------------------------------------------------------------------------------- |
+| `off`      | Nothing runs. Identical to how these flows behaved before gates existed — this is the default. |
+| `warn`     | Checks run against the checkout and report; the pull request opens either way.                 |
+| `required` | The pull request opens only on a green gate.                                                   |
+
+Under `required`, a refusal never destroys work: the change is still written,
+committed and pushed on its branch — only the pull request is withheld, and the
+failing check ids come back with the refusal. A Work that declares `required`
+but configures **no** checks refuses too: a gate that cannot run must not pass
+anything.
+
 ## Reading the result
 
 The Task detail page's **Checks** section shows:

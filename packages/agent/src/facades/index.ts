@@ -32,6 +32,11 @@ export type { SearchFacadeOptions } from '@ever-works/plugin';
 
 // Screenshot Facade
 export { ScreenshotFacadeService, ScreenshotFacadeError } from './screenshot.facade';
+export {
+    BrowserAutomationFacadeService,
+    BrowserAutomationFacadeError,
+    type BrowserReadResult,
+} from './browser-automation.facade';
 
 // Content Extractor Facade
 export {

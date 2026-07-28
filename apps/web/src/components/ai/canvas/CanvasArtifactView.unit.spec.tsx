@@ -161,4 +161,127 @@ describe('CanvasArtifactView', () => {
             expect(screen.getByText((c) => c.includes(text))).toBeTruthy();
         });
     });
+
+    // Judgment layer G8s — typed human-in-the-loop payloads rendered by the
+    // canvas registry. Props are the contract's `HitlQuestion`/`HitlAnswer`,
+    // so these double as a round-trip check through `ComponentArtifact`.
+    describe('HITL renderers', () => {
+        const hitl = (
+            component: 'hitl_question' | 'hitl_answer',
+            props: Record<string, unknown>,
+        ): ComponentArtifact => ({
+            id: '1',
+            kind: 'component',
+            title: 'Needs you',
+            component,
+            props,
+        });
+
+        it('renders a confirm question with both labels', () => {
+            render(
+                <CanvasArtifactView
+                    artifact={hitl('hitl_question', {
+                        id: 'q1',
+                        kind: 'confirm',
+                        prompt: 'Force-push the branch?',
+                        confirmLabel: 'Force-push',
+                        cancelLabel: 'Leave it',
+                    })}
+                />,
+            );
+            expect(screen.getByText('Force-push the branch?')).toBeTruthy();
+            expect(screen.getByText('Force-push')).toBeTruthy();
+            expect(screen.getByText('Leave it')).toBeTruthy();
+        });
+
+        it('renders every option of a choice question, with descriptions', () => {
+            render(
+                <CanvasArtifactView
+                    artifact={hitl('hitl_question', {
+                        id: 'q2',
+                        kind: 'choice',
+                        prompt: 'Which fix?',
+                        context: 'Both are green.',
+                        options: [
+                            { id: 'revert', label: 'Revert the commit', tone: 'warning' },
+                            { id: 'patch', label: 'Patch forward', description: 'Smaller diff' },
+                        ],
+                    })}
+                />,
+            );
+            expect(screen.getByText('Both are green.')).toBeTruthy();
+            expect(screen.getByText('Revert the commit')).toBeTruthy();
+            expect(screen.getByText('Patch forward')).toBeTruthy();
+            expect(screen.getByText('Smaller diff')).toBeTruthy();
+        });
+
+        it('renders an approval question with its action and risks', () => {
+            render(
+                <CanvasArtifactView
+                    artifact={hitl('hitl_question', {
+                        id: 'q3',
+                        kind: 'approval',
+                        prompt: 'May I merge?',
+                        action: 'Merge PR #42 into develop',
+                        risks: ['Touches billing'],
+                    })}
+                />,
+            );
+            expect(screen.getByText('Merge PR #42 into develop')).toBeTruthy();
+            expect(screen.getByText('Touches billing')).toBeTruthy();
+        });
+
+        it('renders a text question placeholder', () => {
+            render(
+                <CanvasArtifactView
+                    artifact={hitl('hitl_question', {
+                        id: 'q4',
+                        kind: 'text',
+                        prompt: 'Release note?',
+                        placeholder: 'One line please',
+                    })}
+                />,
+            );
+            expect(screen.getByText('One line please')).toBeTruthy();
+        });
+
+        it('degrades visibly on a malformed question payload instead of crashing', () => {
+            render(<CanvasArtifactView artifact={hitl('hitl_question', { kind: 'nope' })} />);
+            expect(screen.getByText('Unreadable question payload')).toBeTruthy();
+        });
+
+        it('renders an approval answer with its note', () => {
+            render(
+                <CanvasArtifactView
+                    artifact={hitl('hitl_answer', {
+                        questionId: 'q3',
+                        kind: 'approval',
+                        decision: 'approved',
+                        note: 'Reviewed the diff.',
+                    })}
+                />,
+            );
+            expect(screen.getByText('Approved')).toBeTruthy();
+            expect(screen.getByText('Reviewed the diff.')).toBeTruthy();
+            expect(screen.getByText((c) => c.includes('Answer to q3'))).toBeTruthy();
+        });
+
+        it('renders a multi_choice answer as its selected ids', () => {
+            render(
+                <CanvasArtifactView
+                    artifact={hitl('hitl_answer', {
+                        questionId: 'q5',
+                        kind: 'multi_choice',
+                        optionIds: ['unit', 'lint'],
+                    })}
+                />,
+            );
+            expect(screen.getByText('unit, lint')).toBeTruthy();
+        });
+
+        it('degrades visibly on a malformed answer payload', () => {
+            render(<CanvasArtifactView artifact={hitl('hitl_answer', { kind: 'confirm' })} />);
+            expect(screen.getByText('Unreadable answer payload')).toBeTruthy();
+        });
+    });
 });

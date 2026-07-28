@@ -141,6 +141,26 @@ export class IngestedEventRepository {
         return this.findRecentByUser(userId, { workId, limit });
     }
 
+    /**
+     * Org-scoped digest briefings — the most recent ingested events of
+     * one Organization, across every member who connected a source.
+     *
+     * Separate from `findRecentByUser` on purpose: that read is
+     * owner-keyed and its callers (chat tool, Work feed) rely on it.
+     * Rows with no `organizationId` stamped are personal and never
+     * matched here, so turning on an org digest cannot surface a
+     * member's unscoped events.
+     */
+    async findRecentByOrganization(organizationId: string, limit = 200): Promise<IngestedEvent[]> {
+        const take = Math.min(Math.max(limit, 1), 500);
+        return this.repository
+            .createQueryBuilder('event')
+            .where('event.organizationId = :organizationId', { organizationId })
+            .orderBy('event.occurredAt', 'DESC')
+            .take(take)
+            .getMany();
+    }
+
     async findById(id: string): Promise<IngestedEvent | null> {
         return this.repository.findOne({ where: { id } });
     }

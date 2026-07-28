@@ -10,6 +10,8 @@ export interface CreateFleetNodeData {
     kind: FleetNodeKind;
     status: FleetNodeStatus;
     enrollmentTokenHash: string;
+    /** When the credential above was minted — drives token expiry. */
+    credentialIssuedAt?: Date | null;
     capabilities?: string[];
 }
 

@@ -4,6 +4,7 @@ import {
     PluginUsageRepository,
     UserSpendGroupRow,
 } from '@src/database/repositories/plugin-usage.repository';
+import type { PluginUsageEvent } from '@src/entities/plugin-usage-event.entity';
 
 /** Wave 13 — grouping dimensions for `GET /api/credits/usage-summary`. */
 export const USAGE_SUMMARY_GROUP_BYS = ['day', 'model', 'agent', 'work'] as const;
@@ -109,6 +110,95 @@ export interface UsageSummaryGrouped {
 }
 
 /**
+ * B29 — one CSV line of the account-wide usage export. Deliberately an
+ * explicit projection of `plugin_usage_events` (never the entity): the
+ * scope columns (`tenantId` / `organizationId`) and the free-form
+ * `metadata` blob stay server-side.
+ */
+export interface UsageExportRow {
+    occurredAt: string;
+    pluginId: string;
+    capability: string;
+    units: number;
+    costCents: number;
+    currency: string;
+    modelId: string | null;
+    workId: string | null;
+    agentId: string | null;
+    taskId: string | null;
+    runId: string | null;
+    requestId: string | null;
+}
+
+/**
+ * CSV column order for the account-wide export. Exported so the API
+ * controller writes the header from the same source of truth the rows
+ * are projected from (a column added here can never silently drift out
+ * of the header).
+ */
+export const USAGE_EXPORT_COLUMNS = [
+    'occurredAt',
+    'pluginId',
+    'capability',
+    'units',
+    'costCents',
+    'currency',
+    'modelId',
+    'workId',
+    'agentId',
+    'taskId',
+    'runId',
+    'requestId',
+] as const satisfies readonly (keyof UsageExportRow)[];
+
+export interface UsageExportOptions {
+    /** `YYYY-MM` calendar month (default: current), or rolling `7d`/`30d`. */
+    period?: string;
+    /**
+     * Active Organization from the request scope context. When set, only
+     * that org's rows are exported. NEVER caller-supplied.
+     */
+    organizationId?: string | null;
+    /** Rows fetched per DB round-trip while streaming (test seam). */
+    pageSize?: number;
+}
+
+/** A resolved export: the echoed window plus a lazy chunked row stream. */
+export interface UsageExportStream {
+    window: UsageSummaryWindow;
+    organizationId: string | null;
+    /** Yields pages of rows — never the whole period at once. */
+    chunks: AsyncIterable<UsageExportRow[]>;
+}
+
+/** Rows pulled per DB round-trip while streaming the CSV export. */
+const USAGE_EXPORT_PAGE_SIZE = 500;
+
+/** Hard ceiling so a caller-supplied page size can't force a huge read. */
+const USAGE_EXPORT_MAX_PAGE_SIZE = 5000;
+
+/** Entity → wire projection. Scope columns + metadata never leave here. */
+function toUsageExportRow(event: PluginUsageEvent): UsageExportRow {
+    return {
+        occurredAt:
+            event.occurredAt instanceof Date
+                ? event.occurredAt.toISOString()
+                : String(event.occurredAt ?? ''),
+        pluginId: event.pluginId,
+        capability: event.capability,
+        units: Number(event.units ?? 0),
+        costCents: Number(event.costCents ?? 0),
+        currency: event.currency,
+        modelId: event.modelId ?? null,
+        workId: event.workId ?? null,
+        agentId: event.agentId ?? null,
+        taskId: event.taskId ?? null,
+        runId: event.runId ?? null,
+        requestId: event.requestId ?? null,
+    };
+}
+
+/**
  * Wave 13 (Billing / Usage & Credits pages) — owner-scoped account-wide
  * usage aggregations behind `GET /api/credits/usage-summary`.
  *
@@ -164,6 +254,57 @@ export class UsageSummaryService {
             groupBy,
             rows,
         };
+    }
+
+    /**
+     * B29 — account-wide usage CSV export (`GET /api/credits/usage/export`).
+     *
+     * Returns the resolved window synchronously (so the API boundary can
+     * map a bad period to a 400 and build the filename BEFORE a single
+     * byte is written) plus a lazy async iterable that pages the
+     * repository. The whole period is never buffered: the controller
+     * writes each chunk out as it arrives, so a year-long export costs
+     * one page of rows in memory, not the year.
+     *
+     * Scope: `userId` is the authenticated caller; `organizationId` is
+     * the request's active Organization (from the scope context) and is
+     * never caller-supplied — see
+     * `PluginUsageRepository.findPageForUserExport`.
+     */
+    createExport(userId: string, options: UsageExportOptions = {}): UsageExportStream {
+        const window = resolveUsageSummaryWindow(options.period);
+        const organizationId = options.organizationId ?? null;
+        const pageSize = this.resolvePageSize(options.pageSize);
+        const repository = this.pluginUsageRepository;
+
+        async function* chunks(): AsyncGenerator<UsageExportRow[]> {
+            let offset = 0;
+            for (;;) {
+                const events = await repository.findPageForUserExport(
+                    userId,
+                    window.from,
+                    window.to,
+                    { organizationId, limit: pageSize, offset },
+                );
+                if (events.length === 0) {
+                    return;
+                }
+                yield events.map(toUsageExportRow);
+                if (events.length < pageSize) {
+                    return;
+                }
+                offset += events.length;
+            }
+        }
+
+        return { window, organizationId, chunks: { [Symbol.asyncIterator]: chunks } };
+    }
+
+    private resolvePageSize(requested?: number): number {
+        if (!requested || !Number.isFinite(requested) || requested < 1) {
+            return USAGE_EXPORT_PAGE_SIZE;
+        }
+        return Math.min(Math.floor(requested), USAGE_EXPORT_MAX_PAGE_SIZE);
     }
 
     private async resolveRows(

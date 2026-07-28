@@ -151,7 +151,13 @@ export const showComponent = tool({
         '"json": props { data } (pretty JSON); "code": props { code, language? } (code block); ' +
         '"heatmap": props { rows: [{ label, values: number[] }], columns? } (intensity grid); ' +
         '"rating": props { value, max?, label? } (star rating); ' +
-        '"calendar": props { days: [{ date, value }] } (contribution-graph day grid). ' +
+        '"calendar": props { days: [{ date, value }] } (contribution-graph day grid); ' +
+        '"hitl_question": props are a typed human-in-the-loop question — ' +
+        '{ id, kind: "confirm" | "choice" | "multi_choice" | "text" | "approval", prompt, context?, ' +
+        'and the per-kind fields: options: [{ id, label, description?, tone? }] for choice/multi_choice, ' +
+        'action + risks? + preview? for approval } (renders the question a human must answer); ' +
+        '"hitl_answer": props are the matching answer — ' +
+        '{ questionId, kind, and one of confirmed | optionId | optionIds | text | decision (+ note?) }. ' +
         'After calling, give a one-line summary in chat.',
     inputSchema: z.object({
         title: z.string(),

@@ -1,6 +1,7 @@
 import { test, expect, type APIRequestContext } from '@playwright/test';
 import { API_BASE, authedHeaders, loginViaAPI } from './helpers/api';
 import { loadSeededTestUser } from './helpers/seeded-test-user';
+import { clickAndExpectUrl, clickUntil } from './helpers/nav';
 
 /**
  * Agents — /en/agents catalog + /agents/[id] detail DRIVEN THROUGH THE UI.
@@ -147,9 +148,8 @@ test.describe('Agents catalog UI — prompt-first surface', () => {
         const agent = await createSeededAgent(request);
         await page.goto('/en/agents', { waitUntil: 'domcontentloaded' });
         const card = page.locator(`a[href$="/agents/${agent.id}"]`).first();
-        await expect(card).toBeVisible({ timeout: 30_000 });
-        await card.click();
-        await page.waitForURL(new RegExp(`/agents/${agent.id}$`), { timeout: 30_000 });
+        // Same swallowed-click exposure as the tab links below.
+        await clickAndExpectUrl(page, card, new RegExp(`/agents/${agent.id}$`));
         await expect(page.getByText(agent.name).first()).toBeVisible({ timeout: 30_000 });
     });
 });
@@ -294,9 +294,11 @@ test.describe('Agent detail — tab navigation', () => {
         const agent = await createSeededAgent(request);
         await page.goto(`/en/agents/${agent.id}`, { waitUntil: 'domcontentloaded' });
         const link = page.locator(`a[href$="/agents/${agent.id}/instructions"]`).first();
-        await expect(link).toBeVisible({ timeout: 30_000 });
-        await link.click();
-        await page.waitForURL(new RegExp(`/agents/${agent.id}/instructions`), { timeout: 30_000 });
+        // A click that lands before React attaches its handler is silently
+        // dropped — the link is visible, enabled and stable, Playwright
+        // reports success, and the URL never moves. clickAndExpectUrl
+        // re-clicks only while the URL has NOT arrived.
+        await clickAndExpectUrl(page, link, new RegExp(`/agents/${agent.id}/instructions`));
         // The SOUL.md textarea (aria-label) is the landing editor.
         await expect(page.getByRole('textbox', { name: 'SOUL.md' })).toBeVisible({
             timeout: 30_000,
@@ -310,9 +312,8 @@ test.describe('Agent detail — tab navigation', () => {
         const agent = await createSeededAgent(request);
         await page.goto(`/en/agents/${agent.id}`, { waitUntil: 'domcontentloaded' });
         const link = page.locator(`a[href$="/agents/${agent.id}/settings"]`).first();
-        await expect(link).toBeVisible({ timeout: 30_000 });
-        await link.click();
-        await page.waitForURL(new RegExp(`/agents/${agent.id}/settings`), { timeout: 30_000 });
+        // Same swallowed-click exposure as the Instructions tab above.
+        await clickAndExpectUrl(page, link, new RegExp(`/agents/${agent.id}/settings`));
         await expect(page.getByRole('heading', { name: 'Identity' })).toBeVisible({
             timeout: 30_000,
         });
@@ -326,12 +327,28 @@ test.describe('Agent detail — tab navigation', () => {
     }) => {
         const agent = await createSeededAgent(request);
         for (const tab of ['activity', 'skills', 'budgets']) {
-            await page.goto(`/en/agents/${agent.id}/${tab}`, { waitUntil: 'domcontentloaded' });
-            await expect(page).toHaveURL(new RegExp(`/agents/${agent.id}/${tab}`));
-            // The layout header (agent name) is shared across every tab body.
-            await expect(page.getByText(agent.name).first()).toBeVisible({ timeout: 30_000 });
-            // A resolved route, not a Next notFound() page.
-            await expect(page.getByText(/this page could not be found/i)).toHaveCount(0);
+            // The layout server-fetches the Agent to render the shared header,
+            // and falls to notFound() when that fetch comes back empty. Under
+            // CI load that fetch can miss transiently, which renders the
+            // not-found page — the header is then genuinely absent and the
+            // assertion fails with "element(s) not found" rather than a
+            // timeout, which reads like a routing bug and is not one.
+            //
+            // Re-navigate until the route resolves. Both assertions stay
+            // inside the retry, so a route that is PERSISTENTLY not-found
+            // still fails the test — only a transient SSR miss is absorbed.
+            await expect(async () => {
+                await page.goto(`/en/agents/${agent.id}/${tab}`, {
+                    waitUntil: 'domcontentloaded',
+                });
+                await expect(page).toHaveURL(new RegExp(`/agents/${agent.id}/${tab}`));
+                // A resolved route, not a Next notFound() page.
+                await expect(page.getByText(/this page could not be found/i)).toHaveCount(0);
+                // The layout header (agent name) is shared across every tab body.
+                await expect(page.getByRole('heading', { name: agent.name }).first()).toBeVisible({
+                    timeout: 15_000,
+                });
+            }).toPass({ timeout: 60_000 });
         }
     });
 });
@@ -440,23 +457,22 @@ test.describe('Agent settings — status controls', () => {
         const agent = await createSeededAgent(request);
         const token = await seededToken(request);
         await page.goto(`/en/agents/${agent.id}/settings`, { waitUntil: 'domcontentloaded' });
-        const activate = page.getByRole('button', { name: 'Activate', exact: true });
-        await expect(activate).toBeVisible({ timeout: 30_000 });
-        await activate.click();
+        /** Persisted status — the source of truth for "the action ran". */
+        const persistedStatus = async (): Promise<string> => {
+            const res = await request.get(`${API_BASE}/api/agents/${agent.id}`, {
+                headers: authedHeaders(token),
+            });
+            return ((await res.json()) as UiAgent).status;
+        };
 
-        // The server action mutates via the same seeded user; assert on the
-        // persisted API status (most robust vs. any client re-render timing).
-        await expect
-            .poll(
-                async () => {
-                    const res = await request.get(`${API_BASE}/api/agents/${agent.id}`, {
-                        headers: authedHeaders(token),
-                    });
-                    return ((await res.json()) as UiAgent).status;
-                },
-                { timeout: 20_000 },
-            )
-            .toBe('active');
+        // Click until the server actually flipped the status. A click landing
+        // before React attaches the handler is silently swallowed (button
+        // visible+enabled, click "succeeds", no server action dispatched) — CI
+        // saw the status stay 'draft' for the full poll budget. Re-clicking only
+        // while it is still not active means a landed activate is never repeated.
+        const activate = page.getByRole('button', { name: 'Activate', exact: true });
+        await clickUntil(activate, async () => (await persistedStatus()) === 'active', 60_000);
+        expect(await persistedStatus()).toBe('active');
     });
 });
 

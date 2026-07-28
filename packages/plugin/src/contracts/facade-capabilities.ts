@@ -57,6 +57,16 @@ export const PLUGIN_CAPABILITIES = {
 	CONNECTOR_LINEAR: 'connector-linear',
 	CONNECTOR_NOTION: 'connector-notion',
 	CONNECTOR_MICROSOFT_365: 'connector-microsoft-365',
+	// CRM / enrichment connectors — first-party native connectors over
+	// the vendors' own Node SDKs. Outbound writes CRM records/notes,
+	// the event-source leg streams record changes into the ingest spine.
+	CONNECTOR_HUBSPOT: 'connector-hubspot',
+	CONNECTOR_PIPEDRIVE: 'connector-pipedrive',
+	// Social connectors — public-timeline surfaces. Outbound publishes a
+	// post; the event-source leg streams mentions/replies + the account's
+	// own timeline into the ingest spine.
+	CONNECTOR_BLUESKY: 'connector-bluesky',
+	CONNECTOR_MASTODON: 'connector-mastodon',
 	// Pluggable persistent memory for AI coding / generation agents.
 	// First-party implementation: `@ever-works/agentmemory-plugin`
 	// (talks to the `agentmemory` standalone Node server on :3111 —
@@ -76,6 +86,12 @@ export const PLUGIN_CAPABILITIES = {
 	TERMINAL_STREAM: 'terminal-stream',
 	// Isolated git working contexts for agent Tasks (Wave 2).
 	WORKSPACE: 'workspace',
+	// Headless browser drivers (audit item G22). navigate / extract /
+	// screenshot / act, headless by default, behind a default-deny
+	// navigation allowlist re-checked on every redirect hop. First-party:
+	// `browser-automation` (Playwright). See
+	// capabilities/browser-automation.interface.ts.
+	BROWSER_AUTOMATION: 'browser-automation',
 	// Event-ingest spine (Wave 6) — plugins that pull/push normalized
 	// external events into the platform ingest pipeline. See
 	// capabilities/event-source.interface.ts.

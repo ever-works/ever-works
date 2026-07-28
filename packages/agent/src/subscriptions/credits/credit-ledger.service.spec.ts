@@ -214,6 +214,34 @@ describe('CreditLedgerService', () => {
                 expect.anything(),
             );
         });
+
+        it('propagates the TYPED InsufficientCreditsError (not a bare Error)', async () => {
+            // `consumeForRun` is the second of the two spend entrypoints
+            // (the other is `record` with a negative amount — covered
+            // above). Both MUST reject with the stable-named class: the
+            // api-side InsufficientCreditsExceptionFilter keys its 402 off
+            // `.name`, and RunCostSettlementService keys its
+            // partial-debit + exhaustion-notification policy off the type.
+            // A bare Error here would silently become an unmapped 500 and
+            // a swallowed settlement.
+            const { service } = makeService({
+                recordAtomic: jest.fn().mockResolvedValue({ status: 'insufficient', balance: 4 }),
+            });
+
+            const attempt = service.consumeForRun({
+                userId: 'u1',
+                runId: 'run-5',
+                costCents: 900,
+            });
+
+            await expect(attempt).rejects.toThrow(InsufficientCreditsError);
+            await expect(attempt).rejects.toMatchObject({
+                name: 'InsufficientCreditsError',
+                userId: 'u1',
+                requestedCredits: 900,
+                balanceCredits: 4,
+            });
+        });
     });
 
     describe('getLedger — period/kind filters + pagination', () => {

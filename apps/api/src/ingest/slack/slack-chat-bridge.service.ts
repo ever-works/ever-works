@@ -68,14 +68,23 @@ export interface SlackBindingLookup {
     readonly verifySignature?: (signingSecret: string) => boolean;
 }
 
-/** The subset of a Slack Events API `event_callback` we consume. */
-export interface SlackEventCallbackBody {
-    type?: string;
-    event_id?: string;
+/**
+ * The workspace-identifying fields EVERY signed Slack delivery carries,
+ * whatever its shape — a JSON Events API `event_callback`, or a
+ * form-encoded slash-command invocation. {@link extractSlackWorkspaceRef}
+ * reads only these, so both receivers share one resolution path.
+ */
+export interface SlackWorkspaceCarrier {
     team_id?: string;
     enterprise_id?: string;
     /** Grid deliveries carry the installing team/enterprise here. */
     authorizations?: Array<{ team_id?: string | null; enterprise_id?: string | null }>;
+}
+
+/** The subset of a Slack Events API `event_callback` we consume. */
+export interface SlackEventCallbackBody extends SlackWorkspaceCarrier {
+    type?: string;
+    event_id?: string;
     event?: {
         type?: string;
         subtype?: string;
@@ -91,6 +100,33 @@ export interface SlackEventCallbackBody {
 }
 
 /**
+ * The subset of a Slack SLASH-COMMAND invocation we consume.
+ *
+ * Slash commands are delivered `application/x-www-form-urlencoded` (not
+ * JSON like the Events API), so every field arrives as a string. The
+ * body is signed with the very same v0 scheme, which is why both
+ * receivers share `verifySlackSignature` and `resolveBinding`.
+ */
+export interface SlackSlashCommandBody extends SlackWorkspaceCarrier {
+    /** The invoked command, including the leading slash (e.g. `/works`). */
+    command?: string;
+    /** Everything the user typed after the command. */
+    text?: string;
+    channel_id?: string;
+    channel_name?: string;
+    user_id?: string;
+    user_name?: string;
+    /** Unique per invocation — the dedupe identity for the spine. */
+    trigger_id?: string;
+    /** Slack's delayed-response endpoint (unused; see the receiver's docs). */
+    response_url?: string;
+    api_app_id?: string;
+}
+
+/** Ingest kind for a slash-command invocation (`slack.mention`'s sibling). */
+export const SLACK_COMMAND_EVENT_KIND = 'slack.command';
+
+/**
  * Read the workspace identity off a delivery body.
  *
  * The body is NOT yet signature-verified at this point, and that is safe:
@@ -100,7 +136,7 @@ export interface SlackEventCallbackBody {
  * to attribute an event to someone else.
  */
 export function extractSlackWorkspaceRef(
-    body: SlackEventCallbackBody | undefined,
+    body: SlackWorkspaceCarrier | undefined,
 ): SlackWorkspaceRef | undefined {
     const auth = body?.authorizations?.[0];
     const teamId = body?.team_id ?? auth?.team_id ?? undefined;
@@ -132,6 +168,12 @@ export function extractSlackWorkspaceRef(
  *    completion back into the Slack thread via the slack-connector
  *    plugin's `reply` (best-effort: failures are logged, never thrown —
  *    the webhook 200s regardless).
+ * 4. `handleSlashCommand()` — the SAME chat leg for a slash-command
+ *    invocation (`/works …`): ingest a `slack.command` envelope, then
+ *    run the identical completion + reply path a mention takes, so both
+ *    entry points behave the same. Unlike the mention path this one
+ *    AWAITS the chat leg: its caller (the commands receiver) has
+ *    already acked Slack and detached the work.
  */
 @Injectable()
 export class SlackChatBridgeService {
@@ -404,16 +446,7 @@ export class SlackChatBridgeService {
         }
 
         try {
-            // `model: 'auto'` defers model selection to the user's configured
-            // AI plugin settings — the same path the web chat uses.
-            const completion = await this.openAiCompatService.handleCompletion(
-                {
-                    model: 'auto',
-                    messages: [{ role: 'user', content: prompt }],
-                } as OpenAiChatCompletionRequestDto,
-                { userId: binding.userId },
-            );
-            const replyText = completion.choices?.[0]?.message?.content?.trim();
+            const replyText = await this.runChatCompletion(binding, prompt);
             if (!replyText) {
                 this.logger.warn('Slack mention chat completion returned no content; not replying');
                 return;
@@ -433,10 +466,157 @@ export class SlackChatBridgeService {
         }
     }
 
-    /** Post a threaded reply through the slack-connector plugin (vendor SDK path). */
+    // ── Slash commands ──────────────────────────────────────────────────
+
+    /**
+     * Handle ONE verified slash-command invocation end to end: ingest it
+     * into the spine (so it shows up in Activities/Memory like every
+     * other Slack event), then answer through the same chat leg a
+     * mention takes.
+     *
+     * Called DETACHED by the receiver — Slack has already been acked, so
+     * this may take as long as the completion needs. A duplicate
+     * delivery (Slack re-sends when an ack times out) dedupes to zero
+     * inserts and is never answered twice.
+     */
+    async handleSlashCommand(
+        binding: SlackEventsBinding,
+        command: SlackSlashCommandBody,
+    ): Promise<{ ingested: IngestResult | null }> {
+        const envelope = this.toCommandEnvelope(command);
+        let ingested: IngestResult | null = null;
+
+        if (envelope) {
+            try {
+                ingested = await this.eventIngestService.ingest(binding.userId, [envelope]);
+            } catch (error) {
+                // Ingest is the audit trail, not the answer — a spine
+                // failure must not cost the user their reply.
+                this.logger.warn(
+                    `Slack slash-command ingest failed: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+            }
+            if (ingested && ingested.inserted === 0) {
+                this.logger.debug('Duplicate Slack slash-command delivery; not answering it twice');
+                return { ingested };
+            }
+        }
+
+        await this.bridgeCommandToChat(binding, command);
+        return { ingested };
+    }
+
+    /** Normalize a slash-command invocation into an ingest envelope (or skip it). */
+    toCommandEnvelope(command: SlackSlashCommandBody): IngestedEventEnvelope | null {
+        const channel = command.channel_id ?? '';
+        const invoked = (command.command ?? '').trim();
+        if (!channel || !invoked) return null;
+
+        const text = command.text ?? '';
+        return {
+            id: randomUUID(),
+            source: SLACK_CONNECTOR_PLUGIN_ID,
+            // A slash command has no message `ts`, so `channel:ts` is not
+            // available. `trigger_id` is unique per invocation; the
+            // `command:` namespace keeps it from ever colliding with the
+            // message identities the mention/pull paths mint.
+            sourceEventId: `command:${command.trigger_id ?? randomUUID()}`,
+            kind: SLACK_COMMAND_EVENT_KIND,
+            occurredAt: new Date().toISOString(),
+            actor: {
+                name: command.user_name ?? command.user_id ?? 'unknown',
+                ...(command.user_id ? { externalId: command.user_id } : {}),
+            },
+            subject: {
+                type: 'channel',
+                externalId: channel,
+                ...(command.channel_name ? { title: command.channel_name } : {}),
+            },
+            // Same routing as a message: the channel is the container.
+            workHint: { kind: 'chat-channel', externalId: channel },
+            payload: {
+                channel,
+                command: invoked,
+                ...(command.trigger_id ? { triggerId: command.trigger_id } : {}),
+                ...(command.team_id ? { teamId: command.team_id } : {}),
+                text:
+                    text.length > SLACK_EVENT_TEXT_MAX_CHARS
+                        ? text.slice(0, SLACK_EVENT_TEXT_MAX_CHARS)
+                        : text,
+            },
+        };
+    }
+
+    /**
+     * Route a slash command's text into the platform chat as the bound
+     * user and post the completion back into the originating channel.
+     * BEST-EFFORT end to end, exactly like the mention path: every
+     * failure is logged and swallowed (Slack was acked long ago).
+     */
+    async bridgeCommandToChat(
+        binding: SlackEventsBinding,
+        command: SlackSlashCommandBody,
+    ): Promise<void> {
+        const channel = command.channel_id;
+        const prompt = (command.text ?? '').trim();
+        if (!channel || !prompt) {
+            this.logger.debug('Slack slash command carried no channel or text; skipping');
+            return;
+        }
+
+        try {
+            const replyText = await this.runChatCompletion(binding, prompt);
+            if (!replyText) {
+                this.logger.warn('Slack command chat completion returned no content; not replying');
+                return;
+            }
+            // No thread to answer in — a slash command is invoked against
+            // the channel itself, so the reply lands at the channel root.
+            await this.postReply(binding, {
+                channel,
+                text: replyText,
+                ...(command.trigger_id ? { providerEventId: command.trigger_id } : {}),
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Slack command → chat bridge failed: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+    }
+
+    /**
+     * Run ONE platform-chat completion as the bound user — the single
+     * chat leg shared by the mention and slash-command paths.
+     *
+     * `model: 'auto'` defers model selection to the user's configured AI
+     * plugin settings, which is the same path the web chat uses.
+     */
+    private async runChatCompletion(
+        binding: SlackEventsBinding,
+        prompt: string,
+    ): Promise<string | null> {
+        const completion = await this.openAiCompatService.handleCompletion(
+            {
+                model: 'auto',
+                messages: [{ role: 'user', content: prompt }],
+            } as OpenAiChatCompletionRequestDto,
+            { userId: binding.userId },
+        );
+        return completion.choices?.[0]?.message?.content?.trim() ?? null;
+    }
+
+    /**
+     * Post a reply through the slack-connector plugin (vendor SDK path).
+     * With a `threadTs` the reply lands in that thread (mentions);
+     * without one it lands at the channel root (slash commands).
+     */
     private async postReply(
         binding: SlackEventsBinding,
-        input: { channel: string; threadTs: string; text: string; providerEventId?: string },
+        input: { channel: string; threadTs?: string; text: string; providerEventId?: string },
     ): Promise<void> {
         const plugin = this.getSlackConnector();
         if (!plugin) {
@@ -454,7 +634,9 @@ export class SlackChatBridgeService {
             settings: binding.settings,
             target,
         };
-        const conversationId = `${input.channel}:${input.threadTs}`;
+        const conversationId = input.threadTs
+            ? `${input.channel}:${input.threadTs}`
+            : input.channel;
         if (plugin.reply) {
             await plugin.reply(
                 {
@@ -474,7 +656,11 @@ export class SlackChatBridgeService {
                 text: input.text,
                 messageRef: `slack-mention-${input.providerEventId ?? conversationId}`,
                 attribution: { userId: binding.userId },
-                target: { ...target, channelId: input.channel, threadTs: input.threadTs },
+                target: {
+                    ...target,
+                    channelId: input.channel,
+                    ...(input.threadTs ? { threadTs: input.threadTs } : {}),
+                },
             },
             options,
         );

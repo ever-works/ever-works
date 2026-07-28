@@ -5,6 +5,7 @@ import {
 	LINEAR_EVENT_TEXT_MAX_CHARS,
 	LINEAR_BACKFILL_MAX_PAGES
 } from './linear-connector-plugin.js';
+import { supportsEventSourceBackfill } from '@ever-works/plugin';
 
 const viewerMock = vi.fn();
 const issuesMock = vi.fn();
@@ -322,6 +323,59 @@ describe('LinearConnectorPlugin', () => {
 			});
 			expect(issuesMock).toHaveBeenCalledTimes(1);
 			expect(res.events).toEqual([]);
+		});
+	});
+
+	// `backfill()` capability method (audit item (l)).
+	describe('backfill', () => {
+		it('is exposed as the capability method, feature-detectable by callers', () => {
+			expect(typeof plugin.backfill).toBe('function');
+			expect(supportsEventSourceBackfill(plugin as never)).toBe(true);
+		});
+
+		it('⭐ sweeps an EXPLICIT window regardless of the settings backfillDays', async () => {
+			issuesMock.mockResolvedValue(emptyPage());
+
+			// `backfillDays` deliberately absent: history used to be
+			// reachable ONLY through that first-pull setting.
+			const result = await plugin.backfill({ since: '2026-05-01T00:00:00.000Z', settings: SETTINGS });
+
+			expect(issuesMock.mock.calls[0][0].filter.updatedAt.gte).toEqual(new Date('2026-05-01T00:00:00.000Z'));
+			// Sweep opens on the issues phase and advances to comments.
+			expect(JSON.parse(result.nextCursor as string).p).toBe('comments');
+			expect(result.complete).toBeUndefined();
+		});
+
+		it('marks the sweep as a backfill so the per-phase page bound engages', async () => {
+			issuesMock.mockResolvedValue(emptyPage());
+			const result = await plugin.backfill({ since: '2026-05-01T00:00:00.000Z', settings: SETTINGS });
+			expect(JSON.parse(result.nextCursor as string).f).toBe(1);
+		});
+
+		it('resumes from the returned cursor and reports completion at the end', async () => {
+			issuesMock.mockResolvedValue(emptyPage());
+			commentsMock.mockResolvedValue(emptyPage());
+
+			const first = await plugin.backfill({ since: '2026-05-01T00:00:00.000Z', settings: SETTINGS });
+			const second = await plugin.backfill({
+				since: '2026-05-01T00:00:00.000Z',
+				cursor: first.nextCursor,
+				settings: SETTINGS
+			});
+
+			expect(commentsMock).toHaveBeenCalledTimes(1);
+			expect(second.nextCursor).toBeUndefined();
+			expect(second.complete).toBe(true);
+		});
+
+		it('rejects a malformed window loudly instead of sweeping something arbitrary', async () => {
+			await expect(plugin.backfill({ since: 'last week', settings: SETTINGS })).rejects.toThrow(/valid ISO 8601/);
+		});
+
+		it('still requires credentials — an unconfigured source fails with the stable error name', async () => {
+			await expect(plugin.backfill({ since: '2026-05-01T00:00:00.000Z', settings: {} })).rejects.toMatchObject({
+				name: 'EventSourceNotConfiguredError'
+			});
 		});
 	});
 });

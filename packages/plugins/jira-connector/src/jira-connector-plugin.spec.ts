@@ -10,6 +10,7 @@ import {
 	JIRA_BACKFILL_MAX_PAGES,
 	JIRA_EVENT_TEXT_MAX_CHARS
 } from './jira-connector-plugin.js';
+import { supportsEventSourceBackfill } from '@ever-works/plugin';
 
 const getCurrentUserMock = vi.fn();
 const searchIssuesMock = vi.fn();
@@ -404,6 +405,51 @@ describe('JiraConnectorPlugin', () => {
 				settings: { ...SETTINGS, projectKeys: 'ENG, OPS' }
 			});
 			expect(searchIssuesMock.mock.calls[0][0].jql).toContain('project in (ENG, OPS)');
+		});
+	});
+
+	// `backfill()` capability method (audit item (l)).
+	describe('backfill', () => {
+		it('is exposed as the capability method, feature-detectable by callers', () => {
+			expect(typeof plugin.backfill).toBe('function');
+			expect(supportsEventSourceBackfill(plugin as never)).toBe(true);
+		});
+
+		it('⭐ sweeps an EXPLICIT window regardless of the settings backfillDays', async () => {
+			searchIssuesMock.mockResolvedValue(emptyPage());
+
+			// `backfillDays` deliberately absent: history used to be
+			// reachable ONLY through that first-pull setting.
+			const result = await plugin.backfill({ since: '2026-05-01T00:00:00.000Z', settings: SETTINGS });
+
+			expect(searchIssuesMock.mock.calls[0][0].jql).toContain(toJqlDateTime('2026-05-01T00:00:00.000Z'));
+			expect(result.complete).toBe(true);
+			expect(result.nextCursor).toBeUndefined();
+		});
+
+		it('marks the sweep as a backfill so the page bound engages, and resumes from its cursor', async () => {
+			searchIssuesMock.mockResolvedValue({ issues: [], nextPageToken: 'more' });
+
+			const first = await plugin.backfill({ since: '2026-05-01T00:00:00.000Z', settings: SETTINGS });
+			expect(JSON.parse(first.nextCursor as string).f).toBe(1);
+			expect(first.complete).toBeUndefined();
+
+			await plugin.backfill({
+				since: '2026-05-01T00:00:00.000Z',
+				cursor: first.nextCursor,
+				settings: SETTINGS
+			});
+			expect(searchIssuesMock.mock.calls[1][0].nextPageToken).toBe('more');
+		});
+
+		it('rejects a malformed window loudly instead of sweeping something arbitrary', async () => {
+			await expect(plugin.backfill({ since: 'last week', settings: SETTINGS })).rejects.toThrow(/valid ISO 8601/);
+		});
+
+		it('still requires credentials — an unconfigured source fails with the stable error name', async () => {
+			await expect(plugin.backfill({ since: '2026-05-01T00:00:00.000Z', settings: {} })).rejects.toMatchObject({
+				name: 'EventSourceNotConfiguredError'
+			});
 		});
 	});
 });

@@ -14,7 +14,7 @@ import { ChoiceStep } from './steps/ChoiceStep';
 import { ConfigStep } from './steps/ConfigStep';
 import { PluginsCatalogStep } from './steps/PluginsCatalogStep';
 import { ProfileStep } from './steps/ProfileStep';
-import { CommunicationStep } from './steps/CommunicationStep';
+import { CommunicationStep, SLACK_CONNECTOR_PLUGIN_ID } from './steps/CommunicationStep';
 import { CreateWorkStep } from './steps/CreateWorkStep';
 import { useTurnstile } from './use-turnstile';
 import { AI_ICONS, DB_ICONS, DEPLOY_ICONS, STORAGE_ICONS } from './brand-icons';
@@ -26,6 +26,7 @@ import type {
     OnboardingCatalogResponse,
     OnboardingDbChoice,
     OnboardingDeployChoice,
+    OnboardingDesktopChoice,
     OnboardingStateResponse,
     OnboardingStorageChoice,
 } from '@ever-works/contracts/api';
@@ -240,6 +241,7 @@ export function EverWorksOnboardingWizard({
                                 isStatusLoading={isStatusLoading}
                                 turnstile={turnstile}
                                 correlationId={correlationId}
+                                onPluginConnected={(pluginId) => void refreshConnections(pluginId)}
                             />
                         </div>
                         <WizardFooter
@@ -372,6 +374,7 @@ function StepBody({
     isStatusLoading,
     turnstile,
     correlationId,
+    onPluginConnected,
 }: {
     step: WizardStep;
     flow: ReturnType<typeof useOnboardingFlow>;
@@ -382,6 +385,7 @@ function StepBody({
     isStatusLoading: boolean;
     turnstile: ReturnType<typeof useTurnstile>;
     correlationId: string;
+    onPluginConnected: (pluginId: string) => void;
 }) {
     switch (step.kind) {
         case 'welcome':
@@ -485,6 +489,18 @@ function StepBody({
                     onPlannedClick={(c) => flow.notePlannedClick('deploy', c)}
                 />
             );
+        case 'desktop-choice':
+            return (
+                <ChoiceStep
+                    title="Where Ever Works runs"
+                    description="This one is not about a provider — it decides what we point you at once the wizard is done."
+                    cards={catalog.desktop}
+                    selected={flow.state.desktop?.choice ?? 'cloud'}
+                    columns={3}
+                    onSelect={(choice) => flow.setDesktopChoice(choice as OnboardingDesktopChoice)}
+                    onPlannedClick={(c) => flow.notePlannedClick('desktop', c)}
+                />
+            );
         case 'deploy-config': {
             const pluginId = flow.state.deploy.choice; // 'vercel' | 'k8s'
             const plugin = pluginsById[pluginId] ?? null;
@@ -508,7 +524,18 @@ function StepBody({
                 />
             );
         case 'communication':
-            return <CommunicationStep />;
+            // Audit item (b) — connect in place. The connector plugin is
+            // passed in so the card can render its settings panel + enable
+            // action inline; when the image ships without it the step
+            // degrades to the Settings → Plugins link it used to be.
+            return (
+                <CommunicationStep
+                    slackPlugin={pluginsById[SLACK_CONNECTOR_PLUGIN_ID] ?? null}
+                    slackConnection={connections[SLACK_CONNECTOR_PLUGIN_ID] ?? null}
+                    isStatusLoading={isStatusLoading}
+                    onConnected={onPluginConnected}
+                />
+            );
         case 'plugins-catalog':
             return (
                 <PluginsCatalogStep
@@ -523,6 +550,7 @@ function StepBody({
                     onLeave={() => flow.finish()}
                     prompt={flow.state.prompt}
                     onPromptChange={flow.setPrompt}
+                    desktopChoice={flow.state.desktop?.choice}
                     onQuickCreate={
                         flow.state.prompt
                             ? async (prompt) => {
@@ -664,6 +692,8 @@ function labelForStep(step: WizardStep): string {
             return 'Your deployment';
         case 'deploy-config':
             return 'Configure deployment';
+        case 'desktop-choice':
+            return 'Where it runs';
         case 'profile':
             return 'What do you do';
         case 'communication':

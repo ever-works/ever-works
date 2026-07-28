@@ -135,6 +135,12 @@ export const terminalSessionTriggerAdapter: TerminalSessionDispatcher = {
                 cwd: payload.cwd,
                 env: payload.env,
                 persistent: payload.persistent,
+                // Provider identity resolved by the API-side
+                // `terminal-stream` facade; the worker facade takes it as
+                // its `providerOverride` so both processes host the same
+                // provider (see TerminalSessionLauncher).
+                providerId: payload.providerId,
+                workId: payload.workId,
             } satisfies TerminalSessionPayload,
             { idempotencyKey: `terminal-session:${payload.runId}` },
         );

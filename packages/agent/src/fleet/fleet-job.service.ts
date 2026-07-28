@@ -76,8 +76,10 @@ export interface ReclaimSummary {
  * Auth posture is the Fleet posture, unchanged: the SAME node secret
  * minted at enrollment, verified constant-time against the stored
  * sha256, every invalid path returning `null` so the edge maps it to one
- * undifferentiated 401. Disabled and still-enrolling nodes are refused
- * — a drained node stops getting work immediately.
+ * undifferentiated 401. Still-enrolling nodes are refused outright;
+ * paused and disabled nodes are refused a LEASE (no new work, effective
+ * on the next poll) but may still heartbeat and complete the jobs they
+ * already hold — that is what makes pausing a drain rather than a cut.
  *
  * Reclaim runs inline on every lease poll (bounded, owner-scoped) AND on
  * the `fleet-job-lease-sweeper` cron (global), so a fleet whose nodes
@@ -205,7 +207,9 @@ export class FleetJobService {
         jobId: string,
         leaseTtlSec?: number,
     ): Promise<FleetJobView | null> {
-        const node = await this.authenticateNode(nodeId, secret);
+        // 'report': a draining (paused/disabled) node must keep the
+        // claim on work it is already running.
+        const node = await this.authenticateNode(nodeId, secret, 'report');
         if (!node) return null;
 
         const job = await this.jobs.findById(jobId);
@@ -234,7 +238,9 @@ export class FleetJobService {
      * LAPSED claims (no verdict at all) are retried, by the reclaim path.
      */
     async completeJob(input: CompleteFleetJobInput): Promise<FleetJobView | null> {
-        const node = await this.authenticateNode(input.nodeId, input.secret);
+        // 'report': the whole point of a drain is that in-flight work
+        // still reaches a verdict.
+        const node = await this.authenticateNode(input.nodeId, input.secret, 'report');
         if (!node) return null;
 
         const job = await this.jobs.findById(input.jobId);
@@ -344,22 +350,75 @@ export class FleetJobService {
     }
 
     /**
+     * One node's recent job history, newest first (node-detail drawer).
+     * Owner-scoped in the query itself, not just by convention at the
+     * edge — a node id is a travelling value.
+     */
+    async historyForNode(userId: string, nodeId: string, limit = 20): Promise<FleetJobView[]> {
+        const rows = await this.jobs.findByNodeForUser(
+            userId,
+            nodeId,
+            Math.min(Math.max(limit, 1), 100),
+        );
+        return rows.map(toJobView);
+    }
+
+    /**
+     * Requeue everything a node currently holds — the work half of a
+     * DRAIN. Returns how many claims went back to the pool.
+     *
+     * Best-effort by contract: the caller has already disabled the node
+     * (which is what actually stops it receiving work), so a failure
+     * here must degrade to "the leases lapse on their own" rather than
+     * un-draining the node.
+     */
+    async releaseClaimsForNode(userId: string, nodeId: string): Promise<number> {
+        try {
+            return await this.jobs.releaseClaimsForNode(userId, nodeId);
+        } catch (error) {
+            this.logger.warn(
+                `fleet drain could not requeue claims for node ${nodeId}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return 0;
+        }
+    }
+
+    /**
      * Resolve + verify a node credential. Fail-closed on every path:
-     * malformed ids, unknown nodes, disabled nodes (drained — they must
-     * stop receiving work immediately), still-enrolling nodes (whose
-     * hash column holds a token, not a secret), and bad secrets all
-     * return null.
+     * malformed ids, unknown nodes, still-enrolling nodes (whose hash
+     * column holds a token, not a secret), and bad secrets all return
+     * null.
+     *
+     * `intent` is what makes pausing a DRAIN rather than a cut
+     * (audit A29):
+     *
+     *   - `'lease'`  — a paused or disabled node is refused. Draining
+     *                  means no NEW work, effective on the very next poll.
+     *   - `'report'` — a paused or disabled node is ACCEPTED, so the
+     *                  jobs it already holds can keep their claims alive
+     *                  and deliver a verdict. Severing them instead
+     *                  would throw away completed work, let the lease
+     *                  lapse, and re-run the same job somewhere else —
+     *                  the exact opposite of draining.
+     *
+     * A still-enrolling node is refused for both: it has no secret yet.
      */
     private async authenticateNode(
         nodeId: unknown,
         secret: unknown,
+        intent: 'lease' | 'report' = 'lease',
     ): Promise<{ id: string; userId: string; capabilities: string[] } | null> {
         const verified = verifyNodeSecret(nodeId, secret);
         if (!verified) return null;
 
         const node = await this.nodes.findById(verified.nodeId);
         if (!node) return null;
-        if (node.status === 'disabled' || node.status === 'enrolling') return null;
+        if (node.status === 'enrolling') return null;
+        if (intent === 'lease' && (node.status === 'disabled' || node.status === 'paused')) {
+            return null;
+        }
         if (!verified.matches(node.enrollmentTokenHash)) return null;
 
         return {

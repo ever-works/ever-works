@@ -2,13 +2,22 @@ import { BrowserWindow, app, ipcMain, shell } from 'electron';
 import { execFile, spawn } from 'node:child_process';
 import * as fs from 'node:fs';
 import * as path from 'node:path';
-import type { DesktopConfig, RuntimeSelection, ServiceId } from '../shared/ipc-contract';
+import type {
+	DesktopConfig,
+	DesktopMode,
+	RemoteConnectionInput,
+	RuntimeSelection,
+	ServiceId
+} from '../shared/ipc-contract';
 import { IpcChannels } from '../shared/ipc-contract';
 import { JOB_RUNTIMES } from '../shared/runtimes';
 import { API_HEALTH_URL, WEB_APP_URL, waitForHealthy } from '../services/health';
-import { ProcessManager, resolveServiceCommand } from '../services/process-manager';
+import { ProcessManager } from '../services/process-manager';
 import type { CommandRunner } from '../services/prereq-check';
 import { checkPrerequisites } from '../services/prereq-check';
+import { allowedOriginsFor, probeRemote, resolveRemoteConnection } from '../services/remote-connection';
+import type { LayoutIo, LayoutProbeInput, RuntimeLayout } from '../services/runtime-layout';
+import { resolveRuntimeLayout, resolveServiceLaunch, toLayoutSummary } from '../services/runtime-layout';
 import type { RuntimeSetupIo } from '../services/runtime-setup';
 import { applyRuntimeSelection, detectDocker } from '../services/runtime-setup';
 import { loadConfig, saveConfig } from './config-store';
@@ -18,17 +27,36 @@ import { createTray } from './tray';
 // Paths & state
 // ---------------------------------------------------------------------------
 
+const layoutIo: LayoutIo = {
+	exists: (candidate) => fs.existsSync(candidate),
+	readFile: (candidate) => {
+		try {
+			return fs.readFileSync(candidate, 'utf8');
+		} catch {
+			return undefined;
+		}
+	},
+	join: (...segments) => path.resolve(path.join(...segments))
+};
+
 /**
- * The monorepo root the supervised services run from. In development
- * (`electron .` from apps/desktop) the app path is apps/desktop, so the root
- * is two levels up. Packaged installs must point EVER_WORKS_REPO_ROOT at a
- * platform checkout until bundled dist builds ship (PRD M6 follow-up).
+ * Where the supervised services come from for THIS install.
+ *
+ * Packaged installers ship a self-contained runtime payload under
+ * `resources/app-bundle`, so an installed app needs neither a monorepo
+ * checkout nor Node.js/pnpm on the host. Developer runs and installs that
+ * explicitly point `EVER_WORKS_REPO_ROOT` at a checkout keep the old
+ * run-from-source behavior.
  */
-function resolveRepoRoot(): string {
-	if (process.env.EVER_WORKS_REPO_ROOT) {
-		return path.resolve(process.env.EVER_WORKS_REPO_ROOT);
+function resolveLayout(): RuntimeLayout {
+	const input: LayoutProbeInput = { appPath: app.getAppPath() };
+	if (app.isPackaged && process.resourcesPath) {
+		input.resourcesPath = process.resourcesPath;
 	}
-	return path.resolve(app.getAppPath(), '..', '..');
+	if (process.env.EVER_WORKS_REPO_ROOT) {
+		input.envRepoRoot = path.resolve(process.env.EVER_WORKS_REPO_ROOT);
+	}
+	return resolveRuntimeLayout(layoutIo, input);
 }
 
 const runCommand: CommandRunner['run'] = (command, args) =>
@@ -99,13 +127,23 @@ if (!app.requestSingleInstanceLock()) {
 // ---------------------------------------------------------------------------
 
 function bootstrap(): void {
-	const repoRoot = resolveRepoRoot();
+	const layout = resolveLayout();
 	const userData = app.getPath('userData');
 	const configPath = path.join(userData, 'desktop-config.json');
 	const envFilePath = path.join(userData, 'ever-works-desktop.env');
 	const sqliteDbPath = path.join(userData, 'ever-works.db');
 
 	let config: DesktopConfig = loadConfig(configPath);
+
+	if (layout.kind === 'unavailable') {
+		// Loud, actionable degradation: local-stack mode cannot start anything.
+		// Client mode still works, which is exactly what the wizard offers next.
+		console.error(
+			`[ever-works-desktop] No platform runtime available (${layout.reason ?? 'unknown reason'}). ` +
+				'Local-stack mode is disabled for this install — either reinstall a build that bundles the runtime, ' +
+				'set EVER_WORKS_REPO_ROOT to a monorepo checkout, or use client mode to connect to a remote instance.'
+		);
+	}
 
 	const manager = new ProcessManager({
 		spawnFn: (command, args, options) =>
@@ -141,16 +179,35 @@ function bootstrap(): void {
 		return entries;
 	};
 
-	const ensureServices = (): void => {
+	const ensureServices = (): boolean => {
 		if (manager.all().length > 0) {
-			return;
+			return true;
 		}
 		const env = envEntries();
-		const exists = (candidate: string) => fs.existsSync(candidate);
-		const api = resolveServiceCommand('api', repoRoot, exists, path.join);
-		const web = resolveServiceCommand('web', repoRoot, exists, path.join);
-		manager.create({ id: 'api', ...api, env, readyPattern: /Nest application successfully started|listening/i });
-		manager.create({ id: 'web', ...web, env, readyPattern: /ready|started server|compiled/i });
+		const api = resolveServiceLaunch('api', layout, layoutIo, { nodeExecPath: process.execPath });
+		const web = resolveServiceLaunch('web', layout, layoutIo, { nodeExecPath: process.execPath });
+		if (!api || !web) {
+			console.error(
+				'[ever-works-desktop] Cannot start the local stack: no runtime payload and no monorepo checkout.'
+			);
+			return false;
+		}
+		manager.create({
+			id: 'api',
+			command: api.command,
+			args: api.args,
+			cwd: api.cwd,
+			env: { ...env, ...api.env },
+			readyPattern: /Nest application successfully started|listening/i
+		});
+		manager.create({
+			id: 'web',
+			command: web.command,
+			args: web.args,
+			cwd: web.cwd,
+			env: { ...env, ...web.env },
+			readyPattern: /ready|started server|compiled/i
+		});
 		for (const service of manager.all()) {
 			service.onStatusChange(() => {
 				mainWindow?.webContents.send(IpcChannels.statusEvent, manager.statuses());
@@ -159,10 +216,17 @@ function bootstrap(): void {
 				mainWindow?.webContents.send(IpcChannels.logEvent, entry);
 			});
 		}
+		return true;
 	};
 
 	const startServices = (): void => {
-		ensureServices();
+		if (config.mode === 'remote-client') {
+			// Client mode supervises nothing — the platform runs elsewhere.
+			return;
+		}
+		if (!ensureServices()) {
+			return;
+		}
 		manager.startAll();
 		// Flip per-service health flags as the local endpoints come up.
 		void waitForHealthy(API_HEALTH_URL, { fetchFn: (url) => fetch(url) }).then((healthy) => {
@@ -177,23 +241,73 @@ function bootstrap(): void {
 		await manager.stopAll();
 	};
 
+	/** The URL the main window shows once setup is done. */
+	const appUrl = (): string =>
+		config.mode === 'remote-client' && config.remote ? config.remote.webUrl : WEB_APP_URL;
+
+	// Keep navigation inside the app: the local wizard bundle plus whichever
+	// instance this install targets — the two local service origins in
+	// local-stack mode, or the remote instance's origins in client mode.
+	// Everything else opens in the OS browser.
+	let allowedOrigins = new Set<string>();
+
+	const refreshAllowedOrigins = (): void => {
+		allowedOrigins = new Set(
+			allowedOriginsFor(config.mode === 'remote-client' ? config.remote : undefined, [
+				WEB_APP_URL,
+				'http://localhost:3100'
+			])
+		);
+	};
+
+	refreshAllowedOrigins();
+
 	// -----------------------------------------------------------------------
 	// IPC surface (the wizard/status renderer talks to this via the preload)
 	// -----------------------------------------------------------------------
 
-	ipcMain.handle(IpcChannels.checkPrereqs, () => checkPrerequisites(commandRunner));
+	ipcMain.handle(IpcChannels.checkPrereqs, () =>
+		checkPrerequisites(commandRunner, { requireHostToolchain: layout.requiresHostToolchain })
+	);
 	ipcMain.handle(IpcChannels.listRuntimes, () => JOB_RUNTIMES);
 	ipcMain.handle(IpcChannels.detectDocker, () => detectDocker(runtimeSetupIo));
+	ipcMain.handle(IpcChannels.getRuntimeLayout, () => toLayoutSummary(layout));
 	ipcMain.handle(IpcChannels.applyRuntime, async (_event, selection: RuntimeSelection) => {
 		const result = await applyRuntimeSelection(runtimeSetupIo, {
 			selection,
 			envFilePath,
-			repoRoot,
+			// Only used as the cwd for `docker compose -f docker-compose.infra.yml`,
+			// which is a repo-checkout affordance; bundled installs default to the
+			// embedded SQLite database and never take that path.
+			repoRoot: layout.repoRoot ?? layout.bundleRoot ?? app.getAppPath(),
 			sqliteDbPath
 		});
 		config = { ...config, selection, envFilePath };
 		saveConfig(configPath, config);
 		return { envFilePath: result.envFilePath, keys: Object.keys(result.entries) };
+	});
+	ipcMain.handle(IpcChannels.setMode, (_event, mode: DesktopMode) => {
+		config = { ...config, mode };
+		saveConfig(configPath, config);
+		refreshAllowedOrigins();
+		return config;
+	});
+	ipcMain.handle(IpcChannels.testRemote, async (_event, input: RemoteConnectionInput) => {
+		const resolution = resolveRemoteConnection(input);
+		if (!resolution.ok) {
+			return { ok: false, message: resolution.errors.join(' ') };
+		}
+		return probeRemote(resolution.connection, (url) => fetch(url));
+	});
+	ipcMain.handle(IpcChannels.saveRemote, (_event, input: RemoteConnectionInput) => {
+		const resolution = resolveRemoteConnection(input);
+		if (!resolution.ok) {
+			throw new Error(resolution.errors.join(' '));
+		}
+		config = { ...config, mode: 'remote-client', remote: resolution.connection };
+		saveConfig(configPath, config);
+		refreshAllowedOrigins();
+		return resolution.connection;
 	});
 	ipcMain.handle(IpcChannels.completeWizard, () => {
 		config = { ...config, wizardCompleted: true };
@@ -206,7 +320,7 @@ function bootstrap(): void {
 	ipcMain.handle(IpcChannels.getStatus, () => manager.statuses());
 	ipcMain.handle(IpcChannels.getLogs, (_event, id: ServiceId) => manager.get(id)?.logs.toArray() ?? []);
 	ipcMain.handle(IpcChannels.openWebApp, () => {
-		mainWindow?.loadURL(WEB_APP_URL);
+		void mainWindow?.loadURL(appUrl());
 	});
 
 	// -----------------------------------------------------------------------
@@ -229,9 +343,6 @@ function bootstrap(): void {
 	});
 	mainWindow = window;
 
-	// Keep navigation inside the app: local wizard bundle + the two local
-	// service origins. Everything else opens in the OS browser.
-	const allowedOrigins = new Set(['http://localhost:3000', 'http://localhost:3100']);
 	window.webContents.setWindowOpenHandler(({ url }) => {
 		void shell.openExternal(url);
 		return { action: 'deny' };

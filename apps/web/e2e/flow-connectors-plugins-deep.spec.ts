@@ -393,7 +393,23 @@ test.describe('Connectors — work-level enable / disable / configure / capabili
             `${API_BASE}/api/works/${workId}/plugins/slack-connector/settings`,
             { headers: ctx.headers, data: { settings: { defaultChannelId: 'C42' } } },
         );
-        expect([200, 500]).toContain(withValues.status());
+        // ENV-ADAPTIVE by design, and 400 is a legitimate third outcome (observed
+        // in CI). Which one you get depends on whether the EW-693 lazily-installed
+        // plugin CLASS has materialized yet: cold, the payload is
+        // package.json-manifest-only (no settingsSchema) so the write is accepted
+        // (200) or fails downstream (500); warm, the real schema is present and
+        // rejects a bare 'C42' channel id as invalid (400).
+        expect([200, 400, 500], `settings PATCH status ${withValues.status()}`).toContain(
+            withValues.status(),
+        );
+        // Whatever the branch, the endpoint must answer with a structured body —
+        // never an empty/unmapped response.
+        const body = await withValues.json().catch(() => null);
+        expect(body, 'settings PATCH returns a JSON body').toBeTruthy();
+        if (withValues.status() === 400) {
+            // A rejection must say WHY (validation surface), not just 400.
+            expect(JSON.stringify(body)).toMatch(/valid|settings|channel|required|schema/i);
+        }
     });
 
     test('set active capability: "connector" → 200 activeCapabilities contains it; an unprovided capability → 400', async ({

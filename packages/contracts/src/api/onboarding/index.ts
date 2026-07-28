@@ -32,6 +32,7 @@ export type {
 	OnboardingStorageChoice,
 	OnboardingDbChoice,
 	OnboardingDeployChoice,
+	OnboardingDesktopChoice,
 	OnboardingWizardStateV2,
 	OnboardingStateResponse,
 	OnboardingStatePatchRequest,
@@ -42,6 +43,22 @@ export type {
 	OnboardingProfile,
 	OnboardingProfileOption,
 	OnboardingRoleId,
-	OnboardingTeamSizeId
+	OnboardingTeamSizeId,
+	OnboardingDesktopNextStep
 } from './wizard-state.js';
-export { ONBOARDING_DEFAULT_STATE, ROLE_OPTIONS, TEAM_SIZE_OPTIONS } from './wizard-state.js';
+export {
+	ONBOARDING_DEFAULT_STATE,
+	ROLE_OPTIONS,
+	TEAM_SIZE_OPTIONS,
+	ONBOARDING_DESKTOP_NEXT_STEPS,
+	desktopNextStep
+} from './wizard-state.js';
+export type {
+	OnboardingSeedAgentSuggestion,
+	OnboardingSeedSkillSuggestion,
+	OnboardingSeedSuggestionsResponse,
+	OnboardingSeedRequest,
+	OnboardingSeedOutcome,
+	OnboardingSeedResultEntry,
+	OnboardingSeedResponse
+} from './role-seeding.js';

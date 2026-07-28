@@ -20,9 +20,9 @@
         "dev": "tsc -p tsconfig.json --watch",
         "build:plugins": "pnpm --filter './packages/plugins/*' build",
         "prepare:plugins": "node scripts/prepare-plugins.js",
-        "dev:trigger": "pnpm dlx trigger.dev@4.4.6 dev",
+        "dev:trigger": "trigger dev",
         "predeploy:trigger": "pnpm prepare:plugins",
-        "deploy:trigger": "pnpm dlx trigger.dev@4.4.6 deploy",
+        "deploy:trigger": "trigger deploy",
         "test": "vitest run --passWithNoTests",
         "test:watch": "vitest",
         "test:coverage": "vitest run --coverage"
@@ -40,7 +40,7 @@
         "@nestjs/microservices": "^11.1.19",
         "@nestjs/platform-express": "^11.1.18",
         "@nestjs/websockets": "^11.1.18",
-        "@trigger.dev/sdk": "^4.4.6",
+        "@trigger.dev/sdk": "4.4.6",
         "class-transformer": "^0.5.1",
         "reflect-metadata": "^0.2.2",
         "rxjs": "^7.8.2",
@@ -48,9 +48,10 @@
         "ws": "^8.21.0"
     },
     "devDependencies": {
-        "@trigger.dev/build": "^4.4.6",
+        "@trigger.dev/build": "4.4.6",
         "@types/node": "^22.19.3",
         "@types/ws": "^8.18.0",
+        "trigger.dev": "4.4.6",
         "typescript": "^5.9.3",
         "vitest": "^4.1.0"
     }
