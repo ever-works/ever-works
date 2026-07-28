@@ -1,0 +1,98 @@
+{
+	"name": "@ever-works/bluesky-connector-plugin",
+	"version": "1.0.0",
+	"description": "Bluesky social connector plugin for Ever Works platform (outbound posts via the official @atproto/api SDK, and event-source pull of mentions/replies plus the account's own timeline into the event-ingest pipeline, with opt-in historical backfill)",
+	"author": {
+		"name": "Ever Co. LTD",
+		"email": "ever@ever.co",
+		"url": "https://ever.co"
+	},
+	"license": "AGPL-3.0",
+	"private": false,
+	"type": "module",
+	"main": "./dist/index.cjs",
+	"module": "./dist/index.js",
+	"types": "./dist/index.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/index.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		}
+	},
+	"files": [
+		"dist"
+	],
+	"scripts": {
+		"build": "tsc --noEmit && tsup",
+		"dev": "tsup --watch",
+		"clean": "rm -rf dist",
+		"type-check": "tsc --noEmit",
+		"test": "vitest run",
+		"test:watch": "vitest"
+	},
+	"dependencies": {
+		"@atproto/api": "^0.20.34",
+		"@ever-works/contracts": "workspace:*",
+		"@ever-works/plugin": "workspace:*"
+	},
+	"devDependencies": {
+		"@types/node": "^22.0.0",
+		"tsup": "^8.0.0",
+		"typescript": "^5.9.3",
+		"vitest": "^4.1.0"
+	},
+	"everworks": {
+		"plugin": {
+			"id": "bluesky-connector",
+			"name": "Bluesky Connector",
+			"version": "1.0.0",
+			"category": "connector",
+			"capabilities": [
+				"connector",
+				"connector-bluesky",
+				"event-source"
+			],
+			"description": "Bluesky (AT Protocol) social connector. Outbound publishes posts and threaded replies via the official @atproto/api SDK. Event-source pull ingests mentions/replies and the connected account's own posts since the last watermark into the platform event-ingest pipeline, with opt-in historical backfill (backfillDays, max 90).",
+			"systemPlugin": false,
+			"builtIn": true,
+			"isDefault": false,
+			"autoEnable": false,
+			"settings": {
+				"type": "object",
+				"required": [
+					"identifier",
+					"appPassword"
+				],
+				"properties": {
+					"identifier": {
+						"type": "string",
+						"title": "Bluesky handle or DID (e.g. acme.bsky.social)"
+					},
+					"appPassword": {
+						"type": "string",
+						"title": "Bluesky app password (never your account password)",
+						"x-secret": true,
+						"x-envVar": "BLUESKY_APP_PASSWORD"
+					},
+					"service": {
+						"type": "string",
+						"title": "PDS service URL (defaults to https://bsky.social)",
+						"default": "https://bsky.social"
+					},
+					"backfillDays": {
+						"type": "number",
+						"title": "Historical backfill window in days on first pull (0 = off, max 90)",
+						"default": 0,
+						"minimum": 0,
+						"maximum": 90
+					}
+				}
+			}
+		}
+	},
+	"publishConfig": {
+		"access": "restricted",
+		"registry": "https://registry.npmjs.org"
+	}
+}
