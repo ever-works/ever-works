@@ -58,7 +58,9 @@ import { IngestModule } from './ingest/ingest.module';
 import { MeetingsApiModule } from './meetings/meetings.module';
 import { FleetApiModule } from './fleet/fleet.module';
 import { MergePolicyApiModule } from './merge-policy/merge-policy.module';
+import { ToolGrantsApiModule } from './tool-grants/tool-grants.module';
 import { DigestApiModule } from './digest/digest.module';
+import { EscalationsApiModule } from './escalations/escalations.module';
 import { PrReviewApiModule } from './pr-review/pr-review.module';
 import { TelemetryModule } from './telemetry/telemetry.module';
 import { UsersModule } from './users/users.module';
@@ -214,12 +216,24 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // agent-side PolicyModule. Writes ride the existing Work / Agent /
         // organization PATCH endpoints.
         MergePolicyApiModule,
+        // Tool-grant matrix (audit item G4) — owner-scoped resolve/check
+        // preview plus the write path for the per-scope grant rows. Same
+        // ownership checks as the merge-policy preview; grants are their
+        // own rows, so unlike a merge policy they need a write path here.
+        ToolGrantsApiModule,
         // Digest read (Wave 7) — GET /api/digest owner-scoped composed
         // digest over the agent-side DigestModule. Cadence stays a
         // profile preference; delivery stays on the digest-dispatcher
         // cron. Exists so the `get_digest` chat tool has a REST operation
         // the manifest-driven web tool registry can bind to.
         DigestApiModule,
+        // Judgment layer G3/G10 — /api/escalations, the cross-Task
+        // "what is waiting on me?" queue over the agent-side
+        // AgentEscalationService. The Task-scoped escalation routes on
+        // TasksController stay exactly as they are; this is the read
+        // that made escalations reachable without already knowing which
+        // Task to open.
+        EscalationsApiModule,
         // AI PR review (Wave 7) — POST /api/pr-review owner-scoped
         // trigger over the agent-side PrReviewModule, the third REST
         // operation the web tool registry was missing. Refuses any

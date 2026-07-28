@@ -35,6 +35,11 @@ import { AgentMemoryFacadeService } from '../facades/agent-memory.facade';
 import { resolveMemoryRecall } from '../services/memory-recall';
 import { VisionContextService } from '../services/vision-context.service';
 import { createAgentRunAbortSource } from './agent-run-abort';
+// Tool-grant matrix (G4) + grant-aware skill activation (G12). Leaf
+// modules with type-only / contracts-only imports — no runtime graph is
+// pulled into `agents/`.
+import { TOOL_GRANT_ENFORCER, type ToolGrantEnforcer } from '../policy/tool-grant.enforcer';
+import { filterSkillsByToolGrants } from '../policy/skill-activation';
 import { isGenerationCancelledError } from '../utils/generation-cancellation.utils';
 import { redactSecrets } from '../utils/secret-scan';
 
@@ -181,6 +186,15 @@ export class AgentRunService {
         // AgentsModule. When absent (or the user has no active Org /
         // no vision) the run's prompt simply has no vision segment.
         @Optional() private readonly visionContext?: VisionContextService,
+        // Tool-grant matrix (audit item G4) + grant-aware skill
+        // activation (G12). Trailing + `@Optional()` so existing
+        // unit-test constructor calls that omit it keep working;
+        // production DI provides it via `PolicyModule`. When absent the
+        // run resolves tools and skills exactly as it did before the
+        // matrix existed.
+        @Optional()
+        @Inject(TOOL_GRANT_ENFORCER)
+        private readonly toolGrants?: ToolGrantEnforcer,
     ) {}
 
     async execute(context: AgentRunContext): Promise<AgentRunExecuteResult> {
@@ -250,7 +264,7 @@ export class AgentRunService {
         const [recentRuns, recentActivityRows, resolvedSkills, companyVision] = await Promise.all([
             this.runs.findByAgent(agent.id, 5, 0).catch(() => []),
             this.findRecentActivityForAgent(agent.userId, agent.id).catch(() => []),
-            this.resolveSkillsForRun(agent).catch(() => []),
+            this.resolveSkillsForRun(agent, context.runId).catch(() => []),
             this.visionContext
                 ? this.visionContext.resolveForUser(agent.userId).catch(() => null)
                 : Promise.resolve(null),
@@ -601,10 +615,7 @@ export class AgentRunService {
         });
         const editsThisRunByFile = new Set<string>();
         const baseDescriptors: AgentToolDescriptor[] = this.toolService
-            ? this.toolService.resolveAllowedTools(agent, {
-                  runId: context.runId,
-                  editsThisRunByFile,
-              })
+            ? await this.resolveToolsForRun(agent, context.runId, editsThisRunByFile)
             : [];
         // Virtual transitionTask descriptor — only exposed on `task`
         // kind runs. It captures the model's transition intent rather
@@ -1428,12 +1439,63 @@ export class AgentRunService {
     }
 
     /**
+     * Tool-grant matrix (audit item G4) — resolve the run's tool set
+     * through the grant-aware path when the tool service offers it.
+     *
+     * The `typeof` guard is deliberate: several unit tests mock
+     * `AgentToolService` with only the sync `resolveAllowedTools`, and a
+     * missing method must degrade to the previous behaviour rather than
+     * crash a run. Refused tools are recorded as WARN run-log rows — a
+     * tool that silently vanishes from the loop is the most confusing
+     * failure mode there is.
+     */
+    private async resolveToolsForRun(
+        agent: Agent,
+        runId: string,
+        editsThisRunByFile: Set<string>,
+    ): Promise<AgentToolDescriptor[]> {
+        const service = this.toolService;
+        if (!service) return [];
+        const runContext = { runId, editsThisRunByFile };
+        if (typeof service.resolveGrantedTools !== 'function') {
+            return service.resolveAllowedTools(agent, runContext);
+        }
+
+        const { tools, refused } = await service.resolveGrantedTools(agent, runContext);
+        for (const decision of refused) {
+            void this.runLogs
+                ?.append({
+                    runId,
+                    level: 'WARN',
+                    step: 'tools',
+                    message: `Tool '${decision.toolName}' withheld by the tool-grant matrix (${decision.source} scope).`,
+                    metadata: {
+                        toolName: decision.toolName,
+                        source: decision.source,
+                        code: decision.code ?? null,
+                    },
+                })
+                .catch(() => undefined);
+        }
+        return tools;
+    }
+
+    /**
      * Skills feature — Phase 10.2. Resolve active skills for this
      * Agent run from the binding table. Returns an empty array when
      * the skill-bindings repository is not wired (unit-test mode).
+     *
+     * Grant-aware since audit item G12: a Skill whose frontmatter
+     * declares `allowedTools` and whose EVERY declared tool is refused by
+     * the effective grant matrix is suppressed. Injecting instructions for
+     * a surface the Agent provably cannot reach burns prompt budget and
+     * invites the model to work around the denial. Skills that declare no
+     * tools — the overwhelming majority — are unaffected, as is every
+     * install with no grant rows (the default matrix grants `*`).
      */
     private async resolveSkillsForRun(
         agent: Agent,
+        runId?: string,
     ): Promise<Array<{ slug: string; body: string; priority: number }>> {
         if (!this.skillBindings) return [];
         const rows: ResolvedSkill[] = await this.skillBindings.resolveActive({
@@ -1444,11 +1506,58 @@ export class AgentRunService {
             ideaId: agent.ideaId ?? undefined,
             forAgentRun: true,
         });
-        return rows.map(({ binding, skill }) => ({
+        const candidates = rows.map(({ binding, skill }) => ({
             slug: skill.slug,
             body: skill.instructionsMd,
             priority: binding.priority,
+            allowedTools: skill.frontmatter?.allowedTools ?? null,
         }));
+
+        const grants = await this.resolveGrantsForSkills(agent);
+        const { active, suppressed } = filterSkillsByToolGrants(candidates, grants);
+
+        for (const entry of suppressed) {
+            void this.runLogs
+                ?.append({
+                    runId: runId ?? 'no-run',
+                    level: 'WARN',
+                    step: 'skills',
+                    message: `Skill '${entry.slug}' suppressed — every tool it declares is refused by the tool-grant matrix.`,
+                    metadata: {
+                        slug: entry.slug,
+                        refusedTools: entry.refusals.map((r) => r.toolName),
+                    },
+                })
+                .catch(() => undefined);
+        }
+
+        return active.map(({ slug, body, priority }) => ({ slug, body, priority }));
+    }
+
+    /**
+     * Resolve the grant matrix for skill activation, or `null` when no
+     * enforcer is wired (which leaves every skill active).
+     *
+     * Never throws: a failed lookup must not take the run's skills away.
+     */
+    private async resolveGrantsForSkills(agent: Agent) {
+        if (!this.toolGrants) return null;
+        try {
+            return await this.toolGrants.resolve({
+                userId: agent.userId,
+                agentId: agent.id,
+                workId: agent.workId ?? null,
+                organizationId: agent.organizationId ?? null,
+                tenantId: agent.tenantId ?? null,
+            });
+        } catch (err) {
+            this.logger.warn(
+                `Agent ${agent.id}: tool-grant resolution failed during skill activation; all bound skills stay active: ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+            return null;
+        }
     }
 
     /**

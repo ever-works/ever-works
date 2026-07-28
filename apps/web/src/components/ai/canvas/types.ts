@@ -99,6 +99,12 @@ export const CANVAS_COMPONENT_KEYS = [
     'heatmap',
     'rating',
     'calendar',
+    // Judgment layer G8s — typed human-in-the-loop payloads. Props are a
+    // `HitlQuestion` / `HitlAnswer` from `@ever-works/contracts`; the
+    // renderers parse them defensively (`parseHitlQuestion`) so a
+    // malformed payload degrades to a visible error, never a crash.
+    'hitl_question',
+    'hitl_answer',
 ] as const;
 export type CanvasComponentKey = (typeof CANVAS_COMPONENT_KEYS)[number];
 

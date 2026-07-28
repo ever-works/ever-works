@@ -36,9 +36,15 @@ import { RunSteeringService } from './run-steering.service';
 import { TerminalSessionLauncher } from './terminal-session-launcher.service';
 import { AgentToolService } from './agent-tool.service';
 import { AgentEscalationService } from './agent-escalation.service';
+import { EscalationConfidenceService } from './escalation-confidence';
+import { WorkflowGraphExecutorService } from './workflow-graph-executor.service';
+import { WorkflowAiDecisionAdapter } from './workflow-ai-decision.adapter';
+import { WORKFLOW_DECISION_PORT } from './workflow-graph.ports';
+import { SubAgentDelegationService } from './sub-agent-delegation.service';
 import { VisionContextService } from '../services/vision-context.service';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { SkillsModule } from '../skills/skills.module';
+import { PolicyModule } from '../policy/policy.module';
 import { NotificationsModule } from '../notifications/notifications.module';
 import { FacadesModule } from '../facades/facades.module';
 
@@ -91,6 +97,15 @@ import { FacadesModule } from '../facades/facades.module';
         // Phase 10 — AgentRunService resolves active skills via
         // SkillBindingRepository before assembling the prompt.
         SkillsModule,
+        // Audit items G4 + G12 + G14 — binds TOOL_GRANT_ENFORCER (the
+        // tool-grant matrix consumed by AgentToolService and by
+        // AgentRunService's skill activation) and CREDENTIAL_RESOLVER
+        // (`{{cred.key}}` interpolation). Both are @Optional() at the
+        // consumer, so WITHOUT this import the wiring silently never
+        // fires — the same trap FacadesModule documents just below.
+        // PolicyModule is a leaf (four scope entities + tool_grants), so
+        // this import cannot cycle.
+        PolicyModule,
         // PR #1084 follow-up: AgentRunService injects
         // AgentMemoryFacadeService (@Optional) so it can open + close a
         // memory session per run. Without this import the @Optional()
@@ -138,6 +153,24 @@ import { FacadesModule } from '../facades/facades.module';
         AgentToolService,
         // Judgment layer G3 - the one place a give-up becomes a record.
         AgentEscalationService,
+        // Judgment layer G3 - scores the confidence column on every
+        // escalation (AI judge through the AI facade, deterministic
+        // table otherwise). FacadesModule is already imported above, so
+        // the AiFacadeService it consumes resolves in production.
+        EscalationConfidenceService,
+        // Judgment layer G5 - workflow graph execution. The node runner
+        // (WORKFLOW_NODE_RUNNER) stays @Optional() and is bound by the
+        // host that owns node semantics; the decider is bound HERE to the
+        // AI-facade adapter so every llm_decide call goes through the
+        // facade/plugin seam (FacadesModule is already imported above).
+        WorkflowAiDecisionAdapter,
+        { provide: WORKFLOW_DECISION_PORT, useExisting: WorkflowAiDecisionAdapter },
+        WorkflowGraphExecutorService,
+        // Judgment layer G9 - scoped sub-agent delegation. The runner it
+        // dispatches through (SUB_AGENT_DELEGATION_RUNNER) is @Optional()
+        // and bound by the api-side @Global() module, exactly like
+        // RunDispatchGateService's dispatcher.
+        SubAgentDelegationService,
     ],
     exports: [
         AgentRepository,
@@ -162,6 +195,11 @@ import { FacadesModule } from '../facades/facades.module';
         TerminalSessionLauncher,
         AgentToolService,
         AgentEscalationService,
+        EscalationConfidenceService,
+        WorkflowGraphExecutorService,
+        WorkflowAiDecisionAdapter,
+        WORKFLOW_DECISION_PORT,
+        SubAgentDelegationService,
     ],
 })
 export class AgentsModule {}

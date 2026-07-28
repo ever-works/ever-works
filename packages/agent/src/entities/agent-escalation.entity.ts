@@ -1,6 +1,7 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 import type {
     AgentEscalationAttempt,
+    AgentEscalationConfidenceSource,
     AgentEscalationReasonCode,
     AgentEscalationStatus,
 } from '@ever-works/contracts';
@@ -80,6 +81,34 @@ export class AgentEscalation {
      */
     @Column({ type: 'simple-json', nullable: true })
     attempted?: AgentEscalationAttempt[] | null;
+
+    /**
+     * Judgment layer G3 — how sure the platform is that this escalation
+     * genuinely needs a HUMAN, in `0..1`.
+     *
+     * Written at record time by {@link EscalationConfidenceService}: the
+     * AI judge through the AI facade when one is reachable, the
+     * deterministic reason-code table otherwise. It exists so the
+     * escalation queue can be ORDERED — with one column, "what is waiting
+     * on me?" stops being a flat list of equally-loud cards and becomes a
+     * ranked one, which is the difference between a queue a human works
+     * and a queue a human ignores.
+     *
+     * NULL means "never scored", which is every row written before this
+     * column and every row scored while confidence was switched off. It
+     * must never be read as "low confidence" — a UI that conflates the
+     * two silently demotes real escalations.
+     *
+     * `float` (not `decimal`) to match every sibling score column in this
+     * schema (`goals.currentValue`, `work.domainTypeConfidence`), which
+     * keeps sqlite — the entire e2e stack — working unchanged.
+     */
+    @Column({ type: 'float', nullable: true })
+    confidence?: number | null;
+
+    /** Which scorer produced {@link confidence}; NULL whenever it is NULL. */
+    @Column({ type: 'varchar', length: 16, nullable: true })
+    confidenceSource?: AgentEscalationConfidenceSource | null;
 
     @Column({ type: 'uuid', nullable: true })
     resolvedByUserId?: string | null;

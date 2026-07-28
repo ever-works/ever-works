@@ -32,6 +32,11 @@ export * from './connector.interface.js';
 export * from './agent-memory.interface.js';
 export * from './terminal-stream.interface.js';
 export * from './workspace.interface.js';
+// Headless browser drivers (audit item G22) — navigate / extract /
+// screenshot / act behind a default-deny navigation allowlist that is
+// re-checked on every redirect hop. First-party implementation:
+// `@ever-works/browser-automation-plugin` (Playwright).
+export * from './browser-automation.interface.js';
 // Event-ingest spine (Wave 6) — pull-model event sources feeding the
 // normalized `IngestedEventEnvelope` pipeline (webhook push lands with
 // each concrete connector). See `event-source.interface.ts`.

@@ -12,6 +12,7 @@ import {
     AGENT_EMAIL_FACADE,
     AGENT_NOTIFY_CHANNEL_FACADE,
     AGENT_DOMAIN_TOOL_SOURCES,
+    AgentEscalationService,
     RunSteeringService,
     type AgentDomainToolSources,
     TERMINAL_SESSION_DISPATCHER,
@@ -75,7 +76,12 @@ import { DigestModule, DigestService } from '@ever-works/agent/digest';
 import { MeetingsModule, MeetingRepository } from '@ever-works/agent/meetings';
 import { FleetModule, FleetService } from '@ever-works/agent/fleet';
 import { PrReviewModule, PrReviewService } from '@ever-works/agent/pr-review';
-import { PolicyModule, MergePolicyService, PullRequestGateService } from '@ever-works/agent/policy';
+import {
+    PolicyModule,
+    MergePolicyService,
+    PullRequestGateService,
+    ToolGrantService,
+} from '@ever-works/agent/policy';
 import { WorkOwnershipService } from '@ever-works/agent/services';
 import {
     FacadesModule,
@@ -84,6 +90,7 @@ import {
     ContentExtractorFacadeService,
     AiFacadeService,
     GitFacadeService,
+    BrowserAutomationFacadeService,
 } from '@ever-works/agent/facades';
 // FU-2 — `AgentsController` injects `SkillBindingRepository` (for the
 // `GET /api/agents/:id/skills` rollup) and `PluginUsageRepository` (for
@@ -740,6 +747,9 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                 MergePolicyService,
                 WorkOwnershipService,
                 AgentRepository,
+                BrowserAutomationFacadeService,
+                AgentEscalationService,
+                ToolGrantService,
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -755,6 +765,9 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                 mergePolicy: MergePolicyService,
                 workOwnership: WorkOwnershipService,
                 agents: AgentRepository,
+                browser: BrowserAutomationFacadeService,
+                escalationService: AgentEscalationService,
+                toolGrants: ToolGrantService,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
@@ -764,6 +777,9 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                 digest: { digestService: digest },
                 meetings: { repository: meetings },
                 fleet: { service: fleet },
+                // Audit G22 — headless browsing. Only `read` is passed, so the
+                // capability's page-driving `act` is unreachable from chat.
+                browser: { facade: browser },
                 prReview: { prReviewService: prReview },
                 mergePolicy: {
                     service: mergePolicy,
@@ -787,6 +803,37 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                             if (!agent) return null;
                         }
                         return {
+                            workId: input.workId ?? null,
+                            agentId: input.agentId ?? null,
+                        };
+                    },
+                },
+                // Judgment layer G3/G10 — the escalation queue. Owner
+                // scope is closed inside the service (every read/write
+                // takes the agent owner's userId), so unlike merge-policy
+                // there is no model-supplied id to authorize.
+                escalations: { service: escalationService },
+                // Tool-grant matrix (audit item G4) — the read-only grant
+                // chat tools. Same owner-check posture as the merge-policy
+                // source above: the ids come from the MODEL, so both are
+                // verified against the acting user before any resolution,
+                // and a foreign id returns null (no existence leak).
+                toolGrants: {
+                    service: toolGrants,
+                    async authorize(userId, input) {
+                        if (input.workId) {
+                            try {
+                                await workOwnership.ensureAccess(input.workId, userId);
+                            } catch {
+                                return null;
+                            }
+                        }
+                        if (input.agentId) {
+                            const agent = await agents.findByIdAndUser(input.agentId, userId);
+                            if (!agent) return null;
+                        }
+                        return {
+                            userId,
                             workId: input.workId ?? null,
                             agentId: input.agentId ?? null,
                         };

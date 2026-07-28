@@ -11,6 +11,10 @@ import {
     AgentEscalationService,
     AgentRunService,
     RunDispatchGateService,
+    detectDoomLoop,
+    fingerprintFailures,
+    type DoomLoopVerdict,
+    type LoopAttemptSample,
 } from '@ever-works/agent/agents';
 import { config } from '@ever-works/agent/config';
 import {
@@ -559,7 +563,9 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
             // 'agent-loop' = an iterate attempt's agent loop did not complete
             // (cancelled / budget-blocked inside execute / dispatch failure),
             // so re-running the checks would grade unchanged work.
-            let iterateStop: 'budget' | 'agent-loop' | null = null;
+            // 'loop-detected' = the doom-loop detector (G10) called it: the
+            // trail says the next attempt hits the same wall.
+            let iterateStop: 'budget' | 'agent-loop' | 'loop-detected' | null = null;
             // Judgment layer G2 — the acceptance-criteria judge's latest
             // opinion, and the verdict it collapses to together with the
             // check results. `null` judgement = no judge ran (the default),
@@ -570,6 +576,33 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
             // in step with the iterate loop so a later attempt is judged on
             // its own summary, not the first attempt's.
             let runSummary = result.outcome?.summary ?? '';
+            // Judgment layer G10 — the doom-loop detector's evidence.
+            // One sample per COMPLETED gate execution: the normalized
+            // fingerprint of what failed, plus whether that attempt made
+            // measurable progress (strictly fewer required checks
+            // failing than the attempt before it). Both are what
+            // separates "retrying and fixing" from "hitting the same
+            // wall with the rest of the budget".
+            const loopSamples: LoopAttemptSample[] = [];
+            let previousFailureCount: number | null = null;
+            let loopVerdict: DoomLoopVerdict | null = null;
+            const recordLoopSample = (
+                outcome: Awaited<ReturnType<TaskGateRunnerService['runChecks']>>,
+            ) => {
+                const failing = filterRequiredGateFailures(outcome.results, resolvedChecks);
+                const progressed =
+                    previousFailureCount !== null && failing.length < previousFailureCount;
+                previousFailureCount = failing.length;
+                loopSamples.push({
+                    fingerprint: fingerprintFailures(
+                        failing.map((checkResult) => ({
+                            id: checkResult.id,
+                            outcome: describeCheckFailure(checkResult),
+                        })),
+                    ),
+                    progressed,
+                });
+            };
             if (provisioned && runSucceeded && gatePolicy !== 'off') {
                 const gateRunner = appContext.get(TaskGateRunnerService);
                 const maxGateAttempts = resolveMaxGateAttempts(taskRow, gateWork);
@@ -644,6 +677,7 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                         judgement,
                         attemptsRemaining: gateAttempts < maxGateAttempts,
                     });
+                    recordLoopSample(gateOutcome);
 
                     // Wave 3 M5 — bounded red → iterate loop. On a red gate
                     // under a 'required' policy the run does not end: the
@@ -680,6 +714,25 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                         } catch {
                             // Budget check unreachable from the worker —
                             // documented fail-open to the loop cap.
+                        }
+
+                        // Judgment layer G10 — doom-loop / retry-storm
+                        // check, BEFORE spending another agent loop. The
+                        // attempt cap alone only bounds how long the
+                        // waste lasts; this ends it as soon as the trail
+                        // says the next attempt will hit the same wall,
+                        // and turns the remaining budget into a human
+                        // decision instead of a fifth identical failure.
+                        if (config.agents.isRunLoopDetectorEnabled()) {
+                            const verdict = detectDoomLoop(loopSamples, {
+                                repeatThreshold: config.agents.getRunLoopRepeatThreshold(),
+                                maxRetries: config.agents.getRunLoopMaxRetries(),
+                            });
+                            if (verdict.detected) {
+                                loopVerdict = verdict;
+                                iterateStop = 'loop-detected';
+                                break;
+                            }
                         }
 
                         // G2 — WHICH feedback the agent gets depends on who
@@ -760,6 +813,7 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                             judgement,
                             attemptsRemaining: gateAttempts < maxGateAttempts,
                         });
+                        recordLoopSample(gateOutcome);
                     }
                 } catch (error) {
                     // A crashed gate step marks the run FAILED, never green —
@@ -827,15 +881,27 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                     // Task chat gets the human-facing breakdown. Plain text —
                     // the chat surface never renders agent messages as markup.
                     const taskChat = appContext.get(TaskChatService);
+                    // Why the loop stopped, in the user's words. Shared by
+                    // both bodies below because the reason is orthogonal to
+                    // whether it was the judge (G2) or the checks that
+                    // rejected the work.
+                    const stopNote =
+                        iterateStop === 'budget'
+                            ? [
+                                  '',
+                                  "Iteration stopped early: the Agent's budget cap for this period was reached.",
+                              ]
+                            : iterateStop === 'loop-detected'
+                              ? [
+                                    '',
+                                    `Iteration stopped early: the run was cycling without progress. ${loopVerdict?.reason ?? ''}`.trim(),
+                                    'The remaining attempts were NOT spent — they would have hit the same failure.',
+                                ]
+                              : [];
                     const chatBody = judgeEscalated
                         ? [
                               `Every acceptance check passed, but the acceptance review found the task is not done after ${gateAttempts} ${attemptNoun} — no PR was opened.`,
-                              ...(iterateStop === 'budget'
-                                  ? [
-                                        '',
-                                        "Iteration stopped early: the Agent's budget cap for this period was reached.",
-                                    ]
-                                  : []),
+                              ...stopNote,
                               '',
                               `Reviewer verdict: ${judgement?.reason || 'acceptance criteria unmet'}`,
                               ...(judgement && judgement.unmet.length > 0
@@ -848,12 +914,7 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                           ? 'Quality gate: no checks configured, and this Work requires acceptance checks — no PR was opened. Add checks to the Task or to the Work defaults, then send a message here to re-run.'
                           : [
                                 `Quality gate red after ${gateAttempts} ${attemptNoun} — no PR was opened.`,
-                                ...(iterateStop === 'budget'
-                                    ? [
-                                          '',
-                                          "Iteration stopped early: the Agent's budget cap for this period was reached.",
-                                      ]
-                                    : []),
+                                ...stopNote,
                                 '',
                                 'Failed checks:',
                                 ...requiredFailed.map(
@@ -889,9 +950,11 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                             reasonCode:
                                 iterateStop === 'budget'
                                     ? 'budget-stop'
-                                    : judgeEscalated
-                                      ? 'judge-escalated'
-                                      : 'gate-exhausted',
+                                    : iterateStop === 'loop-detected'
+                                      ? 'loop-detected'
+                                      : judgeEscalated
+                                        ? 'judge-escalated'
+                                        : 'gate-exhausted',
                             runId: run.id,
                             taskId: payload.taskId,
                             workId: taskRow.workId ?? null,

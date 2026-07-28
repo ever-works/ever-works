@@ -1,6 +1,7 @@
 import {
     BadRequestException,
     ConflictException,
+    Inject,
     Injectable,
     InternalServerErrorException,
     Logger,
@@ -26,6 +27,10 @@ import { AgentRepository } from '../database/repositories/agent.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { WorkProposalRepository } from '../user-research/work-proposal.repository';
 import { Mission } from '../entities/mission.entity';
+// Grant-aware skill activation (audit item G12). Both are leaf modules
+// (token + pure function) so the skills subpath gains no runtime graph.
+import { TOOL_GRANT_ENFORCER, type ToolGrantEnforcer } from '../policy/tool-grant.enforcer';
+import { filterSkillsByToolGrants } from '../policy/skill-activation';
 
 export interface CreateSkillInput {
     ownerType: SkillOwnerType;
@@ -94,6 +99,12 @@ export class SkillsService {
         private readonly agents?: AgentRepository,
         private readonly works?: WorkRepository,
         private readonly ideas?: WorkProposalRepository,
+        // Grant-aware skill activation (audit item G12). APPENDED LAST +
+        // `@Optional()` so every existing positional constructor call
+        // keeps working; unbound → activation behaves exactly as before.
+        @Optional()
+        @Inject(TOOL_GRANT_ENFORCER)
+        private readonly toolGrants?: ToolGrantEnforcer,
     ) {}
 
     // ── Skill CRUD ────────────────────────────────────────────────
@@ -254,6 +265,16 @@ export class SkillsService {
         return { deleted: true };
     }
 
+    /**
+     * Which Skills apply to this Agent right now?
+     *
+     * Grant-aware since audit item G12: a Skill whose frontmatter declares
+     * `allowedTools` and whose EVERY declared tool is refused by the
+     * effective tool-grant matrix is dropped here, not injected and then
+     * ignored. Skills that declare no tools are untouched, and an install
+     * with no grant rows (or no enforcer wired) resolves exactly as it did
+     * before the matrix existed.
+     */
     async resolveActiveForAgent(
         userId: string,
         agentId: string,
@@ -261,7 +282,7 @@ export class SkillsService {
         missionId?: string,
         ideaId?: string,
     ): Promise<ResolvedSkill[]> {
-        return this.bindings.resolveActive({
+        const resolved = await this.bindings.resolveActive({
             userId,
             agentId,
             workId,
@@ -269,6 +290,33 @@ export class SkillsService {
             ideaId,
             forAgentRun: true,
         });
+        if (!this.toolGrants || resolved.length === 0) return resolved;
+
+        let grants;
+        try {
+            grants = await this.toolGrants.resolve({
+                userId,
+                agentId,
+                workId: workId ?? null,
+            });
+        } catch (err) {
+            // A failed policy read must never silently strip an Agent of
+            // its Skills — degrade to "everything active" and say so.
+            this.logger.warn(
+                `Tool-grant resolution failed during skill activation for agent ${agentId}; all bound skills stay active: ${err}`,
+            );
+            return resolved;
+        }
+
+        const { active } = filterSkillsByToolGrants(
+            resolved.map((row) => ({
+                slug: row.skill.slug,
+                allowedTools: row.skill.frontmatter?.allowedTools ?? null,
+                row,
+            })),
+            grants,
+        );
+        return active.map((entry) => entry.row);
     }
 
     // ── internals ─────────────────────────────────────────────────

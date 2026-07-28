@@ -22,6 +22,8 @@ jest.mock('@ever-works/agent/agents', () => ({
     AgentsModule: class AgentsModule {},
     AgentRepository: class AgentRepository {},
     RunSteeringService: class RunSteeringService {},
+    // Judgment layer G3/G10 — backs the `escalations` domain tool source.
+    AgentEscalationService: class AgentEscalationService {},
     AGENT_HEARTBEAT_TRIGGER: 'AGENT_HEARTBEAT_TRIGGER',
     AGENT_RUN_CANCELLER: 'AGENT_RUN_CANCELLER',
     AGENT_RUN_CHAT_BACK_POSTER: 'AGENT_RUN_CHAT_BACK_POSTER',
@@ -45,6 +47,7 @@ jest.mock('@ever-works/agent/facades', () => ({
     NotificationChannelFacadeService: class NotificationChannelFacadeService {},
     SearchFacadeService: class SearchFacadeService {},
     ScreenshotFacadeService: class ScreenshotFacadeService {},
+    BrowserAutomationFacadeService: class BrowserAutomationFacadeService {},
     ContentExtractorFacadeService: class ContentExtractorFacadeService {},
     AiFacadeService: class AiFacadeService {},
     GitFacadeService: class GitFacadeService {},
@@ -86,6 +89,7 @@ jest.mock('@ever-works/agent/policy', () => ({
     PolicyModule: class PolicyModule {},
     MergePolicyService: class MergePolicyService {},
     PullRequestGateService: class PullRequestGateService {},
+    ToolGrantService: class ToolGrantService {},
 }));
 jest.mock('@ever-works/agent/services', () => ({
     WorkOwnershipService: class WorkOwnershipService {},
@@ -120,7 +124,7 @@ import { DigestModule, DigestService } from '@ever-works/agent/digest';
 import { MeetingsModule, MeetingRepository } from '@ever-works/agent/meetings';
 import { FleetModule, FleetService } from '@ever-works/agent/fleet';
 import { PrReviewModule, PrReviewService } from '@ever-works/agent/pr-review';
-import { PolicyModule, MergePolicyService } from '@ever-works/agent/policy';
+import { PolicyModule, MergePolicyService, ToolGrantService } from '@ever-works/agent/policy';
 import { WorkOwnershipService } from '@ever-works/agent/services';
 import {
     TasksService,
@@ -131,10 +135,11 @@ import {
 } from '@ever-works/agent/tasks-domain';
 import {
     AgentRepository,
+    AgentEscalationService,
     AGENT_DOMAIN_TOOL_SOURCES,
     AGENT_GIT_FACADE,
 } from '@ever-works/agent/agents';
-import { GitFacadeService } from '@ever-works/agent/facades';
+import { BrowserAutomationFacadeService, GitFacadeService } from '@ever-works/agent/facades';
 import { PullRequestGateService } from '@ever-works/agent/policy';
 import { WorkRepository } from '@ever-works/agent/database';
 
@@ -166,7 +171,7 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
         expect(findProvider(AGENT_DOMAIN_TOOL_SOURCES)).toBeDefined();
     });
 
-    it('injects exactly the services the six descriptor factories need', () => {
+    it('injects exactly the services the descriptor factories need', () => {
         expect(findProvider(AGENT_DOMAIN_TOOL_SOURCES)?.inject).toEqual([
             TasksService,
             TaskChatService,
@@ -181,6 +186,12 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
             MergePolicyService,
             WorkOwnershipService,
             AgentRepository,
+            // Audit G22 — headless browsing (read-only).
+            BrowserAutomationFacadeService,
+            // Judgment layer G3/G10 — the escalation queue tools.
+            AgentEscalationService,
+            // Tool-grant matrix (audit item G4) — the read-only grant tools.
+            ToolGrantService,
         ]);
     });
 
@@ -214,8 +225,14 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
             'digest',
             'meetings',
             'fleet',
+            // Audit G22 — headless browsing. Bound with only `read`, so the
+            // capability's page-driving `act` is unreachable from chat.
+            'browser',
             'prReview',
             'mergePolicy',
+            'escalations',
+            // Audit G4 — the read-only tool-grant matrix.
+            'toolGrants',
         ]);
     });
 });
