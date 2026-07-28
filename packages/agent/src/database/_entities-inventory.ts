@@ -130,6 +130,7 @@ import { FleetNode } from '../entities/fleet-node.entity';
 import { TerminalTranscriptChunk } from '../entities/terminal-transcript-chunk.entity';
 
 import { FleetJob } from '../entities/fleet-job.entity';
+import { ToolGrant } from '../entities/tool-grant.entity';
 
 import {
     PluginEntity,
@@ -314,4 +315,7 @@ export const ENTITIES = [
     // Fleet job runtime (Desktop PRD M4) — the lease-able work queue
     // whose workers are the enrolled nodes above.
     FleetJob,
+    // Tool-grant matrix (audit item G4) — one row per (owner, scope)
+    // carrying that scope's tool allow/deny contribution.
+    ToolGrant,
 ];

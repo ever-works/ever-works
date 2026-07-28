@@ -76,7 +76,12 @@ import { DigestModule, DigestService } from '@ever-works/agent/digest';
 import { MeetingsModule, MeetingRepository } from '@ever-works/agent/meetings';
 import { FleetModule, FleetService } from '@ever-works/agent/fleet';
 import { PrReviewModule, PrReviewService } from '@ever-works/agent/pr-review';
-import { PolicyModule, MergePolicyService, PullRequestGateService } from '@ever-works/agent/policy';
+import {
+    PolicyModule,
+    MergePolicyService,
+    PullRequestGateService,
+    ToolGrantService,
+} from '@ever-works/agent/policy';
 import { WorkOwnershipService } from '@ever-works/agent/services';
 import {
     FacadesModule,
@@ -744,6 +749,7 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                 AgentRepository,
                 BrowserAutomationFacadeService,
                 AgentEscalationService,
+                ToolGrantService,
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -761,6 +767,7 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                 agents: AgentRepository,
                 browser: BrowserAutomationFacadeService,
                 escalationService: AgentEscalationService,
+                toolGrants: ToolGrantService,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
@@ -806,6 +813,32 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                 // takes the agent owner's userId), so unlike merge-policy
                 // there is no model-supplied id to authorize.
                 escalations: { service: escalationService },
+                // Tool-grant matrix (audit item G4) — the read-only grant
+                // chat tools. Same owner-check posture as the merge-policy
+                // source above: the ids come from the MODEL, so both are
+                // verified against the acting user before any resolution,
+                // and a foreign id returns null (no existence leak).
+                toolGrants: {
+                    service: toolGrants,
+                    async authorize(userId, input) {
+                        if (input.workId) {
+                            try {
+                                await workOwnership.ensureAccess(input.workId, userId);
+                            } catch {
+                                return null;
+                            }
+                        }
+                        if (input.agentId) {
+                            const agent = await agents.findByIdAndUser(input.agentId, userId);
+                            if (!agent) return null;
+                        }
+                        return {
+                            userId,
+                            workId: input.workId ?? null,
+                            agentId: input.agentId ?? null,
+                        };
+                    },
+                },
             }),
         },
     ],

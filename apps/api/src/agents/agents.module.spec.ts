@@ -89,6 +89,7 @@ jest.mock('@ever-works/agent/policy', () => ({
     PolicyModule: class PolicyModule {},
     MergePolicyService: class MergePolicyService {},
     PullRequestGateService: class PullRequestGateService {},
+    ToolGrantService: class ToolGrantService {},
 }));
 jest.mock('@ever-works/agent/services', () => ({
     WorkOwnershipService: class WorkOwnershipService {},
@@ -123,7 +124,7 @@ import { DigestModule, DigestService } from '@ever-works/agent/digest';
 import { MeetingsModule, MeetingRepository } from '@ever-works/agent/meetings';
 import { FleetModule, FleetService } from '@ever-works/agent/fleet';
 import { PrReviewModule, PrReviewService } from '@ever-works/agent/pr-review';
-import { PolicyModule, MergePolicyService } from '@ever-works/agent/policy';
+import { PolicyModule, MergePolicyService, ToolGrantService } from '@ever-works/agent/policy';
 import { WorkOwnershipService } from '@ever-works/agent/services';
 import {
     TasksService,
@@ -189,6 +190,8 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
             BrowserAutomationFacadeService,
             // Judgment layer G3/G10 — the escalation queue tools.
             AgentEscalationService,
+            // Tool-grant matrix (audit item G4) — the read-only grant tools.
+            ToolGrantService,
         ]);
     });
 
@@ -228,6 +231,8 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
             'prReview',
             'mergePolicy',
             'escalations',
+            // Audit G4 — the read-only tool-grant matrix.
+            'toolGrants',
         ]);
     });
 });

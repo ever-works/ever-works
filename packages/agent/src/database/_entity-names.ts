@@ -149,6 +149,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     // ──────────────────────────────────────────────────────────
     // Streaming-terminal M9 / D1 — persisted terminal transcripts.
     'TerminalTranscriptChunk',
+    // Tool-grant matrix (audit item G4) — per-scope tool allow/deny rows.
+    'ToolGrant',
     'UsageLedgerEntry',
     'User',
     'UserNotificationCategoryMute',

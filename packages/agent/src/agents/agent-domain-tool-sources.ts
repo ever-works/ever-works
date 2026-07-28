@@ -14,6 +14,8 @@ import type { MergePolicyResolveInput, MergePolicyService } from '../policy/merg
 import type { ResolveMergePolicyArgs } from '../policy/agent-merge-policy-tools';
 import type { BrowserAutomationFacadeService } from '../facades/browser-automation.facade';
 import type { EscalationToolService } from './agent-escalation-tools';
+import type { ToolGrantEnforcer, ToolGrantResolveInput } from '../policy/tool-grant.enforcer';
+import type { ResolveToolGrantsArgs } from '../policy/agent-tool-grant-tools';
 
 /**
  * Domain chat-tool sources — the ONE injection seam that lets
@@ -107,10 +109,18 @@ export interface AgentEscalationToolSource {
 }
 
 /**
- * The bundle itself. Every member optional: a runtime binds what it can
- * reach, and `resolveAllowedTools` registers exactly the corresponding
- * tools.
+ * Tool-grant matrix (audit item G4) — the read-only grant surface.
+ *
+ * Same shape and same reasoning as `AgentMergePolicyToolSource`: the ids
+ * come from the MODEL, so `authorize` runs an owner check before any
+ * resolution and returns null (never throws) when the user may not reach
+ * the scope — no existence leak.
  */
+export interface AgentToolGrantToolSource {
+    service: Pick<ToolGrantEnforcer, 'resolve' | 'decide'>;
+    authorize(userId: string, input: ResolveToolGrantsArgs): Promise<ToolGrantResolveInput | null>;
+}
+
 /**
  * Headless browsing (audit item G22). Read-only by construction — the
  * source carries only `read`, so no wiring mistake can hand the model the
@@ -120,6 +130,11 @@ export interface AgentBrowserToolSource {
     facade: Pick<BrowserAutomationFacadeService, 'read'>;
 }
 
+/**
+ * The bundle itself. Every member optional: a runtime binds what it can
+ * reach, and `resolveAllowedTools` registers exactly the corresponding
+ * tools.
+ */
 export interface AgentDomainToolSources {
     tasks?: AgentTaskToolSource;
     ingest?: AgentIngestToolSource;
@@ -130,4 +145,5 @@ export interface AgentDomainToolSources {
     mergePolicy?: AgentMergePolicyToolSource;
     browser?: AgentBrowserToolSource;
     escalations?: AgentEscalationToolSource;
+    toolGrants?: AgentToolGrantToolSource;
 }

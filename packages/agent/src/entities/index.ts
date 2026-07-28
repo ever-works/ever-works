@@ -145,3 +145,5 @@ export * from './fleet-node.entity';
 export * from './terminal-transcript-chunk.entity';
 
 export * from './fleet-job.entity';
+// Tool-grant matrix (audit item G4) — per-scope tool allow/deny rows.
+export * from './tool-grant.entity';

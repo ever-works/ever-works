@@ -50,6 +50,26 @@ import { buildBrowserTools } from '../facades/agent-browser-tools';
 import { buildEscalationTools } from './agent-escalation-tools';
 import { buildPrReviewTools } from '../pr-review/agent-pr-review-tools';
 import { buildMergePolicyTools } from '../policy/agent-merge-policy-tools';
+import { buildToolGrantTools } from '../policy/agent-tool-grant-tools';
+// Tool-grant matrix (G4) + `{{cred.key}}` interpolation (G14). All four
+// modules are leaves whose own imports are type-only or contracts-only,
+// so they add no runtime graph to the `agents/` subpath — the same
+// property that lets the domain tool factories live next to their
+// domains.
+import { partitionToolsByGrant } from '../policy/tool-grant';
+import { TOOL_GRANT_ENFORCER, type ToolGrantEnforcer } from '../policy/tool-grant.enforcer';
+import { CREDENTIAL_RESOLVER, type CredentialResolver } from '../policy/credential-resolver';
+import {
+    collectCredentialRefs,
+    interpolateCredentials,
+    invalidCredentialKeys,
+    redactCredentialValues,
+} from '../policy/credential-interpolation';
+import {
+    checkToolCredentialsAvailable,
+    requiredCredentialsForTool,
+} from '../policy/tool-credentials';
+import type { ToolGrantDecision } from '@ever-works/contracts';
 // Security: lexical SSRF guard reused by the model-controlled URL tools
 // (screenshot / extractContent). Blocks non-HTTP(S) schemes, literal
 // private/loopback/link-local IPs, and cloud-metadata hostnames before
@@ -160,6 +180,18 @@ export class AgentToolService {
         @Optional()
         @Inject(AGENT_DOMAIN_TOOL_SOURCES)
         private readonly domainToolSources?: AgentDomainToolSources,
+        // Tool-grant matrix (audit item G4). APPENDED LAST + @Optional()
+        // so every existing positional constructor call in the unit tests
+        // keeps working, and so a runtime without `PolicyModule` behaves
+        // exactly as it did before the matrix existed.
+        @Optional()
+        @Inject(TOOL_GRANT_ENFORCER)
+        private readonly toolGrants?: ToolGrantEnforcer,
+        // `{{cred.key}}` interpolation (audit item G14). Same posture:
+        // unbound → no interpolation, no behaviour change.
+        @Optional()
+        @Inject(CREDENTIAL_RESOLVER)
+        private readonly credentials?: CredentialResolver,
     ) {}
 
     /**
@@ -287,7 +319,11 @@ export class AgentToolService {
         // assertion) is unchanged.
         tools.push(...this.buildDomainTools(agent));
 
-        return tools;
+        // `{{cred.key}}` interpolation (audit item G14). A no-op unless a
+        // CredentialResolver is bound, and even then a no-op for every
+        // call whose arguments reference no credential — so ordering,
+        // names and schemas are untouched.
+        return tools.map((tool) => this.withCredentialInterpolation(agent, tool));
     }
 
     /**
@@ -426,7 +462,167 @@ export class AgentToolService {
             );
         }
 
+        // Tool-grant matrix (audit item G4) — the DoD chat tools for the
+        // grant surface. Read-only: the model may ask what it is allowed
+        // to do and why, never widen it.
+        if (sources.toolGrants) {
+            const toolGrants = sources.toolGrants;
+            add('tool-grants', () =>
+                buildToolGrantTools({
+                    userId: agent.userId,
+                    service: toolGrants.service,
+                    authorize: (input) => toolGrants.authorize(agent.userId, input),
+                }),
+            );
+        }
+
         return out;
+    }
+
+    /**
+     * Tool-grant matrix (audit item G4) — the async companion to
+     * `resolveAllowedTools`.
+     *
+     * `resolveAllowedTools` stays exactly as it was (sync, permission
+     * flags + facade presence). This method wraps it with the ONE thing
+     * that needs I/O: resolving the tenant → organization → Work → Agent
+     * grant matrix and dropping every tool it does not grant.
+     *
+     * Additive on purpose. Callers that have no grant enforcer wired (unit
+     * tests, the worker, any runtime without `PolicyModule`) keep calling
+     * the sync method and behave exactly as before; and even WITH the
+     * enforcer bound, the platform default grants `*`, so nothing is
+     * dropped until an operator writes a grant row.
+     *
+     * Returns the dropped tools alongside the kept ones so the caller can
+     * log WHY a tool the model was told about is absent — a silently
+     * missing tool is the single most confusing failure mode in a tool
+     * loop.
+     */
+    async resolveGrantedTools(
+        agent: Agent,
+        runContext: { runId: string; editsThisRunByFile: Set<string> } = {
+            runId: 'no-run',
+            editsThisRunByFile: new Set(),
+        },
+    ): Promise<{ tools: AgentToolDescriptor[]; refused: ToolGrantDecision[] }> {
+        const tools = this.resolveAllowedTools(agent, runContext);
+        if (!this.toolGrants) return { tools, refused: [] };
+
+        try {
+            const resolved = await this.toolGrants.resolve({
+                userId: agent.userId,
+                agentId: agent.id,
+                workId: agent.workId ?? null,
+                organizationId: agent.organizationId ?? null,
+                tenantId: agent.tenantId ?? null,
+            });
+            const { refused } = partitionToolsByGrant(
+                resolved,
+                tools.map((tool) => tool.name),
+            );
+            if (refused.length === 0) return { tools, refused: [] };
+            const refusedNames = new Set(refused.map((decision) => decision.toolName));
+            return {
+                tools: tools.filter((tool) => !refusedNames.has(tool.name)),
+                refused,
+            };
+        } catch (err) {
+            // An access matrix that fails CLOSED on its own lookup error
+            // takes the product down on a transient DB blip. The
+            // per-Agent permission gates above still applied, so degrade
+            // to them and say so loudly.
+            this.logger.warn(
+                `Agent ${agent.id}: tool-grant resolution failed, falling back to permission gates only: ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
+            return { tools, refused: [] };
+        }
+    }
+
+    /**
+     * `{{cred.key}}` interpolation (audit item G14).
+     *
+     * Wraps ONE descriptor so that, immediately before the underlying
+     * invoke runs:
+     *
+     *   1. every `{{cred.x}}` reference in the model-supplied arguments is
+     *      resolved SERVER-SIDE from the bound `CredentialResolver`;
+     *   2. a call whose credentials cannot be resolved is REFUSED with a
+     *      message naming the missing KEYS (never values) — a
+     *      half-authenticated outbound call is worse than a clear refusal;
+     *   3. the result is scrubbed of any resolved value before it travels
+     *      back to the model, because the remote API is not ours and error
+     *      bodies that echo an Authorization header are commonplace.
+     *
+     * Tools whose arguments reference nothing and which declare no
+     * requirement take a zero-cost fast path.
+     */
+    private withCredentialInterpolation(
+        agent: Agent,
+        descriptor: AgentToolDescriptor,
+    ): AgentToolDescriptor {
+        const resolver = this.credentials;
+        if (!resolver) return descriptor;
+        const invoke = descriptor.invoke;
+
+        return {
+            ...descriptor,
+            invoke: async (args: unknown) => {
+                const referenced = collectCredentialRefs(args);
+                const required = requiredCredentialsForTool(descriptor.name);
+                if (referenced.length === 0 && required.length === 0) {
+                    return invoke(args);
+                }
+
+                const malformed = invalidCredentialKeys(args);
+                if (malformed.length > 0) {
+                    return {
+                        error: `Malformed credential reference(s): ${malformed
+                            .map((key) => `{{cred.${key}}}`)
+                            .join(', ')}.`,
+                    };
+                }
+
+                const keys = Array.from(new Set([...referenced, ...required]));
+                let resolved: Map<string, string>;
+                try {
+                    resolved = await resolver.resolve(
+                        {
+                            userId: agent.userId,
+                            agentId: agent.id,
+                            workId: agent.workId ?? null,
+                            organizationId: agent.organizationId ?? null,
+                            tenantId: agent.tenantId ?? null,
+                        },
+                        keys,
+                    );
+                } catch (err) {
+                    // Never surface the underlying error verbatim — a
+                    // secret-store client can put the value it was
+                    // fetching in its own message.
+                    this.logger.warn(
+                        `Agent ${agent.id}: credential resolution failed for tool ${descriptor.name}.`,
+                    );
+                    void err;
+                    return { error: 'Credential resolution failed.' };
+                }
+
+                const availability = checkToolCredentialsAvailable({
+                    toolName: descriptor.name,
+                    referenced,
+                    resolved,
+                });
+                if (!availability.ok) {
+                    return { error: availability.error ?? 'Missing credentials.' };
+                }
+
+                const interpolated = interpolateCredentials(args, resolved);
+                const result = await invoke(interpolated.value);
+                return redactCredentialValues(result, resolved);
+            },
+        } as AgentToolDescriptor;
     }
 
     // ── tool builders ─────────────────────────────────────────────

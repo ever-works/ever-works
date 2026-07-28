@@ -11,4 +11,21 @@ export * from './merge-policy.service';
 // routes through (audit W3 M3).
 export * from './pull-request-gate.service';
 export * from './agent-merge-policy-tools';
+
+// Tool-grant matrix (audit item G4) + grant-aware skill activation (G12)
+// + `{{cred.key}}` interpolation (G14). Same shape: pure resolution and
+// decision functions, a feature-owned repository, the service that is the
+// single decision point, the `TOOL_GRANT_ENFORCER` token its consumers
+// depend on, and the `resolve_tool_grants` / `check_tool_grant` chat-tool
+// factory.
+export * from './tool-grant';
+export * from './tool-grant.enforcer';
+export * from './tool-grant.repository';
+export * from './tool-grant.service';
+export * from './agent-tool-grant-tools';
+export * from './skill-activation';
+export * from './credential-interpolation';
+export * from './credential-resolver';
+export * from './tool-credentials';
+
 export * from './policy.module';
