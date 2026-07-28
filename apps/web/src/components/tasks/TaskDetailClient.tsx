@@ -235,13 +235,7 @@ export function TaskDetailClient({
                                 {task.title}
                             </h1>
                             <div className="flex items-center gap-1.5 shrink-0">
-                                {/* Board dispatch (kanban M3) — run this Task
-                                    from its detail page, through the same
-                                    gated path the board and a status
-                                    transition use. */}
                                 <RunWithAgentMenu taskId={task.id} />
-                                {/* DELETE /api/tasks/:id — behind a confirm,
-                                    since it cascades to the Task's side rows. */}
                                 <TaskDeleteButton taskId={task.id} taskSlug={task.slug} />
                             </div>
                         </div>
