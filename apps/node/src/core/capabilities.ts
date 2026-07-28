@@ -195,15 +195,68 @@ export async function detectCapabilities(runner: CommandRunner, environment: Cap
 	]);
 }
 
-/** Full self-description for an enroll or heartbeat request. */
+/**
+ * Tag families that describe WHAT this machine IS rather than what it OFFERS.
+ * They are never withheld: the scheduler needs `os:`/`arch:`/`node:` to place
+ * work correctly, and hiding them would produce silent mis-placement rather
+ * than a smaller offer.
+ */
+const IDENTITY_TAG_PREFIXES = ['os:', 'arch:', 'node:'] as const;
+
+/** True when a tag is machine identity (always advertised) rather than an offer. */
+export function isIdentityCapability(tag: string): boolean {
+	return IDENTITY_TAG_PREFIXES.some((prefix) => tag.startsWith(prefix));
+}
+
+/**
+ * The tags an operator is actually allowed to choose between — everything the
+ * detector found minus the identity tags. This is what the wizard's capability
+ * step renders as checkboxes.
+ */
+export function selectableCapabilities(detected: readonly string[]): string[] {
+	return detected.filter((tag) => !isIdentityCapability(tag));
+}
+
+/**
+ * Apply the operator's capability opt-in (PRD §3.2 step 3).
+ *
+ * Semantics, in order of precedence:
+ *   1. `selection === undefined | null` → advertise everything detected
+ *      (byte-identical to the pre-selection behaviour, so an older config
+ *      keeps working).
+ *   2. otherwise → advertise identity tags plus the intersection of
+ *      `detected` and `selection`.
+ *
+ * The intersection direction matters: a selection can only ever SHRINK what
+ * the node offers. An operator cannot advertise `docker` on a machine without
+ * Docker by editing the config, and — the case that motivates this — a machine
+ * that later gains Docker does not start attracting Docker work unless its
+ * owner opted into that tag.
+ */
+export function applyCapabilitySelection(detected: readonly string[], selection?: readonly string[] | null): string[] {
+	if (selection === undefined || selection === null) {
+		return normalizeCapabilities([...detected]);
+	}
+	const chosen = new Set(normalizeCapabilities([...selection]));
+	return normalizeCapabilities(detected.filter((tag) => isIdentityCapability(tag) || chosen.has(tag)));
+}
+
+/**
+ * Full self-description for an enroll or heartbeat request.
+ *
+ * `selection` is the operator's capability opt-in; omitting it preserves the
+ * original "advertise everything detected" behaviour.
+ */
 export async function describeSelf(
 	runner: CommandRunner,
 	environment: CapabilityEnvironment,
-	version: string
+	version: string,
+	selection?: readonly string[] | null
 ): Promise<Required<NodeSelfDescription>> {
+	const detected = await detectCapabilities(runner, environment);
 	return {
 		platform: describePlatform(environment),
 		version: version.slice(0, MAX_VERSION_LENGTH),
-		capabilities: await detectCapabilities(runner, environment)
+		capabilities: applyCapabilitySelection(detected, selection)
 	};
 }

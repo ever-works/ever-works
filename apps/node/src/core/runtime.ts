@@ -1,20 +1,23 @@
+import { PlatformAuthClient } from './auth-client';
 import { describeSelf, type CapabilityEnvironment, type CommandRunner } from './capabilities';
 import { FleetClient, type FetchLike } from './fleet-client';
 import { FleetJobClient } from './job-client';
 import { HeartbeatLoop, type Scheduler } from './heartbeat';
+import type { ResourceProbe } from './resource-limits';
 import { WorkerLoop } from './worker-loop';
 import { runAcceptanceChecksJob } from './executors/acceptance-checks';
 import { runAgentTaskJob } from './executors/agent-task';
 import { runBrowserCheckJob } from './executors/browser-check';
 import type { Logger } from './logger';
 import {
+	clampResourceLimits,
 	DEFAULT_HEARTBEAT_INTERVAL_MS,
 	MAX_HEARTBEAT_INTERVAL_MS,
 	MIN_HEARTBEAT_INTERVAL_MS,
 	type FleetEnrollableNodeKind,
-	type FleetNodeKind,
 	type FleetNodeView,
-	type NodeConfig
+	type NodeConfig,
+	type NodeResourceLimits
 } from './types';
 
 /**
@@ -44,6 +47,13 @@ export interface EnrollNodeOptions extends NodeIo {
 	/** Local display label. Optional — defaults to the platform-assigned name. */
 	name?: string;
 	heartbeatIntervalMs?: number;
+	/**
+	 * Operator's capability opt-in (wizard step 3). Omitted means "advertise
+	 * everything detected"; supplied, it can only shrink the offer.
+	 */
+	capabilitySelection?: readonly string[];
+	/** Operator's resource ceilings (wizard step 4). Clamped before storage. */
+	limits?: Partial<NodeResourceLimits>;
 }
 
 /** Clamp an operator-supplied heartbeat interval into the supported range. */
@@ -74,28 +84,86 @@ export async function enrollNode(options: EnrollNodeOptions): Promise<NodeConfig
 		userAgent: options.userAgent ?? `ever-works-node/${options.version}`
 	});
 
-	const description = await describeSelf(options.runner, options.environment, options.version);
+	const description = await describeSelf(
+		options.runner,
+		options.environment,
+		options.version,
+		options.capabilitySelection ?? null
+	);
 	logger.info(`Enrolling with ${client.baseUrl} as ${description.platform} [${description.capabilities.join(', ')}]`);
 
 	const result = await client.enroll({ token: options.token, ...description });
 	logger.protect(result.secret);
 
+	const limits = clampResourceLimits(options.limits);
 	const config: NodeConfig = {
 		apiUrl: client.baseUrl,
 		nodeId: result.nodeId,
 		secret: result.secret,
 		kind: options.kind,
 		capabilities: description.capabilities,
+		limits,
 		heartbeatIntervalMs: clampHeartbeatInterval(options.heartbeatIntervalMs),
 		enrolledAt: new Date(options.now ? options.now() : Date.now()).toISOString()
 	};
+	if (options.capabilitySelection) {
+		config.capabilitySelection = [...options.capabilitySelection];
+	}
 	const label = options.name?.trim() || result.node.name;
 	if (label) {
 		config.name = label;
 	}
 
-	logger.info(`Enrolled as node ${result.nodeId} ("${config.name ?? 'unnamed'}")`);
+	logger.info(
+		`Enrolled as node ${result.nodeId} ("${config.name ?? 'unnamed'}") — ` +
+			`max ${limits.maxConcurrentJobs} concurrent job(s)`
+	);
 	return config;
+}
+
+export interface EnrollWithCredentialsOptions extends Omit<EnrollNodeOptions, 'token'> {
+	email: string;
+	/** Used for exactly one request; never stored, never logged. */
+	password: string;
+	/** Name registered with the platform when minting the token. */
+	nodeName: string;
+}
+
+/**
+ * The authenticate leg (A14): sign in, mint a one-time enrollment token, then
+ * run the ordinary {@link enrollNode} path with it.
+ *
+ * The single-use token still exists and is still consumed exactly once — this
+ * removes the clipboard from the loop, not the protocol step. The password
+ * lives only in this call frame; only the resulting heartbeat secret is ever
+ * persisted, by the caller's `saveConfig`.
+ */
+export async function enrollNodeWithCredentials(options: EnrollWithCredentialsOptions): Promise<NodeConfig> {
+	const { logger } = options;
+	const auth = new PlatformAuthClient({
+		apiUrl: options.apiUrl,
+		fetchFn: options.fetchFn,
+		logger,
+		userAgent: options.userAgent ?? `ever-works-node/${options.version}`
+	});
+
+	const session = await auth.signIn(options.email, options.password);
+	logger.info(`Signed in to ${auth.baseUrl}${session.email ? ` as ${session.email}` : ''}`);
+
+	const token = await auth.createEnrollmentToken(session.sessionToken, {
+		name: options.nodeName,
+		kind: options.kind
+	});
+	logger.info('Enrollment token minted for this machine');
+
+	const { email: _email, password: _password, nodeName, ...rest } = options;
+	return enrollNode({
+		...rest,
+		token,
+		// The local label defaults to the name we just registered, so the
+		// status window and the Fleet page agree without a second prompt.
+		...(rest.name ? {} : { name: nodeName })
+	});
 }
 
 export interface NodeRuntime {
@@ -118,8 +186,18 @@ export interface CreateNodeRuntimeOptions {
 	 * commands are two different consents, and the second is opt-in.
 	 */
 	workerEnabled?: boolean;
-	/** Max jobs in flight on this node. */
+	/**
+	 * Max jobs in flight on this node. Superseded by the stored
+	 * `config.limits.maxConcurrentJobs` when the node has limits.
+	 */
 	concurrency?: number;
+	/**
+	 * Override the stored resource ceilings. Normally omitted — the node's
+	 * own `config.limits` is the source of truth.
+	 */
+	limits?: Partial<NodeResourceLimits>;
+	/** Host sampler backing the CPU/memory admission gate. */
+	resourceProbe?: ResourceProbe;
 	leaseTtlSec?: number;
 	idlePollMs?: number;
 	/**
@@ -153,11 +231,14 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 		userAgent
 	});
 
+	// Re-detection stays intersected with the operator's opt-in, so a tool
+	// installed after enrollment never silently widens what this node offers.
+	const selection = config.capabilitySelection ?? null;
 	const loopOptions = {
 		client,
 		nodeId: config.nodeId,
 		secret: config.secret,
-		describe: () => describeSelf(io.runner, io.environment, io.version),
+		describe: () => describeSelf(io.runner, io.environment, io.version, selection),
 		intervalMs: clampHeartbeatInterval(config.heartbeatIntervalMs),
 		logger: io.logger,
 		...(io.scheduler ? { scheduler: io.scheduler } : {}),
@@ -175,10 +256,18 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 			logger: io.logger,
 			userAgent
 		});
+		// Precedence: explicit override → the node's stored limits → the
+		// legacy `concurrency` option → defaults.
+		const limits = clampResourceLimits(
+			options.limits ??
+				config.limits ??
+				(options.concurrency !== undefined ? { maxConcurrentJobs: options.concurrency } : null)
+		);
 		const worker = new WorkerLoop({
 			client: jobClient,
 			logger: io.logger,
-			...(options.concurrency !== undefined ? { concurrency: options.concurrency } : {}),
+			limits,
+			...(options.resourceProbe ? { resourceProbe: options.resourceProbe } : {}),
 			...(options.leaseTtlSec !== undefined ? { leaseTtlSec: options.leaseTtlSec } : {}),
 			...(options.idlePollMs !== undefined ? { idlePollMs: options.idlePollMs } : {}),
 			...(options.startPaused !== undefined ? { startPaused: options.startPaused } : {}),

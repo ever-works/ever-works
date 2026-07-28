@@ -21,6 +21,23 @@ export type OnboardingDbChoice = 'ever-works-db' | 'custom';
 export type OnboardingDeployChoice = 'ever-works' | 'vercel' | 'k8s';
 
 /**
+ * A8 — where the user actually runs Ever Works, and therefore what their
+ * first run should look like.
+ *
+ * The other four buckets all ask "which provider": AI, storage, database,
+ * deployment. None of them ask the question a desktop-first user is actually
+ * living — "is this thing running on my machine, and are my machines part of
+ * it?" — so those users landed on a cloud-shaped first run and had to find
+ * Fleet and the node apps on their own.
+ *
+ *   - `cloud`      the hosted platform (default; unchanged behaviour)
+ *   - `desktop`    the all-in-one desktop app supervising a local stack
+ *   - `own-nodes`  the platform runs elsewhere, but this person's own
+ *                  machines execute the work (Fleet + node apps)
+ */
+export type OnboardingDesktopChoice = 'cloud' | 'desktop' | 'own-nodes';
+
+/**
  * Wave 11 — "What do you do" onboarding step. A generic option row:
  * stable kebab-case id + English display label + one-line description.
  * The web wizard renders these through i18n keys keyed by `id`; the
@@ -87,6 +104,12 @@ export interface OnboardingWizardStateV2 {
 	readonly storage: { readonly choice: OnboardingStorageChoice };
 	readonly db: { readonly choice: OnboardingDbChoice };
 	readonly deploy: { readonly choice: OnboardingDeployChoice };
+	/**
+	 * A8 — desktop-first bucket. Optional in the persisted shape so a state
+	 * blob written before this bucket existed keeps round-tripping; readers
+	 * fall back to {@link ONBOARDING_DEFAULT_STATE}'s `cloud`.
+	 */
+	readonly desktop?: { readonly choice: OnboardingDesktopChoice };
 	readonly skippedSteps: readonly string[];
 	readonly pluginsReviewed: boolean;
 	/**
@@ -139,6 +162,8 @@ export interface OnboardingStatePatchRequest {
 		readonly storage: Partial<{ choice: OnboardingStorageChoice }>;
 		readonly db: Partial<{ choice: OnboardingDbChoice }>;
 		readonly deploy: Partial<{ choice: OnboardingDeployChoice }>;
+		/** A8 — desktop-first bucket. */
+		readonly desktop: Partial<{ choice: OnboardingDesktopChoice }>;
 		readonly skippedSteps: readonly string[];
 		readonly pluginsReviewed: boolean;
 		/** Max 5 000 chars — enforced by `@MaxLength(5000)` in the server DTO. */
@@ -161,6 +186,8 @@ export interface OnboardingCatalogResponse {
 	readonly storage: ReadonlyArray<OnboardingCard<OnboardingStorageChoice>>;
 	readonly db: ReadonlyArray<OnboardingCard<OnboardingDbChoice>>;
 	readonly deploy: ReadonlyArray<OnboardingCard<OnboardingDeployChoice>>;
+	/** A8 — cards for the desktop-first bucket. */
+	readonly desktop: ReadonlyArray<OnboardingCard<OnboardingDesktopChoice>>;
 	/** Plugins to surface in the "Plugins & Integrations" wizard step. */
 	readonly plugins: ReadonlyArray<OnboardingPluginCard>;
 }
@@ -193,6 +220,48 @@ export const ONBOARDING_DEFAULT_STATE: OnboardingWizardStateV2 = {
 	storage: { choice: 'ever-works-git' },
 	db: { choice: 'ever-works-db' },
 	deploy: { choice: 'ever-works' },
+	desktop: { choice: 'cloud' },
 	skippedSteps: [],
 	pluginsReviewed: false
 };
+
+/**
+ * A8 — first-run guidance implied by the desktop bucket. Consumed by the web
+ * wizard's final step (and any other surface that wants to point a user at the
+ * right next thing) so "which shape am I running" actually changes what the
+ * user is told to do next, rather than being a stored preference nobody reads.
+ */
+export interface OnboardingDesktopNextStep {
+	readonly choice: OnboardingDesktopChoice;
+	readonly title: string;
+	readonly description: string;
+	/** In-app route to send the user to, when there is one. */
+	readonly href?: string;
+}
+
+export const ONBOARDING_DESKTOP_NEXT_STEPS: Readonly<Record<OnboardingDesktopChoice, OnboardingDesktopNextStep>> = {
+	cloud: {
+		choice: 'cloud',
+		title: 'Start building',
+		description: 'Everything runs on the hosted platform — create your first Work and go.'
+	},
+	desktop: {
+		choice: 'desktop',
+		title: 'Finish your desktop setup',
+		description:
+			'Ever Works Desktop supervises the API and web app on this machine. Check the services are healthy, then pick the job runtime you want them to use.',
+		href: '/settings/job-runtime'
+	},
+	'own-nodes': {
+		choice: 'own-nodes',
+		title: 'Add your first node',
+		description:
+			'Enroll the machines that should execute your work. Issue an enrollment token here, then run the Desktop Node app or the headless node on each machine.',
+		href: '/settings/fleet'
+	}
+};
+
+/** The guidance for a bucket choice, defaulting to the cloud path. */
+export function desktopNextStep(choice: OnboardingDesktopChoice | undefined): OnboardingDesktopNextStep {
+	return ONBOARDING_DESKTOP_NEXT_STEPS[choice ?? 'cloud'] ?? ONBOARDING_DESKTOP_NEXT_STEPS.cloud;
+}

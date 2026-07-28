@@ -1,13 +1,13 @@
 import type { Logger } from './logger';
 import type { SecretStore } from './secret-store';
 import {
+	clampResourceLimits,
 	DEFAULT_HEARTBEAT_INTERVAL_MS,
 	isFleetEnrollableNodeKind,
 	MAX_HEARTBEAT_INTERVAL_MS,
 	MIN_HEARTBEAT_INTERVAL_MS,
 	type FleetEnrollableNodeKind,
 	type NodeConfig,
-	type FleetNodeKind,
 	type NodeSecretStorage
 } from './types';
 
@@ -151,11 +151,22 @@ export function parseConfig(raw: string | null): NodeConfig | null {
 		capabilities: Array.isArray(candidate.capabilities)
 			? candidate.capabilities.filter((tag): tag is string => typeof tag === 'string')
 			: [],
+		// A config written before limits existed reads as the conservative
+		// default, so upgrading the app never widens what a node will do.
+		limits: clampResourceLimits(candidate.limits),
 		heartbeatIntervalMs: clampInterval(candidate.heartbeatIntervalMs),
 		enrolledAt: typeof candidate.enrolledAt === 'string' ? candidate.enrolledAt : new Date(0).toISOString(),
 		secretStorage,
 		paused: candidate.paused === true
 	};
+	// Distinguish "no selection recorded" (advertise everything detected)
+	// from "an empty selection" (offer only the identity tags) — dropping
+	// the key entirely is the only way to mean the former.
+	if (Array.isArray(candidate.capabilitySelection)) {
+		config.capabilitySelection = candidate.capabilitySelection.filter(
+			(tag): tag is string => typeof tag === 'string'
+		);
+	}
 	if (typeof candidate.name === 'string' && candidate.name) {
 		config.name = candidate.name;
 	}

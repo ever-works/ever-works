@@ -1,21 +1,31 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { ConnectionStatusView, DesktopNodeBridge, EnrollRequest, LogEntry } from '../shared/ipc-contract';
+import type {
+	AuthenticateRequest,
+	ConnectionStatusView,
+	DesktopNodeBridge,
+	EnrollRequest,
+	LogEntry
+} from '../shared/ipc-contract';
 
 // IMPORTANT: this preload runs sandboxed — it cannot require local modules,
 // so channel names are inlined as string literals. Keep them in sync with
 // `IpcChannels` in src/shared/ipc-contract.ts (types are erased at compile
 // time, so the type-only import above is sandbox-safe).
 //
-// The bridge is deliberately narrow: the renderer can ASK to enroll (sending a
-// token in) but can never read a credential back out.
+// The bridge is deliberately narrow: the renderer can ASK to authenticate or
+// enroll (sending a password or token IN) but can never read a credential back
+// out — every outcome type is credential-free by construction.
 
 const bridge: DesktopNodeBridge = {
 	listApiHosts: () => ipcRenderer.invoke('wizard:list-api-hosts'),
 	detectCapabilities: () => ipcRenderer.invoke('wizard:detect-capabilities'),
+	authenticate: (request: AuthenticateRequest) => ipcRenderer.invoke('wizard:authenticate', request),
 	enroll: (request: EnrollRequest) => ipcRenderer.invoke('wizard:enroll', request),
 	getConfig: () => ipcRenderer.invoke('config:get'),
 	connect: () => ipcRenderer.invoke('node:connect'),
 	disconnect: () => ipcRenderer.invoke('node:disconnect'),
+	pause: () => ipcRenderer.invoke('node:pause'),
+	resume: () => ipcRenderer.invoke('node:resume'),
 	getStatus: () => ipcRenderer.invoke('node:status'),
 	getLogs: () => ipcRenderer.invoke('node:logs'),
 	unenroll: () => ipcRenderer.invoke('node:unenroll'),

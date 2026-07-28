@@ -19,7 +19,7 @@ function initialReducerState() {
 }
 
 describe('computeStepList', () => {
-    it('returns the minimal 9-step list when every choice is the Ever Works default', () => {
+    it('returns the minimal 10-step list when every choice is the Ever Works default', () => {
         const list = computeStepList(ONBOARDING_DEFAULT_STATE);
         expect(list.map((s) => s.kind)).toEqual([
             'welcome',
@@ -27,6 +27,7 @@ describe('computeStepList', () => {
             'storage-choice',
             'db-choice',
             'deploy-choice',
+            'desktop-choice',
             'profile',
             'communication',
             'plugins-catalog',
@@ -71,7 +72,7 @@ describe('computeStepList', () => {
                 deploy: { choice: 'vercel' },
             }),
         );
-        expect(list).toHaveLength(12);
+        expect(list).toHaveLength(13);
         expect(list.map((s) => s.kind)).toEqual([
             'welcome',
             'ai-choice',
@@ -81,6 +82,7 @@ describe('computeStepList', () => {
             'db-choice',
             'deploy-choice',
             'deploy-config',
+            'desktop-choice',
             'profile',
             'communication',
             'plugins-catalog',
@@ -104,7 +106,12 @@ describe('computeStepList', () => {
         const full = computeStepList(defaultsWith({ deploy: { choice: 'vercel' } })).map(
             (s) => s.kind,
         );
-        expect(full.indexOf('profile')).toBe(full.indexOf('deploy-config') + 1);
+        // A8 — `desktop-choice` now sits between the provider steps and
+        // profile, so profile trails IT rather than deploy-config. The
+        // "immediately before Communication" half of the contract is what
+        // this test is really about and is unchanged.
+        expect(full.indexOf('desktop-choice')).toBe(full.indexOf('deploy-config') + 1);
+        expect(full.indexOf('profile')).toBe(full.indexOf('desktop-choice') + 1);
         expect(full.indexOf('profile')).toBe(full.indexOf('communication') - 1);
     });
 

@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react';
 import { ArrowRight, FolderPlus, Sparkles } from 'lucide-react';
+import { desktopNextStep, type OnboardingDesktopChoice } from '@ever-works/contracts/api';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 
@@ -26,6 +27,13 @@ export interface CreateWorkStepProps {
      * "Generate now".
      */
     readonly onPromptChange?: (value: string) => void;
+    /**
+     * A8 — the bucket the user picked on the "Where it runs" step. It decides
+     * the follow-on guidance rendered below the primary action: a desktop or
+     * own-nodes user is finished with the wizard but NOT finished setting up,
+     * and this is the only place the wizard can say so.
+     */
+    readonly desktopChoice?: OnboardingDesktopChoice;
 }
 
 /**
@@ -44,7 +52,11 @@ export function CreateWorkStep({
     prompt,
     onQuickCreate,
     onPromptChange,
+    desktopChoice,
 }: CreateWorkStepProps) {
+    // Defaults to the cloud path, which renders no extra guidance — so a user
+    // who never saw the bucket step sees exactly the previous screen.
+    const nextStep = desktopNextStep(desktopChoice);
     const trimmedPrompt = prompt?.trim() ?? '';
     // Latch the "generate" mode on first render. Once the step is entered via
     // the prompt hand-off it stays in generate mode for the component's
@@ -152,6 +164,27 @@ export function CreateWorkStep({
                         <ArrowRight className="w-4 h-4" />
                     </Link>
                 )}
+                {nextStep.href ? (
+                    <div
+                        data-testid="onboarding-desktop-next-step"
+                        className="mt-4 border-t border-border dark:border-border-dark pt-4"
+                    >
+                        <p className="text-sm font-medium text-text dark:text-text-dark">
+                            {nextStep.title}
+                        </p>
+                        <p className="mt-1 text-sm text-text-muted dark:text-text-muted-dark">
+                            {nextStep.description}
+                        </p>
+                        <Link
+                            href={nextStep.href}
+                            onClick={onLeave}
+                            className="mt-2 inline-flex items-center gap-1.5 text-sm font-medium text-primary hover:underline"
+                        >
+                            {nextStep.title}
+                            <ArrowRight className="w-3.5 h-3.5" />
+                        </Link>
+                    </div>
+                ) : null}
             </div>
         </div>
     );

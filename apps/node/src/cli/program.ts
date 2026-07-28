@@ -12,12 +12,20 @@ import {
 	type SignalSource
 } from '../core/runtime';
 import type { SecretStore } from '../core/secret-store';
+import type { ResourceProbe } from '../core/resource-limits';
 import {
+	clampResourceLimits,
 	DEFAULT_HEARTBEAT_INTERVAL_MS,
+	MAX_CONCURRENT_JOBS,
+	MAX_CPU_PERCENT,
 	MAX_HEARTBEAT_INTERVAL_MS,
+	MIN_CONCURRENT_JOBS,
+	MIN_CPU_PERCENT,
 	MIN_HEARTBEAT_INTERVAL_MS,
+	MIN_MEMORY_MB,
 	redactConfig,
-	type NodeConfig
+	type NodeConfig,
+	type NodeResourceLimits
 } from '../core/types';
 
 /**
@@ -70,6 +78,11 @@ export interface CliDeps {
 	 * (the real service runs until a signal arrives); tests override it.
 	 */
 	waitForShutdown?(): Promise<void>;
+	/**
+	 * Host sampler for the CPU/memory admission gate. Optional: without it
+	 * only the concurrency ceiling is enforced.
+	 */
+	resourceProbe?: ResourceProbe;
 }
 
 /**
@@ -122,17 +135,82 @@ export interface EnrollCommandOptions {
 	token: string;
 	name?: string;
 	heartbeatInterval?: string;
+	/** Comma-separated capability opt-in (A15). Omitted = offer everything detected. */
+	capabilities?: string;
+	/** Resource ceilings (A16). */
+	concurrency?: string;
+	maxCpu?: string;
+	maxMemory?: string;
+}
+
+/** Parse `--capabilities a,b,c` into a tag list; blank entries are dropped. */
+export function parseCapabilityList(raw: string | undefined): string[] | undefined {
+	if (raw === undefined) {
+		return undefined;
+	}
+	return raw
+		.split(',')
+		.map((tag) => tag.trim())
+		.filter((tag) => tag.length > 0);
+}
+
+/** Parse one bounded numeric flag, refusing (never silently clamping) bad input. */
+function parseBounded(raw: string | undefined, flag: string, min: number, max: number): number | undefined {
+	if (raw === undefined) {
+		return undefined;
+	}
+	const value = Number(raw);
+	if (!Number.isFinite(value) || !Number.isInteger(value)) {
+		throw new CliError(`${flag} must be a whole number (got "${raw}")`);
+	}
+	if (value < min || value > max) {
+		throw new CliError(`${flag} must be between ${min} and ${max} (got ${value})`);
+	}
+	return value;
+}
+
+/** Build the resource-limit overrides implied by the CLI flags, if any. */
+export function parseLimitFlags(options: {
+	concurrency?: string;
+	maxCpu?: string;
+	maxMemory?: string;
+}): Partial<NodeResourceLimits> | undefined {
+	const maxConcurrentJobs = parseBounded(
+		options.concurrency,
+		'--concurrency',
+		MIN_CONCURRENT_JOBS,
+		MAX_CONCURRENT_JOBS
+	);
+	const maxCpuPercent = parseBounded(options.maxCpu, '--max-cpu', MIN_CPU_PERCENT, MAX_CPU_PERCENT);
+	const maxMemoryMb = parseBounded(options.maxMemory, '--max-memory', MIN_MEMORY_MB, Number.MAX_SAFE_INTEGER);
+
+	const limits: Partial<NodeResourceLimits> = {};
+	if (maxConcurrentJobs !== undefined) limits.maxConcurrentJobs = maxConcurrentJobs;
+	if (maxCpuPercent !== undefined) limits.maxCpuPercent = maxCpuPercent;
+	if (maxMemoryMb !== undefined) limits.maxMemoryMb = maxMemoryMb;
+	return Object.keys(limits).length > 0 ? limits : undefined;
+}
+
+function describeLimits(limits: NodeResourceLimits): string {
+	const parts = [`${limits.maxConcurrentJobs} concurrent job(s)`];
+	parts.push(limits.maxCpuPercent === null ? 'no CPU ceiling' : `CPU < ${limits.maxCpuPercent}%`);
+	parts.push(limits.maxMemoryMb === null ? 'no memory ceiling' : `memory < ${limits.maxMemoryMb}MB`);
+	return parts.join(', ');
 }
 
 export async function runEnroll(deps: CliDeps, options: EnrollCommandOptions): Promise<void> {
 	const heartbeatIntervalMs = parseIntervalSeconds(options.heartbeatInterval);
+	const capabilitySelection = parseCapabilityList(options.capabilities);
+	const limits = parseLimitFlags(options);
 	const config = await enrollNode({
 		...deps.io,
 		apiUrl: options.apiUrl,
 		token: options.token,
 		kind: 'node',
 		...(options.name !== undefined ? { name: options.name } : {}),
-		...(heartbeatIntervalMs !== undefined ? { heartbeatIntervalMs } : {})
+		...(heartbeatIntervalMs !== undefined ? { heartbeatIntervalMs } : {}),
+		...(capabilitySelection !== undefined ? { capabilitySelection } : {}),
+		...(limits !== undefined ? { limits } : {})
 	});
 
 	await saveConfig(deps.fs, deps.configPath, config, {
@@ -145,6 +223,7 @@ export async function runEnroll(deps: CliDeps, options: EnrollCommandOptions): P
 	deps.out(`  name         ${config.name ?? '(assigned by the platform)'}`);
 	deps.out(`  api          ${config.apiUrl}`);
 	deps.out(`  capabilities ${config.capabilities.join(', ') || '(none detected)'}`);
+	deps.out(`  limits       ${describeLimits(clampResourceLimits(config.limits))}`);
 	deps.out(`  config       ${deps.configPath}`);
 	deps.out(`  credential   ${deps.secrets ? deps.secrets.label : 'config file (no OS keychain available)'}`);
 	deps.out('');
@@ -156,6 +235,8 @@ export interface StartCommandOptions {
 	/** Opt in to leasing and executing platform work on this machine. */
 	work?: boolean;
 	concurrency?: string;
+	maxCpu?: string;
+	maxMemory?: string;
 }
 
 export async function runStart(deps: CliDeps, options: StartCommandOptions): Promise<void> {
@@ -164,15 +245,25 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 	const config: NodeConfig = override === undefined ? stored : { ...stored, heartbeatIntervalMs: override };
 
 	const workerEnabled = options.work === true;
-	const concurrency = parseConcurrency(options.concurrency);
 	// A node paused by `ever-works-node pause` comes back paused: the
 	// operator drained the machine on purpose, and a service restart
 	// (or a reboot) must not quietly hand it work again.
 	const startPaused = config.paused === true;
+	// `--concurrency` is the legacy single knob; `limits` supersedes it,
+	// so it is folded in as the concurrency ceiling rather than passed
+	// alongside — two sources for one number is how they drift.
+	const concurrency = parseConcurrency(options.concurrency);
+	const limitOverrides = parseLimitFlags(options);
+	const effectiveLimits = clampResourceLimits({
+		...(concurrency !== undefined ? { maxConcurrentJobs: concurrency } : {}),
+		...(config.limits ?? {}),
+		...(limitOverrides ?? {})
+	});
 	const { loop, worker } = createNodeRuntime(config, deps.io, {
 		workerEnabled,
 		startPaused,
-		...(concurrency !== undefined ? { concurrency } : {})
+		limits: effectiveLimits,
+		...(deps.resourceProbe ? { resourceProbe: deps.resourceProbe } : {})
 	});
 	loop.onChange((state) => {
 		if (state.state === 'connected') {
@@ -188,7 +279,7 @@ export async function runStart(deps: CliDeps, options: StartCommandOptions): Pro
 		deps.out('Worker host PAUSED — heartbeating only. Run `ever-works-node resume` to take work again.');
 	} else if (worker) {
 		deps.out(
-			`Worker host enabled — leasing [${worker.registeredKinds.join(', ')}] with concurrency ${concurrency ?? 1}`
+			`Worker host enabled — leasing [${worker.registeredKinds.join(', ')}] within ${describeLimits(effectiveLimits)}`
 		);
 	} else {
 		// Say so explicitly: an operator who expected this machine to run
@@ -365,6 +456,12 @@ export async function runStatus(deps: CliDeps): Promise<void> {
 	// plaintext visible.
 	deps.out(`credential   ${view.hasSecret ? 'stored' : 'MISSING'} (${view.secretStorage})`);
 	deps.out(`work         ${view.paused ? 'PAUSED (draining — no new work)' : 'accepting new work'}`);
+	deps.out(
+		`offering     ${view.capabilitySelection ? view.capabilitySelection.join(', ') || '(identity only)' : '(everything detected)'}`
+	);
+	deps.out(`limits       ${describeLimits(view.limits)}`);
+	// The secret itself is never printed — only whether one is stored.
+	deps.out(`credential   ${view.hasSecret ? 'stored' : 'MISSING'}`);
 	deps.out(`config       ${deps.configPath}`);
 }
 
@@ -416,6 +513,22 @@ export function buildProgram(deps: CliDeps): Command {
 			'-i, --heartbeat-interval <seconds>',
 			`Heartbeat cadence in seconds (default ${DEFAULT_HEARTBEAT_INTERVAL_MS / 1000})`
 		)
+		.option(
+			'--capabilities <tags>',
+			'Comma-separated capability tags to OFFER (default: everything detected). Machine identity tags (os/arch/node) are always advertised.'
+		)
+		.option(
+			'-c, --concurrency <count>',
+			`Max jobs to execute at once (${MIN_CONCURRENT_JOBS}-${MAX_CONCURRENT_JOBS})`
+		)
+		.option(
+			'--max-cpu <percent>',
+			`Refuse new work while host CPU is at or above this percent (${MIN_CPU_PERCENT}-${MAX_CPU_PERCENT})`
+		)
+		.option(
+			'--max-memory <mb>',
+			`Refuse new work while host memory in use is at or above this many MB (min ${MIN_MEMORY_MB})`
+		)
 		.action(async (options: EnrollCommandOptions) => {
 			await runEnroll(deps, options);
 		});
@@ -425,7 +538,12 @@ export function buildProgram(deps: CliDeps): Command {
 		.description('Run the heartbeat loop (and, with --work, the job worker host) until SIGINT/SIGTERM')
 		.option('-i, --heartbeat-interval <seconds>', 'Override the stored heartbeat cadence, in seconds')
 		.option('-w, --work', 'Lease and execute platform work on this machine (off by default)')
-		.option('-c, --concurrency <count>', 'Max jobs to execute at once when --work is set (default 1)')
+		.option(
+			'-c, --concurrency <count>',
+			'Max jobs to execute at once when --work is set (overrides the stored limit)'
+		)
+		.option('--max-cpu <percent>', 'Override the stored CPU admission ceiling, in percent')
+		.option('--max-memory <mb>', 'Override the stored memory admission ceiling, in MB')
 		.action(async (options: StartCommandOptions) => {
 			await runStart(deps, options);
 		});
