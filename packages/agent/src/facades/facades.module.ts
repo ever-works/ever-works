@@ -7,6 +7,7 @@ import { PolicyModule } from '../policy/policy.module';
 import { AiFacadeService } from './ai.facade';
 import { SearchFacadeService } from './search.facade';
 import { ScreenshotFacadeService } from './screenshot.facade';
+import { BrowserAutomationFacadeService } from './browser-automation.facade';
 import { ContentExtractorFacadeService } from './content-extractor.facade';
 import { DataSourceFacadeService } from './data-source.facade';
 import { GitFacadeService } from './git.facade';
@@ -28,6 +29,7 @@ const FACADES = [
     AiFacadeService,
     SearchFacadeService,
     ScreenshotFacadeService,
+    BrowserAutomationFacadeService,
     ContentExtractorFacadeService,
     DataSourceFacadeService,
     GitFacadeService,

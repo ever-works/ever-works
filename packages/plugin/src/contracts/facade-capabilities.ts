@@ -76,6 +76,12 @@ export const PLUGIN_CAPABILITIES = {
 	TERMINAL_STREAM: 'terminal-stream',
 	// Isolated git working contexts for agent Tasks (Wave 2).
 	WORKSPACE: 'workspace',
+	// Headless browser drivers (audit item G22). navigate / extract /
+	// screenshot / act, headless by default, behind a default-deny
+	// navigation allowlist re-checked on every redirect hop. First-party:
+	// `browser-automation` (Playwright). See
+	// capabilities/browser-automation.interface.ts.
+	BROWSER_AUTOMATION: 'browser-automation',
 	// Event-ingest spine (Wave 6) — plugins that pull/push normalized
 	// external events into the platform ingest pipeline. See
 	// capabilities/event-source.interface.ts.

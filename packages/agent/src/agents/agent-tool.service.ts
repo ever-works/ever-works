@@ -46,6 +46,7 @@ import { buildIngestEventTools } from '../ingest/agent-ingest-tools';
 import { buildDigestTools } from '../digest/agent-digest-tools';
 import { buildMeetingTools } from '../meetings/agent-meeting-tools';
 import { buildFleetTools } from '../fleet/agent-fleet-tools';
+import { buildBrowserTools } from '../facades/agent-browser-tools';
 import { buildPrReviewTools } from '../pr-review/agent-pr-review-tools';
 import { buildMergePolicyTools } from '../policy/agent-merge-policy-tools';
 // Security: lexical SSRF guard reused by the model-controlled URL tools
@@ -376,6 +377,16 @@ export class AgentToolService {
         if (sources.fleet) {
             const fleet = sources.fleet;
             add('fleet', () => buildFleetTools({ userId: agent.userId, service: fleet.service }));
+        }
+
+        // Fetching an arbitrary URL IS an outbound network call, so it
+        // rides the same permission gate as the other external-tool
+        // surfaces rather than being available to every agent.
+        if (agent.permissions?.canCallExternalTools && sources.browser) {
+            const browser = sources.browser;
+            add('browser', () =>
+                buildBrowserTools({ userId: agent.userId, facade: browser.facade }),
+            );
         }
 
         // Outbound network call + a comment posted on someone's PR —

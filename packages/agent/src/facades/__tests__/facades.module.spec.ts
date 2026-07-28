@@ -3,6 +3,7 @@ import { FacadesModule } from '../facades.module';
 import { AiFacadeService } from '../ai.facade';
 import { SearchFacadeService } from '../search.facade';
 import { ScreenshotFacadeService } from '../screenshot.facade';
+import { BrowserAutomationFacadeService } from '../browser-automation.facade';
 import { ContentExtractorFacadeService } from '../content-extractor.facade';
 import { DataSourceFacadeService } from '../data-source.facade';
 import { GitFacadeService } from '../git.facade';
@@ -39,6 +40,7 @@ describe('FacadesModule + barrel re-exports', () => {
         AiFacadeService,
         SearchFacadeService,
         ScreenshotFacadeService,
+        BrowserAutomationFacadeService,
         ContentExtractorFacadeService,
         DataSourceFacadeService,
         GitFacadeService,
@@ -117,6 +119,9 @@ describe('FacadesModule + barrel re-exports', () => {
             expect(facadesBarrel.AiFacadeService).toBe(AiFacadeService);
             expect(facadesBarrel.SearchFacadeService).toBe(SearchFacadeService);
             expect(facadesBarrel.ScreenshotFacadeService).toBe(ScreenshotFacadeService);
+            expect(facadesBarrel.BrowserAutomationFacadeService).toBe(
+                BrowserAutomationFacadeService,
+            );
             expect(facadesBarrel.ContentExtractorFacadeService).toBe(ContentExtractorFacadeService);
             expect(facadesBarrel.DataSourceFacadeService).toBe(DataSourceFacadeService);
             expect(facadesBarrel.GitFacadeService).toBe(GitFacadeService);
@@ -193,6 +198,8 @@ describe('FacadesModule + barrel re-exports', () => {
                     'AiFacadeError',
                     'AiFacadeService',
                     'BaseFacadeService',
+                    'BrowserAutomationFacadeError',
+                    'BrowserAutomationFacadeService',
                     'CodeEditFacadeService',
                     'ContentExtractorFacadeError',
                     'ContentExtractorFacadeService',
