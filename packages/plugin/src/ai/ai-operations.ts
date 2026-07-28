@@ -13,7 +13,8 @@ import {
 	AIMessage,
 	ToolMessage,
 	type AIMessageChunk,
-	type BaseMessage
+	type BaseMessage,
+	type MessageContentComplex
 } from '@langchain/core/messages';
 import type {
 	ChatCompletionOptions,
@@ -531,12 +532,85 @@ export class AiOperations {
 		return undefined;
 	}
 
+	/**
+	 * Flatten message content to a plain string, keeping the TEXT.
+	 *
+	 * Used for roles where a provider will not accept structured parts
+	 * (system, tool). The point is that the words still arrive — the old
+	 * behaviour returned `''` for anything non-string, which meant a
+	 * caller's prompt could vanish in full with no error raised.
+	 */
+	private flattenContentToText(content: ChatMessage['content']): string {
+		if (typeof content === 'string') return content;
+		if (!Array.isArray(content)) return '';
+		return content
+			.map((part) => {
+				if (typeof part === 'string') return part;
+				if (part && part.type === 'text') return part.text;
+				// An image in a system/tool message has no text form; name it
+				// rather than dropping it to nothing, so the model is not
+				// silently handed a shorter prompt than the caller wrote.
+				if (part && part.type === 'image_url') return '[image]';
+				return '';
+			})
+			.filter((chunk) => chunk.length > 0)
+			.join('\n');
+	}
+
+	/**
+	 * Convert our content union into what LangChain accepts.
+	 *
+	 * `ChatMessageContent` and LangChain's complex-content parts describe
+	 * the same two shapes (`text`, `image_url`), so multimodal input is a
+	 * pass-through — but it was NOT passed through: `toLangChainMessages`
+	 * used to collapse any non-string content to `''`. A caller sending
+	 * `[{type:'text'...},{type:'image_url'...}]` got an empty user message
+	 * and no warning, which is the worst version of this bug: the request
+	 * succeeds, the model answers, and the answer is about nothing.
+	 *
+	 * An all-text array is joined back into a plain string — no reason to
+	 * hand a provider a one-element parts array for what is just text.
+	 */
+	private toLangChainContent(content: ChatMessage['content']): string | MessageContentComplex[] {
+		if (typeof content === 'string') return content;
+		if (!Array.isArray(content) || content.length === 0) return '';
+
+		const parts: MessageContentComplex[] = [];
+		let sawNonText = false;
+		for (const part of content) {
+			if (typeof part === 'string') {
+				parts.push({ type: 'text', text: part });
+				continue;
+			}
+			if (part?.type === 'text') {
+				parts.push({ type: 'text', text: part.text });
+				continue;
+			}
+			if (part?.type === 'image_url') {
+				sawNonText = true;
+				parts.push({
+					type: 'image_url',
+					image_url: part.image_url.detail
+						? { url: part.image_url.url, detail: part.image_url.detail }
+						: { url: part.image_url.url }
+				});
+			}
+		}
+		if (!sawNonText) {
+			return parts.map((p) => ('text' in p ? (p.text as string) : '')).join('\n');
+		}
+		return parts;
+	}
+
 	private toLangChainMessages(messages: readonly ChatMessage[]): BaseMessage[] {
 		return messages.map((msg) => {
-			const content = typeof msg.content === 'string' ? msg.content : '';
+			// system / tool must stay a string — providers reject structured
+			// parts there — so flatten rather than drop.
+			const textOnly = this.flattenContentToText(msg.content);
+			const content = this.toLangChainContent(msg.content);
 			switch (msg.role) {
 				case 'system':
-					return new SystemMessage(content);
+					return new SystemMessage(textOnly);
 				case 'assistant': {
 					const aiMsg = new AIMessage({ content });
 					if (msg.toolCalls?.length) {
@@ -551,12 +625,16 @@ export class AiOperations {
 				}
 				case 'tool':
 					return new ToolMessage({
-						content,
+						content: textOnly,
 						tool_call_id: msg.toolCallId ?? ''
 					});
 				case 'user':
 				default:
-					return new HumanMessage(content);
+					// Object form, not the string overload: the positional
+					// ctor only accepts a string, so passing complex parts
+					// through it would not compile — and silently stringifying
+					// them is exactly the bug this method now fixes.
+					return new HumanMessage({ content });
 			}
 		});
 	}
