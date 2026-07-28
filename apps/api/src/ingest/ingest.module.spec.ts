@@ -51,6 +51,7 @@ jest.mock('../integrations/github-app/github-app-sync.service', () => ({
 import { IngestModule } from './ingest.module';
 import { IngestController } from './ingest.controller';
 import { SlackEventsController } from './slack/slack-events.controller';
+import { SlackCommandsController } from './slack/slack-commands.controller';
 import { GitHubEventsController } from './github/github-events.controller';
 import { GitHubAppWebhookController } from './github/github-app-webhook.controller';
 import { GitHubPrReviewBridgeService } from './github/github-pr-review-bridge.service';
@@ -72,6 +73,31 @@ describe('IngestModule (consolidated GitHub receiver wiring)', () => {
                 GitHubAppWebhookController,
             ]),
         );
+    });
+
+    /**
+     * Same shape-guard for Slack: the slash command is a SECOND route on
+     * the ONE bridge. If the controller stops being registered here the
+     * route silently 404s (Slack shows the user `dispatch_failed`), and
+     * if it were given its own service the two entry points would drift
+     * apart — both invisible to `tsc` and to the controller unit tests.
+     */
+    it('registers the Slack slash-command route over the same chat bridge', () => {
+        expect(controllers()).toEqual(expect.arrayContaining([SlackCommandsController]));
+
+        const injected = Reflect.getMetadata(
+            'design:paramtypes',
+            SlackCommandsController,
+        ) as unknown[];
+        expect(injected).toEqual([SlackChatBridgeService]);
+
+        // …and the events receiver still depends on the very same one.
+        expect(Reflect.getMetadata('design:paramtypes', SlackEventsController)).toEqual([
+            SlackChatBridgeService,
+        ]);
+
+        // Exactly one bridge instance backs both routes.
+        expect(providers().filter((p: unknown) => p === SlackChatBridgeService)).toHaveLength(1);
     });
 
     it('provides the single dispatcher and the PR-review bridge exactly once', () => {

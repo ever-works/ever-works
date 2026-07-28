@@ -7,6 +7,7 @@ import { AiConversationModule } from '../ai-conversation/ai-conversation.module'
 import { GitHubAppModule } from '../integrations/github-app/github-app.module';
 import { IngestController } from './ingest.controller';
 import { SlackEventsController } from './slack/slack-events.controller';
+import { SlackCommandsController } from './slack/slack-commands.controller';
 import { SlackChatBridgeService } from './slack/slack-chat-bridge.service';
 import { GitHubEventsController } from './github/github-events.controller';
 import { GitHubAppWebhookController } from './github/github-app-webhook.controller';
@@ -17,9 +18,19 @@ import { GitHubWebhookDispatcherService } from './github/github-webhook-dispatch
  * Event-ingest spine (Wave 6) — thin API module exposing
  * `GET/POST /api/ingest/events` over the agent-side `EventIngestModule`
  * (dedupe-insert + processor fan-out live there), plus the Slack
- * Events API receiver (`POST /api/ingest/slack/events`) and its
- * mention→platform-chat bridge (`SlackChatBridgeService`), plus the
- * CONSOLIDATED GitHub receiver.
+ * receivers — the Events API (`POST /api/ingest/slack/events`) and the
+ * slash command (`POST /api/ingest/slack/commands`) — over their shared
+ * mention/command→platform-chat bridge (`SlackChatBridgeService`), plus
+ * the CONSOLIDATED GitHub receiver.
+ *
+ * ## The Slack receiver is one bridge on two routes
+ *
+ * `SlackChatBridgeService` owns workspace resolution, signing secrets,
+ * ingest and the chat leg; the two controllers differ only in Slack's
+ * wire contract (JSON events vs. a form-encoded slash command that must
+ * be acked in under 3s). Both verify with the one
+ * `verifySlackSignature` helper, and both answer through the same
+ * completion + connector-reply path.
  *
  * ## The GitHub receiver is one receiver on two routes
  *
@@ -61,6 +72,7 @@ import { GitHubWebhookDispatcherService } from './github/github-webhook-dispatch
     controllers: [
         IngestController,
         SlackEventsController,
+        SlackCommandsController,
         GitHubEventsController,
         GitHubAppWebhookController,
     ],
