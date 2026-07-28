@@ -12,6 +12,7 @@ import { ActivityLogModule } from '@ever-works/agent/activity-log';
 import { ItemsGeneratorModule } from '@ever-works/agent/items-generator';
 import { ActivityFeedModule } from './activity-feed/activity-feed.module';
 import { OrganizationsModule } from '../organizations/organizations.module';
+import { UploadsModule } from '../uploads/uploads.module';
 // Run orchestration (Wave 4 M3) — AgentsModule exports AgentRunRepository
 // for the per-Work runs-summary endpoint (DatabaseModule does not provide it).
 import { AgentsModule } from '@ever-works/agent/agents';
@@ -55,6 +56,11 @@ import { WorkScheduleDispatcherCronService } from './tasks/work-schedule-dispatc
         WorkModule,
         DatabaseModule,
         AuthModule,
+        // Global-Memory ingest of chat attachments reads the stored bytes
+        // back through UploadsService (the same spine that wrote them),
+        // rather than re-uploading them from the browser. UploadsModule
+        // does not import WorksModule, so this direction adds no cycle.
+        UploadsModule,
         TasksTriggerModule,
         WebsiteGeneratorModule,
         FacadesModule,

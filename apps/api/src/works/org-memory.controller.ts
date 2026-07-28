@@ -5,6 +5,7 @@ import {
     Get,
     HttpCode,
     HttpStatus,
+    Logger,
     Post,
     Query,
     UnprocessableEntityException,
@@ -25,7 +26,19 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import { Transform, Type } from 'class-transformer';
 import { CreateKbUploadDto } from '@ever-works/agent/dto';
-import { IsBoolean, IsIn, IsInt, IsOptional, IsString, Max, MaxLength, Min } from 'class-validator';
+import {
+    ArrayMaxSize,
+    IsArray,
+    IsBoolean,
+    IsIn,
+    IsInt,
+    IsOptional,
+    IsString,
+    Matches,
+    Max,
+    MaxLength,
+    Min,
+} from 'class-validator';
 import {
     KnowledgeBaseService,
     MemoryConsolidationService,
@@ -43,6 +56,8 @@ import {
     KB_DOCUMENT_STATUSES,
     type KbMemoryHealth,
 } from '@ever-works/contracts';
+import { UserUploadRepository } from '@ever-works/agent/database';
+import { UploadsService } from '../uploads/uploads.service';
 import { OrganizationMembershipService } from '../organizations/organization-membership.service';
 import { ScopeContextService } from '../scope';
 import { AuthSessionGuard, CurrentUser } from '../auth';
@@ -162,6 +177,20 @@ export class MemoryConsolidateDto {
  */
 const MEMORY_UPLOAD_MAX_BYTES = Number(process.env.KB_UPLOAD_MAX_BYTES) || 200 * 1024 * 1024;
 
+/**
+ * Body for `POST /api/memory/uploads/from-attachments`.
+ *
+ * The ids are content hashes the client already holds from the chat
+ * composer — the same `<sha256>` segment of an `/api/uploads/...` URL.
+ */
+export class IngestAttachmentsDto {
+    @IsArray()
+    @ArrayMaxSize(20)
+    @IsString({ each: true })
+    @Matches(/^[a-f0-9]{64}$/, { each: true })
+    attachmentIds: string[];
+}
+
 /** Query for `GET /api/memory/uploads`. */
 export class ListMemoryUploadsDto {
     @IsOptional()
@@ -209,7 +238,11 @@ export class OrgMemoryController {
         private readonly membership: OrganizationMembershipService,
         private readonly scopeContext: ScopeContextService,
         private readonly health: MemoryHealthService,
+        private readonly uploads: UploadsService,
+        private readonly userUploads: UserUploadRepository,
     ) {}
+
+    private readonly logger = new Logger(OrgMemoryController.name);
 
     @Get('memory/health')
     @HttpCode(HttpStatus.OK)
@@ -429,6 +462,78 @@ export class OrgMemoryController {
             tags: body.tags,
             autoClassify: body.autoClassify,
         });
+    }
+
+    @Post('memory/uploads/from-attachments')
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
+    @ApiOperation({
+        summary: 'Ingest already-uploaded chat attachments into global Memory',
+        description:
+            'Takes content hashes of files the caller previously uploaded through `/api/uploads` — the ids the chat composer already holds — and copies them into the active Organization’s Memory. The bytes are read back from the storage spine that wrote them rather than being re-uploaded from the browser. Each id is resolved against the CALLER’s own uploads, so an id belonging to someone else resolves to nothing. Per-attachment failures are reported in the response rather than failing the batch, because this runs alongside a chat message that must not be lost.',
+    })
+    @ApiResponse({ status: 200, description: '{ results: [{ attachmentId, status, uploadId? }] }' })
+    @ApiResponse({ status: 422, description: 'No active Organization on the request scope' })
+    async ingestAttachmentsIntoMemory(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() body: IngestAttachmentsDto,
+    ) {
+        const organizationId = this.scopeContext.getOrganizationId();
+        if (!organizationId) {
+            throw new UnprocessableEntityException({
+                status: 'error',
+                message: 'No active Organization — cannot ingest attachments into Memory',
+            });
+        }
+        await this.membership.ensureMember(organizationId, auth.userId);
+
+        const results: Array<{ attachmentId: string; status: string; uploadId?: string }> = [];
+        for (const attachmentId of body.attachmentIds) {
+            // Ownership is the lookup: `findOwnedByUser` scopes to the
+            // caller, so a hash belonging to another user simply is not
+            // found. No separate authorization check to forget.
+            const record = await this.userUploads.findOwnedByUser(attachmentId, auth.userId);
+            if (!record) {
+                results.push({ attachmentId, status: 'not_found' });
+                continue;
+            }
+
+            try {
+                // The stored object's basename is what `readFile` keys on;
+                // deriving it from `storagePath` rather than rebuilding
+                // `<sha>.<ext>` keeps this correct for every backend's own
+                // path shape.
+                const filename = record.storagePath.split('/').pop() ?? '';
+                const { buffer, mimeType } = await this.uploads.readFile(auth.userId, filename, {
+                    workId: record.workId ?? undefined,
+                });
+
+                const { upload } = await this.kb.createOrgUpload({
+                    organizationId,
+                    userId: auth.userId,
+                    file: {
+                        buffer,
+                        originalFilename: record.originalFilename ?? filename,
+                        mimeType: record.mimeType ?? mimeType,
+                        size: buffer.length,
+                    },
+                    autoClassify: true,
+                });
+                results.push({ attachmentId, status: 'ingested', uploadId: upload.id });
+            } catch (error) {
+                // Best-effort by design: this is triggered by sending a
+                // chat message, and a storage hiccup on one attachment
+                // must not fail the others or the message itself.
+                this.logger.warn(
+                    `Memory ingest failed for attachment ${attachmentId}: ${
+                        (error as Error).message
+                    }`,
+                );
+                results.push({ attachmentId, status: 'failed' });
+            }
+        }
+
+        return { results };
     }
 
     @Get('memory/uploads')
