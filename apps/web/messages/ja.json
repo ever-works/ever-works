@@ -5895,6 +5895,12 @@
             "feelingLucky": "作成するワークを提案",
             "errors": {
                 "unableToSend": "メッセージの送信ができません"
+            },
+            "attachments": {
+                "attach": "Attach files",
+                "remove": "Remove attachment",
+                "tooLarge": "File is larger than the 25 MB limit",
+                "failed": "Upload failed"
             }
         },
         "plugins": {

@@ -5962,6 +5962,12 @@
             "feelingLucky": "הצע עבודה ליצירה",
             "errors": {
                 "unableToSend": "לא ניתן לשלוח הודעה"
+            },
+            "attachments": {
+                "attach": "Attach files",
+                "remove": "Remove attachment",
+                "tooLarge": "File is larger than the 25 MB limit",
+                "failed": "Upload failed"
             }
         },
         "plugins": {

@@ -5895,6 +5895,12 @@
             "feelingLucky": "Sugerir um trabalho para criar",
             "errors": {
                 "unableToSend": "Não foi possível enviar a mensagem"
+            },
+            "attachments": {
+                "attach": "Attach files",
+                "remove": "Remove attachment",
+                "tooLarge": "File is larger than the 25 MB limit",
+                "failed": "Upload failed"
             }
         },
         "plugins": {

@@ -5895,6 +5895,12 @@
             "feelingLucky": "แนะนำงานให้สร้าง",
             "errors": {
                 "unableToSend": "ไม่สามารถส่งข้อความได้"
+            },
+            "attachments": {
+                "attach": "Attach files",
+                "remove": "Remove attachment",
+                "tooLarge": "File is larger than the 25 MB limit",
+                "failed": "Upload failed"
             }
         },
         "plugins": {
