@@ -8,6 +8,7 @@ import type {
     OnboardingStorageChoice,
     OnboardingDbChoice,
     OnboardingDeployChoice,
+    OnboardingDesktopChoice,
     OnboardingPluginCard,
 } from '@ever-works/contracts/api';
 
@@ -200,6 +201,40 @@ export class OnboardingCatalogService {
             },
         ];
 
+        // A8 — the desktop-first bucket. Unlike the four above it names no
+        // provider and reserves no plugin id: it records WHERE Ever Works
+        // runs, which is what decides the guidance the wizard's last step
+        // gives (see `ONBOARDING_DESKTOP_NEXT_STEPS`). All three are always
+        // available — none of them depends on a feature flag or a key.
+        const desktop: ReadonlyArray<OnboardingCard<OnboardingDesktopChoice>> = [
+            {
+                choice: 'cloud',
+                title: 'The hosted platform',
+                description: 'Everything runs on Ever Works. Nothing to install.',
+                default: true,
+                available: true,
+                badges: ['default'],
+            },
+            {
+                choice: 'desktop',
+                title: 'On my machine',
+                description:
+                    'Ever Works Desktop runs the API and web app locally and supervises them for you.',
+                default: false,
+                available: true,
+                badges: [],
+            },
+            {
+                choice: 'own-nodes',
+                title: 'On my own machines',
+                description:
+                    'The platform runs wherever you like, but your machines execute the work — enroll them as Fleet nodes.',
+                default: false,
+                available: true,
+                badges: [],
+            },
+        ];
+
         const reservedPluginIds = new Set<string>(
             [
                 ...ai.map((c) => c.pluginId),
@@ -212,7 +247,7 @@ export class OnboardingCatalogService {
 
         const plugins = this.collectPluginsStepCards(reservedPluginIds);
 
-        return { ai, storage, db, deploy, plugins };
+        return { ai, storage, db, deploy, desktop, plugins };
     }
 
     private collectPluginsStepCards(reservedPluginIds: Set<string>): OnboardingPluginCard[] {

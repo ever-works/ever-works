@@ -7,6 +7,7 @@ import {
     type OnboardingCatalogResponse,
     type OnboardingDbChoice,
     type OnboardingDeployChoice,
+    type OnboardingDesktopChoice,
     type OnboardingStateResponse,
     type OnboardingStatePatchRequest,
     type OnboardingStorageChoice,
@@ -24,6 +25,7 @@ export type WizardStepKind =
     | 'db-choice'
     | 'deploy-choice'
     | 'deploy-config'
+    | 'desktop-choice'
     | 'profile'
     | 'communication'
     | 'plugins-catalog'
@@ -58,6 +60,10 @@ export function computeStepList(state: OnboardingWizardStateV2): WizardStep[] {
     if (state.deploy.choice === 'vercel' || state.deploy.choice === 'k8s') {
         steps.push({ kind: 'deploy-config', id: `deploy-config:${state.deploy.choice}` });
     }
+    // A8 — "where does this actually run". Asked after the four provider
+    // buckets because it is not a provider question: it decides the guidance
+    // the final step gives, not what gets provisioned.
+    steps.push({ kind: 'desktop-choice', id: 'desktop-choice' });
     // Profile — Wave 11 "What do you do" (roles + team size). Slotted
     // after the provider choices and before Communication; always
     // shown, always skippable — selections are suggestion hints only.
@@ -87,6 +93,7 @@ type FlowAction =
     | { type: 'setStorageChoice'; value: OnboardingStorageChoice }
     | { type: 'setDbChoice'; value: OnboardingDbChoice }
     | { type: 'setDeployChoice'; value: OnboardingDeployChoice }
+    | { type: 'setDesktopChoice'; value: OnboardingDesktopChoice }
     | { type: 'setPrompt'; value: string }
     | { type: 'toggleRole'; value: string }
     | { type: 'setTeamSize'; value: string }
@@ -148,6 +155,11 @@ function reduce(state: FlowReducerState, action: FlowAction): FlowReducerState {
             return {
                 ...state,
                 state: { ...state.state, deploy: { choice: action.value } },
+            };
+        case 'setDesktopChoice':
+            return {
+                ...state,
+                state: { ...state.state, desktop: { choice: action.value } },
             };
         case 'setPrompt':
             // EW-617 G4: prompt carried from landing-page input through the
@@ -241,6 +253,7 @@ export interface UseOnboardingFlowResult {
     readonly setStorageChoice: (value: OnboardingStorageChoice) => void;
     readonly setDbChoice: (value: OnboardingDbChoice) => void;
     readonly setDeployChoice: (value: OnboardingDeployChoice) => void;
+    readonly setDesktopChoice: (value: OnboardingDesktopChoice) => void;
     readonly setPluginsReviewed: (value: boolean) => void;
     readonly setPrompt: (value: string) => void;
     readonly toggleRole: (value: string) => void;
@@ -251,7 +264,10 @@ export interface UseOnboardingFlowResult {
     readonly refresh: () => void;
     readonly jumpTo: (index: number) => void;
     readonly finish: (options?: { dismissed?: boolean }) => void;
-    readonly notePlannedClick: (bucket: 'ai' | 'storage' | 'db' | 'deploy', choice: string) => void;
+    readonly notePlannedClick: (
+        bucket: 'ai' | 'storage' | 'db' | 'deploy' | 'desktop',
+        choice: string,
+    ) => void;
 }
 
 /**
@@ -358,6 +374,14 @@ export function useOnboardingFlow({
         [trackEvent],
     );
 
+    const setDesktopChoice = useCallback(
+        (value: OnboardingDesktopChoice) => {
+            trackEvent('onboarding_desktop_choice_selected', { choice: value });
+            dispatch({ type: 'setDesktopChoice', value });
+        },
+        [trackEvent],
+    );
+
     const setPluginsReviewed = useCallback(
         (value: boolean) => dispatch({ type: 'setPluginsReviewed', value }),
         [],
@@ -412,7 +436,7 @@ export function useOnboardingFlow({
     );
 
     const notePlannedClick = useCallback(
-        (bucket: 'ai' | 'storage' | 'db' | 'deploy', choice: string) =>
+        (bucket: 'ai' | 'storage' | 'db' | 'deploy' | 'desktop', choice: string) =>
             trackEvent('onboarding_planned_card_clicked', { bucket, choice }),
         [trackEvent],
     );
@@ -436,6 +460,7 @@ export function useOnboardingFlow({
         setStorageChoice,
         setDbChoice,
         setDeployChoice,
+        setDesktopChoice,
         setPluginsReviewed,
         setPrompt,
         toggleRole,
@@ -452,14 +477,28 @@ export function useOnboardingFlow({
 
 function stripVersion(state: OnboardingWizardStateV2) {
     // The patch endpoint deep-merges by field; `version` is server-managed.
-    const { lastStep, ai, storage, db, deploy, skippedSteps, pluginsReviewed, prompt, profile } =
-        state;
+    const {
+        lastStep,
+        ai,
+        storage,
+        db,
+        deploy,
+        desktop,
+        skippedSteps,
+        pluginsReviewed,
+        prompt,
+        profile,
+    } = state;
     return {
         lastStep,
         ai: { choice: ai.choice },
         storage: { choice: storage.choice },
         db: { choice: db.choice },
         deploy: { choice: deploy.choice },
+        // A8 — the desktop bucket saves on the same path as the other four.
+        // Falls back to the contract default so a state loaded from an older
+        // blob still round-trips a valid choice rather than dropping the key.
+        desktop: { choice: desktop?.choice ?? 'cloud' },
         skippedSteps: [...skippedSteps],
         pluginsReviewed,
         ...(prompt ? { prompt } : {}),

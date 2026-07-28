@@ -266,6 +266,12 @@ function normaliseState(raw: OnboardingWizardStateV2 | null | undefined): Onboar
         storage: { choice: raw.storage?.choice ?? ONBOARDING_DEFAULT_STATE.storage.choice },
         db: { choice: raw.db?.choice ?? ONBOARDING_DEFAULT_STATE.db.choice },
         deploy: { choice: raw.deploy?.choice ?? ONBOARDING_DEFAULT_STATE.deploy.choice },
+        // A8 — desktop-first bucket. A state blob written before this bucket
+        // existed has no `desktop` key and reads as the `cloud` default, so
+        // upgrading never changes an existing user's first-run path.
+        desktop: {
+            choice: raw.desktop?.choice ?? ONBOARDING_DEFAULT_STATE.desktop?.choice ?? 'cloud',
+        },
         skippedSteps: Array.isArray(raw.skippedSteps) ? [...raw.skippedSteps] : [],
         pluginsReviewed: raw.pluginsReviewed === true,
         // EW-722: contract-declared optional `prompt` (EW-617 G4) round-trips
@@ -320,6 +326,18 @@ function mergeState(
             choice: patch.db?.choice ?? current.db?.choice ?? ONBOARDING_DEFAULT_STATE.db.choice,
         },
         deploy: { choice: patch.deploy?.choice ?? current.deploy.choice },
+        // A8 — desktop bucket. It has to be merged here as well as
+        // normalised on read: a merge that omitted it would drop the user's
+        // choice on the next unrelated patch, and — because the idempotence
+        // check compares the normalised current against the merged next —
+        // would also make every no-op patch write.
+        desktop: {
+            choice:
+                patch.desktop?.choice ??
+                current.desktop?.choice ??
+                ONBOARDING_DEFAULT_STATE.desktop?.choice ??
+                'cloud',
+        },
         skippedSteps: Array.isArray(patch.skippedSteps)
             ? [...patch.skippedSteps]
             : [...current.skippedSteps],

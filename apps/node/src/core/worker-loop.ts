@@ -3,6 +3,8 @@ import { FLEET_JOB_DEFAULT_LEASE_TTL_SEC, FLEET_JOB_MAX_LEASE_BATCH } from '@eve
 import type { Logger } from './logger';
 import type { Scheduler } from './heartbeat';
 import { systemScheduler } from './heartbeat';
+import { admitByResourceLimits, hasAdmissionCeilings, type ResourceProbe } from './resource-limits';
+import { clampResourceLimits, type NodeResourceLimits } from './types';
 
 /**
  * The node worker host: lease → execute → report, forever, until stopped.
@@ -92,10 +94,21 @@ export type WorkerState =
 	| 'retrying'
 	| 'unauthorized'
 	| 'draining'
+	// Over an operator-set CPU/memory ceiling: the loop keeps running and
+	// keeps its in-flight jobs, it just does not lease MORE. Distinct from
+	// `paused`, which is a deliberate operator stop rather than the host
+	// protecting itself.
+	| 'throttled'
 	| 'paused'
 	| 'stopped';
 
 export interface WorkerLoopState {
+	/**
+	 * Why leasing is currently withheld by a resource ceiling, or null.
+	 * Surfaced so an idle-looking node can explain itself instead of
+	 * appearing broken.
+	 */
+	throttleReason?: string | null;
 	state: WorkerState;
 	/** Jobs currently executing on this node. */
 	activeJobIds: string[];
@@ -109,6 +122,10 @@ export interface WorkerLoopState {
 }
 
 export interface WorkerLoopOptions {
+	/** Operator-set CPU/memory ceilings. Wins over `concurrency`. */
+	limits?: NodeResourceLimits;
+	/** Host sampler backing the admission gate. Absent = no ceilings. */
+	resourceProbe?: ResourceProbe;
 	client: JobLeaseCapableClient;
 	/** Max jobs in flight on this node at once. */
 	concurrency?: number;
@@ -131,6 +148,8 @@ export class WorkerLoop {
 	private readonly concurrency: number;
 	private readonly leaseTtlSec: number;
 	private readonly idlePollMs: number;
+	private readonly limits: NodeResourceLimits;
+	private readonly resourceProbe: ResourceProbe | undefined;
 
 	private running = false;
 	private stopping = false;
@@ -143,7 +162,8 @@ export class WorkerLoop {
 		completed: 0,
 		failed: 0,
 		lastError: null,
-		paused: false
+		paused: false,
+		throttleReason: null
 	};
 
 	constructor(private readonly options: WorkerLoopOptions) {
@@ -151,6 +171,10 @@ export class WorkerLoop {
 		this.concurrency = Math.min(Math.max(options.concurrency ?? 1, 1), FLEET_JOB_MAX_LEASE_BATCH);
 		this.leaseTtlSec = options.leaseTtlSec ?? FLEET_JOB_DEFAULT_LEASE_TTL_SEC;
 		this.idlePollMs = options.idlePollMs ?? DEFAULT_IDLE_POLL_MS;
+		// `limits` wins over the legacy `concurrency` option so there is
+		// exactly one number in play once an operator has set limits.
+		this.limits = clampResourceLimits(options.limits ?? { maxConcurrentJobs: this.concurrency });
+		this.resourceProbe = options.resourceProbe;
 		this.paused = options.startPaused === true;
 		this.state.paused = this.paused;
 		if (this.paused) {
@@ -162,6 +186,16 @@ export class WorkerLoop {
 	register(kind: FleetJobKind, executor: JobExecutor): this {
 		this.executors.set(kind, executor);
 		return this;
+	}
+
+	/** The ceilings this loop is enforcing (already clamped). */
+	get resourceLimits(): NodeResourceLimits {
+		return { ...this.limits };
+	}
+
+	/** Max jobs this loop will ever run at once. */
+	get maxConcurrency(): number {
+		return this.limits.maxConcurrentJobs;
 	}
 
 	get registeredKinds(): FleetJobKind[] {
@@ -273,10 +307,29 @@ export class WorkerLoop {
 			return;
 		}
 
-		const capacity = this.concurrency - this.inFlight.size;
+		// `limits.maxConcurrentJobs` — not the legacy `concurrency` field.
+		// `limits` supersedes it (and is clamped), so reading the raw
+		// option here would silently ignore an operator's ceiling.
+		const capacity = this.limits.maxConcurrentJobs - this.inFlight.size;
 		if (capacity <= 0) {
 			this.scheduleNext(this.idlePollMs);
 			return;
+		}
+
+		// Admission gate: CPU / memory ceilings. Evaluated BEFORE the lease
+		// call so an over-loaded machine never claims work it then has to
+		// run badly — the platform re-offers it to a node with headroom.
+		const admission = await this.checkResourceAdmission();
+		if (!admission.admit) {
+			this.patch({
+				state: this.inFlight.size > 0 ? 'working' : 'throttled',
+				throttleReason: admission.reason
+			});
+			this.scheduleNext(this.idlePollMs);
+			return;
+		}
+		if (this.state.throttleReason != null) {
+			this.patch({ throttleReason: null });
 		}
 
 		this.patch({ state: this.inFlight.size > 0 ? 'working' : 'polling' });
@@ -324,6 +377,29 @@ export class WorkerLoop {
 	}
 
 	/** What the loop settles into once a job finishes. */
+	/**
+	 * Sample the host and decide whether more work may be admitted.
+	 *
+	 * A probe that throws or is absent ADMITS: the ceilings are a courtesy to
+	 * the machine's owner, and a broken sampler must degrade to "behave like
+	 * there were no ceiling", never to "this node is permanently idle".
+	 */
+	private async checkResourceAdmission(): Promise<{ admit: boolean; reason: string | null }> {
+		if (!this.resourceProbe || !hasAdmissionCeilings(this.limits)) {
+			return { admit: true, reason: null };
+		}
+		try {
+			const sample = await this.resourceProbe.sample();
+			return admitByResourceLimits(this.limits, sample);
+		} catch (error) {
+			const raw = error instanceof Error ? error.message : String(error);
+			this.options.logger?.warn(
+				`Resource probe failed, admitting work anyway: ${this.options.logger?.redact(raw) ?? raw}`
+			);
+			return { admit: true, reason: null };
+		}
+	}
+
 	private nextIdleState(): WorkerState {
 		if (this.paused) {
 			return this.inFlight.size > 0 ? 'draining' : 'paused';

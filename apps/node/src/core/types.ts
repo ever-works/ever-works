@@ -38,15 +38,6 @@ export type {
 	FleetNodeStatus,
 	FleetNodeView
 } from '@ever-works/contracts';
-/**
- * Node lifecycle as reported by the platform.
- *
- * `paused` is a drain, not a cut: the platform stops leasing new work
- * onto the node while its in-flight jobs keep reporting, and heartbeats
- * stay accepted so a drained machine remains visible in Fleet.
- */
-export type FleetNodeStatus = 'enrolling' | 'online' | 'offline' | 'paused' | 'disabled';
-
 export { FLEET_ENROLLABLE_NODE_KINDS, isFleetEnrollableNodeKind } from '@ever-works/contracts';
 
 /**
@@ -87,6 +78,94 @@ export const MAX_HEARTBEAT_BACKOFF_MS = FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS;
 export const MIN_HEARTBEAT_INTERVAL_MS = 5_000;
 export const MAX_HEARTBEAT_INTERVAL_MS = 15 * 60_000;
 
+// ---------------------------------------------------------------------------
+// Resource limits (wizard step 4 — "how much of this machine may be used")
+// ---------------------------------------------------------------------------
+
+/**
+ * Ceilings the operator sets on how much of THIS machine the platform may
+ * consume. They are enforced entirely on the node — the platform never learns
+ * them and never has to be trusted to respect them, which is the whole point:
+ * lending a machine has to be revocable and bounded from the machine's side.
+ *
+ * - `maxConcurrentJobs` is a hard cap on the worker loop's in-flight set.
+ * - `maxCpuPercent` / `maxMemoryMb` are *admission* ceilings: the loop refuses
+ *   to lease NEW work while the host is above them. They deliberately do NOT
+ *   kill running jobs — a job that is already executing has a lease the
+ *   platform is waiting on, and abandoning it mid-flight would just get the
+ *   work re-offered to the same over-loaded machine.
+ *
+ * `null` means "no ceiling for this dimension".
+ */
+export interface NodeResourceLimits {
+	maxConcurrentJobs: number;
+	/** Refuse to lease while host CPU utilisation exceeds this (1-100), or null. */
+	maxCpuPercent: number | null;
+	/** Refuse to lease while host memory IN USE exceeds this many MB, or null. */
+	maxMemoryMb: number | null;
+}
+
+/** Concurrency bounds. The upper bound matches the server's max lease batch. */
+export const MIN_CONCURRENT_JOBS = 1;
+export const MAX_CONCURRENT_JOBS = 16;
+
+/** CPU ceiling bounds, in percent of total host CPU. */
+export const MIN_CPU_PERCENT = 5;
+export const MAX_CPU_PERCENT = 100;
+
+/** Memory ceiling bounds, in MB of host memory in use. */
+export const MIN_MEMORY_MB = 256;
+export const MAX_MEMORY_MB = 1_024 * 1_024;
+
+/**
+ * Conservative default: one job at a time, no CPU/memory admission gate. A
+ * fresh node must behave exactly like it did before limits existed.
+ */
+export const DEFAULT_RESOURCE_LIMITS: NodeResourceLimits = {
+	maxConcurrentJobs: 1,
+	maxCpuPercent: null,
+	maxMemoryMb: null
+};
+
+function clampInt(value: unknown, min: number, max: number, fallback: number): number {
+	if (typeof value !== 'number' || !Number.isFinite(value)) {
+		return fallback;
+	}
+	return Math.min(Math.max(Math.round(value), min), max);
+}
+
+function clampOptional(value: unknown, min: number, max: number): number | null {
+	if (value === null || value === undefined) {
+		return null;
+	}
+	if (typeof value !== 'number' || !Number.isFinite(value)) {
+		return null;
+	}
+	return Math.min(Math.max(Math.round(value), min), max);
+}
+
+/**
+ * Coerce operator input (a wizard form, a CLI flag, a stored config written by
+ * an older build) into a coherent {@link NodeResourceLimits}. Nonsense never
+ * throws — it collapses to the default for that dimension, because a bad limit
+ * must not be the thing that stops a node from starting.
+ */
+export function clampResourceLimits(input: Partial<NodeResourceLimits> | null | undefined): NodeResourceLimits {
+	if (!input || typeof input !== 'object') {
+		return { ...DEFAULT_RESOURCE_LIMITS };
+	}
+	return {
+		maxConcurrentJobs: clampInt(
+			input.maxConcurrentJobs,
+			MIN_CONCURRENT_JOBS,
+			MAX_CONCURRENT_JOBS,
+			DEFAULT_RESOURCE_LIMITS.maxConcurrentJobs
+		),
+		maxCpuPercent: clampOptional(input.maxCpuPercent, MIN_CPU_PERCENT, MAX_CPU_PERCENT),
+		maxMemoryMb: clampOptional(input.maxMemoryMb, MIN_MEMORY_MB, MAX_MEMORY_MB)
+	};
+}
+
 /**
  * Where the heartbeat secret physically lives.
  *
@@ -113,6 +192,16 @@ export interface NodeConfig {
 	secret: string;
 	kind: FleetEnrollableNodeKind;
 	capabilities: string[];
+	/**
+	 * Operator's capability opt-in (wizard step 3). When present, only these
+	 * tags may be advertised: re-detection on each heartbeat is intersected
+	 * with this set, so installing Docker on a node whose owner did not offer
+	 * `docker` does NOT silently start attracting Docker work. Absent means
+	 * "advertise everything detected" — the pre-selection behaviour.
+	 */
+	capabilitySelection?: string[];
+	/** Ceilings this machine enforces on itself (wizard step 4). */
+	limits?: NodeResourceLimits;
 	/** Local display label; the authoritative name lives on the platform. */
 	name?: string;
 	heartbeatIntervalMs: number;
@@ -135,6 +224,8 @@ export interface RedactedNodeConfig {
 	nodeId: string;
 	kind: FleetEnrollableNodeKind;
 	capabilities: string[];
+	capabilitySelection?: string[];
+	limits: NodeResourceLimits;
 	name?: string;
 	heartbeatIntervalMs: number;
 	enrolledAt: string;
@@ -153,12 +244,16 @@ export function redactConfig(config: NodeConfig): RedactedNodeConfig {
 		nodeId: config.nodeId,
 		kind: config.kind,
 		capabilities: [...config.capabilities],
+		limits: clampResourceLimits(config.limits),
 		heartbeatIntervalMs: config.heartbeatIntervalMs,
 		enrolledAt: config.enrolledAt,
 		hasSecret: typeof config.secret === 'string' && config.secret.length > 0,
 		secretStorage: config.secretStorage ?? 'file',
 		paused: config.paused === true
 	};
+	if (config.capabilitySelection !== undefined) {
+		redacted.capabilitySelection = [...config.capabilitySelection];
+	}
 	if (config.name !== undefined) {
 		redacted.name = config.name;
 	}

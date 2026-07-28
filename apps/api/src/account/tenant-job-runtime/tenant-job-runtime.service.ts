@@ -116,9 +116,85 @@ export class TenantJobRuntimeService {
     async getConfig(tenantId: string): Promise<TenantJobRuntimeConfigResponseDto> {
         const row = await this.configRepository.findOne({ where: { tenantId } });
         if (!row) {
+            // A9 — a desktop install may have a runtime choice waiting to be
+            // recorded against this tenant. Returns null on every other kind
+            // of deployment, which keeps the original behaviour byte-exact.
+            const seeded = await this.seedFromDesktopWizard(tenantId);
+            if (seeded) {
+                return this.toResponse(seeded);
+            }
             return this.toSyntheticInherit(tenantId);
         }
         return this.toResponse(row);
+    }
+
+    /**
+     * A9 — persist the DESKTOP install wizard's runtime choice into
+     * `tenant_job_runtime_config`.
+     *
+     * ## Why it happens here
+     *
+     * The desktop wizard collects a runtime before the platform has a user,
+     * let alone a tenant: it writes the env file, THEN boots the API, and only
+     * later does somebody sign up. There is no moment during the wizard when
+     * an authenticated `PUT /config` could be made. So the choice rides in on
+     * `EVER_WORKS_DESKTOP_JOB_RUNTIME` and is materialised lazily, the first
+     * time a tenant reads its own overlay — by which point the tenant exists
+     * and we know exactly which row to write.
+     *
+     * ## Invariants
+     *
+     * - **Never clobbers.** Only called when the tenant has NO row. An
+     *   operator who has since picked a runtime in Settings keeps it; the
+     *   install-time default does not come back to overwrite them.
+     * - **`mode: 'inherit'`.** The desktop's credentials live in the same env
+     *   file the API already reads, so this records WHICH provider was chosen
+     *   without asserting a tenant-scoped credential pointer that does not
+     *   exist. Resolution behaviour is therefore unchanged; the row is a
+     *   faithful record of the wizard's answer.
+     * - **Best effort.** A failure here must not turn a settings-page read
+     *   into a 500 — the caller falls back to the synthetic inherit default.
+     *
+     * Returns the seeded row, or null when there was nothing to seed.
+     */
+    async seedFromDesktopWizard(tenantId: string): Promise<TenantJobRuntimeConfig | null> {
+        const providerId = config.tenantJobRuntime.getDesktopWizardProviderId();
+        if (!providerId) {
+            return null;
+        }
+        try {
+            const fresh = this.configRepository.create({
+                tenantId,
+                providerId,
+                mode: 'inherit' as const,
+                credentialsSecretRef: null,
+                credentialVersion: 1,
+                enabled: true,
+                // No actor: this is the installer's answer, not a user's.
+                createdBy: null,
+            });
+            const saved = await this.configRepository.save(fresh);
+            await this.emitAudit({
+                tenantId,
+                actorUserId: null,
+                action: 'desktop_wizard_seed',
+                before: null,
+                after: this.redactRowForAudit(saved),
+                credentialVersion: saved.credentialVersion,
+            });
+            this.logger.log(
+                `Recorded the desktop install wizard's job runtime '${providerId}' for tenant ${tenantId}`,
+            );
+            return saved;
+        } catch (error) {
+            // Losing a race with a concurrent write is the expected failure:
+            // whoever won already wrote a row, and the next read returns it.
+            const message = error instanceof Error ? error.message : String(error);
+            this.logger.warn(
+                `Could not record the desktop wizard job runtime for tenant ${tenantId}: ${message}`,
+            );
+            return null;
+        }
     }
 
     /**

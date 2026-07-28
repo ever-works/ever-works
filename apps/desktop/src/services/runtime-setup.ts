@@ -24,12 +24,32 @@ export const ENV_FILE_HEADER = [
 ].join('\n');
 
 /**
- * Desktop-owned marker recording which job runtime the user picked. The
- * platform persists the actual selection through the tenant job-runtime
- * config (providerId) once the API is up; this env entry keeps the choice
- * available to the supervisor before first boot.
+ * Desktop-owned marker recording which job runtime the user picked.
+ *
+ * This is what the API reads at boot to persist the wizard's choice into
+ * `tenant_job_runtime_config` (A9): the install wizard runs BEFORE anybody has
+ * signed in, so there is no session it could use to call the admin API. The
+ * env file is the handoff — the wizard writes the choice here, and the API
+ * materialises the overlay row for the tenant the moment one exists.
  */
 export const DESKTOP_RUNTIME_ENV_KEY = 'EVER_WORKS_DESKTOP_JOB_RUNTIME';
+
+/**
+ * The platform-global runtime selector (ADR-015 / EW-683). Written alongside
+ * the desktop marker so the supervised API actually BOOTS on the runtime the
+ * user chose — without it the wizard's choice was cosmetic until somebody
+ * edited the env file by hand.
+ */
+export const PLATFORM_RUNTIME_ENV_KEY = 'EVER_WORKS_JOB_RUNTIME';
+
+/**
+ * Map a `job-runtime-*` plugin id to the provider id used by the platform's
+ * runtime selector and by `tenant_job_runtime_config.providerId`
+ * (`trigger | temporal | bullmq | pgboss | inngest | node`).
+ */
+export function toJobRuntimeProviderId(runtimeId: string): string {
+	return runtimeId.replace(/^job-runtime-/, '');
+}
 
 /**
  * Translate the wizard's runtime selection into concrete env file entries:
@@ -70,6 +90,7 @@ export function buildEnvEntries(selection: RuntimeSelection, options: BuildEnvOp
 	}
 
 	entries[DESKTOP_RUNTIME_ENV_KEY] = runtime.id;
+	entries[PLATFORM_RUNTIME_ENV_KEY] = toJobRuntimeProviderId(runtime.id);
 
 	for (const field of runtime.fields) {
 		const value = selection.values[field.key] ?? field.defaultValue;

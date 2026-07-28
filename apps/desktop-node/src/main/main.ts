@@ -3,13 +3,17 @@ import * as fsp from 'node:fs/promises';
 import * as path from 'node:path';
 import {
 	NODE_APP_VERSION,
+	PlatformAuthClient,
+	clampResourceLimits,
 	createBufferedLogger,
 	createCommandRunner,
 	createConfigFileSystem,
 	createNodeRuntime,
+	createResourceProbe,
 	currentEnvironment,
 	describeSelf,
 	enrollNode,
+	enrollNodeWithCredentials,
 	loadConfig,
 	saveConfig,
 	systemFetch,
@@ -18,9 +22,27 @@ import {
 	type NodeIo,
 	type NodeRuntime
 } from 'ever-works-node';
-import type { ConnectionStatusView, EnrollRequest, EnrollOutcome, NodeIdentityView } from '../shared/ipc-contract';
-import { API_HOST_OPTIONS, IpcChannels } from '../shared/ipc-contract';
-import { IDLE_STATUS, enrollRequestValid, resolveEnrollApiUrl, toIdentityView, toStatusView } from './identity';
+import type {
+	AuthenticateOutcome,
+	AuthenticateRequest,
+	ConnectionStatusView,
+	EnrollRequest,
+	EnrollOutcome,
+	NodeIdentityView,
+	WorkerStatusView
+} from '../shared/ipc-contract';
+import { API_HOST_OPTIONS, IDLE_WORKER_STATUS, IpcChannels } from '../shared/ipc-contract';
+import {
+	IDLE_STATUS,
+	authenticateRequestValid,
+	enrollRequestValid,
+	requestedEnrollMode,
+	resolveEnrollApiUrl,
+	resolveNodeName,
+	toIdentityView,
+	toStatusView,
+	toWorkerStatusView
+} from './identity';
 import { createTray } from './tray';
 
 /**
@@ -79,9 +101,14 @@ function bootstrap(): void {
 	};
 
 	const fs = createConfigFileSystem();
+	const resourceProbe = createResourceProbe();
 	let config: NodeConfig | null = null;
 	let runtime: NodeRuntime | null = null;
 	let status: ConnectionStatusView = { ...IDLE_STATUS };
+	let workerStatus: WorkerStatusView = { ...IDLE_WORKER_STATUS };
+	// Survives disconnect/reconnect: an operator who paused the node expects it
+	// to still be paused after a reconnect, not quietly back at work.
+	let pausedByOperator = false;
 
 	const publishStatus = (next: ConnectionStatusView): void => {
 		status = next;
@@ -89,14 +116,31 @@ function bootstrap(): void {
 		tray?.update(next);
 	};
 
+	/** Re-emit the current status with a refreshed worker projection. */
+	const republish = (): void => publishStatus({ ...status, worker: workerStatus });
+
 	const connect = (): void => {
 		if (!config || runtime) {
 			return;
 		}
-		const created = createNodeRuntime(config, io);
-		created.loop.onChange((state) => publishStatus(toStatusView(state)));
+		const created = createNodeRuntime(config, io, {
+			// A desktop node exists to DO work; the ceilings the operator set
+			// in the wizard are what makes that safe to enable by default.
+			workerEnabled: true,
+			limits: clampResourceLimits(config.limits),
+			resourceProbe,
+			startPaused: pausedByOperator
+		});
+		created.loop.onChange((state) => publishStatus(toStatusView(state, workerStatus)));
+		created.worker?.onChange((state) => {
+			workerStatus = toWorkerStatusView(state);
+			pausedByOperator = state.paused;
+			republish();
+		});
+		workerStatus = toWorkerStatusView(created.worker?.getState());
 		runtime = created;
 		void created.loop.start();
+		void created.worker?.start();
 	};
 
 	const disconnect = async (): Promise<void> => {
@@ -106,14 +150,80 @@ function bootstrap(): void {
 		const current = runtime;
 		runtime = null;
 		current.loop.stop();
-		await current.loop.settled();
-		publishStatus({ ...IDLE_STATUS, state: 'stopped' });
+		// Drains: in-flight jobs report their verdicts instead of being
+		// abandoned to a lease expiry.
+		await Promise.all([current.loop.settled(), current.worker?.stop() ?? Promise.resolve()]);
+		workerStatus = { ...IDLE_WORKER_STATUS, paused: pausedByOperator };
+		publishStatus({ ...IDLE_STATUS, state: 'stopped', worker: workerStatus });
+	};
+
+	/**
+	 * A18 — pause/resume, wired to the worker loop's real state rather than a
+	 * UI-only flag. Pausing stops LEASING; the heartbeat keeps running so the
+	 * node stays visible in Fleet, and jobs already executing still finish and
+	 * report.
+	 */
+	const pause = (): void => {
+		pausedByOperator = true;
+		if (runtime?.worker) {
+			runtime.worker.pause();
+			return;
+		}
+		// Not connected yet: remember the intent so `connect()` starts paused.
+		workerStatus = { ...workerStatus, paused: true };
+		republish();
+	};
+
+	const resume = (): void => {
+		pausedByOperator = false;
+		if (runtime?.worker) {
+			runtime.worker.resume();
+			return;
+		}
+		workerStatus = { ...workerStatus, paused: false };
+		republish();
+	};
+
+	/**
+	 * A14 — verify platform credentials without enrolling. Lets the wizard
+	 * fail fast on a typo instead of surfacing it several steps later.
+	 */
+	const authenticate = async (request: AuthenticateRequest): Promise<AuthenticateOutcome> => {
+		if (!authenticateRequestValid(request)) {
+			return { ok: false, error: 'Choose an API host and enter your email and password.' };
+		}
+		const apiUrl = resolveEnrollApiUrl(request);
+		if (!apiUrl) {
+			return { ok: false, error: 'That API URL is not usable.' };
+		}
+		try {
+			const auth = new PlatformAuthClient({
+				apiUrl,
+				fetchFn: io.fetchFn,
+				logger,
+				userAgent: io.userAgent
+			});
+			const session = await auth.signIn(request.email, request.password);
+			logger.info(`Signed in to ${apiUrl}`);
+			return { ok: true, ...(session.email ? { email: session.email } : {}) };
+		} catch (error) {
+			const message = error instanceof Error ? error.message : String(error);
+			const safe = logger.redact(message);
+			logger.warn(`Sign-in failed: ${safe}`);
+			return { ok: false, error: safe };
+		}
 	};
 
 	const enroll = async (request: EnrollRequest): Promise<EnrollOutcome> => {
 		// The renderer is not a trust boundary: re-validate here.
 		if (!enrollRequestValid(request)) {
-			return { ok: false, error: 'Choose an API host and paste a complete enrollment token.' };
+			return {
+				ok: false,
+				error:
+					requestedEnrollMode(request) === 'sign-in'
+						? 'Choose an API host and enter your email and password.'
+						: 'Choose an API host and paste a complete enrollment token.'
+			};
 		}
 		const apiUrl = resolveEnrollApiUrl(request);
 		if (!apiUrl) {
@@ -122,15 +232,28 @@ function bootstrap(): void {
 
 		try {
 			await disconnect();
-			const enrolled = await enrollNode({
+			// Both legs converge on the same single-use-token protocol; only
+			// the way the token is OBTAINED differs (A14).
+			const common = {
 				...io,
 				apiUrl,
-				token: request.token.trim(),
-				kind: 'desktop-node',
-				...(request.name ? { name: request.name } : {})
-			});
+				kind: 'desktop-node' as const,
+				...(request.name ? { name: request.name } : {}),
+				...(request.capabilities ? { capabilitySelection: request.capabilities } : {}),
+				...(request.limits ? { limits: request.limits } : {})
+			};
+			const enrolled =
+				requestedEnrollMode(request) === 'sign-in'
+					? await enrollNodeWithCredentials({
+							...common,
+							email: (request.email ?? '').trim(),
+							password: request.password ?? '',
+							nodeName: resolveNodeName(request)
+						})
+					: await enrollNode({ ...common, token: (request.token ?? '').trim() });
 			await saveConfig(fs, configPath, enrolled, { platform: process.platform });
 			config = enrolled;
+			pausedByOperator = false;
 			connect();
 			return { ok: true, identity: toIdentityView(config) };
 		} catch (error) {
@@ -150,6 +273,8 @@ function bootstrap(): void {
 	const unenroll = async (): Promise<void> => {
 		await disconnect();
 		config = null;
+		pausedByOperator = false;
+		workerStatus = { ...IDLE_WORKER_STATUS };
 		try {
 			await fsp.rm(configPath, { force: true });
 		} catch (error) {
@@ -165,13 +290,18 @@ function bootstrap(): void {
 
 	ipcMain.handle(IpcChannels.listApiHosts, () => API_HOST_OPTIONS);
 	ipcMain.handle(IpcChannels.detectCapabilities, async () => {
+		// Unfiltered: the wizard needs the full detected set to render the
+		// capability CHOICES, and the operator's opt-in is applied later.
 		const description = await describeSelf(io.runner, io.environment, io.version);
 		return description.capabilities;
 	});
+	ipcMain.handle(IpcChannels.authenticate, (_event, request: AuthenticateRequest) => authenticate(request));
 	ipcMain.handle(IpcChannels.enroll, (_event, request: EnrollRequest) => enroll(request));
 	ipcMain.handle(IpcChannels.getConfig, (): NodeIdentityView => toIdentityView(config));
 	ipcMain.handle(IpcChannels.connect, () => connect());
 	ipcMain.handle(IpcChannels.disconnect, () => disconnect());
+	ipcMain.handle(IpcChannels.pause, () => pause());
+	ipcMain.handle(IpcChannels.resume, () => resume());
 	ipcMain.handle(IpcChannels.getStatus, () => status);
 	ipcMain.handle(IpcChannels.getLogs, () => logger.entries());
 	ipcMain.handle(IpcChannels.unenroll, () => unenroll());
@@ -233,6 +363,8 @@ function bootstrap(): void {
 		},
 		onConnect: () => connect(),
 		onDisconnect: () => void disconnect(),
+		onPause: () => pause(),
+		onResume: () => resume(),
 		onQuit: () => {
 			quitting = true;
 			app.quit();

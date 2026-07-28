@@ -26,6 +26,7 @@ import type {
     OnboardingCatalogResponse,
     OnboardingDbChoice,
     OnboardingDeployChoice,
+    OnboardingDesktopChoice,
     OnboardingStateResponse,
     OnboardingStorageChoice,
 } from '@ever-works/contracts/api';
@@ -488,6 +489,18 @@ function StepBody({
                     onPlannedClick={(c) => flow.notePlannedClick('deploy', c)}
                 />
             );
+        case 'desktop-choice':
+            return (
+                <ChoiceStep
+                    title="Where Ever Works runs"
+                    description="This one is not about a provider — it decides what we point you at once the wizard is done."
+                    cards={catalog.desktop}
+                    selected={flow.state.desktop?.choice ?? 'cloud'}
+                    columns={3}
+                    onSelect={(choice) => flow.setDesktopChoice(choice as OnboardingDesktopChoice)}
+                    onPlannedClick={(c) => flow.notePlannedClick('desktop', c)}
+                />
+            );
         case 'deploy-config': {
             const pluginId = flow.state.deploy.choice; // 'vercel' | 'k8s'
             const plugin = pluginsById[pluginId] ?? null;
@@ -537,6 +550,7 @@ function StepBody({
                     onLeave={() => flow.finish()}
                     prompt={flow.state.prompt}
                     onPromptChange={flow.setPrompt}
+                    desktopChoice={flow.state.desktop?.choice}
                     onQuickCreate={
                         flow.state.prompt
                             ? async (prompt) => {
@@ -678,6 +692,8 @@ function labelForStep(step: WizardStep): string {
             return 'Your deployment';
         case 'deploy-config':
             return 'Configure deployment';
+        case 'desktop-choice':
+            return 'Where it runs';
         case 'profile':
             return 'What do you do';
         case 'communication':
