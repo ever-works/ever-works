@@ -116,8 +116,33 @@ describe('workbench KbTreePanel', () => {
         expect(row.getAttribute('href')).toBe('/works/work-1/kb/legal/terms.md');
     });
 
-    it('shows the Originals placeholder when the Originals tab is active', async () => {
-        mockFetchOnce([doc({ id: 'd1' })]);
+    it('lists the uploaded originals when the Originals tab is active', async () => {
+        // Two different endpoints are involved once the tab switches: the
+        // document list (KB tab) and the upload list (Originals tab). Route
+        // by URL so the tab switch exercises the real second fetch rather
+        // than replaying the document payload.
+        (globalThis as { fetch: typeof fetch }).fetch = vi.fn(async (input: RequestInfo | URL) => {
+            const url = String(input);
+            const body = url.includes('/kb/uploads')
+                ? {
+                      items: [
+                          {
+                              id: 'u1',
+                              workId: 'work-1',
+                              originalFilename: 'brand-guide.pdf',
+                              extractionStatus: 'succeeded',
+                              extractionError: null,
+                          },
+                      ],
+                      total: 1,
+                  }
+                : { items: [doc({ id: 'd1' })], total: 1 };
+            return new Response(JSON.stringify(body), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }) as unknown as typeof fetch;
+
         render(<KbTreePanel workId="work-1" />);
 
         await waitFor(() => {
@@ -128,9 +153,62 @@ describe('workbench KbTreePanel', () => {
             fireEvent.click(screen.getByTestId('kb-workbench-tab-originals'));
         });
 
-        expect(screen.getByTestId('kb-workbench-originals-placeholder')).toBeTruthy();
+        // The panel fetches on mount, so the row arrives asynchronously.
+        await waitFor(() => {
+            expect(screen.getByTestId('kb-workbench-originals-list')).toBeTruthy();
+        });
+        expect(screen.getByText('brand-guide.pdf')).toBeTruthy();
         // KB rows should no longer be in the DOM after the tab switch.
         expect(screen.queryByTestId('kb-workbench-row-d1')).toBeNull();
+    });
+
+    it('offers a retry only for an upload whose extraction FAILED', async () => {
+        // The distinction this pins: an upload can be stored successfully
+        // and still contribute nothing to retrieval. A failed row must
+        // surface both the reason and the one recovery path the API has.
+        (globalThis as { fetch: typeof fetch }).fetch = vi.fn(async (input: RequestInfo | URL) => {
+            const url = String(input);
+            const body = url.includes('/kb/uploads')
+                ? {
+                      items: [
+                          {
+                              id: 'u-ok',
+                              workId: 'work-1',
+                              originalFilename: 'fine.md',
+                              extractionStatus: 'succeeded',
+                              extractionError: null,
+                          },
+                          {
+                              id: 'u-bad',
+                              workId: 'work-1',
+                              originalFilename: 'broken.pdf',
+                              extractionStatus: 'failed',
+                              extractionError: 'malformed PDF trailer',
+                          },
+                      ],
+                      total: 2,
+                  }
+                : { items: [], total: 0 };
+            return new Response(JSON.stringify(body), {
+                status: 200,
+                headers: { 'Content-Type': 'application/json' },
+            });
+        }) as unknown as typeof fetch;
+
+        render(<KbTreePanel workId="work-1" />);
+        await waitFor(() => {
+            expect(screen.getByTestId('kb-workbench-tab-originals')).toBeTruthy();
+        });
+        act(() => {
+            fireEvent.click(screen.getByTestId('kb-workbench-tab-originals'));
+        });
+
+        await waitFor(() => {
+            expect(screen.getByTestId('kb-workbench-originals-list')).toBeTruthy();
+        });
+        // Exactly one retry control — the succeeded row must not offer one.
+        expect(screen.getAllByTestId('kb-workbench-originals-retry')).toHaveLength(1);
+        expect(screen.getByText('malformed PDF trailer')).toBeTruthy();
     });
 
     it('renders the empty state when the server returns zero docs', async () => {

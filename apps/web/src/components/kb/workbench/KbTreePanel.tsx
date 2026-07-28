@@ -27,6 +27,7 @@ import {
     type LucideIcon,
 } from 'lucide-react';
 import { KB_DOCUMENT_CLASSES, KB_DOCUMENT_SOURCES } from '@ever-works/contracts';
+import { KbOriginalsPanel } from './KbOriginalsPanel';
 import type {
     KbDocumentClass,
     KbDocumentDto,
@@ -281,7 +282,7 @@ export function KbTreePanel({ workId, currentDocPath, refreshKey }: KbTreePanelP
                         }}
                     />
                 ) : (
-                    <OriginalsPlaceholder message={t('workbench.originals.placeholder')} />
+                    <KbOriginalsPanel workId={workId} refreshToken={refreshKey} />
                 )}
             </div>
         </div>
@@ -510,30 +511,6 @@ function TreeTab({ label, active, onClick, testId }: TreeTabProps) {
         >
             {label}
         </button>
-    );
-}
-
-interface OriginalsPlaceholderProps {
-    message: string;
-}
-
-function OriginalsPlaceholder({ message }: OriginalsPlaceholderProps) {
-    return (
-        <div
-            data-testid="kb-workbench-originals-placeholder"
-            className={cn(
-                'flex flex-col items-center justify-center gap-2 rounded-md border border-dashed',
-                'border-border px-4 py-6 text-center text-xs text-text-muted',
-                'dark:border-border-dark dark:text-text-muted-dark/60',
-            )}
-        >
-            <span className="flex h-8 w-8 items-center justify-center rounded-full bg-card-hover dark:bg-card-primary-dark/40">
-                <UploadCloud className="h-4 w-4" aria-hidden="true" />
-            </span>
-            <p>{message}</p>
-            <Database className="hidden h-3 w-3" aria-hidden="true" />
-            <Library className="hidden h-3 w-3" aria-hidden="true" />
-        </div>
     );
 }
 
