@@ -5962,6 +5962,12 @@
             "feelingLucky": "Предложи работа за създаване",
             "errors": {
                 "unableToSend": "Не може да се изпрати съобщение"
+            },
+            "attachments": {
+                "attach": "Attach files",
+                "remove": "Remove attachment",
+                "tooLarge": "File is larger than the 25 MB limit",
+                "failed": "Upload failed"
             }
         },
         "plugins": {
