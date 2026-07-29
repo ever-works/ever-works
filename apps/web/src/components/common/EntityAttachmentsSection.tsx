@@ -18,15 +18,15 @@ import { uploadFile, UploadError } from '@/lib/api/uploads';
 
 /**
  * Generic per-entity attachment panel — shared by the Mission, Idea,
- * and Agent detail pages. Modeled on {@link TaskAttachmentsSection}
- * (which stays as-is to preserve its slightly different shape — Task
- * attachments carry joined upload metadata; the new entity types don't
- * yet).
+ * Agent, and Task detail pages so every surface renders the same
+ * Drive-style tile grid.
  *
  * Flow per file:
  *   1. User drops or picks a file in the drag-and-drop zone.
  *   2. `POST /api/uploads/file` (auth-gated, broader MIME allow-list) →
  *      returns `{ id: <sha256>, url, filename, size, mimeType, hash }`.
+ *      Callers whose bytes belong elsewhere (Tasks upload through the
+ *      Work KB proxy) pass their own `uploader` instead.
  *   3. Caller-supplied `onAttach(uploadId)` wires the upload to the
  *      entity (calls one of the new
  *      `attachUploadTo{Mission,Idea,Agent}Action` server actions).
@@ -162,6 +162,23 @@ export interface EntityAttachmentsSectionProps<TRow extends EntityAttachmentRow>
     readonly title?: string;
     /** Stable test hook prefix. */
     readonly testId?: string;
+    /**
+     * Overrides how the raw bytes get uploaded before `onAttach` runs.
+     * Defaults to `POST /api/uploads/file` (the shared dashboard
+     * endpoint). Tasks route through the Work KB upload proxy instead,
+     * which enforces the Work's own MIME/size policy — hence the seam.
+     * Returns the upload id to attach plus an optional URL used for the
+     * in-session thumbnail before any joined metadata lands.
+     */
+    readonly uploader?: (file: File) => Promise<{ id: string; url?: string }>;
+    /**
+     * Renders `disabledMessage` in place of the drop zone. Used when the
+     * entity cannot accept attachments yet (e.g. a Task with no Work).
+     */
+    readonly disabled?: boolean;
+    readonly disabledMessage?: string;
+    /** Server-side load error surfaced on first paint. */
+    readonly initialError?: string | null;
 }
 
 export function EntityAttachmentsSection<TRow extends EntityAttachmentRow>({
@@ -170,6 +187,10 @@ export function EntityAttachmentsSection<TRow extends EntityAttachmentRow>({
     onDetach,
     title = 'Attachments',
     testId,
+    uploader,
+    disabled = false,
+    disabledMessage,
+    initialError = null,
 }: EntityAttachmentsSectionProps<TRow>) {
     const [rows, setRows] = useState<TRow[]>([...initial]);
     const [meta, setMeta] = useState<Record<string, UploadedFileMeta>>({});
@@ -178,19 +199,19 @@ export function EntityAttachmentsSection<TRow extends EntityAttachmentRow>({
     const [brokenThumbs, setBrokenThumbs] = useState<Record<string, true>>({});
     const [pending, startTransition] = useTransition();
     const [dragOver, setDragOver] = useState(false);
-    const [error, setError] = useState<string | null>(null);
+    const [error, setError] = useState<string | null>(initialError);
     const [busy, setBusy] = useState(false);
     const inputRef = useRef<HTMLInputElement | null>(null);
 
     const uploadFiles = (files: File[]) => {
-        if (files.length === 0) return;
+        if (files.length === 0 || disabled) return;
         setError(null);
         setBusy(true);
         startTransition(() => {
             void (async () => {
                 for (const file of files) {
                     try {
-                        const res = await uploadFile(file);
+                        const res = uploader ? await uploader(file) : await uploadFile(file);
                         const row = await onAttach(res.id);
                         setRows((prev) => [row, ...prev]);
                         setMeta((prev) => ({
@@ -266,44 +287,52 @@ export function EntityAttachmentsSection<TRow extends EntityAttachmentRow>({
                 </p>
             </header>
 
-            <div
-                onDragOver={(e) => {
-                    e.preventDefault();
-                    setDragOver(true);
-                }}
-                onDragLeave={() => setDragOver(false)}
-                onDrop={handleDrop}
-                className={cn(
-                    'rounded-lg border-2 border-dashed transition-colors p-6 flex flex-col items-center justify-center gap-2 text-center',
-                    dragOver
-                        ? 'border-primary bg-primary/5'
-                        : 'border-border/60 dark:border-border-dark/60',
-                    busy && 'opacity-60',
-                )}
-            >
-                <Upload className="w-5 h-5 text-text-muted dark:text-text-muted-dark" />
-                <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
-                    Drag &amp; drop a file here or
-                </p>
-                <Button
-                    type="button"
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => inputRef.current?.click()}
-                    disabled={busy}
-                    data-testid={testId ? `${testId}-browse` : undefined}
+            {disabled ? (
+                <div className="rounded-lg border border-border/60 dark:border-border-dark/60 bg-surface-secondary/40 dark:bg-surface-secondary-dark/30 p-4">
+                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                        {disabledMessage}
+                    </p>
+                </div>
+            ) : (
+                <div
+                    onDragOver={(e) => {
+                        e.preventDefault();
+                        setDragOver(true);
+                    }}
+                    onDragLeave={() => setDragOver(false)}
+                    onDrop={handleDrop}
+                    className={cn(
+                        'rounded-lg border-2 border-dashed transition-colors p-6 flex flex-col items-center justify-center gap-2 text-center',
+                        dragOver
+                            ? 'border-primary bg-primary/5'
+                            : 'border-border/60 dark:border-border-dark/60',
+                        busy && 'opacity-60',
+                    )}
                 >
-                    {busy ? 'Uploading…' : 'Browse'}
-                </Button>
-                <input
-                    ref={inputRef}
-                    type="file"
-                    multiple
-                    onChange={handleSelect}
-                    className="hidden"
-                    data-testid={testId ? `${testId}-input` : undefined}
-                />
-            </div>
+                    <Upload className="w-5 h-5 text-text-muted dark:text-text-muted-dark" />
+                    <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
+                        Drag &amp; drop a file here or
+                    </p>
+                    <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => inputRef.current?.click()}
+                        disabled={busy}
+                        data-testid={testId ? `${testId}-browse` : undefined}
+                    >
+                        {busy ? 'Uploading…' : 'Browse'}
+                    </Button>
+                    <input
+                        ref={inputRef}
+                        type="file"
+                        multiple
+                        onChange={handleSelect}
+                        className="hidden"
+                        data-testid={testId ? `${testId}-input` : undefined}
+                    />
+                </div>
+            )}
 
             {error && (
                 <p
