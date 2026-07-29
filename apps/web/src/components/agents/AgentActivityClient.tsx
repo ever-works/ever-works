@@ -254,6 +254,7 @@ export function AgentActivityClient({
     // id and folded into the feed so the link lands on it. Null until (and
     // unless) such a link arrives.
     const [pinnedRun, setPinnedRun] = useState<AgentRunRow | null>(null);
+    const pinEpoch = useRef(0);
 
     const loadDetail = useCallback(
         async (runId: string): Promise<AgentRunDetail | null> => {
@@ -286,22 +287,25 @@ export function AgentActivityClient({
     // Paging away retires the pinned deep-link run: it belongs to the
     // arrival, not to every page the caller browses afterwards.
     const paginate = (offset: number) => {
+        pinEpoch.current += 1;
         setPinnedRun(null);
         refresh(offset);
     };
 
     const cancel = (runId: string) => {
         setCancellingId(runId);
+        const epoch = pinEpoch.current;
         startTransition(() => {
             void (async () => {
                 try {
                     await cancelAgentRunAction(agentId, runId);
                     refresh(meta.offset);
                     // A pinned run is not in `rows`, so the refresh above
-                    // cannot restatus it — re-read it directly.
+                    // cannot restatus it — re-read it directly, unless the
+                    // caller paged away while the cancel was in flight.
                     if (pinnedRun?.id === runId) {
                         const detail = await loadDetail(runId);
-                        if (detail) setPinnedRun(detail);
+                        if (detail && epoch === pinEpoch.current) setPinnedRun(detail);
                     }
                 } finally {
                     setCancellingId(null);
@@ -325,9 +329,12 @@ export function AgentActivityClient({
         if (!focusRunId || focusHandled.current) return;
         focusHandled.current = true;
         const onPage = rows.some((row) => row.id === focusRunId);
+        const epoch = pinEpoch.current;
         void (async () => {
             const detail = await loadDetail(focusRunId);
-            if (!onPage && detail) setPinnedRun(detail);
+            // Paging away mid-fetch retires this pin: land the logs in
+            // `details`, but do not drag the run onto the new page.
+            if (!onPage && detail && epoch === pinEpoch.current) setPinnedRun(detail);
         })();
     }, [focusRunId, rows, loadDetail]);
 

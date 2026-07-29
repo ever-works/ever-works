@@ -1,5 +1,6 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { render, screen, waitFor } from '@testing-library/react';
+import { act, render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { AgentActivityClient } from './AgentActivityClient';
 
 const listAgentRunsAction = vi.fn();
@@ -130,6 +131,48 @@ describe('AgentActivityClient deep links', () => {
         renderFeed(30, null);
 
         expect(getAgentRunDetailAction).not.toHaveBeenCalled();
+        expect(document.querySelectorAll('tr[id^="run-"]')).toHaveLength(PAGE_SIZE);
+    });
+
+    // The pin belongs to the arrival, not to every page browsed after it.
+    // Paging away while the detail request is still in flight used to let
+    // the late response re-pin the old run onto the new page.
+    it('does not pin the deep-linked run when the caller pages away before its detail resolves', async () => {
+        // run-55 lives on page 3 of 60 runs, so neither the page it arrives
+        // on (1) nor the page it is about to leave for (2) contains it.
+        let resolveDetail!: (detail: unknown) => void;
+        getAgentRunDetailAction.mockReturnValue(
+            new Promise((resolve) => {
+                resolveDetail = resolve;
+            }),
+        );
+        listAgentRunsAction.mockResolvedValue({
+            data: Array.from({ length: PAGE_SIZE }, (_, i) => makeRun(PAGE_SIZE + i)),
+            meta: { total: 60, limit: PAGE_SIZE, offset: PAGE_SIZE },
+        });
+        listAgentEventsAction.mockResolvedValue({ data: [] });
+
+        renderFeed(60, 'run-55');
+
+        await waitFor(() => {
+            expect(getAgentRunDetailAction).toHaveBeenCalledWith(AGENT_ID, 'run-55');
+        });
+        // Still in flight, so nothing is pinned yet.
+        expect(runRow('run-55')).toBeNull();
+
+        await userEvent.click(screen.getByRole('button', { name: 'Next' }));
+        await waitFor(() => {
+            expect(screen.getByText('summary for run 25')).toBeInTheDocument();
+        });
+
+        // The request the caller left behind now lands.
+        await act(async () => {
+            resolveDetail(makeDetail(55));
+        });
+
+        expect(runRow('run-55')).toBeNull();
+        expect(screen.queryAllByText('summary for run 55')).toHaveLength(0);
+        // The page the caller actually asked for is intact.
         expect(document.querySelectorAll('tr[id^="run-"]')).toHaveLength(PAGE_SIZE);
     });
 });
