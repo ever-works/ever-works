@@ -6,6 +6,9 @@ import {
     HttpCode,
     HttpStatus,
     Logger,
+    NotFoundException,
+    Param,
+    ParseUUIDPipe,
     Post,
     Query,
     UnprocessableEntityException,
@@ -534,6 +537,64 @@ export class OrgMemoryController {
         }
 
         return { results };
+    }
+
+    @Get('memory/review')
+    @ApiOperation({
+        summary: 'Memory review queue — documents awaiting a human',
+        description:
+            'Organization documents with `reviewState: proposed`. Memory Consolidation lands LLM-synthesized merges here rather than accepting them automatically; they are withheld from context injection until accepted. The Organization comes from the request scope context.',
+    })
+    @ApiQuery({ name: 'limit', required: false, type: Number })
+    @ApiQuery({ name: 'offset', required: false, type: Number })
+    @ApiResponse({ status: 200, description: '{ items, total }' })
+    async listMemoryReviewQueue(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Query() query: ListMemoryUploadsDto,
+    ) {
+        const organizationId = this.scopeContext.getOrganizationId();
+        if (!organizationId) {
+            return { items: [], total: 0 };
+        }
+        await this.membership.ensureMember(organizationId, auth.userId);
+        return this.kb.listOrgReviewQueue(organizationId, {
+            limit: query.limit ?? 50,
+            offset: query.offset ?? 0,
+        });
+    }
+
+    @Post('memory/review/:docId/accept')
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
+    @ApiOperation({
+        summary: 'Accept a proposed Memory document',
+        description:
+            'Marks a proposed organization document as accepted, which makes it eligible for context injection and — for an inheritable class — overlays it into every Work. Returns 404 when the document does not exist, belongs to another organization, or is Work-scoped.',
+    })
+    @ApiResponse({ status: 200, description: 'The accepted document' })
+    @ApiResponse({ status: 404, description: 'No such document in this Organization' })
+    @ApiResponse({ status: 422, description: 'No active Organization on the request scope' })
+    async acceptMemoryDocument(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('docId', new ParseUUIDPipe()) docId: string,
+    ) {
+        const organizationId = this.scopeContext.getOrganizationId();
+        if (!organizationId) {
+            throw new UnprocessableEntityException({
+                status: 'error',
+                message: 'No active Organization — cannot accept a Memory document',
+            });
+        }
+        await this.membership.ensureMember(organizationId, auth.userId);
+
+        const accepted = await this.kb.acceptOrgDocument(organizationId, docId, auth.userId);
+        if (!accepted) {
+            // Deliberately indistinguishable from "does not exist": a
+            // caller must not be able to probe which document ids belong
+            // to another Organization.
+            throw new NotFoundException({ status: 'error', message: 'Document not found' });
+        }
+        return accepted;
     }
 
     @Get('memory/uploads')

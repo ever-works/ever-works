@@ -43,7 +43,23 @@ function formatWhen(iso: string): string {
     return d.toLocaleString();
 }
 
-export function AgentMemoryPanel() {
+export function AgentMemoryPanel({
+    workId,
+    compact = false,
+}: {
+    /**
+     * Narrow the sessions to one Work. Omitted on `/memory`, where the
+     * question is org-wide. The API asserts Work access when this is
+     * present, so passing it never widens what the caller can see.
+     */
+    readonly workId?: string;
+    /**
+     * Drop the card chrome. The Work workbench renders this inside an
+     * existing bordered tree column, where a second border reads as a
+     * nested card.
+     */
+    readonly compact?: boolean;
+} = {}) {
     const t = useTranslations('dashboard.memoryPage.agentMemory');
     const [availability, setAvailability] = useState<Availability | null>(null);
     const [sessions, setSessions] = useState<AgentMemorySession[]>([]);
@@ -69,7 +85,9 @@ export function AgentMemoryPanel() {
                 return;
             }
 
-            const res = await fetch('/api/agent-memory/sessions?limit=20', {
+            const qs = new URLSearchParams({ limit: '20' });
+            if (workId) qs.set('workId', workId);
+            const res = await fetch(`/api/agent-memory/sessions?${qs.toString()}`, {
                 headers: { Accept: 'application/json' },
                 cache: 'no-store',
             });
@@ -86,7 +104,7 @@ export function AgentMemoryPanel() {
         } finally {
             setLoading(false);
         }
-    }, []);
+    }, [workId]);
 
     useEffect(() => {
         void load();
@@ -96,9 +114,12 @@ export function AgentMemoryPanel() {
         <div
             data-testid="agent-memory-panel"
             className={cn(
-                'flex flex-col gap-3 rounded-lg border p-4',
-                'bg-card dark:bg-card-primary-dark',
-                'border-card-border dark:border-white/9',
+                'flex flex-col gap-3',
+                !compact && [
+                    'rounded-lg border p-4',
+                    'bg-card dark:bg-card-primary-dark',
+                    'border-card-border dark:border-white/9',
+                ],
             )}
         >
             <div className="flex items-center gap-2">
