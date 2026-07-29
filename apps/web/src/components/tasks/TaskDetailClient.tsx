@@ -4,16 +4,14 @@ import { useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { ArrowLeft, Loader2, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Link } from '@/i18n/navigation';
+import { Link, useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
-import type {
-    Task,
-    TaskAttachmentRow,
-    TaskChatMessage,
-    TaskPriority,
-    TaskStatus,
-} from '@/lib/api/tasks';
+// Priority dot/tone — shared so the detail rail and the New Task form
+// picker cannot drift apart. Labels stay in the `tasksPage.priority`
+// i18n namespace.
+import { TASK_PRIORITY_PRESENTATION } from '@/lib/task-priorities/catalog';
+import type { Task, TaskAttachmentRow, TaskChatMessage, TaskStatus } from '@/lib/api/tasks';
 import type { AgentRunSession } from '@/lib/api/agents.shared';
 import { postTaskChatAction, transitionTaskAction, updateTaskAction } from '@/app/actions/tasks';
 import { TaskRecurringSection } from './TaskRecurringSection';
@@ -25,6 +23,7 @@ import { TaskRunsHistory } from './TaskRunsHistory';
 import { RunWithAgentMenu } from './RunWithAgentMenu';
 import { TaskDecisionConflicts } from './TaskDecisionConflicts';
 import { TaskDeleteButton } from './TaskDeleteButton';
+import { WorkSelect } from './WorkSelect';
 
 // Status tones + dots mirror /tasks (TasksList) so colours stay
 // consistent across the list filter and the detail workflow buttons.
@@ -66,16 +65,6 @@ const NEXT_STATUS: Record<TaskStatus, TaskStatus[]> = {
     blocked: ['todo', 'in_progress', 'cancelled'],
     done: ['in_progress'],
     cancelled: [],
-};
-
-// Priority metadata — JIRA-style colour-coded chips. Labels come from
-// the `tasksPage.priority` i18n namespace; only the tone/dot live here.
-const PRIORITY_META: Record<TaskPriority, { dot: string; tone: string }> = {
-    p0: { dot: 'bg-danger', tone: 'text-danger' },
-    p1: { dot: 'bg-warning', tone: 'text-warning' },
-    p2: { dot: 'bg-amber-500', tone: 'text-amber-600 dark:text-amber-400' },
-    p3: { dot: 'bg-info', tone: 'text-info' },
-    p4: { dot: 'bg-text-muted', tone: 'text-text-muted' },
 };
 
 function formatDate(iso: string): string {
@@ -142,6 +131,10 @@ export function TaskDetailClient({
     const [descDraft, setDescDraft] = useState(task.description ?? '');
     const [pendingDesc, startDesc] = useTransition();
     const [descError, setDescError] = useState<string | null>(null);
+    const [workId, setWorkId] = useState<string | null>(task.workId);
+    const [pendingWork, startWork] = useTransition();
+    const [workError, setWorkError] = useState<string | null>(null);
+    const router = useRouter();
     // Re-litigation guard (memory upgrades M6). Bumped after a
     // description save so the conflict check re-runs against the new
     // intent — "created OR its description is edited".
@@ -196,19 +189,35 @@ export function TaskDetailClient({
             })();
         });
     };
+    const handleWorkChange = (next: string) => {
+        const nextWorkId = next || null;
+        if (nextWorkId === workId) return;
+        setWorkError(null);
+        startWork(() => {
+            void (async () => {
+                try {
+                    const updated = await updateTaskAction(task.id, { workId: nextWorkId });
+                    setWorkId(updated.workId);
+                    router.refresh();
+                } catch (err) {
+                    setWorkError(err instanceof Error ? err.message : t('workUpdateError'));
+                }
+            })();
+        });
+    };
 
     // Statuses reachable from the current one — drives which workflow
     // buttons are clickable vs. shown disabled.
     const allowedNext = new Set(NEXT_STATUS[currentStatus] ?? []);
     const labels = task.labels ?? [];
-    const priority = PRIORITY_META[task.priority];
-    const scope = task.workId
-        ? { label: t('scopeWork'), id: task.workId }
-        : task.missionId
-          ? { label: t('scopeMission'), id: task.missionId }
-          : task.ideaId
-            ? { label: t('scopeIdea'), id: task.ideaId }
-            : null;
+    const priority = TASK_PRIORITY_PRESENTATION[task.priority];
+    // Work is no longer folded in here — it has its own editable row
+    // below. This stays as the read-only Mission/Idea association.
+    const scope = task.missionId
+        ? { label: t('scopeMission'), id: task.missionId }
+        : task.ideaId
+          ? { label: t('scopeIdea'), id: task.ideaId }
+          : null;
 
     return (
         <div className="max-w-screen-xl mx-auto p-6">
@@ -380,8 +389,9 @@ export function TaskDetailClient({
 
                     {/* FU-5 — Attachments */}
                     <TaskAttachmentsSection
+                        key={workId ?? 'no-work'}
                         taskId={task.id}
-                        workId={task.workId}
+                        workId={workId}
                         initial={initialAttachments}
                         initialError={initialAttachmentsError}
                     />
@@ -507,6 +517,24 @@ export function TaskDetailClient({
                                 ) : (
                                     <span className="text-xs text-text-muted">—</span>
                                 )}
+                            </DetailRow>
+                            <DetailRow label={t('scopeWork')}>
+                                <div className="space-y-1">
+                                    <WorkSelect
+                                        value={workId ?? ''}
+                                        onValueChange={handleWorkChange}
+                                        disabled={pendingWork}
+                                        size="xs"
+                                        noneLabel={t('workNone')}
+                                        placeholder={t('workPlaceholder')}
+                                        testId="task-detail-work"
+                                    />
+                                    {workError && (
+                                        <p className="text-[11px] text-danger" role="alert">
+                                            {workError}
+                                        </p>
+                                    )}
+                                </div>
                             </DetailRow>
                             {scope && (
                                 <DetailRow label={t('scope')}>
