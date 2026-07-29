@@ -838,6 +838,14 @@
                 "subtitle": "Fichiers téléversés dans la Mémoire. Leur texte est extrait pour les agents.",
                 "title": "Originaux",
                 "uploading": "Téléversement…"
+            },
+            "agentMemory": {
+                "closed": "Fermée",
+                "empty": "Aucune session d’agent enregistrée.",
+                "open": "Ouverte",
+                "subtitle": "Ce dont vos agents se souviennent de leurs exécutions — distinct des documents téléversés.",
+                "title": "Mémoire des agents",
+                "unavailable": "Aucun fournisseur de mémoire d’agent activé."
             }
         },
         "agentsPage": {
@@ -2921,7 +2929,7 @@
                 "deploy": "Déploiement",
                 "members": "Membres",
                 "settings": "Paramètres",
-                "kb": "Base de connaissances",
+                "kb": "Memory",
                 "tooltips": {
                     "activity": "Fil d'activité",
                     "kb": "Base de connaissances",
@@ -4797,7 +4805,7 @@
                     "metaTitle": "Knowledge Base workbench",
                     "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
-                        "kb": "KB",
+                        "kb": "Base de connaissances",
                         "originals": "Originals"
                     },
                     "originals": {
