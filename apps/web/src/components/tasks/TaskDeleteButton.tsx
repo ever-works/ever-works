@@ -18,16 +18,12 @@ import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
 import { deleteTaskAction } from '@/app/actions/tasks';
 
-/**
- * Task detail "Delete" action — `DELETE /api/tasks/:id`.
- *
- * Deleting a Task cascades to its side rows (assignees, approvers,
- * reviewers, watchers, blockers, chat, attachments, relations), so the
- *
- * Selectors locked for tests:
- *  - `data-testid="task-delete-button"` on the trigger
- *  - `data-testid="task-delete-confirm"` / `"task-delete-cancel"`
- */
+// Outlined danger button — kept identical to `btnDanger` in
+// components/meetings/MeetingDetailClient.tsx so the two detail-page
+// delete actions stay visually in step.
+const BTN_DANGER =
+    'inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-danger/30 dark:border-danger/20 text-danger hover:bg-danger/5 dark:hover:bg-danger/10 transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed';
+
 export function TaskDeleteButton({
     taskId,
     taskSlug,
@@ -68,20 +64,19 @@ export function TaskDeleteButton({
 
     return (
         <>
-            <Button
+            <button
                 type="button"
-                variant="danger"
-                size="sm"
                 data-testid="task-delete-button"
-                className={cn('shrink-0', className)}
+                disabled={pending}
+                className={cn(BTN_DANGER, 'shrink-0', className)}
                 onClick={() => {
                     setError(null);
                     setOpen(true);
                 }}
             >
-                <Trash2 className="size-3.5" />
+                <Trash2 className="h-3.5 w-3.5" />
                 {t('action')}
-            </Button>
+            </button>
 
             <Dialog open={open} onOpenChange={(next) => (next ? setOpen(true) : handleClose())}>
                 <DialogContent className="max-w-md">
