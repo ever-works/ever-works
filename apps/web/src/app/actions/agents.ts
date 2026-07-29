@@ -6,6 +6,7 @@ import {
     agentsAPI,
     type Agent,
     type AgentExportEnvelope,
+    type AgentPickerOption,
     type AgentGuardrails,
     type AgentImportOptions,
     type AgentImportResult,
@@ -154,6 +155,27 @@ export async function importAgentAction(
 // thin actions wrap the runtime endpoints (listRuns / listSkills /
 // getBudget / runNow / cancelRun) so the AgentActivityClient /
 // AgentSkillsClient / AgentBudgetsClient client components stay clean.
+
+/**
+ * Options for an Agent picker (the Task detail rail's "Agent" row).
+ *
+ * A projection, not the Agent DTO: only what a dropdown row renders
+ * crosses the boundary. Archived Agents are dropped — they cannot pick up
+ * work, so offering one would produce a Task that never runs. Read-only,
+ * so no `revalidatePath`.
+ */
+export async function listAgentOptionsAction(limit = 100): Promise<AgentPickerOption[]> {
+    await ensureAuth();
+    const res = await agentsAPI.list({ limit: Math.min(100, limit) });
+    return (res.data ?? [])
+        .filter((agent) => agent.status !== 'archived')
+        .map((agent) => ({
+            id: agent.id,
+            name: agent.name,
+            slug: agent.slug,
+            status: agent.status,
+        }));
+}
 
 export async function listAgentRunsAction(
     id: string,

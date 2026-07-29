@@ -24,6 +24,7 @@ import { RunWithAgentMenu } from './RunWithAgentMenu';
 import { TaskDecisionConflicts } from './TaskDecisionConflicts';
 import { TaskDeleteButton } from './TaskDeleteButton';
 import { WorkSelect } from './WorkSelect';
+import { AgentSelect } from './AgentSelect';
 
 // Status tones + dots mirror /tasks (TasksList) so colours stay
 // consistent across the list filter and the detail workflow buttons.
@@ -134,6 +135,11 @@ export function TaskDetailClient({
     const [workId, setWorkId] = useState<string | null>(task.workId);
     const [pendingWork, startWork] = useTransition();
     const [workError, setWorkError] = useState<string | null>(null);
+    // `?? null` on purpose: the API omits owner columns it never set, so
+    // an unassigned Task arrives with `agentId` absent, not null.
+    const [agentId, setAgentId] = useState<string | null>(task.agentId ?? null);
+    const [pendingAgent, startAgent] = useTransition();
+    const [agentError, setAgentError] = useState<string | null>(null);
     const router = useRouter();
     // Re-litigation guard (memory upgrades M6). Bumped after a
     // description save so the conflict check re-runs against the new
@@ -206,6 +212,27 @@ export function TaskDetailClient({
         });
     };
 
+    // Assigning the Agent is what lets "Run" dispatch without stopping to
+    // ask: the server resolves assignees → this Agent → the Work default.
+    // Refreshing afterwards re-reads the Task's run surfaces (candidates,
+    // history) against the new assignment.
+    const handleAgentChange = (next: string) => {
+        const nextAgentId = next || null;
+        if (nextAgentId === agentId) return;
+        setAgentError(null);
+        startAgent(() => {
+            void (async () => {
+                try {
+                    const updated = await updateTaskAction(task.id, { agentId: nextAgentId });
+                    setAgentId(updated.agentId ?? null);
+                    router.refresh();
+                } catch (err) {
+                    setAgentError(err instanceof Error ? err.message : t('agentUpdateError'));
+                }
+            })();
+        });
+    };
+
     // Statuses reachable from the current one — drives which workflow
     // buttons are clickable vs. shown disabled.
     const allowedNext = new Set(NEXT_STATUS[currentStatus] ?? []);
@@ -244,7 +271,11 @@ export function TaskDetailClient({
                                 {task.title}
                             </h1>
                             <div className="flex items-center gap-1.5 shrink-0">
-                                <RunWithAgentMenu taskId={task.id} />
+                                {/* Keyed on the assignment: the picker
+                                    caches its candidate list on first open,
+                                    so re-assigning must remount it rather
+                                    than leave a stale list behind. */}
+                                <RunWithAgentMenu key={agentId ?? 'no-agent'} taskId={task.id} />
                                 <TaskDeleteButton taskId={task.id} taskSlug={task.slug} />
                             </div>
                         </div>
@@ -532,6 +563,24 @@ export function TaskDetailClient({
                                     {workError && (
                                         <p className="text-[11px] text-danger" role="alert">
                                             {workError}
+                                        </p>
+                                    )}
+                                </div>
+                            </DetailRow>
+                            <DetailRow label={t('agent')}>
+                                <div className="space-y-1">
+                                    <AgentSelect
+                                        value={agentId ?? ''}
+                                        onValueChange={handleAgentChange}
+                                        disabled={pendingAgent}
+                                        size="xs"
+                                        noneLabel={t('agentNone')}
+                                        placeholder={t('agentPlaceholder')}
+                                        testId="task-detail-agent"
+                                    />
+                                    {agentError && (
+                                        <p className="text-[11px] text-danger" role="alert">
+                                            {agentError}
                                         </p>
                                     )}
                                 </div>

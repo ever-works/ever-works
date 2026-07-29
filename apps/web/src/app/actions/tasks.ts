@@ -57,6 +57,7 @@ export async function updateTaskAction(
             | 'acceptanceChecks'
             | 'maxGateAttempts'
             | 'workId'
+            | 'agentId'
         >
     >,
 ): Promise<Task> {
