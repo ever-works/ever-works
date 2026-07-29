@@ -38,14 +38,14 @@ An unconfigured connector never quietly returns nothing:
 
 ## Settings
 
-| Key                         | Notes                                                                |
-| --------------------------- | -------------------------------------------------------------------- |
-| `accessToken`               | Private-app token — secret, env `HUBSPOT_ACCESS_TOKEN`.              |
-| `objectTypes`               | Comma-separated sweep list (contacts, companies, deals when empty).  |
-| `portalId`                  | Portal (hub) id — enables record deep links on every envelope.       |
-| `backfillDays`              | Opt-in first-pull history window (0 = off, max 90).                  |
-| `defaultObjectType`         | Default object type for `createRecord` + the verify probe.           |
-| `defaultAssociatedObjectId` | Default CRM record outbound notes attach to.                         |
+| Key                         | Notes                                                               |
+| --------------------------- | ------------------------------------------------------------------- |
+| `accessToken`               | Private-app token — secret, env `HUBSPOT_ACCESS_TOKEN`.             |
+| `objectTypes`               | Comma-separated sweep list (contacts, companies, deals when empty). |
+| `portalId`                  | Portal (hub) id — enables record deep links on every envelope.      |
+| `backfillDays`              | Opt-in first-pull history window (0 = off, max 90).                 |
+| `defaultObjectType`         | Default object type for `createRecord` + the verify probe.          |
+| `defaultAssociatedObjectId` | Default CRM record outbound notes attach to.                        |
 
 No credential is ever hardcoded, logged, or written into an ingested envelope.
 

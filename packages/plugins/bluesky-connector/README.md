@@ -34,12 +34,12 @@ Capabilities: `connector`, `connector-bluesky`, `event-source`.
 
 ## Settings
 
-| Key            | Notes                                                          |
-| -------------- | -------------------------------------------------------------- |
-| `identifier`   | Handle or DID of the connected account.                        |
-| `appPassword`  | App password — secret, env `BLUESKY_APP_PASSWORD`.             |
-| `service`      | PDS URL (defaults to `https://bsky.social`), SSRF-guarded.     |
-| `backfillDays` | Opt-in first-pull history window (0 = off, max 90).            |
+| Key            | Notes                                                      |
+| -------------- | ---------------------------------------------------------- |
+| `identifier`   | Handle or DID of the connected account.                    |
+| `appPassword`  | App password — secret, env `BLUESKY_APP_PASSWORD`.         |
+| `service`      | PDS URL (defaults to `https://bsky.social`), SSRF-guarded. |
+| `backfillDays` | Opt-in first-pull history window (0 = off, max 90).        |
 
 Always authenticate with a Bluesky **app password**, never the account
 password. No credential is hardcoded, logged, or written into an ingested
