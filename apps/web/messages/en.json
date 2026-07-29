@@ -890,6 +890,14 @@
                 "subtitle": "Files uploaded to Memory. Their text is extracted so agents can use it.",
                 "title": "Originals",
                 "uploading": "Uploading…"
+            },
+            "agentMemory": {
+                "closed": "Closed",
+                "empty": "No agent sessions recorded yet.",
+                "open": "Open",
+                "subtitle": "What your agents remember from their runs — separate from uploaded documents.",
+                "title": "Agent Memory",
+                "unavailable": "No agent-memory provider is enabled."
             }
         },
         "agentsPage": {

@@ -807,6 +807,14 @@
                 "subtitle": "上传到记忆的文件。系统会提取其文本供智能体使用。",
                 "title": "原件",
                 "uploading": "上传中…"
+            },
+            "agentMemory": {
+                "closed": "已关闭",
+                "empty": "尚无智能体会话记录。",
+                "open": "进行中",
+                "subtitle": "智能体从运行中记住的内容 — 与上传的文档相互独立。",
+                "title": "智能体记忆",
+                "unavailable": "未启用智能体记忆提供程序。"
             }
         },
         "agentsPage": {

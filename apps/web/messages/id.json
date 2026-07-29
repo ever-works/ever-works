@@ -807,6 +807,14 @@
                 "subtitle": "Berkas yang diunggah ke Memori. Teksnya diekstrak untuk agen.",
                 "title": "Berkas Asli",
                 "uploading": "Mengunggah…"
+            },
+            "agentMemory": {
+                "closed": "Ditutup",
+                "empty": "Belum ada sesi agen yang tercatat.",
+                "open": "Terbuka",
+                "subtitle": "Apa yang diingat agen Anda dari proses mereka — terpisah dari dokumen yang diunggah.",
+                "title": "Memori agen",
+                "unavailable": "Tidak ada penyedia memori agen yang aktif."
             }
         },
         "agentsPage": {

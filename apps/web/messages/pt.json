@@ -807,6 +807,14 @@
                 "subtitle": "Ficheiros carregados na Memória. O texto é extraído para os agentes.",
                 "title": "Originais",
                 "uploading": "A carregar…"
+            },
+            "agentMemory": {
+                "closed": "Fechada",
+                "empty": "Ainda não há sessões de agente registadas.",
+                "open": "Aberta",
+                "subtitle": "O que os seus agentes recordam das execuções — separado dos ficheiros carregados.",
+                "title": "Memória dos agentes",
+                "unavailable": "Nenhum fornecedor de memória de agentes ativado."
             }
         },
         "agentsPage": {

@@ -807,6 +807,14 @@
                 "subtitle": "Bestanden geüpload naar Geheugen. De tekst wordt geëxtraheerd voor agents.",
                 "title": "Originelen",
                 "uploading": "Uploaden…"
+            },
+            "agentMemory": {
+                "closed": "Gesloten",
+                "empty": "Nog geen agentsessies vastgelegd.",
+                "open": "Open",
+                "subtitle": "Wat je agents onthouden van hun runs — los van geüploade documenten.",
+                "title": "Agentgeheugen",
+                "unavailable": "Geen agentgeheugen-provider ingeschakeld."
             }
         },
         "agentsPage": {

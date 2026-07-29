@@ -807,6 +807,14 @@
                 "subtitle": "Pliki przesłane do Pamięci. Ich tekst jest wyodrębniany dla agentów.",
                 "title": "Oryginały",
                 "uploading": "Przesyłanie…"
+            },
+            "agentMemory": {
+                "closed": "Zamknięta",
+                "empty": "Brak zarejestrowanych sesji agentów.",
+                "open": "Otwarta",
+                "subtitle": "Co agenci pamiętają ze swoich uruchomień — odrębnie od przesłanych dokumentów.",
+                "title": "Pamięć agentów",
+                "unavailable": "Nie włączono dostawcy pamięci agentów."
             }
         },
         "agentsPage": {

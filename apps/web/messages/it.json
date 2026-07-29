@@ -807,6 +807,14 @@
                 "subtitle": "File caricati nella Memoria. Il testo viene estratto per gli agenti.",
                 "title": "Originali",
                 "uploading": "Caricamento…"
+            },
+            "agentMemory": {
+                "closed": "Chiusa",
+                "empty": "Nessuna sessione agente registrata.",
+                "open": "Aperta",
+                "subtitle": "Ciò che i tuoi agenti ricordano dalle loro esecuzioni, distinto dai documenti caricati.",
+                "title": "Memoria degli agenti",
+                "unavailable": "Nessun provider di memoria agenti abilitato."
             }
         },
         "agentsPage": {

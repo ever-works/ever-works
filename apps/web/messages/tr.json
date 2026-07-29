@@ -807,6 +807,14 @@
                 "subtitle": "Belleğe yüklenen dosyalar. Metinleri ajanlar için çıkarılır.",
                 "title": "Orijinaller",
                 "uploading": "Yükleniyor…"
+            },
+            "agentMemory": {
+                "closed": "Kapalı",
+                "empty": "Henüz kaydedilmiş ajan oturumu yok.",
+                "open": "Açık",
+                "subtitle": "Ajanlarınızın çalışmalarından hatırladıkları — yüklenen belgelerden ayrı.",
+                "title": "Ajan belleği",
+                "unavailable": "Etkin bir ajan belleği sağlayıcısı yok."
             }
         },
         "agentsPage": {

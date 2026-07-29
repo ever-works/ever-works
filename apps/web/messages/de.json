@@ -838,6 +838,14 @@
                 "subtitle": "In den Speicher hochgeladene Dateien. Ihr Text wird für Agenten extrahiert.",
                 "title": "Originale",
                 "uploading": "Wird hochgeladen…"
+            },
+            "agentMemory": {
+                "closed": "Geschlossen",
+                "empty": "Noch keine Agentensitzungen aufgezeichnet.",
+                "open": "Offen",
+                "subtitle": "Woran sich Ihre Agenten aus ihren Läufen erinnern — getrennt von hochgeladenen Dokumenten.",
+                "title": "Agenten-Speicher",
+                "unavailable": "Kein Agenten-Speicher-Anbieter aktiviert."
             }
         },
         "agentsPage": {
