@@ -4811,7 +4811,8 @@
                     "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
                         "kb": "قاعدة المعرفة",
-                        "originals": "Originals"
+                        "originals": "Originals",
+                        "agentMemory": "ذاكرة الوكلاء"
                     },
                     "originals": {
                         "empty": "No original files yet. Drag a file onto the tree to upload one.",

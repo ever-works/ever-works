@@ -4743,7 +4743,8 @@
                     "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
                         "kb": "ナレッジベース",
-                        "originals": "Originals"
+                        "originals": "Originals",
+                        "agentMemory": "エージェントメモリ"
                     },
                     "originals": {
                         "empty": "No original files yet. Drag a file onto the tree to upload one.",
