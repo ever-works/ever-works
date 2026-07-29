@@ -96,32 +96,20 @@ export class TranscriptionController {
     constructor(private readonly aiFacade: AiFacadeService) {}
 
     /**
-     * Which voice provider handles this call.
+     * The platform-wide default voice provider, if an operator set one.
      *
-     * Deliberately layered the same way every other pluggable capability
-     * in the platform is, so swapping B for A never requires a code
-     * change:
+     * This is a DEFAULT, not a pin: it is handed to the facade as
+     * `fallbackProviderId`, which only applies once scope resolution has
+     * failed to produce a transcription-capable plugin. A tenant that
+     * activates a voice plugin therefore overrides it, which is how every
+     * other setting in this platform resolves (work > user > admin > env
+     * > defaults — env is near the BOTTOM, not the top).
      *
-     *   1. `providerId` on the request — a per-user / per-account choice
-     *      made in the UI, narrowest and therefore highest precedence.
-     *   2. `TRANSCRIPTION_PROVIDER_ID` — a global operator default for
-     *      interactive dictation.
-     *   3. `KB_TRANSCRIPTION_PROVIDER_ID` — honoured for continuity with
-     *      the KB media-ingest pin, which was the only transcription
-     *      setting that existed before this endpoint.
-     *   4. `undefined` — hand the decision to the facade, which uses the
-     *      AI-provider plugin ACTIVATED for this scope and then any
-     *      registered plugin implementing `transcribe()`.
-     *
-     * Step 4 is the important one and the reason this returns undefined
-     * rather than a hardcoded id: with nothing configured anywhere, the
-     * activated plugin wins. The previous version always passed the KB
-     * env pin, which meant a deployment that had pinned a provider for
-     * media ingest silently forced the same vendor on chat dictation and
-     * a tenant could not choose otherwise.
+     * The earlier version passed this as `providerOverride`, which skips
+     * the entire chain. One operator env var then silently beat every
+     * tenant's own activated plugin.
      */
-    private resolveProviderId(requested?: string): string | undefined {
-        if (requested) return requested;
+    private defaultProviderId(): string | undefined {
         const global = process.env.TRANSCRIPTION_PROVIDER_ID;
         if (global && global.length > 0) return global;
         return config.kb.getTranscriptionProviderId();
@@ -138,7 +126,7 @@ export class TranscriptionController {
         const providers = await this.aiFacade.listTranscriptionProviders({
             userId: auth.userId,
         });
-        return { providers, configuredDefault: this.resolveProviderId() ?? null };
+        return { providers, configuredDefault: this.defaultProviderId() ?? null };
     }
 
     @Post()
@@ -152,7 +140,7 @@ export class TranscriptionController {
     @ApiOperation({
         summary: 'Transcribe an audio clip to text',
         description:
-            'Multipart speech-to-text for interactive dictation. Provider resolution is layered so a vendor can be swapped without a code change: `providerId` on the request (per-user choice) wins, then `TRANSCRIPTION_PROVIDER_ID`, then `KB_TRANSCRIPTION_PROVIDER_ID`, and otherwise the AI-provider plugin ACTIVATED for this scope. Returns 503 when nothing offers transcription, so the client can hide the control rather than fail silently.',
+            'Multipart speech-to-text for interactive dictation. Provider resolution is layered most-specific-first, so a vendor can be swapped without a code change: an explicit `providerId` on the request wins, then the AI-provider plugin ACTIVATED for this scope, then the platform default (`TRANSCRIPTION_PROVIDER_ID`, falling back to `KB_TRANSCRIPTION_PROVIDER_ID`), then any registered plugin implementing transcribe. Env is a DEFAULT, not a pin — a tenant that activates a voice plugin overrides it. Returns 503 when nothing offers transcription, so the client can hide the control rather than fail silently.',
     })
     @ApiBody({
         schema: {
@@ -199,8 +187,12 @@ export class TranscriptionController {
                 },
                 {
                     userId: auth.userId,
-                    providerOverride: this.resolveProviderId(body.providerId),
+                    // Only an explicit per-request pick pins a provider.
+                    // Everything else flows through the facade's chain so
+                    // tenant activation keeps its precedence.
+                    providerOverride: body.providerId,
                 },
+                { fallbackProviderId: this.defaultProviderId() },
             );
 
             return {

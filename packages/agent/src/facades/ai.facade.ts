@@ -40,6 +40,19 @@ export class AiFacadeError extends FacadeError {
 }
 
 /**
+ * Lower-precedence selection inputs for `transcribe()`.
+ *
+ * Separate from `FacadeOptions.providerOverride`, which is an absolute
+ * pin that skips the whole chain. A platform default must NOT behave
+ * that way — it should apply only when the caller's scope has not
+ * activated a transcription-capable plugin of its own.
+ */
+export interface TranscribeSelectionOptions {
+    /** Applied only after scope activation fails to produce a provider. */
+    readonly fallbackProviderId?: string;
+}
+
+/**
  * Thrown by `AiFacadeService.transcribe()` when no AI-provider plugin
  * registered for the resolved user/work scope implements the optional
  * `transcribe` capability AND no operator pin is configured.
@@ -592,8 +605,9 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
     async transcribe(
         options: TranscriptionOptions,
         facadeOptions: FacadeOptions,
+        selection: TranscribeSelectionOptions = {},
     ): Promise<TranscriptionResponse> {
-        const plugin = await this.resolveTranscribePlugin(facadeOptions);
+        const plugin = await this.resolveTranscribePlugin(facadeOptions, selection);
 
         const settings = await this.getResolvedSettings(plugin.id, {
             userId: facadeOptions.userId,
@@ -684,6 +698,7 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
 
     private async resolveTranscribePlugin(
         facadeOptions: FacadeOptions,
+        selection: TranscribeSelectionOptions = {},
     ): Promise<IAiProviderPlugin> {
         // 1. Operator pin — caller responsible for passing the env var
         // through `providerOverride`. When pinned we never fall back.
@@ -709,6 +724,24 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
             facadeOptions.workId,
         );
         if (typeof active.transcribe === 'function') return active;
+
+        // 2b. Platform default (env). Deliberately BELOW scope activation,
+        // not above it: a tenant that activated a transcription-capable
+        // plugin has expressed a more specific intent than a deployment
+        // -wide environment variable, and every other setting in this
+        // platform resolves the same way (work > user > admin > env >
+        // defaults). Passing the env value as `providerOverride` would
+        // invert that, which is exactly the bug this parameter exists to
+        // avoid — it would let one operator env var override every
+        // tenant's own choice.
+        if (selection.fallbackProviderId) {
+            const fallback = await this.resolvePlugin<IAiProviderPlugin>(
+                selection.fallbackProviderId,
+                facadeOptions.userId,
+                facadeOptions.workId,
+            ).catch(() => null);
+            if (fallback && typeof fallback.transcribe === 'function') return fallback;
+        }
 
         // 3. Registry iteration — first available plugin whose
         // transcribe is defined. `getByCapability` returns

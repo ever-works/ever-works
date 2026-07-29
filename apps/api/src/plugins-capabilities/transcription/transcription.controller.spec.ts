@@ -122,33 +122,41 @@ describe('TranscriptionController', () => {
         expect(aiFacade.transcribe).toHaveBeenCalledWith(
             expect.objectContaining({ filename: 'dictation.webm' }),
             expect.objectContaining({ userId: 'user-1' }),
+            // Third arg carries the lower-precedence platform default.
+            expect.any(Object),
         );
     });
 
-    describe('provider resolution — swap B for A without a code change', () => {
+    describe('provider resolution — tenant activation outranks the env default', () => {
         afterEach(() => {
             delete process.env.TRANSCRIPTION_PROVIDER_ID;
             delete process.env.KB_TRANSCRIPTION_PROVIDER_ID;
         });
 
-        it('lets the ACTIVATED plugin decide when nothing is configured', async () => {
-            // The important default: no env, no request param => hand the
-            // facade `undefined` so it resolves the plugin activated for
-            // this scope, rather than forcing a vendor.
+        it('pins nothing when the caller expressed no preference', async () => {
             await controller.transcribe(auth, clip('audio/webm'), {});
 
+            // No pin => the facade resolves the plugin activated for this
+            // scope on its own.
             expect(aiFacade.transcribe.mock.calls[0][1].providerOverride).toBeUndefined();
         });
 
-        it('honours a global operator default', async () => {
+        it('passes the env value as a FALLBACK, never as a pin', async () => {
+            // The distinction is the whole point. `providerOverride`
+            // short-circuits the facade's chain, so an env var passed
+            // there would beat every tenant's activated plugin.
+            // `fallbackProviderId` applies only after scope resolution
+            // finds nothing capable.
             process.env.TRANSCRIPTION_PROVIDER_ID = 'groq';
 
             await controller.transcribe(auth, clip('audio/webm'), {});
 
-            expect(aiFacade.transcribe.mock.calls[0][1].providerOverride).toBe('groq');
+            const [, facadeOptions, selection] = aiFacade.transcribe.mock.calls[0];
+            expect(facadeOptions.providerOverride).toBeUndefined();
+            expect(selection).toEqual({ fallbackProviderId: 'groq' });
         });
 
-        it('prefers the per-request choice over the global default', async () => {
+        it('lets an explicit per-request pick pin the provider', async () => {
             process.env.TRANSCRIPTION_PROVIDER_ID = 'groq';
 
             await controller.transcribe(auth, clip('audio/webm'), { providerId: 'openai' });
@@ -156,19 +164,16 @@ describe('TranscriptionController', () => {
             expect(aiFacade.transcribe.mock.calls[0][1].providerOverride).toBe('openai');
         });
 
-        it('falls back to the KB pin only when no dictation setting exists', async () => {
-            // Continuity: KB_TRANSCRIPTION_PROVIDER_ID was the only
-            // transcription setting before this endpoint, so it still
-            // applies — but it must never outrank a dictation-specific
-            // choice, which is what forced one vendor on chat before.
+        it('prefers the dictation env default over the KB ingest pin', async () => {
             process.env.KB_TRANSCRIPTION_PROVIDER_ID = 'kb-pinned';
-
             await controller.transcribe(auth, clip('audio/webm'), {});
-            expect(aiFacade.transcribe.mock.calls[0][1].providerOverride).toBe('kb-pinned');
+            expect(aiFacade.transcribe.mock.calls[0][2]).toEqual({
+                fallbackProviderId: 'kb-pinned',
+            });
 
             process.env.TRANSCRIPTION_PROVIDER_ID = 'groq';
             await controller.transcribe(auth, clip('audio/webm'), {});
-            expect(aiFacade.transcribe.mock.calls[1][1].providerOverride).toBe('groq');
+            expect(aiFacade.transcribe.mock.calls[1][2]).toEqual({ fallbackProviderId: 'groq' });
         });
 
         it('lists only providers that actually implement transcribe', async () => {
