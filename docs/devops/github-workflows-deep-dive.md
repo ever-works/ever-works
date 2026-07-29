@@ -21,21 +21,21 @@ image builds, Kubernetes deployments, CLI publishing, and Trigger.dev deployment
 
 ## Workflow Inventory
 
-| Workflow File                    | Name                                  | Trigger                         | Purpose                       |
-| -------------------------------- | ------------------------------------- | ------------------------------- | ----------------------------- |
-| `ci.yml`                         | CI                                    | Push/PR to main, develop, stage | Lint, build, test             |
-| `docker-build-publish-dev.yml`   | Build and Publish Docker Images Dev   | Push to develop                 | Build Docker images for dev   |
-| `docker-build-publish-stage.yml` | Build and Publish Docker Images Stage | Push to stage                   | Build Docker images for stage |
-| `docker-build-publish-prod.yml`  | Build and Publish Docker Images Prod  | Push to main                    | Build Docker images for prod  |
-| `k8s-build.yml`                  | k8s-build                             | Push to develop, stage, main    | **LIVE** — build api/web/mcp/docs images → GHCR |
-| `docker-build-publish-mcp-{dev,stage,prod}.yml` | Build and Publish MCP Images | Push to branch            | Build MCP images (DigitalOcean path) |
-| `deploy-do-dev.yml`              | Deploy to DO Dev                      | After Docker Dev completes      | **GATED** (`DO_ENABLED`) — legacy DigitalOcean deploy |
-| `deploy-do-stage.yml`            | Deploy to DO Stage                    | After Docker Stage completes    | **GATED** (`DO_ENABLED`) — legacy DigitalOcean deploy |
-| `deploy-do-prod.yml`             | Deploy to DO Prod                     | After Docker Prod completes     | **GATED** (`DO_ENABLED`) — legacy DigitalOcean deploy |
-| `release-trigger-dev.yml`        | Deploy to Trigger.dev Dev             | After CI on develop             | Deploy Trigger.dev dev        |
-| `release-trigger-stage.yml`      | Deploy to Trigger.dev Stage           | After CI on stage               | Deploy Trigger.dev staging    |
-| `release-trigger-prod.yml`       | Deploy to Trigger.dev Prod            | After CI on main                | Deploy Trigger.dev prod       |
-| `publish-cli.yml`                | Build and Publish CLIs                | Push to main, tags, manual      | Publish CLI packages          |
+| Workflow File                                   | Name                                  | Trigger                         | Purpose                                               |
+| ----------------------------------------------- | ------------------------------------- | ------------------------------- | ----------------------------------------------------- |
+| `ci.yml`                                        | CI                                    | Push/PR to main, develop, stage | Lint, build, test                                     |
+| `docker-build-publish-dev.yml`                  | Build and Publish Docker Images Dev   | Push to develop                 | Build Docker images for dev                           |
+| `docker-build-publish-stage.yml`                | Build and Publish Docker Images Stage | Push to stage                   | Build Docker images for stage                         |
+| `docker-build-publish-prod.yml`                 | Build and Publish Docker Images Prod  | Push to main                    | Build Docker images for prod                          |
+| `k8s-build.yml`                                 | k8s-build                             | Push to develop, stage, main    | **LIVE** — build api/web/mcp/docs images → GHCR       |
+| `docker-build-publish-mcp-{dev,stage,prod}.yml` | Build and Publish MCP Images          | Push to branch                  | Build MCP images (DigitalOcean path)                  |
+| `deploy-do-dev.yml`                             | Deploy to DO Dev                      | After Docker Dev completes      | **GATED** (`DO_ENABLED`) — legacy DigitalOcean deploy |
+| `deploy-do-stage.yml`                           | Deploy to DO Stage                    | After Docker Stage completes    | **GATED** (`DO_ENABLED`) — legacy DigitalOcean deploy |
+| `deploy-do-prod.yml`                            | Deploy to DO Prod                     | After Docker Prod completes     | **GATED** (`DO_ENABLED`) — legacy DigitalOcean deploy |
+| `release-trigger-dev.yml`                       | Deploy to Trigger.dev Dev             | After CI on develop             | Deploy Trigger.dev dev                                |
+| `release-trigger-stage.yml`                     | Deploy to Trigger.dev Stage           | After CI on stage               | Deploy Trigger.dev staging                            |
+| `release-trigger-prod.yml`                      | Deploy to Trigger.dev Prod            | After CI on main                | Deploy Trigger.dev prod                               |
+| `publish-cli.yml`                               | Build and Publish CLIs                | Push to main, tags, manual      | Publish CLI packages                                  |
 
 ## Pipeline Flow
 
@@ -165,12 +165,12 @@ The manifests receive a comprehensive set of environment variables:
 
 **Application:**
 
-| Variable          | Example                                                             |
-| ----------------- | ------------------------------------------------------------------- |
+| Variable          | Example                                                              |
+| ----------------- | -------------------------------------------------------------------- |
 | `WEB_URL`         | `https://app.ever.works` (prod) / `https://app-dev.ever.works` (dev) |
-| `ALLOWED_ORIGINS` | `https://app.ever.works,https://api.ever.works`                     |
-| `JWT_SECRET`      | From secrets                                                        |
-| `AUTH_SECRET`     | From secrets                                                        |
+| `ALLOWED_ORIGINS` | `https://app.ever.works,https://api.ever.works`                      |
+| `JWT_SECRET`      | From secrets                                                         |
+| `AUTH_SECRET`     | From secrets                                                         |
 
 **Trigger.dev:**
 
@@ -226,11 +226,11 @@ The manifests receive a comprehensive set of environment variables:
 These are the hostnames actually served by `ever-k8s` (ingress rules live in `ever-co/k8s-gitops` under
 `apps/ever-works-app-{dev,stage,prod}`):
 
-| Environment | Web URL                        | API URL                        | Admin URL                        | MCP URL                        |
-| ----------- | ------------------------------ | ------------------------------ | -------------------------------- | ------------------------------ |
-| dev         | `https://app-dev.ever.works`   | `https://api-dev.ever.works`   | `https://admin-dev.ever.works`   | `https://mcpdev.ever.works`    |
-| stage       | `https://app-stage.ever.works` | `https://api-stage.ever.works` | `https://admin-stage.ever.works` | `https://mcpstage.ever.works`  |
-| prod        | `https://app.ever.works`       | `https://api.ever.works`       | `https://admin.ever.works`       | `https://mcp.ever.works`       |
+| Environment | Web URL                        | API URL                        | Admin URL                        | MCP URL                       |
+| ----------- | ------------------------------ | ------------------------------ | -------------------------------- | ----------------------------- |
+| dev         | `https://app-dev.ever.works`   | `https://api-dev.ever.works`   | `https://admin-dev.ever.works`   | `https://mcpdev.ever.works`   |
+| stage       | `https://app-stage.ever.works` | `https://api-stage.ever.works` | `https://admin-stage.ever.works` | `https://mcpstage.ever.works` |
+| prod        | `https://app.ever.works`       | `https://api.ever.works`       | `https://admin.ever.works`       | `https://mcp.ever.works`      |
 
 **Legacy aliases.** The pre-migration DigitalOcean hostnames `appdev` / `apidev` / `appstage` /
 `apistage.ever.works` (no hyphen) are still served as additional ingress rules on the same backends, so old
