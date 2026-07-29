@@ -124,6 +124,22 @@ vi.mock('@ever-works/agent/agents', () => ({
     AgentRunService: AgentRunServiceToken,
     RunDispatchGateService: RunDispatchGateServiceToken,
     AgentEscalationService: AgentEscalationServiceToken,
+    // `recordLoopSample` calls this on EVERY gate grade, not only when the
+    // run-loop detector is switched on, so its absence from this factory
+    // threw inside the gate try-block and every gate case came back
+    // `gate-execution-failed`. Real signature is
+    // `(failures) => string` (agents/loop-detector.ts); a stable digest of
+    // the failing ids is enough for these tests and keeps the fingerprint
+    // meaningful — an empty string would make consecutive distinct
+    // failures look identical to the detector.
+    fingerprintFailures: (
+        failures: ReadonlyArray<{ id?: unknown; outcome?: unknown } | null | undefined>,
+    ): string =>
+        (failures ?? [])
+            .filter(Boolean)
+            .map((failure) => String((failure as { id?: unknown }).id ?? ''))
+            .sort()
+            .join('|'),
 }));
 
 // Judgment layer G2 - the worker reads the L0 pre-check operator switch
@@ -138,6 +154,14 @@ vi.mock('@ever-works/agent/config', () => ({
             // default OFF so every pre-judge case in this suite keeps its
             // byte-identical shape.
             isGateJudgeEnabled: () => judgeSwitch.on,
+            // Run-loop detector (same wave as `fingerprintFailures`). The
+            // worker calls these while grading a gate; without them the
+            // mocked `config.agents` returned undefined and the call threw.
+            // Default OFF, matching every other switch here, so existing
+            // cases keep their byte-identical pre-detector path.
+            isRunLoopDetectorEnabled: () => false,
+            getRunLoopRepeatThreshold: () => 3,
+            getRunLoopMaxRetries: () => 2,
         },
     },
 }));
