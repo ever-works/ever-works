@@ -807,6 +807,14 @@
                 "subtitle": "Файлы, загруженные в Память. Их текст извлекается для агентов.",
                 "title": "Оригиналы",
                 "uploading": "Загрузка…"
+            },
+            "agentMemory": {
+                "closed": "Закрыта",
+                "empty": "Сессий агентов пока нет.",
+                "open": "Открыта",
+                "subtitle": "Что агенты помнят из своих запусков — отдельно от загруженных документов.",
+                "title": "Память агентов",
+                "unavailable": "Поставщик памяти агентов не включён."
             }
         },
         "agentsPage": {
@@ -2853,7 +2861,7 @@
                 "deploy": "Развертывание",
                 "members": "Участники",
                 "settings": "Настройки",
-                "kb": "База знаний",
+                "kb": "Memory",
                 "tooltips": {
                     "activity": "Лента активности",
                     "kb": "База знаний",
@@ -4729,7 +4737,7 @@
                     "metaTitle": "Knowledge Base workbench",
                     "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
-                        "kb": "KB",
+                        "kb": "База знаний",
                         "originals": "Originals"
                     },
                     "originals": {

@@ -807,6 +807,14 @@
                 "subtitle": "Tệp đã tải lên Bộ nhớ. Văn bản được trích xuất cho tác nhân.",
                 "title": "Bản gốc",
                 "uploading": "Đang tải lên…"
+            },
+            "agentMemory": {
+                "closed": "Đã đóng",
+                "empty": "Chưa có phiên tác nhân nào.",
+                "open": "Đang mở",
+                "subtitle": "Những gì tác nhân ghi nhớ từ các lần chạy — tách biệt với tài liệu đã tải lên.",
+                "title": "Bộ nhớ tác nhân",
+                "unavailable": "Chưa bật nhà cung cấp bộ nhớ tác nhân."
             }
         },
         "agentsPage": {
@@ -2853,7 +2861,7 @@
                 "deploy": "Triển khai",
                 "members": "Thành viên",
                 "settings": "Cài đặt",
-                "kb": "Cơ sở tri thức",
+                "kb": "Memory",
                 "tooltips": {
                     "activity": "Bảng tin hoạt động",
                     "kb": "Cơ sở tri thức",
@@ -4729,7 +4737,7 @@
                     "metaTitle": "Knowledge Base workbench",
                     "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
-                        "kb": "KB",
+                        "kb": "Cơ sở tri thức",
                         "originals": "Originals"
                     },
                     "originals": {

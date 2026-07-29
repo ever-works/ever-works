@@ -807,6 +807,14 @@
                 "subtitle": "Pliki przesłane do Pamięci. Ich tekst jest wyodrębniany dla agentów.",
                 "title": "Oryginały",
                 "uploading": "Przesyłanie…"
+            },
+            "agentMemory": {
+                "closed": "Zamknięta",
+                "empty": "Brak zarejestrowanych sesji agentów.",
+                "open": "Otwarta",
+                "subtitle": "Co agenci pamiętają ze swoich uruchomień — odrębnie od przesłanych dokumentów.",
+                "title": "Pamięć agentów",
+                "unavailable": "Nie włączono dostawcy pamięci agentów."
             }
         },
         "agentsPage": {
@@ -2853,7 +2861,7 @@
                 "deploy": "Wdrożenie",
                 "members": "Członkowie",
                 "settings": "Ustawienia",
-                "kb": "Baza wiedzy",
+                "kb": "Memory",
                 "tooltips": {
                     "activity": "Kanał aktywności",
                     "kb": "Baza wiedzy",
@@ -4729,7 +4737,7 @@
                     "metaTitle": "Knowledge Base workbench",
                     "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
-                        "kb": "KB",
+                        "kb": "Baza wiedzy",
                         "originals": "Originals"
                     },
                     "originals": {
