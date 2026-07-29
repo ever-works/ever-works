@@ -61,9 +61,10 @@ interface Props {
     initialEvents?: AgentEventRow[];
     /**
      * `?run=<id>` — the run to open and scroll to on arrival. Set by the
-     * "View logs" link on a failed run (Task detail). Ignored when the id
-     * is not on this page of runs: the feed still renders normally rather
-     * than erroring on a stale or paged-out link.
+     * "View logs" link on a failed run (Task detail). A run that is not on
+     * this page of runs is fetched by id and pinned into the feed; only a
+     * link that fails to resolve (stale or foreign id) is ignored, and the
+     * feed then still renders normally rather than erroring.
      */
     focusRunId?: string | null;
 }
@@ -249,6 +250,24 @@ export function AgentActivityClient({
     );
     // runId → detail; null = fetch failed (rendered as retryable error state).
     const [details, setDetails] = useState<Record<string, AgentRunDetail | null>>({});
+    // A deep-linked run that is older than this page of runs, fetched by
+    // id and folded into the feed so the link lands on it. Null until (and
+    // unless) such a link arrives.
+    const [pinnedRun, setPinnedRun] = useState<AgentRunRow | null>(null);
+
+    const loadDetail = useCallback(
+        async (runId: string): Promise<AgentRunDetail | null> => {
+            try {
+                const detail = (await getAgentRunDetailAction(agentId, runId)) as AgentRunDetail;
+                setDetails((prev) => ({ ...prev, [runId]: detail }));
+                return detail;
+            } catch {
+                setDetails((prev) => ({ ...prev, [runId]: null }));
+                return null;
+            }
+        },
+        [agentId],
+    );
 
     const refresh = (offset: number) => {
         startTransition(() => {
@@ -264,6 +283,13 @@ export function AgentActivityClient({
         });
     };
 
+    // Paging away retires the pinned deep-link run: it belongs to the
+    // arrival, not to every page the caller browses afterwards.
+    const paginate = (offset: number) => {
+        setPinnedRun(null);
+        refresh(offset);
+    };
+
     const cancel = (runId: string) => {
         setCancellingId(runId);
         startTransition(() => {
@@ -271,6 +297,12 @@ export function AgentActivityClient({
                 try {
                     await cancelAgentRunAction(agentId, runId);
                     refresh(meta.offset);
+                    // A pinned run is not in `rows`, so the refresh above
+                    // cannot restatus it — re-read it directly.
+                    if (pinnedRun?.id === runId) {
+                        const detail = await loadDetail(runId);
+                        if (detail) setPinnedRun(detail);
+                    }
                 } finally {
                     setCancellingId(null);
                 }
@@ -278,32 +310,38 @@ export function AgentActivityClient({
         });
     };
 
-    const loadDetail = useCallback(
-        async (runId: string) => {
-            try {
-                const detail = await getAgentRunDetailAction(agentId, runId);
-                setDetails((prev) => ({ ...prev, [runId]: detail as AgentRunDetail }));
-            } catch {
-                setDetails((prev) => ({ ...prev, [runId]: null }));
-            }
-        },
-        [agentId],
-    );
-
     // Deep-link arrival: the row is already expanded (initial state), so
     // all that is left is fetching its logs and putting it on screen.
+    // The link carries only a run id, and the first page holds 25 rows —
+    // for a busy Agent the failure that was just clicked is often older
+    // than that, so a run that is off-page gets pinned into the feed from
+    // its own fetch. The detail endpoint is Agent-scoped, so it doubles
+    // as the ownership check: a run belonging to another Agent 404s and
+    // leaves the feed untouched.
     // Runs once — re-paginating or collapsing the row afterwards must not
     // yank the view back.
     const focusHandled = useRef(false);
     useEffect(() => {
         if (!focusRunId || focusHandled.current) return;
-        if (!rows.some((row) => row.id === focusRunId)) return;
         focusHandled.current = true;
-        void loadDetail(focusRunId);
-        document
-            .getElementById(`run-${focusRunId}`)
-            ?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+        const onPage = rows.some((row) => row.id === focusRunId);
+        void (async () => {
+            const detail = await loadDetail(focusRunId);
+            if (!onPage && detail) setPinnedRun(detail);
+        })();
     }, [focusRunId, rows, loadDetail]);
+
+    // Scrolling is a second pass because a pinned run only exists in the
+    // DOM once its fetch has landed. Both cases — on-page and pinned —
+    // wait for the row, then scroll it into view exactly once.
+    const focusScrolled = useRef(false);
+    useEffect(() => {
+        if (!focusRunId || focusScrolled.current) return;
+        const row = document.getElementById(`run-${focusRunId}`);
+        if (!row) return;
+        focusScrolled.current = true;
+        row.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }, [focusRunId, rows, pinnedRun]);
 
     const toggle = (runId: string) => {
         if (!expandedIds.has(runId) && details[runId] === undefined) void loadDetail(runId);
@@ -352,15 +390,19 @@ export function AgentActivityClient({
                 (e) => (isFirst || e.createdAt <= newest) && (isLast || e.createdAt >= oldest),
             );
         }
+        // The pinned deep-link run is dropped once the page it lives on is
+        // actually loaded, so it is never rendered twice.
+        const runs =
+            pinnedRun && !rows.some((row) => row.id === pinnedRun.id) ? [...rows, pinnedRun] : rows;
         return [
-            ...rows.map<FeedItem>((run) => ({ kind: 'run', run })),
+            ...runs.map<FeedItem>((run) => ({ kind: 'run', run })),
             ...visible.map<FeedItem>((event) => ({ kind: 'event', event })),
         ].sort((a, b) => {
             const ta = a.kind === 'run' ? a.run.createdAt : a.event.createdAt;
             const tb = b.kind === 'run' ? b.run.createdAt : b.event.createdAt;
             return tb.localeCompare(ta);
         });
-    }, [rows, events, meta]);
+    }, [rows, events, meta, pinnedRun]);
 
     const page = Math.floor(meta.offset / meta.limit) + 1;
     const totalPages = Math.max(1, Math.ceil(meta.total / meta.limit));
@@ -797,14 +839,14 @@ export function AgentActivityClient({
                         </span>
                         <div className="flex gap-1.5">
                             <button
-                                onClick={() => refresh(Math.max(0, meta.offset - meta.limit))}
+                                onClick={() => paginate(Math.max(0, meta.offset - meta.limit))}
                                 disabled={meta.offset === 0 || pending}
                                 className="px-2.5 py-1 text-xs rounded-md border border-border dark:border-border-dark disabled:opacity-40 hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
                             >
                                 Previous
                             </button>
                             <button
-                                onClick={() => refresh(meta.offset + meta.limit)}
+                                onClick={() => paginate(meta.offset + meta.limit)}
                                 disabled={meta.offset + meta.limit >= meta.total || pending}
                                 className="px-2.5 py-1 text-xs rounded-md border border-border dark:border-border-dark disabled:opacity-40 hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
                             >
