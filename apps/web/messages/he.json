@@ -838,6 +838,14 @@
                 "subtitle": "קבצים שהועלו לזיכרון. הטקסט שלהם מופק עבור הסוכנים.",
                 "title": "קבצים מקוריים",
                 "uploading": "מעלה…"
+            },
+            "agentMemory": {
+                "closed": "סגורה",
+                "empty": "עדיין לא נרשמו הפעלות של סוכנים.",
+                "open": "פתוחה",
+                "subtitle": "מה שהסוכנים זוכרים מההרצות שלהם — בנפרד ממסמכים שהועלו.",
+                "title": "זיכרון הסוכנים",
+                "unavailable": "לא מופעל ספק זיכרון סוכנים."
             }
         },
         "agentsPage": {
@@ -2921,7 +2929,7 @@
                 "deploy": "פריסה",
                 "members": "חברים",
                 "settings": "הגדרות",
-                "kb": "מאגר ידע",
+                "kb": "Memory",
                 "tooltips": {
                     "activity": "פיד פעילות",
                     "kb": "מאגר ידע",
@@ -4797,7 +4805,7 @@
                     "metaTitle": "Knowledge Base workbench",
                     "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
-                        "kb": "KB",
+                        "kb": "מאגר ידע",
                         "originals": "Originals"
                     },
                     "originals": {

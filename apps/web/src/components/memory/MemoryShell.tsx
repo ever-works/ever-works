@@ -16,6 +16,7 @@ import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
 import { MemoryUploadsPanel } from './MemoryUploadsPanel';
+import { AgentMemoryPanel } from './AgentMemoryPanel';
 import {
     buildMemoryQuery,
     type MemoryConsolidationReport,
@@ -255,6 +256,9 @@ export function MemoryShell({ initial }: MemoryShellProps) {
 
             {/* Originals — upload files into org-wide Memory */}
             <MemoryUploadsPanel />
+
+            {/* Agent memory — the half of Memory that is not a knowledge base */}
+            <AgentMemoryPanel />
 
             {/* Memory Consolidation — dry-run confirm surface / applied summary */}
             {consolidateFailed && (

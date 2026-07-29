@@ -807,6 +807,14 @@
                 "subtitle": "Ficheiros carregados na Memória. O texto é extraído para os agentes.",
                 "title": "Originais",
                 "uploading": "A carregar…"
+            },
+            "agentMemory": {
+                "closed": "Fechada",
+                "empty": "Ainda não há sessões de agente registadas.",
+                "open": "Aberta",
+                "subtitle": "O que os seus agentes recordam das execuções — separado dos ficheiros carregados.",
+                "title": "Memória dos agentes",
+                "unavailable": "Nenhum fornecedor de memória de agentes ativado."
             }
         },
         "agentsPage": {
@@ -2853,7 +2861,7 @@
                 "deploy": "Implantar",
                 "members": "Membros",
                 "settings": "Configurações",
-                "kb": "Base de conhecimento",
+                "kb": "Memory",
                 "tooltips": {
                     "activity": "Feed de atividade",
                     "kb": "Base de conhecimento",
@@ -4729,7 +4737,7 @@
                     "metaTitle": "Knowledge Base workbench",
                     "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
-                        "kb": "KB",
+                        "kb": "Base de conhecimento",
                         "originals": "Originals"
                     },
                     "originals": {

@@ -838,6 +838,14 @@
                 "subtitle": "Файлове, качени в Паметта. Текстът им се извлича за агентите.",
                 "title": "Оригинали",
                 "uploading": "Качване…"
+            },
+            "agentMemory": {
+                "closed": "Затворена",
+                "empty": "Все още няма записани сесии на агенти.",
+                "open": "Отворена",
+                "subtitle": "Какво помнят агентите от изпълненията си — отделно от качените документи.",
+                "title": "Памет на агентите",
+                "unavailable": "Няма активиран доставчик на памет за агенти."
             }
         },
         "agentsPage": {
@@ -2921,7 +2929,7 @@
                 "deploy": "Разполагане",
                 "members": "Членове",
                 "settings": "Настройки",
-                "kb": "База знания",
+                "kb": "Memory",
                 "tooltips": {
                     "activity": "Поток на активността",
                     "kb": "База знания",
@@ -4797,7 +4805,7 @@
                     "metaTitle": "Knowledge Base workbench",
                     "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
-                        "kb": "KB",
+                        "kb": "База знания",
                         "originals": "Originals"
                     },
                     "originals": {
