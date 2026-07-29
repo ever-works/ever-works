@@ -807,6 +807,14 @@
                 "subtitle": "ไฟล์ที่อัปโหลดไปยังหน่วยความจำ ระบบจะดึงข้อความออกมาให้เอเจนต์ใช้",
                 "title": "ไฟล์ต้นฉบับ",
                 "uploading": "กำลังอัปโหลด…"
+            },
+            "agentMemory": {
+                "closed": "ปิดแล้ว",
+                "empty": "ยังไม่มีเซสชันของเอเจนต์",
+                "open": "เปิดอยู่",
+                "subtitle": "สิ่งที่เอเจนต์จดจำจากการทำงาน แยกจากเอกสารที่อัปโหลด",
+                "title": "หน่วยความจำเอเจนต์",
+                "unavailable": "ยังไม่ได้เปิดใช้ผู้ให้บริการหน่วยความจำเอเจนต์"
             }
         },
         "agentsPage": {
@@ -2853,7 +2861,7 @@
                 "deploy": "เผยแพร่",
                 "members": "สมาชิก",
                 "settings": "การตั้งค่า",
-                "kb": "ฐานความรู้",
+                "kb": "Memory",
                 "tooltips": {
                     "activity": "ฟีดกิจกรรม",
                     "kb": "ฐานความรู้",
@@ -4729,7 +4737,7 @@
                     "metaTitle": "Knowledge Base workbench",
                     "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
-                        "kb": "KB",
+                        "kb": "ฐานความรู้",
                         "originals": "Originals"
                     },
                     "originals": {
