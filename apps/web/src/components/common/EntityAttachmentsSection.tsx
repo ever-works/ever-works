@@ -1,6 +1,7 @@
 'use client';
 
 import { useRef, useState, useTransition } from 'react';
+import Image from 'next/image';
 import {
     File as FileIcon,
     FileArchive,
@@ -363,17 +364,19 @@ export function EntityAttachmentsSection<TRow extends EntityAttachmentRow>({
                         const openUrl = m?.url ?? r.url ?? undefined;
                         // Images render a real thumbnail (served same-origin via
                         // the auth proxy); everything else — and any image that
-                        // fails to load — gets the type-aware icon tile. Plain
-                        // <img>, not next/image: the optimizer fetches server-side
-                        // without the viewer's session cookie, which the
-                        // owner-gated serve proxy rejects with a 401.
+                        // fails to load — gets the type-aware icon tile.
+                        // `unoptimized` is required: the optimizer refetches the
+                        // URL server-side without the viewer's session cookie
                         const PreviewInner =
                             kind.isImage && openUrl && !brokenThumbs[r.id] ? (
-                                <img
+                                <Image
                                     src={openUrl}
                                     alt={filename}
+                                    fill
+                                    unoptimized
                                     loading="lazy"
-                                    className="h-full w-full object-cover"
+                                    sizes="(min-width: 1536px) 25vw, (min-width: 640px) 33vw, 50vw"
+                                    className="object-cover"
                                     onError={() =>
                                         setBrokenThumbs((prev) => ({ ...prev, [r.id]: true }))
                                     }
@@ -409,7 +412,7 @@ export function EntityAttachmentsSection<TRow extends EntityAttachmentRow>({
                                         rel="noopener noreferrer"
                                         title={`Open ${filename}`}
                                         className={cn(
-                                            'flex aspect-4/3 items-center justify-center overflow-hidden',
+                                            'relative flex aspect-4/3 items-center justify-center overflow-hidden',
                                             kind.previewBg,
                                         )}
                                     >
@@ -418,7 +421,7 @@ export function EntityAttachmentsSection<TRow extends EntityAttachmentRow>({
                                 ) : (
                                     <div
                                         className={cn(
-                                            'flex aspect-4/3 items-center justify-center overflow-hidden',
+                                            'relative flex aspect-4/3 items-center justify-center overflow-hidden',
                                             kind.previewBg,
                                         )}
                                     >
