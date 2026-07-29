@@ -48,7 +48,10 @@ const STATIC_SECURITY_HEADERS: Record<string, string> = {
     'X-Content-Type-Options': 'nosniff',
     'X-Frame-Options': 'DENY',
     'Referrer-Policy': 'strict-origin-when-cross-origin',
-    'Permissions-Policy': 'camera=(), microphone=(), geolocation=(), interest-cohort=()',
+    // Keep in lockstep with `next.config.ts` — `microphone=(self)` so
+    // chat voice dictation can reach getUserMedia on our own origin;
+    // still denied to every embed. See the note there.
+    'Permissions-Policy': 'camera=(), microphone=(self), geolocation=(), interest-cohort=()',
     'Strict-Transport-Security': 'max-age=15552000; includeSubDomains',
 };
 

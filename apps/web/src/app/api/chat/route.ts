@@ -1,6 +1,8 @@
 import { consumeStream, type UIMessage } from 'ai';
+import { after } from 'next/server';
 import { z } from 'zod';
 import { runAgent } from '@/lib/ai/agent';
+import { API_URL } from '@/lib/constants';
 import { getAuthAccessCookie } from '@/lib/auth/cookies';
 import { saveConversationMessages, type MessageUsage } from '@/lib/ai/persistence';
 
@@ -65,6 +67,22 @@ const chatBodySchema = z.object({
     workId: z.string().min(1).max(128).optional(),
     conversationId: z.string().min(1).max(128).optional(),
     currentPageUrl: z.string().max(2048).optional(),
+    /**
+     * Upload ids for files attached in the composer.
+     *
+     * The model already sees the attachments as a fenced block inside the
+     * user turn; this is the PLATFORM's copy, so nothing downstream has to
+     * re-parse a model-facing string to recover ids. Constrained to the
+     * sha256 shape the uploads spine issues — an id is a lookup key, and a
+     * free-form string here would be one.
+     *
+     * Bounded at 20: the composer allows multi-select, and an unbounded
+     * array is a cheap way to make a request expensive.
+     */
+    attachmentIds: z
+        .array(z.string().regex(/^[a-f0-9]{64}$/))
+        .max(20)
+        .optional(),
 });
 
 export async function POST(request: Request) {
@@ -88,13 +106,41 @@ export async function POST(request: Request) {
             { status: 400 },
         );
     }
-    const { messages, providerOverride, workId, conversationId, currentPageUrl } = parsed.data as {
-        messages: UIMessage[];
-        providerOverride: string;
-        workId?: string;
-        conversationId?: string;
-        currentPageUrl?: string;
-    };
+    const { messages, providerOverride, workId, conversationId, currentPageUrl, attachmentIds } =
+        parsed.data as {
+            messages: UIMessage[];
+            providerOverride: string;
+            workId?: string;
+            conversationId?: string;
+            currentPageUrl?: string;
+            attachmentIds?: string[];
+        };
+    // Files attached in chat also land in global Memory, so the org keeps
+    // them after the conversation scrolls away.
+    //
+    // Scheduled with `after()` rather than awaited: ingest reads each file
+    // back out of storage and extracts its text, which is far too slow to
+    // sit in front of the first streamed token. It is also strictly
+    // best-effort — a failure here must never cost the user their message,
+    // so nothing about the chat response depends on the outcome.
+    if (attachmentIds && attachmentIds.length > 0) {
+        after(async () => {
+            try {
+                await fetch(`${API_URL}/memory/uploads/from-attachments`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Authorization: `Bearer ${token}`,
+                    },
+                    body: JSON.stringify({ attachmentIds }),
+                    cache: 'no-store',
+                });
+            } catch {
+                // Deliberately silent: Memory ingest is an enhancement of
+                // the chat turn, not part of it.
+            }
+        });
+    }
 
     if (!providerOverride) {
         return new Response('providerOverride is required', { status: 400 });

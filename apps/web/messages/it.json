@@ -791,7 +791,31 @@
                 "noResults": "Nessun documento corrisponde alla tua ricerca e ai filtri."
             },
             "orgScoped": "Organizzazione",
-            "openInWork": "Apri nel Lavoro"
+            "openInWork": "Apri nel Lavoro",
+            "uploads": {
+                "action": "Carica file",
+                "dropHint": "Trascina i file da caricare",
+                "empty": "Nessun file nella Memoria.",
+                "failed": "Caricamento non riuscito",
+                "noOrg": "Seleziona un’organizzazione prima di caricare.",
+                "retry": "Riprova",
+                "statusFailed": "Estrazione non riuscita",
+                "statusPending": "In attesa",
+                "statusRunning": "Estrazione…",
+                "statusSkipped": "Nessun testo estratto",
+                "statusSucceeded": "Estratto",
+                "subtitle": "File caricati nella Memoria. Il testo viene estratto per gli agenti.",
+                "title": "Originali",
+                "uploading": "Caricamento…"
+            },
+            "agentMemory": {
+                "closed": "Chiusa",
+                "empty": "Nessuna sessione agente registrata.",
+                "open": "Aperta",
+                "subtitle": "Ciò che i tuoi agenti ricordano dalle loro esecuzioni, distinto dai documenti caricati.",
+                "title": "Memoria degli agenti",
+                "unavailable": "Nessun provider di memoria agenti abilitato."
+            }
         },
         "agentsPage": {
             "title": "Agenti",
@@ -2860,7 +2884,7 @@
                 "deploy": "Distribuzione",
                 "members": "Membri",
                 "settings": "Impostazioni",
-                "kb": "Base di conoscenza",
+                "kb": "Memory",
                 "tooltips": {
                     "activity": "Feed attività",
                     "kb": "Base di conoscenza",
@@ -4734,13 +4758,26 @@
                 "workbench": {
                     "title": "Knowledge Base workbench",
                     "metaTitle": "Knowledge Base workbench",
-                    "empty": "Select a document from the tree, or upload a file via drag-and-drop (coming in slice C).",
+                    "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
-                        "kb": "KB",
+                        "kb": "Base di conoscenza",
                         "originals": "Originals"
                     },
                     "originals": {
-                        "placeholder": "Drag-and-drop upload of original files lands in slice C. Use the KB tab to browse documents in the meantime."
+                        "empty": "No original files yet. Drag a file onto the tree to upload one.",
+                        "loading": "Loading originals…",
+                        "error": "Could not load originals.",
+                        "retry": "Retry extraction",
+                        "retrying": "Retrying…",
+                        "openDocument": "Open extracted document",
+                        "download": "Download original",
+                        "status": {
+                            "pending": "Pending",
+                            "running": "Extracting…",
+                            "succeeded": "Extracted",
+                            "skipped": "Not extractable",
+                            "failed": "Extraction failed"
+                        }
                     },
                     "editor": {
                         "preview": "Preview",
@@ -5905,6 +5942,17 @@
             "feelingLucky": "Suggerisci una lavori da creare",
             "errors": {
                 "unableToSend": "Impossibile inviare messaggio"
+            },
+            "attachments": {
+                "attach": "Attach files",
+                "remove": "Remove attachment",
+                "tooLarge": "File is larger than the 25 MB limit",
+                "failed": "Upload failed"
+            },
+            "dictation": {
+                "start": "Detta",
+                "stop": "Interrompi registrazione",
+                "transcribing": "Trascrizione…"
             }
         },
         "plugins": {

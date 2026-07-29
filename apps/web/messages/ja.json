@@ -791,7 +791,31 @@
                 "noResults": "検索とフィルターに一致するドキュメントはありません。"
             },
             "orgScoped": "組織",
-            "openInWork": "ワークで開く"
+            "openInWork": "ワークで開く",
+            "uploads": {
+                "action": "ファイルをアップロード",
+                "dropHint": "ファイルをここにドロップ",
+                "empty": "メモリにファイルはまだありません。",
+                "failed": "アップロードに失敗しました",
+                "noOrg": "アップロード前に組織を選択してください。",
+                "retry": "再試行",
+                "statusFailed": "抽出に失敗",
+                "statusPending": "待機中",
+                "statusRunning": "抽出中…",
+                "statusSkipped": "テキストなし",
+                "statusSucceeded": "抽出済み",
+                "subtitle": "メモリにアップロードされたファイル。テキストはエージェント用に抽出されます。",
+                "title": "オリジナル",
+                "uploading": "アップロード中…"
+            },
+            "agentMemory": {
+                "closed": "終了",
+                "empty": "エージェントのセッションはまだありません。",
+                "open": "進行中",
+                "subtitle": "エージェントが実行から記憶した内容 — アップロード文書とは別です。",
+                "title": "エージェントメモリ",
+                "unavailable": "エージェントメモリのプロバイダーが有効になっていません。"
+            }
         },
         "agentsPage": {
             "title": "エージェント",
@@ -2860,7 +2884,7 @@
                 "deploy": "デプロイ",
                 "members": "メンバー",
                 "settings": "設定",
-                "kb": "ナレッジベース",
+                "kb": "Memory",
                 "tooltips": {
                     "activity": "アクティビティフィード",
                     "kb": "ナレッジベース",
@@ -4734,13 +4758,26 @@
                 "workbench": {
                     "title": "Knowledge Base workbench",
                     "metaTitle": "Knowledge Base workbench",
-                    "empty": "Select a document from the tree, or upload a file via drag-and-drop (coming in slice C).",
+                    "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
-                        "kb": "KB",
+                        "kb": "ナレッジベース",
                         "originals": "Originals"
                     },
                     "originals": {
-                        "placeholder": "Drag-and-drop upload of original files lands in slice C. Use the KB tab to browse documents in the meantime."
+                        "empty": "No original files yet. Drag a file onto the tree to upload one.",
+                        "loading": "Loading originals…",
+                        "error": "Could not load originals.",
+                        "retry": "Retry extraction",
+                        "retrying": "Retrying…",
+                        "openDocument": "Open extracted document",
+                        "download": "Download original",
+                        "status": {
+                            "pending": "Pending",
+                            "running": "Extracting…",
+                            "succeeded": "Extracted",
+                            "skipped": "Not extractable",
+                            "failed": "Extraction failed"
+                        }
                     },
                     "editor": {
                         "preview": "Preview",
@@ -5905,6 +5942,17 @@
             "feelingLucky": "作成するワークを提案",
             "errors": {
                 "unableToSend": "メッセージの送信ができません"
+            },
+            "attachments": {
+                "attach": "Attach files",
+                "remove": "Remove attachment",
+                "tooLarge": "File is larger than the 25 MB limit",
+                "failed": "Upload failed"
+            },
+            "dictation": {
+                "start": "音声入力",
+                "stop": "録音を停止",
+                "transcribing": "文字起こし中…"
             }
         },
         "plugins": {

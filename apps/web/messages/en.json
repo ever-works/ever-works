@@ -874,7 +874,31 @@
                 "noResults": "No documents match your search and filters."
             },
             "orgScoped": "Organization",
-            "openInWork": "Open in Work"
+            "openInWork": "Open in Work",
+            "uploads": {
+                "action": "Upload files",
+                "dropHint": "Drop files to upload",
+                "empty": "No files uploaded to Memory yet.",
+                "failed": "Upload failed",
+                "noOrg": "Select an Organization before uploading.",
+                "retry": "Retry",
+                "statusFailed": "Extraction failed",
+                "statusPending": "Pending",
+                "statusRunning": "Extracting…",
+                "statusSkipped": "No text extracted",
+                "statusSucceeded": "Extracted",
+                "subtitle": "Files uploaded to Memory. Their text is extracted so agents can use it.",
+                "title": "Originals",
+                "uploading": "Uploading…"
+            },
+            "agentMemory": {
+                "closed": "Closed",
+                "empty": "No agent sessions recorded yet.",
+                "open": "Open",
+                "subtitle": "What your agents remember from their runs — separate from uploaded documents.",
+                "title": "Agent Memory",
+                "unavailable": "No agent-memory provider is enabled."
+            }
         },
         "agentsPage": {
             "title": "Agents",
@@ -3002,7 +3026,7 @@
                 "deploy": "Deploy",
                 "members": "Members",
                 "settings": "Settings",
-                "kb": "KB",
+                "kb": "Memory",
                 "tooltips": {
                     "activity": "Activity Feed",
                     "kb": "Knowledge Base",
@@ -4876,13 +4900,26 @@
                 "workbench": {
                     "title": "Knowledge Base workbench",
                     "metaTitle": "Knowledge Base workbench",
-                    "empty": "Select a document from the tree, or upload a file via drag-and-drop (coming in slice C).",
+                    "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
-                        "kb": "KB",
+                        "kb": "Knowledge Base",
                         "originals": "Originals"
                     },
                     "originals": {
-                        "placeholder": "Drag-and-drop upload of original files lands in slice C. Use the KB tab to browse documents in the meantime."
+                        "empty": "No original files yet. Drag a file onto the tree to upload one.",
+                        "loading": "Loading originals…",
+                        "error": "Could not load originals.",
+                        "retry": "Retry extraction",
+                        "retrying": "Retrying…",
+                        "openDocument": "Open extracted document",
+                        "download": "Download original",
+                        "status": {
+                            "pending": "Pending",
+                            "running": "Extracting…",
+                            "succeeded": "Extracted",
+                            "skipped": "Not extractable",
+                            "failed": "Extraction failed"
+                        }
                     },
                     "editor": {
                         "preview": "Preview",
@@ -6204,6 +6241,17 @@
             "feelingLucky": "Suggest a Work to build",
             "errors": {
                 "unableToSend": "Unable to send message"
+            },
+            "attachments": {
+                "attach": "Attach files",
+                "remove": "Remove attachment",
+                "tooLarge": "File is larger than the 25 MB limit",
+                "failed": "Upload failed"
+            },
+            "dictation": {
+                "start": "Dictate",
+                "stop": "Stop recording",
+                "transcribing": "Transcribing…"
             }
         },
         "plugins": {

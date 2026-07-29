@@ -512,6 +512,9 @@ export class KbController {
             tags: body.tags,
             description: body.description ?? null,
             title: body.title,
+            // When set, the service derives the class from the extracted
+            // text and `targetClass` becomes the fallback.
+            autoClassify: body.autoClassify,
         });
     }
 

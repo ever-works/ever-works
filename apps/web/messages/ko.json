@@ -791,7 +791,31 @@
                 "noResults": "검색 및 필터와 일치하는 문서가 없습니다."
             },
             "orgScoped": "조직",
-            "openInWork": "워크에서 열기"
+            "openInWork": "워크에서 열기",
+            "uploads": {
+                "action": "파일 업로드",
+                "dropHint": "파일을 여기에 놓으세요",
+                "empty": "메모리에 파일이 없습니다.",
+                "failed": "업로드 실패",
+                "noOrg": "업로드하기 전에 조직을 선택하세요.",
+                "retry": "다시 시도",
+                "statusFailed": "추출 실패",
+                "statusPending": "대기 중",
+                "statusRunning": "추출 중…",
+                "statusSkipped": "추출된 텍스트 없음",
+                "statusSucceeded": "추출됨",
+                "subtitle": "메모리에 업로드된 파일입니다. 에이전트가 사용할 수 있도록 텍스트를 추출합니다.",
+                "title": "원본",
+                "uploading": "업로드 중…"
+            },
+            "agentMemory": {
+                "closed": "닫힘",
+                "empty": "기록된 에이전트 세션이 없습니다.",
+                "open": "열림",
+                "subtitle": "에이전트가 실행에서 기억한 내용 — 업로드된 문서와는 별개입니다.",
+                "title": "에이전트 메모리",
+                "unavailable": "활성화된 에이전트 메모리 공급자가 없습니다."
+            }
         },
         "agentsPage": {
             "title": "에이전트",
@@ -2860,7 +2884,7 @@
                 "deploy": "배포",
                 "members": "멤버",
                 "settings": "설정",
-                "kb": "지식 베이스",
+                "kb": "Memory",
                 "tooltips": {
                     "activity": "활동 피드",
                     "kb": "지식 베이스",
@@ -4734,13 +4758,26 @@
                 "workbench": {
                     "title": "Knowledge Base workbench",
                     "metaTitle": "Knowledge Base workbench",
-                    "empty": "Select a document from the tree, or upload a file via drag-and-drop (coming in slice C).",
+                    "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
-                        "kb": "KB",
+                        "kb": "지식 베이스",
                         "originals": "Originals"
                     },
                     "originals": {
-                        "placeholder": "Drag-and-drop upload of original files lands in slice C. Use the KB tab to browse documents in the meantime."
+                        "empty": "No original files yet. Drag a file onto the tree to upload one.",
+                        "loading": "Loading originals…",
+                        "error": "Could not load originals.",
+                        "retry": "Retry extraction",
+                        "retrying": "Retrying…",
+                        "openDocument": "Open extracted document",
+                        "download": "Download original",
+                        "status": {
+                            "pending": "Pending",
+                            "running": "Extracting…",
+                            "succeeded": "Extracted",
+                            "skipped": "Not extractable",
+                            "failed": "Extraction failed"
+                        }
                     },
                     "editor": {
                         "preview": "Preview",
@@ -5905,6 +5942,17 @@
             "feelingLucky": "생성할 워크 제안",
             "errors": {
                 "unableToSend": "메시지 전송 불가"
+            },
+            "attachments": {
+                "attach": "Attach files",
+                "remove": "Remove attachment",
+                "tooLarge": "File is larger than the 25 MB limit",
+                "failed": "Upload failed"
+            },
+            "dictation": {
+                "start": "받아쓰기",
+                "stop": "녹음 중지",
+                "transcribing": "변환 중…"
             }
         },
         "plugins": {

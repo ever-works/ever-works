@@ -822,7 +822,31 @@
                 "noResults": "Keine Dokumente entsprechen Ihrer Suche und Ihren Filtern."
             },
             "orgScoped": "Organisation",
-            "openInWork": "Im Werk öffnen"
+            "openInWork": "Im Werk öffnen",
+            "uploads": {
+                "action": "Dateien hochladen",
+                "dropHint": "Dateien zum Hochladen ablegen",
+                "empty": "Noch keine Dateien im Speicher.",
+                "failed": "Upload fehlgeschlagen",
+                "noOrg": "Wählen Sie vor dem Hochladen eine Organisation aus.",
+                "retry": "Erneut versuchen",
+                "statusFailed": "Extraktion fehlgeschlagen",
+                "statusPending": "Ausstehend",
+                "statusRunning": "Wird extrahiert…",
+                "statusSkipped": "Kein Text extrahiert",
+                "statusSucceeded": "Extrahiert",
+                "subtitle": "In den Speicher hochgeladene Dateien. Ihr Text wird für Agenten extrahiert.",
+                "title": "Originale",
+                "uploading": "Wird hochgeladen…"
+            },
+            "agentMemory": {
+                "closed": "Geschlossen",
+                "empty": "Noch keine Agentensitzungen aufgezeichnet.",
+                "open": "Offen",
+                "subtitle": "Woran sich Ihre Agenten aus ihren Läufen erinnern — getrennt von hochgeladenen Dokumenten.",
+                "title": "Agenten-Speicher",
+                "unavailable": "Kein Agenten-Speicher-Anbieter aktiviert."
+            }
         },
         "agentsPage": {
             "title": "Agenten",
@@ -2928,7 +2952,7 @@
                 "deploy": "Bereitstellen",
                 "members": "Mitglieder",
                 "settings": "Einstellungen",
-                "kb": "Wissensdatenbank",
+                "kb": "Memory",
                 "tooltips": {
                     "activity": "Aktivitäts-Feed",
                     "kb": "Wissensdatenbank",
@@ -4802,13 +4826,26 @@
                 "workbench": {
                     "title": "Knowledge Base workbench",
                     "metaTitle": "Knowledge Base workbench",
-                    "empty": "Select a document from the tree, or upload a file via drag-and-drop (coming in slice C).",
+                    "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
-                        "kb": "KB",
+                        "kb": "Wissensdatenbank",
                         "originals": "Originals"
                     },
                     "originals": {
-                        "placeholder": "Drag-and-drop upload of original files lands in slice C. Use the KB tab to browse documents in the meantime."
+                        "empty": "No original files yet. Drag a file onto the tree to upload one.",
+                        "loading": "Loading originals…",
+                        "error": "Could not load originals.",
+                        "retry": "Retry extraction",
+                        "retrying": "Retrying…",
+                        "openDocument": "Open extracted document",
+                        "download": "Download original",
+                        "status": {
+                            "pending": "Pending",
+                            "running": "Extracting…",
+                            "succeeded": "Extracted",
+                            "skipped": "Not extractable",
+                            "failed": "Extraction failed"
+                        }
                     },
                     "editor": {
                         "preview": "Preview",
@@ -5972,6 +6009,17 @@
             "feelingLucky": "Schlage ein zu erstellendes Werk vor",
             "errors": {
                 "unableToSend": "Nachricht konnte nicht gesendet werden"
+            },
+            "attachments": {
+                "attach": "Attach files",
+                "remove": "Remove attachment",
+                "tooLarge": "File is larger than the 25 MB limit",
+                "failed": "Upload failed"
+            },
+            "dictation": {
+                "start": "Diktieren",
+                "stop": "Aufnahme stoppen",
+                "transcribing": "Wird transkribiert…"
             }
         },
         "plugins": {

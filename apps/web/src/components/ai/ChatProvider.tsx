@@ -16,6 +16,11 @@ import { usePathname } from 'next/navigation';
 import type { ProviderOption } from '@/lib/api/types-only';
 import { getGlobalFormSchema } from '@/app/actions/dashboard/generator-form';
 import { resolveEffectiveDefault } from '@ever-works/plugin';
+import {
+    attachmentUploadIds,
+    formatAttachmentsBlock,
+    type ChatAttachmentRef,
+} from '@/lib/ai/attachments';
 import { toast } from 'sonner';
 import { DEFAULT_AI_PROVIDER } from '@/lib/constants';
 import { useLocalStorage } from '@/lib/hooks/use-local-storage';
@@ -36,7 +41,12 @@ interface ChatContextValue {
     error: Error | undefined;
     stop: () => void;
     regenerate: () => void;
-    sendMessage: (text: string) => void;
+    /**
+     * `attachments` is optional so every existing caller (welcome
+     * suggestions, tool-result confirm/cancel buttons) keeps compiling
+     * unchanged — only the composer passes them.
+     */
+    sendMessage: (text: string, attachments?: ReadonlyArray<ChatAttachmentRef>) => void;
     resetChat: () => void;
     providers: ProviderOption[];
     selectedProvider: string;
@@ -170,12 +180,19 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     }, [refreshConversations]);
 
     const sendMessage = useCallback(
-        async (text: string) => {
-            if (!text.trim()) return;
+        async (text: string, attachments?: ReadonlyArray<ChatAttachmentRef>) => {
+            const refs = attachments ?? [];
+            // A message carrying only files is legitimate — "here, look at
+            // this" — so an empty string is allowed when attachments exist.
+            if (!text.trim() && refs.length === 0) return;
 
             if (!conversationIdRef.current) {
                 try {
-                    const normalised = text.replace(/\s+/g, ' ').trim();
+                    // Title from the TEXT only. A conversation titled after a
+                    // filename tells the user nothing useful in the history
+                    // list, and the attachment block is machine-shaped.
+                    const seed = text.trim() || refs[0]?.name || '';
+                    const normalised = seed.replace(/\s+/g, ' ').trim();
                     const title =
                         normalised.length <= 60 ? normalised : normalised.substring(0, 57) + '...';
                     const conv = await createConversation(selectedProviderRef.current, title);
@@ -186,13 +203,19 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 }
             }
 
+            // The fenced block is what the MODEL sees; `attachmentIds` is
+            // what the PLATFORM sees. Sending both means the server never
+            // has to re-parse a model-facing string to recover ids — the
+            // block can change wording freely without breaking tool calls.
+            const body = text.trim() + formatAttachmentsBlock(refs);
             chatRef.current.sendMessage(
-                { text },
+                { text: body },
                 {
                     body: {
                         providerOverride: selectedProviderRef.current,
                         conversationId: conversationIdRef.current,
                         currentPageUrl: pathnameRef.current,
+                        attachmentIds: attachmentUploadIds(refs),
                     },
                 },
             );

@@ -791,7 +791,31 @@
                 "noResults": "Nenhum documento corresponde à sua pesquisa e filtros."
             },
             "orgScoped": "Organização",
-            "openInWork": "Abrir no Trabalho"
+            "openInWork": "Abrir no Trabalho",
+            "uploads": {
+                "action": "Carregar ficheiros",
+                "dropHint": "Largue os ficheiros para carregar",
+                "empty": "Ainda não há ficheiros na Memória.",
+                "failed": "Falha no carregamento",
+                "noOrg": "Selecione uma organização antes de carregar.",
+                "retry": "Tentar novamente",
+                "statusFailed": "Falha na extração",
+                "statusPending": "Pendente",
+                "statusRunning": "A extrair…",
+                "statusSkipped": "Nenhum texto extraído",
+                "statusSucceeded": "Extraído",
+                "subtitle": "Ficheiros carregados na Memória. O texto é extraído para os agentes.",
+                "title": "Originais",
+                "uploading": "A carregar…"
+            },
+            "agentMemory": {
+                "closed": "Fechada",
+                "empty": "Ainda não há sessões de agente registadas.",
+                "open": "Aberta",
+                "subtitle": "O que os seus agentes recordam das execuções — separado dos ficheiros carregados.",
+                "title": "Memória dos agentes",
+                "unavailable": "Nenhum fornecedor de memória de agentes ativado."
+            }
         },
         "agentsPage": {
             "title": "Agentes",
@@ -2860,7 +2884,7 @@
                 "deploy": "Implantar",
                 "members": "Membros",
                 "settings": "Configurações",
-                "kb": "Base de conhecimento",
+                "kb": "Memory",
                 "tooltips": {
                     "activity": "Feed de atividade",
                     "kb": "Base de conhecimento",
@@ -4734,13 +4758,26 @@
                 "workbench": {
                     "title": "Knowledge Base workbench",
                     "metaTitle": "Knowledge Base workbench",
-                    "empty": "Select a document from the tree, or upload a file via drag-and-drop (coming in slice C).",
+                    "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
-                        "kb": "KB",
+                        "kb": "Base de conhecimento",
                         "originals": "Originals"
                     },
                     "originals": {
-                        "placeholder": "Drag-and-drop upload of original files lands in slice C. Use the KB tab to browse documents in the meantime."
+                        "empty": "No original files yet. Drag a file onto the tree to upload one.",
+                        "loading": "Loading originals…",
+                        "error": "Could not load originals.",
+                        "retry": "Retry extraction",
+                        "retrying": "Retrying…",
+                        "openDocument": "Open extracted document",
+                        "download": "Download original",
+                        "status": {
+                            "pending": "Pending",
+                            "running": "Extracting…",
+                            "succeeded": "Extracted",
+                            "skipped": "Not extractable",
+                            "failed": "Extraction failed"
+                        }
                     },
                     "editor": {
                         "preview": "Preview",
@@ -5905,6 +5942,17 @@
             "feelingLucky": "Sugerir um trabalho para criar",
             "errors": {
                 "unableToSend": "Não foi possível enviar a mensagem"
+            },
+            "attachments": {
+                "attach": "Attach files",
+                "remove": "Remove attachment",
+                "tooLarge": "File is larger than the 25 MB limit",
+                "failed": "Upload failed"
+            },
+            "dictation": {
+                "start": "Ditar",
+                "stop": "Parar gravação",
+                "transcribing": "A transcrever…"
             }
         },
         "plugins": {
