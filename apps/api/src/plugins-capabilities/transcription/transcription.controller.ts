@@ -2,6 +2,7 @@ import {
     BadRequestException,
     Body,
     Controller,
+    Get,
     HttpCode,
     HttpStatus,
     Logger,
@@ -21,7 +22,7 @@ import {
     ApiTags,
 } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
-import { IsOptional, IsString, MaxLength } from 'class-validator';
+import { IsOptional, IsString, Matches, MaxLength } from 'class-validator';
 import { AiFacadeService, TranscriptionNotConfiguredError } from '@ever-works/agent/facades';
 import { config } from '@ever-works/agent/config';
 import { AuthSessionGuard, CurrentUser } from '../../auth';
@@ -66,6 +67,23 @@ export class TranscribeDto {
     @IsString()
     @MaxLength(35)
     language?: string;
+
+    /**
+     * Explicit provider for this call — the narrowest level of the
+     * resolution chain, so a user (or a per-account setting in the UI)
+     * can pick B instead of A without touching deployment config.
+     *
+     * Omit it and selection falls through to the operator default, then
+     * to whichever AI-provider plugin is ACTIVATED for this scope. See
+     * `resolveProviderId` for the whole order.
+     */
+    @IsOptional()
+    @IsString()
+    @MaxLength(64)
+    @Matches(/^[a-z0-9-]+$/, {
+        message: 'providerId must be a plugin id (lowercase, digits, hyphens)',
+    })
+    providerId?: string;
 }
 
 @ApiTags('Transcription')
@@ -76,6 +94,40 @@ export class TranscriptionController {
     private readonly logger = new Logger(TranscriptionController.name);
 
     constructor(private readonly aiFacade: AiFacadeService) {}
+
+    /**
+     * The platform-wide default voice provider, if an operator set one.
+     *
+     * This is a DEFAULT, not a pin: it is handed to the facade as
+     * `fallbackProviderId`, which only applies once scope resolution has
+     * failed to produce a transcription-capable plugin. A tenant that
+     * activates a voice plugin therefore overrides it, which is how every
+     * other setting in this platform resolves (work > user > admin > env
+     * > defaults — env is near the BOTTOM, not the top).
+     *
+     * The earlier version passed this as `providerOverride`, which skips
+     * the entire chain. One operator env var then silently beat every
+     * tenant's own activated plugin.
+     */
+    private defaultProviderId(): string | undefined {
+        const global = process.env.TRANSCRIPTION_PROVIDER_ID;
+        if (global && global.length > 0) return global;
+        return config.kb.getTranscriptionProviderId();
+    }
+
+    @Get('providers')
+    @ApiOperation({
+        summary: 'Voice providers available in this scope',
+        description:
+            'AI-provider plugins that implement `transcribe()`, so the client can offer a choice rather than assume a vendor. `isActive` marks the one this scope resolves to by default. Capability is probed on the plugin instance because `transcribe` is optional on the AI-provider interface — being an AI provider does not imply speech-to-text.',
+    })
+    @ApiResponse({ status: 200, description: '{ providers: [{ id, name, isActive }] }' })
+    async listProviders(@CurrentUser() auth: AuthenticatedUser) {
+        const providers = await this.aiFacade.listTranscriptionProviders({
+            userId: auth.userId,
+        });
+        return { providers, configuredDefault: this.defaultProviderId() ?? null };
+    }
 
     @Post()
     @HttpCode(HttpStatus.OK)
@@ -88,7 +140,7 @@ export class TranscriptionController {
     @ApiOperation({
         summary: 'Transcribe an audio clip to text',
         description:
-            'Multipart speech-to-text through the active AI-provider plugin, for interactive dictation. Provider selection follows the same order as KB media ingest: an operator pin via `KB_TRANSCRIPTION_PROVIDER_ID` wins, otherwise the first scoped provider implementing the capability. Returns 503 when no provider offers transcription, so the client can hide the control rather than fail silently.',
+            'Multipart speech-to-text for interactive dictation. Provider resolution is layered most-specific-first, so a vendor can be swapped without a code change: an explicit `providerId` on the request wins, then the AI-provider plugin ACTIVATED for this scope, then the platform default (`TRANSCRIPTION_PROVIDER_ID`, falling back to `KB_TRANSCRIPTION_PROVIDER_ID`), then any registered plugin implementing transcribe. Env is a DEFAULT, not a pin — a tenant that activates a voice plugin overrides it. Returns 503 when nothing offers transcription, so the client can hide the control rather than fail silently.',
     })
     @ApiBody({
         schema: {
@@ -97,6 +149,7 @@ export class TranscriptionController {
             properties: {
                 file: { type: 'string', format: 'binary' },
                 language: { type: 'string' },
+                providerId: { type: 'string' },
             },
         },
     })
@@ -134,8 +187,12 @@ export class TranscriptionController {
                 },
                 {
                     userId: auth.userId,
-                    providerOverride: config.kb.getTranscriptionProviderId(),
+                    // Only an explicit per-request pick pins a provider.
+                    // Everything else flows through the facade's chain so
+                    // tenant activation keeps its precedence.
+                    providerOverride: body.providerId,
                 },
+                { fallbackProviderId: this.defaultProviderId() },
             );
 
             return {

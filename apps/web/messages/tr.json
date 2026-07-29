@@ -815,6 +815,11 @@
                 "subtitle": "Ajanlarınızın çalışmalarından hatırladıkları — yüklenen belgelerden ayrı.",
                 "title": "Ajan belleği",
                 "unavailable": "Etkin bir ajan belleği sağlayıcısı yok."
+            },
+            "review": {
+                "accept": "Kabul et",
+                "subtitle": "Bir ajanın birleştirdiği veya önerdiği belgeler. Siz kabul edene kadar ajan bağlamının dışında tutulur.",
+                "title": "İnceleme bekliyor ({count})"
             }
         },
         "agentsPage": {
@@ -4738,7 +4743,8 @@
                     "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
                         "kb": "Bilgi Tabanı",
-                        "originals": "Originals"
+                        "originals": "Originals",
+                        "agentMemory": "Ajan belleği"
                     },
                     "originals": {
                         "empty": "No original files yet. Drag a file onto the tree to upload one.",
@@ -5927,6 +5933,8 @@
                 "failed": "Upload failed"
             },
             "dictation": {
+                "provider": "Ses sağlayıcısı",
+                "providerAuto": "Otomatik",
                 "start": "Dikte et",
                 "stop": "Kaydı durdur",
                 "transcribing": "Yazıya dökülüyor…"

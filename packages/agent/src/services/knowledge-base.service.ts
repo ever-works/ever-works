@@ -2197,6 +2197,76 @@ export class KnowledgeBaseService {
         return this.toBodyDto(doc);
     }
 
+    /**
+     * The review queue: organization documents still awaiting a human.
+     *
+     * Memory consolidation lands LLM-synthesized merges as
+     * `reviewState: 'proposed'` and they are withheld from context
+     * injection until accepted. Until now there was no way to see them,
+     * so they accumulated invisibly with nowhere to act on them.
+     */
+    async listOrgReviewQueue(
+        organizationId: string,
+        opts: { limit?: number; offset?: number } = {},
+    ): Promise<{ items: KbDocumentDto[]; total: number }> {
+        const { items, total } = await this.documentRepository.list({
+            organizationId,
+            reviewState: 'proposed' as KbReviewState,
+            limit: opts.limit,
+            offset: opts.offset,
+        });
+        return { items: items.map((d) => this.toDto(d)), total };
+    }
+
+    /**
+     * Accept a proposed organization document.
+     *
+     * Accepting is a real privilege escalation for the content: an
+     * accepted doc of an inheritable class is injected into every Work's
+     * context. So the document is re-fetched SCOPED TO THE ORGANIZATION
+     * first — `documentRepository.update` keys on the id alone, and a
+     * document id from another tenant would otherwise be directly
+     * writable by anyone who could guess or obtain one.
+     *
+     * Returns null when the document does not exist, belongs to another
+     * organization, or is Work-scoped, so the caller answers 404 without
+     * revealing which.
+     */
+    async acceptOrgDocument(
+        organizationId: string,
+        docId: string,
+        userId: string,
+    ): Promise<KbDocumentDto | null> {
+        const existing = await this.documentRepository.findOrgById(organizationId, docId);
+        if (!existing) return null;
+
+        const updated = await this.documentRepository.update(docId, {
+            reviewState: 'accepted' as KbReviewState,
+            updatedById: userId,
+        });
+        if (!updated) return null;
+
+        // Now that it is accepted it becomes eligible to overlay into
+        // every Work, so re-run the fanout the create path performs —
+        // class-gated for the same reason it is there (a non-inheritable
+        // doc must never be written into a Work's repo).
+        if (
+            (KB_ORG_INHERITABLE_CLASSES as ReadonlyArray<KbDocumentClass>).includes(
+                updated.kbDocumentClass,
+            )
+        ) {
+            await this.enqueueOrgOverlayFanout(
+                organizationId,
+                updated.id,
+                'upsert',
+                updated.path,
+                updated.kbDocumentClass,
+            );
+        }
+
+        return this.toDto(updated);
+    }
+
     async listOrgDocuments(
         organizationId: string,
         opts: { class?: KbDocumentClass } = {},
@@ -2358,12 +2428,36 @@ export class KnowledgeBaseService {
             targetClasses,
         );
 
+        // Withhold anything still awaiting review.
+        //
+        // Memory consolidation lands LLM-synthesized org documents as
+        // `reviewState: 'proposed'` on the documented promise that they are
+        // "excluded from context injection until a human accepts them".
+        // Nothing enforced that: `listInheritableForOrg` filters on
+        // organizationId / workId IS NULL / class / status='active' and
+        // never looks at reviewState, so an unreviewed machine-merged
+        // document was resolved into every Work's context exactly as if an
+        // operator had approved it — inverting the guarantee that "an
+        // unreviewed merge can never teach other agents".
+        //
+        // Applied to BOTH legs, and before the merge. A proposed Work
+        // override would otherwise not merely appear but SHADOW the
+        // accepted org document at the same path.
+        //
+        // Only an explicit 'proposed' is withheld: `reviewState` is null on
+        // every document predating the review gate, and the repository's own
+        // accepted-filter already treats NULL as accepted.
+        const awaitingReview = (d: WorkKnowledgeDocument): boolean =>
+            (d.reviewState as string | null | undefined) === 'proposed';
+
         // Build a map keyed by path with Work overriding org.
         const byPath = new Map<string, WorkKnowledgeDocument>();
         for (const d of orgDocs) {
+            if (awaitingReview(d)) continue;
             byPath.set(d.path, d);
         }
         for (const d of workOverrides) {
+            if (awaitingReview(d)) continue;
             byPath.set(d.path, d);
         }
 

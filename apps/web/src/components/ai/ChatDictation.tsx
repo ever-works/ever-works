@@ -27,6 +27,16 @@ import { cn } from '@/lib/utils/cn';
 
 type State = 'idle' | 'recording' | 'transcribing';
 
+interface TranscriptionProvider {
+    readonly id: string;
+    readonly name: string;
+    readonly isActive: boolean;
+}
+
+/** Per-browser preference. The durable per-account choice is which
+ *  plugin the account activates; this only overrides it for one user. */
+const PROVIDER_STORAGE_KEY = 'ever-works.dictation.providerId';
+
 export function ChatDictation({
     onText,
     disabled,
@@ -37,6 +47,14 @@ export function ChatDictation({
     const t = useTranslations('dashboard.aiChat.dictation');
     const [state, setState] = useState<State>('idle');
     const [unsupported, setUnsupported] = useState(false);
+    const [providers, setProviders] = useState<TranscriptionProvider[]>([]);
+    // The user's explicit pick. `null` means "no opinion", which is the
+    // meaningful default: the request omits providerId entirely and the
+    // server falls through to whichever plugin is activated for the
+    // scope. Sending the active provider's id explicitly would look
+    // identical but silently pin it, so an operator later switching the
+    // activated plugin would not reach this user.
+    const [providerId, setProviderId] = useState<string | null>(null);
     const recorderRef = useRef<MediaRecorder | null>(null);
     const chunksRef = useRef<Blob[]>([]);
     const streamRef = useRef<MediaStream | null>(null);
@@ -51,12 +69,39 @@ export function ChatDictation({
     // as the app still listening.
     useEffect(() => stopTracks, [stopTracks]);
 
+    useEffect(() => {
+        let cancelled = false;
+        void (async () => {
+            try {
+                const res = await fetch('/api/transcription/providers', {
+                    headers: { Accept: 'application/json' },
+                    cache: 'no-store',
+                });
+                if (!res.ok || cancelled) return;
+                const body = (await res.json()) as { providers?: TranscriptionProvider[] };
+                if (cancelled) return;
+                const list = body.providers ?? [];
+                setProviders(list);
+                // Restore a previous pick only if that plugin is still
+                // available — an operator may have disabled it since.
+                const stored = window.localStorage.getItem(PROVIDER_STORAGE_KEY);
+                if (stored && list.some((p) => p.id === stored)) setProviderId(stored);
+            } catch {
+                // No picker; dictation still works on the active plugin.
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, []);
+
     const transcribe = useCallback(
         async (blob: Blob) => {
             setState('transcribing');
             try {
                 const form = new FormData();
                 form.append('file', blob, 'dictation.webm');
+                if (providerId) form.append('providerId', providerId);
                 const res = await fetch('/api/transcription', { method: 'POST', body: form });
                 if (res.status === 503) {
                     // No provider configured in this deployment — retire
@@ -75,7 +120,7 @@ export function ChatDictation({
                 setState('idle');
             }
         },
-        [onText],
+        [onText, providerId],
     );
 
     const start = useCallback(async () => {
@@ -125,30 +170,64 @@ export function ChatDictation({
               ? t('transcribing')
               : t('start');
 
+    // Only offer a picker when there is something to pick BETWEEN.
+    // A select showing one option is pure noise in a composer toolbar.
+    const picker =
+        providers.length > 1 ? (
+            <select
+                aria-label={t('provider')}
+                data-testid="chat-dictation-provider"
+                value={providerId ?? ''}
+                disabled={disabled || state !== 'idle'}
+                onChange={(e) => {
+                    const next = e.target.value || null;
+                    setProviderId(next);
+                    if (next) window.localStorage.setItem(PROVIDER_STORAGE_KEY, next);
+                    else window.localStorage.removeItem(PROVIDER_STORAGE_KEY);
+                }}
+                className={cn(
+                    'h-7 max-w-28 rounded-lg border bg-transparent px-1 text-[10px]',
+                    'border-border text-text-muted dark:border-white/15 dark:text-white/40',
+                    'disabled:cursor-not-allowed disabled:opacity-40',
+                )}
+            >
+                {/* Empty value = defer to the activated plugin. */}
+                <option value="">{t('providerAuto')}</option>
+                {providers.map((p) => (
+                    <option key={p.id} value={p.id}>
+                        {p.name}
+                    </option>
+                ))}
+            </select>
+        ) : null;
+
     return (
-        <button
-            type="button"
-            aria-label={label}
-            title={label}
-            data-testid="chat-dictation-button"
-            data-state={state}
-            disabled={disabled || state === 'transcribing'}
-            onClick={() => (state === 'recording' ? stop() : void start())}
-            className={cn(
-                'flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg transition-colors',
-                state === 'recording'
-                    ? 'bg-danger/10 text-danger hover:bg-danger/20'
-                    : 'text-text-muted hover:bg-card-hover hover:text-text dark:text-white/40 dark:hover:bg-white/10 dark:hover:text-white',
-                'disabled:cursor-not-allowed disabled:opacity-40',
-            )}
-        >
-            {state === 'transcribing' ? (
-                <Loader2 className="h-3.5 w-3.5 animate-spin" />
-            ) : state === 'recording' ? (
-                <Square className="h-3 w-3" />
-            ) : (
-                <Mic className="h-3.5 w-3.5" />
-            )}
-        </button>
+        <>
+            {picker}
+            <button
+                type="button"
+                aria-label={label}
+                title={label}
+                data-testid="chat-dictation-button"
+                data-state={state}
+                disabled={disabled || state === 'transcribing'}
+                onClick={() => (state === 'recording' ? stop() : void start())}
+                className={cn(
+                    'flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg transition-colors',
+                    state === 'recording'
+                        ? 'bg-danger/10 text-danger hover:bg-danger/20'
+                        : 'text-text-muted hover:bg-card-hover hover:text-text dark:text-white/40 dark:hover:bg-white/10 dark:hover:text-white',
+                    'disabled:cursor-not-allowed disabled:opacity-40',
+                )}
+            >
+                {state === 'transcribing' ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                ) : state === 'recording' ? (
+                    <Square className="h-3 w-3" />
+                ) : (
+                    <Mic className="h-3.5 w-3.5" />
+                )}
+            </button>
+        </>
     );
 }
