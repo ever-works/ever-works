@@ -56,6 +56,7 @@ export async function updateTaskAction(
             | 'isolationMode'
             | 'acceptanceChecks'
             | 'maxGateAttempts'
+            | 'workId'
         >
     >,
 ): Promise<Task> {
