@@ -2358,12 +2358,36 @@ export class KnowledgeBaseService {
             targetClasses,
         );
 
+        // Withhold anything still awaiting review.
+        //
+        // Memory consolidation lands LLM-synthesized org documents as
+        // `reviewState: 'proposed'` on the documented promise that they are
+        // "excluded from context injection until a human accepts them".
+        // Nothing enforced that: `listInheritableForOrg` filters on
+        // organizationId / workId IS NULL / class / status='active' and
+        // never looks at reviewState, so an unreviewed machine-merged
+        // document was resolved into every Work's context exactly as if an
+        // operator had approved it — inverting the guarantee that "an
+        // unreviewed merge can never teach other agents".
+        //
+        // Applied to BOTH legs, and before the merge. A proposed Work
+        // override would otherwise not merely appear but SHADOW the
+        // accepted org document at the same path.
+        //
+        // Only an explicit 'proposed' is withheld: `reviewState` is null on
+        // every document predating the review gate, and the repository's own
+        // accepted-filter already treats NULL as accepted.
+        const awaitingReview = (d: WorkKnowledgeDocument): boolean =>
+            (d.reviewState as string | null | undefined) === 'proposed';
+
         // Build a map keyed by path with Work overriding org.
         const byPath = new Map<string, WorkKnowledgeDocument>();
         for (const d of orgDocs) {
+            if (awaitingReview(d)) continue;
             byPath.set(d.path, d);
         }
         for (const d of workOverrides) {
+            if (awaitingReview(d)) continue;
             byPath.set(d.path, d);
         }
 
