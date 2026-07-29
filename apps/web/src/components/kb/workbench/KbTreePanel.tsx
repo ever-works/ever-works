@@ -28,6 +28,7 @@ import {
 } from 'lucide-react';
 import { KB_DOCUMENT_CLASSES, KB_DOCUMENT_SOURCES } from '@ever-works/contracts';
 import { KbOriginalsPanel } from './KbOriginalsPanel';
+import { AgentMemoryPanel } from '@/components/memory/AgentMemoryPanel';
 import type {
     KbDocumentClass,
     KbDocumentDto,
@@ -67,7 +68,7 @@ export interface KbTreePanelProps {
     refreshKey?: number;
 }
 
-type Tab = 'kb' | 'originals';
+type Tab = 'kb' | 'originals' | 'agentMemory';
 
 interface ListResponse {
     items: KbDocumentDto[];
@@ -192,6 +193,16 @@ export function KbTreePanel({ workId, currentDocPath, refreshKey }: KbTreePanelP
                     onClick={() => setTab('originals')}
                     testId="kb-workbench-tab-originals"
                 />
+                {/* The third thing a Work's Memory holds. Documents and
+                    originals are authored/uploaded; this is what the
+                    agents themselves retained from their runs. Read-only
+                    — sessions are written by agents during a run. */}
+                <TreeTab
+                    label={t('workbench.tab.agentMemory')}
+                    active={tab === 'agentMemory'}
+                    onClick={() => setTab('agentMemory')}
+                    testId="kb-workbench-tab-agent-memory"
+                />
                 {/* Memory upgrades M8 — the review queue's entry point.
                     A link (not a tab) because the queue is its own route
                     inside the same workbench shell. The count badge is
@@ -281,8 +292,10 @@ export function KbTreePanel({ workId, currentDocPath, refreshKey }: KbTreePanelP
                             lockedLabel: t('lock.full'),
                         }}
                     />
-                ) : (
+                ) : tab === 'originals' ? (
                     <KbOriginalsPanel workId={workId} refreshToken={refreshKey} />
+                ) : (
+                    <AgentMemoryPanel workId={workId} compact />
                 )}
             </div>
         </div>

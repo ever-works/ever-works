@@ -898,6 +898,11 @@
                 "subtitle": "What your agents remember from their runs — separate from uploaded documents.",
                 "title": "Agent Memory",
                 "unavailable": "No agent-memory provider is enabled."
+            },
+            "review": {
+                "accept": "Accept",
+                "subtitle": "Documents an agent merged or proposed. They are withheld from agent context until you accept them.",
+                "title": "Awaiting review ({count})"
             }
         },
         "agentsPage": {
@@ -4880,7 +4885,8 @@
                     "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
                         "kb": "Knowledge Base",
-                        "originals": "Originals"
+                        "originals": "Originals",
+                        "agentMemory": "Agent Memory"
                     },
                     "originals": {
                         "empty": "No original files yet. Drag a file onto the tree to upload one.",
@@ -6226,6 +6232,8 @@
                 "failed": "Upload failed"
             },
             "dictation": {
+                "provider": "Voice provider",
+                "providerAuto": "Auto",
                 "start": "Dictate",
                 "stop": "Stop recording",
                 "transcribing": "Transcribing…"
