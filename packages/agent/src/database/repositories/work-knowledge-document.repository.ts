@@ -461,15 +461,29 @@ export class WorkKnowledgeDocumentRepository {
             return [];
         }
 
-        return this.repository.find({
-            where: {
-                organizationId,
-                workId: IsNull(),
-                kbDocumentClass: In(inheritableClasses),
-                status: 'active' as KbDocumentStatus,
-            },
-            order: { path: 'ASC' },
-        });
+        // Defense in depth for the review gate.
+        //
+        // `KnowledgeBaseService.resolveInheritableDocuments` already
+        // withholds `proposed` documents, but this is the query that feeds
+        // it: excluding them here means an unreviewed machine merge is
+        // never even fetched, and any future caller of this method
+        // inherits the guarantee instead of having to remember it.
+        //
+        // Written as an explicit NULL branch rather than `Not('proposed')`.
+        // In SQL, `review_state != 'proposed'` evaluates to NULL — not
+        // true — for a NULL column, so the simple form would silently drop
+        // every document predating the review gate, which is all of them.
+        return this.repository
+            .createQueryBuilder('doc')
+            .where('doc.organizationId = :organizationId', { organizationId })
+            .andWhere('doc.workId IS NULL')
+            .andWhere('doc.kbDocumentClass IN (:...inheritableClasses)', { inheritableClasses })
+            .andWhere('doc.status = :status', { status: 'active' as KbDocumentStatus })
+            .andWhere('(doc.reviewState IS NULL OR doc.reviewState != :proposed)', {
+                proposed: KbReviewState.PROPOSED,
+            })
+            .orderBy('doc.path', 'ASC')
+            .getMany();
     }
 
     async listWorkOverridesForClasses(
