@@ -5933,6 +5933,8 @@
                 "failed": "Upload failed"
             },
             "dictation": {
+                "provider": "Голосовий провайдер",
+                "providerAuto": "Авто",
                 "start": "Диктувати",
                 "stop": "Зупинити запис",
                 "transcribing": "Розшифрування…"

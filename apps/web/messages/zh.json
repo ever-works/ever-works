@@ -5933,6 +5933,8 @@
                 "failed": "Upload failed"
             },
             "dictation": {
+                "provider": "语音提供程序",
+                "providerAuto": "自动",
                 "start": "语音输入",
                 "stop": "停止录音",
                 "transcribing": "转写中…"

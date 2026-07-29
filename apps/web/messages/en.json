@@ -6232,6 +6232,8 @@
                 "failed": "Upload failed"
             },
             "dictation": {
+                "provider": "Voice provider",
+                "providerAuto": "Auto",
                 "start": "Dictate",
                 "stop": "Stop recording",
                 "transcribing": "Transcribing…"

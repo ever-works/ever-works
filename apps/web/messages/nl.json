@@ -5933,6 +5933,8 @@
                 "failed": "Upload failed"
             },
             "dictation": {
+                "provider": "Spraakprovider",
+                "providerAuto": "Automatisch",
                 "start": "Dicteren",
                 "stop": "Opname stoppen",
                 "transcribing": "Transcriberen…"

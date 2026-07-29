@@ -6000,6 +6000,8 @@
                 "failed": "Upload failed"
             },
             "dictation": {
+                "provider": "ספק קולי",
+                "providerAuto": "אוטומטי",
                 "start": "הכתבה בדיבור",
                 "stop": "עצור הקלטה",
                 "transcribing": "מתמלל…"

@@ -5933,6 +5933,8 @@
                 "failed": "Upload failed"
             },
             "dictation": {
+                "provider": "Penyedia suara",
+                "providerAuto": "Otomatis",
                 "start": "Dikte",
                 "stop": "Hentikan perekaman",
                 "transcribing": "Mentranskripsi…"

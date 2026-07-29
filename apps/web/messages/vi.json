@@ -5933,6 +5933,8 @@
                 "failed": "Upload failed"
             },
             "dictation": {
+                "provider": "Nhà cung cấp giọng nói",
+                "providerAuto": "Tự động",
                 "start": "Đọc chính tả",
                 "stop": "Dừng ghi âm",
                 "transcribing": "Đang chuyển thành văn bản…"

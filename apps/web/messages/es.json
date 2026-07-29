@@ -6000,6 +6000,8 @@
                 "failed": "Upload failed"
             },
             "dictation": {
+                "provider": "Proveedor de voz",
+                "providerAuto": "Automático",
                 "start": "Dictar",
                 "stop": "Detener la grabación",
                 "transcribing": "Transcribiendo…"

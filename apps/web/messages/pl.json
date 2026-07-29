@@ -5933,6 +5933,8 @@
                 "failed": "Upload failed"
             },
             "dictation": {
+                "provider": "Dostawca głosu",
+                "providerAuto": "Automatycznie",
                 "start": "Dyktuj",
                 "stop": "Zatrzymaj nagrywanie",
                 "transcribing": "Transkrypcja…"

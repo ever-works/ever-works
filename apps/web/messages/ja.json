@@ -5933,6 +5933,8 @@
                 "failed": "Upload failed"
             },
             "dictation": {
+                "provider": "音声プロバイダー",
+                "providerAuto": "自動",
                 "start": "音声入力",
                 "stop": "録音を停止",
                 "transcribing": "文字起こし中…"

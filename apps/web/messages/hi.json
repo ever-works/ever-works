@@ -5933,6 +5933,8 @@
                 "failed": "Upload failed"
             },
             "dictation": {
+                "provider": "वॉइस प्रदाता",
+                "providerAuto": "स्वतः",
                 "start": "बोलकर लिखें",
                 "stop": "रिकॉर्डिंग रोकें",
                 "transcribing": "लिप्यंतरण हो रहा है…"
