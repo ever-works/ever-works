@@ -815,6 +815,11 @@
                 "subtitle": "Apa yang diingat agen Anda dari proses mereka — terpisah dari dokumen yang diunggah.",
                 "title": "Memori agen",
                 "unavailable": "Tidak ada penyedia memori agen yang aktif."
+            },
+            "review": {
+                "accept": "Terima",
+                "subtitle": "Dokumen yang digabungkan atau diusulkan agen. Tidak masuk konteks agen sampai Anda menerimanya.",
+                "title": "Menunggu peninjauan ({count})"
             }
         },
         "agentsPage": {
@@ -4738,7 +4743,8 @@
                     "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
                         "kb": "Basis Pengetahuan",
-                        "originals": "Originals"
+                        "originals": "Originals",
+                        "agentMemory": "Memori agen"
                     },
                     "originals": {
                         "empty": "No original files yet. Drag a file onto the tree to upload one.",
@@ -5927,6 +5933,8 @@
                 "failed": "Upload failed"
             },
             "dictation": {
+                "provider": "Penyedia suara",
+                "providerAuto": "Otomatis",
                 "start": "Dikte",
                 "stop": "Hentikan perekaman",
                 "transcribing": "Mentranskripsi…"

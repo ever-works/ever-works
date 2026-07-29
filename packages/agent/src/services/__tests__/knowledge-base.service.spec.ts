@@ -1288,6 +1288,81 @@ describe('KnowledgeBaseService', () => {
     });
 
     describe('resolveInheritableDocuments', () => {
+        it('never injects a `proposed` org document into a Work context', async () => {
+            // Memory consolidation (`apply: true`) synthesizes LLM-merged org
+            // documents and lands them as `reviewState: 'proposed'`, on the
+            // documented promise that they are "excluded from context
+            // injection until a human accepts them in the review queue".
+            //
+            // Nothing enforced that. `listInheritableForOrg` filters on
+            // organizationId / workId IS NULL / class / status='active' and
+            // never looks at reviewState, so an unreviewed machine-merged
+            // document was resolved into every Work's context exactly as if
+            // an operator had approved it — the "an unreviewed merge can
+            // never teach other agents" guarantee inverted.
+            const accepted = buildDocument({
+                id: 'org-accepted',
+                workId: null,
+                organizationId: ORG_ID,
+                path: 'legal/terms.md',
+                title: 'Accepted terms',
+                kbDocumentClass: 'legal' as KbDocumentClass,
+                reviewState: 'accepted' as never,
+            });
+            const proposed = buildDocument({
+                id: 'org-proposed',
+                workId: null,
+                organizationId: ORG_ID,
+                path: 'legal/synthesis-abc.md',
+                title: 'Synthesis: Terms',
+                kbDocumentClass: 'legal' as KbDocumentClass,
+                reviewState: 'proposed' as never,
+            });
+
+            docRepo.listInheritableForOrg.mockResolvedValue([accepted, proposed]);
+            docRepo.listWorkOverridesForClasses.mockResolvedValue([]);
+
+            const result = await service.resolveInheritableDocuments(WORK_ID, ORG_ID, [
+                'legal' as KbDocumentClass,
+            ]);
+
+            const paths = result.map((d) => d.path);
+            expect(paths).toContain('legal/terms.md');
+            expect(paths).not.toContain('legal/synthesis-abc.md');
+        });
+
+        it('also withholds a `proposed` Work-level override', async () => {
+            // Same rule on the other leg: a Work override is merged over the
+            // org doc by path, so an unreviewed override would otherwise
+            // SHADOW an accepted org document rather than merely appear.
+            const orgTerms = buildDocument({
+                id: 'org-terms',
+                workId: null,
+                organizationId: ORG_ID,
+                path: 'legal/terms.md',
+                title: 'Accepted org terms',
+                kbDocumentClass: 'legal' as KbDocumentClass,
+                reviewState: 'accepted' as never,
+            });
+            const proposedOverride = buildDocument({
+                id: 'work-terms',
+                workId: WORK_ID,
+                path: 'legal/terms.md',
+                title: 'Unreviewed work override',
+                kbDocumentClass: 'legal' as KbDocumentClass,
+                reviewState: 'proposed' as never,
+            });
+
+            docRepo.listInheritableForOrg.mockResolvedValue([orgTerms]);
+            docRepo.listWorkOverridesForClasses.mockResolvedValue([proposedOverride]);
+
+            const result = await service.resolveInheritableDocuments(WORK_ID, ORG_ID, [
+                'legal' as KbDocumentClass,
+            ]);
+
+            expect(result.map((d) => d.title)).toEqual(['Accepted org terms']);
+        });
+
         it('merges org docs with Work overrides by path', async () => {
             const orgPrivacy = buildDocument({
                 id: 'org-privacy',

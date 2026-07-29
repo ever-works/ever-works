@@ -846,6 +846,11 @@
                 "subtitle": "ما يتذكره وكلاؤك من عمليات التشغيل — منفصل عن المستندات المرفوعة.",
                 "title": "ذاكرة الوكلاء",
                 "unavailable": "لا يوجد مزوّد لذاكرة الوكلاء مُفعّل."
+            },
+            "review": {
+                "accept": "قبول",
+                "subtitle": "مستندات دمجها أو اقترحها وكيل. تبقى خارج سياق الوكلاء حتى تقبلها.",
+                "title": "بانتظار المراجعة ({count})"
             }
         },
         "agentsPage": {
@@ -4806,7 +4811,8 @@
                     "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
                         "kb": "قاعدة المعرفة",
-                        "originals": "Originals"
+                        "originals": "Originals",
+                        "agentMemory": "ذاكرة الوكلاء"
                     },
                     "originals": {
                         "empty": "No original files yet. Drag a file onto the tree to upload one.",
@@ -5994,6 +6000,8 @@
                 "failed": "Upload failed"
             },
             "dictation": {
+                "provider": "مزوّد الصوت",
+                "providerAuto": "تلقائي",
                 "start": "إملاء صوتي",
                 "stop": "إيقاف التسجيل",
                 "transcribing": "جارٍ التفريغ…"

@@ -815,6 +815,11 @@
                 "subtitle": "Ciò che i tuoi agenti ricordano dalle loro esecuzioni, distinto dai documenti caricati.",
                 "title": "Memoria degli agenti",
                 "unavailable": "Nessun provider di memoria agenti abilitato."
+            },
+            "review": {
+                "accept": "Accetta",
+                "subtitle": "Documenti uniti o proposti da un agente. Restano esclusi dal contesto degli agenti finché non li accetti.",
+                "title": "In attesa di revisione ({count})"
             }
         },
         "agentsPage": {
@@ -4738,7 +4743,8 @@
                     "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
                         "kb": "Base di conoscenza",
-                        "originals": "Originals"
+                        "originals": "Originals",
+                        "agentMemory": "Memoria degli agenti"
                     },
                     "originals": {
                         "empty": "No original files yet. Drag a file onto the tree to upload one.",
@@ -5927,6 +5933,8 @@
                 "failed": "Upload failed"
             },
             "dictation": {
+                "provider": "Fornitore vocale",
+                "providerAuto": "Automatico",
                 "start": "Detta",
                 "stop": "Interrompi registrazione",
                 "transcribing": "Trascrizione…"
