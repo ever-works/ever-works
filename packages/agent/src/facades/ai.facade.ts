@@ -645,6 +645,43 @@ export class AiFacadeService extends BaseFacadeService implements IAiFacade {
      * selection chain. Kept separate from `transcribe()` so it can be
      * unit-tested without mocking the entire usage-ledger surface.
      */
+    /**
+     * Every registered AI-provider plugin that actually implements
+     * `transcribe()`, so a UI can offer a choice instead of hardcoding a
+     * vendor.
+     *
+     * Capability is probed on the instance rather than read from plugin
+     * metadata: `transcribe` is an OPTIONAL method on
+     * `IAiProviderPlugin`, so "is an ai-provider" and "can do speech to
+     * text" are different questions, and only the second one belongs in
+     * this list.
+     *
+     * `isActive` marks the plugin the scope would resolve to on its own,
+     * which is what the client should preselect when the user has never
+     * chosen explicitly.
+     */
+    async listTranscriptionProviders(
+        facadeOptions: FacadeOptions,
+    ): Promise<Array<{ id: string; name: string; isActive: boolean }>> {
+        const activeId = await this.resolvePlugin<IAiProviderPlugin>(
+            undefined,
+            facadeOptions.userId,
+            facadeOptions.workId,
+        )
+            .then((p) => p.id)
+            .catch(() => null);
+
+        return this.registry
+            .getByCapability(this.CAPABILITY)
+            .map((registered) => registered.plugin as unknown as IAiProviderPlugin)
+            .filter((plugin) => typeof plugin.transcribe === 'function')
+            .map((plugin) => ({
+                id: plugin.id,
+                name: (plugin as unknown as { name?: string }).name ?? plugin.id,
+                isActive: plugin.id === activeId,
+            }));
+    }
+
     private async resolveTranscribePlugin(
         facadeOptions: FacadeOptions,
     ): Promise<IAiProviderPlugin> {

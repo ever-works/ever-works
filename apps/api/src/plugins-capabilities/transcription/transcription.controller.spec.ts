@@ -35,13 +35,19 @@ describe('TranscriptionController', () => {
             size: 10,
         }) as Express.Multer.File;
 
-    let aiFacade: { transcribe: jest.Mock };
+    let aiFacade: { transcribe: jest.Mock; listTranscriptionProviders: jest.Mock };
     let controller: TranscriptionController;
 
     beforeEach(() => {
         aiFacade = {
             transcribe: jest.fn().mockResolvedValue({ text: 'hello world', model: 'whisper-1' }),
+            listTranscriptionProviders: jest.fn().mockResolvedValue([
+                { id: 'openai', name: 'OpenAI', isActive: true },
+                { id: 'groq', name: 'Groq', isActive: false },
+            ]),
         };
+        delete process.env.TRANSCRIPTION_PROVIDER_ID;
+        delete process.env.KB_TRANSCRIPTION_PROVIDER_ID;
         controller = new TranscriptionController(aiFacade as unknown as AiFacadeService);
     });
 
@@ -117,5 +123,59 @@ describe('TranscriptionController', () => {
             expect.objectContaining({ filename: 'dictation.webm' }),
             expect.objectContaining({ userId: 'user-1' }),
         );
+    });
+
+    describe('provider resolution — swap B for A without a code change', () => {
+        afterEach(() => {
+            delete process.env.TRANSCRIPTION_PROVIDER_ID;
+            delete process.env.KB_TRANSCRIPTION_PROVIDER_ID;
+        });
+
+        it('lets the ACTIVATED plugin decide when nothing is configured', async () => {
+            // The important default: no env, no request param => hand the
+            // facade `undefined` so it resolves the plugin activated for
+            // this scope, rather than forcing a vendor.
+            await controller.transcribe(auth, clip('audio/webm'), {});
+
+            expect(aiFacade.transcribe.mock.calls[0][1].providerOverride).toBeUndefined();
+        });
+
+        it('honours a global operator default', async () => {
+            process.env.TRANSCRIPTION_PROVIDER_ID = 'groq';
+
+            await controller.transcribe(auth, clip('audio/webm'), {});
+
+            expect(aiFacade.transcribe.mock.calls[0][1].providerOverride).toBe('groq');
+        });
+
+        it('prefers the per-request choice over the global default', async () => {
+            process.env.TRANSCRIPTION_PROVIDER_ID = 'groq';
+
+            await controller.transcribe(auth, clip('audio/webm'), { providerId: 'openai' });
+
+            expect(aiFacade.transcribe.mock.calls[0][1].providerOverride).toBe('openai');
+        });
+
+        it('falls back to the KB pin only when no dictation setting exists', async () => {
+            // Continuity: KB_TRANSCRIPTION_PROVIDER_ID was the only
+            // transcription setting before this endpoint, so it still
+            // applies — but it must never outrank a dictation-specific
+            // choice, which is what forced one vendor on chat before.
+            process.env.KB_TRANSCRIPTION_PROVIDER_ID = 'kb-pinned';
+
+            await controller.transcribe(auth, clip('audio/webm'), {});
+            expect(aiFacade.transcribe.mock.calls[0][1].providerOverride).toBe('kb-pinned');
+
+            process.env.TRANSCRIPTION_PROVIDER_ID = 'groq';
+            await controller.transcribe(auth, clip('audio/webm'), {});
+            expect(aiFacade.transcribe.mock.calls[1][1].providerOverride).toBe('groq');
+        });
+
+        it('lists only providers that actually implement transcribe', async () => {
+            const res = await controller.listProviders(auth);
+
+            expect(res.providers.map((p: { id: string }) => p.id)).toEqual(['openai', 'groq']);
+            expect(res.providers.find((p: { isActive: boolean }) => p.isActive)?.id).toBe('openai');
+        });
     });
 });

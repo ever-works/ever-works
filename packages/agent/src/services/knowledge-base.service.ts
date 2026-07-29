@@ -2237,7 +2237,7 @@ export class KnowledgeBaseService {
         docId: string,
         userId: string,
     ): Promise<KbDocumentDto | null> {
-        const existing = await this.documentRepository.findByIdForOrg(organizationId, docId);
+        const existing = await this.documentRepository.findOrgById(organizationId, docId);
         if (!existing) return null;
 
         const updated = await this.documentRepository.update(docId, {
