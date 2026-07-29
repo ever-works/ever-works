@@ -479,10 +479,9 @@ export class WorkKnowledgeDocumentRepository {
             .andWhere('doc.workId IS NULL')
             .andWhere('doc.kbDocumentClass IN (:...inheritableClasses)', { inheritableClasses })
             .andWhere('doc.status = :status', { status: 'active' as KbDocumentStatus })
-            .andWhere(
-                '(doc.reviewState IS NULL OR doc.reviewState != :proposed)',
-                { proposed: KbReviewState.PROPOSED },
-            )
+            .andWhere('(doc.reviewState IS NULL OR doc.reviewState != :proposed)', {
+                proposed: KbReviewState.PROPOSED,
+            })
             .orderBy('doc.path', 'ASC')
             .getMany();
     }
