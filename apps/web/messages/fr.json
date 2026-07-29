@@ -846,6 +846,11 @@
                 "subtitle": "Ce dont vos agents se souviennent de leurs exécutions — distinct des documents téléversés.",
                 "title": "Mémoire des agents",
                 "unavailable": "Aucun fournisseur de mémoire d’agent activé."
+            },
+            "review": {
+                "accept": "Accepter",
+                "subtitle": "Documents fusionnés ou proposés par un agent. Ils sont exclus du contexte des agents jusqu’à votre acceptation.",
+                "title": "En attente de revue ({count})"
             }
         },
         "agentsPage": {
@@ -4806,7 +4811,8 @@
                     "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
                         "kb": "Base de connaissances",
-                        "originals": "Originals"
+                        "originals": "Originals",
+                        "agentMemory": "Mémoire des agents"
                     },
                     "originals": {
                         "empty": "No original files yet. Drag a file onto the tree to upload one.",
@@ -5994,6 +6000,8 @@
                 "failed": "Upload failed"
             },
             "dictation": {
+                "provider": "Fournisseur vocal",
+                "providerAuto": "Auto",
                 "start": "Dicter",
                 "stop": "Arrêter l’enregistrement",
                 "transcribing": "Transcription…"

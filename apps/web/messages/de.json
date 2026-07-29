@@ -846,6 +846,11 @@
                 "subtitle": "Woran sich Ihre Agenten aus ihren Läufen erinnern — getrennt von hochgeladenen Dokumenten.",
                 "title": "Agenten-Speicher",
                 "unavailable": "Kein Agenten-Speicher-Anbieter aktiviert."
+            },
+            "review": {
+                "accept": "Annehmen",
+                "subtitle": "Von einem Agenten zusammengeführte oder vorgeschlagene Dokumente. Bis zur Freigabe bleiben sie aus dem Agentenkontext ausgeschlossen.",
+                "title": "Wartet auf Prüfung ({count})"
             }
         },
         "agentsPage": {
@@ -4806,7 +4811,8 @@
                     "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
                         "kb": "Wissensdatenbank",
-                        "originals": "Originals"
+                        "originals": "Originals",
+                        "agentMemory": "Agenten-Speicher"
                     },
                     "originals": {
                         "empty": "No original files yet. Drag a file onto the tree to upload one.",
@@ -5994,6 +6000,8 @@
                 "failed": "Upload failed"
             },
             "dictation": {
+                "provider": "Sprachanbieter",
+                "providerAuto": "Automatisch",
                 "start": "Diktieren",
                 "stop": "Aufnahme stoppen",
                 "transcribing": "Wird transkribiert…"

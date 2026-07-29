@@ -7,23 +7,35 @@ sidebar_position: 8
 
 # GitHub Workflows Deep Dive
 
-The Ever Works platform uses 11 GitHub Actions workflow files in `.github/workflows/` to automate CI, Docker image builds, Kubernetes deployments, CLI publishing, and Trigger.dev deployments across three environments (dev, stage, prod).
+The Ever Works platform uses GitHub Actions workflows in `.github/workflows/` to automate CI, container
+image builds, Kubernetes deployments, CLI publishing, and Trigger.dev deployments across three environments
+(dev, stage, prod).
+
+> **Which pipeline is actually live?** Images are built by **`k8s-build.yml`** and pushed to **GHCR**, then
+> deployed to the self-hosted **`ever-k8s`** cluster by **ArgoCD**, which syncs manifests from the
+> **`ever-co/k8s-gitops`** repo (ArgoCD Image Updater bumps the image digests automatically).
+>
+> The `deploy-do-*.yml` workflows below deploy to **DigitalOcean** and are **gated off** behind
+> `vars.DO_ENABLED == 'true'`. They are retained deliberately (no-removal policy), not active. Treat any
+> DigitalOcean hostname, registry or IP in this document as historical.
 
 ## Workflow Inventory
 
-| Workflow File                    | Name                                  | Trigger                         | Purpose                       |
-| -------------------------------- | ------------------------------------- | ------------------------------- | ----------------------------- |
-| `ci.yml`                         | CI                                    | Push/PR to main, develop, stage | Lint, build, test             |
-| `docker-build-publish-dev.yml`   | Build and Publish Docker Images Dev   | Push to develop                 | Build Docker images for dev   |
-| `docker-build-publish-stage.yml` | Build and Publish Docker Images Stage | Push to stage                   | Build Docker images for stage |
-| `docker-build-publish-prod.yml`  | Build and Publish Docker Images Prod  | Push to main                    | Build Docker images for prod  |
-| `deploy-do-dev.yml`              | Deploy to DO Dev                      | After Docker Dev completes      | Deploy to K8s dev             |
-| `deploy-do-stage.yml`            | Deploy to DO Stage                    | After Docker Stage completes    | Deploy to K8s stage           |
-| `deploy-do-prod.yml`             | Deploy to DO Prod                     | After Docker Prod completes     | Deploy to K8s prod            |
-| `release-trigger-dev.yml`        | Deploy to Trigger.dev Dev             | After CI on develop             | Deploy Trigger.dev dev        |
-| `release-trigger-stage.yml`      | Deploy to Trigger.dev Stage           | After CI on stage               | Deploy Trigger.dev staging    |
-| `release-trigger-prod.yml`       | Deploy to Trigger.dev Prod            | After CI on main                | Deploy Trigger.dev prod       |
-| `publish-cli.yml`                | Build and Publish CLIs                | Push to main, tags, manual      | Publish CLI packages          |
+| Workflow File                                   | Name                                  | Trigger                         | Purpose                                               |
+| ----------------------------------------------- | ------------------------------------- | ------------------------------- | ----------------------------------------------------- |
+| `ci.yml`                                        | CI                                    | Push/PR to main, develop, stage | Lint, build, test                                     |
+| `docker-build-publish-dev.yml`                  | Build and Publish Docker Images Dev   | Push to develop                 | Build Docker images for dev                           |
+| `docker-build-publish-stage.yml`                | Build and Publish Docker Images Stage | Push to stage                   | Build Docker images for stage                         |
+| `docker-build-publish-prod.yml`                 | Build and Publish Docker Images Prod  | Push to main                    | Build Docker images for prod                          |
+| `k8s-build.yml`                                 | k8s-build                             | Push to develop, stage, main    | **LIVE** — build api/web/mcp/docs images → GHCR       |
+| `docker-build-publish-mcp-{dev,stage,prod}.yml` | Build and Publish MCP Images          | Push to branch                  | Build MCP images (DigitalOcean path)                  |
+| `deploy-do-dev.yml`                             | Deploy to DO Dev                      | After Docker Dev completes      | **GATED** (`DO_ENABLED`) — legacy DigitalOcean deploy |
+| `deploy-do-stage.yml`                           | Deploy to DO Stage                    | After Docker Stage completes    | **GATED** (`DO_ENABLED`) — legacy DigitalOcean deploy |
+| `deploy-do-prod.yml`                            | Deploy to DO Prod                     | After Docker Prod completes     | **GATED** (`DO_ENABLED`) — legacy DigitalOcean deploy |
+| `release-trigger-dev.yml`                       | Deploy to Trigger.dev Dev             | After CI on develop             | Deploy Trigger.dev dev                                |
+| `release-trigger-stage.yml`                     | Deploy to Trigger.dev Stage           | After CI on stage               | Deploy Trigger.dev staging                            |
+| `release-trigger-prod.yml`                      | Deploy to Trigger.dev Prod            | After CI on main                | Deploy Trigger.dev prod                               |
+| `publish-cli.yml`                               | Build and Publish CLIs                | Push to main, tags, manual      | Publish CLI packages                                  |
 
 ## Pipeline Flow
 
@@ -31,15 +43,18 @@ The Ever Works platform uses 11 GitHub Actions workflow files in `.github/workfl
 flowchart LR
     subgraph develop["Push to develop"]
         ci_dev["ci.yml"] --> trigger_dev["release-trigger-dev.yml"]
-        docker_dev["docker-build-publish-dev.yml"] --> deploy_dev["deploy-do-dev.yml"]
+        k8s_dev["k8s-build.yml"] --> ghcr_dev["GHCR :dev"] --> argo_dev["ArgoCD → ever-k8s"]
+        docker_dev["docker-build-publish-dev.yml"] -.gated.-> deploy_dev["deploy-do-dev.yml"]
     end
     subgraph stage["Push to stage"]
         ci_stage["ci.yml"] --> trigger_stage["release-trigger-stage.yml"]
-        docker_stage["docker-build-publish-stage.yml"] --> deploy_stage["deploy-do-stage.yml"]
+        k8s_stage["k8s-build.yml"] --> ghcr_stage["GHCR :stage"] --> argo_stage["ArgoCD → ever-k8s"]
+        docker_stage["docker-build-publish-stage.yml"] -.gated.-> deploy_stage["deploy-do-stage.yml"]
     end
     subgraph main["Push to main"]
         ci_main["ci.yml"] --> trigger_prod["release-trigger-prod.yml"]
-        docker_main["docker-build-publish-prod.yml"] --> deploy_prod["deploy-do-prod.yml"]
+        k8s_main["k8s-build.yml"] --> ghcr_main["GHCR :prod"] --> argo_prod["ArgoCD → ever-k8s"]
+        docker_main["docker-build-publish-prod.yml"] -.gated.-> deploy_prod["deploy-do-prod.yml"]
         publish["publish-cli.yml (on tags)"]
     end
 ```
@@ -114,6 +129,11 @@ Each image is pushed to up to four registries:
 
 ## Kubernetes Deploy Workflows
 
+> **Legacy — not the live path.** These three workflows deploy to **DigitalOcean** Kubernetes and every step
+> is gated behind `vars.DO_ENABLED == 'true'`, which is not set. The live deployment path is
+> `k8s-build.yml` → GHCR → ArgoCD → `ever-k8s` (manifests in `ever-co/k8s-gitops`). This section is kept
+> for reference and in case the DigitalOcean path is ever re-enabled.
+
 Three workflows (`deploy-do-dev.yml`, `deploy-do-stage.yml`, `deploy-do-prod.yml`) deploy to DigitalOcean Kubernetes.
 
 ### Trigger
@@ -145,12 +165,12 @@ The manifests receive a comprehensive set of environment variables:
 
 **Application:**
 
-| Variable          | Example                                                             |
-| ----------------- | ------------------------------------------------------------------- |
-| `WEB_URL`         | `https://app.ever.works` (prod) / `https://appdev.ever.works` (dev) |
-| `ALLOWED_ORIGINS` | `https://app.ever.works,https://api.ever.works`                     |
-| `JWT_SECRET`      | From secrets                                                        |
-| `AUTH_SECRET`     | From secrets                                                        |
+| Variable          | Example                                                              |
+| ----------------- | -------------------------------------------------------------------- |
+| `WEB_URL`         | `https://app.ever.works` (prod) / `https://app-dev.ever.works` (dev) |
+| `ALLOWED_ORIGINS` | `https://app.ever.works,https://api.ever.works`                      |
+| `JWT_SECRET`      | From secrets                                                         |
+| `AUTH_SECRET`     | From secrets                                                         |
 
 **Trigger.dev:**
 
@@ -203,11 +223,19 @@ The manifests receive a comprehensive set of environment variables:
 
 ### Environment URLs
 
-| Environment | Web URL                        | API URL                        |
-| ----------- | ------------------------------ | ------------------------------ |
-| dev         | `https://appdev.ever.works`    | `https://apidev.ever.works`    |
-| stage       | (configured in stage manifest) | (configured in stage manifest) |
-| prod        | `https://app.ever.works`       | `https://api.ever.works`       |
+These are the hostnames actually served by `ever-k8s` (ingress rules live in `ever-co/k8s-gitops` under
+`apps/ever-works-app-{dev,stage,prod}`):
+
+| Environment | Web URL                        | API URL                        | Admin URL                        | MCP URL                       |
+| ----------- | ------------------------------ | ------------------------------ | -------------------------------- | ----------------------------- |
+| dev         | `https://app-dev.ever.works`   | `https://api-dev.ever.works`   | `https://admin-dev.ever.works`   | `https://mcpdev.ever.works`   |
+| stage       | `https://app-stage.ever.works` | `https://api-stage.ever.works` | `https://admin-stage.ever.works` | `https://mcpstage.ever.works` |
+| prod        | `https://app.ever.works`       | `https://api.ever.works`       | `https://admin.ever.works`       | `https://mcp.ever.works`      |
+
+**Legacy aliases.** The pre-migration DigitalOcean hostnames `appdev` / `apidev` / `appstage` /
+`apistage.ever.works` (no hyphen) are still served as additional ingress rules on the same backends, so old
+links and bookmarks keep working. Prefer the hyphenated names above for anything new — they are the ones the
+manifests are keyed on.
 
 ## Trigger.dev Deploy Workflows
 

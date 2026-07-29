@@ -815,6 +815,11 @@
                 "subtitle": "สิ่งที่เอเจนต์จดจำจากการทำงาน แยกจากเอกสารที่อัปโหลด",
                 "title": "หน่วยความจำเอเจนต์",
                 "unavailable": "ยังไม่ได้เปิดใช้ผู้ให้บริการหน่วยความจำเอเจนต์"
+            },
+            "review": {
+                "accept": "ยอมรับ",
+                "subtitle": "เอกสารที่เอเจนต์รวมหรือเสนอไว้ จะไม่ถูกใช้ในบริบทของเอเจนต์จนกว่าคุณจะยอมรับ",
+                "title": "รอการตรวจสอบ ({count})"
             }
         },
         "agentsPage": {
@@ -4738,7 +4743,8 @@
                     "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
                         "kb": "ฐานความรู้",
-                        "originals": "Originals"
+                        "originals": "Originals",
+                        "agentMemory": "หน่วยความจำเอเจนต์"
                     },
                     "originals": {
                         "empty": "No original files yet. Drag a file onto the tree to upload one.",
@@ -5927,6 +5933,8 @@
                 "failed": "Upload failed"
             },
             "dictation": {
+                "provider": "ผู้ให้บริการเสียง",
+                "providerAuto": "อัตโนมัติ",
                 "start": "พูดเพื่อพิมพ์",
                 "stop": "หยุดบันทึก",
                 "transcribing": "กำลังถอดความ…"

@@ -846,6 +846,11 @@
                 "subtitle": "Lo que tus agentes recuerdan de sus ejecuciones, aparte de los documentos subidos.",
                 "title": "Memoria de agentes",
                 "unavailable": "No hay proveedor de memoria de agentes habilitado."
+            },
+            "review": {
+                "accept": "Aceptar",
+                "subtitle": "Documentos que un agente fusionó o propuso. Se excluyen del contexto de los agentes hasta que los aceptes.",
+                "title": "Pendiente de revisión ({count})"
             }
         },
         "agentsPage": {
@@ -4806,7 +4811,8 @@
                     "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
                         "kb": "Base de conocimiento",
-                        "originals": "Originals"
+                        "originals": "Originals",
+                        "agentMemory": "Memoria de agentes"
                     },
                     "originals": {
                         "empty": "No original files yet. Drag a file onto the tree to upload one.",
@@ -5994,6 +6000,8 @@
                 "failed": "Upload failed"
             },
             "dictation": {
+                "provider": "Proveedor de voz",
+                "providerAuto": "Automático",
                 "start": "Dictar",
                 "stop": "Detener la grabación",
                 "transcribing": "Transcribiendo…"

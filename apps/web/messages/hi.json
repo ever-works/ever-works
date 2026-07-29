@@ -815,6 +815,11 @@
                 "subtitle": "आपके एजेंट अपने रन से क्या याद रखते हैं — अपलोड किए गए दस्तावेज़ों से अलग।",
                 "title": "एजेंट मेमोरी",
                 "unavailable": "कोई एजेंट-मेमोरी प्रदाता सक्षम नहीं है।"
+            },
+            "review": {
+                "accept": "स्वीकारें",
+                "subtitle": "एजेंट द्वारा मर्ज किए गए या प्रस्तावित दस्तावेज़। स्वीकार करने तक ये एजेंट संदर्भ से बाहर रहते हैं।",
+                "title": "समीक्षा प्रतीक्षित ({count})"
             }
         },
         "agentsPage": {
@@ -4738,7 +4743,8 @@
                     "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
                         "kb": "ज्ञान आधार",
-                        "originals": "Originals"
+                        "originals": "Originals",
+                        "agentMemory": "एजेंट मेमोरी"
                     },
                     "originals": {
                         "empty": "No original files yet. Drag a file onto the tree to upload one.",
@@ -5927,6 +5933,8 @@
                 "failed": "Upload failed"
             },
             "dictation": {
+                "provider": "वॉइस प्रदाता",
+                "providerAuto": "स्वतः",
                 "start": "बोलकर लिखें",
                 "stop": "रिकॉर्डिंग रोकें",
                 "transcribing": "लिप्यंतरण हो रहा है…"

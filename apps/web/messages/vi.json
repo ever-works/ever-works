@@ -815,6 +815,11 @@
                 "subtitle": "Những gì tác nhân ghi nhớ từ các lần chạy — tách biệt với tài liệu đã tải lên.",
                 "title": "Bộ nhớ tác nhân",
                 "unavailable": "Chưa bật nhà cung cấp bộ nhớ tác nhân."
+            },
+            "review": {
+                "accept": "Chấp nhận",
+                "subtitle": "Tài liệu do tác nhân hợp nhất hoặc đề xuất. Chúng bị giữ ngoài ngữ cảnh của tác nhân cho đến khi bạn chấp nhận.",
+                "title": "Chờ duyệt ({count})"
             }
         },
         "agentsPage": {
@@ -4738,7 +4743,8 @@
                     "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
                         "kb": "Cơ sở tri thức",
-                        "originals": "Originals"
+                        "originals": "Originals",
+                        "agentMemory": "Bộ nhớ tác nhân"
                     },
                     "originals": {
                         "empty": "No original files yet. Drag a file onto the tree to upload one.",
@@ -5927,6 +5933,8 @@
                 "failed": "Upload failed"
             },
             "dictation": {
+                "provider": "Nhà cung cấp giọng nói",
+                "providerAuto": "Tự động",
                 "start": "Đọc chính tả",
                 "stop": "Dừng ghi âm",
                 "transcribing": "Đang chuyển thành văn bản…"

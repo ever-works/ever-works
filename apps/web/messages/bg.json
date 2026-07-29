@@ -846,6 +846,11 @@
                 "subtitle": "Какво помнят агентите от изпълненията си — отделно от качените документи.",
                 "title": "Памет на агентите",
                 "unavailable": "Няма активиран доставчик на памет за агенти."
+            },
+            "review": {
+                "accept": "Приемане",
+                "subtitle": "Документи, обединени или предложени от агент. Остават извън контекста на агентите, докато не ги приемете.",
+                "title": "Чака преглед ({count})"
             }
         },
         "agentsPage": {
@@ -4806,7 +4811,8 @@
                     "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
                         "kb": "База знания",
-                        "originals": "Originals"
+                        "originals": "Originals",
+                        "agentMemory": "Памет на агентите"
                     },
                     "originals": {
                         "empty": "No original files yet. Drag a file onto the tree to upload one.",
@@ -5994,6 +6000,8 @@
                 "failed": "Upload failed"
             },
             "dictation": {
+                "provider": "Гласов доставчик",
+                "providerAuto": "Автоматично",
                 "start": "Диктуване",
                 "stop": "Спри записа",
                 "transcribing": "Транскрибиране…"
