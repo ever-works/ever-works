@@ -140,7 +140,7 @@ user.isAnonymous: true }`.
 | ------------------------------- | ------------------------------------------------------------------------------------ |
 | `DEPLOY_EVER_WORKS_ENABLED`     | `true` (inlined in deploy-do-{dev,stage,prod}.yml)                                   |
 | `EVER_WORKS_DOMAIN`             | `ever.works` (inlined in workflows)                                                  |
-| `EVER_WORKS_DEPLOY_LB_HOSTNAME` | `lb.ever.works` → A `157.230.74.11` (k8s-works ingress LB)                           |
+| `EVER_WORKS_DEPLOY_LB_HOSTNAME` | `lb.ever.works` → proxied CNAME → Cloudflare Tunnel (see "DNS anchor record")        |
 | `CLOUDFLARE_API_TOKEN`          | GH secret `CLOUDFLARE_API_TOKEN` (Zone:DNS edit on ever.works)                       |
 | `CLOUDFLARE_ZONE_ID`            | GH secret `CLOUDFLARE_ZONE_ID` → `14b28d7fd73db5679d4280e4278ec6cf`                  |
 | `CAPTCHA_PROVIDER`              | GH secret `CAPTCHA_PROVIDER` — **empty** until Turnstile widget + client wiring ship |
@@ -159,13 +159,43 @@ ever-works/ever-works`.
 
 ### DNS anchor record
 
-`lb.ever.works → A 157.230.74.11` is the anchor that all customer
-`{slug}.ever.works` CNAMEs point at. Created via the Cloudflare API
-2026-05-15 (PR ${{TBD}}). To rotate the LB IP, update this A record
-once; every existing CNAME inherits the new target. The k8s-works
-LoadBalancer Service (`ingress-nginx/ingress-nginx-controller`) does not
-expose a hostname, only an IP, which is why the anchor record exists in
-the first place.
+`lb.ever.works` is the anchor that customer `{slug}.ever.works` CNAMEs
+point at. Created via the Cloudflare API 2026-05-15; **repointed
+2026-07-29**.
+
+**Current shape:** `lb.ever.works` → **proxied CNAME** →
+`5a1c27a6-7d93-4f25-a329-3154995e16db.cfargotunnel.com`, i.e. the same
+Cloudflare Tunnel every other `ever.works` hostname uses. The tunnel has
+a catch-all rule to `ingress-nginx-controller.ingress-nginx` on the
+self-hosted `ever-k8s` cluster.
+
+🛑 **It must stay proxied.** `*.cfargotunnel.com` only resolves through
+the Cloudflare proxy; a grey-cloud (unproxied) record pointing at the
+tunnel will not resolve.
+
+**History:** it previously pointed at `A 157.230.74.11`, the DigitalOcean
+k8s-works ingress LB. That droplet was decommissioned, so the anchor
+resolved to a dead origin (Cloudflare HTTP 521) until it was repointed.
+Any customer subdomain CNAMEd to it during that window would have been
+unreachable.
+
+**Note on current practice:** the customer Work subdomains that exist
+today (`chairs`, `dir`, `startup-books`, `timetrack`, `vectordb`,
+`compliance-automation`, `mcpserver`) are CNAMEd **directly** at the
+tunnel rather than at this anchor, so the anchor currently has zero
+dependents. It is kept working because
+`EVER_WORKS_DEPLOY_LB_HOSTNAME` still defaults to it in
+`managed-subdomain.service`.
+
+**Rotating:** because the target is now a tunnel rather than an IP,
+there is normally nothing to rotate — changing which cluster serves a
+hostname is done in the tunnel's ingress rules / the k8s Ingress, not in
+DNS.
+
+⚠️ A subdomain will still 404 unless a matching k8s Ingress rule exists.
+Pointing DNS at the tunnel is necessary but **not sufficient**: the
+tunnel catch-all forwards to ingress-nginx, which returns 404 for a Host
+it has no server block for.
 
 ### Cloudflare token security note
 
