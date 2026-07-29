@@ -898,6 +898,11 @@
                 "subtitle": "What your agents remember from their runs — separate from uploaded documents.",
                 "title": "Agent Memory",
                 "unavailable": "No agent-memory provider is enabled."
+            },
+            "review": {
+                "accept": "Accept",
+                "subtitle": "Documents an agent merged or proposed. They are withheld from agent context until you accept them.",
+                "title": "Awaiting review ({count})"
             }
         },
         "agentsPage": {

@@ -846,6 +846,11 @@
                 "subtitle": "Lo que tus agentes recuerdan de sus ejecuciones, aparte de los documentos subidos.",
                 "title": "Memoria de agentes",
                 "unavailable": "No hay proveedor de memoria de agentes habilitado."
+            },
+            "review": {
+                "accept": "Aceptar",
+                "subtitle": "Documentos que un agente fusionó o propuso. Se excluyen del contexto de los agentes hasta que los aceptes.",
+                "title": "Pendiente de revisión ({count})"
             }
         },
         "agentsPage": {

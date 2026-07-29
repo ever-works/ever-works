@@ -815,6 +815,11 @@
                 "subtitle": "Ajanlarınızın çalışmalarından hatırladıkları — yüklenen belgelerden ayrı.",
                 "title": "Ajan belleği",
                 "unavailable": "Etkin bir ajan belleği sağlayıcısı yok."
+            },
+            "review": {
+                "accept": "Kabul et",
+                "subtitle": "Bir ajanın birleştirdiği veya önerdiği belgeler. Siz kabul edene kadar ajan bağlamının dışında tutulur.",
+                "title": "İnceleme bekliyor ({count})"
             }
         },
         "agentsPage": {

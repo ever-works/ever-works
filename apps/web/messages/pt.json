@@ -815,6 +815,11 @@
                 "subtitle": "O que os seus agentes recordam das execuções — separado dos ficheiros carregados.",
                 "title": "Memória dos agentes",
                 "unavailable": "Nenhum fornecedor de memória de agentes ativado."
+            },
+            "review": {
+                "accept": "Aceitar",
+                "subtitle": "Documentos que um agente fundiu ou propôs. Ficam excluídos do contexto dos agentes até os aceitar.",
+                "title": "A aguardar revisão ({count})"
             }
         },
         "agentsPage": {

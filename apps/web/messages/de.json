@@ -846,6 +846,11 @@
                 "subtitle": "Woran sich Ihre Agenten aus ihren Läufen erinnern — getrennt von hochgeladenen Dokumenten.",
                 "title": "Agenten-Speicher",
                 "unavailable": "Kein Agenten-Speicher-Anbieter aktiviert."
+            },
+            "review": {
+                "accept": "Annehmen",
+                "subtitle": "Von einem Agenten zusammengeführte oder vorgeschlagene Dokumente. Bis zur Freigabe bleiben sie aus dem Agentenkontext ausgeschlossen.",
+                "title": "Wartet auf Prüfung ({count})"
             }
         },
         "agentsPage": {

@@ -504,6 +504,25 @@ export class WorkKnowledgeDocumentRepository {
         return this.repository.save(entity);
     }
 
+    /**
+     * Fetch an ORG-scoped document by id, scoped to that organization.
+     *
+     * `update(docId, patch)` keys on the id alone, so any caller that
+     * mutates a document must first prove the caller's organization owns
+     * it — otherwise a guessed/leaked document id from another tenant is
+     * directly writable. This is that proof, and pinning `workId IS NULL`
+     * also stops a Work-scoped document being mutated through an
+     * org-level route.
+     */
+    async findByIdForOrg(
+        organizationId: string,
+        docId: string,
+    ): Promise<WorkKnowledgeDocument | null> {
+        return this.repository.findOne({
+            where: { id: docId, organizationId, workId: IsNull() },
+        });
+    }
+
     async update(
         docId: string,
         patch: Partial<WorkKnowledgeDocument>,

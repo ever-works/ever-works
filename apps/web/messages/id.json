@@ -815,6 +815,11 @@
                 "subtitle": "Apa yang diingat agen Anda dari proses mereka — terpisah dari dokumen yang diunggah.",
                 "title": "Memori agen",
                 "unavailable": "Tidak ada penyedia memori agen yang aktif."
+            },
+            "review": {
+                "accept": "Terima",
+                "subtitle": "Dokumen yang digabungkan atau diusulkan agen. Tidak masuk konteks agen sampai Anda menerimanya.",
+                "title": "Menunggu peninjauan ({count})"
             }
         },
         "agentsPage": {

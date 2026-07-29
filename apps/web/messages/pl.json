@@ -815,6 +815,11 @@
                 "subtitle": "Co agenci pamiętają ze swoich uruchomień — odrębnie od przesłanych dokumentów.",
                 "title": "Pamięć agentów",
                 "unavailable": "Nie włączono dostawcy pamięci agentów."
+            },
+            "review": {
+                "accept": "Akceptuj",
+                "subtitle": "Dokumenty scalone lub zaproponowane przez agenta. Pozostają poza kontekstem agentów do czasu akceptacji.",
+                "title": "Oczekuje na przegląd ({count})"
             }
         },
         "agentsPage": {

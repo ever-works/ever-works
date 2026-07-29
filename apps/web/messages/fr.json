@@ -846,6 +846,11 @@
                 "subtitle": "Ce dont vos agents se souviennent de leurs exécutions — distinct des documents téléversés.",
                 "title": "Mémoire des agents",
                 "unavailable": "Aucun fournisseur de mémoire d’agent activé."
+            },
+            "review": {
+                "accept": "Accepter",
+                "subtitle": "Documents fusionnés ou proposés par un agent. Ils sont exclus du contexte des agents jusqu’à votre acceptation.",
+                "title": "En attente de revue ({count})"
             }
         },
         "agentsPage": {
