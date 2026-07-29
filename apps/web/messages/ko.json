@@ -807,6 +807,14 @@
                 "subtitle": "메모리에 업로드된 파일입니다. 에이전트가 사용할 수 있도록 텍스트를 추출합니다.",
                 "title": "원본",
                 "uploading": "업로드 중…"
+            },
+            "agentMemory": {
+                "closed": "닫힘",
+                "empty": "기록된 에이전트 세션이 없습니다.",
+                "open": "열림",
+                "subtitle": "에이전트가 실행에서 기억한 내용 — 업로드된 문서와는 별개입니다.",
+                "title": "에이전트 메모리",
+                "unavailable": "활성화된 에이전트 메모리 공급자가 없습니다."
             }
         },
         "agentsPage": {
@@ -2853,7 +2861,7 @@
                 "deploy": "배포",
                 "members": "멤버",
                 "settings": "설정",
-                "kb": "지식 베이스",
+                "kb": "Memory",
                 "tooltips": {
                     "activity": "활동 피드",
                     "kb": "지식 베이스",
@@ -4729,7 +4737,7 @@
                     "metaTitle": "Knowledge Base workbench",
                     "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
-                        "kb": "KB",
+                        "kb": "지식 베이스",
                         "originals": "Originals"
                     },
                     "originals": {

@@ -807,6 +807,14 @@
                 "subtitle": "メモリにアップロードされたファイル。テキストはエージェント用に抽出されます。",
                 "title": "オリジナル",
                 "uploading": "アップロード中…"
+            },
+            "agentMemory": {
+                "closed": "終了",
+                "empty": "エージェントのセッションはまだありません。",
+                "open": "進行中",
+                "subtitle": "エージェントが実行から記憶した内容 — アップロード文書とは別です。",
+                "title": "エージェントメモリ",
+                "unavailable": "エージェントメモリのプロバイダーが有効になっていません。"
             }
         },
         "agentsPage": {
@@ -2853,7 +2861,7 @@
                 "deploy": "デプロイ",
                 "members": "メンバー",
                 "settings": "設定",
-                "kb": "ナレッジベース",
+                "kb": "Memory",
                 "tooltips": {
                     "activity": "アクティビティフィード",
                     "kb": "ナレッジベース",
@@ -4729,7 +4737,7 @@
                     "metaTitle": "Knowledge Base workbench",
                     "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
-                        "kb": "KB",
+                        "kb": "ナレッジベース",
                         "originals": "Originals"
                     },
                     "originals": {

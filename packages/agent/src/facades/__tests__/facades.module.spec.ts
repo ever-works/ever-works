@@ -261,6 +261,12 @@ describe('FacadesModule + barrel re-exports', () => {
                     // Merge-policy matrix (Wave 3, D4). `AgentMergeActor` is
                     // type-only and correctly absent from this runtime list.
                     'MergePolicyRefusedError',
+                    // Voice dictation (#1940) — `POST /api/transcription` maps
+                    // this to a 503 so the client hides the mic instead of
+                    // offering a control that can only fail. It crosses the
+                    // package boundary into apps/api, so it must be barrel
+                    // -exported, and therefore pinned here.
+                    'TranscriptionNotConfiguredError',
                 ].sort(),
             );
         });

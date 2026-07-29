@@ -807,6 +807,14 @@
                 "subtitle": "Belleğe yüklenen dosyalar. Metinleri ajanlar için çıkarılır.",
                 "title": "Orijinaller",
                 "uploading": "Yükleniyor…"
+            },
+            "agentMemory": {
+                "closed": "Kapalı",
+                "empty": "Henüz kaydedilmiş ajan oturumu yok.",
+                "open": "Açık",
+                "subtitle": "Ajanlarınızın çalışmalarından hatırladıkları — yüklenen belgelerden ayrı.",
+                "title": "Ajan belleği",
+                "unavailable": "Etkin bir ajan belleği sağlayıcısı yok."
             }
         },
         "agentsPage": {
@@ -2853,7 +2861,7 @@
                 "deploy": "Dağıt",
                 "members": "Üyeler",
                 "settings": "Ayarlar",
-                "kb": "Bilgi Tabanı",
+                "kb": "Memory",
                 "tooltips": {
                     "activity": "Etkinlik Akışı",
                     "kb": "Bilgi Tabanı",
@@ -4729,7 +4737,7 @@
                     "metaTitle": "Knowledge Base workbench",
                     "empty": "Select a document from the tree, or drag a file onto the tree to upload one.",
                     "tab": {
-                        "kb": "KB",
+                        "kb": "Bilgi Tabanı",
                         "originals": "Originals"
                     },
                     "originals": {
