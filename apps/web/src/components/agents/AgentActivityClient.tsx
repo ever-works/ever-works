@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useMemo, useState, useTransition } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import { formatDistanceToNow } from 'date-fns';
 import {
     CheckCircle2,
@@ -59,6 +59,13 @@ interface Props {
     agentId: string;
     initial: { data: AgentRunRow[]; meta: { total: number; limit: number; offset: number } };
     initialEvents?: AgentEventRow[];
+    /**
+     * `?run=<id>` — the run to open and scroll to on arrival. Set by the
+     * "View logs" link on a failed run (Task detail). Ignored when the id
+     * is not on this page of runs: the feed still renders normally rather
+     * than erroring on a stale or paged-out link.
+     */
+    focusRunId?: string | null;
 }
 
 type FeedItem = { kind: 'run'; run: AgentRunRow } | { kind: 'event'; event: AgentEventRow };
@@ -223,13 +230,23 @@ function Timestamp({
 const TH_CLASS =
     'px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-text-secondary dark:text-text-secondary-dark';
 
-export function AgentActivityClient({ agentId, initial, initialEvents = [] }: Props) {
+export function AgentActivityClient({
+    agentId,
+    initial,
+    initialEvents = [],
+    focusRunId = null,
+}: Props) {
     const [rows, setRows] = useState<AgentRunRow[]>(initial.data);
     const [meta, setMeta] = useState(initial.meta);
     const [events, setEvents] = useState<AgentEventRow[]>(initialEvents);
     const [pending, startTransition] = useTransition();
     const [cancellingId, setCancellingId] = useState<string | null>(null);
-    const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set());
+    // A `?run=` deep link (the "View logs" link on a failed Task run)
+    // opens that run expanded — landing on a collapsed page of 25 rows
+    // would make the caller hunt for the failure they just clicked.
+    const [expandedIds, setExpandedIds] = useState<Set<string>>(() =>
+        focusRunId ? new Set([focusRunId]) : new Set(),
+    );
     // runId → detail; null = fetch failed (rendered as retryable error state).
     const [details, setDetails] = useState<Record<string, AgentRunDetail | null>>({});
 
@@ -261,14 +278,32 @@ export function AgentActivityClient({ agentId, initial, initialEvents = [] }: Pr
         });
     };
 
-    const loadDetail = async (runId: string) => {
-        try {
-            const detail = await getAgentRunDetailAction(agentId, runId);
-            setDetails((prev) => ({ ...prev, [runId]: detail as AgentRunDetail }));
-        } catch {
-            setDetails((prev) => ({ ...prev, [runId]: null }));
-        }
-    };
+    const loadDetail = useCallback(
+        async (runId: string) => {
+            try {
+                const detail = await getAgentRunDetailAction(agentId, runId);
+                setDetails((prev) => ({ ...prev, [runId]: detail as AgentRunDetail }));
+            } catch {
+                setDetails((prev) => ({ ...prev, [runId]: null }));
+            }
+        },
+        [agentId],
+    );
+
+    // Deep-link arrival: the row is already expanded (initial state), so
+    // all that is left is fetching its logs and putting it on screen.
+    // Runs once — re-paginating or collapsing the row afterwards must not
+    // yank the view back.
+    const focusHandled = useRef(false);
+    useEffect(() => {
+        if (!focusRunId || focusHandled.current) return;
+        if (!rows.some((row) => row.id === focusRunId)) return;
+        focusHandled.current = true;
+        void loadDetail(focusRunId);
+        document
+            .getElementById(`run-${focusRunId}`)
+            ?.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }, [focusRunId, rows, loadDetail]);
 
     const toggle = (runId: string) => {
         if (!expandedIds.has(runId) && details[runId] === undefined) void loadDetail(runId);
@@ -425,7 +460,15 @@ export function AgentActivityClient({ agentId, initial, initialEvents = [] }: Pr
                                 return (
                                     <Fragment key={r.id}>
                                         <tr
-                                            className="bg-card dark:bg-transparent hover:bg-muted/30 dark:hover:bg-muted/10 transition-colors cursor-pointer"
+                                            id={`run-${r.id}`}
+                                            className={cn(
+                                                'bg-card dark:bg-transparent hover:bg-muted/30 dark:hover:bg-muted/10 transition-colors cursor-pointer',
+                                                // Deep-linked row — tinted so the
+                                                // caller sees WHICH run the link
+                                                // meant, not just a page of runs.
+                                                r.id === focusRunId &&
+                                                    'bg-amber-50/70 dark:bg-amber-900/10',
+                                            )}
                                             onClick={() => toggle(r.id)}
                                             onKeyDown={(e) => handleRowKeyDown(e, r.id)}
                                             tabIndex={0}
