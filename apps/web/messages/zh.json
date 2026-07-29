@@ -820,6 +820,23 @@
                 "accept": "接受",
                 "subtitle": "由智能体合并或提议的文档。在你接受之前，不会进入智能体的上下文。",
                 "title": "待审核 ({count})"
+            },
+            "schedule": {
+                "cadence": "每",
+                "cadences": {
+                    "daily": "天",
+                    "weekly": "周",
+                    "monthly": "月"
+                },
+                "enabled": "按计划运行",
+                "lastRun": "上次运行：{when}",
+                "mode": "模式",
+                "modes": {
+                    "dry-run": "仅生成报告",
+                    "propose": "提议合并"
+                },
+                "subtitle": "定期合并高度重复的文档。提议进入待审核队列，不会自动接受或删除任何内容。",
+                "title": "定时合并"
             }
         },
         "agentsPage": {

@@ -820,6 +820,23 @@
                 "accept": "Accepteren",
                 "subtitle": "Documenten die een agent heeft samengevoegd of voorgesteld. Ze blijven buiten de agentcontext tot je ze accepteert.",
                 "title": "Wacht op beoordeling ({count})"
+            },
+            "schedule": {
+                "cadence": "Elke",
+                "cadences": {
+                    "daily": "Dag",
+                    "weekly": "Week",
+                    "monthly": "Maand"
+                },
+                "enabled": "Volgens schema uitvoeren",
+                "lastRun": "Laatste run: {when}",
+                "mode": "Modus",
+                "modes": {
+                    "dry-run": "Alleen rapport",
+                    "propose": "Samenvoegingen voorstellen"
+                },
+                "subtitle": "Voegt periodiek bijna-identieke documenten samen. Voorstellen gaan naar de beoordelingswachtrij — niets wordt automatisch geaccepteerd of verwijderd.",
+                "title": "Geplande consolidatie"
             }
         },
         "agentsPage": {

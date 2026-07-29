@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils/cn';
 import { MemoryUploadsPanel } from './MemoryUploadsPanel';
 import { AgentMemoryPanel } from './AgentMemoryPanel';
 import { MemoryReviewPanel } from './MemoryReviewPanel';
+import { MemoryConsolidationSettings } from './MemoryConsolidationSettings';
 import {
     buildMemoryQuery,
     type MemoryConsolidationReport,
@@ -254,6 +255,9 @@ export function MemoryShell({ initial }: MemoryShellProps) {
                     {t('consolidation.action')}
                 </button>
             </div>
+
+            {/* Scheduled consolidation — the settings that make the pass runnable */}
+            <MemoryConsolidationSettings />
 
             {/* Review queue — proposed docs awaiting a human (hidden when empty) */}
             <MemoryReviewPanel />

@@ -820,6 +820,23 @@
                 "accept": "Accetta",
                 "subtitle": "Documenti uniti o proposti da un agente. Restano esclusi dal contesto degli agenti finché non li accetti.",
                 "title": "In attesa di revisione ({count})"
+            },
+            "schedule": {
+                "cadence": "Ogni",
+                "cadences": {
+                    "daily": "Giorno",
+                    "weekly": "Settimana",
+                    "monthly": "Mese"
+                },
+                "enabled": "Esegui su pianificazione",
+                "lastRun": "Ultima esecuzione: {when}",
+                "mode": "Modalità",
+                "modes": {
+                    "dry-run": "Solo report",
+                    "propose": "Proponi unioni"
+                },
+                "subtitle": "Unisce periodicamente documenti quasi duplicati. Le proposte finiscono nella coda di revisione: nulla viene accettato o eliminato automaticamente.",
+                "title": "Consolidamento pianificato"
             }
         },
         "agentsPage": {

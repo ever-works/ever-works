@@ -820,6 +820,23 @@
                 "accept": "Aceitar",
                 "subtitle": "Documentos que um agente fundiu ou propôs. Ficam excluídos do contexto dos agentes até os aceitar.",
                 "title": "A aguardar revisão ({count})"
+            },
+            "schedule": {
+                "cadence": "A cada",
+                "cadences": {
+                    "daily": "Dia",
+                    "weekly": "Semana",
+                    "monthly": "Mês"
+                },
+                "enabled": "Executar agendado",
+                "lastRun": "Última execução: {when}",
+                "mode": "Modo",
+                "modes": {
+                    "dry-run": "Apenas relatório",
+                    "propose": "Propor fusões"
+                },
+                "subtitle": "Funde periodicamente documentos quase duplicados. As propostas vão para a fila de revisão — nada é aceite ou eliminado automaticamente.",
+                "title": "Consolidação agendada"
             }
         },
         "agentsPage": {

@@ -903,6 +903,23 @@
                 "accept": "Accept",
                 "subtitle": "Documents an agent merged or proposed. They are withheld from agent context until you accept them.",
                 "title": "Awaiting review ({count})"
+            },
+            "schedule": {
+                "cadence": "Every",
+                "cadences": {
+                    "daily": "Day",
+                    "weekly": "Week",
+                    "monthly": "Month"
+                },
+                "enabled": "Run on a schedule",
+                "lastRun": "Last run: {when}",
+                "mode": "Mode",
+                "modes": {
+                    "dry-run": "Report only",
+                    "propose": "Propose merges"
+                },
+                "subtitle": "Periodically merge near-duplicate Memory documents. Proposals go to the review queue — nothing is ever accepted or deleted automatically.",
+                "title": "Scheduled consolidation"
             }
         },
         "agentsPage": {

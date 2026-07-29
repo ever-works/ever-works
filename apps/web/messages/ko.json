@@ -820,6 +820,23 @@
                 "accept": "수락",
                 "subtitle": "에이전트가 병합하거나 제안한 문서입니다. 수락하기 전까지 에이전트 컨텍스트에서 제외됩니다.",
                 "title": "검토 대기 ({count})"
+            },
+            "schedule": {
+                "cadence": "주기",
+                "cadences": {
+                    "daily": "매일",
+                    "weekly": "매주",
+                    "monthly": "매월"
+                },
+                "enabled": "예약 실행",
+                "lastRun": "마지막 실행: {when}",
+                "mode": "모드",
+                "modes": {
+                    "dry-run": "보고서만",
+                    "propose": "병합 제안"
+                },
+                "subtitle": "거의 중복된 문서를 주기적으로 병합합니다. 제안은 검토 대기열로 이동하며 자동으로 수락되거나 삭제되지 않습니다.",
+                "title": "예약된 통합"
             }
         },
         "agentsPage": {
