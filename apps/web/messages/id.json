@@ -818,6 +818,7 @@
             },
             "review": {
                 "accept": "Terima",
+                "acceptFailed": "Gagal menerima — coba lagi",
                 "subtitle": "Dokumen yang digabungkan atau diusulkan agen. Tidak masuk konteks agen sampai Anda menerimanya.",
                 "title": "Menunggu peninjauan ({count})"
             },

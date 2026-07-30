@@ -818,6 +818,7 @@
             },
             "review": {
                 "accept": "Accepteren",
+                "acceptFailed": "Accepteren mislukt — probeer opnieuw",
                 "subtitle": "Documenten die een agent heeft samengevoegd of voorgesteld. Ze blijven buiten de agentcontext tot je ze accepteert.",
                 "title": "Wacht op beoordeling ({count})"
             },

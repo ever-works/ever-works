@@ -818,6 +818,7 @@
             },
             "review": {
                 "accept": "Kabul et",
+                "acceptFailed": "Kabul edilemedi — tekrar deneyin",
                 "subtitle": "Bir ajanın birleştirdiği veya önerdiği belgeler. Siz kabul edene kadar ajan bağlamının dışında tutulur.",
                 "title": "İnceleme bekliyor ({count})"
             },

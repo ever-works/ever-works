@@ -901,6 +901,7 @@
             },
             "review": {
                 "accept": "Accept",
+                "acceptFailed": "Couldn't accept — try again",
                 "subtitle": "Documents an agent merged or proposed. They are withheld from agent context until you accept them.",
                 "title": "Awaiting review ({count})"
             },

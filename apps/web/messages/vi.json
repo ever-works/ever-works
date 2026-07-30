@@ -818,6 +818,7 @@
             },
             "review": {
                 "accept": "Chấp nhận",
+                "acceptFailed": "Không thể chấp nhận — thử lại",
                 "subtitle": "Tài liệu do tác nhân hợp nhất hoặc đề xuất. Chúng bị giữ ngoài ngữ cảnh của tác nhân cho đến khi bạn chấp nhận.",
                 "title": "Chờ duyệt ({count})"
             },

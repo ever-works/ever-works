@@ -818,6 +818,7 @@
             },
             "review": {
                 "accept": "Akceptuj",
+                "acceptFailed": "Nie udało się zaakceptować — spróbuj ponownie",
                 "subtitle": "Dokumenty scalone lub zaproponowane przez agenta. Pozostają poza kontekstem agentów do czasu akceptacji.",
                 "title": "Oczekuje na przegląd ({count})"
             },

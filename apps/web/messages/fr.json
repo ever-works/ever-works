@@ -849,6 +849,7 @@
             },
             "review": {
                 "accept": "Accepter",
+                "acceptFailed": "Échec de l’acceptation — réessayez",
                 "subtitle": "Documents fusionnés ou proposés par un agent. Ils sont exclus du contexte des agents jusqu’à votre acceptation.",
                 "title": "En attente de revue ({count})"
             },

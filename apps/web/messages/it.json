@@ -818,6 +818,7 @@
             },
             "review": {
                 "accept": "Accetta",
+                "acceptFailed": "Accettazione non riuscita — riprova",
                 "subtitle": "Documenti uniti o proposti da un agente. Restano esclusi dal contesto degli agenti finché non li accetti.",
                 "title": "In attesa di revisione ({count})"
             },

@@ -849,6 +849,7 @@
             },
             "review": {
                 "accept": "Annehmen",
+                "acceptFailed": "Annahme fehlgeschlagen — erneut versuchen",
                 "subtitle": "Von einem Agenten zusammengeführte oder vorgeschlagene Dokumente. Bis zur Freigabe bleiben sie aus dem Agentenkontext ausgeschlossen.",
                 "title": "Wartet auf Prüfung ({count})"
             },

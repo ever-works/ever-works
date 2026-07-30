@@ -849,6 +849,7 @@
             },
             "review": {
                 "accept": "Aceptar",
+                "acceptFailed": "No se pudo aceptar; inténtalo de nuevo",
                 "subtitle": "Documentos que un agente fusionó o propuso. Se excluyen del contexto de los agentes hasta que los aceptes.",
                 "title": "Pendiente de revisión ({count})"
             },

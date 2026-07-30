@@ -818,6 +818,7 @@
             },
             "review": {
                 "accept": "Aceitar",
+                "acceptFailed": "Não foi possível aceitar — tente novamente",
                 "subtitle": "Documentos que um agente fundiu ou propôs. Ficam excluídos do contexto dos agentes até os aceitar.",
                 "title": "A aguardar revisão ({count})"
             },
