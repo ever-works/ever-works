@@ -182,13 +182,13 @@ export function PromptChipsRow<TValue extends string = string>({
                 <>
                     <div
                         aria-hidden="true"
-                        className="pointer-events-none absolute left-0 top-0 bottom-0 z-10 w-12 bg-gradient-to-r from-background to-transparent dark:from-black"
+                        className="pointer-events-none absolute left-0 top-0 bottom-0 z-10 w-12 bg-gradient-to-r from-background to-transparent dark:from-surface-dark"
                     />
                     <button
                         type="button"
                         onClick={() => panBy(-STEP)}
                         aria-label="Show previous chips"
-                        className="absolute left-0 top-1/2 z-20 grid -translate-y-1/2 place-items-center rounded-full border border-border/60 dark:border-white/10 bg-background/90 dark:bg-black/80 size-8 shadow-md hover:bg-foreground/5"
+                        className="absolute left-0 top-1/2 z-20 grid size-8 -translate-y-1/2 place-items-center rounded-full border border-border/60 bg-background/90 text-text-secondary shadow-md transition-colors hover:bg-foreground/5 hover:text-text dark:border-white/10 dark:bg-surface-dark/90 dark:text-text-secondary-dark dark:hover:bg-white/6 dark:hover:text-text-dark"
                         data-testid={testIdPrefix ? `${testIdPrefix}-scroll-left` : undefined}
                     >
                         <ChevronLeft className="size-4" aria-hidden="true" />
@@ -227,7 +227,7 @@ export function PromptChipsRow<TValue extends string = string>({
                                     aria-disabled="true"
                                     aria-selected="false"
                                     title="Coming soon"
-                                    className="inline-flex shrink-0 cursor-not-allowed select-none items-center gap-2 rounded-full border px-3 py-1.5 text-sm border-border/40 dark:border-white/5 bg-foreground/[0.03] text-text-muted dark:text-text-muted-dark"
+                                    className="inline-flex shrink-0 cursor-not-allowed select-none items-center gap-2 rounded-full border px-3 py-1.5 text-xs border-border/40 dark:border-white/5 bg-foreground/[0.03] text-text-muted dark:text-text-muted-dark"
                                     data-testid={
                                         testIdPrefix ? `${testIdPrefix}-${c.value}` : undefined
                                     }
@@ -265,10 +265,10 @@ export function PromptChipsRow<TValue extends string = string>({
                                     testIdPrefix ? `${testIdPrefix}-${c.value}` : undefined
                                 }
                                 className={cn(
-                                    'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-sm transition-colors',
+                                    'inline-flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1.5 text-xs transition-colors',
                                     selected
-                                        ? 'border-primary/60 bg-primary/10 text-primary shadow-sm'
-                                        : 'border-border/60 dark:border-white/10 bg-transparent text-text-secondary dark:text-text-secondary-dark hover:border-primary/40',
+                                        ? 'border-text bg-text text-white shadow-sm dark:border-white dark:bg-white dark:text-black'
+                                        : 'border-border/60 bg-transparent text-text-secondary hover:border-border hover:bg-foreground/3 hover:text-text dark:border-white/10 dark:text-text-secondary-dark dark:hover:border-white/20 dark:hover:bg-white/5 dark:hover:text-text-dark',
                                 )}
                             >
                                 <Icon className="size-3.5" aria-hidden="true" />
@@ -283,13 +283,13 @@ export function PromptChipsRow<TValue extends string = string>({
                 <>
                     <div
                         aria-hidden="true"
-                        className="pointer-events-none absolute right-0 top-0 bottom-0 z-10 w-12 bg-gradient-to-l from-background to-transparent dark:from-black"
+                        className="pointer-events-none absolute right-0 top-0 bottom-0 z-10 w-12 bg-gradient-to-l from-background to-transparent dark:from-surface-dark"
                     />
                     <button
                         type="button"
                         onClick={() => panBy(STEP)}
                         aria-label="Show next chips"
-                        className="absolute right-0 top-1/2 z-20 grid -translate-y-1/2 place-items-center rounded-full border border-border/60 dark:border-white/10 bg-background/90 dark:bg-black/80 size-8 shadow-md hover:bg-foreground/5"
+                        className="absolute right-0 top-1/2 z-20 grid size-8 -translate-y-1/2 place-items-center rounded-full border border-border/60 bg-background/90 text-text-secondary shadow-md transition-colors hover:bg-foreground/5 hover:text-text dark:border-white/10 dark:bg-surface-dark/90 dark:text-text-secondary-dark dark:hover:bg-white/6 dark:hover:text-text-dark"
                         data-testid={testIdPrefix ? `${testIdPrefix}-scroll-right` : undefined}
                     >
                         <ChevronRight className="size-4" aria-hidden="true" />
