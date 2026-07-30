@@ -76,6 +76,20 @@ describe('WorksCreateComposer chip seeding', () => {
         expect(getTextarea(container).value).toBe(BLOG_SEED);
     });
 
+    it('stops replacing a seed once the user has edited it', () => {
+        // Editing the seed makes it the user's own words — the next chip pick
+        // has to leave it alone even though we put the first draft there.
+        const { container } = render(<WorksCreateComposer />);
+        clickChip(container, 'directory');
+
+        const edited = `${DIRECTORY_SEED}, self-hosted only`;
+        fireEvent.change(getTextarea(container), { target: { value: edited } });
+
+        clickChip(container, 'blog');
+
+        expect(getTextarea(container).value).toBe(edited);
+    });
+
     it('never overwrites text the user typed', () => {
         const { container } = render(<WorksCreateComposer />);
         fireEvent.change(getTextarea(container), {
