@@ -1,4 +1,4 @@
-import { Injectable, Logger, Optional } from '@nestjs/common';
+import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import type { SubAgentDelegationRequest, SubAgentDelegationResult } from '@ever-works/contracts';
 import type { SubAgentDelegationRunner } from '@ever-works/agent/agents';
 import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
@@ -36,6 +36,20 @@ import { TasksService, TaskTransitionService } from '@ever-works/agent/tasks-dom
  * reported as `failed` with a distinct summary rather than pretending
  * the child succeeded.
  */
+/**
+ * Injection token for the sleep seam.
+ *
+ * A real token, NOT a bare `@Optional()` on an anonymous object type:
+ * that has no runtime token for Nest to match, so the parameter could
+ * never be injected and would silently stay `undefined` forever — a
+ * decorative seam of exactly the kind this PR exists to remove.
+ */
+export const DELEGATION_CLOCK = 'DELEGATION_CLOCK' as const;
+
+export interface DelegationClock {
+    sleep(ms: number): Promise<void>;
+}
+
 @Injectable()
 export class SubAgentDelegationRunnerService implements SubAgentDelegationRunner {
     private readonly logger = new Logger(SubAgentDelegationRunnerService.name);
@@ -50,7 +64,7 @@ export class SubAgentDelegationRunnerService implements SubAgentDelegationRunner
         private readonly runs: AgentRunRepository,
         private readonly tasks: TasksService,
         private readonly transitions: TaskTransitionService,
-        @Optional() private readonly clock?: { sleep(ms: number): Promise<void> },
+        @Optional() @Inject(DELEGATION_CLOCK) private readonly clock?: DelegationClock,
     ) {}
 
     async run(request: SubAgentDelegationRequest): Promise<SubAgentDelegationResult> {

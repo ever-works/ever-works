@@ -1,5 +1,5 @@
 import { Test, TestingModule } from '@nestjs/testing';
-import { SubAgentDelegationRunnerService } from './sub-agent-delegation.runner';
+import { DELEGATION_CLOCK, SubAgentDelegationRunnerService } from './sub-agent-delegation.runner';
 import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
 import { TasksService, TaskTransitionService } from '@ever-works/agent/tasks-domain';
 
@@ -59,7 +59,10 @@ describe('SubAgentDelegationRunnerService', () => {
                 { provide: TasksService, useValue: tasks },
                 { provide: TaskTransitionService, useValue: transitions },
                 // Deterministic clock so the poll loop never really sleeps.
-                { provide: 'CLOCK', useValue: { sleep: async () => undefined } },
+                // Must use the real token: a bare string that does not match
+                // the @Inject leaves `clock` undefined and the test silently
+                // sleeps for real (this one took 2s before the token existed).
+                { provide: DELEGATION_CLOCK, useValue: { sleep: async () => undefined } },
             ],
         }).compile();
 

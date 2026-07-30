@@ -179,6 +179,16 @@ export class WorkflowNodeRunnerService implements WorkflowNodeRunner {
             parentAgentId,
             parentRunId: context.runId,
             parentTaskId: this.contextString(context, 'taskId') ?? null,
+            // Threaded from the run context when the host provides it.
+            //
+            // Be honest about what bounds recursion here: this field is
+            // ADVISORY unless a host actually populates `delegationDepth`,
+            // and nothing does yet — so the depth check in
+            // `validateSubAgentDelegationRequest` will not fire on its own.
+            // The effective backstop is `TasksService.create`, which walks
+            // the parent chain and refuses past depth 64. That works
+            // because `parentTaskId` above threads the chain; a host that
+            // omits `taskId` loses the backstop too.
             depth: this.contextNumber(context, 'delegationDepth') ?? 0,
             objective,
             scope: {
