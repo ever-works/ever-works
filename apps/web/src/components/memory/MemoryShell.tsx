@@ -18,6 +18,7 @@ import { cn } from '@/lib/utils/cn';
 import { MemoryUploadsPanel } from './MemoryUploadsPanel';
 import { AgentMemoryPanel } from './AgentMemoryPanel';
 import { MemoryReviewPanel } from './MemoryReviewPanel';
+import { MemoryConsolidationSettings } from './MemoryConsolidationSettings';
 import {
     buildMemoryQuery,
     type MemoryConsolidationReport,
@@ -414,6 +415,11 @@ export function MemoryShell({ initial }: MemoryShellProps) {
                     </ul>
                 )}
             </div>
+
+            {/* Scheduled consolidation — configuration, deliberately placed
+                AFTER the document list. Someone opening /memory came to read
+                their documents, not to meet a settings form. */}
+            <MemoryConsolidationSettings />
         </div>
     );
 }

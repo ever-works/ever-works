@@ -818,8 +818,26 @@
             },
             "review": {
                 "accept": "承認",
+                "acceptFailed": "承認できませんでした — 再試行してください",
                 "subtitle": "エージェントが統合または提案した文書です。承認するまでエージェントのコンテキストには使われません。",
                 "title": "レビュー待ち ({count})"
+            },
+            "schedule": {
+                "cadence": "間隔",
+                "cadences": {
+                    "daily": "毎日",
+                    "weekly": "毎週",
+                    "monthly": "毎月"
+                },
+                "enabled": "スケジュール実行",
+                "lastRun": "最終実行: {when}",
+                "mode": "モード",
+                "modes": {
+                    "dry-run": "レポートのみ",
+                    "propose": "統合を提案"
+                },
+                "subtitle": "ほぼ重複する文書を定期的に統合します。提案はレビュー待ちに入り、自動で承認や削除されることはありません。",
+                "title": "定期統合"
             }
         },
         "agentsPage": {

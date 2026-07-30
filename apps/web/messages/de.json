@@ -849,8 +849,26 @@
             },
             "review": {
                 "accept": "Annehmen",
+                "acceptFailed": "Annahme fehlgeschlagen — erneut versuchen",
                 "subtitle": "Von einem Agenten zusammengeführte oder vorgeschlagene Dokumente. Bis zur Freigabe bleiben sie aus dem Agentenkontext ausgeschlossen.",
                 "title": "Wartet auf Prüfung ({count})"
+            },
+            "schedule": {
+                "cadence": "Alle",
+                "cadences": {
+                    "daily": "Tage",
+                    "weekly": "Wochen",
+                    "monthly": "Monate"
+                },
+                "enabled": "Nach Zeitplan ausführen",
+                "lastRun": "Letzter Lauf: {when}",
+                "mode": "Modus",
+                "modes": {
+                    "dry-run": "Nur Bericht",
+                    "propose": "Zusammenführungen vorschlagen"
+                },
+                "subtitle": "Führt nahezu doppelte Dokumente regelmäßig zusammen. Vorschläge landen in der Prüf-Warteschlange — nichts wird automatisch übernommen oder gelöscht.",
+                "title": "Geplante Konsolidierung"
             }
         },
         "agentsPage": {

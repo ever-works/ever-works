@@ -818,8 +818,26 @@
             },
             "review": {
                 "accept": "Terima",
+                "acceptFailed": "Gagal menerima — coba lagi",
                 "subtitle": "Dokumen yang digabungkan atau diusulkan agen. Tidak masuk konteks agen sampai Anda menerimanya.",
                 "title": "Menunggu peninjauan ({count})"
+            },
+            "schedule": {
+                "cadence": "Setiap",
+                "cadences": {
+                    "daily": "Hari",
+                    "weekly": "Minggu",
+                    "monthly": "Bulan"
+                },
+                "enabled": "Jalankan terjadwal",
+                "lastRun": "Terakhir dijalankan: {when}",
+                "mode": "Mode",
+                "modes": {
+                    "dry-run": "Laporan saja",
+                    "propose": "Usulkan penggabungan"
+                },
+                "subtitle": "Menggabungkan dokumen yang nyaris sama secara berkala. Usulan masuk ke antrean tinjauan — tidak ada yang diterima atau dihapus otomatis.",
+                "title": "Konsolidasi terjadwal"
             }
         },
         "agentsPage": {

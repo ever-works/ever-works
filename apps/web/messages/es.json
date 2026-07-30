@@ -849,8 +849,26 @@
             },
             "review": {
                 "accept": "Aceptar",
+                "acceptFailed": "No se pudo aceptar; inténtalo de nuevo",
                 "subtitle": "Documentos que un agente fusionó o propuso. Se excluyen del contexto de los agentes hasta que los aceptes.",
                 "title": "Pendiente de revisión ({count})"
+            },
+            "schedule": {
+                "cadence": "Cada",
+                "cadences": {
+                    "daily": "Día",
+                    "weekly": "Semana",
+                    "monthly": "Mes"
+                },
+                "enabled": "Ejecutar programado",
+                "lastRun": "Última ejecución: {when}",
+                "mode": "Modo",
+                "modes": {
+                    "dry-run": "Solo informe",
+                    "propose": "Proponer fusiones"
+                },
+                "subtitle": "Fusiona periódicamente documentos casi duplicados. Las propuestas van a la cola de revisión; nada se acepta ni se elimina automáticamente.",
+                "title": "Consolidación programada"
             }
         },
         "agentsPage": {

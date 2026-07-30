@@ -818,8 +818,26 @@
             },
             "review": {
                 "accept": "Kabul et",
+                "acceptFailed": "Kabul edilemedi — tekrar deneyin",
                 "subtitle": "Bir ajanın birleştirdiği veya önerdiği belgeler. Siz kabul edene kadar ajan bağlamının dışında tutulur.",
                 "title": "İnceleme bekliyor ({count})"
+            },
+            "schedule": {
+                "cadence": "Her",
+                "cadences": {
+                    "daily": "Gün",
+                    "weekly": "Hafta",
+                    "monthly": "Ay"
+                },
+                "enabled": "Zamanlanmış çalıştır",
+                "lastRun": "Son çalışma: {when}",
+                "mode": "Mod",
+                "modes": {
+                    "dry-run": "Yalnızca rapor",
+                    "propose": "Birleştirme öner"
+                },
+                "subtitle": "Neredeyse aynı belgeleri düzenli olarak birleştirir. Öneriler inceleme kuyruğuna gider; hiçbir şey otomatik kabul edilmez veya silinmez.",
+                "title": "Zamanlanmış birleştirme"
             }
         },
         "agentsPage": {

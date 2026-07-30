@@ -1,5 +1,6 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import { WorkKnowledgeDocumentRepository } from '../database/repositories/work-knowledge-document.repository';
+import { OrganizationRepository } from '../database/repositories/organization.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { WorkKnowledgeDocument } from '../entities/work-knowledge-document.entity';
 import {
@@ -20,6 +21,7 @@ import {
     scoreMemoryDocument,
     selectPromotions,
 } from './memory-consolidation';
+import type { KbMemoryConsolidationSettings } from '@ever-works/contracts';
 
 /** Caller scope for a consolidation run (mirrors `aggregateOrgMemory`). */
 export interface MemoryConsolidationScope {
@@ -118,6 +120,10 @@ export class MemoryConsolidationService {
         // when `aiFacade` is absent synthesis is skipped with a note.
         @Optional() private readonly workRepository?: WorkRepository,
         @Optional() private readonly aiFacade?: AiFacadeService,
+        // Needed only by the schedule-settings accessors below. Optional
+        // for the same reason as the two above: the isolated consolidation
+        // unit tests construct this service without a database.
+        @Optional() private readonly organizationRepository?: OrganizationRepository,
     ) {}
 
     async runConsolidation(
@@ -465,6 +471,85 @@ export class MemoryConsolidationService {
         const meta = (doc.metadata ?? {}) as { body?: unknown };
         if (typeof meta.body === 'string') return meta.body;
         return doc.description ?? '';
+    }
+
+    /**
+     * Fail loudly rather than silently.
+     *
+     * `organizationRepository` is `@Optional()` so the isolated unit
+     * tests can construct this service without a database — but it IS
+     * provided in production via `REPOSITORY_PROVIDERS`. If that ever
+     * stops being true, an optional-chained write would return success
+     * having stored nothing, and the scheduled pass would go back to
+     * never running for anyone. That silence is the exact failure these
+     * methods exist to fix, so it must not be reintroduced here.
+     */
+    private assertOrganizationRepository(): void {
+        if (!this.organizationRepository) {
+            throw new Error(
+                'MemoryConsolidationService: OrganizationRepository is not available — scheduled consolidation settings cannot be read or written.',
+            );
+        }
+    }
+
+    /**
+     * Defaults for an Organization that has never configured the
+     * scheduled pass. `dry-run` and `enabled: false` are deliberate: a
+     * consolidation that persists anything must be an explicit choice.
+     */
+    private static readonly SCHEDULE_DEFAULTS: KbMemoryConsolidationSettings = {
+        enabled: false,
+        cadence: 'weekly',
+        mode: 'dry-run',
+        notify: true,
+        lastRunAt: null,
+    };
+
+    /**
+     * Read the scheduled-pass settings for an Organization.
+     *
+     * Returns the defaults rather than null when unset, so a settings UI
+     * has something to render without special-casing "never configured".
+     */
+    async getScheduleSettings(organizationId: string): Promise<KbMemoryConsolidationSettings> {
+        this.assertOrganizationRepository();
+        const org = await this.organizationRepository!.findById(organizationId);
+        return {
+            ...MemoryConsolidationService.SCHEDULE_DEFAULTS,
+            ...(org?.memoryConsolidation ?? {}),
+        };
+    }
+
+    /**
+     * Write the scheduled-pass settings.
+     *
+     * This method is why the scheduled pass can run at all. The tick
+     * selects organizations with `memory_consolidation IS NOT NULL`, and
+     * nothing in the codebase ever wrote that column — the only other
+     * write updates `lastRunAt` on rows that are already non-null. So the
+     * scheduler's candidate set was permanently empty and the whole
+     * feature was unreachable in production.
+     *
+     * Merges onto the stored value so a caller can flip one knob without
+     * restating the rest, and `lastRunAt` is preserved rather than reset
+     * — changing a cadence should not make the pass think it has never
+     * run and fire immediately.
+     */
+    async updateScheduleSettings(
+        organizationId: string,
+        patch: Partial<KbMemoryConsolidationSettings>,
+    ): Promise<KbMemoryConsolidationSettings> {
+        this.assertOrganizationRepository();
+        const current = await this.getScheduleSettings(organizationId);
+        const next: KbMemoryConsolidationSettings = {
+            ...current,
+            ...patch,
+            lastRunAt: current.lastRunAt ?? null,
+        };
+        await this.organizationRepository!.update(organizationId, {
+            memoryConsolidation: next,
+        });
+        return next;
     }
 }
 

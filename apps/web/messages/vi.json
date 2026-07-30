@@ -818,8 +818,26 @@
             },
             "review": {
                 "accept": "Chấp nhận",
+                "acceptFailed": "Không thể chấp nhận — thử lại",
                 "subtitle": "Tài liệu do tác nhân hợp nhất hoặc đề xuất. Chúng bị giữ ngoài ngữ cảnh của tác nhân cho đến khi bạn chấp nhận.",
                 "title": "Chờ duyệt ({count})"
+            },
+            "schedule": {
+                "cadence": "Mỗi",
+                "cadences": {
+                    "daily": "Ngày",
+                    "weekly": "Tuần",
+                    "monthly": "Tháng"
+                },
+                "enabled": "Chạy theo lịch",
+                "lastRun": "Lần chạy cuối: {when}",
+                "mode": "Chế độ",
+                "modes": {
+                    "dry-run": "Chỉ báo cáo",
+                    "propose": "Đề xuất hợp nhất"
+                },
+                "subtitle": "Định kỳ hợp nhất các tài liệu gần trùng. Đề xuất vào hàng chờ duyệt — không có gì được chấp nhận hay xóa tự động.",
+                "title": "Hợp nhất theo lịch"
             }
         },
         "agentsPage": {

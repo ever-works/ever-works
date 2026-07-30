@@ -818,8 +818,26 @@
             },
             "review": {
                 "accept": "Akceptuj",
+                "acceptFailed": "Nie udało się zaakceptować — spróbuj ponownie",
                 "subtitle": "Dokumenty scalone lub zaproponowane przez agenta. Pozostają poza kontekstem agentów do czasu akceptacji.",
                 "title": "Oczekuje na przegląd ({count})"
+            },
+            "schedule": {
+                "cadence": "Co",
+                "cadences": {
+                    "daily": "Dzień",
+                    "weekly": "Tydzień",
+                    "monthly": "Miesiąc"
+                },
+                "enabled": "Uruchamiaj wg harmonogramu",
+                "lastRun": "Ostatnie uruchomienie: {when}",
+                "mode": "Tryb",
+                "modes": {
+                    "dry-run": "Tylko raport",
+                    "propose": "Proponuj scalenia"
+                },
+                "subtitle": "Okresowo scala niemal identyczne dokumenty. Propozycje trafiają do kolejki przeglądu — nic nie jest akceptowane ani usuwane automatycznie.",
+                "title": "Zaplanowana konsolidacja"
             }
         },
         "agentsPage": {
