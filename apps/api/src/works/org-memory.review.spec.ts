@@ -33,7 +33,7 @@ describe('OrgMemoryController — review queue', () => {
     const DOC = '11111111-1111-4111-8111-111111111111';
 
     let kb: { listOrgReviewQueue: jest.Mock; acceptOrgDocument: jest.Mock };
-    let membership: { ensureMember: jest.Mock };
+    let membership: { ensureMember: jest.Mock; ensureAdmin: jest.Mock };
     let scopeContext: { getOrganizationId: jest.Mock };
     let controller: OrgMemoryController;
 
@@ -42,7 +42,10 @@ describe('OrgMemoryController — review queue', () => {
             listOrgReviewQueue: jest.fn().mockResolvedValue({ items: [], total: 0 }),
             acceptOrgDocument: jest.fn().mockResolvedValue({ id: DOC, reviewState: 'accepted' }),
         };
-        membership = { ensureMember: jest.fn().mockResolvedValue({ id: 'org-1' }) };
+        membership = {
+            ensureMember: jest.fn().mockResolvedValue({ id: 'org-1' }),
+            ensureAdmin: jest.fn().mockResolvedValue({ id: 'org-1' }),
+        };
         scopeContext = { getOrganizationId: jest.fn().mockReturnValue('org-1') };
 
         controller = new OrgMemoryController(
@@ -72,6 +75,13 @@ describe('OrgMemoryController — review queue', () => {
 
         expect(res).toEqual({ items: [], total: 0 });
         expect(kb.listOrgReviewQueue).not.toHaveBeenCalled();
+        expect(membership.ensureMember).not.toHaveBeenCalled();
+    });
+
+    it('authorizes accept as a WRITE (ensureAdmin), not a plain read', async () => {
+        await controller.acceptMemoryDocument(auth, DOC);
+
+        expect(membership.ensureAdmin).toHaveBeenCalledWith('org-1', 'user-1');
         expect(membership.ensureMember).not.toHaveBeenCalled();
     });
 
