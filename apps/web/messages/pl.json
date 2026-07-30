@@ -818,8 +818,26 @@
             },
             "review": {
                 "accept": "Akceptuj",
+                "acceptFailed": "Nie udało się zaakceptować — spróbuj ponownie",
                 "subtitle": "Dokumenty scalone lub zaproponowane przez agenta. Pozostają poza kontekstem agentów do czasu akceptacji.",
                 "title": "Oczekuje na przegląd ({count})"
+            },
+            "schedule": {
+                "cadence": "Co",
+                "cadences": {
+                    "daily": "Dzień",
+                    "weekly": "Tydzień",
+                    "monthly": "Miesiąc"
+                },
+                "enabled": "Uruchamiaj wg harmonogramu",
+                "lastRun": "Ostatnie uruchomienie: {when}",
+                "mode": "Tryb",
+                "modes": {
+                    "dry-run": "Tylko raport",
+                    "propose": "Proponuj scalenia"
+                },
+                "subtitle": "Okresowo scala niemal identyczne dokumenty. Propozycje trafiają do kolejki przeglądu — nic nie jest akceptowane ani usuwane automatycznie.",
+                "title": "Zaplanowana konsolidacja"
             }
         },
         "agentsPage": {
@@ -1036,6 +1054,13 @@
                 "priority": "Priorytet",
                 "labels": "Etykiety",
                 "labelsPlaceholder": "oddzielone przecinkami",
+                "labelsHint": "Oddziel wiele etykiet przecinkami.",
+                "labelsAutoHint": "Tworzone na podstawie tytułu, dopóki ich nie zmienisz. Oddziel wiele etykiet przecinkami.",
+                "organize": "Organizuj",
+                "work": "Work",
+                "workNone": "Brak Work (Workspace)",
+                "workPlaceholder": "Wybierz Work…",
+                "workHint": "Opcjonalne. Pliki można dołączać tylko do zadań powiązanych z Work.",
                 "workScopedTask": "Zadanie ograniczone do Work",
                 "missionScopedTask": "Zadanie ograniczone do Mission",
                 "ideaScopedTask": "Zadanie ograniczone do Idea",
@@ -1067,7 +1092,14 @@
                 "browse": "Przeglądaj",
                 "uploading": "Wysyłanie…",
                 "detach": "Odłącz",
-                "attachmentsWorkOnly": "Załączniki są dostępne tylko w zadaniach powiązanych z Work. Utwórz zadanie z poziomu Work, aby dołączyć pliki.",
+                "attachmentsWorkOnly": "Załączniki są dostępne tylko w zadaniach powiązanych z Work. Wybierz Work w panelu Szczegóły, aby dołączać pliki.",
+                "workNone": "Brak Work (Workspace)",
+                "workPlaceholder": "Wybierz Work…",
+                "workUpdateError": "Nie udało się zaktualizować Work",
+                "agent": "Agent",
+                "agentNone": "Nie przypisano Agenta",
+                "agentPlaceholder": "Wybierz Agenta…",
+                "agentUpdateError": "Nie udało się zaktualizować Agenta",
                 "labels": "Etykiety",
                 "edited": "edytowano",
                 "description": "Opis",
@@ -1086,6 +1118,15 @@
                 "scopeWork": "Praca",
                 "scopeMission": "Misja",
                 "scopeIdea": "Pomysł",
+                "delete": {
+                    "action": "Usuń",
+                    "title": "Usunąć to zadanie?",
+                    "body": "{slug} i wszystko, co jest z nim powiązane — rozmowa, załączniki, osoby przypisane i relacje — zostanie trwale usunięte. Tej operacji nie można cofnąć.",
+                    "confirm": "Usuń zadanie",
+                    "cancel": "Anuluj",
+                    "deleting": "Usuwanie…",
+                    "error": "Nie udało się usunąć zadania"
+                },
                 "runControls": {
                     "title": "Run controls",
                     "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",

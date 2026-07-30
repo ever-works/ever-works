@@ -818,8 +818,26 @@
             },
             "review": {
                 "accept": "Chấp nhận",
+                "acceptFailed": "Không thể chấp nhận — thử lại",
                 "subtitle": "Tài liệu do tác nhân hợp nhất hoặc đề xuất. Chúng bị giữ ngoài ngữ cảnh của tác nhân cho đến khi bạn chấp nhận.",
                 "title": "Chờ duyệt ({count})"
+            },
+            "schedule": {
+                "cadence": "Mỗi",
+                "cadences": {
+                    "daily": "Ngày",
+                    "weekly": "Tuần",
+                    "monthly": "Tháng"
+                },
+                "enabled": "Chạy theo lịch",
+                "lastRun": "Lần chạy cuối: {when}",
+                "mode": "Chế độ",
+                "modes": {
+                    "dry-run": "Chỉ báo cáo",
+                    "propose": "Đề xuất hợp nhất"
+                },
+                "subtitle": "Định kỳ hợp nhất các tài liệu gần trùng. Đề xuất vào hàng chờ duyệt — không có gì được chấp nhận hay xóa tự động.",
+                "title": "Hợp nhất theo lịch"
             }
         },
         "agentsPage": {
@@ -1036,6 +1054,13 @@
                 "priority": "Ưu tiên",
                 "labels": "Nhãn",
                 "labelsPlaceholder": "phân cách bằng dấu phẩy",
+                "labelsHint": "Phân tách nhiều nhãn bằng dấu phẩy.",
+                "labelsAutoHint": "Được lấy từ tiêu đề cho đến khi bạn chỉnh sửa. Phân tách nhiều nhãn bằng dấu phẩy.",
+                "organize": "Sắp xếp",
+                "work": "Work",
+                "workNone": "Không có Work (Workspace)",
+                "workPlaceholder": "Chọn một Work…",
+                "workHint": "Không bắt buộc. Tệp chỉ có thể đính kèm vào các nhiệm vụ thuộc một Work.",
                 "workScopedTask": "Nhiệm vụ giới hạn trong Work",
                 "missionScopedTask": "Nhiệm vụ giới hạn trong Mission",
                 "ideaScopedTask": "Nhiệm vụ giới hạn trong Idea",
@@ -1067,7 +1092,14 @@
                 "browse": "Duyệt",
                 "uploading": "Đang tải lên...",
                 "detach": "Tách",
-                "attachmentsWorkOnly": "Tệp đính kèm chỉ khả dụng cho các nhiệm vụ thuộc một Work. Hãy tạo nhiệm vụ từ một Work để đính kèm tệp.",
+                "attachmentsWorkOnly": "Tệp đính kèm chỉ khả dụng cho các nhiệm vụ thuộc một Work. Hãy chọn một Work trong bảng Chi tiết để đính kèm tệp.",
+                "workNone": "Không có Work (Workspace)",
+                "workPlaceholder": "Chọn một Work…",
+                "workUpdateError": "Không thể cập nhật Work",
+                "agent": "Agent",
+                "agentNone": "Chưa gán Agent",
+                "agentPlaceholder": "Chọn một Agent…",
+                "agentUpdateError": "Không thể cập nhật Agent",
                 "labels": "Nhãn",
                 "edited": "đã chỉnh sửa",
                 "description": "Mô tả",
@@ -1086,6 +1118,15 @@
                 "scopeWork": "Công việc",
                 "scopeMission": "Nhiệm vụ",
                 "scopeIdea": "Ý tưởng",
+                "delete": {
+                    "action": "Xóa",
+                    "title": "Xóa nhiệm vụ này?",
+                    "body": "{slug} và mọi thứ gắn với nó — cuộc trò chuyện, tệp đính kèm, người được giao và các liên kết — sẽ bị xóa vĩnh viễn. Không thể hoàn tác.",
+                    "confirm": "Xóa nhiệm vụ",
+                    "cancel": "Hủy",
+                    "deleting": "Đang xóa…",
+                    "error": "Không thể xóa nhiệm vụ"
+                },
                 "runControls": {
                     "title": "Run controls",
                     "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",

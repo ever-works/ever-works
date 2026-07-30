@@ -10,6 +10,7 @@ import {
     Param,
     ParseUUIDPipe,
     Post,
+    Put,
     Query,
     UnprocessableEntityException,
     UploadedFile,
@@ -57,6 +58,9 @@ import {
     KB_DOCUMENT_CLASSES,
     KB_DOCUMENT_SOURCES,
     KB_DOCUMENT_STATUSES,
+    KB_MEMORY_CONSOLIDATION_CADENCES,
+    KB_MEMORY_CONSOLIDATION_MODES,
+    type KbMemoryConsolidationSettings,
     type KbMemoryHealth,
 } from '@ever-works/contracts';
 import { UserUploadRepository } from '@ever-works/agent/database';
@@ -192,6 +196,30 @@ export class IngestAttachmentsDto {
     @IsString({ each: true })
     @Matches(/^[a-f0-9]{64}$/, { each: true })
     attachmentIds: string[];
+}
+
+/**
+ * Body for `PUT /api/memory/consolidation/settings`.
+ *
+ * Every field is optional so a caller can flip one knob without
+ * restating the rest; the handler merges onto what is stored.
+ */
+export class MemoryConsolidationSettingsDto {
+    @IsOptional()
+    @IsBoolean()
+    enabled?: boolean;
+
+    @IsOptional()
+    @IsIn(KB_MEMORY_CONSOLIDATION_CADENCES as unknown as readonly string[])
+    cadence?: string;
+
+    @IsOptional()
+    @IsIn(KB_MEMORY_CONSOLIDATION_MODES as unknown as readonly string[])
+    mode?: string;
+
+    @IsOptional()
+    @IsBoolean()
+    notify?: boolean;
 }
 
 /** Query for `GET /api/memory/uploads`. */
@@ -537,6 +565,50 @@ export class OrgMemoryController {
         }
 
         return { results };
+    }
+
+    @Get('memory/consolidation/settings')
+    @ApiOperation({
+        summary: 'Scheduled Memory Consolidation settings',
+        description:
+            'Cadence, mode and notification settings for the scheduled consolidation pass, plus `lastRunAt`. Returns the defaults when the Organization has never configured it.',
+    })
+    @ApiResponse({ status: 200, description: 'Current settings' })
+    async getConsolidationSettings(@CurrentUser() auth: AuthenticatedUser) {
+        const organizationId = this.scopeContext.getOrganizationId();
+        if (!organizationId) {
+            return { enabled: false, cadence: 'weekly', mode: 'dry-run', notify: true };
+        }
+        await this.membership.ensureMember(organizationId, auth.userId);
+        return this.consolidation.getScheduleSettings(organizationId);
+    }
+
+    @Put('memory/consolidation/settings')
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    @ApiOperation({
+        summary: 'Configure scheduled Memory Consolidation',
+        description:
+            'Turns the scheduled pass on or off and sets its cadence and mode. Until this exists the settings column was never written by anything, so the scheduler — which only selects organizations whose settings are non-null — could never run for anyone. `mode` defaults to `dry-run`: the pass reports without persisting, and nothing is ever auto-accepted.',
+    })
+    @ApiResponse({ status: 200, description: 'The stored settings' })
+    @ApiResponse({ status: 422, description: 'No active Organization on the request scope' })
+    async putConsolidationSettings(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() body: MemoryConsolidationSettingsDto,
+    ) {
+        const organizationId = this.scopeContext.getOrganizationId();
+        if (!organizationId) {
+            throw new UnprocessableEntityException({
+                status: 'error',
+                message: 'No active Organization — cannot configure Memory Consolidation',
+            });
+        }
+        await this.membership.ensureMember(organizationId, auth.userId);
+        return this.consolidation.updateScheduleSettings(
+            organizationId,
+            body as Partial<KbMemoryConsolidationSettings>,
+        );
     }
 
     @Get('memory/review')

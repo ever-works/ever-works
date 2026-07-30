@@ -14,7 +14,6 @@ import { serverFetch, serverMutation } from './server-api';
  */
 
 export type AgentScope = 'tenant' | 'mission' | 'work' | 'idea';
-export type AgentStatus = 'draft' | 'active' | 'paused' | 'running' | 'error' | 'archived';
 export type AgentAvatarMode = 'initials' | 'icon' | 'image';
 export type AgentIdleBehavior = 'propose' | 'sleep' | 'self-improve';
 
@@ -31,6 +30,8 @@ export {
     type AgentGuardrailActionType,
     type AgentGuardrailsMode,
     type AgentGuardrails,
+    type AgentPickerOption,
+    type AgentStatus,
     type AgentRunSession,
     type AgentRunSessionStatus,
     type AgentRunTriggerKind,
@@ -41,6 +42,7 @@ export {
 } from './agents.shared';
 import type {
     AgentGuardrails,
+    AgentStatus,
     AgentRunSession,
     ListRunSessionsQuery,
     RunSteerResponse,

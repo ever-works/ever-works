@@ -818,8 +818,26 @@
             },
             "review": {
                 "accept": "수락",
+                "acceptFailed": "수락하지 못했습니다 — 다시 시도하세요",
                 "subtitle": "에이전트가 병합하거나 제안한 문서입니다. 수락하기 전까지 에이전트 컨텍스트에서 제외됩니다.",
                 "title": "검토 대기 ({count})"
+            },
+            "schedule": {
+                "cadence": "주기",
+                "cadences": {
+                    "daily": "매일",
+                    "weekly": "매주",
+                    "monthly": "매월"
+                },
+                "enabled": "예약 실행",
+                "lastRun": "마지막 실행: {when}",
+                "mode": "모드",
+                "modes": {
+                    "dry-run": "보고서만",
+                    "propose": "병합 제안"
+                },
+                "subtitle": "거의 중복된 문서를 주기적으로 병합합니다. 제안은 검토 대기열로 이동하며 자동으로 수락되거나 삭제되지 않습니다.",
+                "title": "예약된 통합"
             }
         },
         "agentsPage": {
@@ -1036,6 +1054,13 @@
                 "priority": "우선순위",
                 "labels": "레이블",
                 "labelsPlaceholder": "쉼표로 구분",
+                "labelsHint": "여러 레이블은 쉼표로 구분하세요.",
+                "labelsAutoHint": "직접 수정하기 전까지는 제목에서 자동으로 만들어집니다. 여러 레이블은 쉼표로 구분하세요.",
+                "organize": "정리",
+                "work": "Work",
+                "workNone": "Work 없음 (Workspace)",
+                "workPlaceholder": "Work 선택…",
+                "workHint": "선택 사항입니다. 파일은 Work 범위 작업에만 첨부할 수 있습니다.",
                 "workScopedTask": "Work 범위 작업",
                 "missionScopedTask": "Mission 범위 작업",
                 "ideaScopedTask": "Idea 범위 작업",
@@ -1067,7 +1092,14 @@
                 "browse": "찾아보기",
                 "uploading": "업로드 중...",
                 "detach": "분리",
-                "attachmentsWorkOnly": "첨부 파일은 Work 범위 작업에서만 사용할 수 있습니다. 파일을 첨부하려면 Work에서 작업을 만드세요.",
+                "attachmentsWorkOnly": "첨부 파일은 Work 범위 작업에서만 사용할 수 있습니다. 파일을 첨부하려면 상세 정보 패널에서 Work를 선택하세요.",
+                "workNone": "Work 없음 (Workspace)",
+                "workPlaceholder": "Work 선택…",
+                "workUpdateError": "Work를 업데이트하지 못했습니다",
+                "agent": "에이전트",
+                "agentNone": "할당된 에이전트 없음",
+                "agentPlaceholder": "에이전트 선택…",
+                "agentUpdateError": "에이전트를 업데이트하지 못했습니다",
                 "labels": "레이블",
                 "edited": "편집됨",
                 "description": "설명",
@@ -1086,6 +1118,15 @@
                 "scopeWork": "작업",
                 "scopeMission": "임무",
                 "scopeIdea": "아이디어",
+                "delete": {
+                    "action": "삭제",
+                    "title": "이 작업을 삭제할까요?",
+                    "body": "{slug} 및 이에 연결된 모든 항목(대화, 첨부 파일, 담당자, 관계)이 영구적으로 삭제됩니다. 이 작업은 되돌릴 수 없습니다.",
+                    "confirm": "작업 삭제",
+                    "cancel": "취소",
+                    "deleting": "삭제 중…",
+                    "error": "작업을 삭제하지 못했습니다"
+                },
                 "runControls": {
                     "title": "Run controls",
                     "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",
