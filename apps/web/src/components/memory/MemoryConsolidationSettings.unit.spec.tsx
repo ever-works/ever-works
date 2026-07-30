@@ -42,13 +42,19 @@ describe('MemoryConsolidationSettings', () => {
     });
 
     beforeEach(() => {
-        vi.stubGlobal('fetch', mockFetch(() => ({ ok: true, json: () => SETTINGS })));
+        vi.stubGlobal(
+            'fetch',
+            mockFetch(() => ({ ok: true, json: () => SETTINGS })),
+        );
     });
 
     it('renders nothing until the current settings are known', () => {
         // Showing controls before the state is read would display defaults
         // as if they were the stored configuration.
-        vi.stubGlobal('fetch', vi.fn(() => new Promise(() => {})));
+        vi.stubGlobal(
+            'fetch',
+            vi.fn(() => new Promise(() => {})),
+        );
         const { container } = render(<MemoryConsolidationSettings />);
         expect(container.firstChild).toBeNull();
     });
