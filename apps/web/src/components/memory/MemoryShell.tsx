@@ -256,9 +256,6 @@ export function MemoryShell({ initial }: MemoryShellProps) {
                 </button>
             </div>
 
-            {/* Scheduled consolidation — the settings that make the pass runnable */}
-            <MemoryConsolidationSettings />
-
             {/* Review queue — proposed docs awaiting a human (hidden when empty) */}
             <MemoryReviewPanel />
 
@@ -418,6 +415,11 @@ export function MemoryShell({ initial }: MemoryShellProps) {
                     </ul>
                 )}
             </div>
+
+            {/* Scheduled consolidation — configuration, deliberately placed
+                AFTER the document list. Someone opening /memory came to read
+                their documents, not to meet a settings form. */}
+            <MemoryConsolidationSettings />
         </div>
     );
 }
