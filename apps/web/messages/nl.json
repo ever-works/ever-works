@@ -818,8 +818,26 @@
             },
             "review": {
                 "accept": "Accepteren",
+                "acceptFailed": "Accepteren mislukt — probeer opnieuw",
                 "subtitle": "Documenten die een agent heeft samengevoegd of voorgesteld. Ze blijven buiten de agentcontext tot je ze accepteert.",
                 "title": "Wacht op beoordeling ({count})"
+            },
+            "schedule": {
+                "cadence": "Elke",
+                "cadences": {
+                    "daily": "Dag",
+                    "weekly": "Week",
+                    "monthly": "Maand"
+                },
+                "enabled": "Volgens schema uitvoeren",
+                "lastRun": "Laatste run: {when}",
+                "mode": "Modus",
+                "modes": {
+                    "dry-run": "Alleen rapport",
+                    "propose": "Samenvoegingen voorstellen"
+                },
+                "subtitle": "Voegt periodiek bijna-identieke documenten samen. Voorstellen gaan naar de beoordelingswachtrij — niets wordt automatisch geaccepteerd of verwijderd.",
+                "title": "Geplande consolidatie"
             }
         },
         "agentsPage": {
@@ -1036,6 +1054,13 @@
                 "priority": "Prioriteit",
                 "labels": "Labels",
                 "labelsPlaceholder": "komma-gescheiden",
+                "labelsHint": "Scheid meerdere labels met komma’s.",
+                "labelsAutoHint": "Afgeleid van de titel totdat je ze bewerkt. Scheid meerdere labels met komma’s.",
+                "organize": "Ordenen",
+                "work": "Work",
+                "workNone": "Geen Work (Workspace)",
+                "workPlaceholder": "Selecteer een Work…",
+                "workHint": "Optioneel. Bestanden kunnen alleen aan Work-gebonden taken worden toegevoegd.",
                 "workScopedTask": "Taak beperkt tot een Work",
                 "missionScopedTask": "Taak beperkt tot een Mission",
                 "ideaScopedTask": "Taak beperkt tot een Idea",
@@ -1067,7 +1092,14 @@
                 "browse": "Bladeren",
                 "uploading": "Uploaden...",
                 "detach": "Loskoppelen",
-                "attachmentsWorkOnly": "Bijlagen zijn alleen beschikbaar bij Work-gebonden taken. Maak een taak vanuit een Work om bestanden toe te voegen.",
+                "attachmentsWorkOnly": "Bijlagen zijn alleen beschikbaar bij Work-gebonden taken. Kies een Work in het paneel Details om bestanden toe te voegen.",
+                "workNone": "Geen Work (Workspace)",
+                "workPlaceholder": "Selecteer een Work…",
+                "workUpdateError": "Bijwerken van Work mislukt",
+                "agent": "Agent",
+                "agentNone": "Geen Agent toegewezen",
+                "agentPlaceholder": "Selecteer een Agent…",
+                "agentUpdateError": "Bijwerken van Agent mislukt",
                 "labels": "Labels",
                 "edited": "bewerkt",
                 "description": "Beschrijving",
@@ -1086,6 +1118,15 @@
                 "scopeWork": "Werk",
                 "scopeMission": "Missie",
                 "scopeIdea": "Idee",
+                "delete": {
+                    "action": "Verwijderen",
+                    "title": "Deze taak verwijderen?",
+                    "body": "{slug} en alles wat eraan gekoppeld is — gesprek, bijlagen, toegewezen personen en relaties — wordt definitief verwijderd. Dit kan niet ongedaan worden gemaakt.",
+                    "confirm": "Taak verwijderen",
+                    "cancel": "Annuleren",
+                    "deleting": "Bezig met verwijderen…",
+                    "error": "Verwijderen van de taak is mislukt"
+                },
                 "runControls": {
                     "title": "Run controls",
                     "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",

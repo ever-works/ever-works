@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { TaskRunsHistory, formatDuration, formatTokens } from './TaskRunsHistory';
 import type { AgentRunSession } from '@/lib/api/agents.shared';
 
@@ -80,6 +81,22 @@ describe('TaskRunsHistory', () => {
         expect(screen.queryByText('should not be shown')).toBeNull();
     });
 
+    it('deep-links a failed run to its own row in the Agent activity log', () => {
+        render(<TaskRunsHistory runs={[run({ status: 'failed', errorMessage: 'boom' })]} />);
+        const link = screen.getByTestId('task-run-history-logs-link');
+        expect(link.getAttribute('href')).toBe('/agents/agent-abcdef12/activity?run=run-1');
+    });
+
+    it('offers the logs link even when the failure carried no message', () => {
+        render(<TaskRunsHistory runs={[run({ status: 'failed', errorMessage: null })]} />);
+        expect(screen.getByTestId('task-run-history-logs-link')).toBeTruthy();
+    });
+
+    it('does not offer a logs link on a run that did not fail', () => {
+        render(<TaskRunsHistory runs={[run()]} />);
+        expect(screen.queryByTestId('task-run-history-logs-link')).toBeNull();
+    });
+
     it('shows the summary on a completed run', () => {
         render(<TaskRunsHistory runs={[run()]} />);
         expect(screen.getByText('Implemented the endpoint')).toBeTruthy();
@@ -111,6 +128,60 @@ describe('TaskRunsHistory', () => {
         expect(row.textContent).not.toContain('tok');
         expect(row.textContent).not.toContain('gate:');
         expect(row.textContent).not.toContain('±');
+    });
+});
+
+describe('TaskRunsHistory paging', () => {
+    const many = (count: number) =>
+        Array.from({ length: count }, (_, i) => run({ id: `run-${i + 1}` }));
+
+    it('renders every run inline while the history fits in one page', () => {
+        render(<TaskRunsHistory runs={many(7)} />);
+        expect(screen.getAllByTestId('task-run-history-row')).toHaveLength(7);
+        expect(screen.queryByTestId('task-runs-history-tabs')).toBeNull();
+    });
+
+    it('splits into tabs of 7 past the eighth run', () => {
+        render(<TaskRunsHistory runs={many(10)} />);
+        expect(screen.getAllByTestId('task-runs-history-tab')).toHaveLength(2);
+        expect(screen.getAllByTestId('task-run-history-row')).toHaveLength(7);
+        // The count stays the TOTAL — tabs page the view, not the history.
+        expect(screen.getByTestId('task-runs-history-count').textContent).toBe('10');
+    });
+
+    it('shows the remaining runs on the last tab', async () => {
+        const user = userEvent.setup();
+        render(<TaskRunsHistory runs={many(10)} />);
+        await user.click(screen.getAllByTestId('task-runs-history-tab')[1]);
+        expect(screen.getAllByTestId('task-run-history-row')).toHaveLength(3);
+    });
+
+    it('moves between tabs with the arrow keys', async () => {
+        const user = userEvent.setup();
+        render(<TaskRunsHistory runs={many(15)} />);
+        const tabs = screen.getAllByTestId('task-runs-history-tab');
+        expect(tabs).toHaveLength(3);
+        tabs[0].focus();
+        await user.keyboard('{ArrowRight}');
+        expect(
+            screen.getAllByTestId('task-runs-history-tab')[1].getAttribute('aria-selected'),
+        ).toBe('true');
+        // Wraps around rather than dead-ending on the last tab.
+        await user.keyboard('{End}');
+        expect(
+            screen.getAllByTestId('task-runs-history-tab')[2].getAttribute('aria-selected'),
+        ).toBe('true');
+        await user.keyboard('{ArrowRight}');
+        expect(
+            screen.getAllByTestId('task-runs-history-tab')[0].getAttribute('aria-selected'),
+        ).toBe('true');
+    });
+
+    it('keeps only the selected tab in the tab order', () => {
+        render(<TaskRunsHistory runs={many(10)} />);
+        const tabs = screen.getAllByTestId('task-runs-history-tab');
+        expect(tabs[0].getAttribute('tabindex')).toBe('0');
+        expect(tabs[1].getAttribute('tabindex')).toBe('-1');
     });
 });
 

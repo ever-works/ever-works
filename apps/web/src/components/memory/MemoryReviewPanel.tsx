@@ -35,6 +35,10 @@ export function MemoryReviewPanel() {
     const [items, setItems] = useState<ReviewDocument[]>([]);
     const [loading, setLoading] = useState(true);
     const [accepting, setAccepting] = useState<string | null>(null);
+    // Ids whose accept failed. Without this the button simply stops
+    // spinning and the row stays put, which is indistinguishable from
+    // "nothing happened" — the user cannot tell a refusal from a no-op.
+    const [failed, setFailed] = useState<Set<string>>(new Set());
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -62,6 +66,12 @@ export function MemoryReviewPanel() {
 
     const accept = useCallback(async (docId: string) => {
         setAccepting(docId);
+        setFailed((prev) => {
+            if (!prev.has(docId)) return prev;
+            const next = new Set(prev);
+            next.delete(docId);
+            return next;
+        });
         try {
             const res = await fetch(`/api/memory/review/${docId}/accept`, { method: 'POST' });
             if (res.ok) {
@@ -69,9 +79,12 @@ export function MemoryReviewPanel() {
                 // gone from the queue by definition once accepted, and
                 // a refetch would make the whole list flicker.
                 setItems((prev) => prev.filter((d) => d.id !== docId));
+                return;
             }
+            setFailed((prev) => new Set(prev).add(docId));
         } catch {
-            // Leave the row in place; the user can retry.
+            // Leave the row in place and say so; the user can retry.
+            setFailed((prev) => new Set(prev).add(docId));
         } finally {
             setAccepting(null);
         }
@@ -110,8 +123,18 @@ export function MemoryReviewPanel() {
                             <p className="truncate text-sm text-text dark:text-text-dark">
                                 {doc.title}
                             </p>
-                            <p className="truncate text-xs text-text-muted dark:text-text-muted-dark">
-                                {doc.description || doc.path}
+                            <p
+                                className={cn(
+                                    'truncate text-xs',
+                                    failed.has(doc.id)
+                                        ? 'text-danger'
+                                        : 'text-text-muted dark:text-text-muted-dark',
+                                )}
+                                data-testid={failed.has(doc.id) ? 'memory-review-error' : undefined}
+                            >
+                                {failed.has(doc.id)
+                                    ? t('acceptFailed')
+                                    : doc.description || doc.path}
                             </p>
                         </div>
                         <button

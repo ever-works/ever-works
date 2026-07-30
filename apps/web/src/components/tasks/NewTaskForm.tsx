@@ -10,7 +10,9 @@ import { Select } from '@/components/ui/select';
 import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import type { Task, TaskPriority } from '@/lib/api/tasks';
+import { TASK_PRIORITY_PRESENTATION } from '@/lib/task-priorities/catalog';
 import { ChecksEditor } from './ChecksEditor';
+import { WorkSelect } from './WorkSelect';
 // PASS-4 review fix (CRITICAL): templates dead end. Pre-fill from
 // ?from=<slug> when the user clicked "Use template" on /tasks/templates.
 import { listAstTemplates } from '@/lib/api/agent-templates';
@@ -36,6 +38,19 @@ type CreateTaskFn = (input: {
  * recurring chips land in a follow-up sub-tick (component is the
  * primitive, the surrounding context wires the picker UIs).
  */
+/** Priority rows in display order (most urgent first), paired with their
+ *  message keys so the labels stay translated. */
+const PRIORITY_OPTIONS: ReadonlyArray<{
+    value: TaskPriority;
+    labelKey: 'priorityP0' | 'priorityP1' | 'priorityP2' | 'priorityP3' | 'priorityP4';
+}> = [
+    { value: 'p0', labelKey: 'priorityP0' },
+    { value: 'p1', labelKey: 'priorityP1' },
+    { value: 'p2', labelKey: 'priorityP2' },
+    { value: 'p3', labelKey: 'priorityP3' },
+    { value: 'p4', labelKey: 'priorityP4' },
+];
+
 /**
  * Slugify the task title into a label: lowercase, spaces (and other
  * non-alphanumerics) collapse to a single hyphen, with no leading or
@@ -76,6 +91,12 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
     const missionId = searchParams?.get('missionId') || null;
     const ideaId = searchParams?.get('ideaId') || null;
     const scopeCount = [workId, missionId, ideaId].filter(Boolean).length;
+    // The Work picker is the source of truth for `workId`, seeded from
+    // `?workId=` when the user arrived from a Work's Tasks tab. Without a
+    // picker the only way to get a Work-scoped Task was that query param,
+    // which left every Task created from /tasks or /new permanently
+    // unable to take attachments.
+    const [workChoice, setWorkChoice] = useState<string>(workId ?? '');
     const scopeKey =
         scopeCount === 1
             ? workId
@@ -174,7 +195,7 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
                         description: description.trim() || null,
                         priority,
                         labels: labels.length ? labels : undefined,
-                        workId: scopeCount === 1 ? workId : null,
+                        workId: workChoice || null,
                         missionId: scopeCount === 1 ? missionId : null,
                         ideaId: scopeCount === 1 ? ideaId : null,
                         // Quality gates — only declared rows with a command
@@ -258,6 +279,20 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
                         className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-3 text-sm text-text dark:text-text-dark"
                     />
                 </div>
+                <div>
+                    <label className="block text-xs text-text-secondary mb-1">{t('work')}</label>
+                    <WorkSelect
+                        value={workChoice}
+                        onValueChange={setWorkChoice}
+                        disabled={pending}
+                        noneLabel={t('workNone')}
+                        placeholder={t('workPlaceholder')}
+                        testId="new-task-work"
+                    />
+                    <p className="mt-1 text-[11px] text-text-muted dark:text-text-muted-dark">
+                        {t('workHint')}
+                    </p>
+                </div>
                 <div className="grid grid-cols-2 gap-4">
                     <div>
                         <label className="block text-xs text-text-secondary mb-1">
@@ -266,13 +301,19 @@ export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {
                         <Select
                             value={priority}
                             onValueChange={(value) => setPriority(value as TaskPriority)}
+                            disabled={pending}
                             size="xs"
+                            data-testid="new-task-priority"
                         >
-                            <option value="p0">{t('priorityP0')}</option>
-                            <option value="p1">{t('priorityP1')}</option>
-                            <option value="p2">{t('priorityP2')}</option>
-                            <option value="p3">{t('priorityP3')}</option>
-                            <option value="p4">{t('priorityP4')}</option>
+                            {PRIORITY_OPTIONS.map(({ value, labelKey }) => (
+                                <option
+                                    key={value}
+                                    value={value}
+                                    data-dot={TASK_PRIORITY_PRESENTATION[value].dot}
+                                >
+                                    {t(labelKey)}
+                                </option>
+                            ))}
                         </Select>
                     </div>
                     <div>

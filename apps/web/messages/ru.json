@@ -818,8 +818,26 @@
             },
             "review": {
                 "accept": "Принять",
+                "acceptFailed": "Не удалось принять — повторите",
                 "subtitle": "Документы, объединённые или предложенные агентом. Они не попадают в контекст агентов до вашего подтверждения.",
                 "title": "Ожидает проверки ({count})"
+            },
+            "schedule": {
+                "cadence": "Каждые",
+                "cadences": {
+                    "daily": "День",
+                    "weekly": "Неделя",
+                    "monthly": "Месяц"
+                },
+                "enabled": "Запускать по расписанию",
+                "lastRun": "Последний запуск: {when}",
+                "mode": "Режим",
+                "modes": {
+                    "dry-run": "Только отчёт",
+                    "propose": "Предлагать объединения"
+                },
+                "subtitle": "Периодически объединяет почти одинаковые документы. Предложения попадают в очередь проверки — ничего не принимается и не удаляется автоматически.",
+                "title": "Плановая консолидация"
             }
         },
         "agentsPage": {
@@ -1036,6 +1054,13 @@
                 "priority": "Приоритет",
                 "labels": "Метки",
                 "labelsPlaceholder": "через запятую",
+                "labelsHint": "Разделяйте несколько меток запятыми.",
+                "labelsAutoHint": "Формируются из заголовка, пока вы их не измените. Разделяйте несколько меток запятыми.",
+                "organize": "Организация",
+                "work": "Work",
+                "workNone": "Без Work (Workspace)",
+                "workPlaceholder": "Выберите Work…",
+                "workHint": "Необязательно. Файлы можно прикреплять только к задачам, привязанным к Work.",
                 "workScopedTask": "Задача в рамках Work",
                 "missionScopedTask": "Задача в рамках Mission",
                 "ideaScopedTask": "Задача в рамках Idea",
@@ -1067,7 +1092,14 @@
                 "browse": "Обзор",
                 "uploading": "Загрузка...",
                 "detach": "Отсоединить",
-                "attachmentsWorkOnly": "Вложения доступны только для задач, привязанных к Work. Создайте задачу из Work, чтобы прикреплять файлы.",
+                "attachmentsWorkOnly": "Вложения доступны только для задач, привязанных к Work. Выберите Work на панели «Детали», чтобы прикреплять файлы.",
+                "workNone": "Без Work (Workspace)",
+                "workPlaceholder": "Выберите Work…",
+                "workUpdateError": "Не удалось обновить Work",
+                "agent": "Агент",
+                "agentNone": "Агент не назначен",
+                "agentPlaceholder": "Выберите Агента…",
+                "agentUpdateError": "Не удалось обновить Агента",
                 "labels": "Метки",
                 "edited": "изменено",
                 "description": "Описание",
@@ -1086,6 +1118,15 @@
                 "scopeWork": "Работа",
                 "scopeMission": "Миссия",
                 "scopeIdea": "Идея",
+                "delete": {
+                    "action": "Удалить",
+                    "title": "Удалить эту задачу?",
+                    "body": "{slug} и всё, что с ней связано — переписка, вложения, исполнители и связи — будет удалено безвозвратно. Это действие нельзя отменить.",
+                    "confirm": "Удалить задачу",
+                    "cancel": "Отмена",
+                    "deleting": "Удаление…",
+                    "error": "Не удалось удалить задачу"
+                },
                 "runControls": {
                     "title": "Run controls",
                     "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",

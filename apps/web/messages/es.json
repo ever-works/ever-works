@@ -849,8 +849,26 @@
             },
             "review": {
                 "accept": "Aceptar",
+                "acceptFailed": "No se pudo aceptar; inténtalo de nuevo",
                 "subtitle": "Documentos que un agente fusionó o propuso. Se excluyen del contexto de los agentes hasta que los aceptes.",
                 "title": "Pendiente de revisión ({count})"
+            },
+            "schedule": {
+                "cadence": "Cada",
+                "cadences": {
+                    "daily": "Día",
+                    "weekly": "Semana",
+                    "monthly": "Mes"
+                },
+                "enabled": "Ejecutar programado",
+                "lastRun": "Última ejecución: {when}",
+                "mode": "Modo",
+                "modes": {
+                    "dry-run": "Solo informe",
+                    "propose": "Proponer fusiones"
+                },
+                "subtitle": "Fusiona periódicamente documentos casi duplicados. Las propuestas van a la cola de revisión; nada se acepta ni se elimina automáticamente.",
+                "title": "Consolidación programada"
             }
         },
         "agentsPage": {
@@ -1067,6 +1085,13 @@
                 "priority": "Prioridad",
                 "labels": "Etiquetas",
                 "labelsPlaceholder": "separadas por comas",
+                "labelsHint": "Separa varias etiquetas con comas.",
+                "labelsAutoHint": "Se derivan del título hasta que las edites. Separa varias etiquetas con comas.",
+                "organize": "Organizar",
+                "work": "Work",
+                "workNone": "Sin Work (Workspace)",
+                "workPlaceholder": "Selecciona un Work…",
+                "workHint": "Opcional. Los archivos solo se pueden adjuntar a tareas limitadas a un Work.",
                 "workScopedTask": "Tarea limitada a un Work",
                 "missionScopedTask": "Tarea limitada a una Mission",
                 "ideaScopedTask": "Tarea limitada a una Idea",
@@ -1098,7 +1123,14 @@
                 "browse": "Examinar",
                 "uploading": "Subiendo...",
                 "detach": "Desvincular",
-                "attachmentsWorkOnly": "Los archivos adjuntos solo están disponibles en tareas limitadas a un Work. Crea una tarea desde un Work para adjuntar archivos.",
+                "attachmentsWorkOnly": "Los archivos adjuntos solo están disponibles en tareas limitadas a un Work. Elige un Work en el panel de Detalles para adjuntar archivos.",
+                "workNone": "Sin Work (Workspace)",
+                "workPlaceholder": "Selecciona un Work…",
+                "workUpdateError": "No se pudo actualizar el Work",
+                "agent": "Agente",
+                "agentNone": "Ningún Agente asignado",
+                "agentPlaceholder": "Selecciona un Agente…",
+                "agentUpdateError": "No se pudo actualizar el Agente",
                 "labels": "Etiquetas",
                 "edited": "editado",
                 "description": "Descripción",
@@ -1117,6 +1149,15 @@
                 "scopeWork": "Trabajo",
                 "scopeMission": "Misión",
                 "scopeIdea": "Idea",
+                "delete": {
+                    "action": "Eliminar",
+                    "title": "¿Eliminar esta tarea?",
+                    "body": "{slug} y todo lo asociado a ella — conversación, archivos adjuntos, asignados y relaciones — se eliminarán de forma permanente. Esta acción no se puede deshacer.",
+                    "confirm": "Eliminar tarea",
+                    "cancel": "Cancelar",
+                    "deleting": "Eliminando…",
+                    "error": "No se pudo eliminar la tarea"
+                },
                 "runControls": {
                     "title": "Run controls",
                     "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",

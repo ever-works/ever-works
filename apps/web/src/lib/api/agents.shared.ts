@@ -135,3 +135,24 @@ export interface ListRunSessionsQuery {
     limit?: number;
     offset?: number;
 }
+
+// ── Agent picker (Task assignment) ──
+// The Task detail rail assigns a Task's Agent from a `'use client'`
+// dropdown, so the status union and the option row it renders have to be
+// reachable without importing the `server-only` `agents.ts`. Both are
+// re-exported from there, so server-side callers keep one import site.
+
+export type AgentStatus = 'draft' | 'active' | 'paused' | 'running' | 'error' | 'archived';
+
+/**
+ * One row of the Agent dropdown — the narrow projection of `Agent` the
+ * picker actually renders. Deliberately not the full DTO: the option list
+ * crosses a Server-Action boundary on every mount and nothing else on the
+ * Agent is needed to label or colour a row.
+ */
+export interface AgentPickerOption {
+    id: string;
+    name: string;
+    slug: string;
+    status: AgentStatus;
+}
