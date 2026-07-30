@@ -5,20 +5,12 @@ import { Check, Mic, X } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 
 /**
- * The composer's toolbar while dictation is running. Replaces the normal
- * row (attach / mic / counter / send) rather than sitting next to it, so
- * recording is a distinct mode instead of one more toggled button.
+ * The composer's toolbar while dictation is running. Replaces the normal row
+ * (attach / mic / counter / send) rather than sitting next to it, so recording
+ * is a distinct mode instead of one more toggled button.
  *
- * Layout: mic → live meter → elapsed → discard / keep. Deliberately wordless
- * next to the meter: the transcript is already landing in the textarea an
- * inch above, so echoing it here (or captioning the meter "Listening…") was
- * duplicate noise. The moving bars are the status.
- *
- * Colours are design-system neutrals — a red-tinted bar read as an error
- * state rather than "we're recording".
- *
- * Owns its own ticker so the elapsed clock doesn't re-render the composer
- * (and the textarea) twice a second.
+ * Owns its own ticker so the elapsed clock doesn't re-render the composer (and
+ * the textarea) twice a second.
  */
 
 function formatElapsed(ms: number): string {
@@ -29,7 +21,7 @@ function formatElapsed(ms: number): string {
 }
 
 function ElapsedClock({ startedAt }: { readonly startedAt: number }) {
-    // Seeded from mount (which coincides with dictation starting) so there's
+    // Seeded from mount (which coincides with dictation starting) so there is
     // no setState-in-effect just to show 0:00 on the first frame.
     const [now, setNow] = useState(() => Date.now());
     useEffect(() => {
@@ -45,8 +37,7 @@ function ElapsedClock({ startedAt }: { readonly startedAt: number }) {
 
 /**
  * Stand-in for the canvas meter when the mic level is unavailable — denied
- * permission, no Web Audio, or `prefers-reduced-motion`. Still communicates
- * "live" without claiming to show real levels.
+ * permission, no Web Audio, or `prefers-reduced-motion`.
  */
 function StaticBars({ testId }: { readonly testId?: string }) {
     return (
@@ -105,7 +96,7 @@ export function VoiceBar({
             {waveformActive ? (
                 <canvas
                     ref={canvasRef}
-                    // The bar colour is read back off this element via
+                    // The bar colour is read off this element via
                     // getComputedStyle — see paint() in use-mic-waveform.
                     className="h-6 w-24 shrink-0 text-text-secondary dark:text-text-secondary-dark sm:w-40"
                     aria-hidden="true"

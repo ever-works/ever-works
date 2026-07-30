@@ -36,34 +36,12 @@ import {
 
 /**
  * The strip of attached items rendered inside the composer card, above the
- * toolbar.
- *
- * **One tile shape for everything.** The image thumbnail is the shape the strip
- * is built around — a square you can recognise at a glance, with its actions as
- * badges on the corners — so a document, a picked folder and a GitHub repo take
- * the same tile: same width, same height, same row, in the order they were
- * added. What differs is only what sits inside the square and the caption under
- * it:
- *
- *   - **Images** → the thumbnail itself, so you can tell *which* screenshot you
- *     attached. Clicking opens it full size.
- *   - **Documents** → a type glyph. Text and code documents open in the preview
- *     overlay; binaries offer a download badge once the upload resolves.
- *   - **Folders** → a folder glyph with the file count (`webkitdirectory` hands
- *     us a flat file list). Expanding one opens its file list *below* the row,
- *     so the tiles themselves never change size. Forty separate tiles for one
- *     folder pick is unreadable.
- *
- * The caption carries the name and `PDF · 240 KB` under every tile, since a
- * glyph alone doesn't say which file it stands for.
+ * toolbar. Images, documents, folders and repos all take the same tile shape;
+ * only the tile's face and caption differ.
  *
  * A failed upload stays on screen with its error and a retry rather than
- * disappearing; silently dropping it would let someone submit believing the
+ * disappearing — silently dropping it would let someone submit believing the
  * file went along.
- *
- * Colours come from the design-system tokens only (`text`, `text-muted`,
- * `border`, `danger`, `warning`, `success`, `info`) — no brand/primary accent,
- * so the strip stays quiet next to the prompt it belongs to.
  */
 
 const KIND_ICONS: Record<FileIconKind, LucideIcon> = {
@@ -78,8 +56,7 @@ const KIND_ICONS: Record<FileIconKind, LucideIcon> = {
     file: FileIcon,
 };
 
-// One muted hue per family so a stack of documents is scannable. All four are
-// design-system status tokens rather than the brand colour.
+// One muted hue per family so a stack of documents is scannable.
 const KIND_TINTS: Record<FileIconKind, string> = {
     image: 'text-info',
     pdf: 'text-danger',
@@ -92,16 +69,14 @@ const KIND_TINTS: Record<FileIconKind, string> = {
     file: 'text-text-secondary dark:text-text-secondary-dark',
 };
 
-// The single footprint every attachment gets: a 4rem square plus its caption.
-// Fixed on both axes — a tile that grew with its label would break the row into
-// ragged bands.
+// Fixed on both axes — a tile that grew with its label would break the row
+// into ragged bands.
 const ITEM = 'group relative w-16 shrink-0';
 const TILE_BASE =
     'relative flex size-16 items-center justify-center overflow-hidden rounded-xl border transition-[transform,box-shadow,border-color] duration-150';
 const TILE_QUIET =
     'border-border/60 bg-foreground/[0.03] dark:border-white/10 dark:bg-white/[0.04]';
 const TILE_ERROR = 'border-danger/50 bg-danger/[0.06]';
-// Only tiles that do something on click lift and take focus.
 const TILE_INTERACTIVE =
     'hover:-translate-y-0.5 hover:shadow-md hover:border-border-secondary dark:hover:border-white/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-muted/40';
 const BADGE =
@@ -118,7 +93,6 @@ function stateTagOf(a: ComposerFileAttachment): string {
     return a.uploading ? 'uploading' : 'ready';
 }
 
-/** Name + `PDF · 240 KB` under a tile, clipped to the tile's width. */
 function Caption({ name, meta }: { readonly name: string; readonly meta: string }) {
     return (
         <span className="mt-1 block w-16">
@@ -176,7 +150,6 @@ function RetryButton({
     );
 }
 
-/** What fills the square: the picked image, or a typed glyph, plus its state. */
 function TileFace({ attachment }: { readonly attachment: ComposerFileAttachment }) {
     const { displayName, uploading, progress, error, file } = attachment;
     const kind = fileIconKind(displayName, file.type);
@@ -220,11 +193,6 @@ function TileFace({ attachment }: { readonly attachment: ComposerFileAttachment 
     );
 }
 
-/**
- * A tile for a single picked file — image or document alike. It is clickable
- * when we can render the file ourselves (image / text / code / CSV); otherwise
- * it is inert and a download badge appears once the upload lands.
- */
 function FileTile({
     attachment,
     onOpen,
@@ -247,8 +215,7 @@ function FileTile({
           ? `${progress}% · ${label}`
           : `${label} · ${formatBytes(file.size)}`;
     const tileClass = cn(TILE_BASE, error ? TILE_ERROR : TILE_QUIET, onOpen && TILE_INTERACTIVE);
-    // Offered only once the upload resolves — before that there is no URL to
-    // point at.
+    // Only once the upload resolves — before that there is no URL to point at.
     const downloadHref = !onOpen && !error && !uploading ? attachment.url : undefined;
 
     return (
@@ -256,9 +223,8 @@ function FileTile({
             className={ITEM}
             data-testid={testId ? `${testId}-attachment-${stateTagOf(attachment)}` : undefined}
         >
-            {/* Element type is chosen from the file, never from upload state:
-                previewability doesn't change mid-flight, so the tile never
-                remounts (and never loses focus) when an upload lands. */}
+            {/* Element type comes from the file, never from upload state, so the
+                tile never remounts (or loses focus) when an upload lands. */}
             {onOpen ? (
                 <button
                     type="button"
@@ -284,8 +250,7 @@ function FileTile({
 
             <Caption name={displayName} meta={meta} />
 
-            {/* Badges sit outside the tile button so a click on one never also
-                opens the preview. */}
+            {/* Outside the tile button so a badge click never also opens the preview. */}
             {error ? (
                 <RetryButton
                     label={`Retry upload of ${displayName}`}
@@ -357,7 +322,6 @@ function FolderTile({
                     className="size-6 text-text-secondary dark:text-text-secondary-dark"
                     aria-hidden="true"
                 />
-                {/* The count is what tells two folder tiles apart at a glance. */}
                 <span className="absolute bottom-1 right-1 rounded px-1 text-[10px] font-medium tabular-nums text-text-muted dark:text-text-muted-dark">
                     {count}
                 </span>
@@ -378,9 +342,6 @@ function FolderTile({
 
             <RemoveButton
                 label={`Remove folder ${name}`}
-                // Each file is its own attachment, so removing the folder
-                // removes them one by one; the functional state updates
-                // compose, so this settles as a single render.
                 onClick={onRemoveFolder}
                 className={cn(BADGE, '-right-1.5 -top-1.5', BADGE_REVEAL)}
             />
@@ -415,9 +376,8 @@ function RepoTile({
 }
 
 /**
- * The contents of the one expanded folder, rendered under the tile row rather
- * than inside the tile, so expanding never changes the size of a tile or
- * reflows the row around it.
+ * Rendered under the tile row rather than inside the tile, so expanding a
+ * folder never resizes a tile or reflows the row around it.
  */
 function FolderFileList({
     group,
@@ -516,14 +476,11 @@ export function AttachmentStrip({
     onPreview,
     testId,
 }: AttachmentStripProps) {
-    // Which folder tile is open, by folder name. Held here rather than in the
-    // tile because the file list renders outside the row.
+    // Held here rather than in the tile because the file list renders outside the row.
     const [expandedFolder, setExpandedFolder] = useState<string | null>(null);
 
     if (attachments.length === 0) return null;
 
-    // Folder files always live inside their folder tile, so the loose tiles
-    // only cover standalone picks.
     const loose = attachments.filter((a): a is ComposerFileAttachment => a.kind === 'file');
     const folders = groupFolderFiles(attachments);
     const repos = attachments.filter(

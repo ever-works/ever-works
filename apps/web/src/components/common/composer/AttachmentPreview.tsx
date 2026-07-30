@@ -14,34 +14,23 @@ import {
 
 /**
  * Full-size viewer for attachments the composer can render itself: images
- * (from their local object URL) and text / code / CSV documents (read
- * straight off the local `File`). Both paths are entirely local — nothing
- * here waits on the upload to finish.
+ * (from their local object URL) and text / code / CSV documents (read off the
+ * local `File`). PDFs and other binaries are intentionally absent — the
+ * uploads API serves attachments with a non-inline disposition and the app's
+ * CSP blocks `blob:` frames, so those cards offer a download instead.
  *
- * PDFs and other binaries are intentionally absent: the uploads API serves
- * attachments with a non-inline disposition and the app's CSP does not allow
- * `blob:` frames, so an embedded viewer would either be blocked or require
- * relaxing the policy. Those cards offer a download instead.
- *
- * Rendered through a portal onto `document.body` rather than inside the
- * composer card: the card is `overflow-hidden` and uses backdrop blur, which
- * establishes a containing block for `position: fixed` — an overlay mounted
- * inside it would be clipped to the card's rounded rectangle.
- *
- * Keyboard: Escape closes, ArrowLeft/ArrowRight step through the set. Focus
- * moves to the close button on open and returns to whatever was focused
- * before (the thumbnail) on close.
+ * Portalled onto `document.body`: the composer card is `overflow-hidden` and
+ * uses backdrop blur, which establishes a containing block for
+ * `position: fixed`, so an overlay mounted inside it would be clipped.
  */
 
 /** Placeholder so the hook below has a stable `File` to depend on. */
 const NO_FILE = typeof File === 'undefined' ? null : new File([], '');
 
 /**
- * Reads the head of a text file for display, flagging truncation.
- *
- * The resolved text is stored *with* the file it came from, so stepping from
- * one document to the next never shows the previous file's contents while the
- * new read is in flight.
+ * Reads the head of a text file for display. The resolved text is stored
+ * *with* the file it came from, so stepping from one document to the next
+ * never shows the previous file's contents while the new read is in flight.
  */
 function useTextPreview(file: File | null, enabled: boolean) {
     const [loaded, setLoaded] = useState<{
@@ -129,8 +118,8 @@ export function AttachmentPreview({
         return () => document.removeEventListener('keydown', onKey);
     }, [onClose, step]);
 
-    // Stop the page behind the overlay from scrolling, and hand focus to the
-    // dialog so Escape / arrows work without the user clicking first.
+    // Lock the page behind the overlay and hand focus to the dialog so Escape
+    // and the arrow keys work without the user clicking first.
     useEffect(() => {
         restoreFocusRef.current = document.activeElement;
         const previousOverflow = document.body.style.overflow;
@@ -154,8 +143,8 @@ export function AttachmentPreview({
             aria-label={`Attachment preview: ${current.displayName}`}
             data-testid={testId ? `${testId}-lightbox` : undefined}
             className="fixed inset-0 z-100 flex flex-col bg-black/80 backdrop-blur-sm"
-            // Only a click on the backdrop itself closes — clicks that
-            // started on the content or the chrome must not fall through.
+            // Only a click on the backdrop itself closes; clicks that started
+            // on the content or the chrome must not fall through.
             onMouseDown={(event) => {
                 if (event.target === event.currentTarget) onClose();
             }}
@@ -217,9 +206,8 @@ export function AttachmentPreview({
 
                 {isImage ? (
                     /* eslint-disable-next-line @next/next/no-img-element --
-                       the source is a local `blob:` object URL for a file the
-                       user just picked; next/image can neither optimize nor
-                       allowlist it. */
+                       local `blob:` object URL; nothing for next/image to
+                       optimize or allowlist. */
                     <img
                         key={current.localId}
                         src={current.previewUrl}

@@ -5,15 +5,12 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 /**
  * Live microphone level meter for the composer's dictation bar.
  *
- * The Web Speech API tells us *what* was said but exposes no audio level, so
- * a dictation UI built on it alone can only offer a static "listening" dot —
- * the user gets no confirmation their mic is actually picking anything up.
- * This hook opens a second, silent `getUserMedia` stream purely to read
- * amplitude off an `AnalyserNode` and paints it as a scrolling bar meter.
+ * The Web Speech API exposes no audio level, so this hook opens a second,
+ * silent `getUserMedia` stream purely to read amplitude off an `AnalyserNode`
+ * and paint it as a scrolling bar meter.
  *
- * Everything runs on refs + `requestAnimationFrame` into a `<canvas>`: React
- * never re-renders while recording, which matters because this repaints
- * continuously for as long as the user talks.
+ * Everything runs on refs + `requestAnimationFrame` into a `<canvas>`, so
+ * React never re-renders while recording.
  *
  * The analyser is deliberately NOT connected to `ctx.destination` — routing
  * the mic to the speakers would feed back.
@@ -35,15 +32,14 @@ export interface MicWaveform {
     /** True while a mic stream is open and the meter is painting. */
     readonly active: boolean;
     /**
-     * Opens the mic and starts painting. Resolves `false` when the mic is
-     * unavailable, permission is denied, or the browser lacks Web Audio —
-     * callers fall back to a non-audio "listening" indicator.
+     * Resolves `false` when the mic is unavailable, permission is denied, or
+     * the browser lacks Web Audio — callers fall back to a static indicator.
      */
     start: () => Promise<boolean>;
     stop: () => void;
 }
 
-/** RMS amplitude of the current audio frame, normalized to a 0–1 bar height. */
+/** RMS amplitude of the current frame, normalized to a 0–1 bar height. */
 function readLevel(analyser: AnalyserNode, data: Uint8Array<ArrayBuffer>): number {
     analyser.getByteTimeDomainData(data);
     let sumSquares = 0;
@@ -76,9 +72,9 @@ function paint(canvas: HTMLCanvasElement, levels: ReadonlyArray<number>): void {
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, cssWidth, cssHeight);
 
-    // Inherit the colour from CSS so the meter follows the light/dark design
-    // token set on the element instead of hard-coding a hex here.
-    // (`currentColor` is not a valid canvas fill, hence a literal neutral.)
+    // Inherit the colour from CSS so the meter follows the light/dark token on
+    // the element. (`currentColor` is not a valid canvas fill, hence the
+    // literal neutral fallback.)
     ctx.fillStyle = window.getComputedStyle(canvas).color || '#71717a';
 
     const step = BAR_WIDTH + BAR_GAP;
@@ -166,9 +162,8 @@ export function useMicWaveform(): MicWaveform {
             levelsRef.current = [];
             lastSampleRef.current = 0;
 
-            // The loop lives here (a hoisted declaration so it can schedule
-            // itself) and touches only refs, so it never needs re-creating
-            // and React never re-renders while the meter runs.
+            // Hoisted so it can schedule itself; touches only refs, so React
+            // never re-renders while the meter runs.
             function frame() {
                 rafRef.current = requestAnimationFrame(frame);
 
@@ -200,7 +195,6 @@ export function useMicWaveform(): MicWaveform {
     // Never leave a mic stream open behind an unmounted composer.
     useEffect(() => stop, [stop]);
 
-    // Stable identity so the consuming hook's start/stop stay stable too —
-    // they end up in effect dependency arrays.
+    // Stable identity: the consuming hook puts start/stop in dependency arrays.
     return useMemo(() => ({ canvasRef, active, start, stop }), [active, start, stop]);
 }

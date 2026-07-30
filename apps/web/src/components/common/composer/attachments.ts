@@ -2,17 +2,9 @@
  * Attachment shapes shared by the PromptComposer and its sub-components.
  *
  * Lives in its own module so `AttachmentStrip` / `AttachmentPreview` can type
- * their props without importing back from `PromptComposer.tsx` (which
- * imports them — a cycle). `PromptComposer` re-exports the public names so
- * existing consumers keep importing from
- * `@/components/common/PromptComposer`.
+ * their props without importing back from `PromptComposer.tsx` (a cycle).
  */
 
-/**
- * A picked file (or a file inside a picked folder). Each entry owns its
- * upload state so the strip can render distinct uploading / ready / error
- * variants.
- */
 export interface ComposerFileAttachment {
     readonly kind: 'file' | 'folder-file';
     readonly localId: string;
@@ -21,27 +13,16 @@ export interface ComposerFileAttachment {
     /** 0–100 percent — XHR-driven during upload. */
     progress: number;
     uploading: boolean;
-    /**
-     * Server-side upload id (sha256 of bytes) once the upload completes.
-     * Callers persist this — it's the canonical reference for
-     * `POST /api/me/missions/:id/attachments` etc.
-     */
+    /** Server-side upload id (sha256 of bytes); the canonical reference callers persist. */
     uploadId?: string;
-    /**
-     * API-routed serve URL (`/api/uploads/<userId>/<filename>`) once the
-     * upload completes. Forwarded into the chat prompt so the chat AI can
-     * reference the file by URL.
-     */
+    /** API-routed serve URL (`/api/uploads/<userId>/<filename>`) once uploaded. */
     url?: string;
-    /** Server-declared MIME (echoed from backend response). */
     mimeType?: string;
-    /** Human-readable failure message; the chip/tile flips to red. */
     error?: string;
     /**
-     * `URL.createObjectURL(file)` for images only. Set at pick time so the
-     * thumbnail renders instantly instead of waiting for the upload to
-     * resolve into a server URL. The composer revokes it on removal and on
-     * unmount — an un-revoked object URL pins the whole file in memory.
+     * `URL.createObjectURL(file)` for images only, set at pick time so the
+     * thumbnail renders without waiting on the upload. Revoked on removal and
+     * on unmount — an un-revoked object URL pins the whole file in memory.
      */
     previewUrl?: string;
 }
@@ -55,13 +36,9 @@ export interface ComposerGithubAttachment {
 
 export type ComposerAttachment = ComposerFileAttachment | ComposerGithubAttachment;
 
-/** A file attachment we have a local preview for — i.e. renderable as a tile. */
 export type ComposerImageAttachment = ComposerFileAttachment & { previewUrl: string };
 
-/**
- * Matches the uploads API's own default cap so the user is told before we
- * push 30 MB up the wire only to have it rejected.
- */
+/** Matches the uploads API's own default cap, so we reject before the wire. */
 export const MAX_UPLOAD_BYTES = 25 * 1024 * 1024;
 
 export function isImageFile(file: File): boolean {
@@ -69,17 +46,12 @@ export function isImageFile(file: File): boolean {
 }
 
 /**
- * Narrow to the entries the image strip / lightbox can render. Guards on
- * `previewUrl` rather than the MIME type so an image we could not create an
- * object URL for still degrades to a normal file chip.
+ * Guards on `previewUrl` rather than the MIME type so an image we could not
+ * create an object URL for still degrades to a normal file chip.
  */
 export function isImageAttachment(a: ComposerAttachment): a is ComposerImageAttachment {
     return a.kind !== 'github-repo' && typeof a.previewUrl === 'string';
 }
-
-/* -------------------------------------------------------------------- */
-/* File typing — what a document card shows and whether it can preview  */
-/* -------------------------------------------------------------------- */
 
 /** Which glyph a document card shows. Mapped to a lucide icon by the strip. */
 export type FileIconKind =
@@ -134,11 +106,10 @@ const TEXT_EXTENSIONS =
 export const TEXT_PREVIEW_BYTES = 128 * 1024;
 
 /**
- * Whether we can render this file's contents ourselves, from the local `File`
- * — no server round trip. Text and code we read and show in a `<pre>`; PDFs
- * and binaries we deliberately do not, because the uploads API serves
- * attachments with a non-inline disposition (and the app's CSP blocks
- * `blob:` frames), so there is nothing honest to embed.
+ * Whether we can render this file's contents ourselves from the local `File`.
+ * PDFs and binaries deliberately return false: the uploads API serves
+ * attachments with a non-inline disposition and the app's CSP blocks `blob:`
+ * frames, so there is nothing honest to embed.
  */
 export function isTextLike(file: File, displayName: string): boolean {
     if (file.type.startsWith('text/')) return true;
@@ -152,15 +123,9 @@ export function isPreviewableAttachment(a: ComposerAttachment): a is ComposerFil
     return typeof a.previewUrl === 'string' || isTextLike(a.file, a.displayName);
 }
 
-/* -------------------------------------------------------------------- */
-/* Folders                                                              */
-/* -------------------------------------------------------------------- */
-
 /**
- * A picked folder, reassembled from the flat `FileList` the browser hands
- * back for `webkitdirectory`. Dropping 40 individual chips on the user for
- * one folder pick is unreadable — the strip shows one card per folder that
- * expands to the files inside.
+ * A picked folder, reassembled from the flat `FileList` the browser hands back
+ * for `webkitdirectory` — one card per folder instead of 40 loose chips.
  */
 export interface ComposerFolderGroup {
     readonly name: string;
@@ -233,29 +198,20 @@ export function formatBytes(bytes: number): string {
     return `${value >= 10 || exponent === 0 ? Math.round(value) : value.toFixed(1)} ${units[exponent]}`;
 }
 
-/**
- * The lighter `{ name, url, mimeType?, kind }` shape that
- * `useStartFromPrompt` accepts.
- */
+/** The lighter attachment shape that `useStartFromPrompt` accepts. */
 export interface ComposerAttachmentRef {
     readonly name: string;
     readonly url: string;
     readonly mimeType?: string;
     readonly kind: 'upload' | 'github-repo';
-    /**
-     * SHA-256 upload id — present only for `kind: 'upload'` refs that have
-     * completed. Callers that wire the upload to a freshly-created entity
-     * (Mission/Idea/Agent) pass this to `addAttachment`. The chat-forwarder
-     * ignores this field.
-     */
+    /** SHA-256 upload id — present only for completed `kind: 'upload'` refs. */
     readonly uploadId?: string;
 }
 
 /**
- * Turn the composer's full attachment list into refs callers can act on.
  * Uploads still in flight, uploads that failed, and entries without a
- * server-side URL are filtered out — only references the chat AI can
- * actually resolve are forwarded.
+ * server-side URL are filtered out — only references the chat AI can actually
+ * resolve are forwarded.
  */
 export function buildAttachmentRefs(
     attachments: ReadonlyArray<ComposerAttachment>,

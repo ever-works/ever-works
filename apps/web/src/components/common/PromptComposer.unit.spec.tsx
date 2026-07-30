@@ -1,10 +1,5 @@
-// Unit spec for the PromptComposer's attachment + dictation behaviour:
-// image thumbnails and the full-size preview overlay, paste / drop intake,
-// document cards, folder grouping, and the dictation bar's append / discard
-// semantics.
-//
-// The upload client is mocked — this spec is about what the composer renders
-// and hands back, not about the XHR in `lib/api/uploads`.
+// The upload client is mocked — this spec covers what the composer renders and
+// hands back, not the XHR in `lib/api/uploads`.
 
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
@@ -141,8 +136,7 @@ describe('PromptComposer attachments', () => {
         const card = await screen.findByTestId(`${TEST_ID}-attachment-ready`);
         expect(card).toHaveTextContent('brief.pdf');
         expect(card).toHaveTextContent(/PDF · \d+ B/);
-        // A PDF is not an image and cannot be rendered in-app, so no thumbnail
-        // and no preview affordance — a download instead.
+        // A PDF cannot be rendered in-app, so it offers a download instead.
         expect(screen.queryByLabelText('Preview brief.pdf')).toBeNull();
         expect(screen.getByLabelText('Download brief.pdf')).toBeInTheDocument();
         await waitFor(() => expect(screen.getByTestId('ref-count')).toHaveTextContent('1'));
@@ -223,10 +217,6 @@ describe('PromptComposer attachments', () => {
     });
 });
 
-/* -------------------------------------------------------------------- */
-/* Dictation                                                            */
-/* -------------------------------------------------------------------- */
-
 interface FakeSpeechEvent {
     resultIndex: number;
     results: { length: number; [index: number]: unknown };
@@ -274,8 +264,7 @@ describe('PromptComposer dictation', () => {
         // Send is replaced by keep/discard — recording is a mode, not a toggle.
         expect(screen.queryByTestId(`${TEST_ID}-submit`)).toBeNull();
         expect(screen.getByTestId(`${TEST_ID}-voice-done`)).toBeInTheDocument();
-        // No getUserMedia in jsdom, so the live meter degrades to static bars;
-        // the wordless bar keeps its status in an sr-only region.
+        // No getUserMedia in jsdom, so the live meter degrades to static bars.
         expect(screen.getByTestId(`${TEST_ID}-voice-static`)).toBeInTheDocument();
         expect(screen.getByText('Listening…')).toHaveClass('sr-only');
     });
