@@ -138,8 +138,7 @@ export function useMicWaveform(): MicWaveform {
 
             const audioCtx = new window.AudioContext();
             audioCtxRef.current = audioCtx;
-            void audioCtx.resume().catch(() => {
-            });
+            void audioCtx.resume().catch(() => {});
 
             const analyser = audioCtx.createAnalyser();
             analyser.fftSize = 1024;
