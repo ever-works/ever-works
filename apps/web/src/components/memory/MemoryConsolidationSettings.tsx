@@ -61,21 +61,30 @@ export function MemoryConsolidationSettings() {
 
     const save = useCallback(async (patch: Partial<Settings>) => {
         setSaving(true);
-        // Optimistic: the control should respond immediately, and a failed
-        // write is corrected by the response below.
-        setSettings((prev) => (prev ? { ...prev, ...patch } : prev));
+        // Optimistic so the control responds immediately — but a settings
+        // form must never keep a value it failed to store. Both the error
+        // and the non-ok paths roll back to what was actually saved,
+        // otherwise a failed write reads as success and the user believes
+        // the schedule is on when it is not.
+        let previous: Settings | null = null;
+        setSettings((prev) => {
+            previous = prev;
+            return prev ? { ...prev, ...patch } : prev;
+        });
         try {
             const res = await fetch('/api/memory/consolidation/settings', {
                 method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify(patch),
             });
-            if (res.ok) {
-                const body = (await res.json()) as Settings;
-                setSettings(body);
+            if (!res.ok) {
+                setSettings(previous);
+                return;
             }
+            const body = (await res.json()) as Settings;
+            setSettings(body);
         } catch {
-            // Keep the optimistic value; the next load reconciles.
+            setSettings(previous);
         } finally {
             setSaving(false);
         }
