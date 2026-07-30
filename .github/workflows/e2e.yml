@@ -3,21 +3,27 @@ name: E2E Tests
 # Playwright e2e suite â€” auto-starts API (sqlite in-memory) + Next.js dev
 # server in the runner, then runs all specs from apps/web/e2e/.
 #
-# Scope (intentionally DEVELOP-ONLY â€” never runs on feature/fix branches,
-# and no longer re-runs on the stage/main release cascade):
-#   - push to `develop`              â†’ run (the single integration gate)
-#   - workflow_dispatch on any branch â†’ run (one-off pre-merge verification)
+# Scope (intentionally STAGE-ONLY — owner decision 2026-07-30):
+#   - push to `stage`                 → run (the pre-production gate)
+#   - workflow_dispatch on any branch  → run (one-off verification)
 #
-# There is deliberately NO `pull_request` trigger, and (since 2026-06-12)
-# NO `stage` / `main` / `master` push trigger either. The full suite is
-# sharded 16Ã— (~25 min wall-clock per shard on ubicloud-standard-8), so:
-#   - running it on every feature/fix PR burned runners without gating
-#     anything the post-merge develop push doesn't already catch; and
-#   - re-running the IDENTICAL suite again when develop cascades to stage
-#     and then to main was pure duplicate work â€” the code is byte-for-byte
-#     what already passed e2e on develop. `develop` is the integration
-#     point: once code is green there, promotion to stage/main is a
-#     fast-forward cascade, not a re-test.
+# There is deliberately NO `pull_request` trigger, and NO `develop` or
+# `main`/`master` push trigger.
+#
+# Why it moved off `develop`. The suite is sharded 32× on the x64-8 pool,
+# and each of those runners requests 4 CPU / 26 GiB — so a single run asks
+# the self-hosted fleet for roughly 128 CPU and 832 GiB. `develop` is by
+# far the busiest branch, and firing that fan-out on every merge starved
+# `ci.yml` — whose `lint-and-test` job is the ONLY required status check
+# on main/develop/stage. On 2026-07-29 that queued a two-file docs PR for
+# ~2.5 hours behind e2e runs which then never reached a verdict at all.
+#
+# `stage` is the right home: it is the promotion gate immediately before
+# production, it moves far less often than develop, and a red result there
+# actually blocks something. develop stays fast for iteration; nothing
+# reaches production without passing through stage.
+#
+# Use `workflow_dispatch` for pre-merge verification on a feature branch.
 #
 # Nothing downstream depends on this workflow (no `workflow_run` consumer),
 # so trimming the cascade triggers cannot break a deploy/release chain â€”
@@ -39,7 +45,7 @@ name: E2E Tests
 
 on:
   push:
-    branches: [develop]
+    branches: [stage]
   workflow_dispatch:
 
 # M-12: minimum default permissions. Individual jobs can elevate where needed.
