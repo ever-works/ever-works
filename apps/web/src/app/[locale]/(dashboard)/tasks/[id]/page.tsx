@@ -47,7 +47,11 @@ export default async function TaskDetailPage({ params }: { params: Promise<{ id:
         // for both — they read the same projection, so fetching twice
         // would be pure waste. Best-effort: a miss just renders the
         // pre-dispatch declared checks and no history.
-        agentsAPI.listSessions({ taskId: id, limit: 10 }),
+        //
+        // 25 (up from 10) now that the Runs section pages its rows in
+        // tabs of 7 instead of rendering the whole list — the same page
+        // size the Agent Activity feed uses.
+        agentsAPI.listSessions({ taskId: id, limit: 25 }),
     ]);
 
     const chat =

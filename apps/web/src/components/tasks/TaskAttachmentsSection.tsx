@@ -1,18 +1,12 @@
 'use client';
 
-import { useRef, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
-import { Paperclip, Trash2, Upload } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils/cn';
+import {
+    EntityAttachmentsSection,
+    type EntityAttachmentRow,
+} from '@/components/common/EntityAttachmentsSection';
 import { attachUploadAction, detachAttachmentAction } from '@/app/actions/tasks';
 import type { TaskAttachmentRow } from '@/lib/api/tasks';
-
-interface UploadedFileMeta {
-    filename: string;
-    sizeBytes: number;
-    contentType: string;
-}
 
 interface Props {
     taskId: string;
@@ -25,229 +19,74 @@ interface Props {
  * FU-5 — task attachments panel mounted between transitions and
  * conversation on TaskDetailClient.
  *
- * Drag-and-drop file picker uploads through the Work KB proxy route,
- * then wires the returned upload row id into the Task via the existing
- * `POST /api/tasks/:id/attachments` endpoint. Filename + size are
- * captured client-side so the list reads as something more useful
- * than a bare uuid even before the joined upload metadata lands on
- * the API response.
+ * Presentation is the shared {@link EntityAttachmentsSection} (same
+ * Drive-style tile grid the Agent / Mission / Idea detail pages use);
+ * this wrapper only supplies the Task-specific plumbing:
  *
- * Upload validation comes from the Work KB controller; upstream
- * errors are surfaced verbatim so the user sees the right 413 / 415 /
- * 400 message instead of a generic toast.
+ *   - Bytes upload through the Work KB proxy
+ *     (`POST /api/works/:workId/kb/uploads`) rather than the shared
+ *     `/api/uploads/file` endpoint, so the Work's own MIME/size policy
+ *     applies. Upstream errors are surfaced verbatim so the user sees
+ *     the right 413 / 415 / 400 message.
+ *   - The returned upload id is wired into the Task via
+ *     `POST /api/tasks/:id/attachments`.
+ *   - Tiles open/preview through the KB download proxy
+ *     (`/api/works/:workId/kb/uploads/:uploadId/download`), which
+ *     forwards to the owner/viewer-gated NestJS route.
+ *
+ * Tasks without a Work can't own attachments at all, so the drop zone
+ * is replaced by the `attachmentsWorkOnly` explainer.
  */
 export function TaskAttachmentsSection({ taskId, workId, initial, initialError = null }: Props) {
     const t = useTranslations('dashboard.tasksPage.detail');
-    const [rows, setRows] = useState<TaskAttachmentRow[]>(initial);
-    const [meta, setMeta] = useState<Record<string, UploadedFileMeta>>({});
-    const [pending, startTransition] = useTransition();
-    const [dragOver, setDragOver] = useState(false);
-    const [error, setError] = useState<string | null>(initialError);
-    const [busy, setBusy] = useState(false);
-    const inputRef = useRef<HTMLInputElement | null>(null);
 
-    const uploadFiles = (files: File[]) => {
-        if (files.length === 0) return;
-        setError(null);
-        setBusy(true);
-        startTransition(() => {
-            void (async () => {
-                for (const file of files) {
-                    try {
-                        if (!workId) {
-                            throw new Error('Attachments are available for Work-scoped tasks.');
-                        }
-                        const form = new FormData();
-                        form.append('file', file);
-                        const resp = await fetch(`/api/works/${workId}/kb/uploads`, {
-                            method: 'POST',
-                            body: form,
-                        });
-                        if (!resp.ok) {
-                            const text = await resp.text().catch(() => '');
-                            throw new Error(text || `Upload failed (${resp.status})`);
-                        }
-                        const body = (await resp.json()) as {
-                            id?: string;
-                            upload?: { id?: string };
-                        };
-                        const uploadId = body.upload?.id ?? body.id;
-                        if (!uploadId) {
-                            throw new Error('Upload succeeded but response missing upload id.');
-                        }
-                        const row = await attachUploadAction(taskId, uploadId);
-                        setRows((prev) => [row, ...prev]);
-                        setMeta((prev) => ({
-                            ...prev,
-                            [row.id]: {
-                                filename: file.name,
-                                sizeBytes: file.size,
-                                contentType: file.type,
-                            },
-                        }));
-                    } catch (err) {
-                        setError(err instanceof Error ? err.message : 'Upload failed');
-                    }
-                }
-                setBusy(false);
-            })();
+    const downloadUrl = (uploadId: string): string | null =>
+        workId ? `/api/works/${workId}/kb/uploads/${uploadId}/download` : null;
+
+    // Task rows nest their joined upload metadata under `upload`; the
+    // shared panel reads it flat, so normalize on the way in.
+    const toTile = (row: TaskAttachmentRow): EntityAttachmentRow => ({
+        id: row.id,
+        uploadId: row.uploadId,
+        createdAt: row.createdAt,
+        filename: row.upload?.filename ?? null,
+        mimeType: row.upload?.contentType ?? null,
+        sizeBytes: row.upload?.sizeBytes ?? null,
+        url: row.upload?.downloadUrl ?? downloadUrl(row.uploadId),
+    });
+
+    const uploader = async (file: File): Promise<{ id: string; url?: string }> => {
+        if (!workId) {
+            throw new Error('Attachments are available for Work-scoped tasks.');
+        }
+        const form = new FormData();
+        form.append('file', file);
+        const resp = await fetch(`/api/works/${workId}/kb/uploads`, {
+            method: 'POST',
+            body: form,
         });
-    };
-
-    const handleDrop = (e: React.DragEvent) => {
-        e.preventDefault();
-        setDragOver(false);
-        const files = Array.from(e.dataTransfer.files ?? []);
-        uploadFiles(files);
-    };
-
-    const handleSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = Array.from(e.target.files ?? []);
-        uploadFiles(files);
-        if (inputRef.current) inputRef.current.value = '';
-    };
-
-    const handleRemove = (attachmentId: string) => {
-        startTransition(() => {
-            void (async () => {
-                try {
-                    await detachAttachmentAction(taskId, attachmentId);
-                    setRows((prev) => prev.filter((r) => r.id !== attachmentId));
-                    setMeta((prev) => {
-                        const next = { ...prev };
-                        delete next[attachmentId];
-                        return next;
-                    });
-                } catch (err) {
-                    setError(err instanceof Error ? err.message : 'Detach failed');
-                }
-            })();
-        });
-    };
-
-    const formatSize = (bytes: number): string => {
-        if (bytes < 1024) return `${bytes} B`;
-        if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-        return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+        if (!resp.ok) {
+            const text = await resp.text().catch(() => '');
+            throw new Error(text || `Upload failed (${resp.status})`);
+        }
+        const body = (await resp.json()) as { id?: string; upload?: { id?: string } };
+        const uploadId = body.upload?.id ?? body.id;
+        if (!uploadId) {
+            throw new Error('Upload succeeded but response missing upload id.');
+        }
+        return { id: uploadId, url: downloadUrl(uploadId) ?? undefined };
     };
 
     return (
-        <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5">
-            <header className="flex items-center justify-between mb-3">
-                <h2 className="text-sm font-medium text-text dark:text-text-dark">Attachments</h2>
-                <p className="text-[11px] text-text-muted dark:text-text-muted-dark">
-                    {rows.length} file{rows.length === 1 ? '' : 's'}
-                </p>
-            </header>
-
-            {workId ? (
-                <div
-                    onDragOver={(e) => {
-                        e.preventDefault();
-                        setDragOver(true);
-                    }}
-                    onDragLeave={() => setDragOver(false)}
-                    onDrop={handleDrop}
-                    className={cn(
-                        'rounded-lg border-2 border-dashed transition-colors p-6 flex flex-col items-center justify-center gap-2 text-center',
-                        dragOver
-                            ? 'border-primary bg-primary/5'
-                            : 'border-border/60 dark:border-border-dark/60',
-                        busy && 'opacity-60',
-                    )}
-                >
-                    <Upload className="w-5 h-5 text-text-muted dark:text-text-muted-dark" />
-                    <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
-                        Drag &amp; drop a file here or
-                    </p>
-                    <Button
-                        type="button"
-                        size="sm"
-                        variant="ghost"
-                        onClick={() => inputRef.current?.click()}
-                        disabled={busy}
-                    >
-                        {busy ? 'Uploading…' : 'Browse'}
-                    </Button>
-                    <input
-                        ref={inputRef}
-                        type="file"
-                        multiple
-                        onChange={handleSelect}
-                        className="hidden"
-                    />
-                </div>
-            ) : (
-                <div className="rounded-lg border border-border/60 dark:border-border-dark/60 bg-surface-secondary/40 dark:bg-surface-secondary-dark/30 p-4">
-                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                        {t('attachmentsWorkOnly')}
-                    </p>
-                </div>
-            )}
-
-            {error && (
-                <p className="text-xs text-danger mt-2" role="alert">
-                    {error}
-                </p>
-            )}
-
-            {rows.length > 0 && (
-                <ul className="mt-4 space-y-2">
-                    {rows.map((r) => {
-                        const m = meta[r.id] ?? r.upload ?? null;
-                        const filename = m && 'filename' in m ? m.filename : r.uploadId;
-                        const size =
-                            m && 'sizeBytes' in m && typeof m.sizeBytes === 'number'
-                                ? formatSize(m.sizeBytes)
-                                : null;
-                        return (
-                            <li
-                                key={r.id}
-                                className="flex items-center gap-3 rounded-md border border-border/40 dark:border-border-dark/40 p-2.5"
-                            >
-                                <Paperclip className="w-4 h-4 text-text-muted dark:text-text-muted-dark shrink-0" />
-                                <div className="min-w-0 flex-1">
-                                    {/* Download streams the raw bytes through the
-                                        KB upload download proxy
-                                        (/api/works/:id/kb/uploads/:uploadId/download),
-                                        which forwards to the owner/viewer-gated
-                                        NestJS route. Only Work-scoped tasks carry a
-                                        workId, which is also the only case an
-                                        attachment can exist. */}
-                                    {workId ? (
-                                        <a
-                                            href={`/api/works/${workId}/kb/uploads/${r.uploadId}/download`}
-                                            download={filename}
-                                            className="text-sm text-primary hover:underline truncate block"
-                                            title={`Download ${filename}`}
-                                        >
-                                            {filename}
-                                        </a>
-                                    ) : (
-                                        <span className="text-sm text-text dark:text-text-dark truncate block">
-                                            {filename}
-                                        </span>
-                                    )}
-                                    <div className="text-[11px] text-text-muted dark:text-text-muted-dark">
-                                        {size ?? r.uploadId.slice(0, 12) + '…'} · attached{' '}
-                                        {new Date(r.createdAt).toLocaleString()}
-                                    </div>
-                                </div>
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => handleRemove(r.id)}
-                                    disabled={pending}
-                                    className="text-danger hover:text-danger gap-1.5"
-                                    title="Detach"
-                                >
-                                    <Trash2 className="w-3.5 h-3.5" />
-                                </Button>
-                            </li>
-                        );
-                    })}
-                </ul>
-            )}
-        </section>
+        <EntityAttachmentsSection<EntityAttachmentRow>
+            initial={initial.map(toTile)}
+            initialError={initialError}
+            onAttach={async (uploadId) => toTile(await attachUploadAction(taskId, uploadId))}
+            onDetach={(attachmentId) => detachAttachmentAction(taskId, attachmentId)}
+            uploader={uploader}
+            disabled={!workId}
+            disabledMessage={t('attachmentsWorkOnly')}
+            testId="task-attachments"
+        />
     );
 }
