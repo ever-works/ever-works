@@ -155,6 +155,13 @@ export interface Task {
     missionId: string | null;
     ideaId: string | null;
     workId: string | null;
+    /**
+     * The Agent this Task is filed under — one of the owner columns, and
+     * the second step of run-agent resolution (assignees → this →
+     * the Work default). Assigning it is what makes "Run" on Task detail
+     * dispatch without asking which Agent to use.
+     */
+    agentId: string | null;
     parentTaskId: string | null;
     createdByType: TaskActorType;
     createdById: string;
@@ -287,6 +294,8 @@ export const tasksAPI = {
                 | 'isolationMode'
                 | 'acceptanceChecks'
                 | 'maxGateAttempts'
+                | 'workId'
+                | 'agentId'
             >
         >,
     ) {

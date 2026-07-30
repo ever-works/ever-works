@@ -818,8 +818,26 @@
             },
             "review": {
                 "accept": "Accetta",
+                "acceptFailed": "Accettazione non riuscita — riprova",
                 "subtitle": "Documenti uniti o proposti da un agente. Restano esclusi dal contesto degli agenti finché non li accetti.",
                 "title": "In attesa di revisione ({count})"
+            },
+            "schedule": {
+                "cadence": "Ogni",
+                "cadences": {
+                    "daily": "Giorno",
+                    "weekly": "Settimana",
+                    "monthly": "Mese"
+                },
+                "enabled": "Esegui su pianificazione",
+                "lastRun": "Ultima esecuzione: {when}",
+                "mode": "Modalità",
+                "modes": {
+                    "dry-run": "Solo report",
+                    "propose": "Proponi unioni"
+                },
+                "subtitle": "Unisce periodicamente documenti quasi duplicati. Le proposte finiscono nella coda di revisione: nulla viene accettato o eliminato automaticamente.",
+                "title": "Consolidamento pianificato"
             }
         },
         "agentsPage": {
@@ -1036,6 +1054,13 @@
                 "priority": "Priorità",
                 "labels": "Etichette",
                 "labelsPlaceholder": "separate da virgola",
+                "labelsHint": "Separa più etichette con delle virgole.",
+                "labelsAutoHint": "Derivate dal titolo finché non le modifichi. Separa più etichette con delle virgole.",
+                "organize": "Organizza",
+                "work": "Work",
+                "workNone": "Nessun Work (Workspace)",
+                "workPlaceholder": "Seleziona un Work…",
+                "workHint": "Facoltativo. I file possono essere allegati solo alle attività legate a un Work.",
                 "workScopedTask": "Attività limitata a un Work",
                 "missionScopedTask": "Attività limitata a una Mission",
                 "ideaScopedTask": "Attività limitata a una Idea",
@@ -1067,7 +1092,14 @@
                 "browse": "Sfoglia",
                 "uploading": "Caricamento…",
                 "detach": "Scollega",
-                "attachmentsWorkOnly": "Gli allegati sono disponibili solo per le attività legate a un Work. Crea un'attività da un Work per allegare file.",
+                "attachmentsWorkOnly": "Gli allegati sono disponibili solo per le attività legate a un Work. Scegli un Work nel pannello Dettagli per allegare file.",
+                "workNone": "Nessun Work (Workspace)",
+                "workPlaceholder": "Seleziona un Work…",
+                "workUpdateError": "Impossibile aggiornare il Work",
+                "agent": "Agente",
+                "agentNone": "Nessun Agente assegnato",
+                "agentPlaceholder": "Seleziona un Agente…",
+                "agentUpdateError": "Impossibile aggiornare l’Agente",
                 "labels": "Etichette",
                 "edited": "modificato",
                 "description": "Descrizione",
@@ -1086,6 +1118,15 @@
                 "scopeWork": "Lavoro",
                 "scopeMission": "Missione",
                 "scopeIdea": "Idea",
+                "delete": {
+                    "action": "Elimina",
+                    "title": "Eliminare questa attività?",
+                    "body": "{slug} e tutto ciò che vi è collegato — conversazione, allegati, assegnatari e relazioni — verranno eliminati definitivamente. L'operazione è irreversibile.",
+                    "confirm": "Elimina attività",
+                    "cancel": "Annulla",
+                    "deleting": "Eliminazione…",
+                    "error": "Impossibile eliminare l'attività"
+                },
                 "runControls": {
                     "title": "Run controls",
                     "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",

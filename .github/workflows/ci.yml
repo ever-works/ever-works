@@ -125,16 +125,58 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      # Formatting is checked on EVERY run, including docs-only PRs: prettier
+      # covers *.md, and a hand-wrapped markdown table is exactly the kind of
+      # thing it catches (PR #1949). It needs only the install above.
       - name: Check formatting
         run: pnpm format:check
 
+      # Decide whether the expensive half of this job is needed.
+      #
+      # `lint-and-test` is the ONLY required status check on main/develop/stage,
+      # so this job must always RUN and report a conclusion — a workflow-level
+      # `paths-ignore` would leave the check permanently "expected" and block
+      # every docs PR forever. Hence a per-step gate rather than a trigger
+      # filter.
+      #
+      # Fails SAFE: every unexpected condition (push build, absent base sha,
+      # unfetchable base, empty or failed diff) resolves to `code=true`, so the
+      # full build+test runs. The only way to skip it is a positive
+      # determination that the PR touches nothing but `docs/` and `*.md`.
+      #
+      # Note the pattern deliberately anchors `^docs/` rather than matching
+      # `docs/` anywhere: `apps/docs` is a real Next.js app whose .tsx must
+      # still be built and tested.
+      - name: Decide whether the heavy build/test steps are needed
+        id: scope
+        run: |
+          decide() { echo "code=$1" >> "$GITHUB_OUTPUT"; exit 0; }
+          [ "${{ github.event_name }}" = "pull_request" ] || decide true
+          BASE="${{ github.event.pull_request.base.sha }}"
+          [ -n "$BASE" ] || decide true
+          git fetch --no-tags --depth=1 origin "$BASE" >/dev/null 2>&1 || true
+          git cat-file -e "$BASE^{commit}" 2>/dev/null || decide true
+          CHANGED=$(git diff --name-only "$BASE" HEAD 2>/dev/null) || decide true
+          [ -n "$CHANGED" ] || decide true
+          echo "Changed files:"; printf '  %s\n' $CHANGED
+          if printf '%s\n' "$CHANGED" | grep -qvE '^docs/|\.md$'; then
+            echo "-> non-docs changes present; running the full build + test."
+            decide true
+          else
+            echo "-> docs-only change; skipping build + test (formatting was still checked)."
+            decide false
+          fi
+
       - name: Build all packages
+        if: steps.scope.outputs.code == 'true'
         run: pnpm build --filter=!./apps/docs
 
       - name: run test on all packages
+        if: steps.scope.outputs.code == 'true'
         run: pnpm test
 
       - name: Build Internal CLI
+        if: steps.scope.outputs.code == 'true'
         working-directory: apps/internal-cli
         run: pnpm build:cli
         env:
@@ -142,6 +184,7 @@ jobs:
           WEB_URL: ${{ secrets.WEB_URL }}
 
       - name: Build External CLI
+        if: steps.scope.outputs.code == 'true'
         working-directory: apps/cli
         run: pnpm build:cli
         env:
@@ -149,6 +192,7 @@ jobs:
           WEB_URL: ${{ secrets.WEB_URL }}
 
       - name: Test Internal CLI
+        if: steps.scope.outputs.code == 'true'
         working-directory: apps/internal-cli
         # NODE_ENV=test signals this is a test-context bootstrap (the CLI uses
         # in-memory sqlite here, not a real database). C-07 PR-B made
@@ -162,6 +206,7 @@ jobs:
         run: pnpm test:cli
 
       - name: Test External CLI
+        if: steps.scope.outputs.code == 'true'
         working-directory: apps/cli
         # See note above on the Internal CLI step â€” same C-07 PR-B implication.
         env:

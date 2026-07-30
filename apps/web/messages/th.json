@@ -818,8 +818,26 @@
             },
             "review": {
                 "accept": "ยอมรับ",
+                "acceptFailed": "ยอมรับไม่สำเร็จ — ลองอีกครั้ง",
                 "subtitle": "เอกสารที่เอเจนต์รวมหรือเสนอไว้ จะไม่ถูกใช้ในบริบทของเอเจนต์จนกว่าคุณจะยอมรับ",
                 "title": "รอการตรวจสอบ ({count})"
+            },
+            "schedule": {
+                "cadence": "ทุก",
+                "cadences": {
+                    "daily": "วัน",
+                    "weekly": "สัปดาห์",
+                    "monthly": "เดือน"
+                },
+                "enabled": "ทำงานตามกำหนดเวลา",
+                "lastRun": "ทำงานล่าสุด: {when}",
+                "mode": "โหมด",
+                "modes": {
+                    "dry-run": "รายงานเท่านั้น",
+                    "propose": "เสนอการรวม"
+                },
+                "subtitle": "รวมเอกสารที่ซ้ำกันเกือบทั้งหมดเป็นระยะ ข้อเสนอจะเข้าคิวตรวจสอบ ไม่มีสิ่งใดถูกยอมรับหรือลบโดยอัตโนมัติ",
+                "title": "การรวมตามกำหนดเวลา"
             }
         },
         "agentsPage": {
@@ -1036,6 +1054,13 @@
                 "priority": "ความสำคัญ",
                 "labels": "ป้ายกำกับ",
                 "labelsPlaceholder": "คั่นด้วยจุลภาค",
+                "labelsHint": "คั่นป้ายกำกับหลายรายการด้วยจุลภาค",
+                "labelsAutoHint": "สร้างจากชื่อเรื่องจนกว่าคุณจะแก้ไข คั่นป้ายกำกับหลายรายการด้วยจุลภาค",
+                "organize": "จัดระเบียบ",
+                "work": "Work",
+                "workNone": "ไม่มี Work (Workspace)",
+                "workPlaceholder": "เลือก Work…",
+                "workHint": "ไม่บังคับ ไฟล์แนบได้เฉพาะกับงานที่อยู่ใน Work เท่านั้น",
                 "workScopedTask": "งานที่จำกัดอยู่ใน Work",
                 "missionScopedTask": "งานที่จำกัดอยู่ใน Mission",
                 "ideaScopedTask": "งานที่จำกัดอยู่ใน Idea",
@@ -1067,7 +1092,14 @@
                 "browse": "เรียกดู",
                 "uploading": "กำลังอัปโหลด...",
                 "detach": "แยกออก",
-                "attachmentsWorkOnly": "ไฟล์แนบใช้ได้เฉพาะกับงานที่อยู่ใน Work เท่านั้น สร้างงานจาก Work เพื่อแนบไฟล์",
+                "attachmentsWorkOnly": "ไฟล์แนบใช้ได้เฉพาะกับงานที่อยู่ใน Work เท่านั้น เลือก Work ในแผงรายละเอียดเพื่อแนบไฟล์",
+                "workNone": "ไม่มี Work (Workspace)",
+                "workPlaceholder": "เลือก Work…",
+                "workUpdateError": "อัปเดต Work ไม่สำเร็จ",
+                "agent": "เอเจนต์",
+                "agentNone": "ยังไม่ได้กำหนดเอเจนต์",
+                "agentPlaceholder": "เลือกเอเจนต์…",
+                "agentUpdateError": "อัปเดตเอเจนต์ไม่สำเร็จ",
                 "labels": "ป้ายกำกับ",
                 "edited": "แก้ไขแล้ว",
                 "description": "คำอธิบาย",
@@ -1086,6 +1118,15 @@
                 "scopeWork": "งาน",
                 "scopeMission": "ภารกิจ",
                 "scopeIdea": "ความคิด",
+                "delete": {
+                    "action": "ลบ",
+                    "title": "ลบงานนี้หรือไม่",
+                    "body": "{slug} และทุกอย่างที่เชื่อมโยงกับงานนี้ — บทสนทนา ไฟล์แนบ ผู้รับผิดชอบ และความสัมพันธ์ — จะถูกลบอย่างถาวร การกระทำนี้ไม่สามารถย้อนกลับได้",
+                    "confirm": "ลบงาน",
+                    "cancel": "ยกเลิก",
+                    "deleting": "กำลังลบ…",
+                    "error": "ลบงานไม่สำเร็จ"
+                },
                 "runControls": {
                     "title": "Run controls",
                     "liveHint": "This run is live. Send a message to steer it — the agent picks it up between steps.",
