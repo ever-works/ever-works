@@ -35,7 +35,7 @@ describe('OrgMemoryController — ingest chat attachments into Memory', () => {
     const OTHER_SHA = 'b'.repeat(64);
 
     let kb: { createOrgUpload: jest.Mock };
-    let membership: { ensureMember: jest.Mock };
+    let membership: { ensureMember: jest.Mock; ensureAdmin: jest.Mock };
     let scopeContext: { getOrganizationId: jest.Mock };
     let uploads: { readFile: jest.Mock };
     let userUploads: { findOwnedByUser: jest.Mock };
@@ -48,7 +48,10 @@ describe('OrgMemoryController — ingest chat attachments into Memory', () => {
                 document: { id: 'doc-1' },
             }),
         };
-        membership = { ensureMember: jest.fn().mockResolvedValue({ id: 'org-1' }) };
+        membership = {
+            ensureMember: jest.fn().mockResolvedValue({ id: 'org-1' }),
+            ensureAdmin: jest.fn().mockResolvedValue({ id: 'org-1' }),
+        };
         scopeContext = { getOrganizationId: jest.fn().mockReturnValue('org-1') };
         uploads = {
             readFile: jest
