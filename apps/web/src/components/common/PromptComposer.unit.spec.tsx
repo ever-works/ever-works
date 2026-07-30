@@ -253,7 +253,12 @@ describe('PromptComposer dictation', () => {
         (window as unknown as { SpeechRecognition: unknown }).SpeechRecognition = FakeRecognition;
     });
     afterEach(() => {
-        delete (window as unknown as { SpeechRecognition?: unknown }).SpeechRecognition;
+        const w = window as unknown as {
+            SpeechRecognition?: unknown;
+            webkitSpeechRecognition?: unknown;
+        };
+        delete w.SpeechRecognition;
+        delete w.webkitSpeechRecognition;
     });
 
     it('swaps the toolbar for the dictation bar while listening', async () => {
@@ -279,6 +284,22 @@ describe('PromptComposer dictation', () => {
 
         fireEvent.click(screen.getByTestId(`${TEST_ID}-voice-cancel`));
         await waitFor(() => expect(textarea.value).toBe('Build me'));
+    });
+
+    it('falls back to webkitSpeechRecognition on browsers without the standard name', async () => {
+        const w = window as unknown as {
+            SpeechRecognition?: unknown;
+            webkitSpeechRecognition?: unknown;
+        };
+        delete w.SpeechRecognition;
+        w.webkitSpeechRecognition = FakeRecognition;
+
+        render(<Harness />);
+        fireEvent.click(await screen.findByTestId(`${TEST_ID}-mic`));
+
+        emit('a pricing page');
+        const textarea = screen.getByTestId(TEST_ID) as HTMLTextAreaElement;
+        await waitFor(() => expect(textarea.value).toBe('a pricing page'));
     });
 
     it('keeps the transcript when dictation is confirmed', async () => {

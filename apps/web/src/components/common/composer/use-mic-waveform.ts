@@ -27,14 +27,8 @@ const LEVEL_GAIN = 4;
 const MIN_LEVEL = 0.05;
 
 export interface MicWaveform {
-    /** Attach to the `<canvas>` that should show the meter. */
     readonly canvasRef: React.RefObject<HTMLCanvasElement | null>;
-    /** True while a mic stream is open and the meter is painting. */
     readonly active: boolean;
-    /**
-     * Resolves `false` when the mic is unavailable, permission is denied, or
-     * the browser lacks Web Audio — callers fall back to a static indicator.
-     */
     start: () => Promise<boolean>;
     stop: () => void;
 }
@@ -58,9 +52,6 @@ function paint(canvas: HTMLCanvasElement, levels: ReadonlyArray<number>): void {
     const cssWidth = canvas.clientWidth;
     const cssHeight = canvas.clientHeight;
     if (cssWidth === 0 || cssHeight === 0) return;
-
-    // Re-back the bitmap only when the CSS box or DPR actually changed;
-    // assigning width/height clears the canvas on every write.
     const dpr = window.devicePixelRatio || 1;
     const targetWidth = Math.round(cssWidth * dpr);
     const targetHeight = Math.round(cssHeight * dpr);
@@ -71,15 +62,10 @@ function paint(canvas: HTMLCanvasElement, levels: ReadonlyArray<number>): void {
 
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.clearRect(0, 0, cssWidth, cssHeight);
-
-    // Inherit the colour from CSS so the meter follows the light/dark token on
-    // the element. (`currentColor` is not a valid canvas fill, hence the
-    // literal neutral fallback.)
     ctx.fillStyle = window.getComputedStyle(canvas).color || '#71717a';
 
     const step = BAR_WIDTH + BAR_GAP;
     const visible = Math.max(6, Math.floor((cssWidth + BAR_GAP) / step));
-    // Newest sample sits at the right edge, so the meter scrolls leftwards.
     const window_ = levels.slice(-visible);
     const offset = visible - window_.length;
 
@@ -88,7 +74,6 @@ function paint(canvas: HTMLCanvasElement, levels: ReadonlyArray<number>): void {
         const height = Math.max(2, level * (cssHeight - 2));
         const x = (offset + i) * step;
         const y = (cssHeight - height) / 2;
-        // Fade the tail so the history reads as motion even in a still frame.
         ctx.globalAlpha = 0.3 + 0.7 * ((offset + i + 1) / visible);
         if (typeof ctx.roundRect === 'function') {
             ctx.beginPath();
@@ -107,20 +92,19 @@ export function useMicWaveform(): MicWaveform {
     const streamRef = useRef<MediaStream | null>(null);
     const audioCtxRef = useRef<AudioContext | null>(null);
     const analyserRef = useRef<AnalyserNode | null>(null);
-    // Explicit `<ArrayBuffer>` — `getByteTimeDomainData` rejects the
-    // `ArrayBufferLike` default (it could be a SharedArrayBuffer).
     const dataRef = useRef<Uint8Array<ArrayBuffer> | null>(null);
     const rafRef = useRef<number | null>(null);
     const lastSampleRef = useRef(0);
+    /** Bumped by every `start`/`stop`; lets a resolving `start` know it is stale. */
+    const sessionRef = useRef(0);
     const [active, setActive] = useState(false);
 
     const stop = useCallback(() => {
+        sessionRef.current++;
         if (rafRef.current !== null) {
             cancelAnimationFrame(rafRef.current);
             rafRef.current = null;
         }
-        // Releasing the tracks is what turns the browser's recording
-        // indicator off — closing the AudioContext alone does not.
         streamRef.current?.getTracks().forEach((track) => track.stop());
         streamRef.current = null;
         analyserRef.current = null;
@@ -137,19 +121,24 @@ export function useMicWaveform(): MicWaveform {
 
     const start = useCallback(async () => {
         if (typeof window === 'undefined') return false;
-        // A continuously animating meter is exactly what "reduce motion"
-        // asks us not to draw; the caller shows a static indicator instead.
         if (window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) return false;
         if (!navigator.mediaDevices?.getUserMedia || !window.AudioContext) return false;
 
+        const session = ++sessionRef.current;
+
         try {
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            // The permission prompt can outlive the request: bail out if the caller
+            // stopped dictation, or started it again, while we were waiting.
+            if (sessionRef.current !== session) {
+                stream.getTracks().forEach((track) => track.stop());
+                return false;
+            }
             streamRef.current = stream;
 
             const audioCtx = new window.AudioContext();
             audioCtxRef.current = audioCtx;
             void audioCtx.resume().catch(() => {
-                /* autoplay policy — the meter just stays flat */
             });
 
             const analyser = audioCtx.createAnalyser();
@@ -161,9 +150,6 @@ export function useMicWaveform(): MicWaveform {
 
             levelsRef.current = [];
             lastSampleRef.current = 0;
-
-            // Hoisted so it can schedule itself; touches only refs, so React
-            // never re-renders while the meter runs.
             function frame() {
                 rafRef.current = requestAnimationFrame(frame);
 
@@ -186,15 +172,11 @@ export function useMicWaveform(): MicWaveform {
             rafRef.current = requestAnimationFrame(frame);
             return true;
         } catch {
-            // Permission denied / no input device / mic already claimed.
-            stop();
+            if (sessionRef.current === session) stop();
             return false;
         }
     }, [stop]);
 
-    // Never leave a mic stream open behind an unmounted composer.
     useEffect(() => stop, [stop]);
-
-    // Stable identity: the consuming hook puts start/stop in dependency arrays.
     return useMemo(() => ({ canvasRef, active, start, stop }), [active, start, stop]);
 }

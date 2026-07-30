@@ -64,6 +64,7 @@ export interface Dictation {
 
 export function useDictation(onFinalText: (text: string) => void): Dictation {
     const recognitionRef = useRef<SpeechRecognizer | null>(null);
+    const sessionActiveRef = useRef(false);
     const [listening, setListening] = useState(false);
     const [supported, setSupported] = useState(false);
     const [startedAt, setStartedAt] = useState<number | null>(null);
@@ -95,6 +96,7 @@ export function useDictation(onFinalText: (text: string) => void): Dictation {
         rec.interimResults = true;
         rec.lang = typeof navigator !== 'undefined' ? navigator.language || 'en-US' : 'en-US';
         rec.onresult = (event) => {
+            if (!sessionActiveRef.current) return;
             let finalText = '';
             for (let i = event.resultIndex; i < event.results.length; i++) {
                 const result = event.results[i];
@@ -103,6 +105,7 @@ export function useDictation(onFinalText: (text: string) => void): Dictation {
             if (finalText.trim()) onFinalTextRef.current(finalText.trim());
         };
         const endSession = () => {
+            sessionActiveRef.current = false;
             setListening(false);
             setStartedAt(null);
             waveformStopRef.current();
@@ -113,6 +116,7 @@ export function useDictation(onFinalText: (text: string) => void): Dictation {
         // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot capability detection at mount; can't be derived during render (needs window.SpeechRecognition).
         setSupported(true);
         return () => {
+            sessionActiveRef.current = false;
             try {
                 rec.stop();
             } catch {
@@ -131,12 +135,14 @@ export function useDictation(onFinalText: (text: string) => void): Dictation {
         } catch {
             return; /* already started */
         }
+        sessionActiveRef.current = true;
         setListening(true);
         setStartedAt(Date.now());
         void waveform.start();
     }, [waveform]);
 
     const stop = useCallback(() => {
+        sessionActiveRef.current = false;
         try {
             recognitionRef.current?.stop();
         } catch {
