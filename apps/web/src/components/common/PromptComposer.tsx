@@ -23,6 +23,7 @@ import {
     type KeyboardEvent,
     type ReactNode,
 } from 'react';
+import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils/cn';
 import { uploadFile, UploadError } from '@/lib/api/uploads';
 import { AttachmentStrip } from './composer/AttachmentStrip';
@@ -226,6 +227,53 @@ interface DirectoryEntryLike {
 const MAX_DROPPED_FOLDER_FILES = 200;
 
 /**
+ * Ceiling (px) the auto-growing textarea stops at before it scrolls
+ * internally. Matches the height of the fixed three-row box the composer
+ * used before it grew with its content: three lines of `text-base` at
+ * `leading-relaxed` (3 × 26px) plus the `pt-4` / `pb-3` padding (28px).
+ */
+const MAX_TEXTAREA_HEIGHT = 106;
+
+/**
+ * Geometry for the (+) popover. It renders in a portal at the document root
+ * rather than next to the button, because the composer card clips its
+ * children (`overflow-hidden`, for the rounded corners) and the pages that
+ * embed the composer clip theirs — an absolutely positioned menu got sliced
+ * off at the card's edge.
+ *
+ * `MENU_WIDTH` mirrors the old `w-60` and `MENU_EST_HEIGHT` is roughly the
+ * tallest the menu gets (four rows); both only feed the flip / clamp
+ * decisions, so approximations are fine.
+ */
+const MENU_WIDTH = 240;
+const MENU_EST_HEIGHT = 260;
+const MENU_GAP = 8;
+const VIEWPORT_MARGIN = 8;
+
+interface MenuPosition {
+    readonly left: number;
+    /** Set when the menu opens downward. */
+    readonly top?: number;
+    /** Set when the menu opens upward (the preferred direction). */
+    readonly bottom?: number;
+}
+
+function measureMenuPosition(button: HTMLElement): MenuPosition {
+    const rect = button.getBoundingClientRect();
+    const left = Math.max(
+        VIEWPORT_MARGIN,
+        Math.min(rect.left, window.innerWidth - MENU_WIDTH - VIEWPORT_MARGIN),
+    );
+    const spaceAbove = rect.top;
+    const spaceBelow = window.innerHeight - rect.bottom;
+    // Above is the default — content directly under a composer is usually
+    // dense — but flip when there genuinely isn't room up there.
+    const openAbove = spaceAbove >= MENU_EST_HEIGHT + MENU_GAP || spaceAbove >= spaceBelow;
+    if (openAbove) return { left, bottom: window.innerHeight - rect.top + MENU_GAP };
+    return { left, top: rect.bottom + MENU_GAP };
+}
+
+/**
  * `webkitGetAsEntry()` must be called synchronously inside the drop handler —
  * the item list is emptied as soon as the event finishes. The returned entry
  * objects stay valid afterwards, so the async walk below is safe.
@@ -302,7 +350,7 @@ export interface PromptComposerProps {
     rows?: number;
     /**
      * Ceiling (px) the auto-growing textarea stops at before it scrolls
-     * internally. Defaults to 240.
+     * internally. Defaults to the old fixed three-row height.
      */
     maxHeight?: number;
     submitting?: boolean;
@@ -356,7 +404,7 @@ export function PromptComposer({
     minLength = 10,
     maxLength = 5000,
     rows = 3,
-    maxHeight = 240,
+    maxHeight = MAX_TEXTAREA_HEIGHT,
     submitting = false,
     placeholderExamples,
     placeholder,
@@ -383,6 +431,7 @@ export function PromptComposer({
 
     const [attachments, setAttachments] = useState<ComposerAttachment[]>([]);
     const [attachMenuOpen, setAttachMenuOpen] = useState(false);
+    const [menuPosition, setMenuPosition] = useState<MenuPosition | null>(null);
     const [githubFormOpen, setGithubFormOpen] = useState(false);
     const [githubUrl, setGithubUrl] = useState('');
     const [githubError, setGithubError] = useState<string | null>(null);
@@ -661,8 +710,9 @@ export function PromptComposer({
     /* Text input                                                       */
     /* ---------------------------------------------------------------- */
 
-    // Grow with the content up to `maxHeight`, then scroll internally —
-    // a fixed 3-row box hid the tail of anything longer than a sentence.
+    // Grow with the content up to `maxHeight`, then scroll internally, so a
+    // short brief gets a compact box and a long one never pushes the card
+    // past the height the old fixed-row layout settled on.
     const autoGrow = useCallback(() => {
         const el = textareaRef.current;
         if (!el) return;
@@ -764,6 +814,34 @@ export function PromptComposer({
         document.addEventListener('keydown', onKey);
         return () => document.removeEventListener('keydown', onKey);
     }, [attachMenuOpen, closeAttachMenu]);
+
+    // The menu only ever opens from a click, so `document` is guaranteed by
+    // then; this guard is just for the server render of the closed state.
+    const canPortal = typeof document !== 'undefined';
+
+    const openAttachMenu = useCallback(() => {
+        setGithubFormOpen(false);
+        const button = attachButtonRef.current;
+        if (button) setMenuPosition(measureMenuPosition(button));
+        setAttachMenuOpen(true);
+    }, []);
+
+    // The portaled menu is anchored to a point in the viewport, so it has to
+    // follow the button when the page moves under it. Scroll is captured so
+    // nested scrollers count too; either event just re-measures.
+    useEffect(() => {
+        if (!attachMenuOpen) return;
+        const reposition = () => {
+            const button = attachButtonRef.current;
+            if (button) setMenuPosition(measureMenuPosition(button));
+        };
+        window.addEventListener('scroll', reposition, true);
+        window.addEventListener('resize', reposition);
+        return () => {
+            window.removeEventListener('scroll', reposition, true);
+            window.removeEventListener('resize', reposition);
+        };
+    }, [attachMenuOpen]);
 
     // Document-level mousedown listener to close the popover on outside
     // click. The composer card uses backdrop-blur which creates a
@@ -1007,13 +1085,13 @@ export function PromptComposer({
                                     >)}
                                 />
 
-                                <div className="relative">
+                                <div>
                                     <button
                                         ref={attachButtonRef}
                                         type="button"
                                         onClick={() => {
-                                            setGithubFormOpen(false);
-                                            setAttachMenuOpen((v) => !v);
+                                            if (attachMenuOpen) closeAttachMenu();
+                                            else openAttachMenu();
                                         }}
                                         aria-label="Add attachment"
                                         title={
@@ -1040,144 +1118,164 @@ export function PromptComposer({
                                         />
                                     </button>
 
-                                    {attachMenuOpen ? (
-                                        <div
-                                            ref={attachMenuRef}
-                                            role="menu"
-                                            aria-label="Attachment options"
-                                            onKeyDown={onMenuKeyDown}
-                                            data-testid={
-                                                testId ? `${testId}-attach-menu` : undefined
-                                            }
-                                            // Positioned ABOVE the (+) button so the
-                                            // menu stays visible without clipping —
-                                            // page content below the composer is
-                                            // typically dense.
-                                            className={cn(
-                                                'absolute bottom-full left-0 z-50 mb-2 w-60 overflow-hidden rounded-2xl',
-                                                'border border-border/60 bg-background shadow-lg shadow-black/5',
-                                                'dark:border-white/10 dark:bg-zinc-900 dark:shadow-black/40',
-                                                'animate-in fade-in-0 zoom-in-95 slide-in-from-bottom-1 duration-150',
-                                            )}
-                                        >
-                                            {githubFormOpen ? (
-                                                <div className="flex flex-col gap-3 p-3">
-                                                    <label
-                                                        htmlFor={
-                                                            testId
-                                                                ? `${testId}-attach-github-input`
-                                                                : undefined
-                                                        }
-                                                        className="text-[11px] font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark"
-                                                    >
-                                                        GitHub repo URL
-                                                    </label>
-                                                    <input
-                                                        ref={githubInputRef}
-                                                        id={
-                                                            testId
-                                                                ? `${testId}-attach-github-input`
-                                                                : undefined
-                                                        }
-                                                        data-testid={
-                                                            testId
-                                                                ? `${testId}-attach-github-input`
-                                                                : undefined
-                                                        }
-                                                        type="url"
-                                                        value={githubUrl}
-                                                        onChange={(e) => {
-                                                            setGithubUrl(e.target.value);
-                                                            if (githubError) setGithubError(null);
-                                                        }}
-                                                        onKeyDown={(e) => {
-                                                            if (e.key === 'Enter') {
-                                                                e.preventDefault();
-                                                                onAddGithub();
-                                                            } else if (e.key === 'Escape') {
-                                                                e.preventDefault();
-                                                                onCancelGithub();
-                                                            }
-                                                        }}
-                                                        placeholder="https://github.com/owner/repo"
-                                                        className="w-full rounded-lg border border-border/60 bg-foreground/[0.03] px-2.5 py-1.5 text-[13px] text-text transition-colors placeholder:text-text-muted/50 focus:border-border-secondary focus:outline-none focus:ring-1 focus:ring-foreground/10 dark:border-white/10 dark:bg-white/[0.03] dark:text-text-dark dark:placeholder:text-text-muted-dark/50 dark:focus:border-white/25"
-                                                    />
-                                                    {githubError ? (
-                                                        <p
-                                                            role="alert"
-                                                            className="text-[11px] text-danger"
-                                                        >
-                                                            {githubError}
-                                                        </p>
-                                                    ) : null}
-                                                    <div className="flex items-center justify-end gap-2">
-                                                        <button
-                                                            type="button"
-                                                            onClick={onCancelGithub}
-                                                            className="rounded-lg px-2.5 py-1.5 text-xs text-text-muted transition-colors hover:bg-foreground/[0.06] dark:text-text-muted-dark dark:hover:bg-white/[0.06]"
-                                                        >
-                                                            Cancel
-                                                        </button>
-                                                        <button
-                                                            type="button"
-                                                            onClick={onAddGithub}
-                                                            data-testid={
-                                                                testId
-                                                                    ? `${testId}-attach-github-add`
-                                                                    : undefined
-                                                            }
-                                                            className="rounded-lg bg-button-primary px-2.5 py-1.5 text-xs font-medium text-button-primary-foreground transition-colors hover:bg-button-primary-hover dark:bg-button-primary-dark dark:text-button-primary-foreground-dark dark:hover:bg-button-primary-hover-dark"
-                                                        >
-                                                            Add
-                                                        </button>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <ul className="flex flex-col gap-0.5 p-1.5">
-                                                    {ATTACH_MENU_ITEMS.map((item) => {
-                                                        if (
-                                                            item.id === 'github' &&
-                                                            !showImportGithubRepo
-                                                        )
-                                                            return null;
-                                                        const Icon = item.icon;
-                                                        return (
-                                                            <li key={item.id}>
-                                                                <button
-                                                                    type="button"
-                                                                    role="menuitem"
-                                                                    onClick={
-                                                                        attachMenuActions[item.id]
-                                                                    }
-                                                                    data-testid={
-                                                                        testId
-                                                                            ? `${testId}-attach-${item.id}`
-                                                                            : undefined
-                                                                    }
-                                                                    className={menuItemClass}
-                                                                >
-                                                                    <span
-                                                                        className={menuIconClass}
-                                                                        aria-hidden="true"
-                                                                    >
-                                                                        <Icon className="size-3.5" />
-                                                                    </span>
-                                                                    <span className="min-w-0 flex-1">
-                                                                        <span className="block truncate">
-                                                                            {item.label}
-                                                                        </span>
-                                                                        <span className="block truncate text-[11px] text-text-muted dark:text-text-muted-dark">
-                                                                            {item.hint}
-                                                                        </span>
-                                                                    </span>
-                                                                </button>
-                                                            </li>
-                                                        );
-                                                    })}
-                                                </ul>
-                                            )}
-                                        </div>
-                                    ) : null}
+                                    {attachMenuOpen && menuPosition && canPortal
+                                        ? createPortal(
+                                              <div
+                                                  ref={attachMenuRef}
+                                                  role="menu"
+                                                  aria-label="Attachment options"
+                                                  onKeyDown={onMenuKeyDown}
+                                                  data-testid={
+                                                      testId ? `${testId}-attach-menu` : undefined
+                                                  }
+                                                  // Fixed to coordinates measured off the (+)
+                                                  // button, in a portal at the document root:
+                                                  // both the composer card and the pages
+                                                  // around it clip their overflow, so an
+                                                  // absolutely positioned menu was cut off at
+                                                  // the card's edge.
+                                                  style={{
+                                                      position: 'fixed',
+                                                      left: menuPosition.left,
+                                                      top: menuPosition.top,
+                                                      bottom: menuPosition.bottom,
+                                                      width: MENU_WIDTH,
+                                                  }}
+                                                  className={cn(
+                                                      'z-70 overflow-hidden rounded-2xl',
+                                                      'border border-border/60 bg-background shadow-lg shadow-black/5',
+                                                      'dark:border-white/10 dark:bg-zinc-900 dark:shadow-black/40',
+                                                      'animate-in fade-in-0 zoom-in-95 duration-150',
+                                                      menuPosition.bottom !== undefined
+                                                          ? 'slide-in-from-bottom-1'
+                                                          : 'slide-in-from-top-1',
+                                                  )}
+                                              >
+                                                  {githubFormOpen ? (
+                                                      <div className="flex flex-col gap-3 p-3">
+                                                          <label
+                                                              htmlFor={
+                                                                  testId
+                                                                      ? `${testId}-attach-github-input`
+                                                                      : undefined
+                                                              }
+                                                              className="text-[11px] font-semibold uppercase tracking-wider text-text-muted dark:text-text-muted-dark"
+                                                          >
+                                                              GitHub repo URL
+                                                          </label>
+                                                          <input
+                                                              ref={githubInputRef}
+                                                              id={
+                                                                  testId
+                                                                      ? `${testId}-attach-github-input`
+                                                                      : undefined
+                                                              }
+                                                              data-testid={
+                                                                  testId
+                                                                      ? `${testId}-attach-github-input`
+                                                                      : undefined
+                                                              }
+                                                              type="url"
+                                                              value={githubUrl}
+                                                              onChange={(e) => {
+                                                                  setGithubUrl(e.target.value);
+                                                                  if (githubError)
+                                                                      setGithubError(null);
+                                                              }}
+                                                              onKeyDown={(e) => {
+                                                                  if (e.key === 'Enter') {
+                                                                      e.preventDefault();
+                                                                      onAddGithub();
+                                                                  } else if (e.key === 'Escape') {
+                                                                      e.preventDefault();
+                                                                      onCancelGithub();
+                                                                  }
+                                                              }}
+                                                              placeholder="https://github.com/owner/repo"
+                                                              className="w-full rounded-lg border border-border/60 bg-foreground/[0.03] px-2.5 py-1.5 text-[13px] text-text transition-colors placeholder:text-text-muted/50 focus:border-border-secondary focus:outline-none focus:ring-1 focus:ring-foreground/10 dark:border-white/10 dark:bg-white/[0.03] dark:text-text-dark dark:placeholder:text-text-muted-dark/50 dark:focus:border-white/25"
+                                                          />
+                                                          {githubError ? (
+                                                              <p
+                                                                  role="alert"
+                                                                  className="text-[11px] text-danger"
+                                                              >
+                                                                  {githubError}
+                                                              </p>
+                                                          ) : null}
+                                                          <div className="flex items-center justify-end gap-2">
+                                                              <button
+                                                                  type="button"
+                                                                  onClick={onCancelGithub}
+                                                                  className="rounded-lg px-2.5 py-1.5 text-xs text-text-muted transition-colors hover:bg-foreground/[0.06] dark:text-text-muted-dark dark:hover:bg-white/[0.06]"
+                                                              >
+                                                                  Cancel
+                                                              </button>
+                                                              <button
+                                                                  type="button"
+                                                                  onClick={onAddGithub}
+                                                                  data-testid={
+                                                                      testId
+                                                                          ? `${testId}-attach-github-add`
+                                                                          : undefined
+                                                                  }
+                                                                  className="rounded-lg bg-button-primary px-2.5 py-1.5 text-xs font-medium text-button-primary-foreground transition-colors hover:bg-button-primary-hover dark:bg-button-primary-dark dark:text-button-primary-foreground-dark dark:hover:bg-button-primary-hover-dark"
+                                                              >
+                                                                  Add
+                                                              </button>
+                                                          </div>
+                                                      </div>
+                                                  ) : (
+                                                      <ul className="flex flex-col gap-0.5 p-1.5">
+                                                          {ATTACH_MENU_ITEMS.map((item) => {
+                                                              if (
+                                                                  item.id === 'github' &&
+                                                                  !showImportGithubRepo
+                                                              )
+                                                                  return null;
+                                                              const Icon = item.icon;
+                                                              return (
+                                                                  <li key={item.id}>
+                                                                      <button
+                                                                          type="button"
+                                                                          role="menuitem"
+                                                                          onClick={
+                                                                              attachMenuActions[
+                                                                                  item.id
+                                                                              ]
+                                                                          }
+                                                                          data-testid={
+                                                                              testId
+                                                                                  ? `${testId}-attach-${item.id}`
+                                                                                  : undefined
+                                                                          }
+                                                                          className={menuItemClass}
+                                                                      >
+                                                                          <span
+                                                                              className={
+                                                                                  menuIconClass
+                                                                              }
+                                                                              aria-hidden="true"
+                                                                          >
+                                                                              <Icon className="size-3.5" />
+                                                                          </span>
+                                                                          <span className="min-w-0 flex-1">
+                                                                              <span className="block truncate">
+                                                                                  {item.label}
+                                                                              </span>
+                                                                              <span className="block truncate text-[11px] text-text-muted dark:text-text-muted-dark">
+                                                                                  {item.hint}
+                                                                              </span>
+                                                                          </span>
+                                                                      </button>
+                                                                  </li>
+                                                              );
+                                                          })}
+                                                      </ul>
+                                                  )}
+                                              </div>,
+                                              document.body,
+                                          )
+                                        : null}
                                 </div>
                             </>
                         ) : null}
