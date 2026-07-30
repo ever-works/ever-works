@@ -307,7 +307,7 @@
         "stripe": "^22.3.2",
         "superjson": "^1.13.3",
         "turndown": "^7.2.2",
-        "typeorm": "^0.3.28",
+        "typeorm": "^0.3.31",
         "yaml": "^2.8.3",
         "zod": "^3.25.76",
         "zod-to-json-schema": "^3.25.1"
