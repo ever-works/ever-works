@@ -227,12 +227,19 @@ interface DirectoryEntryLike {
 const MAX_DROPPED_FOLDER_FILES = 200;
 
 /**
- * Ceiling (px) the auto-growing textarea stops at before it scrolls
- * internally. Matches the height of the fixed three-row box the composer
- * used before it grew with its content: three lines of `text-base` at
- * `leading-relaxed` (3 × 26px) plus the `pt-4` / `pb-3` padding (28px).
+ * Vertical geometry of the textarea, used to turn a `rows` count into the
+ * pixel ceiling the auto-growing box stops at: one line of `text-base` at
+ * `leading-relaxed`, plus the `pt-4` / `pb-3` padding.
  */
-const MAX_TEXTAREA_HEIGHT = 106;
+const TEXTAREA_LINE_HEIGHT = 26;
+const TEXTAREA_VERTICAL_PADDING = 28;
+
+/**
+ * Floor for the ceiling (px) the auto-growing textarea stops at before it
+ * scrolls internally. Matches the height of the fixed three-row box the
+ * composer used before it grew with its content.
+ */
+const MAX_TEXTAREA_HEIGHT = 3 * TEXTAREA_LINE_HEIGHT + TEXTAREA_VERTICAL_PADDING;
 
 /**
  * Geometry for the (+) popover. It renders in a portal at the document root
@@ -346,11 +353,15 @@ export interface PromptComposerProps {
     minLength?: number;
     /** Hard cap enforced by the textarea. Defaults to 5000. */
     maxLength?: number;
-    /** Starting height of the textarea, in rows. Defaults to 3. */
+    /**
+     * Starting height of the textarea, in rows. Defaults to 3. Also sets the
+     * auto-grow ceiling unless `maxHeight` pins it explicitly.
+     */
     rows?: number;
     /**
      * Ceiling (px) the auto-growing textarea stops at before it scrolls
-     * internally. Defaults to the old fixed three-row height.
+     * internally. Defaults to whichever is taller: `rows`, or the old fixed
+     * three-row height.
      */
     maxHeight?: number;
     submitting?: boolean;
@@ -404,7 +415,7 @@ export function PromptComposer({
     minLength = 10,
     maxLength = 5000,
     rows = 3,
-    maxHeight = MAX_TEXTAREA_HEIGHT,
+    maxHeight,
     submitting = false,
     placeholderExamples,
     placeholder,
@@ -710,16 +721,23 @@ export function PromptComposer({
     /* Text input                                                       */
     /* ---------------------------------------------------------------- */
 
-    // Grow with the content up to `maxHeight`, then scroll internally, so a
+    // Without an explicit `maxHeight` the ceiling tracks `rows`, so a surface
+    // that asked for a taller box keeps it instead of being clamped back to
+    // the three-row default.
+    const heightCeiling =
+        maxHeight ??
+        Math.max(MAX_TEXTAREA_HEIGHT, rows * TEXTAREA_LINE_HEIGHT + TEXTAREA_VERTICAL_PADDING);
+
+    // Grow with the content up to the ceiling, then scroll internally, so a
     // short brief gets a compact box and a long one never pushes the card
-    // past the height the old fixed-row layout settled on.
+    // past the height the fixed-row layout settled on.
     const autoGrow = useCallback(() => {
         const el = textareaRef.current;
         if (!el) return;
         el.style.height = 'auto';
-        el.style.height = `${Math.min(el.scrollHeight, maxHeight)}px`;
-        el.style.overflowY = el.scrollHeight > maxHeight ? 'auto' : 'hidden';
-    }, [maxHeight]);
+        el.style.height = `${Math.min(el.scrollHeight, heightCeiling)}px`;
+        el.style.overflowY = el.scrollHeight > heightCeiling ? 'auto' : 'hidden';
+    }, [heightCeiling]);
 
     useLayoutEffect(() => {
         autoGrow();
