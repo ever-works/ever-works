@@ -60,10 +60,20 @@ export function buildDeployment(input: ManifestRenderInputs): Record<string, unk
 					timeoutSeconds: 10,
 					failureThreshold: 6
 				},
-				// 512Mi OOM-killed a real catalogue (the mcp-servers Work needs ~4Gi
-				// for 4065 items x ~20 locales) — it restarted 4x and never served.
-				// Requests stay small so scheduling is cheap; the limit is what has
-				// to be honest. Overridable per Work via plugin settings.
+				// 512Mi OOM-killed a real catalogue — the mcp-servers Work restarted
+				// 4x and never served. Measured usage of the seven live Works:
+				// 441Mi / 487 / 567 / 586 / 616 / 1557, and mcp-servers at 3980Mi.
+				//
+				// 2Gi covers six of the seven with headroom and — critically — FITS.
+				// k8s-works and k8s-works-shared workers have only ~3.72Gi allocatable
+				// EACH, so a larger default would be a limit no node could ever honour:
+				// requests are small enough that such a pod schedules happily and then
+				// gets OOM-killed climbing toward a ceiling that does not physically
+				// exist. A Work genuinely needing more (mcp-servers) needs a bigger
+				// node or a smaller footprint, not a bigger number here.
+				//
+				// Requests stay small so scheduling is cheap. All four are overridable
+				// per Work via plugin settings.
 				resources: {
 					requests: {
 						cpu: input.cpuRequest ?? '100m',
@@ -71,7 +81,7 @@ export function buildDeployment(input: ManifestRenderInputs): Record<string, unk
 					},
 					limits: {
 						cpu: input.cpuLimit ?? '2',
-						memory: input.memoryLimit ?? '4Gi'
+						memory: input.memoryLimit ?? '2Gi'
 					}
 				},
 				// Server-side deploys (EW — platform-managed clusters) mount the
