@@ -78,9 +78,7 @@ describe('manifest.renderer — server-side inputs', () => {
 	it('mounts the runtime-env Secret via optional envFrom when named', () => {
 		const manifest = buildDeployment({ ...base, envFromSecretName: 'my-site-runtime-env' });
 		const container = (manifest as any).spec.template.spec.containers[0];
-		expect(container.envFrom).toEqual([
-			{ secretRef: { name: 'my-site-runtime-env', optional: true } }
-		]);
+		expect(container.envFrom).toEqual([{ secretRef: { name: 'my-site-runtime-env', optional: true } }]);
 	});
 
 	it('adds no envFrom when no secret is named (pre-existing behaviour)', () => {
