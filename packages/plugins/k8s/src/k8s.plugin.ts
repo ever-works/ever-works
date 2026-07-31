@@ -280,6 +280,33 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 				default: DEFAULT_REPLICAS,
 				minimum: 1,
 				maximum: 10
+			},
+			// Per-Work sizing. `deploy()` already reads all four off `settings`,
+			// but PluginSettingsService resolves settings by iterating the SCHEMA's
+			// keys — anything not declared here is silently dropped, so without
+			// these entries the overrides existed in name only: you could persist
+			// `memoryLimit` on a Work, see it stored, and still get the default
+			// rendered into the Deployment. Verified by reading back the ReplicaSet.
+			cpuRequest: {
+				type: 'string',
+				title: 'CPU request',
+				description: "Kubernetes quantity, e.g. '100m'. Small requests keep scheduling cheap."
+			},
+			memoryRequest: {
+				type: 'string',
+				title: 'Memory request',
+				description: "Kubernetes quantity, e.g. '256Mi'."
+			},
+			cpuLimit: {
+				type: 'string',
+				title: 'CPU limit',
+				description: "Kubernetes quantity, e.g. '2'."
+			},
+			memoryLimit: {
+				type: 'string',
+				title: 'Memory limit',
+				description:
+					"Kubernetes quantity, e.g. '2Gi'. Must fit the target node: a limit larger than a node's allocatable memory schedules fine (requests are small) and then OOM-kills the pod climbing toward a ceiling that does not exist."
 			}
 		},
 		// `kubeconfig` is only required when `clusterSource === 'custom-kubeconfig'`
