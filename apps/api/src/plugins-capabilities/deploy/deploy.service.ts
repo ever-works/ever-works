@@ -343,6 +343,8 @@ export class DeployService {
                   userId,
                   plugin,
                   kubeconfig: effectiveDeployToken,
+                  gitToken,
+                  revision: env.commitSha,
                   deploySettings: deploySettings ?? {},
                   deploymentId: deployment.id,
                   targetBranch,
@@ -1224,11 +1226,23 @@ export class DeployService {
         userId: string;
         plugin: IDeploymentPlugin;
         kubeconfig: string;
+        gitToken: string;
         deploySettings: Record<string, unknown>;
         deploymentId: string;
         targetBranch: string;
+        revision?: string;
     }): Promise<boolean> {
-        const { work, plugin, kubeconfig, deploySettings, deploymentId, targetBranch } = args;
+        const {
+            work,
+            userId,
+            plugin,
+            kubeconfig,
+            gitToken,
+            deploySettings,
+            deploymentId,
+            targetBranch,
+            revision,
+        } = args;
         try {
             // ALWAYS the branch alias — never a commit SHA. `k8s-build.yml`
             // (the workflow that actually publishes these images) pushes exactly
@@ -1258,7 +1272,8 @@ export class DeployService {
                 }
             }
 
-            const runtimeEnv = await this.collectServerSideRuntimeEnv(work, hosts[0]);
+            const ghcrReadToken = await this.resolveGhcrReadToken(work, userId, gitToken);
+            const runtimeEnv = await this.collectServerSideRuntimeEnv(work, hosts[0], gitToken);
 
             const namespace =
                 typeof deploySettings.namespace === 'string' && deploySettings.namespace.trim()
@@ -1274,7 +1289,14 @@ export class DeployService {
                 }
             ).deploy(
                 {
-                    projectName: work.slug || work.id,
+                    // MUST match what DeploymentVerifierService reads back:
+                    // it calls lookupExistingDeployment(work.getWebsiteRepo()),
+                    // and the plugin names every object sanitiseSlug(projectName).
+                    // Naming these after work.slug made the writer and the reader
+                    // disagree for every Work whose website repo is <slug>-website
+                    // (the default), so verification could never find the
+                    // Deployment and every deploy ended TIMEOUT.
+                    projectName: work.getWebsiteRepo(),
                     // Required by `DeploymentConfig`. The k8s plugin applies
                     // pre-built manifests and never reads it — there is no
                     // local checkout server-side — so '.' is the same inert
@@ -1287,6 +1309,24 @@ export class DeployService {
                         namespaceOverride: namespace,
                         hosts,
                         runtimeEnv,
+                        // BLOCK-1: without a read:packages token the plugin
+                        // resolves visibility 'auto' -> 'private' (it errs on the
+                        // safe side when websiteRepoIsPrivate is unknown), mints a
+                        // pull secret, finds an empty password and throws
+                        // GITHUB_NOT_CONNECTED *before* applying anything. The
+                        // workflow path had secrets.GITHUB_TOKEN as a last resort;
+                        // this is the server-side equivalent.
+                        githubReadPackagesToken: ghcrReadToken,
+                        // Annotation only — NEVER the image tag. CI publishes
+                        // `sha-<full>`, and the plugin truncates a gitSha to 12
+                        // chars, so a SHA can't address the image; it can still
+                        // make the pod template differ between deploys.
+                        revision: revision,
+                        // Per-Work settings (replicas, registry, kubeContext, ...)
+                        // never reach the plugin otherwise: its context is built
+                        // unscoped, so getSettings() resolves admin -> env ->
+                        // schema default and silently discards what the Work set.
+                        settingsOverride: deploySettings,
                     },
                 },
                 kubeconfig,
@@ -1342,13 +1382,34 @@ export class DeployService {
     private async collectServerSideRuntimeEnv(
         work: Work,
         primaryHost?: string,
+        gitToken?: string,
     ): Promise<Record<string, string>> {
+        // DATA_REPOSITORY must be a CLONE URL, not a bare repo name. The
+        // workflow this replaces rewrote it exactly this way
+        // ("DATA_REPOSITORY=https://github.com/<owner>/<repo>"); the running app
+        // parses it with zod .url().catch(undefined), so a bare name is silently
+        // discarded and the site renders an empty directory while reporting Ready.
+        const dataRepo = work.getDataRepo();
+        const alreadyQualified =
+            dataRepo.startsWith('https://') ||
+            dataRepo.startsWith('http://') ||
+            dataRepo.startsWith('git@');
+        const dataRepositoryUrl = alreadyQualified
+            ? dataRepo
+            : `https://github.com/${work.getRepoOwner('data').toLowerCase()}/${dataRepo}`;
+
         const env: Record<string, string> = {
             TENANT_ID: work.id,
             WORK_ID: work.id,
-            DATA_REPOSITORY: work.getDataRepo(),
+            DATA_REPOSITORY: dataRepositoryUrl,
             COOKIE_SECURE: 'true',
         };
+        // GH_TOKEN is not optional: item.repository.ts throws
+        // "DATA_REPOSITORY and GH_TOKEN environment variables are required",
+        // which kills sync, moderation, /api/items/* and every admin route.
+        // envFrom optional:true means its absence fails silently at runtime.
+        if (gitToken) env.GH_TOKEN = gitToken;
+        if (primaryHost) env.COOKIE_DOMAIN = primaryHost;
         try {
             env.AUTH_SECRET = await this.workRuntimeEnvService.getOrGenerateAuthSecret(work.id);
             env.COOKIE_SECRET = await this.workRuntimeEnvService.getOrGenerateCookieSecret(work.id);
@@ -1396,6 +1457,52 @@ export class DeployService {
             }
         }
         return env;
+    }
+
+    /**
+     * The read:packages credential the server-side deploy hands the k8s plugin
+     * so it can mint the image-pull Secret for a private GHCR image.
+     *
+     * Same resolution order `setKubernetesGhcrPullSecret` uses for the workflow
+     * path (per-Work GitHub plugin settings -> platform defaults for the repo
+     * owner), with the caller's git token as the last resort — the server-side
+     * equivalent of the workflow's `secrets.GITHUB_TOKEN` fallback.
+     *
+     * Never throws: a missing token is not worth failing a deploy that might be
+     * pulling a public image, and the plugin raises GITHUB_NOT_CONNECTED with a
+     * far better message if it turns out one was needed.
+     */
+    private async resolveGhcrReadToken(
+        work: Work,
+        userId: string,
+        gitToken?: string,
+    ): Promise<string> {
+        try {
+            const githubSettings = await this.deployFacade.getOtherPluginSettings('github', {
+                userId,
+                workId: work.id,
+            });
+            const fineGrained =
+                typeof githubSettings?.readPackagesPat === 'string'
+                    ? githubSettings.readPackagesPat.trim()
+                    : '';
+            const classic =
+                typeof githubSettings?.readPackagesPatClassic === 'string'
+                    ? githubSettings.readPackagesPatClassic.trim()
+                    : '';
+            if (fineGrained || classic) return fineGrained || classic;
+
+            const platformDefaults = this.getPlatformGhcrCredentials(work.getRepoOwner('website'));
+            const platformToken = platformDefaults.fineGrained || platformDefaults.classic;
+            if (platformToken) return platformToken;
+        } catch (error: unknown) {
+            this.logger.warn(
+                `GHCR read-token lookup failed for work ${work.id}; falling back to the git token: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+        return gitToken ?? '';
     }
 
     private providerTokenSecretName(providerId: string): string {
