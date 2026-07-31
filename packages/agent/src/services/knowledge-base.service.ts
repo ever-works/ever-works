@@ -2278,10 +2278,17 @@ export class KnowledgeBaseService {
             return this.toDto(existing);
         }
 
-        // Captured BEFORE the write: whether this document was ever
-        // eligible to reach a Work decides if there is anything to
-        // retract below.
-        const wasAccepted = existing.reviewState !== KbReviewState.PROPOSED;
+        // Whether this document was ever WRITTEN INTO a Work decides if
+        // there is anything to retract — and that is decided by CLASS
+        // alone, not by review state.
+        //
+        // `createOrgDocument` enqueues the overlay fanout gated on
+        // `isInheritable` only (see its call site), so an inheritable
+        // document is materialized into every Work's data repo the moment
+        // it is created — including a `proposed` one. The review gate
+        // withholds it from CONTEXT INJECTION
+        // (`listInheritableForOrg` excludes proposed), but the file is
+        // physically there either way.
         const isInheritable = (
             KB_ORG_INHERITABLE_CLASSES as ReadonlyArray<KbDocumentClass>
         ).includes(existing.kbDocumentClass);
@@ -2292,19 +2299,21 @@ export class KnowledgeBaseService {
         });
         if (!updated) return null;
 
-        // Retraction, and only when one is actually owed.
+        // Retract the overlay for every inheritable document, whatever
+        // its review state was.
         //
-        // A `proposed` document was never fanned out — `acceptOrgDocument`
-        // is the only thing that enqueues an overlay, and it runs on
-        // accept. So the normal reject path (proposed -> archived) has
-        // nothing written into any Work's repo to take back, and firing a
-        // delete would churn every Work's git repo for no reason.
+        // Conditioning this on "was it accepted" would skip retraction for
+        // precisely the documents that are hardest to notice: a `proposed`
+        // inheritable doc is already sitting in every Work's data repo
+        // (the create path fanned it out), so archiving it without a
+        // `delete` would leave the file behind in every repository with
+        // nothing left pointing at it — an orphan a human would have to
+        // find by hand, in N repos.
         //
-        // The exception is a document that was accepted first and is
-        // being retired afterwards: that one IS in every Work, and
-        // leaving it there would mean an archived document kept teaching
-        // agents forever.
-        if (wasAccepted && isInheritable) {
+        // Non-inheritable classes were never fanned out at all, so they
+        // genuinely have nothing to take back and firing a delete for them
+        // would churn every Work's git repo for no reason.
+        if (isInheritable) {
             await this.enqueueOrgOverlayFanout(
                 organizationId,
                 updated.id,

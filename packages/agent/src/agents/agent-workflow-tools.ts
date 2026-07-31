@@ -70,6 +70,37 @@ export const WORKFLOW_TOOL_MAX_STEPS = 25;
 export type WorkflowAdmission = { ok: true; graph: WorkflowGraph } | { ok: false; reason: string };
 
 /**
+ * Is `nodeId` reachable from itself by following edges?
+ *
+ * Plain BFS over the edge list rather than a general cycle detector: the
+ * question is only ever asked about one specific node, and self-reachable
+ * is exactly the property that lets a node execute more than once.
+ */
+function isOnCycle(graph: WorkflowGraph, nodeId: string): boolean {
+    const outgoing = new Map<string, string[]>();
+    for (const edge of graph.edges) {
+        if (!edge || typeof edge !== 'object') continue;
+        const from = (edge as { from?: unknown }).from;
+        const to = (edge as { to?: unknown }).to;
+        if (typeof from !== 'string' || typeof to !== 'string') continue;
+        const list = outgoing.get(from);
+        if (list) list.push(to);
+        else outgoing.set(from, [to]);
+    }
+
+    const seen = new Set<string>();
+    const queue = [...(outgoing.get(nodeId) ?? [])];
+    while (queue.length > 0) {
+        const current = queue.shift() as string;
+        if (current === nodeId) return true;
+        if (seen.has(current)) continue;
+        seen.add(current);
+        for (const next of outgoing.get(current) ?? []) queue.push(next);
+    }
+    return false;
+}
+
+/**
  * Admit a model-authored graph, or refuse it with a reason the model can
  * act on.
  *
@@ -102,29 +133,58 @@ export function admitModelAuthoredGraph(raw: unknown): WorkflowAdmission {
         };
     }
 
-    const unknown = graph.nodes.find(
-        (node: WorkflowNode) => !WORKFLOW_TOOL_ALLOWED_NODE_KINDS.includes(node?.kind),
+    // Shape check FIRST, and by index rather than with `.find()`.
+    //
+    // `.find()` would return the offending entry, and a `null` entry is
+    // itself falsy — so an `if (found)` guard silently passes it through
+    // and the next `.filter(n => n.kind)` throws a TypeError out of this
+    // function, past the caller's try/catch, and out of the tool loop.
+    for (let i = 0; i < graph.nodes.length; i += 1) {
+        const node = graph.nodes[i];
+        if (!node || typeof node !== 'object') {
+            return { ok: false, reason: `graph.nodes[${i}] is not an object` };
+        }
+        if (typeof node.id !== 'string' || node.id.length === 0) {
+            return { ok: false, reason: `graph.nodes[${i}] is missing a string id` };
+        }
+        if (!WORKFLOW_TOOL_ALLOWED_NODE_KINDS.includes(node.kind)) {
+            // Refused, not skipped. A graph that silently drops a node it
+            // does not understand would report success for work it never
+            // did.
+            return {
+                ok: false,
+                reason:
+                    `node '${node.id}' has unsupported kind '${node.kind}'; ` +
+                    `supported kinds are ${WORKFLOW_TOOL_ALLOWED_NODE_KINDS.join(', ')}`,
+            };
+        }
+    }
+
+    const delegateNodes = graph.nodes.filter(
+        (node: WorkflowNode) => node.kind === 'agent.delegate',
     );
-    if (unknown) {
-        // Refused, not skipped. A graph that silently drops a node it does
-        // not understand would report success for work it never did.
+    if (delegateNodes.length > WORKFLOW_TOOL_MAX_DELEGATE_NODES) {
         return {
             ok: false,
             reason:
-                `node '${unknown.id}' has unsupported kind '${unknown.kind}'; ` +
-                `supported kinds are ${WORKFLOW_TOOL_ALLOWED_NODE_KINDS.join(', ')}`,
+                `graph has ${delegateNodes.length} agent.delegate nodes; the limit is ` +
+                `${WORKFLOW_TOOL_MAX_DELEGATE_NODES} because each one spawns a child agent run`,
         };
     }
 
-    const delegateCount = graph.nodes.filter(
-        (node: WorkflowNode) => node.kind === 'agent.delegate',
-    ).length;
-    if (delegateCount > WORKFLOW_TOOL_MAX_DELEGATE_NODES) {
+    // The delegate cap counts NODES; the executor counts EXECUTIONS. A
+    // delegate node on a cycle is therefore not bounded by the cap at all
+    // — it re-runs once per loop iteration, so a single node could spawn
+    // up to `maxSteps` child agent runs instead of one. Cycles stay legal
+    // everywhere else (a retry loop is a cycle, and that is the point);
+    // they are only refused when a delegation sits inside one.
+    const cyclic = delegateNodes.find((node) => isOnCycle(graph, node.id));
+    if (cyclic) {
         return {
             ok: false,
             reason:
-                `graph has ${delegateCount} agent.delegate nodes; the limit is ` +
-                `${WORKFLOW_TOOL_MAX_DELEGATE_NODES} because each one spawns a child agent run`,
+                `agent.delegate node '${cyclic.id}' is on a cycle; each pass would spawn ` +
+                'another child agent run, so the delegation cap could not bound it',
         };
     }
 
@@ -194,6 +254,16 @@ export function buildWorkflowTools(args: {
     agentId: string;
     workId?: string | null;
     organizationId?: string | null;
+    /**
+     * The CURRENT AgentRun's id — the anchor for delegation depth.
+     *
+     * A graph gets a fresh `runId` of its own from the executor, which is
+     * not an `agent_runs` row, so it cannot be used to find the Task this
+     * work belongs to. Without the real run id here, a delegation issued
+     * by an `agent.delegate` node has nothing to resolve its depth from
+     * and the recursion cap silently never fires.
+     */
+    agentRunId?: string | null;
     executor: Pick<WorkflowGraphExecutorService, 'execute'>;
 }): AgentToolDescriptor[] {
     const out: AgentToolDescriptor[] = [];
@@ -246,11 +316,19 @@ export function buildWorkflowTools(args: {
                         agentId: args.agentId,
                         workId: args.workId ?? null,
                         organizationId: args.organizationId ?? null,
-                        // A chat-initiated graph is the ROOT of any delegation
-                        // chain it starts. Stating 0 explicitly (rather than
-                        // omitting it) documents that this is the anchor; the
-                        // real bound comes from the server-derived depth the
-                        // delegation service resolves off the Task chain.
+                        // The anchor for delegation depth. The node runner
+                        // hands this to the delegation as `parentRunId`, and
+                        // the resolver walks agent_run -> task ->
+                        // delegationDepth from it. The executor's own graph
+                        // runId is NOT an agent_runs row, so without this the
+                        // resolver finds nothing and the depth cap never
+                        // fires — the exact inertness this whole seam exists
+                        // to remove.
+                        agentRunId: args.agentRunId ?? null,
+                        // Advisory floor only. The binding number is the
+                        // server-derived one the delegation service resolves
+                        // off the Task chain via `agentRunId` above; it can
+                        // only ever raise this.
                         delegationDepth: 0,
                     },
                 });

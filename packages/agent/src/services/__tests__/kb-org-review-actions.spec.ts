@@ -209,11 +209,18 @@ describe('KnowledgeBaseService — org Memory review actions', () => {
             expect(docRepo.update).not.toHaveBeenCalled();
         });
 
-        it('does NOT fan out a retraction for a document that was never accepted', async () => {
-            // A proposed document was never overlaid into any Work, so a
-            // delete fanout would churn every Work repo for nothing.
+        it('retracts a PROPOSED inheritable document — the create path already fanned it out', async () => {
+            // The trap this pins: it is tempting to assume a proposed doc
+            // was never overlaid and so needs no retraction. False —
+            // `createOrgDocument` enqueues the fanout gated on class ALONE,
+            // so a proposed inheritable doc is already materialized in
+            // every Work's data repo. Skipping the delete would strand the
+            // file in N repositories with nothing pointing at it.
             docRepo.findOrgById.mockResolvedValue(
-                buildOrgDocument({ reviewState: KbReviewState.PROPOSED }),
+                buildOrgDocument({
+                    reviewState: KbReviewState.PROPOSED,
+                    kbDocumentClass: KbDocumentClass.LEGAL,
+                }),
             );
             docRepo.update.mockResolvedValue(
                 buildOrgDocument({ status: KbDocumentStatus.ARCHIVED }),
@@ -221,7 +228,9 @@ describe('KnowledgeBaseService — org Memory review actions', () => {
 
             await service.rejectOrgDocument(ORG_ID, DOC_ID, USER_ID);
 
-            expect(fanout.dispatchKbOrgOverlayFanout).not.toHaveBeenCalled();
+            expect(fanout.dispatchKbOrgOverlayFanout).toHaveBeenCalledWith(
+                expect.objectContaining({ operation: 'delete' }),
+            );
         });
 
         it('DOES retract a previously accepted inheritable document', async () => {

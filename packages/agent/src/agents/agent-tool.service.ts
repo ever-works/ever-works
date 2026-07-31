@@ -318,7 +318,7 @@ export class AgentToolService {
         // requires every new entity to ship with. Appended LAST so the
         // built-in tool ordering (and every existing index-based
         // assertion) is unchanged.
-        tools.push(...this.buildDomainTools(agent));
+        tools.push(...this.buildDomainTools(agent, runContext));
 
         // `{{cred.key}}` interpolation (audit item G14). A no-op unless a
         // CredentialResolver is bound, and even then a no-op for every
@@ -360,7 +360,7 @@ export class AgentToolService {
      * replay for no user-visible gain. Documented, not churned — see
      * `docs/specs/features/chat-everything/README.md` §4.1.
      */
-    private buildDomainTools(agent: Agent): AgentToolDescriptor[] {
+    private buildDomainTools(agent: Agent, runContext?: { runId: string }): AgentToolDescriptor[] {
         const sources = this.domainToolSources;
         if (!sources) return [];
 
@@ -496,6 +496,13 @@ export class AgentToolService {
                     agentId: agent.id,
                     workId: agent.workId ?? null,
                     organizationId: agent.organizationId ?? null,
+                    // `'no-run'` is the sentinel the default runContext
+                    // uses; passing it through would have the resolver
+                    // look up a run that cannot exist.
+                    agentRunId:
+                        runContext?.runId && runContext.runId !== 'no-run'
+                            ? runContext.runId
+                            : null,
                     executor: workflow.executor,
                 }),
             );

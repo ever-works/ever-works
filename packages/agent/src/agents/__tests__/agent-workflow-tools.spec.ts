@@ -107,6 +107,70 @@ describe('admitModelAuthoredGraph', () => {
         expect(result).toMatchObject({ ok: false });
         expect((result as { reason: string }).reason).toContain('invalid graph');
     });
+
+    it('refuses a null node instead of throwing past the caller', () => {
+        // `.find()` returns the null entry, and null is itself falsy — an
+        // `if (found)` guard would wave it through and the next
+        // `.filter(n => n.kind)` would throw a TypeError out of this
+        // function, past the tool's try/catch, and out of the tool loop.
+        const result = admitModelAuthoredGraph(graph({ nodes: [node('a'), null as never] }));
+        expect(result).toMatchObject({ ok: false });
+        expect((result as { reason: string }).reason).toContain('not an object');
+    });
+
+    it('refuses a node with no usable id', () => {
+        const result = admitModelAuthoredGraph(
+            graph({ nodes: [node('a'), { kind: 'noop' } as never] }),
+        );
+        expect(result).toMatchObject({ ok: false });
+        expect((result as { reason: string }).reason).toContain('string id');
+    });
+
+    it('refuses an agent.delegate node that sits on a cycle', () => {
+        // The delegate cap counts NODES; the executor counts EXECUTIONS.
+        // One delegate node on a loop re-runs once per iteration, so a
+        // single node could spawn up to `maxSteps` child agent runs — the
+        // cap of 4 would not bound it at all.
+        const result = admitModelAuthoredGraph(
+            graph({
+                entryNodeId: 'a',
+                nodes: [node('a'), node('d', 'agent.delegate')],
+                edges: [
+                    { id: 'e1', kind: 'sequential', from: 'a', to: 'd' },
+                    { id: 'e2', kind: 'sequential', from: 'd', to: 'a' },
+                ] as never,
+            }),
+        );
+        expect(result).toMatchObject({ ok: false });
+        expect((result as { reason: string }).reason).toContain('cycle');
+    });
+
+    it('still allows a cycle that contains NO delegate node', () => {
+        // A retry loop is a cycle, and that is the whole point of
+        // on_failure edges — cycles are only refused around delegations.
+        const result = admitModelAuthoredGraph(
+            graph({
+                entryNodeId: 'a',
+                nodes: [node('a'), node('b')],
+                edges: [
+                    { id: 'e1', kind: 'sequential', from: 'a', to: 'b' },
+                    { id: 'e2', kind: 'sequential', from: 'b', to: 'a' },
+                ] as never,
+            }),
+        );
+        expect(result).toMatchObject({ ok: true });
+    });
+
+    it('allows a delegate node that is not self-reachable', () => {
+        const result = admitModelAuthoredGraph(
+            graph({
+                entryNodeId: 'a',
+                nodes: [node('a'), node('d', 'agent.delegate')],
+                edges: [{ id: 'e1', kind: 'sequential', from: 'a', to: 'd' }] as never,
+            }),
+        );
+        expect(result).toMatchObject({ ok: true });
+    });
 });
 
 describe('buildWorkflowTools', () => {
@@ -126,12 +190,13 @@ describe('buildWorkflowTools', () => {
             ...over,
         }) as WorkflowRunResult;
 
-    const tools = (execute: jest.Mock) =>
+    const tools = (execute: jest.Mock, agentRunId: string | null = 'run-real-1') =>
         buildWorkflowTools({
             userId: OWNER,
             agentId: AGENT,
             workId: 'work-1',
             organizationId: 'org-1',
+            agentRunId,
             executor: { execute },
         });
 
@@ -173,10 +238,22 @@ describe('buildWorkflowTools', () => {
                     agentId: AGENT,
                     workId: 'work-1',
                     organizationId: 'org-1',
+                    agentRunId: 'run-real-1',
                     delegationDepth: 0,
                 },
             }),
         );
+    });
+
+    it('carries the REAL agent run id so delegation depth can be resolved', async () => {
+        // Without this the node runner falls back to the graph's own runId,
+        // which is not an `agent_runs` row — the depth resolver finds
+        // nothing and the recursion cap silently never fires.
+        const execute = jest.fn().mockResolvedValue(runResult());
+
+        await runTool(execute).invoke({ graph: graph() });
+
+        expect(execute.mock.calls[0][1].context.agentRunId).toBe('run-real-1');
     });
 
     it('DISCARDS a model-supplied context rather than merging it', async () => {
