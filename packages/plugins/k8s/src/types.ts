@@ -179,6 +179,17 @@ export interface ManifestRenderInputs {
 	replicas: number;
 	containerPort: number;
 	pullSecretName?: string;
+	/**
+	 * Name of an existing (or just-applied) Opaque Secret in the target
+	 * namespace to `envFrom` into the app container. Marked `optional: true`
+	 * in the manifest so a missing Secret never blocks pod scheduling —
+	 * the app falls back to its baked-in defaults, exactly as it does today.
+	 */
+	envFromSecretName?: string;
+	/** Per-deploy pod-template annotations — required to force a rollout when the image tag is a mutable alias. */
+	podAnnotations?: Record<string, string>;
+	/** Defaults to 'Always'; only side-loaded (kind) images should use 'IfNotPresent'. */
+	imagePullPolicy?: 'Always' | 'IfNotPresent' | 'Never';
 	hosts: string[];
 	ingressClass?: string;
 	tlsIssuer?: string;

@@ -30,7 +30,11 @@ export function buildDeployment(input: ManifestRenderInputs): Record<string, unk
 			{
 				name: 'app',
 				image: input.image,
-				imagePullPolicy: 'IfNotPresent',
+				// The server-side path pins a MUTABLE branch alias (:dev/:stage/:prod)
+				// that CI republishes, so a node with a cached layer would keep
+				// serving the old build forever under IfNotPresent. Callers that
+				// side-load an image (the kind-based e2e runbook) opt back out.
+				imagePullPolicy: input.imagePullPolicy ?? 'Always',
 				ports: [{ containerPort: input.containerPort, name: 'http' }],
 				readinessProbe: {
 					httpGet: { path: '/', port: 'http' },
@@ -45,7 +49,17 @@ export function buildDeployment(input: ManifestRenderInputs): Record<string, unk
 				resources: {
 					requests: { cpu: '100m', memory: '128Mi' },
 					limits: { cpu: '500m', memory: '512Mi' }
-				}
+				},
+				// Server-side deploys (EW — platform-managed clusters) mount the
+				// per-work runtime-env Secret the platform applied just before
+				// this manifest. `optional: true` keeps the pod schedulable when
+				// the Secret is absent (older works, custom clusters) — the app
+				// then boots on its baked-in defaults exactly as before.
+				...(input.envFromSecretName
+					? {
+							envFrom: [{ secretRef: { name: input.envFromSecretName, optional: true } }]
+						}
+					: {})
 			}
 		]
 	};
@@ -63,10 +77,50 @@ export function buildDeployment(input: ManifestRenderInputs): Record<string, unk
 			selector: { matchLabels: selector },
 			strategy: { type: 'RollingUpdate', rollingUpdate: { maxSurge: 1, maxUnavailable: 0 } },
 			template: {
-				metadata: { labels: { ...selector, ...labels } },
+				// Without a per-deploy annotation the rendered Deployment is
+				// byte-identical between deploys of the same branch (the tag is a
+				// fixed alias), so server-side apply produces no generation bump,
+				// no new ReplicaSet and no rollout — the deploy reports success and
+				// nothing changes. Re-applying the runtime-env Secret does not help
+				// either: envFrom is materialised at container start.
+				metadata: {
+					labels: { ...selector, ...labels },
+					...(input.podAnnotations && Object.keys(input.podAnnotations).length
+						? { annotations: input.podAnnotations }
+						: {})
+				},
 				spec: podSpec
 			}
 		}
+	};
+}
+
+/**
+ * Build the per-work runtime-env Secret the app container `envFrom`s.
+ *
+ * Server-side (platform-managed) deploys only: the platform assembles the
+ * runtime environment it used to push as GitHub Actions secrets and applies
+ * it directly to the target namespace instead — no cluster credential and no
+ * runtime value ever lands in the website repo. `stringData` so the values
+ * are written verbatim (the API server base64-encodes on persist).
+ */
+export function buildRuntimeEnvSecret(input: {
+	name: string;
+	namespace: string;
+	workId: string;
+	workSlug: string;
+	env: Record<string, string>;
+}): Record<string, unknown> {
+	return {
+		apiVersion: 'v1',
+		kind: 'Secret',
+		metadata: {
+			name: input.name,
+			namespace: input.namespace,
+			labels: COMMON_LABELS(input.workId, input.workSlug)
+		},
+		type: 'Opaque',
+		stringData: input.env
 	};
 }
 

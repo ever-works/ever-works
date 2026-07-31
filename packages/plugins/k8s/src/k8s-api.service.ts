@@ -439,6 +439,21 @@ export class KubernetesApiService {
 		await objects.patch(manifest, undefined, undefined, FIELD_MANAGER, true, SERVER_SIDE_APPLY);
 	}
 
+	/**
+	 * SSA-apply an arbitrary Secret manifest (runtime-env for server-side
+	 * deploys). Same mechanics as `applyImagePullSecret` — kept as its own
+	 * method so call sites say what they mean.
+	 */
+	async applySecret(
+		kubeconfigYaml: string,
+		manifest: Record<string, unknown>,
+		contextOverride?: string
+	): Promise<void> {
+		const client = this.factory.createKubeConfig(kubeconfigYaml, contextOverride);
+		const objects = this.factory.objectApi(client);
+		await objects.patch(manifest, undefined, undefined, FIELD_MANAGER, true, SERVER_SIDE_APPLY);
+	}
+
 	async readIngress(
 		kubeconfigYaml: string,
 		namespace: string,
