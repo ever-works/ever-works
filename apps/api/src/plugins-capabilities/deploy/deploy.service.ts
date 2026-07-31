@@ -346,7 +346,6 @@ export class DeployService {
                   deploySettings: deploySettings ?? {},
                   deploymentId: deployment.id,
                   targetBranch,
-                  commitSha: env.commitSha,
               })
             : await this.dispatchWithRetry(
                   work,
@@ -1211,10 +1210,10 @@ export class DeployService {
      * KubernetesPlugin.deploy().
      *
      * Image: CI (k8s-build.yml, synced from the template into every website
-     * repo) pushes `ghcr.io/<owner>/<WEBSITE-REPO>:<tag>` where tag is the
-     * 12-char commit SHA and the branch alias (develop→dev, stage→stage,
-     * main|master→prod). When the caller supplied a commit SHA we pin it;
-     * otherwise we deploy the branch alias, which always exists.
+     * repo) pushes `ghcr.io/<owner>/<WEBSITE-REPO>` tagged with the branch
+     * alias (develop→dev, stage→stage, main|master→prod) and with
+     * `sha-<full-sha>`. We deploy the alias — see the note at the tag
+     * computation for why a short-SHA pin would not resolve.
      *
      * Runtime env: the same values the workflow used to copy out of GitHub
      * secrets are assembled here from their sources of truth and applied as
@@ -1228,15 +1227,24 @@ export class DeployService {
         deploySettings: Record<string, unknown>;
         deploymentId: string;
         targetBranch: string;
-        commitSha?: string;
     }): Promise<boolean> {
-        const { work, plugin, kubeconfig, deploySettings, deploymentId, targetBranch, commitSha } =
-            args;
+        const { work, plugin, kubeconfig, deploySettings, deploymentId, targetBranch } = args;
         try {
-            const gitSha =
-                commitSha && commitSha.trim().length > 0
-                    ? commitSha.trim().slice(0, 12)
-                    : DeployService.branchImageAlias(targetBranch);
+            // ALWAYS the branch alias — never a commit SHA. `k8s-build.yml`
+            // (the workflow that actually publishes these images) pushes exactly
+            // two tag shapes:
+            //     :<alias>          dev | stage | prod
+            //     :sha-<full-sha>   40 hex chars, `sha-` prefixed
+            // The bare 12-char SHA tag this used to pin was published by
+            // `deploy_k8s.yaml`, which is now gated off — so pinning a short SHA
+            // would reference a tag that does not exist and the pod would sit in
+            // ImagePullBackOff. `sha-<full>` cannot be used either: the plugin
+            // truncates gitSha to 12 chars (see `sanitiseDockerTag` in
+            // k8s.plugin.ts), which would mangle it to `sha-abcd1234`.
+            // The alias is republished on every push to the branch, so it is
+            // both always-present and always-current — the same contract
+            // ArgoCD Image Updater relies on elsewhere in this fleet.
+            const gitSha = DeployService.branchImageAlias(targetBranch);
 
             const hosts: string[] = [];
             const ingressHost = deploySettings.ingressHost;
