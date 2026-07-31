@@ -7,6 +7,7 @@ import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { PromptComposer } from '@/components/common/PromptComposer';
 import { PromptChipsRow, type PromptChip } from '@/components/common/PromptChipsRow';
+import { seedFromExample, usePromptSeed } from '@/components/common/composer/use-prompt-seed';
 import { Button } from '@/components/ui/button';
 import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
@@ -78,6 +79,8 @@ const PLACEHOLDERS_BY_KIND: Record<InitialWorkKind, ReadonlyArray<string>> = {
     ],
 };
 
+const PROMPT_INPUT_ID = 'works-quick-add';
+
 const KIND_INTENT_LABEL: Record<InitialWorkKind, string> = {
     website: 'website',
     'landing-page': 'landing page',
@@ -93,6 +96,11 @@ export function WorksCreateComposer() {
     const [selectedKind, setSelectedKind] = useState<InitialWorkKind>('website');
     const [submitting, startSubmit] = useTransition();
     const startFromPrompt = useStartFromPrompt();
+    const seedPrompt = usePromptSeed({
+        value: prompt,
+        onChange: setPrompt,
+        inputId: PROMPT_INPUT_ID,
+    });
 
     const placeholderExamples = useMemo(
         () => PLACEHOLDERS_BY_KIND[selectedKind] ?? PLACEHOLDERS_BY_KIND.website,
@@ -128,7 +136,7 @@ export function WorksCreateComposer() {
     return (
         <div className="mb-8 space-y-3">
             <PromptComposer
-                inputId="works-quick-add"
+                inputId={PROMPT_INPUT_ID}
                 value={prompt}
                 onChange={setPrompt}
                 onSubmit={submit}
@@ -143,7 +151,14 @@ export function WorksCreateComposer() {
                         <PromptChipsRow<InitialWorkKind>
                             chips={chips}
                             value={selectedKind}
-                            onChange={(v) => v && setSelectedKind(v)}
+                            onChange={(v) => {
+                                if (!v) return;
+                                setSelectedKind(v);
+                                // Picking a kind writes that kind's example
+                                // into the input — the chip hands over a
+                                // real prompt to edit, not just a hint.
+                                seedPrompt(seedFromExample(PLACEHOLDERS_BY_KIND[v][0]));
+                            }}
                             ariaLabel={t('promptLabel')}
                             testIdPrefix="works-quick-add"
                         />
