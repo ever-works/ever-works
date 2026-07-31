@@ -443,14 +443,15 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 
 	async deploy(config: DeploymentConfig, kubeconfig: string): Promise<DeploymentResult> {
 		const settings = await this.loadSettings();
-		const optsForNamespace = (config.options ?? {}) as DeployOptions;
+		const opts = (config.options ?? {}) as DeployOptions;
+		// `namespaceOverride` is the namespace the PLATFORM enforced server-side
+		// (per-tenant override + reserved-namespace blocklist). It must win over
+		// the plugin's own persisted `namespace`, which is free-text the user
+		// typed and carries no such guarantee.
 		const namespace =
-			optsForNamespace.namespaceOverride?.trim() ||
-			settings.namespace?.trim() ||
-			DEFAULT_NAMESPACE;
+			opts.namespaceOverride?.trim() || settings.namespace?.trim() || DEFAULT_NAMESPACE;
 		const replicas = clampReplicas(settings.replicas);
 		const registry = settings.registry ?? { kind: 'github' as const };
-		const opts = (config.options ?? {}) as DeployOptions;
 		// Security: the caller-supplied gitSha is interpolated into the Docker
 		// image tag below. Strip any character outside the Docker tag charset so
 		// a crafted value (e.g. `latest@sha256:...`) cannot pin an unintended
