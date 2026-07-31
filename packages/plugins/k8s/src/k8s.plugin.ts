@@ -448,8 +448,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		// (per-tenant override + reserved-namespace blocklist). It must win over
 		// the plugin's own persisted `namespace`, which is free-text the user
 		// typed and carries no such guarantee.
-		const namespace =
-			opts.namespaceOverride?.trim() || settings.namespace?.trim() || DEFAULT_NAMESPACE;
+		const namespace = opts.namespaceOverride?.trim() || settings.namespace?.trim() || DEFAULT_NAMESPACE;
 		const replicas = clampReplicas(settings.replicas);
 		const registry = settings.registry ?? { kind: 'github' as const };
 		// Security: the caller-supplied gitSha is interpolated into the Docker
