@@ -227,4 +227,88 @@ describe('MissionAttachedWorksPanel', () => {
         );
         expect(screen.getByTestId('mission-attach-work-submit')).toBeDisabled();
     });
+
+    it('asks in a dialog before detaching, never a window.confirm', async () => {
+        const nativeConfirm = vi.spyOn(window, 'confirm');
+        render(
+            <MissionAttachedWorksPanel
+                missionId="m1"
+                initialRelations={[mkRelation()]}
+                attachableWorks={[{ id: 'w1', name: 'Cat Directory' }]}
+            />,
+        );
+
+        expect(screen.queryByTestId('mission-attached-works-detach-confirm')).toBeNull();
+        fireEvent.click(screen.getByTestId('mission-attached-works-detach-w1-improves'));
+
+        await waitFor(() =>
+            expect(screen.getByTestId('mission-attached-works-detach-confirm')).toBeInTheDocument(),
+        );
+        expect(screen.getByText('detachDialog.title')).toBeInTheDocument();
+        expect(nativeConfirm).not.toHaveBeenCalled();
+        expect(detachMock).not.toHaveBeenCalled();
+        nativeConfirm.mockRestore();
+    });
+
+    it('detaches the edge once confirmed and leaves sibling edges alone', async () => {
+        detachMock.mockResolvedValue({ deleted: true });
+        render(
+            <MissionAttachedWorksPanel
+                missionId="m1"
+                initialRelations={[
+                    mkRelation(),
+                    // Same Work, different relation — a distinct edge that
+                    // must survive detaching the first.
+                    mkRelation({ id: 'e2', relation: 'operates' }),
+                ]}
+                attachableWorks={[{ id: 'w1', name: 'Cat Directory' }]}
+            />,
+        );
+
+        fireEvent.click(screen.getByTestId('mission-attached-works-detach-w1-improves'));
+        fireEvent.click(await screen.findByTestId('mission-attached-works-detach-confirm'));
+
+        await waitFor(() => expect(detachMock).toHaveBeenCalledWith('m1', 'w1', 'improves'));
+        await waitFor(() =>
+            expect(screen.queryByTestId('mission-attached-works-row-w1-improves')).toBeNull(),
+        );
+        expect(screen.getByTestId('mission-attached-works-row-w1-operates')).toBeInTheDocument();
+        expect(toastSuccess).toHaveBeenCalledWith('toasts.detached');
+    });
+
+    it('does nothing when the detach dialog is cancelled', async () => {
+        render(
+            <MissionAttachedWorksPanel
+                missionId="m1"
+                initialRelations={[mkRelation()]}
+                attachableWorks={[{ id: 'w1', name: 'Cat Directory' }]}
+            />,
+        );
+
+        fireEvent.click(screen.getByTestId('mission-attached-works-detach-w1-improves'));
+        fireEvent.click(await screen.findByTestId('mission-attached-works-detach-cancel'));
+
+        expect(detachMock).not.toHaveBeenCalled();
+        expect(screen.getByTestId('mission-attached-works-row-w1-improves')).toBeInTheDocument();
+    });
+
+    it('keeps the row and shows the error in the dialog when detaching fails', async () => {
+        detachMock.mockRejectedValue(new Error('locked'));
+        render(
+            <MissionAttachedWorksPanel
+                missionId="m1"
+                initialRelations={[mkRelation()]}
+                attachableWorks={[{ id: 'w1', name: 'Cat Directory' }]}
+            />,
+        );
+
+        fireEvent.click(screen.getByTestId('mission-attached-works-detach-w1-improves'));
+        fireEvent.click(await screen.findByTestId('mission-attached-works-detach-confirm'));
+
+        await waitFor(() => expect(toastError).toHaveBeenCalledWith('locked'));
+        expect(screen.getByTestId('mission-attached-works-detach-error')).toHaveTextContent(
+            'locked',
+        );
+        expect(screen.getByTestId('mission-attached-works-row-w1-improves')).toBeInTheDocument();
+    });
 });
