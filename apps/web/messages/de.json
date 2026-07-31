@@ -1474,7 +1474,14 @@
                 "relationLabel": "Relation",
                 "attach": "Attach",
                 "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "detachDialog": {
+                    "title": "Detach this Work?",
+                    "body": "{title} will be removed from this Mission. The Work itself is never touched — this only removes the reference.",
+                    "confirm": "Detach Work",
+                    "cancel": "Cancel",
+                    "detaching": "Detaching…",
+                    "error": "Failed to detach Work"
+                },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
                     "created": "Created",
@@ -1612,13 +1619,24 @@
                 "primaryBadge": "Primary",
                 "primaryTooltip": "The primary Goal for this Mission - only one Goal can be primary at a time.",
                 "attach": "Attach",
+                "detach": "Detach",
+                "detachDialog": {
+                    "title": "Detach this Goal?",
+                    "body": "{title} will be removed from this Mission. The Goal itself is not deleted — it stays on the Goals page and on any other Mission it is attached to.",
+                    "confirm": "Detach Goal",
+                    "cancel": "Cancel",
+                    "detaching": "Detaching…",
+                    "error": "Failed to detach Goal"
+                },
                 "alreadyLinkedOption": "{title} (already attached)",
                 "noGoalsToAttach": "You have no Goals yet. Create one on the Goals page, then attach it here.",
                 "pickerTruncated": "Showing your 100 most recent Goals - open the Goals page for the full list.",
                 "invariantNote": "Attaching a Goal never changes this Mission's status - completing a Mission stays an explicit action.",
                 "toasts": {
                     "attached": "Goal attached",
-                    "attachError": "Couldn't attach Goal"
+                    "attachError": "Couldn't attach Goal",
+                    "detached": "Goal detached",
+                    "detachError": "Couldn't detach Goal"
                 }
             }
         },
