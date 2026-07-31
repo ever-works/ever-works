@@ -148,25 +148,46 @@ describe('MissionDetailClient (Phase 6 PR R)', () => {
         expect(runNowMock).toHaveBeenCalledWith('m1');
     });
 
-    it('delete confirms via window.confirm and skips on cancel', () => {
+    it('delete opens the confirmation dialog rather than deleting straight away', () => {
         deleteMock.mockClear();
-        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(false);
         render(<MissionDetailClient mission={mkMission()} ideas={[]} />);
-        fireEvent.click(screen.getByText('actions.delete'));
-        expect(confirmSpy).toHaveBeenCalled();
+        expect(screen.queryByTestId('mission-delete-confirm')).toBeNull();
+
+        fireEvent.click(screen.getByTestId('mission-delete-button'));
+
+        expect(screen.getByText('deleteDialog.title')).toBeTruthy();
+        expect(screen.getByTestId('mission-delete-confirm')).toBeTruthy();
         expect(deleteMock).not.toHaveBeenCalled();
-        confirmSpy.mockRestore();
     });
 
-    it('delete confirms via window.confirm and proceeds on confirm', async () => {
+    it('delete dialog Cancel closes without deleting', () => {
+        deleteMock.mockClear();
+        render(<MissionDetailClient mission={mkMission()} ideas={[]} />);
+        fireEvent.click(screen.getByTestId('mission-delete-button'));
+        fireEvent.click(screen.getByTestId('mission-delete-cancel'));
+        expect(deleteMock).not.toHaveBeenCalled();
+    });
+
+    it('delete dialog Confirm calls deleteMissionAction with the mission id', async () => {
         deleteMock.mockClear();
         deleteMock.mockResolvedValueOnce({ deleted: true });
-        const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true);
         render(<MissionDetailClient mission={mkMission()} ideas={[]} />);
-        fireEvent.click(screen.getByText('actions.delete'));
+        fireEvent.click(screen.getByTestId('mission-delete-button'));
+        fireEvent.click(screen.getByTestId('mission-delete-confirm'));
         await Promise.resolve();
         expect(deleteMock).toHaveBeenCalledWith('m1');
-        confirmSpy.mockRestore();
+    });
+
+    it('a failed delete surfaces the error inline and keeps the dialog open', async () => {
+        deleteMock.mockClear();
+        routerPushMock.mockClear();
+        deleteMock.mockRejectedValueOnce(new Error('Mission is locked'));
+        render(<MissionDetailClient mission={mkMission()} ideas={[]} />);
+        fireEvent.click(screen.getByTestId('mission-delete-button'));
+        fireEvent.click(screen.getByTestId('mission-delete-confirm'));
+        expect(await screen.findByTestId('mission-delete-error')).toBeTruthy();
+        expect(screen.getByText('Mission is locked')).toBeTruthy();
+        expect(routerPushMock).not.toHaveBeenCalledWith('/missions');
     });
 
     it('saving settings PATCHes the schedule + auto-build + cap (with -1/inherit handling)', () => {

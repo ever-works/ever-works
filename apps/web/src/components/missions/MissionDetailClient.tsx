@@ -18,6 +18,7 @@ import {
     Shield,
     Target,
     Trash2,
+    TriangleAlertIcon,
     Zap,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
@@ -55,11 +56,14 @@ import { BudgetSummaryCard } from '@/components/budgets';
 import { EntityAttachmentsSection } from '@/components/common/EntityAttachmentsSection';
 import {
     Dialog,
+    DialogClose,
     DialogContent,
+    DialogDescription,
     DialogFooter,
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { ShowDateTime } from '@/components/ui/show-datetime';
@@ -182,6 +186,9 @@ export function MissionDetailClient({
 
     const [cloneOpen, setCloneOpen] = useState(false);
     const [cloneTitleDraft, setCloneTitleDraft] = useState('');
+
+    const [deleteOpen, setDeleteOpen] = useState(false);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
 
     // PR-3 — Complete dialog: outcome verdict select ('' = no verdict).
     const [completeOpen, setCompleteOpen] = useState(false);
@@ -322,15 +329,26 @@ export function MissionDetailClient({
         });
     };
 
+    const openDelete = () => {
+        setDeleteError(null);
+        setDeleteOpen(true);
+    };
+
+    const closeDelete = () => {
+        if (pendingDelete) return;
+        setDeleteOpen(false);
+        setDeleteError(null);
+    };
+
     const handleDelete = () => {
-        if (!window.confirm(t('confirm.delete'))) return;
+        setDeleteError(null);
         startDelete(async () => {
             try {
                 await deleteMissionAction(mission.id);
                 toast.success(t('toasts.deleted'));
                 router.push(ROUTES.DASHBOARD_MISSIONS);
             } catch (err) {
-                toast.error(err instanceof Error ? err.message : t('toasts.deleteError'));
+                setDeleteError(err instanceof Error ? err.message : t('deleteDialog.error'));
             }
         });
     };
@@ -473,9 +491,10 @@ export function MissionDetailClient({
                         </button>
                         <button
                             type="button"
-                            onClick={handleDelete}
+                            data-testid="mission-delete-button"
+                            onClick={openDelete}
                             disabled={pendingDelete}
-                            className={btnDanger}
+                            className={cn(btnDanger, 'shrink-0')}
                         >
                             <Trash2 className="w-3.5 h-3.5" />
                             {t('actions.delete')}
@@ -761,6 +780,62 @@ export function MissionDetailClient({
                             <Copy className="w-3.5 h-3.5" />
                             {t('clone.confirm')}
                         </button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* ── Delete modal (mirrors the Task detail delete dialog) ─────── */}
+            <Dialog
+                open={deleteOpen}
+                onOpenChange={(next) => (next ? setDeleteOpen(true) : closeDelete())}
+            >
+                <DialogContent className="max-w-md">
+                    <DialogClose onClose={closeDelete} />
+                    <DialogHeader className="mb-0">
+                        <div className="flex items-center gap-3 mb-1">
+                            <span className="flex items-center justify-center size-9 rounded-full bg-red-100 dark:bg-red-950/50 shrink-0">
+                                <TriangleAlertIcon className="size-4 text-red-600 dark:text-red-400" />
+                            </span>
+                            <DialogTitle className="text-base font-semibold text-text dark:text-text-dark">
+                                {t('deleteDialog.title')}
+                            </DialogTitle>
+                        </div>
+                        <DialogDescription>
+                            {t('deleteDialog.body', { title: mission.title })}
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {deleteError && (
+                        <p
+                            role="alert"
+                            data-testid="mission-delete-error"
+                            className="mt-4 text-xs text-danger"
+                        >
+                            {deleteError}
+                        </p>
+                    )}
+
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            data-testid="mission-delete-cancel"
+                            disabled={pendingDelete}
+                            onClick={closeDelete}
+                        >
+                            {t('deleteDialog.cancel')}
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="danger"
+                            size="sm"
+                            data-testid="mission-delete-confirm"
+                            loading={pendingDelete}
+                            onClick={handleDelete}
+                        >
+                            {pendingDelete ? t('deleteDialog.deleting') : t('deleteDialog.confirm')}
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
