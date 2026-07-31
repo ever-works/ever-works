@@ -30,8 +30,10 @@ vi.mock('sonner', () => ({
 }));
 
 const linkMock = vi.fn();
+const unlinkMock = vi.fn();
 vi.mock('@/app/actions/dashboard/mission-goals', () => ({
     linkGoalToMissionAction: (...args: unknown[]) => linkMock(...args),
+    unlinkGoalFromMissionAction: (...args: unknown[]) => unlinkMock(...args),
 }));
 
 // Stub the `Select` primitive with a native <select> — the real one is
@@ -103,8 +105,10 @@ function mkLink(overrides: Partial<MissionGoalLinkDto> = {}): MissionGoalLinkDto
 describe('MissionGoalsPanel', () => {
     beforeEach(() => {
         linkMock.mockReset();
+        unlinkMock.mockReset();
         toastSuccess.mockReset();
         toastError.mockReset();
+        vi.restoreAllMocks();
     });
 
     it('renders the empty state when no Goals are attached', () => {
@@ -239,5 +243,90 @@ describe('MissionGoalsPanel', () => {
             />,
         );
         expect(screen.getByTestId('mission-attach-goal-submit')).toBeDisabled();
+    });
+
+    it('asks in a dialog before detaching, never a window.confirm', async () => {
+        const nativeConfirm = vi.spyOn(window, 'confirm');
+        render(
+            <MissionGoalsPanel
+                missionId="m1"
+                initialLinks={[mkLink()]}
+                attachableGoals={[{ id: 'g1', title: 'Reach 1k signups' }]}
+            />,
+        );
+
+        // Closed until the trash button is pressed.
+        expect(screen.queryByTestId('mission-goals-detach-confirm')).toBeNull();
+        fireEvent.click(screen.getByTestId('mission-goals-detach-g1'));
+
+        await waitFor(() =>
+            expect(screen.getByTestId('mission-goals-detach-confirm')).toBeInTheDocument(),
+        );
+        expect(screen.getByText('detachDialog.title')).toBeInTheDocument();
+        expect(nativeConfirm).not.toHaveBeenCalled();
+        // Nothing is sent just by opening the dialog.
+        expect(unlinkMock).not.toHaveBeenCalled();
+    });
+
+    it('detaches a Goal once confirmed and drops only that row', async () => {
+        unlinkMock.mockResolvedValue({ deleted: true });
+        render(
+            <MissionGoalsPanel
+                missionId="m1"
+                initialLinks={[mkLink(), mkLink({ id: 'l2', goalId: 'g2' })]}
+                attachableGoals={[{ id: 'g1', title: 'Reach 1k signups' }]}
+            />,
+        );
+
+        fireEvent.click(screen.getByTestId('mission-goals-detach-g1'));
+        fireEvent.click(await screen.findByTestId('mission-goals-detach-confirm'));
+
+        await waitFor(() => expect(unlinkMock).toHaveBeenCalledWith('m1', 'g1'));
+        await waitFor(() => expect(screen.queryByTestId('mission-goals-row-g1')).toBeNull());
+        // The sibling edge is untouched — detach removes one row, not the list.
+        expect(screen.getByTestId('mission-goals-row-g2')).toBeInTheDocument();
+        expect(toastSuccess).toHaveBeenCalledWith('toasts.detached');
+        // The dialog closes itself on success.
+        await waitFor(() =>
+            expect(screen.queryByTestId('mission-goals-detach-confirm')).toBeNull(),
+        );
+    });
+
+    it('does nothing when the detach dialog is cancelled', async () => {
+        render(
+            <MissionGoalsPanel
+                missionId="m1"
+                initialLinks={[mkLink()]}
+                attachableGoals={[{ id: 'g1', title: 'Reach 1k signups' }]}
+            />,
+        );
+
+        fireEvent.click(screen.getByTestId('mission-goals-detach-g1'));
+        fireEvent.click(await screen.findByTestId('mission-goals-detach-cancel'));
+
+        expect(unlinkMock).not.toHaveBeenCalled();
+        expect(screen.getByTestId('mission-goals-row-g1')).toBeInTheDocument();
+        await waitFor(() =>
+            expect(screen.queryByTestId('mission-goals-detach-confirm')).toBeNull(),
+        );
+    });
+
+    it('keeps the row and shows the error in the dialog when detaching fails', async () => {
+        unlinkMock.mockRejectedValue(new Error('locked'));
+        render(
+            <MissionGoalsPanel
+                missionId="m1"
+                initialLinks={[mkLink()]}
+                attachableGoals={[{ id: 'g1', title: 'Reach 1k signups' }]}
+            />,
+        );
+
+        fireEvent.click(screen.getByTestId('mission-goals-detach-g1'));
+        fireEvent.click(await screen.findByTestId('mission-goals-detach-confirm'));
+
+        await waitFor(() => expect(toastError).toHaveBeenCalledWith('locked'));
+        // The dialog stays open carrying the reason, so the user can retry.
+        expect(screen.getByTestId('mission-goals-detach-error')).toHaveTextContent('locked');
+        expect(screen.getByTestId('mission-goals-row-g1')).toBeInTheDocument();
     });
 });
