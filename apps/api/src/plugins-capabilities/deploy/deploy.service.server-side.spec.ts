@@ -274,9 +274,20 @@ describe('DeployService — server-side deploy for managed cluster tiers', () =>
         expect(plugin.deploy).toHaveBeenCalledTimes(1);
         const [config, kubeconfig] = plugin.deploy.mock.calls[0];
         expect(kubeconfig).toBe(SHARED_KC);
-        expect(config.projectName).toBe('my-site');
-        expect(config.options.imageName).toBe('acme-site');
+        // The website repo, NOT the work slug. The plugin names every object
+        // sanitiseSlug(projectName), and DeploymentVerifierService reads them
+        // back with lookupExistingDeployment(work.getWebsiteRepo()). Asserting
+        // the slug here is what let the writer/reader mismatch ship: the apply
+        // succeeded, verification never found the Deployment, and the deploy
+        // ended TIMEOUT — which DeployReadyPollerService cannot rescue.
+        expect(config.projectName).toBe('acme-site');
+        expect(config.projectName).toBe(config.options.imageName);
         expect(config.options.githubOwner).toBe('acme');
+        // A read:packages token must reach the plugin: with registry.visibility
+        // 'auto' and an unknown repo visibility it resolves to 'private', mints
+        // a pull secret, and throws GITHUB_NOT_CONNECTED on an empty token
+        // BEFORE applying anything.
+        expect(config.options.githubReadPackagesToken).toBeTruthy();
         // No workflow dispatch on the managed path.
         expect(githubPlugin.dispatchWorkflow).not.toHaveBeenCalled();
     });
