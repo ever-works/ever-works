@@ -166,4 +166,104 @@ describe('SubAgentDelegationService', () => {
         });
         expect(child.run).not.toHaveBeenCalled();
     });
+
+    /**
+     * Server-derived depth (judgment layer G9).
+     *
+     * The depth ceiling was inert in production: it is evaluated against
+     * `request.depth`, which every caller declared as 0, so
+     * `depth >= maxDepth` could never be true. The resolver is what makes
+     * the cap real — and the direction of its authority is the thing that
+     * must not be got backwards.
+     */
+    describe('depth resolution', () => {
+        const resolver = (value: number | null | Promise<never>) => ({
+            resolveDepth: jest
+                .fn()
+                .mockImplementation(() =>
+                    value instanceof Promise ? value : Promise.resolve(value),
+                ),
+        });
+
+        it('RAISES a caller-declared 0 to the resolved depth and refuses', async () => {
+            // The whole attack: a caller that declares 0 on every hop.
+            const child = runner();
+            const service = new SubAgentDelegationService(child, resolver(3));
+
+            const result = await service.delegate(request({ depth: 0 }), { parentScope });
+
+            expect(result).toMatchObject({ status: 'refused', refusalCode: 'depth-exceeded' });
+            expect(child.run).not.toHaveBeenCalled();
+        });
+
+        it('NEVER lowers a declared depth', async () => {
+            // A stale or wrong resolver reading must not remove a bound the
+            // caller honestly declared.
+            const child = runner();
+            const service = new SubAgentDelegationService(child, resolver(0));
+
+            const result = await service.delegate(request({ depth: 3 }), { parentScope });
+
+            expect(result).toMatchObject({ status: 'refused', refusalCode: 'depth-exceeded' });
+            expect(child.run).not.toHaveBeenCalled();
+        });
+
+        it('passes the RAISED depth through to the runner on an admitted delegation', async () => {
+            const child = runner();
+            const service = new SubAgentDelegationService(child, resolver(2));
+
+            await service.delegate(request({ depth: 0 }), { parentScope });
+
+            const passed = child.run.mock.calls[0][0] as SubAgentDelegationRequest;
+            // The child must be stamped one deeper than the TRUE depth, not
+            // one deeper than the fiction the caller sent.
+            expect(passed.depth).toBe(2);
+        });
+
+        it('leaves the request untouched when the depth is unresolvable', async () => {
+            const child = runner();
+            const service = new SubAgentDelegationService(child, resolver(null));
+
+            await service.delegate(request({ depth: 1 }), { parentScope });
+
+            const passed = child.run.mock.calls[0][0] as SubAgentDelegationRequest;
+            expect(passed.depth).toBe(1);
+        });
+
+        it('treats a throwing resolver as unresolvable rather than an error', async () => {
+            // A resolver outage must not convert a delegation into a
+            // failure — the declared depth simply stands.
+            const child = runner();
+            const service = new SubAgentDelegationService(child, {
+                resolveDepth: jest.fn().mockRejectedValue(new Error('db down')),
+            });
+
+            const result = await service.delegate(request({ depth: 0 }), { parentScope });
+
+            expect(result).toMatchObject({ status: 'completed' });
+            expect(child.run).toHaveBeenCalled();
+        });
+
+        it('ignores a nonsense resolved depth', async () => {
+            const child = runner();
+            const service = new SubAgentDelegationService(child, resolver(-4 as number));
+
+            await service.delegate(request({ depth: 1 }), { parentScope });
+
+            const passed = child.run.mock.calls[0][0] as SubAgentDelegationRequest;
+            expect(passed.depth).toBe(1);
+        });
+
+        it('behaves exactly as before when no resolver is bound', async () => {
+            // Additive: an install without the resolver keeps today's
+            // semantics rather than refusing everything.
+            const child = runner();
+            const result = await new SubAgentDelegationService(child).delegate(
+                request({ depth: 0 }),
+                { parentScope },
+            );
+
+            expect(result).toMatchObject({ status: 'completed' });
+        });
+    });
 });

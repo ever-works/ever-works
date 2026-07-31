@@ -148,6 +148,16 @@ describe('AgentToolService — domain chat tool assembly', () => {
                 } as any,
                 authorize: authorize as any,
             },
+            workflow: {
+                executor: {
+                    execute: jest.fn().mockResolvedValue({
+                        status: 'completed',
+                        runId: 'wfr-1',
+                        visited: [],
+                        output: null,
+                    }),
+                } as any,
+            },
         };
     });
 
@@ -223,6 +233,23 @@ describe('AgentToolService — domain chat tool assembly', () => {
             )
             .map((tool) => tool.name);
         expect(withPerm).toContain('review_pull_request');
+    });
+
+    it('gates run_workflow_graph behind canAssignTasks (an agent.delegate node raises a Task)', () => {
+        // Judgment layer G5. A graph can create a child Task through an
+        // `agent.delegate` node, so an agent that may not raise a Task
+        // directly must not be able to raise one via a graph either.
+        const without = makeSvc()
+            .resolveAllowedTools(makeAgent())
+            .map((tool) => tool.name);
+        expect(without).not.toContain('run_workflow_graph');
+        expect(without).not.toContain('validate_workflow_graph');
+
+        const withPerm = makeSvc()
+            .resolveAllowedTools(makeAgent({ permissions: makePerms({ canAssignTasks: true }) }))
+            .map((tool) => tool.name);
+        expect(withPerm).toContain('run_workflow_graph');
+        expect(withPerm).toContain('validate_workflow_graph');
     });
 
     it('registers only the domains the bundle actually carries', () => {

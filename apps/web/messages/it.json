@@ -819,6 +819,9 @@
             "review": {
                 "accept": "Accetta",
                 "acceptFailed": "Accettazione non riuscita — riprova",
+                "reject": "Rifiuta",
+                "rejectFailed": "Impossibile rifiutare — riprova",
+                "rejectHint": "Archivia il documento: esce dalla coda e non viene più utilizzato, ma non viene eliminato.",
                 "subtitle": "Documenti uniti o proposti da un agente. Restano esclusi dal contesto degli agenti finché non li accetti.",
                 "title": "In attesa di revisione ({count})"
             },

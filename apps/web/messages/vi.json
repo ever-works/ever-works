@@ -819,6 +819,9 @@
             "review": {
                 "accept": "Chấp nhận",
                 "acceptFailed": "Không thể chấp nhận — thử lại",
+                "reject": "Từ chối",
+                "rejectFailed": "Không thể từ chối — hãy thử lại",
+                "rejectHint": "Lưu trữ tài liệu — tài liệu rời khỏi hàng đợi và không còn được sử dụng, nhưng không bị xóa.",
                 "subtitle": "Tài liệu do tác nhân hợp nhất hoặc đề xuất. Chúng bị giữ ngoài ngữ cảnh của tác nhân cho đến khi bạn chấp nhận.",
                 "title": "Chờ duyệt ({count})"
             },

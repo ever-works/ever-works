@@ -88,12 +88,24 @@ export class SubAgentDelegationRunnerService implements SubAgentDelegationRunner
             return this.failure(request, 'child agent belongs to a different owner');
         }
 
+        // Recover the parent Task from the parent RUN when the caller did
+        // not name one.
+        //
+        // Without this the child is created as a fresh ROOT: the chain has
+        // no audit linkage (a delegated Task looks unrelated to the work
+        // that asked for it), and `TasksService.create`'s parent-chain
+        // guard is skipped entirely because it is wholly inside an
+        // `if (input.parentTaskId)`. The graph path in particular never
+        // supplies `parentTaskId` — it only knows the run — so without
+        // this recovery every delegated Task would be an orphan.
+        const parentTaskId = await this.resolveParentTaskId(request);
+
         let childTask: { id: string };
         try {
             childTask = await this.tasks.create(parent.userId, {
                 title: this.titleFor(request),
                 description: this.describe(request),
-                parentTaskId: request.parentTaskId ?? null,
+                parentTaskId,
                 workId: request.scope.workId ?? null,
                 // The child is raised BY an agent, not by a person. That
                 // provenance is what lets the UI (and any later audit)
@@ -106,6 +118,16 @@ export class SubAgentDelegationRunnerService implements SubAgentDelegationRunner
                 // should exist.
                 createdById: request.parentAgentId,
                 agentId: request.childAgentId ?? null,
+                // Judgment layer G9 — the recursion bound, written by the
+                // platform rather than declared by a caller.
+                //
+                // `request.depth` is the depth of THIS delegation (already
+                // raised to the server-derived value by
+                // `SubAgentDelegationService`), so the child sits one
+                // deeper. This stamp is what the depth resolver reads back
+                // on the next hop; without it the chain has no record of
+                // itself and the cap is unenforceable.
+                delegationDepth: (Number.isInteger(request.depth) ? request.depth : 0) + 1,
             });
         } catch (error) {
             return this.failure(
@@ -187,6 +209,25 @@ export class SubAgentDelegationRunnerService implements SubAgentDelegationRunner
             summary: `child run did not finish within ${budgetMs}ms`,
             output: null,
         };
+    }
+
+    /**
+     * The Task this delegation hangs off: the one the caller named, or
+     * failing that the one the parent RUN belongs to.
+     *
+     * Never throws and never invents a link — an unresolvable parent
+     * yields `null`, which is exactly the behaviour before this recovery
+     * existed.
+     */
+    private async resolveParentTaskId(request: SubAgentDelegationRequest): Promise<string | null> {
+        if (request.parentTaskId) return request.parentTaskId;
+        if (!request.parentRunId) return null;
+        try {
+            const run = await this.runs.findById(request.parentRunId);
+            return run?.taskId ?? null;
+        } catch {
+            return null;
+        }
     }
 
     private sleep(ms: number): Promise<void> {

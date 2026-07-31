@@ -48,6 +48,7 @@ import { buildMeetingTools } from '../meetings/agent-meeting-tools';
 import { buildFleetTools } from '../fleet/agent-fleet-tools';
 import { buildBrowserTools } from '../facades/agent-browser-tools';
 import { buildEscalationTools } from './agent-escalation-tools';
+import { buildWorkflowTools } from './agent-workflow-tools';
 import { buildPrReviewTools } from '../pr-review/agent-pr-review-tools';
 import { buildMergePolicyTools } from '../policy/agent-merge-policy-tools';
 import { buildToolGrantTools } from '../policy/agent-tool-grant-tools';
@@ -317,7 +318,7 @@ export class AgentToolService {
         // requires every new entity to ship with. Appended LAST so the
         // built-in tool ordering (and every existing index-based
         // assertion) is unchanged.
-        tools.push(...this.buildDomainTools(agent));
+        tools.push(...this.buildDomainTools(agent, runContext));
 
         // `{{cred.key}}` interpolation (audit item G14). A no-op unless a
         // CredentialResolver is bound, and even then a no-op for every
@@ -359,7 +360,7 @@ export class AgentToolService {
      * replay for no user-visible gain. Documented, not churned — see
      * `docs/specs/features/chat-everything/README.md` §4.1.
      */
-    private buildDomainTools(agent: Agent): AgentToolDescriptor[] {
+    private buildDomainTools(agent: Agent, runContext?: { runId: string }): AgentToolDescriptor[] {
         const sources = this.domainToolSources;
         if (!sources) return [];
 
@@ -472,6 +473,37 @@ export class AgentToolService {
                     userId: agent.userId,
                     service: toolGrants.service,
                     authorize: (input) => toolGrants.authorize(agent.userId, input),
+                }),
+            );
+        }
+
+        // Workflow graphs (judgment layer G5). Gated on `canAssignTasks`
+        // because an `agent.delegate` node creates a child Task and starts
+        // a child agent run — the same capability the task tools are gated
+        // on, reached by a different route. An agent that may not raise a
+        // Task must not be able to raise one through a graph.
+        //
+        // The scope passed here comes from the AGENT ROW, never from the
+        // model: the node runner reads userId/workId/organizationId out of
+        // the run context to decide what a node may touch, so letting a
+        // model-supplied context through would be letting it choose its own
+        // authorization.
+        if (agent.permissions?.canAssignTasks && sources.workflow) {
+            const workflow = sources.workflow;
+            add('workflow', () =>
+                buildWorkflowTools({
+                    userId: agent.userId,
+                    agentId: agent.id,
+                    workId: agent.workId ?? null,
+                    organizationId: agent.organizationId ?? null,
+                    // `'no-run'` is the sentinel the default runContext
+                    // uses; passing it through would have the resolver
+                    // look up a run that cannot exist.
+                    agentRunId:
+                        runContext?.runId && runContext.runId !== 'no-run'
+                            ? runContext.runId
+                            : null,
+                    executor: workflow.executor,
                 }),
             );
         }

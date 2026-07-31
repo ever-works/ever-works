@@ -819,6 +819,9 @@
             "review": {
                 "accept": "Aceitar",
                 "acceptFailed": "Não foi possível aceitar — tente novamente",
+                "reject": "Rejeitar",
+                "rejectFailed": "Não foi possível rejeitar — tente novamente",
+                "rejectHint": "Arquiva o documento: sai da fila e deixa de ser usado, mas não é excluído.",
                 "subtitle": "Documentos que um agente fundiu ou propôs. Ficam excluídos do contexto dos agentes até os aceitar.",
                 "title": "A aguardar revisão ({count})"
             },
