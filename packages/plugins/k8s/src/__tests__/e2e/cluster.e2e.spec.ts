@@ -91,7 +91,12 @@ describeE2E('k8s plugin e2e — against real cluster', () => {
 			image: IMAGE,
 			replicas: 1,
 			containerPort: 8080, // nginx-unprivileged listens on 8080
-			hosts: []
+			hosts: [],
+			// The default is now 'Always' (the server-side deploy path pins a
+			// MUTABLE branch alias, so a cached layer would pin a stale build).
+			// This suite side-loads its image with `kind load docker-image` and
+			// there is no registry to pull from, so it opts back out explicitly.
+			imagePullPolicy: 'IfNotPresent'
 		});
 		const service = buildService({
 			workId: WORK_ID,

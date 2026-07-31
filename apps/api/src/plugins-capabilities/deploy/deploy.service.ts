@@ -42,7 +42,7 @@ import {
     WebsiteTemplateResolverService,
 } from '@ever-works/agent/generators';
 import { DeploymentDispatchedEvent } from '@ever-works/agent/events';
-import type { IDeploymentPlugin } from '@ever-works/plugin';
+import type { DeploymentConfig, DeploymentResult, IDeploymentPlugin } from '@ever-works/plugin';
 import type { BatchDeployItemDto, BatchDeployItemResultDto } from './dto/batch-deploy.dto';
 import {
     ClusterSource,
@@ -266,7 +266,28 @@ export class DeployService {
             deploySettings = { ...(deploySettings ?? {}), namespace: enforcedNamespace };
         }
 
-        await this.setRequiredSecrets(ctx, effectiveDeployToken, work, plugin, deploySettings);
+        // EW — server-side deploy for platform-managed cluster tiers.
+        //
+        // The GitHub Actions deploy path is structurally unable to reach a
+        // platform-managed cluster: our ARC runner pods have no egress to the
+        // cluster APIs, and a customer repo runs on GitHub-hosted runners that
+        // can never reach a private RFC1918 endpoint. The platform API pod CAN
+        // reach them (verified), already holds the kubeconfig, and
+        // KubernetesPlugin.deploy() applies the manifests directly — which is
+        // exactly what docs/features/k8s-deployment.md promises for the
+        // customer default: "No cluster credentials to manage; the platform
+        // runs it for you." `custom-kubeconfig` (bring-your-own cluster, incl.
+        // forks) keeps the workflow-dispatch path unchanged.
+        const serverSide = this.isServerSideManagedDeploy(
+            work.deployProvider,
+            plugin,
+            settings ?? {},
+            effectiveDeployToken,
+        );
+
+        await this.setRequiredSecrets(ctx, effectiveDeployToken, work, plugin, deploySettings, {
+            omitDeployToken: serverSide,
+        });
         await this.setKubernetesGhcrPullSecret(ctx, work, userId, plugin);
         await this.setOptionalSecrets(ctx, options.teamScope, gitToken);
         await this.ensureCronSecret(ctx);
@@ -316,18 +337,30 @@ export class DeployService {
             });
         }
 
-        const dispatched = await this.dispatchWithRetry(
-            work,
-            user,
-            gitToken,
-            plugin,
-            env.environment,
-            targetBranch,
-            env.prNumber,
-            env.commitSha,
-        );
+        const dispatched = serverSide
+            ? await this.deployServerSideManaged({
+                  work,
+                  userId,
+                  plugin,
+                  kubeconfig: effectiveDeployToken,
+                  gitToken,
+                  revision: env.commitSha,
+                  deploySettings: deploySettings ?? {},
+                  deploymentId: deployment.id,
+                  targetBranch,
+              })
+            : await this.dispatchWithRetry(
+                  work,
+                  user,
+                  gitToken,
+                  plugin,
+                  env.environment,
+                  targetBranch,
+                  env.prNumber,
+                  env.commitSha,
+              );
 
-        if (!dispatched) {
+        if (!dispatched && !serverSide) {
             await this.deploymentRepository.markTerminal(deployment.id, 'ERROR', {
                 lastError: 'Workflow dispatch failed',
             });
@@ -871,6 +904,17 @@ export class DeployService {
         work: Work,
         plugin?: IDeploymentPlugin,
         settings?: Record<string, unknown>,
+        options?: {
+            /**
+             * Server-side (platform-managed) deploys: the resolved deploy
+             * token is the PLATFORM's cluster kubeconfig. It must never be
+             * written to the website repo — the documented contract for the
+             * managed tiers is "no cluster credentials to manage". Everything
+             * else (tenant ids, sync secrets, plugin extras) still pushes, so
+             * CI builds keep working unchanged.
+             */
+            omitDeployToken?: boolean;
+        },
     ) {
         const provider = work.deployProvider || EVER_WORKS_DEPLOY_PROVIDER_ID;
         const tokenSecretProvider = plugin?.id || provider;
@@ -886,8 +930,16 @@ export class DeployService {
             this.setSecret(ctx, 'TENANT_ID', work.id),
             this.setSecret(ctx, 'WORK_ID', work.id),
             this.setSecret(ctx, 'DATA_REPOSITORY', work.getDataRepo()),
-            this.setSecret(ctx, this.providerTokenSecretName(tokenSecretProvider), deployToken),
-            this.setSecret(ctx, 'DEPLOY_TOKEN', deployToken),
+            ...(options?.omitDeployToken
+                ? []
+                : [
+                      this.setSecret(
+                          ctx,
+                          this.providerTokenSecretName(tokenSecretProvider),
+                          deployToken,
+                      ),
+                      this.setSecret(ctx, 'DEPLOY_TOKEN', deployToken),
+                  ]),
         ]);
 
         // SITE_URL — used by the deployed site for canonical URLs, sitemap.xml,
@@ -1124,6 +1176,333 @@ export class DeployService {
             deployProvider === EVER_WORKS_DEPLOY_PROVIDER_ID ||
             pluginId === KUBERNETES_DEPLOY_PROVIDER_ID
         );
+    }
+
+    /**
+     * True when this deploy should be applied server-side by the platform
+     * instead of dispatched to a GitHub Actions workflow.
+     *
+     * Conditions, all required:
+     *  - kubernetes-family provider (`k8s` or the managed `ever-works`),
+     *  - the plugin actually implements `deploy()` (older/lazy plugins may not),
+     *  - a non-empty resolved kubeconfig (for managed tiers this is the
+     *    platform-held kubeconfig; empty means resolution failed upstream),
+     *  - and the work targets a platform-managed cluster: either the managed
+     *    `ever-works` provider (always platform-held) or a k8s clusterSource
+     *    of `k8s-works` / `k8s-works-shared`. `custom-kubeconfig` stays on
+     *    the workflow path — that cluster is reachable from GitHub runners by
+     *    definition (the user pasted its kubeconfig for exactly that reason).
+     */
+    private isServerSideManagedDeploy(
+        deployProvider: string | undefined,
+        plugin: IDeploymentPlugin | undefined,
+        settings: Record<string, unknown>,
+        resolvedKubeconfig: string,
+    ): boolean {
+        if (!this.isKubernetesDeploy(deployProvider, plugin?.id)) return false;
+        if (typeof (plugin as { deploy?: unknown } | undefined)?.deploy !== 'function')
+            return false;
+        if (!resolvedKubeconfig || !resolvedKubeconfig.trim()) return false;
+        if (deployProvider === EVER_WORKS_DEPLOY_PROVIDER_ID) return true;
+        return coerceClusterSource(settings.clusterSource) !== 'custom-kubeconfig';
+    }
+
+    /**
+     * Apply the work's manifests directly to the managed cluster via
+     * KubernetesPlugin.deploy().
+     *
+     * Image: CI (k8s-build.yml, synced from the template into every website
+     * repo) pushes `ghcr.io/<owner>/<WEBSITE-REPO>` tagged with the branch
+     * alias (develop→dev, stage→stage, main|master→prod) and with
+     * `sha-<full-sha>`. We deploy the alias — see the note at the tag
+     * computation for why a short-SHA pin would not resolve.
+     *
+     * Runtime env: the same values the workflow used to copy out of GitHub
+     * secrets are assembled here from their sources of truth and applied as
+     * the `<slug>-runtime-env` Secret — they never touch the repo.
+     */
+    private async deployServerSideManaged(args: {
+        work: Work;
+        userId: string;
+        plugin: IDeploymentPlugin;
+        kubeconfig: string;
+        gitToken: string;
+        deploySettings: Record<string, unknown>;
+        deploymentId: string;
+        targetBranch: string;
+        revision?: string;
+    }): Promise<boolean> {
+        const {
+            work,
+            userId,
+            plugin,
+            kubeconfig,
+            gitToken,
+            deploySettings,
+            deploymentId,
+            targetBranch,
+            revision,
+        } = args;
+        try {
+            // ALWAYS the branch alias — never a commit SHA. `k8s-build.yml`
+            // (the workflow that actually publishes these images) pushes exactly
+            // two tag shapes:
+            //     :<alias>          dev | stage | prod
+            //     :sha-<full-sha>   40 hex chars, `sha-` prefixed
+            // The bare 12-char SHA tag this used to pin was published by
+            // `deploy_k8s.yaml`, which is now gated off — so pinning a short SHA
+            // would reference a tag that does not exist and the pod would sit in
+            // ImagePullBackOff. `sha-<full>` cannot be used either: the plugin
+            // truncates gitSha to 12 chars (see `sanitiseDockerTag` in
+            // k8s.plugin.ts), which would mangle it to `sha-abcd1234`.
+            // The alias is republished on every push to the branch, so it is
+            // both always-present and always-current — the same contract
+            // ArgoCD Image Updater relies on elsewhere in this fleet.
+            const gitSha = DeployService.branchImageAlias(targetBranch);
+
+            const hosts: string[] = [];
+            const ingressHost = deploySettings.ingressHost;
+            if (typeof ingressHost === 'string' && ingressHost.trim()) {
+                hosts.push(ingressHost.trim());
+            }
+            const extraHosts = deploySettings.extraHosts;
+            if (Array.isArray(extraHosts)) {
+                for (const h of extraHosts) {
+                    if (typeof h === 'string' && h.trim()) hosts.push(h.trim());
+                }
+            }
+
+            const ghcrReadToken = await this.resolveGhcrReadToken(work, userId, gitToken);
+            const runtimeEnv = await this.collectServerSideRuntimeEnv(work, hosts[0], gitToken);
+
+            const namespace =
+                typeof deploySettings.namespace === 'string' && deploySettings.namespace.trim()
+                    ? deploySettings.namespace.trim()
+                    : undefined;
+
+            const result = await (
+                plugin as IDeploymentPlugin & {
+                    deploy: (
+                        config: DeploymentConfig,
+                        kubeconfig: string,
+                    ) => Promise<DeploymentResult>;
+                }
+            ).deploy(
+                {
+                    // MUST match what DeploymentVerifierService reads back:
+                    // it calls lookupExistingDeployment(work.getWebsiteRepo()),
+                    // and the plugin names every object sanitiseSlug(projectName).
+                    // Naming these after work.slug made the writer and the reader
+                    // disagree for every Work whose website repo is <slug>-website
+                    // (the default), so verification could never find the
+                    // Deployment and every deploy ended TIMEOUT.
+                    projectName: work.getWebsiteRepo(),
+                    // Required by `DeploymentConfig`. The k8s plugin applies
+                    // pre-built manifests and never reads it — there is no
+                    // local checkout server-side — so '.' is the same inert
+                    // value the plugin's own tests pass.
+                    sourceDir: '.',
+                    options: {
+                        gitSha,
+                        githubOwner: work.getRepoOwner('website'),
+                        imageName: work.getWebsiteRepo(),
+                        namespaceOverride: namespace,
+                        hosts,
+                        runtimeEnv,
+                        // BLOCK-1: without a read:packages token the plugin
+                        // resolves visibility 'auto' -> 'private' (it errs on the
+                        // safe side when websiteRepoIsPrivate is unknown), mints a
+                        // pull secret, finds an empty password and throws
+                        // GITHUB_NOT_CONNECTED *before* applying anything. The
+                        // workflow path had secrets.GITHUB_TOKEN as a last resort;
+                        // this is the server-side equivalent.
+                        githubReadPackagesToken: ghcrReadToken,
+                        // Annotation only — NEVER the image tag. CI publishes
+                        // `sha-<full>`, and the plugin truncates a gitSha to 12
+                        // chars, so a SHA can't address the image; it can still
+                        // make the pod template differ between deploys.
+                        revision: revision,
+                        // Per-Work settings (replicas, registry, kubeContext, ...)
+                        // never reach the plugin otherwise: its context is built
+                        // unscoped, so getSettings() resolves admin -> env ->
+                        // schema default and silently discards what the Work set.
+                        settingsOverride: deploySettings,
+                    },
+                },
+                kubeconfig,
+            );
+
+            if (result?.status === 'error') {
+                await this.deploymentRepository.markTerminal(deploymentId, 'ERROR', {
+                    lastError: result.error ?? 'Server-side deploy failed',
+                });
+                this.logger.error(
+                    `Server-side deploy failed for work ${work.id}: ${result.error ?? 'unknown error'}`,
+                );
+                return false;
+            }
+            this.logger.log(
+                `Server-side deploy applied for work ${work.id} (image tag ${gitSha}${
+                    hosts[0] ? `, host ${hosts[0]}` : ''
+                })`,
+            );
+            return true;
+        } catch (error: unknown) {
+            const message = error instanceof Error ? error.message : String(error);
+            await this.deploymentRepository.markTerminal(deploymentId, 'ERROR', {
+                lastError: message,
+            });
+            this.logger.error(`Server-side deploy threw for work ${work.id}: ${message}`);
+            return false;
+        }
+    }
+
+    /** develop→dev, stage→stage, main|master→prod — mirrors k8s-build.yml. */
+    private static branchImageAlias(branch: string): string {
+        switch (branch) {
+            case 'develop':
+                return 'dev';
+            case 'stage':
+                return 'stage';
+            case 'main':
+            case 'master':
+                return 'prod';
+            default:
+                return branch.replace(/\//g, '-');
+        }
+    }
+
+    /**
+     * The core runtime environment for a server-side deploy — the same values
+     * the GitHub Actions path pushed as repo secrets for the workflow to copy
+     * into the cluster, assembled from their sources of truth instead.
+     * Best-effort per value: a failed lookup logs and omits the key rather
+     * than failing the deploy (matching the workflow path's posture).
+     */
+    private async collectServerSideRuntimeEnv(
+        work: Work,
+        primaryHost?: string,
+        gitToken?: string,
+    ): Promise<Record<string, string>> {
+        // DATA_REPOSITORY must be a CLONE URL, not a bare repo name. The
+        // workflow this replaces rewrote it exactly this way
+        // ("DATA_REPOSITORY=https://github.com/<owner>/<repo>"); the running app
+        // parses it with zod .url().catch(undefined), so a bare name is silently
+        // discarded and the site renders an empty directory while reporting Ready.
+        const dataRepo = work.getDataRepo();
+        const alreadyQualified =
+            dataRepo.startsWith('https://') ||
+            dataRepo.startsWith('http://') ||
+            dataRepo.startsWith('git@');
+        const dataRepositoryUrl = alreadyQualified
+            ? dataRepo
+            : `https://github.com/${work.getRepoOwner('data').toLowerCase()}/${dataRepo}`;
+
+        const env: Record<string, string> = {
+            TENANT_ID: work.id,
+            WORK_ID: work.id,
+            DATA_REPOSITORY: dataRepositoryUrl,
+            COOKIE_SECURE: 'true',
+        };
+        // GH_TOKEN is not optional: item.repository.ts throws
+        // "DATA_REPOSITORY and GH_TOKEN environment variables are required",
+        // which kills sync, moderation, /api/items/* and every admin route.
+        // envFrom optional:true means its absence fails silently at runtime.
+        if (gitToken) env.GH_TOKEN = gitToken;
+        if (primaryHost) env.COOKIE_DOMAIN = primaryHost;
+        try {
+            env.AUTH_SECRET = await this.workRuntimeEnvService.getOrGenerateAuthSecret(work.id);
+            env.COOKIE_SECRET = await this.workRuntimeEnvService.getOrGenerateCookieSecret(work.id);
+        } catch (error: unknown) {
+            this.logger.error(
+                `Runtime-env auth/cookie secret generation failed for work ${work.id}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+        try {
+            const databaseUrl = await this.workRuntimeEnvService.getDatabaseUrl(work.id);
+            if (databaseUrl) env.DATABASE_URL = databaseUrl;
+        } catch (error: unknown) {
+            this.logger.error(
+                `Runtime-env DATABASE_URL lookup failed for work ${work.id}: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+        if (primaryHost) {
+            const url = `https://${primaryHost}`;
+            env.SITE_URL = url;
+            env.NEXT_PUBLIC_SITE_URL = url;
+            env.NEXT_PUBLIC_APP_URL = url;
+        }
+        // Activity Feed sync — same transport selection as the secret-push path.
+        const syncMode = work.activitySyncMode ?? 'pull';
+        if (syncMode === 'push') {
+            if (process.env.PLATFORM_API_URL && process.env.PLATFORM_API_SECRET_TOKEN) {
+                env.PLATFORM_API_URL = process.env.PLATFORM_API_URL;
+                env.PLATFORM_API_SECRET_TOKEN = process.env.PLATFORM_API_SECRET_TOKEN;
+            }
+        } else if (syncMode === 'pull') {
+            try {
+                env.PLATFORM_SYNC_SECRET = await this.platformSyncSecretService.getOrGenerate(
+                    work.id,
+                );
+            } catch (error: unknown) {
+                this.logger.error(
+                    `Runtime-env PLATFORM_SYNC_SECRET generation failed for work ${work.id}: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+            }
+        }
+        return env;
+    }
+
+    /**
+     * The read:packages credential the server-side deploy hands the k8s plugin
+     * so it can mint the image-pull Secret for a private GHCR image.
+     *
+     * Same resolution order `setKubernetesGhcrPullSecret` uses for the workflow
+     * path (per-Work GitHub plugin settings -> platform defaults for the repo
+     * owner), with the caller's git token as the last resort — the server-side
+     * equivalent of the workflow's `secrets.GITHUB_TOKEN` fallback.
+     *
+     * Never throws: a missing token is not worth failing a deploy that might be
+     * pulling a public image, and the plugin raises GITHUB_NOT_CONNECTED with a
+     * far better message if it turns out one was needed.
+     */
+    private async resolveGhcrReadToken(
+        work: Work,
+        userId: string,
+        gitToken?: string,
+    ): Promise<string> {
+        try {
+            const githubSettings = await this.deployFacade.getOtherPluginSettings('github', {
+                userId,
+                workId: work.id,
+            });
+            const fineGrained =
+                typeof githubSettings?.readPackagesPat === 'string'
+                    ? githubSettings.readPackagesPat.trim()
+                    : '';
+            const classic =
+                typeof githubSettings?.readPackagesPatClassic === 'string'
+                    ? githubSettings.readPackagesPatClassic.trim()
+                    : '';
+            if (fineGrained || classic) return fineGrained || classic;
+
+            const platformDefaults = this.getPlatformGhcrCredentials(work.getRepoOwner('website'));
+            const platformToken = platformDefaults.fineGrained || platformDefaults.classic;
+            if (platformToken) return platformToken;
+        } catch (error: unknown) {
+            this.logger.warn(
+                `GHCR read-token lookup failed for work ${work.id}; falling back to the git token: ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+        }
+        return gitToken ?? '';
     }
 
     private providerTokenSecretName(providerId: string): string {
