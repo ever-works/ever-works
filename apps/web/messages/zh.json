@@ -819,6 +819,9 @@
             "review": {
                 "accept": "接受",
                 "acceptFailed": "接受失败 — 请重试",
+                "reject": "拒绝",
+                "rejectFailed": "拒绝失败 — 请重试",
+                "rejectHint": "将文档归档：它会离开审核队列并不再被使用，但不会被删除。",
                 "subtitle": "由智能体合并或提议的文档。在你接受之前，不会进入智能体的上下文。",
                 "title": "待审核 ({count})"
             },

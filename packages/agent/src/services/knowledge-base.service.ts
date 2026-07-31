@@ -2204,6 +2204,12 @@ export class KnowledgeBaseService {
      * `reviewState: 'proposed'` and they are withheld from context
      * injection until accepted. Until now there was no way to see them,
      * so they accumulated invisibly with nowhere to act on them.
+     *
+     * Archived documents are excluded. That is what makes `reject`
+     * (which archives, and deliberately LEAVES `reviewState` at
+     * `'proposed'`) actually remove a row from the queue — without this
+     * status filter a rejected document would reappear on every load and
+     * the verb would be a no-op.
      */
     async listOrgReviewQueue(
         organizationId: string,
@@ -2212,10 +2218,112 @@ export class KnowledgeBaseService {
         const { items, total } = await this.documentRepository.list({
             organizationId,
             reviewState: 'proposed' as KbReviewState,
+            // Both live states, i.e. "not archived". Written as an
+            // allow-list rather than a `!= archived` exclusion so a
+            // future lifecycle state has to be added here deliberately
+            // instead of silently appearing in a human review queue.
+            statuses: [KbDocumentStatus.DRAFT, KbDocumentStatus.ACTIVE],
             limit: opts.limit,
             offset: opts.offset,
         });
         return { items: items.map((d) => this.toDto(d)), total };
+    }
+
+    /**
+     * Reject a proposed organization document — the counterpart to
+     * {@link acceptOrgDocument}.
+     *
+     * ## Why archive, and why `reviewState` does not move
+     *
+     * There is no `'rejected'` member of `KB_REVIEW_STATES`, and adding
+     * one would be the wrong trade here: roughly six independent call
+     * sites across the KB, decision-conflict and consolidation services
+     * withhold documents with `reviewState !== 'proposed'` — a DENY
+     * list. A brand-new state would pass every one of them, so widening
+     * the enum would quietly make rejected text injectable unless all
+     * six were flipped in the same change.
+     *
+     * So rejection is expressed the way the codebase already expresses
+     * "no longer live": `status: 'archived'`, with `reviewState` left at
+     * `'proposed'`. That is belt AND braces —
+     *
+     *   - every existing review gate still sees `'proposed'` and keeps
+     *     withholding it (unchanged behaviour, nothing to audit);
+     *   - `listInheritableForOrg` requires `status = 'active'`, so the
+     *     archived row is not even fetched by the injection path;
+     *   - `listOrgReviewQueue` excludes archived, so it leaves the queue.
+     *
+     * NEVER a physical delete — the same never-delete discipline
+     * consolidation follows. A rejected document stays readable; it just
+     * stops teaching anyone.
+     *
+     * Returns null when the document does not exist, belongs to another
+     * organization, or is Work-scoped, so the caller answers 404 without
+     * revealing which. Idempotent: rejecting an already-archived
+     * document is a no-op that returns it unchanged.
+     */
+    async rejectOrgDocument(
+        organizationId: string,
+        docId: string,
+        userId: string,
+    ): Promise<KbDocumentDto | null> {
+        // Re-fetch SCOPED TO THE ORGANIZATION for the same reason accept
+        // does: `documentRepository.update` keys on the id alone, so a
+        // document id from another tenant would otherwise be directly
+        // writable by anyone who obtained one.
+        const existing = await this.documentRepository.findOrgById(organizationId, docId);
+        if (!existing) return null;
+
+        if (existing.status === KbDocumentStatus.ARCHIVED) {
+            return this.toDto(existing);
+        }
+
+        // Whether this document was ever WRITTEN INTO a Work decides if
+        // there is anything to retract — and that is decided by CLASS
+        // alone, not by review state.
+        //
+        // `createOrgDocument` enqueues the overlay fanout gated on
+        // `isInheritable` only (see its call site), so an inheritable
+        // document is materialized into every Work's data repo the moment
+        // it is created — including a `proposed` one. The review gate
+        // withholds it from CONTEXT INJECTION
+        // (`listInheritableForOrg` excludes proposed), but the file is
+        // physically there either way.
+        const isInheritable = (
+            KB_ORG_INHERITABLE_CLASSES as ReadonlyArray<KbDocumentClass>
+        ).includes(existing.kbDocumentClass);
+
+        const updated = await this.documentRepository.update(docId, {
+            status: KbDocumentStatus.ARCHIVED,
+            updatedById: userId,
+        });
+        if (!updated) return null;
+
+        // Retract the overlay for every inheritable document, whatever
+        // its review state was.
+        //
+        // Conditioning this on "was it accepted" would skip retraction for
+        // precisely the documents that are hardest to notice: a `proposed`
+        // inheritable doc is already sitting in every Work's data repo
+        // (the create path fanned it out), so archiving it without a
+        // `delete` would leave the file behind in every repository with
+        // nothing left pointing at it — an orphan a human would have to
+        // find by hand, in N repos.
+        //
+        // Non-inheritable classes were never fanned out at all, so they
+        // genuinely have nothing to take back and firing a delete for them
+        // would churn every Work's git repo for no reason.
+        if (isInheritable) {
+            await this.enqueueOrgOverlayFanout(
+                organizationId,
+                updated.id,
+                'delete',
+                updated.path,
+                updated.kbDocumentClass,
+            );
+        }
+
+        return this.toDto(updated);
     }
 
     /**

@@ -32,7 +32,11 @@ describe('OrgMemoryController — review queue', () => {
     const auth = { userId: 'user-1' } as AuthenticatedUser;
     const DOC = '11111111-1111-4111-8111-111111111111';
 
-    let kb: { listOrgReviewQueue: jest.Mock; acceptOrgDocument: jest.Mock };
+    let kb: {
+        listOrgReviewQueue: jest.Mock;
+        acceptOrgDocument: jest.Mock;
+        rejectOrgDocument: jest.Mock;
+    };
     let membership: { ensureMember: jest.Mock; ensureAdmin: jest.Mock };
     let scopeContext: { getOrganizationId: jest.Mock };
     let controller: OrgMemoryController;
@@ -41,6 +45,7 @@ describe('OrgMemoryController — review queue', () => {
         kb = {
             listOrgReviewQueue: jest.fn().mockResolvedValue({ items: [], total: 0 }),
             acceptOrgDocument: jest.fn().mockResolvedValue({ id: DOC, reviewState: 'accepted' }),
+            rejectOrgDocument: jest.fn().mockResolvedValue({ id: DOC, status: 'archived' }),
         };
         membership = {
             ensureMember: jest.fn().mockResolvedValue({ id: 'org-1' }),
@@ -112,5 +117,51 @@ describe('OrgMemoryController — review queue', () => {
             UnprocessableEntityException,
         );
         expect(kb.acceptOrgDocument).not.toHaveBeenCalled();
+    });
+
+    // Reject is the counterpart verb. It archives rather than deletes, so
+    // the boundary tests are the same ones accept has — a reject must not
+    // be reachable on a laxer authorization path than accept, and must not
+    // leak which document ids exist in another Organization.
+    describe('reject', () => {
+        it('authorizes reject as a WRITE (ensureAdmin), not a plain read', async () => {
+            await controller.rejectMemoryDocument(auth, DOC);
+
+            expect(membership.ensureAdmin).toHaveBeenCalledWith('org-1', 'user-1');
+            expect(membership.ensureMember).not.toHaveBeenCalled();
+        });
+
+        it('rejects a document in the scoped Organization', async () => {
+            const res = await controller.rejectMemoryDocument(auth, DOC);
+
+            expect(kb.rejectOrgDocument).toHaveBeenCalledWith('org-1', DOC, 'user-1');
+            expect(res).toMatchObject({ status: 'archived' });
+        });
+
+        it("reports another Organization's document as 404, not 403", async () => {
+            kb.rejectOrgDocument.mockResolvedValue(null);
+
+            await expect(controller.rejectMemoryDocument(auth, DOC)).rejects.toBeInstanceOf(
+                NotFoundException,
+            );
+        });
+
+        it('refuses to reject when the request has no active Organization', async () => {
+            scopeContext.getOrganizationId.mockReturnValue(null);
+
+            await expect(controller.rejectMemoryDocument(auth, DOC)).rejects.toBeInstanceOf(
+                UnprocessableEntityException,
+            );
+            expect(kb.rejectOrgDocument).not.toHaveBeenCalled();
+        });
+
+        it('never routes reject through the accept path', async () => {
+            // Guards against the copy-paste failure this pair invites:
+            // a reject handler that calls acceptOrgDocument would report
+            // success while doing the exact opposite of what was asked.
+            await controller.rejectMemoryDocument(auth, DOC);
+
+            expect(kb.acceptOrgDocument).not.toHaveBeenCalled();
+        });
     });
 });

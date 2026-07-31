@@ -10,7 +10,9 @@ import {
 } from '@ever-works/contracts';
 import {
     SUB_AGENT_DELEGATION_RUNNER,
+    SUB_AGENT_DELEGATION_DEPTH_RESOLVER,
     type SubAgentDelegationRunner,
+    type SubAgentDelegationDepthResolver,
 } from './sub-agent-delegation.port';
 
 /**
@@ -49,6 +51,12 @@ export class SubAgentDelegationService {
         @Optional()
         @Inject(SUB_AGENT_DELEGATION_RUNNER)
         private readonly runner?: SubAgentDelegationRunner,
+        // Judgment layer G9 — server-derived depth. Also @Optional() and
+        // appended LAST per the positional-spec arity rule, so the ten
+        // positional constructions in the spec keep working unchanged.
+        @Optional()
+        @Inject(SUB_AGENT_DELEGATION_DEPTH_RESOLVER)
+        private readonly depthResolver?: SubAgentDelegationDepthResolver,
     ) {}
 
     /**
@@ -65,7 +73,12 @@ export class SubAgentDelegationService {
         limits: SubAgentDelegationLimits = {},
     ): Promise<SubAgentDelegationResult> {
         const delegationId = request?.delegationId ?? 'unknown';
-        const validation = validateSubAgentDelegationRequest(request, limits);
+        // Resolve the TRUE depth before validating. `request.depth` is
+        // caller-declared, and a caller that declares 0 on every hop would
+        // otherwise recurse forever — the ceiling below is only meaningful
+        // against a number the platform wrote itself.
+        const effectiveRequest = await this.withResolvedDepth(request);
+        const validation = validateSubAgentDelegationRequest(effectiveRequest, limits);
         // `=== false` rather than `!validation.ok`: this package compiles
         // with `strictNullChecks: false`, under which negated-discriminant
         // narrowing silently picks the WRONG union member. An explicit
@@ -101,6 +114,56 @@ export class SubAgentDelegationService {
                 output: null,
             };
         }
+    }
+
+    /**
+     * Replace the caller-declared depth with the server-derived one when
+     * it is HIGHER (judgment layer G9).
+     *
+     * Raise-only, deliberately:
+     *
+     *  - Raising is the safety direction. A caller under-declaring its
+     *    depth is the whole attack — "I am at depth 0" repeated forever —
+     *    and the persisted Task chain is the only account of the truth.
+     *  - Lowering would be the opposite: a stale or wrong resolver reading
+     *    could hand a deep chain a shallow number and REMOVE a bound that
+     *    the caller had honestly declared. So a resolver that returns
+     *    something smaller is ignored.
+     *  - An unresolvable depth (`null`) leaves the request exactly as it
+     *    arrived, so this is strictly additive to today's behaviour.
+     *
+     * Never throws. A resolver outage must not convert a delegation into
+     * an error; the declared value simply stands.
+     */
+    private async withResolvedDepth(
+        request: SubAgentDelegationRequest,
+    ): Promise<SubAgentDelegationRequest> {
+        if (!this.depthResolver || !request || typeof request !== 'object') {
+            return request;
+        }
+        let resolved: number | null = null;
+        try {
+            resolved = await this.depthResolver.resolveDepth(request);
+        } catch (err) {
+            this.logger.debug(
+                `Delegation ${request.delegationId}: depth resolver failed ` +
+                    `(${err instanceof Error ? err.message : String(err)}); ` +
+                    'using the declared depth.',
+            );
+            return request;
+        }
+        if (!Number.isInteger(resolved) || (resolved as number) < 0) {
+            return request;
+        }
+        const declared = Number.isInteger(request.depth) ? request.depth : 0;
+        if ((resolved as number) <= declared) {
+            return request;
+        }
+        this.logger.debug(
+            `Delegation ${request.delegationId}: raising declared depth ${declared} ` +
+                `to the resolved depth ${resolved}.`,
+        );
+        return { ...request, depth: resolved as number };
     }
 
     /**

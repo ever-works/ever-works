@@ -59,6 +59,15 @@ export interface CreateTaskInput {
     acceptanceChecks?: TaskAcceptanceCheck[] | null;
     /** Quality gates: `null` = inherit the Work's budget (clamped 1..5 at resolve). */
     maxGateAttempts?: number | null;
+    /**
+     * Judgment layer G9 — sub-agent delegation depth.
+     *
+     * SERVER-WRITTEN ONLY. The delegation runner passes
+     * `parent.delegationDepth + 1`; nothing else should set it, and it is
+     * deliberately absent from `CreateTaskDto` so a client cannot declare
+     * itself shallow and recurse past the cap.
+     */
+    delegationDepth?: number | null;
 }
 
 export interface UpdateTaskInput {
@@ -399,6 +408,7 @@ export class TasksService {
             requireAllApprovers: input.requireAllApprovers ?? true,
             acceptanceChecks: input.acceptanceChecks ?? null,
             maxGateAttempts: input.maxGateAttempts ?? null,
+            delegationDepth: input.delegationDepth ?? null,
         });
 
         await this.logActivity({
