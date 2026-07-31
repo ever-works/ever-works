@@ -186,6 +186,10 @@ export interface ManifestRenderInputs {
 	 * the app falls back to its baked-in defaults, exactly as it does today.
 	 */
 	envFromSecretName?: string;
+	/** Per-deploy pod-template annotations — required to force a rollout when the image tag is a mutable alias. */
+	podAnnotations?: Record<string, string>;
+	/** Defaults to 'Always'; only side-loaded (kind) images should use 'IfNotPresent'. */
+	imagePullPolicy?: 'Always' | 'IfNotPresent' | 'Never';
 	hosts: string[];
 	ingressClass?: string;
 	tlsIssuer?: string;
