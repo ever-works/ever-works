@@ -351,6 +351,22 @@ export const missionsAPI = {
             wrapInData: false,
         });
     },
+
+    /**
+     * `DELETE /me/missions/:id/goals/:goalId` — detach one Mission↔Goal
+     * edge. The Goal itself is never touched (I-4): it stays on the
+     * /goals surface and any other Mission it is attached to. Deleting
+     * the Goal proper is a separate action on the Goal detail page.
+     * 404 when the edge doesn't exist.
+     */
+    async unlinkGoal(id: string, goalId: string): Promise<{ deleted: true }> {
+        return serverMutation<{ deleted: true }>({
+            endpoint: `/me/missions/${id}/goals/${goalId}`,
+            data: {},
+            method: 'DELETE',
+            wrapInData: false,
+        });
+    },
 };
 
 /** Row shape returned by `/me/missions/:id/attachments`. */

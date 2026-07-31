@@ -54,3 +54,25 @@ export async function linkGoalToMissionAction(
     revalidatePath(`/[locale]/(dashboard)/goals/${input.goalId}`, 'page');
     return links;
 }
+
+/**
+ * `DELETE /me/missions/:id/goals/:goalId` — detach a Goal from a
+ * Mission.
+ *
+ * Removes the `mission_goals` edge ONLY. The Goal itself survives on
+ * the /goals surface and on any other Mission it is attached to —
+ * deleting the Goal proper is `deleteGoalAction` on the Goal detail
+ * page. Unlike the attach path there is no server-side ripple to pick
+ * up (detaching a primary Goal does not promote another), so the
+ * caller can drop the row locally instead of re-reading the list.
+ */
+export async function unlinkGoalFromMissionAction(
+    missionId: string,
+    goalId: string,
+): Promise<{ deleted: true }> {
+    await requireMissionAuth();
+    const result = await missionsAPI.unlinkGoal(missionId, goalId);
+    revalidatePath(`/[locale]/(dashboard)/missions/${missionId}`, 'page');
+    revalidatePath(`/[locale]/(dashboard)/goals/${goalId}`, 'page');
+    return result;
+}
