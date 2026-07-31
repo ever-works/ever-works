@@ -16,6 +16,7 @@ import type { BrowserAutomationFacadeService } from '../facades/browser-automati
 import type { EscalationToolService } from './agent-escalation-tools';
 import type { ToolGrantEnforcer, ToolGrantResolveInput } from '../policy/tool-grant.enforcer';
 import type { ResolveToolGrantsArgs } from '../policy/agent-tool-grant-tools';
+import type { WorkflowGraphExecutorService } from './workflow-graph-executor.service';
 
 /**
  * Domain chat-tool sources — the ONE injection seam that lets
@@ -131,6 +132,16 @@ export interface AgentBrowserToolSource {
 }
 
 /**
+ * Workflow graphs (judgment layer G5) — the seam that finally gives
+ * `WorkflowGraphExecutorService` a production caller. Only `execute` is
+ * carried: a graph is admitted and clamped inside the descriptor factory,
+ * and nothing else on the executor should be reachable from chat.
+ */
+export interface AgentWorkflowToolSource {
+    executor: Pick<WorkflowGraphExecutorService, 'execute'>;
+}
+
+/**
  * The bundle itself. Every member optional: a runtime binds what it can
  * reach, and `resolveAllowedTools` registers exactly the corresponding
  * tools.
@@ -146,4 +157,5 @@ export interface AgentDomainToolSources {
     browser?: AgentBrowserToolSource;
     escalations?: AgentEscalationToolSource;
     toolGrants?: AgentToolGrantToolSource;
+    workflow?: AgentWorkflowToolSource;
 }

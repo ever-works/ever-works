@@ -101,6 +101,36 @@ describe('WorkflowNodeRunnerService', () => {
         );
     });
 
+    it('prefers the REAL agent run id as parentRunId when the host supplies one', async () => {
+        // This is what anchors delegation depth. The resolver walks
+        // `agent_run -> task -> delegationDepth` from `parentRunId`, and
+        // the graph's own `runId` is minted by the executor — it is not an
+        // `agent_runs` row, so resolving from it finds nothing and the
+        // recursion cap silently never fires.
+        await runner.run(
+            { id: 'n1', kind: 'agent.delegate', config: { objective: 'do the thing' } },
+            {},
+            ctx({ agentRunId: 'agent-run-real' }) as never,
+        );
+
+        expect(delegation.delegate).toHaveBeenCalledWith(
+            expect.objectContaining({ parentRunId: 'agent-run-real' }),
+        );
+    });
+
+    it('falls back to the graph run id when no agent run is threaded', async () => {
+        // A host that supplies neither keeps working exactly as before.
+        await runner.run(
+            { id: 'n1', kind: 'agent.delegate', config: { objective: 'do the thing' } },
+            {},
+            ctx() as never,
+        );
+
+        expect(delegation.delegate).toHaveBeenCalledWith(
+            expect.objectContaining({ parentRunId: 'run-1' }),
+        );
+    });
+
     it('surfaces a delegation refusal code so an on_failure edge can route on it', async () => {
         delegation.delegate.mockResolvedValue({
             status: 'refused',

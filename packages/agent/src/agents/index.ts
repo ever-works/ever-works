@@ -113,6 +113,7 @@ export * from './escalation-confidence';
 // Judgment layer G3/G10 - escalation chat tools (DoD: every entity
 // ships with chat tools + keyword slots, not just REST).
 export * from './agent-escalation-tools';
+export * from './agent-workflow-tools';
 // Judgment layer G10 - the doom-loop / retry-storm detector. Pure, so
 // the worker's gate loop can consult it without a service round-trip.
 export * from './loop-detector';

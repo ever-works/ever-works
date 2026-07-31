@@ -177,7 +177,16 @@ export class WorkflowNodeRunnerService implements WorkflowNodeRunner {
             // child for the same node.
             delegationId: `${context.runId}:${node.id}`,
             parentAgentId,
-            parentRunId: context.runId,
+            // The REAL AgentRun id when the host supplied one, falling back
+            // to the graph's own run id.
+            //
+            // This is what anchors delegation depth: the resolver walks
+            // `agent_run -> task -> delegationDepth` from `parentRunId`, and
+            // `context.runId` is minted by the graph executor — it is not an
+            // `agent_runs` row, so resolving from it finds nothing and the
+            // depth cap silently never fires. The fallback keeps a host that
+            // supplies neither working exactly as before.
+            parentRunId: this.contextString(context, 'agentRunId') ?? context.runId,
             parentTaskId: this.contextString(context, 'taskId') ?? null,
             // Threaded from the run context when the host provides it.
             //

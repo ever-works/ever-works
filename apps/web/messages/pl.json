@@ -819,6 +819,9 @@
             "review": {
                 "accept": "Akceptuj",
                 "acceptFailed": "Nie udało się zaakceptować — spróbuj ponownie",
+                "reject": "Odrzuć",
+                "rejectFailed": "Nie udało się odrzucić — spróbuj ponownie",
+                "rejectHint": "Archiwizuje dokument — znika z kolejki i przestaje być używany, ale nie zostaje usunięty.",
                 "subtitle": "Dokumenty scalone lub zaproponowane przez agenta. Pozostają poza kontekstem agentów do czasu akceptacji.",
                 "title": "Oczekuje na przegląd ({count})"
             },

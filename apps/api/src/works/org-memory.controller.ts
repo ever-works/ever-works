@@ -689,6 +689,43 @@ export class OrgMemoryController {
         return accepted;
     }
 
+    @Post('memory/review/:docId/reject')
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
+    @ApiOperation({
+        summary: 'Reject a proposed Memory document',
+        description:
+            'Archives a proposed organization document instead of accepting it: it leaves the review queue and is never injected into any context. This is NOT a delete — the document stays readable, matching the never-delete discipline consolidation follows — and it is idempotent. If the document had already been accepted and is of an inheritable class, the overlay written into every Work is retracted. Returns 404 when the document does not exist, belongs to another organization, or is Work-scoped.',
+    })
+    @ApiResponse({ status: 200, description: 'The rejected (archived) document' })
+    @ApiResponse({ status: 404, description: 'No such document in this Organization' })
+    @ApiResponse({ status: 422, description: 'No active Organization on the request scope' })
+    async rejectMemoryDocument(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('docId', new ParseUUIDPipe()) docId: string,
+    ) {
+        const organizationId = this.scopeContext.getOrganizationId();
+        if (!organizationId) {
+            // Same refusal as accept, and deliberately NOT the
+            // empty-payload treatment the read paths get: a write with no
+            // Organization has no correct target.
+            throw new UnprocessableEntityException({
+                status: 'error',
+                message: 'No active Organization — cannot reject a Memory document',
+            });
+        }
+        // WRITE side => `ensureAdmin`, exactly as accept. Rejecting is the
+        // more consequential of the pair for a reader (the document stops
+        // being offered), so it must not be the laxer route.
+        await this.membership.ensureAdmin(organizationId, auth.userId);
+
+        const rejected = await this.kb.rejectOrgDocument(organizationId, docId, auth.userId);
+        if (!rejected) {
+            throw new NotFoundException({ status: 'error', message: 'Document not found' });
+        }
+        return rejected;
+    }
+
     @Get('memory/uploads')
     @ApiOperation({
         summary: 'List global-Memory originals',
