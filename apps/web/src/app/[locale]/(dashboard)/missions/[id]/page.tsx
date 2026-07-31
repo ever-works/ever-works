@@ -106,6 +106,7 @@ export default async function MissionDetailPage({ params }: { params: Params }) 
             attachableWorks={(worksResponse?.works ?? []).map((w) => ({
                 id: w.id,
                 name: w.name,
+                kind: w.kind,
             }))}
             goalLinks={goalLinks}
             attachableGoals={attachableGoals.map((g) => ({

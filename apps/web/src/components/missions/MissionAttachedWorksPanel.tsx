@@ -1,13 +1,24 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { ArrowRight, Link2, Trash2 } from 'lucide-react';
+import {
+    Archive,
+    ArrowRight,
+    Cog,
+    Link2,
+    Megaphone,
+    Search,
+    Sparkles,
+    Trash2,
+    TrendingUp,
+} from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
 import { Select } from '@/components/ui/select';
+import { WORK_KIND_PRESENTATION, normalizeWorkKind } from '@/lib/work-kinds/catalog';
 import {
     attachWorkToMissionAction,
     detachWorkFromMissionAction,
@@ -39,7 +50,36 @@ const RELATIONS: readonly MissionWorkRelation[] = [
 export interface AttachableWorkOption {
     readonly id: string;
     readonly name: string;
+    /** Raw `work.kind`; drives the option's leading icon. */
+    readonly kind?: string;
 }
+
+/**
+ * Leading icons for the two pickers. `Select` renders `iconMap[key]`
+ * for any `<option data-icon={key}>`, in both the trigger and the
+ * dropdown rows.
+ *
+ * Works reuse `WORK_KIND_PRESENTATION` so a Work carries the same glyph
+ * here as on its card, header and badge. The glyphs are already
+ * distinct per kind, so they render in the neutral text tone rather
+ * than the badge's pill colours — colour would compete with the
+ * relation chip sitting next to the picker.
+ */
+const WORK_ICON_MAP: Record<string, React.ReactNode> = Object.fromEntries(
+    Object.entries(WORK_KIND_PRESENTATION).map(([kind, { icon: Icon }]) => [
+        kind,
+        <Icon key={kind} className="size-3.5 text-text-muted dark:text-text-muted-dark" />,
+    ]),
+);
+
+const RELATION_ICONS: Record<MissionWorkRelation, React.ReactNode> = {
+    created: <Sparkles className="size-3.5 text-primary" />,
+    improves: <TrendingUp className="size-3.5 text-primary" />,
+    operates: <Cog className="size-3.5 text-primary" />,
+    markets: <Megaphone className="size-3.5 text-primary" />,
+    researches: <Search className="size-3.5 text-primary" />,
+    retires: <Archive className="size-3.5 text-primary" />,
+};
 
 export interface MissionAttachedWorksPanelProps {
     missionId: string;
@@ -170,58 +210,76 @@ export function MissionAttachedWorksPanel({
                         {t('noWorksToAttach')}
                     </p>
                 ) : (
-                    <div className="flex flex-wrap items-end gap-3">
-                        <label className="space-y-1.5 min-w-48 flex-1 max-w-xs">
-                            <span className="block text-xs text-text-muted dark:text-text-muted-dark">
-                                {t('workLabel')}
-                            </span>
-                            <Select
-                                size="sm"
-                                value={workDraft}
-                                onValueChange={setWorkDraft}
-                                placeholder={t('workPlaceholder')}
-                                data-testid="mission-attach-work-select"
-                            >
-                                {attachableWorks.map((w) => (
-                                    <option key={w.id} value={w.id}>
-                                        {w.name}
-                                    </option>
-                                ))}
-                            </Select>
-                            {attachableWorks.length >= 100 ? (
-                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                    {t('pickerTruncated')}
-                                </p>
-                            ) : null}
-                        </label>
-                        <label className="space-y-1.5 min-w-36">
-                            <span className="block text-xs text-text-muted dark:text-text-muted-dark">
-                                {t('relationLabel')}
-                            </span>
-                            <Select
-                                size="sm"
-                                value={relationDraft}
-                                onValueChange={(v) => setRelationDraft(v as MissionWorkRelation)}
-                                data-testid="mission-attach-relation-select"
-                            >
-                                {RELATIONS.map((rel) => (
-                                    <option key={rel} value={rel}>
-                                        {t(`relations.${rel}`)}
-                                    </option>
-                                ))}
-                            </Select>
-                        </label>
-                        <button
-                            type="button"
-                            onClick={handleAttach}
-                            disabled={pending || !workDraft}
-                            className={cn(btn, 'h-8')}
-                            data-testid="mission-attach-work-submit"
-                        >
-                            <Link2 className="w-3.5 h-3.5" />
-                            {t('attach')}
-                        </button>
-                    </div>
+                    <>
+                        {/* One 32px-tall control row: each labelled select is a
+                            stacked block and the submit sits in its own
+                            fixed-height group, so `items-end` lines all three
+                            bottoms up. The truncation hint lives OUTSIDE the
+                            row — inside the label it grew that stack and
+                            knocked the other controls out of alignment. */}
+                        <div className="flex flex-wrap items-end gap-3">
+                            <label className="min-w-48 flex-1 max-w-xs">
+                                <span className="mb-1.5 block text-xs text-text-muted dark:text-text-muted-dark">
+                                    {t('workLabel')}
+                                </span>
+                                <Select
+                                    size="xs"
+                                    value={workDraft}
+                                    onValueChange={setWorkDraft}
+                                    placeholder={t('workPlaceholder')}
+                                    iconMap={WORK_ICON_MAP}
+                                    data-testid="mission-attach-work-select"
+                                >
+                                    {attachableWorks.map((w) => (
+                                        <option
+                                            key={w.id}
+                                            value={w.id}
+                                            data-icon={normalizeWorkKind(w.kind)}
+                                        >
+                                            {w.name}
+                                        </option>
+                                    ))}
+                                </Select>
+                            </label>
+                            <label className="min-w-36">
+                                <span className="mb-1.5 block text-xs text-text-muted dark:text-text-muted-dark">
+                                    {t('relationLabel')}
+                                </span>
+                                <Select
+                                    size="xs"
+                                    value={relationDraft}
+                                    onValueChange={(v) =>
+                                        setRelationDraft(v as MissionWorkRelation)
+                                    }
+                                    iconMap={RELATION_ICONS}
+                                    data-testid="mission-attach-relation-select"
+                                >
+                                    {RELATIONS.map((rel) => (
+                                        <option key={rel} value={rel} data-icon={rel}>
+                                            {t(`relations.${rel}`)}
+                                        </option>
+                                    ))}
+                                </Select>
+                            </label>
+                            <div className="flex h-8 items-center">
+                                <button
+                                    type="button"
+                                    onClick={handleAttach}
+                                    disabled={pending || !workDraft}
+                                    className={cn(btn, 'h-8')}
+                                    data-testid="mission-attach-work-submit"
+                                >
+                                    <Link2 className="w-3.5 h-3.5" />
+                                    {t('attach')}
+                                </button>
+                            </div>
+                        </div>
+                        {attachableWorks.length >= 100 ? (
+                            <p className="mt-2 text-xs text-text-muted dark:text-text-muted-dark">
+                                {t('pickerTruncated')}
+                            </p>
+                        ) : null}
+                    </>
                 )}
             </div>
         </section>
