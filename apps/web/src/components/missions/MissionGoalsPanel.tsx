@@ -14,6 +14,8 @@ import { StatusPill } from '@/components/work-agent';
 import { COMPARATOR_GLYPH, formatMetricValue } from '@/components/goals/goal-ui';
 import { linkGoalToMissionAction } from '@/app/actions/dashboard/mission-goals';
 import type { MissionGoalLinkDto } from '@/lib/api/missions';
+// `goals.shared` (not `goals`) — the latter is `server-only`.
+import type { GoalStatus } from '@/lib/api/goals.shared';
 
 /**
  * Goals & Metrics PR-8 (web) — the "Goals" panel on the Mission
@@ -29,6 +31,8 @@ import type { MissionGoalLinkDto } from '@/lib/api/missions';
 export interface AttachableGoalOption {
     readonly id: string;
     readonly title: string;
+    /** Drives the option's leading icon tint. Omitted → neutral. */
+    readonly status?: GoalStatus;
 }
 
 export interface MissionGoalsPanelProps {
@@ -40,6 +44,29 @@ export interface MissionGoalsPanelProps {
 
 const btn =
     'inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-border dark:border-border-dark text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed';
+
+/**
+ * Leading Goal icons for the picker. `Select` renders `iconMap[key]`
+ * for any `<option data-icon={key}>` in both the trigger and the
+ * dropdown row, so one map covers both. Keyed by Goal status: the
+ * glyph is constant (a Goal is a Goal) and only the tint carries the
+ * state, which is the signal that matters when choosing what to
+ * attach — a completed Goal reads differently from an active one.
+ */
+const GOAL_ICON_CLASS: Record<GoalStatus | 'unknown', string> = {
+    active: 'text-emerald-600 dark:text-emerald-400',
+    paused: 'text-warning',
+    draft: 'text-text-muted dark:text-text-muted-dark',
+    completed: 'text-info',
+    unknown: 'text-text-muted dark:text-text-muted-dark',
+};
+
+const GOAL_ICON_MAP: Record<string, React.ReactNode> = Object.fromEntries(
+    Object.entries(GOAL_ICON_CLASS).map(([key, className]) => [
+        key,
+        <Target key={key} className={cn('size-3.5', className)} />,
+    ]),
+);
 
 export function MissionGoalsPanel({
     missionId,
@@ -147,51 +174,64 @@ export function MissionGoalsPanel({
                         {t('noGoalsToAttach')}
                     </p>
                 ) : (
-                    <div className="flex flex-wrap items-end gap-3">
-                        <label className="space-y-1.5 min-w-48 flex-1 max-w-xs">
-                            <span className="block text-xs text-text-muted dark:text-text-muted-dark">
-                                {t('goalLabel')}
-                            </span>
-                            <Select
-                                size="sm"
-                                value={goalDraft}
-                                onValueChange={setGoalDraft}
-                                placeholder={t('goalPlaceholder')}
-                                data-testid="mission-attach-goal-select"
-                            >
-                                {attachableGoals.map((g) => (
-                                    <option key={g.id} value={g.id}>
-                                        {linkedGoalIds.has(g.id)
-                                            ? t('alreadyLinkedOption', { title: g.title })
-                                            : g.title}
-                                    </option>
-                                ))}
-                            </Select>
-                            {attachableGoals.length >= 100 ? (
-                                <p className="mt-1 text-xs text-gray-500 dark:text-gray-400">
-                                    {t('pickerTruncated')}
-                                </p>
-                            ) : null}
-                        </label>
-                        <div className="pb-1.5">
-                            <Checkbox
-                                label={t('primaryLabel')}
-                                checked={primaryDraft}
-                                onChange={(e) => setPrimaryDraft(e.target.checked)}
-                                data-testid="mission-attach-goal-primary"
-                            />
+                    <>
+                        {/* One 32px-tall control row: the labelled select is a
+                            stacked block, so the checkbox + submit sit in their
+                            own fixed-height group and `items-end` lines all
+                            three bottoms up. The truncation hint lives OUTSIDE
+                            the row — inside the label it grew the stack and
+                            knocked the other controls out of alignment. */}
+                        <div className="flex flex-wrap items-end gap-3">
+                            <label className="min-w-48 flex-1 max-w-xs">
+                                <span className="mb-1.5 block text-xs text-text-muted dark:text-text-muted-dark">
+                                    {t('goalLabel')}
+                                </span>
+                                <Select
+                                    size="xs"
+                                    value={goalDraft}
+                                    onValueChange={setGoalDraft}
+                                    placeholder={t('goalPlaceholder')}
+                                    iconMap={GOAL_ICON_MAP}
+                                    data-testid="mission-attach-goal-select"
+                                >
+                                    {attachableGoals.map((g) => (
+                                        <option
+                                            key={g.id}
+                                            value={g.id}
+                                            data-icon={g.status ?? 'unknown'}
+                                        >
+                                            {linkedGoalIds.has(g.id)
+                                                ? t('alreadyLinkedOption', { title: g.title })
+                                                : g.title}
+                                        </option>
+                                    ))}
+                                </Select>
+                            </label>
+                            <div className="flex h-8 items-center gap-3">
+                                <Checkbox
+                                    label={t('primaryLabel')}
+                                    checked={primaryDraft}
+                                    onChange={(e) => setPrimaryDraft(e.target.checked)}
+                                    data-testid="mission-attach-goal-primary"
+                                />
+                                <button
+                                    type="button"
+                                    onClick={handleAttach}
+                                    disabled={pending || !goalDraft}
+                                    className={cn(btn, 'h-8')}
+                                    data-testid="mission-attach-goal-submit"
+                                >
+                                    <Target className="w-3.5 h-3.5" />
+                                    {t('attach')}
+                                </button>
+                            </div>
                         </div>
-                        <button
-                            type="button"
-                            onClick={handleAttach}
-                            disabled={pending || !goalDraft}
-                            className={cn(btn, 'h-8')}
-                            data-testid="mission-attach-goal-submit"
-                        >
-                            <Target className="w-3.5 h-3.5" />
-                            {t('attach')}
-                        </button>
-                    </div>
+                        {attachableGoals.length >= 100 ? (
+                            <p className="mt-2 text-xs text-text-muted dark:text-text-muted-dark">
+                                {t('pickerTruncated')}
+                            </p>
+                        ) : null}
+                    </>
                 )}
                 <p className="mt-3 text-[11px] text-text-muted dark:text-text-muted-dark">
                     {t('invariantNote')}

@@ -108,7 +108,11 @@ export default async function MissionDetailPage({ params }: { params: Params }) 
                 name: w.name,
             }))}
             goalLinks={goalLinks}
-            attachableGoals={attachableGoals.map((g) => ({ id: g.id, title: g.title }))}
+            attachableGoals={attachableGoals.map((g) => ({
+                id: g.id,
+                title: g.title,
+                status: g.status,
+            }))}
         />
     );
 }

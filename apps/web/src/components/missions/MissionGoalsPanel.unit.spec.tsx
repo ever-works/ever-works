@@ -115,6 +115,26 @@ describe('MissionGoalsPanel', () => {
         expect(screen.queryByTestId('mission-attach-goal-select')).toBeNull();
     });
 
+    it('tags each picker option with a status-keyed Goal icon', () => {
+        render(
+            <MissionGoalsPanel
+                missionId="m1"
+                initialLinks={[]}
+                attachableGoals={[
+                    { id: 'g1', title: 'Reach 1k signups', status: 'active' },
+                    { id: 'g2', title: 'Cut churn', status: 'completed' },
+                    // No status → the neutral icon, never a missing key.
+                    { id: 'g3', title: 'Ship v2' },
+                ]}
+            />,
+        );
+        const select = screen.getByTestId('mission-attach-goal-select');
+        const icons = Array.from(select.querySelectorAll('option[value]'))
+            .filter((o) => o.getAttribute('value'))
+            .map((o) => o.getAttribute('data-icon'));
+        expect(icons).toEqual(['active', 'completed', 'unknown']);
+    });
+
     it('renders attached Goals with progress and a primary badge', () => {
         render(
             <MissionGoalsPanel
