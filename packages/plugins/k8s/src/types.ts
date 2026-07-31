@@ -179,6 +179,13 @@ export interface ManifestRenderInputs {
 	replicas: number;
 	containerPort: number;
 	pullSecretName?: string;
+	/**
+	 * Name of an existing (or just-applied) Opaque Secret in the target
+	 * namespace to `envFrom` into the app container. Marked `optional: true`
+	 * in the manifest so a missing Secret never blocks pod scheduling —
+	 * the app falls back to its baked-in defaults, exactly as it does today.
+	 */
+	envFromSecretName?: string;
 	hosts: string[];
 	ingressClass?: string;
 	tlsIssuer?: string;
