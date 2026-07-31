@@ -14,6 +14,8 @@ import type {
 	PluginManifest
 } from '@ever-works/plugin';
 
+import { createHash } from 'node:crypto';
+
 import { K8sPluginError, buildSecretPattern, scrubError } from './errors.js';
 import { KubernetesApiService } from './k8s-api.service.js';
 import { defaultIngressStrategyRegistry, IngressStrategyRegistry } from './ingress/strategy.registry.js';
@@ -52,6 +54,17 @@ function isClusterSource(value: unknown): value is ClusterSource {
 	return typeof value === 'string' && (VALID_CLUSTER_SOURCES as readonly string[]).includes(value);
 }
 
+function hashRuntimeEnv(env: Record<string, string>): string {
+	// Rolls the pods when the runtime env genuinely changes (rotated secret,
+	// new host) and leaves them alone when it does not. Not a security
+	// boundary — just a change detector — but sha256 keeps it collision-free.
+	const canonical = Object.keys(env)
+		.sort()
+		.map((key) => `${key}=${env[key]}`)
+		.join('\n');
+	return createHash('sha256').update(canonical).digest('hex').slice(0, 16);
+}
+
 const DEFAULT_NAMESPACE = 'ever-works';
 const DEFAULT_REPLICAS = 1;
 const CONTAINER_PORT = 3000;
@@ -88,6 +101,19 @@ interface DeployOptions {
 	namespaceOverride?: string;
 	imageName?: string;
 	runtimeEnv?: Record<string, string>;
+	/**
+	 * Work-scoped plugin settings, layered over the ones this plugin loads for
+	 * itself. The singleton's PluginContext is built WITHOUT a user/work scope
+	 * (createContext takes only a pluginId), so `getSettings()` resolves
+	 * admin -> env -> schema default and silently discards everything the Work
+	 * configured — replicas would clamp to 1, a per-Work registry override
+	 * would be ignored, kubeContext dropped. The caller has the scoped values.
+	 */
+	settingsOverride?: Record<string, unknown>;
+	/** Escape hatch for side-loaded images (kind e2e). Production leaves this unset -> 'Always'. */
+	imagePullPolicy?: 'Always' | 'IfNotPresent' | 'Never';
+	/** Full commit SHA — used only as a pod annotation to force a rollout, never as the image tag. */
+	revision?: string;
 }
 
 const REGISTRY_SCHEMA: JsonSchema = {
@@ -442,8 +468,11 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 	}
 
 	async deploy(config: DeploymentConfig, kubeconfig: string): Promise<DeploymentResult> {
-		const settings = await this.loadSettings();
 		const opts = (config.options ?? {}) as DeployOptions;
+		const settings = {
+			...(await this.loadSettings()),
+			...((opts.settingsOverride ?? {}) as Partial<KubernetesSettings>)
+		} as KubernetesSettings;
 		// `namespaceOverride` is the namespace the PLATFORM enforced server-side
 		// (per-tenant override + reserved-namespace blocklist). It must win over
 		// the plugin's own persisted `namespace`, which is free-text the user
@@ -537,6 +566,19 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 				containerPort: CONTAINER_PORT,
 				pullSecretName,
 				envFromSecretName: runtimeEnvSecretName,
+				imagePullPolicy: opts.imagePullPolicy,
+				// Makes the pod template differ between deploys of the same branch.
+				// The image tag is a mutable alias, so without this the manifest is
+				// identical every time and server-side apply rolls nothing.
+				podAnnotations: {
+					// NOT gitSha: that is the branch alias and is identical on every
+					// deploy, which would leave the pod template unchanged and defeat
+					// the point. Fall back to a per-deploy timestamp.
+					'ever-works.io/revision': opts.revision?.trim() || `t${Date.now().toString(36)}`,
+					...(opts.runtimeEnv && Object.keys(opts.runtimeEnv).length
+						? { 'ever-works.io/runtime-env-hash': hashRuntimeEnv(opts.runtimeEnv) }
+						: {})
+				},
 				hosts,
 				ingressClass,
 				tlsIssuer: settings.tlsIssuer,
