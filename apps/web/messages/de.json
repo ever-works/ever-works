@@ -850,6 +850,9 @@
             "review": {
                 "accept": "Annehmen",
                 "acceptFailed": "Annahme fehlgeschlagen — erneut versuchen",
+                "reject": "Ablehnen",
+                "rejectFailed": "Ablehnen fehlgeschlagen — bitte erneut versuchen",
+                "rejectHint": "Archiviert das Dokument — es verlässt die Warteschlange und wird nicht mehr verwendet, aber nicht gelöscht.",
                 "subtitle": "Von einem Agenten zusammengeführte oder vorgeschlagene Dokumente. Bis zur Freigabe bleiben sie aus dem Agentenkontext ausgeschlossen.",
                 "title": "Wartet auf Prüfung ({count})"
             },

@@ -819,6 +819,9 @@
             "review": {
                 "accept": "Kabul et",
                 "acceptFailed": "Kabul edilemedi — tekrar deneyin",
+                "reject": "Reddet",
+                "rejectFailed": "Reddedilemedi — tekrar deneyin",
+                "rejectHint": "Belgeyi arşivler — kuyruktan çıkar ve artık kullanılmaz, ancak silinmez.",
                 "subtitle": "Bir ajanın birleştirdiği veya önerdiği belgeler. Siz kabul edene kadar ajan bağlamının dışında tutulur.",
                 "title": "İnceleme bekliyor ({count})"
             },

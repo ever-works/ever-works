@@ -24,6 +24,8 @@ jest.mock('@ever-works/agent/agents', () => ({
     RunSteeringService: class RunSteeringService {},
     // Judgment layer G3/G10 — backs the `escalations` domain tool source.
     AgentEscalationService: class AgentEscalationService {},
+    // Judgment layer G5 — backs the `workflow` domain tool source.
+    WorkflowGraphExecutorService: class WorkflowGraphExecutorService {},
     AGENT_HEARTBEAT_TRIGGER: 'AGENT_HEARTBEAT_TRIGGER',
     AGENT_RUN_CANCELLER: 'AGENT_RUN_CANCELLER',
     AGENT_RUN_CHAT_BACK_POSTER: 'AGENT_RUN_CHAT_BACK_POSTER',
@@ -136,6 +138,7 @@ import {
 import {
     AgentRepository,
     AgentEscalationService,
+    WorkflowGraphExecutorService,
     AGENT_DOMAIN_TOOL_SOURCES,
     AGENT_GIT_FACADE,
 } from '@ever-works/agent/agents';
@@ -192,6 +195,9 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
             AgentEscalationService,
             // Tool-grant matrix (audit item G4) — the read-only grant tools.
             ToolGrantService,
+            // Judgment layer G5 — the workflow-graph tools. This binding is
+            // what gives `WorkflowGraphExecutorService` a production caller.
+            WorkflowGraphExecutorService,
         ]);
     });
 
@@ -233,6 +239,8 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
             'escalations',
             // Audit G4 — the read-only tool-grant matrix.
             'toolGrants',
+            // Judgment layer G5 — workflow graphs.
+            'workflow',
         ]);
     });
 });

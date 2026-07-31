@@ -850,6 +850,9 @@
             "review": {
                 "accept": "Aceptar",
                 "acceptFailed": "No se pudo aceptar; inténtalo de nuevo",
+                "reject": "Rechazar",
+                "rejectFailed": "No se pudo rechazar — inténtalo de nuevo",
+                "rejectHint": "Archiva el documento: sale de la cola y deja de usarse, pero no se elimina.",
                 "subtitle": "Documentos que un agente fusionó o propuso. Se excluyen del contexto de los agentes hasta que los aceptes.",
                 "title": "Pendiente de revisión ({count})"
             },

@@ -2204,6 +2204,12 @@ export class KnowledgeBaseService {
      * `reviewState: 'proposed'` and they are withheld from context
      * injection until accepted. Until now there was no way to see them,
      * so they accumulated invisibly with nowhere to act on them.
+     *
+     * Archived documents are excluded. That is what makes `reject`
+     * (which archives, and deliberately LEAVES `reviewState` at
+     * `'proposed'`) actually remove a row from the queue — without this
+     * status filter a rejected document would reappear on every load and
+     * the verb would be a no-op.
      */
     async listOrgReviewQueue(
         organizationId: string,
@@ -2212,10 +2218,103 @@ export class KnowledgeBaseService {
         const { items, total } = await this.documentRepository.list({
             organizationId,
             reviewState: 'proposed' as KbReviewState,
+            // Both live states, i.e. "not archived". Written as an
+            // allow-list rather than a `!= archived` exclusion so a
+            // future lifecycle state has to be added here deliberately
+            // instead of silently appearing in a human review queue.
+            statuses: [KbDocumentStatus.DRAFT, KbDocumentStatus.ACTIVE],
             limit: opts.limit,
             offset: opts.offset,
         });
         return { items: items.map((d) => this.toDto(d)), total };
+    }
+
+    /**
+     * Reject a proposed organization document — the counterpart to
+     * {@link acceptOrgDocument}.
+     *
+     * ## Why archive, and why `reviewState` does not move
+     *
+     * There is no `'rejected'` member of `KB_REVIEW_STATES`, and adding
+     * one would be the wrong trade here: roughly six independent call
+     * sites across the KB, decision-conflict and consolidation services
+     * withhold documents with `reviewState !== 'proposed'` — a DENY
+     * list. A brand-new state would pass every one of them, so widening
+     * the enum would quietly make rejected text injectable unless all
+     * six were flipped in the same change.
+     *
+     * So rejection is expressed the way the codebase already expresses
+     * "no longer live": `status: 'archived'`, with `reviewState` left at
+     * `'proposed'`. That is belt AND braces —
+     *
+     *   - every existing review gate still sees `'proposed'` and keeps
+     *     withholding it (unchanged behaviour, nothing to audit);
+     *   - `listInheritableForOrg` requires `status = 'active'`, so the
+     *     archived row is not even fetched by the injection path;
+     *   - `listOrgReviewQueue` excludes archived, so it leaves the queue.
+     *
+     * NEVER a physical delete — the same never-delete discipline
+     * consolidation follows. A rejected document stays readable; it just
+     * stops teaching anyone.
+     *
+     * Returns null when the document does not exist, belongs to another
+     * organization, or is Work-scoped, so the caller answers 404 without
+     * revealing which. Idempotent: rejecting an already-archived
+     * document is a no-op that returns it unchanged.
+     */
+    async rejectOrgDocument(
+        organizationId: string,
+        docId: string,
+        userId: string,
+    ): Promise<KbDocumentDto | null> {
+        // Re-fetch SCOPED TO THE ORGANIZATION for the same reason accept
+        // does: `documentRepository.update` keys on the id alone, so a
+        // document id from another tenant would otherwise be directly
+        // writable by anyone who obtained one.
+        const existing = await this.documentRepository.findOrgById(organizationId, docId);
+        if (!existing) return null;
+
+        if (existing.status === KbDocumentStatus.ARCHIVED) {
+            return this.toDto(existing);
+        }
+
+        // Captured BEFORE the write: whether this document was ever
+        // eligible to reach a Work decides if there is anything to
+        // retract below.
+        const wasAccepted = existing.reviewState !== KbReviewState.PROPOSED;
+        const isInheritable = (
+            KB_ORG_INHERITABLE_CLASSES as ReadonlyArray<KbDocumentClass>
+        ).includes(existing.kbDocumentClass);
+
+        const updated = await this.documentRepository.update(docId, {
+            status: KbDocumentStatus.ARCHIVED,
+            updatedById: userId,
+        });
+        if (!updated) return null;
+
+        // Retraction, and only when one is actually owed.
+        //
+        // A `proposed` document was never fanned out — `acceptOrgDocument`
+        // is the only thing that enqueues an overlay, and it runs on
+        // accept. So the normal reject path (proposed -> archived) has
+        // nothing written into any Work's repo to take back, and firing a
+        // delete would churn every Work's git repo for no reason.
+        //
+        // The exception is a document that was accepted first and is
+        // being retired afterwards: that one IS in every Work, and
+        // leaving it there would mean an archived document kept teaching
+        // agents forever.
+        if (wasAccepted && isInheritable) {
+            await this.enqueueOrgOverlayFanout(
+                organizationId,
+                updated.id,
+                'delete',
+                updated.path,
+                updated.kbDocumentClass,
+            );
+        }
+
+        return this.toDto(updated);
     }
 
     /**

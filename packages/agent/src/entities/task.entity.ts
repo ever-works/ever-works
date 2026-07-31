@@ -258,6 +258,26 @@ export class Task {
     @Column({ type: 'int', nullable: true })
     maxGateAttempts?: number | null;
 
+    /**
+     * How many sub-agent delegations deep this Task sits.
+     *
+     * SERVER-WRITTEN provenance, never a user setting: the delegation
+     * runner stamps `parent.delegationDepth + 1` on each child Task it
+     * creates, and `SubAgentDelegationService` reads it back through the
+     * parent chain to bound recursion. `null` means "not delegated" and
+     * reads as 0 — every human-filed Task, and every row predating this
+     * column.
+     *
+     * It has to be persisted rather than derived because the only other
+     * way to know a run's depth is to walk the parent chain on every
+     * delegation, and the caller that issues one is deliberately
+     * runtime-free. Deriving it from a caller-declared number instead is
+     * what made the depth cap inert in the first place — a caller that
+     * declares 0 forever can recurse forever.
+     */
+    @Column({ type: 'int', nullable: true })
+    delegationDepth?: number | null;
+
     // ── Recurring (F5 override) ────────────────────────────────────
     @Column({ type: 'boolean', default: false })
     isRecurring: boolean;

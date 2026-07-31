@@ -94,6 +94,24 @@ describe('SubAgentDelegationRunnerService', () => {
         expect(tasks.create.mock.calls[0][1].createdById).toBe(PARENT_AGENT);
     });
 
+    it('stamps the child Task one delegation deeper than this request', async () => {
+        // Judgment layer G9. This stamp is the ONLY record of how deep a
+        // chain has gone: the depth resolver reads it back on the next hop,
+        // and without it the ceiling is evaluated against a number the
+        // caller declares — which is how the cap came to be inert.
+        await runner.run(request({ childAgentId: CHILD_AGENT, depth: 2 }));
+
+        expect(tasks.create.mock.calls[0][1].delegationDepth).toBe(3);
+    });
+
+    it('treats a missing depth as 0 rather than skipping the stamp', async () => {
+        await runner.run(request({ childAgentId: CHILD_AGENT, depth: undefined as never }));
+
+        // A child with no stamp would read back as depth 0 forever, which
+        // is exactly the unbounded case.
+        expect(tasks.create.mock.calls[0][1].delegationDepth).toBe(1);
+    });
+
     it('refuses a child agent owned by someone else', async () => {
         agents.findById.mockImplementation(async (id: string) =>
             id === CHILD_AGENT ? { id, userId: 'someone-else' } : { id, userId: OWNER },

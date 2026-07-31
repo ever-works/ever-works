@@ -902,6 +902,9 @@
             "review": {
                 "accept": "Accept",
                 "acceptFailed": "Couldn't accept — try again",
+                "reject": "Reject",
+                "rejectFailed": "Couldn't reject — try again",
+                "rejectHint": "Archives the document — it leaves the queue and is no longer used, but is not deleted.",
                 "subtitle": "Documents an agent merged or proposed. They are withheld from agent context until you accept them.",
                 "title": "Awaiting review ({count})"
             },

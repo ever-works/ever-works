@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslations } from 'next-intl';
-import { Check, Loader2, ShieldQuestion } from 'lucide-react';
+import { Check, Loader2, ShieldQuestion, X } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 
 /**
@@ -12,14 +12,17 @@ import { cn } from '@/lib/utils/cn';
  * lands the result as `reviewState: 'proposed'` — deliberately NOT
  * accepted, because an unreviewed machine merge must not teach every
  * agent in the organization. Those documents existed and were withheld,
- * but there was nowhere to see or accept them, so the queue silently
+ * but there was nowhere to see or act on them, so the queue silently
  * accumulated.
  *
- * Accept is the only action here on purpose. Rejecting needs its own
- * semantics — archive? delete? supersede back to the originals? — and
- * consolidation never deletes anything, so guessing at that would be the
- * one irreversible verb on this page.
+ * Both verbs are here now. Reject ARCHIVES the document rather than
+ * deleting it — consolidation never deletes anything, and neither does
+ * this — so the row leaves the queue and stops being eligible for any
+ * context, while the text itself stays readable. Nothing on this page is
+ * irreversible.
  */
+
+type ReviewAction = 'accept' | 'reject';
 
 interface ReviewDocument {
     readonly id: string;
@@ -34,11 +37,16 @@ export function MemoryReviewPanel() {
     const t = useTranslations('dashboard.memoryPage.review');
     const [items, setItems] = useState<ReviewDocument[]>([]);
     const [loading, setLoading] = useState(true);
-    const [accepting, setAccepting] = useState<string | null>(null);
-    // Ids whose accept failed. Without this the button simply stops
-    // spinning and the row stays put, which is indistinguishable from
-    // "nothing happened" — the user cannot tell a refusal from a no-op.
-    const [failed, setFailed] = useState<Set<string>>(new Set());
+    // Which row is mid-flight, and doing what. Tracking the action too
+    // (not just the id) is what lets only the clicked button spin while
+    // both stay disabled — a single `pendingId` would spin both.
+    const [pending, setPending] = useState<{ id: string; action: ReviewAction } | null>(null);
+    // Ids whose action failed, and which action it was. Without this the
+    // button simply stops spinning and the row stays put, which is
+    // indistinguishable from "nothing happened" — the user cannot tell a
+    // refusal from a no-op. The action is recorded so the message names
+    // the verb that actually failed.
+    const [failed, setFailed] = useState<Map<string, ReviewAction>>(new Map());
 
     const load = useCallback(async () => {
         setLoading(true);
@@ -64,29 +72,36 @@ export function MemoryReviewPanel() {
         void load();
     }, [load]);
 
-    const accept = useCallback(async (docId: string) => {
-        setAccepting(docId);
+    /**
+     * Both verbs are the same transaction shape — POST, then drop the row
+     * — so they share one handler. Accept and reject each remove the
+     * document from the queue on success (accept moves `reviewState`,
+     * reject archives it), and both leave the row in place with a named
+     * error on failure so a refusal never reads as a no-op.
+     */
+    const act = useCallback(async (docId: string, action: ReviewAction) => {
+        setPending({ id: docId, action });
         setFailed((prev) => {
             if (!prev.has(docId)) return prev;
-            const next = new Set(prev);
+            const next = new Map(prev);
             next.delete(docId);
             return next;
         });
         try {
-            const res = await fetch(`/api/memory/review/${docId}/accept`, { method: 'POST' });
+            const res = await fetch(`/api/memory/review/${docId}/${action}`, { method: 'POST' });
             if (res.ok) {
                 // Drop it locally rather than refetching: the row is
-                // gone from the queue by definition once accepted, and
+                // gone from the queue by definition once acted on, and
                 // a refetch would make the whole list flicker.
                 setItems((prev) => prev.filter((d) => d.id !== docId));
                 return;
             }
-            setFailed((prev) => new Set(prev).add(docId));
+            setFailed((prev) => new Map(prev).set(docId, action));
         } catch {
             // Leave the row in place and say so; the user can retry.
-            setFailed((prev) => new Set(prev).add(docId));
+            setFailed((prev) => new Map(prev).set(docId, action));
         } finally {
-            setAccepting(null);
+            setPending(null);
         }
     }, []);
 
@@ -133,28 +148,59 @@ export function MemoryReviewPanel() {
                                 data-testid={failed.has(doc.id) ? 'memory-review-error' : undefined}
                             >
                                 {failed.has(doc.id)
-                                    ? t('acceptFailed')
+                                    ? failed.get(doc.id) === 'reject'
+                                        ? t('rejectFailed')
+                                        : t('acceptFailed')
                                     : doc.description || doc.path}
                             </p>
                         </div>
-                        <button
-                            type="button"
-                            data-testid="memory-review-accept"
-                            disabled={accepting === doc.id}
-                            onClick={() => void accept(doc.id)}
-                            className={cn(
-                                'inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-colors',
-                                'border-primary/40 text-primary hover:bg-primary/10',
-                                'disabled:cursor-not-allowed disabled:opacity-40',
-                            )}
-                        >
-                            {accepting === doc.id ? (
-                                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                            ) : (
-                                <Check className="w-3.5 h-3.5" />
-                            )}
-                            {t('accept')}
-                        </button>
+                        <div className="flex shrink-0 items-center gap-2">
+                            <button
+                                type="button"
+                                data-testid="memory-review-accept"
+                                // Disabled while EITHER verb is in flight
+                                // on this row: the two are mutually
+                                // exclusive outcomes and letting both fire
+                                // would race two writes at one document.
+                                disabled={pending?.id === doc.id}
+                                onClick={() => void act(doc.id, 'accept')}
+                                className={cn(
+                                    'inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-colors',
+                                    'border-primary/40 text-primary hover:bg-primary/10',
+                                    'disabled:cursor-not-allowed disabled:opacity-40',
+                                )}
+                            >
+                                {pending?.id === doc.id && pending.action === 'accept' ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                    <Check className="w-3.5 h-3.5" />
+                                )}
+                                {t('accept')}
+                            </button>
+                            <button
+                                type="button"
+                                data-testid="memory-review-reject"
+                                disabled={pending?.id === doc.id}
+                                onClick={() => void act(doc.id, 'reject')}
+                                // Muted, not destructive-red: rejecting
+                                // archives and is reversible, so styling it
+                                // like a delete would overstate it.
+                                title={t('rejectHint')}
+                                className={cn(
+                                    'inline-flex shrink-0 items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs transition-colors',
+                                    'border-card-border text-text-muted hover:bg-card-border/30',
+                                    'dark:border-white/9 dark:text-text-muted-dark dark:hover:bg-white/5',
+                                    'disabled:cursor-not-allowed disabled:opacity-40',
+                                )}
+                            >
+                                {pending?.id === doc.id && pending.action === 'reject' ? (
+                                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                ) : (
+                                    <X className="w-3.5 h-3.5" />
+                                )}
+                                {t('reject')}
+                            </button>
+                        </div>
                     </li>
                 ))}
             </ul>

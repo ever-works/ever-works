@@ -14,6 +14,7 @@ import {
     AGENT_DOMAIN_TOOL_SOURCES,
     AgentEscalationService,
     RunSteeringService,
+    WorkflowGraphExecutorService,
     type AgentDomainToolSources,
     TERMINAL_SESSION_DISPATCHER,
     TerminalSessionLauncher,
@@ -750,6 +751,7 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                 BrowserAutomationFacadeService,
                 AgentEscalationService,
                 ToolGrantService,
+                WorkflowGraphExecutorService,
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -768,6 +770,7 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                 browser: BrowserAutomationFacadeService,
                 escalationService: AgentEscalationService,
                 toolGrants: ToolGrantService,
+                workflowExecutor: WorkflowGraphExecutorService,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
@@ -839,6 +842,18 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                         };
                     },
                 },
+                // Judgment layer G5 — workflow graphs. Binding this is what
+                // finally gives `WorkflowGraphExecutorService` a production
+                // caller: it has been complete and DI-wired for a while,
+                // with its node runner bound in `TasksModule`, yet nothing
+                // ever invoked `execute()`.
+                //
+                // No `authorize` hook, unlike merge-policy and tool-grants:
+                // the model supplies no ids here. The graph's entire
+                // authority comes from the Agent row, assembled in
+                // `buildDomainTools`, and the tool schema has no parameter
+                // that could carry one.
+                workflow: { executor: workflowExecutor },
             }),
         },
     ],

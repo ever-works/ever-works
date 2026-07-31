@@ -48,6 +48,7 @@ import { buildMeetingTools } from '../meetings/agent-meeting-tools';
 import { buildFleetTools } from '../fleet/agent-fleet-tools';
 import { buildBrowserTools } from '../facades/agent-browser-tools';
 import { buildEscalationTools } from './agent-escalation-tools';
+import { buildWorkflowTools } from './agent-workflow-tools';
 import { buildPrReviewTools } from '../pr-review/agent-pr-review-tools';
 import { buildMergePolicyTools } from '../policy/agent-merge-policy-tools';
 import { buildToolGrantTools } from '../policy/agent-tool-grant-tools';
@@ -472,6 +473,30 @@ export class AgentToolService {
                     userId: agent.userId,
                     service: toolGrants.service,
                     authorize: (input) => toolGrants.authorize(agent.userId, input),
+                }),
+            );
+        }
+
+        // Workflow graphs (judgment layer G5). Gated on `canAssignTasks`
+        // because an `agent.delegate` node creates a child Task and starts
+        // a child agent run — the same capability the task tools are gated
+        // on, reached by a different route. An agent that may not raise a
+        // Task must not be able to raise one through a graph.
+        //
+        // The scope passed here comes from the AGENT ROW, never from the
+        // model: the node runner reads userId/workId/organizationId out of
+        // the run context to decide what a node may touch, so letting a
+        // model-supplied context through would be letting it choose its own
+        // authorization.
+        if (agent.permissions?.canAssignTasks && sources.workflow) {
+            const workflow = sources.workflow;
+            add('workflow', () =>
+                buildWorkflowTools({
+                    userId: agent.userId,
+                    agentId: agent.id,
+                    workId: agent.workId ?? null,
+                    organizationId: agent.organizationId ?? null,
+                    executor: workflow.executor,
                 }),
             );
         }

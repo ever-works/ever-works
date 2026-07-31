@@ -850,6 +850,9 @@
             "review": {
                 "accept": "Accepter",
                 "acceptFailed": "Échec de l’acceptation — réessayez",
+                "reject": "Rejeter",
+                "rejectFailed": "Échec du rejet — réessayez",
+                "rejectHint": "Archive le document : il quitte la file d'attente et n'est plus utilisé, mais il n'est pas supprimé.",
                 "subtitle": "Documents fusionnés ou proposés par un agent. Ils sont exclus du contexte des agents jusqu’à votre acceptation.",
                 "title": "En attente de revue ({count})"
             },

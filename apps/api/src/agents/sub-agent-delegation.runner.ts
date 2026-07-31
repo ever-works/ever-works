@@ -106,6 +106,16 @@ export class SubAgentDelegationRunnerService implements SubAgentDelegationRunner
                 // should exist.
                 createdById: request.parentAgentId,
                 agentId: request.childAgentId ?? null,
+                // Judgment layer G9 — the recursion bound, written by the
+                // platform rather than declared by a caller.
+                //
+                // `request.depth` is the depth of THIS delegation (already
+                // raised to the server-derived value by
+                // `SubAgentDelegationService`), so the child sits one
+                // deeper. This stamp is what the depth resolver reads back
+                // on the next hop; without it the chain has no record of
+                // itself and the cap is unenforceable.
+                delegationDepth: (Number.isInteger(request.depth) ? request.depth : 0) + 1,
             });
         } catch (error) {
             return this.failure(
