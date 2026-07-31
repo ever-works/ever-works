@@ -604,6 +604,26 @@ export class DeployService {
         // honour the user's namespace, but never a platform-reserved one.
         const requested = typeof settings.namespace === 'string' ? settings.namespace.trim() : '';
         if (!requested) {
+            // `k8s-works` is OUR cluster, and leaving this undefined means the
+            // plugin falls back to its own DEFAULT_NAMESPACE ('ever-works') —
+            // which is platform-reserved. The blocklist below never catches it
+            // because it only inspects a namespace the user actually typed, so
+            // every Work created on k8s-works without an explicit namespace
+            // silently targets the reserved shared namespace. Derive one.
+            //
+            // custom-kubeconfig is deliberately left alone: that is the user's
+            // own cluster and their default namespace is their business.
+            if (clusterSource === 'k8s-works') {
+                const slug = (work.slug || work.id)
+                    .toLowerCase()
+                    .replace(/[^a-z0-9-]+/g, '-')
+                    .replace(/^-+|-+$/g, '')
+                    .slice(0, 40);
+                const derived = slug ? `ever-works-${slug}-prod` : '';
+                if (derived && !isReservedDeployNamespace(derived)) {
+                    return derived;
+                }
+            }
             return undefined;
         }
         if (isReservedDeployNamespace(requested)) {
