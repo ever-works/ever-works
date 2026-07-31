@@ -45,7 +45,19 @@ export function buildDeployment(input: ManifestRenderInputs): Record<string, unk
 				resources: {
 					requests: { cpu: '100m', memory: '128Mi' },
 					limits: { cpu: '500m', memory: '512Mi' }
-				}
+				},
+				// Server-side deploys (EW — platform-managed clusters) mount the
+				// per-work runtime-env Secret the platform applied just before
+				// this manifest. `optional: true` keeps the pod schedulable when
+				// the Secret is absent (older works, custom clusters) — the app
+				// then boots on its baked-in defaults exactly as before.
+				...(input.envFromSecretName
+					? {
+							envFrom: [
+								{ secretRef: { name: input.envFromSecretName, optional: true } }
+							]
+						}
+					: {})
 			}
 		]
 	};
@@ -67,6 +79,35 @@ export function buildDeployment(input: ManifestRenderInputs): Record<string, unk
 				spec: podSpec
 			}
 		}
+	};
+}
+
+/**
+ * Build the per-work runtime-env Secret the app container `envFrom`s.
+ *
+ * Server-side (platform-managed) deploys only: the platform assembles the
+ * runtime environment it used to push as GitHub Actions secrets and applies
+ * it directly to the target namespace instead — no cluster credential and no
+ * runtime value ever lands in the website repo. `stringData` so the values
+ * are written verbatim (the API server base64-encodes on persist).
+ */
+export function buildRuntimeEnvSecret(input: {
+	name: string;
+	namespace: string;
+	workId: string;
+	workSlug: string;
+	env: Record<string, string>;
+}): Record<string, unknown> {
+	return {
+		apiVersion: 'v1',
+		kind: 'Secret',
+		metadata: {
+			name: input.name,
+			namespace: input.namespace,
+			labels: COMMON_LABELS(input.workId, input.workSlug)
+		},
+		type: 'Opaque',
+		stringData: input.env
 	};
 }
 
