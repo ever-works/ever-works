@@ -36,19 +36,43 @@ export function buildDeployment(input: ManifestRenderInputs): Record<string, unk
 				// side-load an image (the kind-based e2e runbook) opt back out.
 				imagePullPolicy: input.imagePullPolicy ?? 'Always',
 				ports: [{ containerPort: input.containerPort, name: 'http' }],
+				// A directory Work renders its whole catalogue on first request, so
+				// the default 1s probe timeout could never pass on a large one — the
+				// pod stayed 0/1 forever while the app was healthy. Readiness stays
+				// comparatively tight (an unready pod must leave the Service), but it
+				// gets a realistic timeout; a startupProbe absorbs the cold start so
+				// liveness never kills a warming container and loses its cache.
+				startupProbe: {
+					httpGet: { path: '/', port: 'http' },
+					periodSeconds: 10,
+					timeoutSeconds: 10,
+					failureThreshold: input.startupFailureThreshold ?? 30
+				},
 				readinessProbe: {
 					httpGet: { path: '/', port: 'http' },
-					periodSeconds: 5,
-					initialDelaySeconds: 5
+					periodSeconds: 10,
+					timeoutSeconds: 5,
+					failureThreshold: 3
 				},
 				livenessProbe: {
 					httpGet: { path: '/', port: 'http' },
-					periodSeconds: 10,
-					initialDelaySeconds: 30
+					periodSeconds: 20,
+					timeoutSeconds: 10,
+					failureThreshold: 6
 				},
+				// 512Mi OOM-killed a real catalogue (the mcp-servers Work needs ~4Gi
+				// for 4065 items x ~20 locales) — it restarted 4x and never served.
+				// Requests stay small so scheduling is cheap; the limit is what has
+				// to be honest. Overridable per Work via plugin settings.
 				resources: {
-					requests: { cpu: '100m', memory: '128Mi' },
-					limits: { cpu: '500m', memory: '512Mi' }
+					requests: {
+						cpu: input.cpuRequest ?? '100m',
+						memory: input.memoryRequest ?? '256Mi'
+					},
+					limits: {
+						cpu: input.cpuLimit ?? '2',
+						memory: input.memoryLimit ?? '4Gi'
+					}
 				},
 				// Server-side deploys (EW — platform-managed clusters) mount the
 				// per-work runtime-env Secret the platform applied just before
