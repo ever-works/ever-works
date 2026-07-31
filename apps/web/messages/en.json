@@ -1575,8 +1575,13 @@
                 "runNow": "Run now",
                 "clone": "Clone"
             },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            "deleteDialog": {
+                "title": "Delete this Mission?",
+                "body": "{title} will be permanently deleted. Child Ideas and Works are preserved, but their back-link to this Mission is broken. This cannot be undone.",
+                "confirm": "Delete Mission",
+                "cancel": "Cancel",
+                "deleting": "Deleting…",
+                "error": "Failed to delete Mission"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
