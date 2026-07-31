@@ -42,7 +42,7 @@ import {
     WebsiteTemplateResolverService,
 } from '@ever-works/agent/generators';
 import { DeploymentDispatchedEvent } from '@ever-works/agent/events';
-import type { IDeploymentPlugin } from '@ever-works/plugin';
+import type { DeploymentConfig, DeploymentResult, IDeploymentPlugin } from '@ever-works/plugin';
 import type { BatchDeployItemDto, BatchDeployItemResultDto } from './dto/batch-deploy.dto';
 import {
     ClusterSource,
@@ -1260,13 +1260,18 @@ export class DeployService {
             const result = await (
                 plugin as IDeploymentPlugin & {
                     deploy: (
-                        config: { projectName: string; options?: Record<string, unknown> },
+                        config: DeploymentConfig,
                         kubeconfig: string,
-                    ) => Promise<{ status?: string; error?: string; url?: string }>;
+                    ) => Promise<DeploymentResult>;
                 }
             ).deploy(
                 {
                     projectName: work.slug || work.id,
+                    // Required by `DeploymentConfig`. The k8s plugin applies
+                    // pre-built manifests and never reads it — there is no
+                    // local checkout server-side — so '.' is the same inert
+                    // value the plugin's own tests pass.
+                    sourceDir: '.',
                     options: {
                         gitSha,
                         githubOwner: work.getRepoOwner('website'),
