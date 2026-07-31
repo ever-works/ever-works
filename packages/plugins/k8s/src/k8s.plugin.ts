@@ -567,6 +567,12 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 				pullSecretName,
 				envFromSecretName: runtimeEnvSecretName,
 				imagePullPolicy: opts.imagePullPolicy,
+				// Per-Work sizing, resolved through the same settings merge as the
+				// rest (settingsOverride layers the work tier over the plugin's own).
+				cpuRequest: settings.cpuRequest,
+				memoryRequest: settings.memoryRequest,
+				cpuLimit: settings.cpuLimit,
+				memoryLimit: settings.memoryLimit,
 				// Makes the pod template differ between deploys of the same branch.
 				// The image tag is a mutable alias, so without this the manifest is
 				// identical every time and server-side apply rolls nothing.

@@ -1422,7 +1422,7 @@ export class DeployService {
         }
         try {
             const databaseUrl = await this.workRuntimeEnvService.getDatabaseUrl(work.id);
-            if (databaseUrl) env.DATABASE_URL = databaseUrl;
+            if (databaseUrl) env.DATABASE_URL = DeployService.externalizeDatabaseHost(databaseUrl);
         } catch (error: unknown) {
             this.logger.error(
                 `Runtime-env DATABASE_URL lookup failed for work ${work.id}: ${
@@ -1490,10 +1490,15 @@ export class DeployService {
                 typeof githubSettings?.readPackagesPatClassic === 'string'
                     ? githubSettings.readPackagesPatClassic.trim()
                     : '';
-            if (fineGrained || classic) return fineGrained || classic;
+            // Classic FIRST. Verified 2026-07-31 against
+            // ghcr.io/v2/ever-works/awesome-mcp-servers-website/manifests/prod:
+            // the fine-grained PAT returns 403, the classic ghp_ one returns 200.
+            // Preferring fineGrained would silently re-break image pulls the
+            // moment someone adds a fine-grained PAT to the platform secret.
+            if (classic || fineGrained) return classic || fineGrained;
 
             const platformDefaults = this.getPlatformGhcrCredentials(work.getRepoOwner('website'));
-            const platformToken = platformDefaults.fineGrained || platformDefaults.classic;
+            const platformToken = platformDefaults.classic || platformDefaults.fineGrained;
             if (platformToken) return platformToken;
         } catch (error: unknown) {
             this.logger.warn(
@@ -1503,6 +1508,47 @@ export class DeployService {
             );
         }
         return gitToken ?? '';
+    }
+
+    /**
+     * Rewrite an in-cluster Postgres host to the address a Work can actually
+     * reach from ITS OWN cluster.
+     *
+     * The platform runs on ever-k8s and talks to Postgres over the in-cluster
+     * service DNS (`pg-rw.databases.svc.cluster.local`). A Work deployed to
+     * k8s-works / k8s-works-shared is on a DIFFERENT cluster, where that name
+     * does not resolve at all — verified from inside a Work pod on
+     * k8s-works-shared: ENOTFOUND, while the LoadBalancer address connects.
+     * Handing the Work the platform's own URL made it die on startup with
+     * "Database initialization failed", which reads like a migration bug and is
+     * really a DNS one.
+     *
+     * `DB_EVER_WORKS_SHARED_HOST` already carries the externally-reachable
+     * address for exactly this purpose; this only swaps host:port and leaves
+     * credentials, database name and query string untouched. No-op when the
+     * host is not an in-cluster name (custom-kubeconfig Works pointing at their
+     * own database keep working unchanged).
+     */
+    static externalizeDatabaseHost(databaseUrl: string): string {
+        const externalHost = (process.env.DB_EVER_WORKS_SHARED_HOST || '').trim();
+        if (!externalHost) return databaseUrl;
+        let parsed: URL;
+        try {
+            parsed = new URL(databaseUrl);
+        } catch {
+            return databaseUrl;
+        }
+        if (!parsed.hostname.endsWith('.svc.cluster.local') && !parsed.hostname.endsWith('.svc')) {
+            return databaseUrl;
+        }
+        parsed.hostname = externalHost;
+        const externalPort = (process.env.DB_EVER_WORKS_SHARED_PORT || '').trim();
+        if (externalPort) parsed.port = externalPort;
+        const sslMode = (process.env.DB_EVER_WORKS_SHARED_SSLMODE || '').trim();
+        if (sslMode && !parsed.searchParams.has('sslmode')) {
+            parsed.searchParams.set('sslmode', sslMode);
+        }
+        return parsed.toString();
     }
 
     private providerTokenSecretName(providerId: string): string {

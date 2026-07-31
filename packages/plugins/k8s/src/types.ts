@@ -86,6 +86,11 @@ export type ClusterSource = 'k8s-works' | 'k8s-works-shared' | 'custom-kubeconfi
  * Plugin settings as stored in `plugin_settings`.
  */
 export interface KubernetesSettings {
+	/** Per-Work container sizing (optional; sensible defaults in the renderer). */
+	cpuRequest?: string;
+	memoryRequest?: string;
+	cpuLimit?: string;
+	memoryLimit?: string;
 	/** Where the kubeconfig for the target cluster comes from. Defaults
 	 *  to `'custom-kubeconfig'` so existing Works (which pre-date this
 	 *  field and have a user-pasted `kubeconfig`) keep working without
@@ -188,6 +193,13 @@ export interface ManifestRenderInputs {
 	envFromSecretName?: string;
 	/** Per-deploy pod-template annotations — required to force a rollout when the image tag is a mutable alias. */
 	podAnnotations?: Record<string, string>;
+	/** Per-Work sizing. Defaults suit a large directory catalogue; small Works can shrink these. */
+	cpuRequest?: string;
+	memoryRequest?: string;
+	cpuLimit?: string;
+	memoryLimit?: string;
+	/** startupProbe failureThreshold (x10s). Default 30 = 5 min of cold start before liveness engages. */
+	startupFailureThreshold?: number;
 	/** Defaults to 'Always'; only side-loaded (kind) images should use 'IfNotPresent'. */
 	imagePullPolicy?: 'Always' | 'IfNotPresent' | 'Never';
 	hosts: string[];
