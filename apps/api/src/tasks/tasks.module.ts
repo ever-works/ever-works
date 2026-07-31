@@ -10,7 +10,13 @@ import { DatabaseModule } from '@ever-works/agent/database';
 // inject it for mention-lookup population. Without this import the
 // controllers would fail to instantiate at boot with an "argument
 // AgentRepository is not available" Nest error.
-import { AgentsModule } from '@ever-works/agent/agents';
+import {
+    AgentsModule,
+    SUB_AGENT_DELEGATION_RUNNER,
+    WORKFLOW_NODE_RUNNER,
+} from '@ever-works/agent/agents';
+import { SubAgentDelegationRunnerService } from '../agents/sub-agent-delegation.runner';
+import { WorkflowNodeRunnerService } from '../agents/workflow-node.runner';
 // Memory upgrades M6 — `DecisionConflictService` (the re-litigation
 // guard behind `GET /api/tasks/:id/decision-conflicts`) is provided and
 // exported by `KnowledgeBaseModule`. NestJS only resolves a controller's
@@ -73,7 +79,25 @@ import { TaskChatController } from './task-chat.controller';
             inject: [FleetRunRouterService],
         },
         { provide: AGENT_CHAT_REPLY_DISPATCHER, useValue: agentChatReplyTriggerAdapter },
+        // Judgment layers G5 + G9 — the two runner seams the agents module
+        // declares @Optional() and documents as "bound by the api-side
+        // @Global() module". Nothing ever bound them, so
+        // `WorkflowGraphExecutorService` could validate a graph but never
+        // execute a node, and every delegation was refused `no-runner`.
+        //
+        // They live HERE for the same reason the dispatchers do: the
+        // delegation runner needs the job-runtime dispatcher to start a
+        // child run, and only this module has it.
+        SubAgentDelegationRunnerService,
+        { provide: SUB_AGENT_DELEGATION_RUNNER, useExisting: SubAgentDelegationRunnerService },
+        WorkflowNodeRunnerService,
+        { provide: WORKFLOW_NODE_RUNNER, useExisting: WorkflowNodeRunnerService },
     ],
-    exports: [AGENT_TASK_EXECUTE_DISPATCHER, AGENT_CHAT_REPLY_DISPATCHER],
+    exports: [
+        AGENT_TASK_EXECUTE_DISPATCHER,
+        AGENT_CHAT_REPLY_DISPATCHER,
+        SUB_AGENT_DELEGATION_RUNNER,
+        WORKFLOW_NODE_RUNNER,
+    ],
 })
 export class TasksModule {}
