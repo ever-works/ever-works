@@ -30,7 +30,11 @@ export function buildDeployment(input: ManifestRenderInputs): Record<string, unk
 			{
 				name: 'app',
 				image: input.image,
-				imagePullPolicy: 'IfNotPresent',
+				// The server-side path pins a MUTABLE branch alias (:dev/:stage/:prod)
+				// that CI republishes, so a node with a cached layer would keep
+				// serving the old build forever under IfNotPresent. Callers that
+				// side-load an image (the kind-based e2e runbook) opt back out.
+				imagePullPolicy: input.imagePullPolicy ?? 'Always',
 				ports: [{ containerPort: input.containerPort, name: 'http' }],
 				readinessProbe: {
 					httpGet: { path: '/', port: 'http' },
@@ -73,7 +77,18 @@ export function buildDeployment(input: ManifestRenderInputs): Record<string, unk
 			selector: { matchLabels: selector },
 			strategy: { type: 'RollingUpdate', rollingUpdate: { maxSurge: 1, maxUnavailable: 0 } },
 			template: {
-				metadata: { labels: { ...selector, ...labels } },
+				// Without a per-deploy annotation the rendered Deployment is
+				// byte-identical between deploys of the same branch (the tag is a
+				// fixed alias), so server-side apply produces no generation bump,
+				// no new ReplicaSet and no rollout — the deploy reports success and
+				// nothing changes. Re-applying the runtime-env Secret does not help
+				// either: envFrom is materialised at container start.
+				metadata: {
+					labels: { ...selector, ...labels },
+					...(input.podAnnotations && Object.keys(input.podAnnotations).length
+						? { annotations: input.podAnnotations }
+						: {})
+				},
 				spec: podSpec
 			}
 		}
