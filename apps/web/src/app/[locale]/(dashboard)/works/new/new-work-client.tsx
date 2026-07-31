@@ -31,6 +31,7 @@ import {
     type ComposerAttachment,
 } from '@/components/common/PromptComposer';
 import { PromptChipsRow, type PromptChip } from '@/components/common/PromptChipsRow';
+import { seedFromExample, usePromptSeed } from '@/components/common/composer/use-prompt-seed';
 import { PageHeader } from '@/components/common/PageHeader';
 import { useStartFromPrompt } from '@/lib/hooks/use-start-from-prompt';
 import type { ProviderWithConnection } from './page';
@@ -105,6 +106,8 @@ const PLACEHOLDERS_BY_KIND: Record<InitialWorkKind, ReadonlyArray<string>> = {
     ],
 };
 
+const PROMPT_INPUT_ID = 'new-work-prompt';
+
 interface NewWorkClientProps {
     user: AuthUser;
     providers: ProviderWithConnection[];
@@ -161,6 +164,11 @@ export default function NewWorkClient({
     const [attachments, setAttachments] = useState<ReadonlyArray<ComposerAttachment>>([]);
     const [, startSubmit] = useTransition();
     const startFromPrompt = useStartFromPrompt();
+    const seedPrompt = usePromptSeed({
+        value: prompt,
+        onChange: setPrompt,
+        inputId: PROMPT_INPUT_ID,
+    });
 
     const WORK_KIND_INTENT_LABEL: Record<InitialWorkKind, string> = {
         website: 'website',
@@ -269,7 +277,7 @@ export default function NewWorkClient({
                 />
 
                 <PromptComposer
-                    inputId="new-work-prompt"
+                    inputId={PROMPT_INPUT_ID}
                     value={prompt}
                     onChange={setPrompt}
                     onSubmit={submitPrompt}
@@ -296,6 +304,11 @@ export default function NewWorkClient({
                                         return;
                                     }
                                     setSelectedKind(next);
+                                    // Picking a kind writes that kind's
+                                    // example into the input — the chip
+                                    // hands over a real prompt to edit,
+                                    // not just a hint.
+                                    seedPrompt(seedFromExample(PLACEHOLDERS_BY_KIND[next][0]));
                                 }}
                                 ariaLabel={t('promptLabel')}
                                 testIdPrefix="new-work-kind"

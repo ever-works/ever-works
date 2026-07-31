@@ -392,3 +392,45 @@ describe('NewPageClient (chat-open + canvas-route on submit)', () => {
         });
     });
 });
+
+describe('NewPageClient chip seeding', () => {
+    const DIRECTORY_SEED =
+        'Directory of AI coding assistants with reviews, pricing tiers, and editor compatibility';
+    const BLOG_SEED =
+        'Personal blog about indie game development with postmortems and tooling tags';
+
+    function clickChip(container: HTMLElement, value: string) {
+        const chip = container.querySelector(`button[data-testid="new-chip-${value}"]`);
+        if (!chip) throw new Error(`chip ${value} not found`);
+        fireEvent.click(chip);
+    }
+
+    it('writes the picked chip\u2019s example into the input', () => {
+        const { container } = render(<NewPageClient />);
+        expect(getTextarea(container).value).toBe('');
+
+        clickChip(container, 'directory');
+
+        // The `e.g. "…"` wrapper is stripped — what lands in the box is a
+        // prompt the user can send as-is.
+        expect(getTextarea(container).value).toBe(DIRECTORY_SEED);
+    });
+
+    it('replaces its own seed when the user switches chips', () => {
+        const { container } = render(<NewPageClient />);
+        clickChip(container, 'directory');
+        clickChip(container, 'blog');
+        expect(getTextarea(container).value).toBe(BLOG_SEED);
+    });
+
+    it('never overwrites text the user typed', () => {
+        const { container } = render(<NewPageClient />);
+        fireEvent.change(getTextarea(container), {
+            target: { value: 'My own brief, in my own words' },
+        });
+
+        clickChip(container, 'directory');
+
+        expect(getTextarea(container).value).toBe('My own brief, in my own words');
+    });
+});

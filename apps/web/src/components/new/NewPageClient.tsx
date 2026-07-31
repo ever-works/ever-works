@@ -23,6 +23,7 @@ import {
     type ComposerAttachment,
 } from '@/components/common/PromptComposer';
 import { PromptChipsRow, type PromptChip } from '@/components/common/PromptChipsRow';
+import { seedFromExample, usePromptSeed } from '@/components/common/composer/use-prompt-seed';
 import { useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { useChatPanel } from '@/lib/hooks/use-chat-panel';
@@ -211,6 +212,8 @@ export interface NewPageClientProps {
     disabledKinds?: string[];
 }
 
+const PROMPT_INPUT_ID = 'new-prompt';
+
 const CHIP_INTENT_LABEL: Record<ChipType, string> = {
     mission: 'Mission',
     idea: 'Idea',
@@ -255,6 +258,11 @@ export function NewPageClient({
     const [attachments, setAttachments] = useState<ReadonlyArray<ComposerAttachment>>([]);
     const [submitting, startSubmit] = useTransition();
     const startFromPrompt = useStartFromPrompt();
+    const seedPrompt = usePromptSeed({
+        value: prompt,
+        onChange: setPrompt,
+        inputId: PROMPT_INPUT_ID,
+    });
     // EW-662 Phase 10 — Company chip is a special chip whose submit
     // opens the Register-Company dialog instead of going through the
     // chat-AI / canvas pipeline. We hold the dialog open-state here so
@@ -489,7 +497,7 @@ export function NewPageClient({
                 website's landing layout — chips sit outside the input
                 container, not inside). */}
             <PromptComposer
-                inputId="new-prompt"
+                inputId={PROMPT_INPUT_ID}
                 value={prompt}
                 onChange={setPrompt}
                 onSubmit={submit}
@@ -516,6 +524,10 @@ export function NewPageClient({
                                     return;
                                 }
                                 setSelectedChip(next);
+                                // Picking a chip writes that chip's example
+                                // into the input — the chip hands over a
+                                // real prompt to edit, not just a hint.
+                                seedPrompt(seedFromExample(PLACEHOLDERS_BY_CHIP[next][0]));
                             }}
                             ariaLabel={t('chipLabel')}
                             testIdPrefix="new-chip"

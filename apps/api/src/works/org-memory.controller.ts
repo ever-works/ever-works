@@ -411,7 +411,11 @@ export class OrgMemoryController {
         // Same defense-in-depth membership gate as the GET aggregation:
         // throws NotFound (not Forbidden) on a cross-tenant mismatch,
         // matching the existence-leak contract.
-        await this.membership.ensureMember(organizationId, auth.userId);
+        // WRITE side => `ensureAdmin`, not `ensureMember`. Identical checks
+        // today (no org-admin role in the schema yet) — routing writes
+        // through this name is what gives the future role model a single
+        // seam to tighten, instead of a retrofit across every route.
+        await this.membership.ensureAdmin(organizationId, auth.userId);
 
         return this.consolidation.runConsolidation(
             { organizationId, userId: auth.userId },
@@ -472,7 +476,11 @@ export class OrgMemoryController {
             });
         }
 
-        await this.membership.ensureMember(organizationId, auth.userId);
+        // WRITE side => `ensureAdmin`, not `ensureMember`. Identical checks
+        // today (no org-admin role in the schema yet) — routing writes
+        // through this name is what gives the future role model a single
+        // seam to tighten, instead of a retrofit across every route.
+        await this.membership.ensureAdmin(organizationId, auth.userId);
 
         return this.kb.createOrgUpload({
             organizationId,
@@ -516,7 +524,11 @@ export class OrgMemoryController {
                 message: 'No active Organization — cannot ingest attachments into Memory',
             });
         }
-        await this.membership.ensureMember(organizationId, auth.userId);
+        // WRITE side => `ensureAdmin`, not `ensureMember`. Identical checks
+        // today (no org-admin role in the schema yet) — routing writes
+        // through this name is what gives the future role model a single
+        // seam to tighten, instead of a retrofit across every route.
+        await this.membership.ensureAdmin(organizationId, auth.userId);
 
         const results: Array<{ attachmentId: string; status: string; uploadId?: string }> = [];
         for (const attachmentId of body.attachmentIds) {
@@ -604,7 +616,11 @@ export class OrgMemoryController {
                 message: 'No active Organization — cannot configure Memory Consolidation',
             });
         }
-        await this.membership.ensureMember(organizationId, auth.userId);
+        // WRITE side => `ensureAdmin`, not `ensureMember`. Identical checks
+        // today (no org-admin role in the schema yet) — routing writes
+        // through this name is what gives the future role model a single
+        // seam to tighten, instead of a retrofit across every route.
+        await this.membership.ensureAdmin(organizationId, auth.userId);
         return this.consolidation.updateScheduleSettings(
             organizationId,
             body as Partial<KbMemoryConsolidationSettings>,
@@ -657,7 +673,11 @@ export class OrgMemoryController {
                 message: 'No active Organization — cannot accept a Memory document',
             });
         }
-        await this.membership.ensureMember(organizationId, auth.userId);
+        // WRITE side => `ensureAdmin`, not `ensureMember`. Identical checks
+        // today (no org-admin role in the schema yet) — routing writes
+        // through this name is what gives the future role model a single
+        // seam to tighten, instead of a retrofit across every route.
+        await this.membership.ensureAdmin(organizationId, auth.userId);
 
         const accepted = await this.kb.acceptOrgDocument(organizationId, docId, auth.userId);
         if (!accepted) {

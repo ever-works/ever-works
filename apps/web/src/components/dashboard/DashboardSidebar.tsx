@@ -298,8 +298,8 @@ export function DashboardSidebar({
                 >
                     <ul
                         className={cn(
-                            'pb-4',
-                            isCollapsed ? 'space-y-1 flex flex-col items-center' : 'space-y-0.5',
+                            'pb-4 space-y-0.5',
+                            isCollapsed && 'flex flex-col items-center',
                         )}
                     >
                         {navigation.map((item) => {

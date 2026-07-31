@@ -38,7 +38,7 @@ describe('OrgMemoryController — memory health', () => {
 
     let kb: Record<string, jest.Mock>;
     let consolidation: Record<string, jest.Mock>;
-    let membership: { ensureMember: jest.Mock };
+    let membership: { ensureMember: jest.Mock; ensureAdmin: jest.Mock };
     let scopeContext: { getOrganizationId: jest.Mock };
     let health: { getOrgHealth: jest.Mock; emptyHealth: jest.Mock };
     let controller: OrgMemoryController;
@@ -46,7 +46,10 @@ describe('OrgMemoryController — memory health', () => {
     beforeEach(() => {
         kb = { aggregateOrgMemory: jest.fn().mockResolvedValue({ documents: [] }) };
         consolidation = { runConsolidation: jest.fn() };
-        membership = { ensureMember: jest.fn().mockResolvedValue({ id: 'o-1' }) };
+        membership = {
+            ensureMember: jest.fn().mockResolvedValue({ id: 'o-1' }),
+            ensureAdmin: jest.fn().mockResolvedValue({ id: 'o-1' }),
+        };
         scopeContext = { getOrganizationId: jest.fn().mockReturnValue('o-1') };
         health = {
             getOrgHealth: jest.fn().mockResolvedValue({ recallHitRate: 0.5 }),
