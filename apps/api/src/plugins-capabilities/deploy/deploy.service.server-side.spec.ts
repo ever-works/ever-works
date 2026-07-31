@@ -290,8 +290,10 @@ describe('DeployService — server-side deploy for managed cluster tiers', () =>
 
         await service.deploy('work-1', 'user-1');
 
+        // setActionSecret({ key, value, owner, repo }, publicKey, token) — the
+        // secret NAME is a field of the first argument, not a positional arg.
         const pushedNames = githubPlugin.setActionSecret.mock.calls.map(
-            (c: unknown[]) => c[3] ?? c[2],
+            (c: unknown[]) => (c[0] as { key: string }).key,
         );
         const pushedPairs = githubPlugin.setActionSecret.mock.calls.map((c: unknown[]) =>
             JSON.stringify(c),
@@ -370,8 +372,10 @@ describe('DeployService — server-side deploy for managed cluster tiers', () =>
 
         expect(plugin.deploy).not.toHaveBeenCalled();
         expect(githubPlugin.dispatchWorkflow).toHaveBeenCalled();
+        // setActionSecret({ key, value, owner, repo }, publicKey, token) — the
+        // secret NAME is a field of the first argument, not a positional arg.
         const pushedNames = githubPlugin.setActionSecret.mock.calls.map(
-            (c: unknown[]) => c[3] ?? c[2],
+            (c: unknown[]) => (c[0] as { key: string }).key,
         );
         expect(pushedNames).toContain('K8S_TOKEN');
     });
