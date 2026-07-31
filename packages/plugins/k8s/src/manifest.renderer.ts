@@ -53,9 +53,7 @@ export function buildDeployment(input: ManifestRenderInputs): Record<string, unk
 				// then boots on its baked-in defaults exactly as before.
 				...(input.envFromSecretName
 					? {
-							envFrom: [
-								{ secretRef: { name: input.envFromSecretName, optional: true } }
-							]
+							envFrom: [{ secretRef: { name: input.envFromSecretName, optional: true } }]
 						}
 					: {})
 			}
