@@ -303,7 +303,7 @@ describe('DeployService — server-side deploy for managed cluster tiers', () =>
         expect(pushedNames).toContain('WORK_ID');
     });
 
-    it('managed tier → branch alias image tag when no commit SHA (main → prod)', async () => {
+    it('managed tier → branch alias image tag (main → prod)', async () => {
         const plugin = managedPlugin();
         const { service } = buildService({
             plugin,
@@ -314,6 +314,26 @@ describe('DeployService — server-side deploy for managed cluster tiers', () =>
 
         const [config] = plugin.deploy.mock.calls[0];
         expect(config.options.gitSha).toBe('prod');
+    });
+
+    it('managed tier → alias even when a commit SHA is supplied (tag must exist)', async () => {
+        // Regression guard. `k8s-build.yml` publishes only `:<alias>` and
+        // `:sha-<full-sha>`; the bare short-SHA tag came from `deploy_k8s.yaml`,
+        // which is now gated off. Pinning a short SHA here would reference a
+        // tag that does not exist and park the pod in ImagePullBackOff.
+        const plugin = managedPlugin();
+        const { service } = buildService({
+            plugin,
+            settings: { clusterSource: 'k8s-works-shared' },
+        });
+
+        await service.deploy('work-1', 'user-1', {
+            commitSha: 'abcdef1234567890abcdef1234567890abcdef12',
+        });
+
+        const [config] = plugin.deploy.mock.calls[0];
+        expect(config.options.gitSha).toBe('prod');
+        expect(config.options.gitSha).not.toContain('abcdef');
     });
 
     it('managed tier → plugin error marks the deployment terminal and reports failure', async () => {
