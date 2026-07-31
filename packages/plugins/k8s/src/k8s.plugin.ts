@@ -21,6 +21,7 @@ import { defaultRegistryProviderRegistry, RegistryProviderRegistry } from './reg
 import { mapDeploymentToStatus } from './status.mapper.js';
 import {
 	buildDeployment,
+	buildRuntimeEnvSecret,
 	buildImagePullSecret,
 	buildIngress,
 	buildService,
@@ -66,6 +67,27 @@ interface DeployOptions {
 	githubReadPackagesToken?: string;
 	/** Custom hosts to add as Ingress rules (in addition to settings.ingressHost). */
 	hosts?: string[];
+	/**
+	 * Server-side (platform-managed) deploys — overrides for values the
+	 * GitHub Actions path derived inside the workflow:
+	 *
+	 * `namespaceOverride` — the namespace the platform ENFORCED server-side
+	 * (per-tenant override + reserved-namespace blocklist). Without it this
+	 * method would fall back to the plugin's own persisted settings, i.e.
+	 * whatever free-text the user typed.
+	 *
+	 * `imageName` — the image repository name when it differs from the work
+	 * slug. CI (k8s-build.yml) pushes `ghcr.io/<owner>/<WEBSITE-REPO>:<tag>`,
+	 * so the platform passes the website repo name here; manifest names and
+	 * labels keep using `projectName` (the work slug).
+	 *
+	 * `runtimeEnv` — key→value map applied as the `<slug>-runtime-env`
+	 * Opaque Secret and `envFrom`'d into the container. Replaces the
+	 * workflow's toJSON(secrets) copy step; values never touch the repo.
+	 */
+	namespaceOverride?: string;
+	imageName?: string;
+	runtimeEnv?: Record<string, string>;
 }
 
 const REGISTRY_SCHEMA: JsonSchema = {
@@ -421,7 +443,11 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 
 	async deploy(config: DeploymentConfig, kubeconfig: string): Promise<DeploymentResult> {
 		const settings = await this.loadSettings();
-		const namespace = settings.namespace?.trim() || DEFAULT_NAMESPACE;
+		const optsForNamespace = (config.options ?? {}) as DeployOptions;
+		const namespace =
+			optsForNamespace.namespaceOverride?.trim() ||
+			settings.namespace?.trim() ||
+			DEFAULT_NAMESPACE;
 		const replicas = clampReplicas(settings.replicas);
 		const registry = settings.registry ?? { kind: 'github' as const };
 		const opts = (config.options ?? {}) as DeployOptions;
@@ -432,6 +458,11 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		// unaffected. Fall back to a timestamp tag if nothing valid remains.
 		const gitSha = sanitiseDockerTag((opts.gitSha ?? '').slice(0, 12)) || Date.now().toString(36).slice(0, 12);
 		const slug = sanitiseSlug(config.projectName);
+		// CI pushes images named after the WEBSITE REPO, which is not always
+		// the work slug (legacy works: slug `mcpserver`, repo
+		// `awesome-mcp-servers-website`). `imageName` lets the caller pin the
+		// repo name for the image ref while manifests keep the slug.
+		const imageName = sanitiseSlug(opts.imageName ?? config.projectName);
 		const createdAt = new Date().toISOString();
 
 		const provider = this.registries.resolve(registry.kind);
@@ -442,7 +473,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 		};
 		const visibility: ResolvedImageVisibility = provider.resolveVisibility(registry, registryCtx);
 		const imageBase = provider.imageBase(registry, registryCtx);
-		const image = `${imageBase}/${slug}:${gitSha}`;
+		const image = `${imageBase}/${imageName}:${gitSha}`;
 
 		const ingressClass = settings.ingressClass;
 		const controller = await this.controllerForClassName(kubeconfig, settings.kubeContext, ingressClass);
@@ -480,6 +511,23 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 				await this.api.applyImagePullSecret(kubeconfig, secret, settings.kubeContext);
 			}
 
+			// Server-side runtime env: apply the Secret BEFORE the Deployment so
+			// the first pod generation already sees it (envFrom is resolved at
+			// pod creation). Applied every deploy — SSA makes it idempotent and
+			// picks up rotated values.
+			let runtimeEnvSecretName: string | undefined;
+			if (opts.runtimeEnv && Object.keys(opts.runtimeEnv).length > 0) {
+				runtimeEnvSecretName = `${slug}-runtime-env`;
+				const runtimeEnvSecret = buildRuntimeEnvSecret({
+					name: runtimeEnvSecretName,
+					namespace,
+					workId: config.projectName,
+					workSlug: slug,
+					env: opts.runtimeEnv
+				});
+				await this.api.applySecret(kubeconfig, runtimeEnvSecret, settings.kubeContext);
+			}
+
 			const renderInputs = {
 				workId: config.projectName,
 				workSlug: slug,
@@ -488,6 +536,7 @@ export class KubernetesPlugin implements IPlugin, IDeploymentPlugin {
 				replicas,
 				containerPort: CONTAINER_PORT,
 				pullSecretName,
+				envFromSecretName: runtimeEnvSecretName,
 				hosts,
 				ingressClass,
 				tlsIssuer: settings.tlsIssuer,
