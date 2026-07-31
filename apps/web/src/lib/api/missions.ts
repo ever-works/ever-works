@@ -1,5 +1,6 @@
 import 'server-only';
 import { serverFetch, serverMutation } from './server-api';
+import type { Goal } from './goals';
 
 /**
  * Phase 6 PR Q — web-side mirror of the agent-side `MissionDto`
@@ -319,6 +320,37 @@ export const missionsAPI = {
         );
         return res.relations;
     },
+
+    // Goals & Metrics PR-8 — Mission ↔ Goal links (spec FR-11). Goals
+    // are created standalone via `POST /me/goals` (the /goals surface)
+    // and attached here. At most one primary Goal per Mission; linking
+    // with `isPrimary: true` demotes the existing primary server-side.
+    //
+    // Invariant I-4: Goal state never feeds back into Mission status —
+    // these edges are references, and unlinking never touches the Goal.
+
+    /** `GET /me/missions/:id/goals` → the Goals attached to this Mission. */
+    async listGoals(id: string): Promise<MissionGoalLinkDto[]> {
+        return serverFetch<MissionGoalLinkDto[]>(`/me/missions/${id}/goals`, { method: 'GET' });
+    },
+
+    /**
+     * `POST /me/missions/:id/goals` — attach an EXISTING Goal.
+     * Idempotent on the `(missionId, goalId)` pair: re-POSTing an
+     * already-linked Goal just applies the new `isPrimary` intent.
+     * 404 on an unknown/foreign Mission or Goal.
+     */
+    async linkGoal(
+        id: string,
+        input: { goalId: string; isPrimary?: boolean },
+    ): Promise<MissionGoalLinkDto> {
+        return serverMutation<MissionGoalLinkDto>({
+            endpoint: `/me/missions/${id}/goals`,
+            data: { goalId: input.goalId, isPrimary: input.isPrimary ?? false },
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
 };
 
 /** Row shape returned by `/me/missions/:id/attachments`. */
@@ -360,6 +392,22 @@ export interface MissionWorkRelationDto {
     readonly createdAt: string;
     readonly workName: string | null;
     readonly workSlug: string | null;
+}
+
+/**
+ * Row shape returned by `GET/POST /me/missions/:id/goals` — a
+ * `mission_goals` edge expanded with the Goal projection (agent-side
+ * `MissionGoalLinkDto` in `packages/agent/src/goals/types.ts`).
+ * `goal` is null only when the Goal row vanished mid-flight.
+ * `createdAt` is wire-serialized to an ISO string.
+ */
+export interface MissionGoalLinkDto {
+    readonly id: string;
+    readonly missionId: string;
+    readonly goalId: string;
+    readonly isPrimary: boolean;
+    readonly createdAt: string;
+    readonly goal: Goal | null;
 }
 
 /**

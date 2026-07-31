@@ -42,6 +42,7 @@ import {
 import type {
     Mission,
     MissionAttachmentRow,
+    MissionGoalLinkDto,
     MissionOutcome,
     MissionWorkRelationDto,
     OwnerBudgetSummary,
@@ -49,6 +50,7 @@ import type {
 import type { WorkProposal } from '@/lib/api/work-proposals';
 import { IdeaCard } from '@/components/ideas';
 import { MissionAttachedWorksPanel, type AttachableWorkOption } from './MissionAttachedWorksPanel';
+import { MissionGoalsPanel, type AttachableGoalOption } from './MissionGoalsPanel';
 import { BudgetSummaryCard } from '@/components/budgets';
 import { EntityAttachmentsSection } from '@/components/common/EntityAttachmentsSection';
 import {
@@ -73,6 +75,10 @@ export interface MissionDetailClientProps {
     workRelations?: MissionWorkRelationDto[];
     /** PR-2 — the caller's Works, feeding the "Attach Work" select. */
     attachableWorks?: ReadonlyArray<AttachableWorkOption>;
+    /** Goals & Metrics PR-8 — `mission_goals` edges for the "Goals" panel. */
+    goalLinks?: ReadonlyArray<MissionGoalLinkDto>;
+    /** Goals & Metrics PR-8 — the caller's Goals, feeding the "Attach Goal" select. */
+    attachableGoals?: ReadonlyArray<AttachableGoalOption>;
 }
 
 const RUNNABLE_STATUSES = new Set(['active', 'paused']);
@@ -161,6 +167,8 @@ export function MissionDetailClient({
     attachments = [],
     workRelations = [],
     attachableWorks = [],
+    goalLinks = [],
+    attachableGoals = [],
 }: MissionDetailClientProps) {
     const t = useTranslations('dashboard.missionDetail');
     const router = useRouter();
@@ -549,6 +557,13 @@ export function MissionDetailClient({
                         : t('guardrails.inheriting')}
                 </p>
             </section>
+
+            {/* ── Goals (mission_goals edges, Goals & Metrics PR-8) ───────── */}
+            <MissionGoalsPanel
+                missionId={mission.id}
+                initialLinks={goalLinks}
+                attachableGoals={attachableGoals}
+            />
 
             {/* ── Activity + Spend ─────────────────────────────────────────── */}
             <div className="grid gap-5 @3xl/main:grid-cols-2">

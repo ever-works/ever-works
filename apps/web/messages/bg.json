@@ -1596,6 +1596,25 @@
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)"
                 }
+            },
+            "goals": {
+                "title": "Goals",
+                "empty": "No Goals attached to this Mission yet. Attach one below to track what success means.",
+                "attachTitle": "Attach a Goal",
+                "goalLabel": "Goal",
+                "goalPlaceholder": "Select a Goal",
+                "primaryLabel": "Set as primary",
+                "primaryBadge": "Primary",
+                "primaryTooltip": "The primary Goal for this Mission - only one Goal can be primary at a time.",
+                "attach": "Attach",
+                "alreadyLinkedOption": "{title} (already attached)",
+                "noGoalsToAttach": "You have no Goals yet. Create one on the Goals page, then attach it here.",
+                "pickerTruncated": "Showing your 100 most recent Goals - open the Goals page for the full list.",
+                "invariantNote": "Attaching a Goal never changes this Mission's status - completing a Mission stays an explicit action.",
+                "toasts": {
+                    "attached": "Goal attached",
+                    "attachError": "Couldn't attach Goal"
+                }
             }
         },
         "ideasPage": {
