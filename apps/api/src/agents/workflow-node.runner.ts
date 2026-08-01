@@ -1,5 +1,5 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
-import type { WorkflowNode } from '@ever-works/contracts';
+import type { SubAgentScope, WorkflowNode } from '@ever-works/contracts';
 import type {
     WorkflowNodeRunContext,
     WorkflowNodeRunResult,
@@ -42,6 +42,13 @@ import { KnowledgeBaseService } from '@ever-works/agent/services';
 @Injectable()
 export class WorkflowNodeRunnerService implements WorkflowNodeRunner {
     private readonly logger = new Logger(WorkflowNodeRunnerService.name);
+
+    /**
+     * Delegations issued per graph run, feeding the contract's fan-out
+     * cap. Bounded — see {@link countDelegation}.
+     */
+    private readonly delegationsByRun = new Map<string, number>();
+    private static readonly MAX_TRACKED_RUNS = 500;
 
     constructor(
         @Optional() private readonly delegation?: SubAgentDelegationService,
@@ -171,41 +178,61 @@ export class WorkflowNodeRunnerService implements WorkflowNodeRunner {
             };
         }
 
-        const result = await this.delegation.delegate({
-            // Deterministic per (run, node) so a retried graph step
-            // reuses the dispatch dedup key instead of spawning a second
-            // child for the same node.
-            delegationId: `${context.runId}:${node.id}`,
-            parentAgentId,
-            // The REAL AgentRun id when the host supplied one, falling back
-            // to the graph's own run id.
-            //
-            // This is what anchors delegation depth: the resolver walks
-            // `agent_run -> task -> delegationDepth` from `parentRunId`, and
-            // `context.runId` is minted by the graph executor — it is not an
-            // `agent_runs` row, so resolving from it finds nothing and the
-            // depth cap silently never fires. The fallback keeps a host that
-            // supplies neither working exactly as before.
-            parentRunId: this.contextString(context, 'agentRunId') ?? context.runId,
-            parentTaskId: this.contextString(context, 'taskId') ?? null,
-            // Threaded from the run context when the host provides it.
-            //
-            // Be honest about what bounds recursion here: this field is
-            // ADVISORY unless a host actually populates `delegationDepth`,
-            // and nothing does yet — so the depth check in
-            // `validateSubAgentDelegationRequest` will not fire on its own.
-            // The effective backstop is `TasksService.create`, which walks
-            // the parent chain and refuses past depth 64. That works
-            // because `parentTaskId` above threads the chain; a host that
-            // omits `taskId` loses the backstop too.
-            depth: this.contextNumber(context, 'delegationDepth') ?? 0,
-            objective,
-            scope: {
-                allowedTools: this.stringArrayConfig(node, 'allowedTools') ?? [],
-                workId: this.contextString(context, 'workId') ?? null,
-                organizationId: this.contextString(context, 'organizationId') ?? null,
+        // The scope the PARENT holds, built server-side by whichever host
+        // started this graph. Its presence is what activates
+        // `narrowSubAgentScope` — the contract's "privilege can only ever
+        // shrink going down the tree" property, which does not run at all
+        // when `limits.parentScope` is undefined.
+        const parentScope = this.parentScope(context);
+
+        const result = await this.delegation.delegate(
+            {
+                // Deterministic per (run, node) so a retried graph step
+                // reuses the dispatch dedup key instead of spawning a second
+                // child for the same node.
+                delegationId: `${context.runId}:${node.id}`,
+                parentAgentId,
+                // The REAL AgentRun id when the host supplied one, falling back
+                // to the graph's own run id.
+                //
+                // This is what anchors delegation depth: the resolver walks
+                // `agent_run -> task -> delegationDepth` from `parentRunId`, and
+                // `context.runId` is minted by the graph executor — it is not an
+                // `agent_runs` row, so resolving from it finds nothing and the
+                // depth cap silently never fires. The fallback keeps a host that
+                // supplies neither working exactly as before.
+                parentRunId: this.contextString(context, 'agentRunId') ?? context.runId,
+                parentTaskId: this.contextString(context, 'taskId') ?? null,
+                // An advisory FLOOR. The binding number is server-derived:
+                // `SubAgentDelegationService` resolves the true depth from the
+                // Task chain (anchored by `parentRunId` above) and raises this
+                // value before validating, never lowers it.
+                depth: this.contextNumber(context, 'delegationDepth') ?? 0,
+                objective,
+                scope: {
+                    // `['*']` means "everything the parent had" — the contract's
+                    // only wildcard, and the honest default for a node that
+                    // names no tools. Used ONLY when a parent scope exists to
+                    // bound it; without one it would be an unbounded request,
+                    // so the empty list (which the contract refuses as
+                    // `scope-empty`) is kept instead. Same outcome as before
+                    // this change for any host that supplies no parent scope.
+                    allowedTools:
+                        this.stringArrayConfig(node, 'allowedTools') ?? (parentScope ? ['*'] : []),
+                    workId: this.contextString(context, 'workId') ?? null,
+                    organizationId: this.contextString(context, 'organizationId') ?? null,
+                },
             },
-        });
+            {
+                // Without these two the contract's caps are inert:
+                // `narrowSubAgentScope` never runs (so a node's
+                // model-supplied `allowedTools` was taken verbatim), and the
+                // fan-out check compares `0 >= maxSiblings`, which is never
+                // true however many delegations one run issues.
+                ...(parentScope ? { parentScope } : {}),
+                siblingCount: this.countDelegation(context.runId),
+            },
+        );
 
         // A refusal is a legitimate graph outcome, not an exception: the
         // failure code is surfaced so an on_failure edge can route on it
@@ -219,6 +246,66 @@ export class WorkflowNodeRunnerService implements WorkflowNodeRunner {
             };
         }
         return { ok: true, output: result.output };
+    }
+
+    /**
+     * Read the parent scope the host put in the run context.
+     *
+     * Validated rather than trusted: the context is assembled server-side
+     * today, but this is the object that decides how far a child's
+     * privilege reaches, so a malformed one is dropped (returning
+     * `undefined`, i.e. today's no-narrowing behaviour) rather than
+     * half-applied. A scope with no tools is also dropped — it would
+     * intersect to nothing and refuse every delegation with `scope-empty`,
+     * which is a broken feature rather than a safe default.
+     */
+    private parentScope(context: WorkflowNodeRunContext): SubAgentScope | undefined {
+        const raw = context.context['parentScope'];
+        if (!raw || typeof raw !== 'object') return undefined;
+        const candidate = raw as Partial<SubAgentScope>;
+        if (!Array.isArray(candidate.allowedTools)) return undefined;
+        const allowedTools = candidate.allowedTools.filter(
+            (tool): tool is string => typeof tool === 'string' && tool.length > 0,
+        );
+        if (allowedTools.length === 0) return undefined;
+        return {
+            allowedTools,
+            workId: typeof candidate.workId === 'string' ? candidate.workId : null,
+            organizationId:
+                typeof candidate.organizationId === 'string' ? candidate.organizationId : null,
+            networkAccess: Boolean(candidate.networkAccess),
+        };
+    }
+
+    /**
+     * How many delegations this graph run has already issued, then record
+     * this one.
+     *
+     * The contract's fan-out cap is checked against a count the CALLER
+     * supplies; nothing supplied one, so `0 >= maxSiblings` was never true
+     * and the cap could not fire. A graph run is the right unit here —
+     * it is one parent's burst of delegations.
+     *
+     * Bounded on purpose: this service is a long-lived singleton, so an
+     * unbounded Map keyed by run id is a slow leak. Runs are short and the
+     * count only matters while one is executing, so the oldest entries are
+     * evicted once the map exceeds {@link MAX_TRACKED_RUNS}. A run evicted
+     * mid-flight simply restarts its count — it under-counts rather than
+     * over-refusing, which is the right direction for an eviction to fail.
+     */
+    private countDelegation(runId: string): number {
+        const previous = this.delegationsByRun.get(runId) ?? 0;
+        // Re-insert so insertion order tracks recency (Map preserves it),
+        // which is what makes the eviction below drop the OLDEST run.
+        this.delegationsByRun.delete(runId);
+        this.delegationsByRun.set(runId, previous + 1);
+
+        while (this.delegationsByRun.size > WorkflowNodeRunnerService.MAX_TRACKED_RUNS) {
+            const oldest = this.delegationsByRun.keys().next();
+            if (oldest.done) break;
+            this.delegationsByRun.delete(oldest.value);
+        }
+        return previous;
     }
 
     private stringConfig(node: WorkflowNode, key: string): string | undefined {
