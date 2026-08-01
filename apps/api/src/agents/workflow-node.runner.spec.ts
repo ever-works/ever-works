@@ -247,6 +247,51 @@ describe('WorkflowNodeRunnerService', () => {
             expect(delegation.delegate.mock.calls[0][0].scope.allowedTools).toEqual(['read_file']);
         });
 
+        it('INHERITS the parent networkAccess instead of pinning every child off', async () => {
+            // `narrowSubAgentScope` ANDs parent and requested. A node never
+            // asks for network, so leaving `requested` unset collapses the
+            // AND to false for every child — the field would be threaded
+            // three layers only to be pinned off.
+            await runner.run(
+                delegateNode(),
+                {},
+                ctx({ parentScope: { ...PARENT_SCOPE, networkAccess: true } }) as never,
+            );
+
+            expect(delegation.delegate.mock.calls[0][0].scope.networkAccess).toBe(true);
+        });
+
+        it('does not invent networkAccess when there is no parent scope', async () => {
+            await runner.run(delegateNode(), {}, ctx() as never);
+
+            expect(delegation.delegate.mock.calls[0][0].scope.networkAccess).toBeUndefined();
+        });
+
+        it('bounds how long one delegate node may block the tool call', async () => {
+            // Unbudgeted, `awaitTerminal` waits 10 minutes per node and the
+            // executor walks up to 4 delegate nodes sequentially — ~40
+            // minutes for a single chat tool call.
+            await runner.run(delegateNode(), {}, ctx({ parentScope: PARENT_SCOPE }) as never);
+
+            expect(delegation.delegate.mock.calls[0][0].budget.maxDurationMs).toBe(5 * 60_000);
+        });
+
+        it('lets a node ask for LESS time but not more', async () => {
+            await runner.run(
+                delegateNode({ maxDurationMs: 30_000 }),
+                {},
+                ctx({ parentScope: PARENT_SCOPE }) as never,
+            );
+            await runner.run(
+                delegateNode({ maxDurationMs: 60 * 60_000 }),
+                {},
+                ctx({ parentScope: PARENT_SCOPE }) as never,
+            );
+
+            expect(delegation.delegate.mock.calls[0][0].budget.maxDurationMs).toBe(30_000);
+            expect(delegation.delegate.mock.calls[1][0].budget.maxDurationMs).toBe(10 * 60_000);
+        });
+
         it('drops a malformed parent scope rather than half-applying it', async () => {
             await runner.run(
                 delegateNode(),

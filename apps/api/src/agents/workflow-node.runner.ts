@@ -51,6 +51,21 @@ export class WorkflowNodeRunnerService implements WorkflowNodeRunner {
     private readonly delegationsByRun = new Map<string, number>();
     private static readonly MAX_TRACKED_RUNS = 500;
 
+    /**
+     * Default wait for one delegate node.
+     *
+     * Half the delegation runner's own 10-minute fallback, chosen so a
+     * maximal graph (4 delegate nodes, walked sequentially) bounds a chat
+     * tool call at ~20 minutes rather than ~40 — while still leaving a real
+     * child agent run a realistic amount of time. A node that genuinely
+     * needs the old allowance can ask for it, up to
+     * {@link MAX_DELEGATION_BUDGET_MS}, so nothing that worked before is
+     * cut off; it just has to say so.
+     */
+    private static readonly DEFAULT_DELEGATION_BUDGET_MS = 5 * 60_000;
+    /** Ceiling a node may not raise past — the previous implicit default. */
+    private static readonly MAX_DELEGATION_BUDGET_MS = 10 * 60_000;
+
     constructor(
         @Optional() private readonly delegation?: SubAgentDelegationService,
         @Optional() private readonly ai?: AiFacadeService,
@@ -222,7 +237,33 @@ export class WorkflowNodeRunnerService implements WorkflowNodeRunner {
                         this.stringArrayConfig(node, 'allowedTools') ?? (parentScope ? ['*'] : []),
                     workId: this.contextString(context, 'workId') ?? null,
                     organizationId: this.contextString(context, 'organizationId') ?? null,
+                    // INHERIT the parent's value rather than leaving this
+                    // undefined.
+                    //
+                    // `narrowSubAgentScope` computes
+                    // `Boolean(parent.networkAccess) && Boolean(requested.networkAccess)`.
+                    // A node never asks for network, so leaving this unset
+                    // makes the AND collapse to `false` for EVERY child —
+                    // the field would be threaded three layers only to be
+                    // pinned off, which is not a bound, it is a bug that
+                    // happens to look strict.
+                    ...(parentScope ? { networkAccess: parentScope.networkAccess } : {}),
                 },
+                // Bound the wait.
+                //
+                // `awaitTerminal` falls back to a 10-MINUTE budget, and a
+                // graph may hold up to `WORKFLOW_TOOL_MAX_DELEGATE_NODES`
+                // delegate nodes which the executor walks sequentially —
+                // so an unbudgeted graph could block one chat tool call for
+                // ~40 minutes. Before this change that never happened
+                // because a bare delegate node was refused outright as
+                // `scope-empty`; making delegation actually work is what
+                // exposes the wait.
+                //
+                // A timeout surfaces as a `failed` node, which an
+                // `on_failure` edge can route around — it does not lose the
+                // graph.
+                budget: { maxDurationMs: this.delegationBudgetMs(node) },
             },
             {
                 // Without these two the contract's caps are inert:
@@ -259,6 +300,22 @@ export class WorkflowNodeRunnerService implements WorkflowNodeRunner {
             };
         }
         return { ok: true, output: result.output };
+    }
+
+    /**
+     * How long one `agent.delegate` node may wait for its child.
+     *
+     * A node may ask for less via `config.maxDurationMs`; it may not ask
+     * for more, because the ceiling is what keeps a maximal graph from
+     * pinning a chat tool call for most of an hour.
+     */
+    private delegationBudgetMs(node: WorkflowNode): number {
+        const requested = node.config?.['maxDurationMs'];
+        const asked =
+            typeof requested === 'number' && Number.isFinite(requested) && requested > 0
+                ? requested
+                : WorkflowNodeRunnerService.DEFAULT_DELEGATION_BUDGET_MS;
+        return Math.min(asked, WorkflowNodeRunnerService.MAX_DELEGATION_BUDGET_MS);
     }
 
     /**
