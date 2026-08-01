@@ -364,6 +364,37 @@ describe('AgentToolService — domain chat tool assembly', () => {
         expect((sources.tasks!.chatService as any).post).not.toHaveBeenCalled();
     });
 
+    it('resolves the parent scope through the REAL service without recursing', async () => {
+        // The parent scope's `allowedTools` comes from a thunk that calls
+        // `resolveAllowedTools` again — from INSIDE a tool built by that
+        // very method. The laziness is what makes that safe (building a
+        // descriptor does not invoke it), but "safe" is a claim worth
+        // executing rather than reasoning about: an eager version would
+        // blow the stack right here.
+        const execute = jest.fn().mockResolvedValue({
+            status: 'completed',
+            runId: 'wfr-1',
+            visited: [],
+            output: null,
+        });
+        const svc = makeSvc({ ...sources, workflow: { executor: { execute } as any } });
+        const tools = svc.resolveAllowedTools(
+            makeAgent({ permissions: makePerms({ canAssignTasks: true }) }),
+        );
+        const tool = tools.find((t) => t.name === 'run_workflow_graph')!;
+
+        await tool.invoke({
+            graph: { id: 'g', entryNodeId: 'a', nodes: [{ id: 'a', kind: 'noop' }], edges: [] },
+        });
+
+        const scope = execute.mock.calls[0][1].context.parentScope;
+        // A real, enumerated tool set — NOT the `['*']` fallback, which is
+        // what we would see if the thunk had thrown.
+        expect(scope.allowedTools).toContain('run_workflow_graph');
+        expect(scope.allowedTools).not.toEqual(['*']);
+        expect(scope.allowedTools.length).toBeGreaterThan(1);
+    });
+
     it('skips a domain whose factory throws instead of failing tool resolution', () => {
         // A source object that makes `buildFleetTools` throw at build time.
         const exploding = {

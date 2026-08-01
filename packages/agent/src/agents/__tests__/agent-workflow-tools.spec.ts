@@ -240,9 +240,96 @@ describe('buildWorkflowTools', () => {
                     organizationId: 'org-1',
                     agentRunId: 'run-real-1',
                     delegationDepth: 0,
+                    // No `resolveParentToolNames` was supplied by this
+                    // fixture, so the scope falls back to the
+                    // inherit-everything wildcard while still PINNING the
+                    // Work / Org / network dimensions.
+                    parentScope: {
+                        allowedTools: ['*'],
+                        workId: 'work-1',
+                        organizationId: 'org-1',
+                        networkAccess: false,
+                    },
                 },
             }),
         );
+    });
+
+    /**
+     * The parent scope is what makes `narrowSubAgentScope` run at all —
+     * the contract's "privilege can only ever shrink going down the tree"
+     * property. Without it in the context, a delegate node's
+     * model-supplied `allowedTools` is taken verbatim.
+     */
+    describe('parent scope', () => {
+        const withScope = (over: Parameters<typeof buildWorkflowTools>[0] | object = {}) =>
+            buildWorkflowTools({
+                userId: OWNER,
+                agentId: AGENT,
+                workId: 'work-1',
+                organizationId: 'org-1',
+                agentRunId: 'run-real-1',
+                resolveParentToolNames: () => ['read_file', 'write_file'],
+                networkAccess: false,
+                executor: { execute: jest.fn().mockResolvedValue(runResult()) },
+                ...over,
+            } as Parameters<typeof buildWorkflowTools>[0]);
+
+        it('carries the agent’s REAL tool set, not a wildcard', async () => {
+            const execute = jest.fn().mockResolvedValue(runResult());
+            const tool = withScope({ executor: { execute } }).find(
+                (t) => t.name === 'run_workflow_graph',
+            )!;
+
+            await tool.invoke({ graph: graph() });
+
+            expect(execute.mock.calls[0][1].context.parentScope).toEqual({
+                allowedTools: ['read_file', 'write_file'],
+                workId: 'work-1',
+                organizationId: 'org-1',
+                networkAccess: false,
+            });
+        });
+
+        it('pins networkAccess from the agent permission', async () => {
+            const execute = jest.fn().mockResolvedValue(runResult());
+            const tool = withScope({ executor: { execute }, networkAccess: true }).find(
+                (t) => t.name === 'run_workflow_graph',
+            )!;
+
+            await tool.invoke({ graph: graph() });
+
+            expect(execute.mock.calls[0][1].context.parentScope.networkAccess).toBe(true);
+        });
+
+        it('falls back to the inherit-everything wildcard when the tool list cannot be resolved', async () => {
+            // NOT to an empty list: empty intersects to nothing and would
+            // refuse every delegation with `scope-empty`, turning a
+            // resolution hiccup into a broken feature.
+            const execute = jest.fn().mockResolvedValue(runResult());
+            const tool = withScope({
+                executor: { execute },
+                resolveParentToolNames: () => {
+                    throw new Error('resolution blew up');
+                },
+            }).find((t) => t.name === 'run_workflow_graph')!;
+
+            await tool.invoke({ graph: graph() });
+
+            expect(execute.mock.calls[0][1].context.parentScope.allowedTools).toEqual(['*']);
+        });
+
+        it('falls back to the wildcard for an empty resolved list', async () => {
+            const execute = jest.fn().mockResolvedValue(runResult());
+            const tool = withScope({
+                executor: { execute },
+                resolveParentToolNames: () => [],
+            }).find((t) => t.name === 'run_workflow_graph')!;
+
+            await tool.invoke({ graph: graph() });
+
+            expect(execute.mock.calls[0][1].context.parentScope.allowedTools).toEqual(['*']);
+        });
     });
 
     it('carries the REAL agent run id so delegation depth can be resolved', async () => {
