@@ -44,8 +44,9 @@ export class WorkflowNodeRunnerService implements WorkflowNodeRunner {
     private readonly logger = new Logger(WorkflowNodeRunnerService.name);
 
     /**
-     * Delegations issued per graph run, feeding the contract's fan-out
-     * cap. Bounded — see {@link countDelegation}.
+     * Delegations issued per AGENT run (falling back to the graph run when
+     * no agent run is threaded), feeding the contract's fan-out cap.
+     * Bounded — see {@link countDelegation}.
      */
     private readonly delegationsByRun = new Map<string, number>();
     private static readonly MAX_TRACKED_RUNS = 500;
@@ -230,7 +231,19 @@ export class WorkflowNodeRunnerService implements WorkflowNodeRunner {
                 // fan-out check compares `0 >= maxSiblings`, which is never
                 // true however many delegations one run issues.
                 ...(parentScope ? { parentScope } : {}),
-                siblingCount: this.countDelegation(context.runId),
+                siblingCount: this.countDelegation(
+                    // Keyed by the AGENT run, not the graph run.
+                    //
+                    // The contract's wording is "how many delegations the
+                    // parent has already issued in this run", and the parent
+                    // is an agent run — a model may call
+                    // `run_workflow_graph` repeatedly, and each call mints a
+                    // fresh graph id. Counting per graph run would hand out a
+                    // brand-new budget on every call, which combined with the
+                    // 4-delegate-node admission cap means the ceiling of 5
+                    // could never be reached at all.
+                    this.contextString(context, 'agentRunId') ?? context.runId,
+                ),
             },
         );
 
@@ -283,8 +296,14 @@ export class WorkflowNodeRunnerService implements WorkflowNodeRunner {
      *
      * The contract's fan-out cap is checked against a count the CALLER
      * supplies; nothing supplied one, so `0 >= maxSiblings` was never true
-     * and the cap could not fire. A graph run is the right unit here —
-     * it is one parent's burst of delegations.
+     * and the cap could not fire.
+     *
+     * The key is the AGENT run (see the call site). The graph run is the
+     * wrong unit: the executor is a single linear walk, so with
+     * delegate-on-a-cycle already refused each delegate node runs at most
+     * once — at most 4 per graph, under the ceiling of 5. Per-graph
+     * counting would therefore never refuse anything, while a model
+     * calling the tool repeatedly racked up unbounded delegations.
      *
      * Bounded on purpose: this service is a long-lived singleton, so an
      * unbounded Map keyed by run id is a slow leak. Runs are short and the

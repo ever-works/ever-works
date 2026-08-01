@@ -152,7 +152,57 @@ describe('WorkflowNodeRunnerService', () => {
             expect(counts).toEqual([0, 1, 2]);
         });
 
-        it('counts siblings PER RUN, not globally', async () => {
+        it('shares one budget across SEPARATE graph runs of the same agent run', async () => {
+            // The cap would otherwise be unreachable. The executor is a
+            // single linear walk and delegate-on-a-cycle is refused, so one
+            // graph issues at most 4 delegations — under the ceiling of 5.
+            // A model that calls run_workflow_graph twice would get a fresh
+            // budget each time, so counting per GRAPH run never refuses.
+            const first = {
+                graphId: 'g1',
+                runId: 'wf-run-1',
+                viaEdgeId: null,
+                stepIndex: 0,
+                context: {
+                    userId: 'user-1',
+                    agentId: 'agent-1',
+                    agentRunId: 'agent-run-A',
+                    parentScope: PARENT_SCOPE,
+                },
+            };
+            const second = { ...first, runId: 'wf-run-2' };
+
+            await runner.run(delegateNode(), {}, first as never);
+            await runner.run(delegateNode(), {}, second as never);
+
+            const counts = delegation.delegate.mock.calls.map((c) => c[1].siblingCount);
+            expect(counts).toEqual([0, 1]);
+        });
+
+        it('gives a DIFFERENT agent run its own budget', async () => {
+            const base = {
+                graphId: 'g1',
+                viaEdgeId: null,
+                stepIndex: 0,
+                context: { userId: 'user-1', agentId: 'agent-1', parentScope: PARENT_SCOPE },
+            };
+            await runner.run(delegateNode(), {}, {
+                ...base,
+                runId: 'wf-1',
+                context: { ...base.context, agentRunId: 'agent-run-A' },
+            } as never);
+            await runner.run(delegateNode(), {}, {
+                ...base,
+                runId: 'wf-2',
+                context: { ...base.context, agentRunId: 'agent-run-B' },
+            } as never);
+
+            // Otherwise one busy agent would refuse delegations for an
+            // unrelated one.
+            expect(delegation.delegate.mock.calls[1][1].siblingCount).toBe(0);
+        });
+
+        it('keys the budget by the graph run when no agent run is threaded', async () => {
             await runner.run(delegateNode(), {}, ctx({ parentScope: PARENT_SCOPE }) as never);
 
             const other = {
