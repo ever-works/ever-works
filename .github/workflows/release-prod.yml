@@ -32,9 +32,26 @@ jobs:
     runs-on: ${{ matrix.os }}
     timeout-minutes: 300
 
+    # GitHub-hosted ON PURPOSE — do not move this back onto the
+    # self-hosted pool.
+    #
+    # This job only ever talks to github.com with the built-in
+    # GITHUB_TOKEN: checkout, push a tag, create a release. It needs no
+    # cluster network, no internal registry and no OpenBao secret, which
+    # is what the shared `RUNNER_LINUX_X64_4` pool exists to provide.
+    #
+    # Occupying a pool slot for that was actively harmful. Measured on
+    # 2026-07-31: this run was created at 20:23:21 and its job did not
+    # start until 21:48:32 — 85 minutes queued behind the deploy jobs that
+    # genuinely need the pool — and then finished in 93 seconds. The
+    # release record for a production deploy lagged the deploy itself by
+    # an hour and a half, and it held a slot the deploys were waiting for.
+    #
+    # `ubuntu-latest` was already the fallback whenever the org var is
+    # unset, so it is a target this workflow is known to run on.
     strategy:
       matrix:
-        os: ["${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}"]
+        os: ['ubuntu-latest']
 
     steps:
       - name: Check out Git repository
