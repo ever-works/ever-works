@@ -229,6 +229,68 @@ export interface RunWorkflowGraphResult {
     output: unknown;
 }
 
+/**
+ * The scope a delegating node is narrowed against.
+ *
+ * Mirrors `SubAgentScope` structurally without importing it — this module
+ * only ever hands the object to the run context, and the node runner is
+ * what passes it to the delegation contract.
+ */
+export interface WorkflowParentScope {
+    allowedTools: string[];
+    workId: string | null;
+    organizationId: string | null;
+    networkAccess: boolean;
+}
+
+/**
+ * Build the parent scope from what the agent genuinely holds.
+ *
+ * `allowedTools` is the agent's REAL resolved tool list, so a delegate
+ * node cannot hand its child a tool the parent never had. The wildcard
+ * `['*']` is used only when the tool list cannot be resolved — it means
+ * "everything the parent had", which is the honest answer when we do not
+ * know the enumeration, and it still pins `workId` / `organizationId` /
+ * `networkAccess`. Inventing a narrow list we could not verify would
+ * refuse legitimate delegations for the wrong reason.
+ *
+ * Note the tool list is the pre-grant-filter set: an operator tool-grant
+ * that refuses a tool for the parent is not subtracted here. That is a
+ * deliberate over-approximation of ONE dimension — the child's own grants
+ * are resolved independently at its run time, so nothing is actually
+ * widened by it.
+ */
+function buildParentScope(args: {
+    workId?: string | null;
+    organizationId?: string | null;
+    networkAccess?: boolean;
+    resolveParentToolNames?: () => string[];
+}): WorkflowParentScope {
+    let allowedTools: string[] = ['*'];
+    if (args.resolveParentToolNames) {
+        try {
+            const names = args.resolveParentToolNames();
+            if (Array.isArray(names) && names.length > 0) {
+                allowedTools = names.filter(
+                    (name): name is string => typeof name === 'string' && name.length > 0,
+                );
+            }
+        } catch {
+            // Fall back to the wildcard rather than to an EMPTY list: an
+            // empty parent scope intersects to nothing and would refuse
+            // every delegation with `scope-empty`, turning a resolution
+            // hiccup into a broken feature.
+            allowedTools = ['*'];
+        }
+    }
+    return {
+        allowedTools,
+        workId: args.workId ?? null,
+        organizationId: args.organizationId ?? null,
+        networkAccess: Boolean(args.networkAccess),
+    };
+}
+
 /** Cap on the serialized size of the returned output. */
 const MAX_OUTPUT_CHARS = 8_000;
 
@@ -264,6 +326,18 @@ export function buildWorkflowTools(args: {
      * and the recursion cap silently never fires.
      */
     agentRunId?: string | null;
+    /**
+     * The tool names this agent actually holds — the `allowedTools` half
+     * of the parent scope every `agent.delegate` node is narrowed against.
+     *
+     * A THUNK, not an array, because the parent's tool list is what we are
+     * in the middle of assembling when this factory runs; resolving it
+     * eagerly would recurse. At invoke time the resolution has long since
+     * finished, so calling it there is safe.
+     */
+    resolveParentToolNames?: () => string[];
+    /** Whether this agent may reach the network at all. ANDed into the child's scope. */
+    networkAccess?: boolean;
     executor: Pick<WorkflowGraphExecutorService, 'execute'>;
 }): AgentToolDescriptor[] {
     const out: AgentToolDescriptor[] = [];
@@ -330,6 +404,17 @@ export function buildWorkflowTools(args: {
                         // off the Task chain via `agentRunId` above; it can
                         // only ever raise this.
                         delegationDepth: 0,
+                        // The scope an `agent.delegate` node is narrowed
+                        // AGAINST — the contract's "privilege can only ever
+                        // shrink going down the tree" property.
+                        //
+                        // Without it, `limits.parentScope` is undefined,
+                        // `narrowSubAgentScope` never runs, and a node's
+                        // model-supplied `allowedTools` is taken verbatim.
+                        // Built here rather than in the node runner because
+                        // this is the only layer that knows what the PARENT
+                        // agent actually holds.
+                        parentScope: buildParentScope(args),
                     },
                 });
 
