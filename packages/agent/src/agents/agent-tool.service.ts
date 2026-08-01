@@ -503,6 +503,12 @@ export class AgentToolService {
                         runContext?.runId && runContext.runId !== 'no-run'
                             ? runContext.runId
                             : null,
+                    // The parent's REAL tool set, resolved lazily at invoke
+                    // time. Eager resolution would recurse — we are inside
+                    // that very resolution right now.
+                    resolveParentToolNames: () =>
+                        this.resolveAllowedTools(agent).map((tool) => tool.name),
+                    networkAccess: Boolean(agent.permissions?.canCallExternalTools),
                     executor: workflow.executor,
                 }),
             );
