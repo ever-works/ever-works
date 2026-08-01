@@ -8,18 +8,17 @@ import {
     CalendarClock,
     CheckCircle2,
     ChevronLeft,
-    Copy,
     GitFork,
     Lightbulb,
     Pause,
     Play,
+    PlayCircle,
     Radio,
     Settings as SettingsIcon,
     Shield,
     Target,
     Trash2,
     TriangleAlertIcon,
-    Zap,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
@@ -370,171 +369,170 @@ export function MissionDetailClient({
     const canComplete = COMPLETABLE_STATUSES.has(mission.status);
     const canRunNow = RUNNABLE_STATUSES.has(mission.status);
     const isScheduled = mission.type === 'scheduled';
-    const hasLifecycleActions = canRunNow || canPause || canResume || canComplete;
 
     return (
         <div className="w-full p-6 max-w-screen-2xl mx-auto space-y-6">
             {/* ── Header ───────────────────────────────────────────────────── */}
             <div>
-                <Link
-                    href={ROUTES.DASHBOARD_MISSIONS}
-                    className="inline-flex items-center gap-1 text-xs text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark transition-colors"
-                >
-                    <ChevronLeft className="w-3.5 h-3.5" />
-                    {t('backToMissions')}
-                </Link>
+                {/* Top bar — every action on the page lives here, on the
+                    breadcrumb line, as a single non-wrapping row: Run now,
+                    Clone, the lifecycle verbs, then Delete behind a divider so
+                    the destructive intent never reads as part of the same
+                    group. Icons match how the rest of the app already draws
+                    these verbs: `PlayCircle` is the "Run now" glyph in
+                    WorkScheduleCard and TaskRunControls, and `GitFork` is the
+                    clone glyph on the "Cloned" badge below and on MissionCard. */}
+                <div className="flex items-center justify-between gap-3">
+                    <Link
+                        href={ROUTES.DASHBOARD_MISSIONS}
+                        className="inline-flex min-w-0 items-center gap-1 text-xs text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark transition-colors"
+                    >
+                        <ChevronLeft className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">{t('backToMissions')}</span>
+                    </Link>
 
-                <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
-                    {/* Icon + title + badges + description */}
-                    <div className="flex items-start gap-3 min-w-0 flex-1">
-                        {/* The one accented tile left on the page, and it uses
+                    {/* No wrapping here: the buttons hold one line and the
+                        back link truncates instead — it is the one element on
+                        this row that can lose characters without losing
+                        meaning. Below the widest breakpoints the row scrolls
+                        sideways rather than breaking onto a second line, and
+                        the vertical padding keeps focus rings unclipped. */}
+                    <div className="flex min-w-0 items-center gap-2 overflow-x-auto py-0.5">
+                        {canRunNow && (
+                            <button
+                                type="button"
+                                onClick={runNow}
+                                disabled={pendingRunNow}
+                                className={cn(btn, 'shrink-0')}
+                            >
+                                <PlayCircle className="w-3.5 h-3.5" />
+                                {t('actions.runNow')}
+                            </button>
+                        )}
+                        <button
+                            type="button"
+                            onClick={() => setCloneOpen(true)}
+                            disabled={pendingClone}
+                            className={cn(btn, 'shrink-0')}
+                        >
+                            <GitFork className="w-3.5 h-3.5" />
+                            {t('actions.clone')}
+                        </button>
+                        {canPause && (
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    transition('pause', () => pauseMissionAction(mission.id))
+                                }
+                                disabled={pendingLifecycle}
+                                className={cn(btn, 'shrink-0')}
+                            >
+                                <Pause className="w-3.5 h-3.5" />
+                                {t('actions.pause')}
+                            </button>
+                        )}
+                        {canResume && (
+                            <button
+                                type="button"
+                                onClick={() =>
+                                    transition('resume', () => resumeMissionAction(mission.id))
+                                }
+                                disabled={pendingLifecycle}
+                                className={cn(btn, 'shrink-0')}
+                            >
+                                <Play className="w-3.5 h-3.5" />
+                                {t('actions.resume')}
+                            </button>
+                        )}
+                        {canComplete && (
+                            <button
+                                type="button"
+                                onClick={() => setCompleteOpen(true)}
+                                disabled={pendingLifecycle}
+                                className={cn(btn, 'shrink-0')}
+                            >
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                {t('actions.complete')}
+                            </button>
+                        )}
+                        <span
+                            aria-hidden
+                            className="h-5 w-px shrink-0 bg-border dark:bg-border-dark"
+                        />
+                        <button
+                            type="button"
+                            data-testid="mission-delete-button"
+                            onClick={openDelete}
+                            disabled={pendingDelete}
+                            className={cn(btnDanger, 'shrink-0')}
+                        >
+                            <Trash2 className="w-3.5 h-3.5" />
+                            {t('actions.delete')}
+                        </button>
+                    </div>
+                </div>
+
+                {/* Icon + title + badges + description — the actions that used
+                    to share this row now all live in the top bar above. */}
+                <div className="mt-3 flex items-start gap-3 min-w-0">
+                    {/* The one accented tile left on the page, and it uses
                             the `concept-missions` token every other Mission
                             surface uses (MissionCard, MissionsList,
                             NewMissionForm, PageHeader) — this page was the
                             only one painting the entity icon `warning`. */}
-                        <div className="shrink-0 w-10 h-10 rounded-xl bg-concept-missions/10 border border-concept-missions/20 flex items-center justify-center">
-                            <Target className="w-5 h-5 text-concept-missions" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                            <h1 className="text-2xl font-semibold text-text dark:text-text-dark leading-tight">
-                                {mission.title}
-                            </h1>
-                            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                                <StatusPill status={mission.status} />
-                                {mission.outcome && (
-                                    <span
-                                        title={t('outcomeTooltip')}
-                                        className={cn(
-                                            'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium',
-                                            OUTCOME_STYLES[mission.outcome],
-                                        )}
-                                    >
-                                        <CheckCircle2 className="w-3 h-3" />
-                                        {t(`outcomes.${mission.outcome}`)}
-                                    </span>
-                                )}
-                                {mission.completedAt && (
-                                    <span className="inline-flex items-center gap-1 rounded-full border border-border dark:border-border-dark bg-surface dark:bg-surface-dark px-2 py-0.5 text-[11px] font-medium text-text-muted dark:text-text-muted-dark">
-                                        {t('completedAtLabel')}{' '}
-                                        <ShowDateTime value={mission.completedAt} />
-                                    </span>
-                                )}
+                    <div className="shrink-0 w-10 h-10 rounded-xl bg-concept-missions/10 border border-concept-missions/20 flex items-center justify-center">
+                        <Target className="w-5 h-5 text-concept-missions" />
+                    </div>
+                    <div className="min-w-0 flex-1">
+                        <h1 className="text-2xl font-semibold text-text dark:text-text-dark leading-tight">
+                            {mission.title}
+                        </h1>
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                            <StatusPill status={mission.status} />
+                            {mission.outcome && (
                                 <span
+                                    title={t('outcomeTooltip')}
                                     className={cn(
                                         'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium',
-                                        isScheduled
-                                            ? 'border-info/30 bg-info/8 dark:bg-info/12 text-info'
-                                            : 'border-border dark:border-border-dark bg-surface dark:bg-surface-dark text-text-muted dark:text-text-muted-dark',
+                                        OUTCOME_STYLES[mission.outcome],
                                     )}
                                 >
-                                    {isScheduled && <CalendarClock className="w-3 h-3" />}
-                                    {t(isScheduled ? 'badges.scheduled' : 'badges.oneShot')}
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    {t(`outcomes.${mission.outcome}`)}
                                 </span>
-                                {mission.sourceMissionId && (
-                                    <span
-                                        title={t('badges.clonedTooltip')}
-                                        className="inline-flex items-center gap-1 rounded-full border border-border dark:border-border-dark bg-surface dark:bg-surface-dark px-2 py-0.5 text-[11px] font-medium text-text-muted dark:text-text-muted-dark"
-                                    >
-                                        <GitFork className="w-3 h-3" />
-                                        {t('badges.cloned')}
-                                    </span>
+                            )}
+                            {mission.completedAt && (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-border dark:border-border-dark bg-surface dark:bg-surface-dark px-2 py-0.5 text-[11px] font-medium text-text-muted dark:text-text-muted-dark">
+                                    {t('completedAtLabel')}{' '}
+                                    <ShowDateTime value={mission.completedAt} />
+                                </span>
+                            )}
+                            <span
+                                className={cn(
+                                    'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium',
+                                    isScheduled
+                                        ? 'border-info/30 bg-info/8 dark:bg-info/12 text-info'
+                                        : 'border-border dark:border-border-dark bg-surface dark:bg-surface-dark text-text-muted dark:text-text-muted-dark',
                                 )}
-                            </div>
-                            {mission.description && (
-                                <p className="mt-2.5 text-sm text-text-secondary dark:text-text-secondary-dark max-w-3xl leading-relaxed">
-                                    {mission.description}
-                                </p>
+                            >
+                                {isScheduled && <CalendarClock className="w-3 h-3" />}
+                                {t(isScheduled ? 'badges.scheduled' : 'badges.oneShot')}
+                            </span>
+                            {mission.sourceMissionId && (
+                                <span
+                                    title={t('badges.clonedTooltip')}
+                                    className="inline-flex items-center gap-1 rounded-full border border-border dark:border-border-dark bg-surface dark:bg-surface-dark px-2 py-0.5 text-[11px] font-medium text-text-muted dark:text-text-muted-dark"
+                                >
+                                    <GitFork className="w-3 h-3" />
+                                    {t('badges.cloned')}
+                                </span>
                             )}
                         </div>
-                    </div>
-
-                    {/* Action buttons — lifecycle verbs first, then the
-                        destructive/duplicating pair behind a divider so the
-                        two intents never read as one undifferentiated row. */}
-                    <div className="flex flex-wrap items-center gap-2 shrink-0">
-                        {hasLifecycleActions && (
-                            <div className="flex flex-wrap items-center gap-2">
-                                {canRunNow && (
-                                    <button
-                                        type="button"
-                                        onClick={runNow}
-                                        disabled={pendingRunNow}
-                                        className={btn}
-                                    >
-                                        <Zap className="w-3.5 h-3.5" />
-                                        {t('actions.runNow')}
-                                    </button>
-                                )}
-                                {canPause && (
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            transition('pause', () =>
-                                                pauseMissionAction(mission.id),
-                                            )
-                                        }
-                                        disabled={pendingLifecycle}
-                                        className={btn}
-                                    >
-                                        <Pause className="w-3.5 h-3.5" />
-                                        {t('actions.pause')}
-                                    </button>
-                                )}
-                                {canResume && (
-                                    <button
-                                        type="button"
-                                        onClick={() =>
-                                            transition('resume', () =>
-                                                resumeMissionAction(mission.id),
-                                            )
-                                        }
-                                        disabled={pendingLifecycle}
-                                        className={btn}
-                                    >
-                                        <Play className="w-3.5 h-3.5" />
-                                        {t('actions.resume')}
-                                    </button>
-                                )}
-                                {canComplete && (
-                                    <button
-                                        type="button"
-                                        onClick={() => setCompleteOpen(true)}
-                                        disabled={pendingLifecycle}
-                                        className={btn}
-                                    >
-                                        <CheckCircle2 className="w-3.5 h-3.5" />
-                                        {t('actions.complete')}
-                                    </button>
-                                )}
-                            </div>
+                        {mission.description && (
+                            <p className="mt-2.5 text-sm text-text-secondary dark:text-text-secondary-dark max-w-3xl leading-relaxed">
+                                {mission.description}
+                            </p>
                         )}
-                        {hasLifecycleActions && (
-                            <span
-                                aria-hidden
-                                className="hidden @xl/main:block h-5 w-px bg-border dark:bg-border-dark"
-                            />
-                        )}
-                        <div className="flex items-center gap-2">
-                            <button
-                                type="button"
-                                onClick={() => setCloneOpen(true)}
-                                disabled={pendingClone}
-                                className={btn}
-                            >
-                                <Copy className="w-3.5 h-3.5" />
-                                {t('actions.clone')}
-                            </button>
-                            <button
-                                type="button"
-                                data-testid="mission-delete-button"
-                                onClick={openDelete}
-                                disabled={pendingDelete}
-                                className={cn(btnDanger, 'shrink-0')}
-                            >
-                                <Trash2 className="w-3.5 h-3.5" />
-                                {t('actions.delete')}
-                            </button>
-                        </div>
                     </div>
                 </div>
             </div>
@@ -810,7 +808,7 @@ export function MissionDetailClient({
                             disabled={pendingClone}
                             className={btn}
                         >
-                            <Copy className="w-3.5 h-3.5" />
+                            <GitFork className="w-3.5 h-3.5" />
                             {t('clone.confirm')}
                         </button>
                     </DialogFooter>
