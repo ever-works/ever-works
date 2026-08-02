@@ -1444,12 +1444,12 @@
                 "attach": "Attach",
                 "detach": "Detach",
                 "detachDialog": {
-                    "title": "Detach this Work?",
-                    "body": "{title} will be removed from this Mission. The Work itself is never touched — this only removes the reference.",
-                    "confirm": "Detach Work",
-                    "cancel": "Cancel",
-                    "detaching": "Detaching…",
-                    "error": "Failed to detach Work"
+                    "title": "Открепить эту Работу?",
+                    "body": "{title} будет удалена из этой Миссии. Сама Работа не изменяется — удаляется только связь.",
+                    "confirm": "Открепить Работу",
+                    "cancel": "Отмена",
+                    "detaching": "Открепление…",
+                    "error": "Не удалось открепить Работу"
                 },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
@@ -1500,12 +1500,12 @@
                 "clone": "Clone"
             },
             "deleteDialog": {
-                "title": "Delete this Mission?",
-                "body": "{title} will be permanently deleted. Child Ideas and Works are preserved, but their back-link to this Mission is broken. This cannot be undone.",
-                "confirm": "Delete Mission",
-                "cancel": "Cancel",
-                "deleting": "Deleting…",
-                "error": "Failed to delete Mission"
+                "title": "Удалить эту Миссию?",
+                "body": "{title} будет удалена безвозвратно. Дочерние Идеи и Работы сохранятся, но их обратная связь с этой Миссией будет потеряна. Это действие нельзя отменить.",
+                "confirm": "Удалить Миссию",
+                "cancel": "Отмена",
+                "deleting": "Удаление…",
+                "error": "Не удалось удалить Миссию"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1579,33 +1579,33 @@
                 }
             },
             "goals": {
-                "title": "Goals",
-                "empty": "No Goals attached to this Mission yet. Attach one below to track what success means.",
-                "attachTitle": "Attach a Goal",
-                "goalLabel": "Goal",
-                "goalPlaceholder": "Select a Goal",
-                "primaryLabel": "Set as primary",
-                "primaryBadge": "Primary",
-                "primaryTooltip": "The primary Goal for this Mission - only one Goal can be primary at a time.",
-                "attach": "Attach",
-                "detach": "Detach",
+                "title": "Цели",
+                "empty": "К этой Миссии пока не прикреплено ни одной Цели. Прикрепите Цель ниже, чтобы определить, что считать успехом.",
+                "attachTitle": "Прикрепить Цель",
+                "goalLabel": "Цель",
+                "goalPlaceholder": "Выберите Цель",
+                "primaryLabel": "Сделать основной",
+                "primaryBadge": "Основная",
+                "primaryTooltip": "Основная Цель этой Миссии - основной может быть только одна Цель одновременно.",
+                "attach": "Прикрепить",
+                "detach": "Открепить",
                 "detachDialog": {
-                    "title": "Detach this Goal?",
-                    "body": "{title} will be removed from this Mission. The Goal itself is not deleted — it stays on the Goals page and on any other Mission it is attached to.",
-                    "confirm": "Detach Goal",
-                    "cancel": "Cancel",
-                    "detaching": "Detaching…",
-                    "error": "Failed to detach Goal"
+                    "title": "Открепить эту Цель?",
+                    "body": "{title} будет удалена из этой Миссии. Сама Цель не удаляется — она останется на странице Целей и во всех других Миссиях, к которым прикреплена.",
+                    "confirm": "Открепить Цель",
+                    "cancel": "Отмена",
+                    "detaching": "Открепление…",
+                    "error": "Не удалось открепить Цель"
                 },
-                "alreadyLinkedOption": "{title} (already attached)",
-                "noGoalsToAttach": "You have no Goals yet. Create one on the Goals page, then attach it here.",
-                "pickerTruncated": "Showing your 100 most recent Goals - open the Goals page for the full list.",
-                "invariantNote": "Attaching a Goal never changes this Mission's status - completing a Mission stays an explicit action.",
+                "alreadyLinkedOption": "{title} (уже прикреплена)",
+                "noGoalsToAttach": "У вас пока нет Целей. Создайте Цель на странице Целей, а затем прикрепите её здесь.",
+                "pickerTruncated": "Показаны 100 последних Целей - откройте страницу Целей, чтобы увидеть полный список.",
+                "invariantNote": "Прикрепление Цели никогда не изменяет статус этой Миссии - завершение Миссии остаётся явным действием.",
                 "toasts": {
-                    "attached": "Goal attached",
-                    "attachError": "Couldn't attach Goal",
-                    "detached": "Goal detached",
-                    "detachError": "Couldn't detach Goal"
+                    "attached": "Цель прикреплена",
+                    "attachError": "Не удалось прикрепить Цель",
+                    "detached": "Цель откреплена",
+                    "detachError": "Не удалось открепить Цель"
                 }
             }
         },

@@ -1444,12 +1444,12 @@
                 "attach": "Attach",
                 "detach": "Detach",
                 "detachDialog": {
-                    "title": "Detach this Work?",
-                    "body": "{title} will be removed from this Mission. The Work itself is never touched — this only removes the reference.",
-                    "confirm": "Detach Work",
-                    "cancel": "Cancel",
-                    "detaching": "Detaching…",
-                    "error": "Failed to detach Work"
+                    "title": "Lepaskan Karya ini?",
+                    "body": "{title} akan dihapus dari Misi ini. Karya itu sendiri tidak pernah diubah — tindakan ini hanya menghapus referensinya.",
+                    "confirm": "Lepaskan Karya",
+                    "cancel": "Batal",
+                    "detaching": "Melepaskan…",
+                    "error": "Gagal melepaskan Karya"
                 },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
@@ -1500,12 +1500,12 @@
                 "clone": "Clone"
             },
             "deleteDialog": {
-                "title": "Delete this Mission?",
-                "body": "{title} will be permanently deleted. Child Ideas and Works are preserved, but their back-link to this Mission is broken. This cannot be undone.",
-                "confirm": "Delete Mission",
-                "cancel": "Cancel",
-                "deleting": "Deleting…",
-                "error": "Failed to delete Mission"
+                "title": "Hapus Misi ini?",
+                "body": "{title} akan dihapus secara permanen. Ide dan Karya turunan tetap dipertahankan, tetapi tautan baliknya ke Misi ini terputus. Tindakan ini tidak dapat dibatalkan.",
+                "confirm": "Hapus Misi",
+                "cancel": "Batal",
+                "deleting": "Menghapus…",
+                "error": "Gagal menghapus Misi"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1579,33 +1579,33 @@
                 }
             },
             "goals": {
-                "title": "Goals",
-                "empty": "No Goals attached to this Mission yet. Attach one below to track what success means.",
-                "attachTitle": "Attach a Goal",
-                "goalLabel": "Goal",
-                "goalPlaceholder": "Select a Goal",
-                "primaryLabel": "Set as primary",
-                "primaryBadge": "Primary",
-                "primaryTooltip": "The primary Goal for this Mission - only one Goal can be primary at a time.",
-                "attach": "Attach",
-                "detach": "Detach",
+                "title": "Sasaran",
+                "empty": "Belum ada Sasaran yang dilampirkan ke Misi ini. Lampirkan satu di bawah untuk melacak arti keberhasilan.",
+                "attachTitle": "Lampirkan Sasaran",
+                "goalLabel": "Sasaran",
+                "goalPlaceholder": "Pilih Sasaran",
+                "primaryLabel": "Tetapkan sebagai utama",
+                "primaryBadge": "Utama",
+                "primaryTooltip": "Sasaran utama untuk Misi ini - hanya satu Sasaran yang dapat menjadi utama dalam satu waktu.",
+                "attach": "Lampirkan",
+                "detach": "Lepaskan",
                 "detachDialog": {
-                    "title": "Detach this Goal?",
-                    "body": "{title} will be removed from this Mission. The Goal itself is not deleted — it stays on the Goals page and on any other Mission it is attached to.",
-                    "confirm": "Detach Goal",
-                    "cancel": "Cancel",
-                    "detaching": "Detaching…",
-                    "error": "Failed to detach Goal"
+                    "title": "Lepaskan Sasaran ini?",
+                    "body": "{title} akan dihapus dari Misi ini. Sasaran itu sendiri tidak dihapus — Sasaran tetap ada di halaman Sasaran dan di Misi lain mana pun yang melampirkannya.",
+                    "confirm": "Lepaskan Sasaran",
+                    "cancel": "Batal",
+                    "detaching": "Melepaskan…",
+                    "error": "Gagal melepaskan Sasaran"
                 },
-                "alreadyLinkedOption": "{title} (already attached)",
-                "noGoalsToAttach": "You have no Goals yet. Create one on the Goals page, then attach it here.",
-                "pickerTruncated": "Showing your 100 most recent Goals - open the Goals page for the full list.",
-                "invariantNote": "Attaching a Goal never changes this Mission's status - completing a Mission stays an explicit action.",
+                "alreadyLinkedOption": "{title} (sudah dilampirkan)",
+                "noGoalsToAttach": "Anda belum memiliki Sasaran. Buat satu di halaman Sasaran, lalu lampirkan di sini.",
+                "pickerTruncated": "Menampilkan 100 Sasaran terbaru Anda - buka halaman Sasaran untuk daftar lengkap.",
+                "invariantNote": "Melampirkan Sasaran tidak pernah mengubah status Misi ini - menyelesaikan Misi tetap merupakan tindakan eksplisit.",
                 "toasts": {
-                    "attached": "Goal attached",
-                    "attachError": "Couldn't attach Goal",
-                    "detached": "Goal detached",
-                    "detachError": "Couldn't detach Goal"
+                    "attached": "Sasaran dilampirkan",
+                    "attachError": "Tidak dapat melampirkan Sasaran",
+                    "detached": "Sasaran dilepaskan",
+                    "detachError": "Tidak dapat melepaskan Sasaran"
                 }
             }
         },

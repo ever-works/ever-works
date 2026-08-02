@@ -1444,12 +1444,12 @@
                 "attach": "Attach",
                 "detach": "Detach",
                 "detachDialog": {
-                    "title": "Detach this Work?",
-                    "body": "{title} will be removed from this Mission. The Work itself is never touched — this only removes the reference.",
-                    "confirm": "Detach Work",
-                    "cancel": "Cancel",
-                    "detaching": "Detaching…",
-                    "error": "Failed to detach Work"
+                    "title": "このワークを切り離しますか？",
+                    "body": "{title} はこのミッションから削除されます。ワーク自体には一切影響しません — 参照が解除されるだけです。",
+                    "confirm": "ワークを切り離す",
+                    "cancel": "キャンセル",
+                    "detaching": "切り離しています…",
+                    "error": "ワークを切り離せませんでした"
                 },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
@@ -1500,12 +1500,12 @@
                 "clone": "Clone"
             },
             "deleteDialog": {
-                "title": "Delete this Mission?",
-                "body": "{title} will be permanently deleted. Child Ideas and Works are preserved, but their back-link to this Mission is broken. This cannot be undone.",
-                "confirm": "Delete Mission",
-                "cancel": "Cancel",
-                "deleting": "Deleting…",
-                "error": "Failed to delete Mission"
+                "title": "このミッションを削除しますか？",
+                "body": "{title} は完全に削除されます。子のアイデアとワークは保持されますが、このミッションへの逆リンクは失われます。この操作は取り消せません。",
+                "confirm": "ミッションを削除",
+                "cancel": "キャンセル",
+                "deleting": "削除しています…",
+                "error": "ミッションを削除できませんでした"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1579,33 +1579,33 @@
                 }
             },
             "goals": {
-                "title": "Goals",
-                "empty": "No Goals attached to this Mission yet. Attach one below to track what success means.",
-                "attachTitle": "Attach a Goal",
-                "goalLabel": "Goal",
-                "goalPlaceholder": "Select a Goal",
-                "primaryLabel": "Set as primary",
-                "primaryBadge": "Primary",
-                "primaryTooltip": "The primary Goal for this Mission - only one Goal can be primary at a time.",
-                "attach": "Attach",
-                "detach": "Detach",
+                "title": "ゴール",
+                "empty": "このミッションにはまだゴールが紐付けられていません。成功の基準を追跡するには、下からゴールを紐付けてください。",
+                "attachTitle": "ゴールを紐付ける",
+                "goalLabel": "ゴール",
+                "goalPlaceholder": "ゴールを選択",
+                "primaryLabel": "主要に設定",
+                "primaryBadge": "主要",
+                "primaryTooltip": "このミッションの主要ゴール - 主要にできるゴールは同時に 1 つだけです。",
+                "attach": "紐付ける",
+                "detach": "切り離す",
                 "detachDialog": {
-                    "title": "Detach this Goal?",
-                    "body": "{title} will be removed from this Mission. The Goal itself is not deleted — it stays on the Goals page and on any other Mission it is attached to.",
-                    "confirm": "Detach Goal",
-                    "cancel": "Cancel",
-                    "detaching": "Detaching…",
-                    "error": "Failed to detach Goal"
+                    "title": "このゴールを切り離しますか？",
+                    "body": "{title} はこのミッションから削除されます。ゴール自体は削除されません — ゴールページや、紐付けられている他のミッションには残ります。",
+                    "confirm": "ゴールを切り離す",
+                    "cancel": "キャンセル",
+                    "detaching": "切り離しています…",
+                    "error": "ゴールを切り離せませんでした"
                 },
-                "alreadyLinkedOption": "{title} (already attached)",
-                "noGoalsToAttach": "You have no Goals yet. Create one on the Goals page, then attach it here.",
-                "pickerTruncated": "Showing your 100 most recent Goals - open the Goals page for the full list.",
-                "invariantNote": "Attaching a Goal never changes this Mission's status - completing a Mission stays an explicit action.",
+                "alreadyLinkedOption": "{title}（紐付け済み）",
+                "noGoalsToAttach": "ゴールがまだありません。ゴールページで作成してから、ここで紐付けてください。",
+                "pickerTruncated": "最近のゴール 100 件を表示しています - すべて見るにはゴールページを開いてください。",
+                "invariantNote": "ゴールを紐付けてもこのミッションのステータスは変わりません - ミッションの完了は明示的な操作のままです。",
                 "toasts": {
-                    "attached": "Goal attached",
-                    "attachError": "Couldn't attach Goal",
-                    "detached": "Goal detached",
-                    "detachError": "Couldn't detach Goal"
+                    "attached": "ゴールを紐付けました",
+                    "attachError": "ゴールを紐付けられませんでした",
+                    "detached": "ゴールを切り離しました",
+                    "detachError": "ゴールを切り離せませんでした"
                 }
             }
         },

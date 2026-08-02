@@ -1475,12 +1475,12 @@
                 "attach": "Attach",
                 "detach": "Detach",
                 "detachDialog": {
-                    "title": "Detach this Work?",
-                    "body": "{title} will be removed from this Mission. The Work itself is never touched — this only removes the reference.",
-                    "confirm": "Detach Work",
-                    "cancel": "Cancel",
-                    "detaching": "Detaching…",
-                    "error": "Failed to detach Work"
+                    "title": "¿Desvincular este Trabajo?",
+                    "body": "{title} se eliminará de esta Misión. El Trabajo en sí nunca se modifica — esto solo elimina la referencia.",
+                    "confirm": "Desvincular Trabajo",
+                    "cancel": "Cancelar",
+                    "detaching": "Desvinculando…",
+                    "error": "No se pudo desvincular el Trabajo"
                 },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
@@ -1531,12 +1531,12 @@
                 "clone": "Clone"
             },
             "deleteDialog": {
-                "title": "Delete this Mission?",
-                "body": "{title} will be permanently deleted. Child Ideas and Works are preserved, but their back-link to this Mission is broken. This cannot be undone.",
-                "confirm": "Delete Mission",
-                "cancel": "Cancel",
-                "deleting": "Deleting…",
-                "error": "Failed to delete Mission"
+                "title": "¿Eliminar esta Misión?",
+                "body": "{title} se eliminará de forma permanente. Las Ideas y los Trabajos secundarios se conservan, pero se pierde su vínculo con esta Misión. Esta acción no se puede deshacer.",
+                "confirm": "Eliminar Misión",
+                "cancel": "Cancelar",
+                "deleting": "Eliminando…",
+                "error": "No se pudo eliminar la Misión"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1610,33 +1610,33 @@
                 }
             },
             "goals": {
-                "title": "Goals",
-                "empty": "No Goals attached to this Mission yet. Attach one below to track what success means.",
-                "attachTitle": "Attach a Goal",
-                "goalLabel": "Goal",
-                "goalPlaceholder": "Select a Goal",
-                "primaryLabel": "Set as primary",
-                "primaryBadge": "Primary",
-                "primaryTooltip": "The primary Goal for this Mission - only one Goal can be primary at a time.",
-                "attach": "Attach",
-                "detach": "Detach",
+                "title": "Objetivos",
+                "empty": "Todavía no hay Objetivos vinculados a esta Misión. Vincula uno a continuación para definir qué significa el éxito.",
+                "attachTitle": "Vincular un Objetivo",
+                "goalLabel": "Objetivo",
+                "goalPlaceholder": "Selecciona un Objetivo",
+                "primaryLabel": "Establecer como principal",
+                "primaryBadge": "Principal",
+                "primaryTooltip": "El Objetivo principal de esta Misión - solo un Objetivo puede ser principal a la vez.",
+                "attach": "Vincular",
+                "detach": "Desvincular",
                 "detachDialog": {
-                    "title": "Detach this Goal?",
-                    "body": "{title} will be removed from this Mission. The Goal itself is not deleted — it stays on the Goals page and on any other Mission it is attached to.",
-                    "confirm": "Detach Goal",
-                    "cancel": "Cancel",
-                    "detaching": "Detaching…",
-                    "error": "Failed to detach Goal"
+                    "title": "¿Desvincular este Objetivo?",
+                    "body": "{title} se eliminará de esta Misión. El Objetivo en sí no se elimina — permanece en la página de Objetivos y en cualquier otra Misión a la que esté vinculado.",
+                    "confirm": "Desvincular Objetivo",
+                    "cancel": "Cancelar",
+                    "detaching": "Desvinculando…",
+                    "error": "No se pudo desvincular el Objetivo"
                 },
-                "alreadyLinkedOption": "{title} (already attached)",
-                "noGoalsToAttach": "You have no Goals yet. Create one on the Goals page, then attach it here.",
-                "pickerTruncated": "Showing your 100 most recent Goals - open the Goals page for the full list.",
-                "invariantNote": "Attaching a Goal never changes this Mission's status - completing a Mission stays an explicit action.",
+                "alreadyLinkedOption": "{title} (ya vinculado)",
+                "noGoalsToAttach": "Todavía no tienes Objetivos. Crea uno en la página de Objetivos y luego vincúlalo aquí.",
+                "pickerTruncated": "Se muestran tus 100 Objetivos más recientes - abre la página de Objetivos para ver la lista completa.",
+                "invariantNote": "Vincular un Objetivo nunca cambia el estado de esta Misión - completar una Misión sigue siendo una acción explícita.",
                 "toasts": {
-                    "attached": "Goal attached",
-                    "attachError": "Couldn't attach Goal",
-                    "detached": "Goal detached",
-                    "detachError": "Couldn't detach Goal"
+                    "attached": "Objetivo vinculado",
+                    "attachError": "No se pudo vincular el Objetivo",
+                    "detached": "Objetivo desvinculado",
+                    "detachError": "No se pudo desvincular el Objetivo"
                 }
             }
         },

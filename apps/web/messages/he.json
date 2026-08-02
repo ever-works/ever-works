@@ -1475,12 +1475,12 @@
                 "attach": "Attach",
                 "detach": "Detach",
                 "detachDialog": {
-                    "title": "Detach this Work?",
-                    "body": "{title} will be removed from this Mission. The Work itself is never touched — this only removes the reference.",
-                    "confirm": "Detach Work",
-                    "cancel": "Cancel",
-                    "detaching": "Detaching…",
-                    "error": "Failed to detach Work"
+                    "title": "לנתק את העבודה הזו?",
+                    "body": "{title} תוסר מהמשימה הזו. העבודה עצמה לא מושפעת כלל — הפעולה מסירה רק את הקישור.",
+                    "confirm": "נתק עבודה",
+                    "cancel": "ביטול",
+                    "detaching": "מנתק…",
+                    "error": "ניתוק העבודה נכשל"
                 },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
@@ -1531,12 +1531,12 @@
                 "clone": "Clone"
             },
             "deleteDialog": {
-                "title": "Delete this Mission?",
-                "body": "{title} will be permanently deleted. Child Ideas and Works are preserved, but their back-link to this Mission is broken. This cannot be undone.",
-                "confirm": "Delete Mission",
-                "cancel": "Cancel",
-                "deleting": "Deleting…",
-                "error": "Failed to delete Mission"
+                "title": "למחוק את המשימה הזו?",
+                "body": "{title} תימחק לצמיתות. רעיונות ועבודות מקושרים נשמרים, אך הקישור שלהם חזרה למשימה הזו יאבד. לא ניתן לבטל פעולה זו.",
+                "confirm": "מחק משימה",
+                "cancel": "ביטול",
+                "deleting": "מוחק…",
+                "error": "מחיקת המשימה נכשלה"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1610,33 +1610,33 @@
                 }
             },
             "goals": {
-                "title": "Goals",
-                "empty": "No Goals attached to this Mission yet. Attach one below to track what success means.",
-                "attachTitle": "Attach a Goal",
-                "goalLabel": "Goal",
-                "goalPlaceholder": "Select a Goal",
-                "primaryLabel": "Set as primary",
-                "primaryBadge": "Primary",
-                "primaryTooltip": "The primary Goal for this Mission - only one Goal can be primary at a time.",
-                "attach": "Attach",
-                "detach": "Detach",
+                "title": "יעדים",
+                "empty": "עדיין לא מחוברים יעדים למשימה הזו. חבר יעד למטה כדי להגדיר מהי הצלחה.",
+                "attachTitle": "חיבור יעד",
+                "goalLabel": "יעד",
+                "goalPlaceholder": "בחר יעד",
+                "primaryLabel": "הגדר כיעד ראשי",
+                "primaryBadge": "ראשי",
+                "primaryTooltip": "היעד הראשי של המשימה הזו - רק יעד אחד יכול להיות ראשי בכל רגע.",
+                "attach": "חבר",
+                "detach": "נתק",
                 "detachDialog": {
-                    "title": "Detach this Goal?",
-                    "body": "{title} will be removed from this Mission. The Goal itself is not deleted — it stays on the Goals page and on any other Mission it is attached to.",
-                    "confirm": "Detach Goal",
-                    "cancel": "Cancel",
-                    "detaching": "Detaching…",
-                    "error": "Failed to detach Goal"
+                    "title": "לנתק את היעד הזה?",
+                    "body": "{title} יוסר מהמשימה הזו. היעד עצמו לא נמחק — הוא נשאר בעמוד היעדים ובכל משימה אחרת שאליה הוא מחובר.",
+                    "confirm": "נתק יעד",
+                    "cancel": "ביטול",
+                    "detaching": "מנתק…",
+                    "error": "ניתוק היעד נכשל"
                 },
-                "alreadyLinkedOption": "{title} (already attached)",
-                "noGoalsToAttach": "You have no Goals yet. Create one on the Goals page, then attach it here.",
-                "pickerTruncated": "Showing your 100 most recent Goals - open the Goals page for the full list.",
-                "invariantNote": "Attaching a Goal never changes this Mission's status - completing a Mission stays an explicit action.",
+                "alreadyLinkedOption": "{title} (כבר מחובר)",
+                "noGoalsToAttach": "אין לך עדיין יעדים. צור יעד בעמוד היעדים ולאחר מכן חבר אותו כאן.",
+                "pickerTruncated": "מוצגים 100 היעדים האחרונים שלך - פתח את עמוד היעדים לרשימה המלאה.",
+                "invariantNote": "חיבור יעד לעולם אינו משנה את הסטטוס של המשימה הזו - סיום משימה נשאר פעולה מפורשת.",
                 "toasts": {
-                    "attached": "Goal attached",
-                    "attachError": "Couldn't attach Goal",
-                    "detached": "Goal detached",
-                    "detachError": "Couldn't detach Goal"
+                    "attached": "היעד חובר",
+                    "attachError": "לא ניתן היה לחבר את היעד",
+                    "detached": "היעד נותק",
+                    "detachError": "לא ניתן היה לנתק את היעד"
                 }
             }
         },

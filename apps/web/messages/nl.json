@@ -1444,12 +1444,12 @@
                 "attach": "Attach",
                 "detach": "Detach",
                 "detachDialog": {
-                    "title": "Detach this Work?",
-                    "body": "{title} will be removed from this Mission. The Work itself is never touched — this only removes the reference.",
-                    "confirm": "Detach Work",
-                    "cancel": "Cancel",
-                    "detaching": "Detaching…",
-                    "error": "Failed to detach Work"
+                    "title": "Dit Werk loskoppelen?",
+                    "body": "{title} wordt verwijderd uit deze Missie. Het Werk zelf wordt nooit aangepast — dit verwijdert alleen de verwijzing.",
+                    "confirm": "Werk loskoppelen",
+                    "cancel": "Annuleren",
+                    "detaching": "Loskoppelen…",
+                    "error": "Loskoppelen van Werk mislukt"
                 },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
@@ -1500,12 +1500,12 @@
                 "clone": "Clone"
             },
             "deleteDialog": {
-                "title": "Delete this Mission?",
-                "body": "{title} will be permanently deleted. Child Ideas and Works are preserved, but their back-link to this Mission is broken. This cannot be undone.",
-                "confirm": "Delete Mission",
-                "cancel": "Cancel",
-                "deleting": "Deleting…",
-                "error": "Failed to delete Mission"
+                "title": "Deze Missie verwijderen?",
+                "body": "{title} wordt permanent verwijderd. Onderliggende Ideeën en Werken blijven behouden, maar hun koppeling terug naar deze Missie gaat verloren. Dit kan niet ongedaan worden gemaakt.",
+                "confirm": "Missie verwijderen",
+                "cancel": "Annuleren",
+                "deleting": "Verwijderen…",
+                "error": "Verwijderen van Missie mislukt"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1579,33 +1579,33 @@
                 }
             },
             "goals": {
-                "title": "Goals",
-                "empty": "No Goals attached to this Mission yet. Attach one below to track what success means.",
-                "attachTitle": "Attach a Goal",
-                "goalLabel": "Goal",
-                "goalPlaceholder": "Select a Goal",
-                "primaryLabel": "Set as primary",
-                "primaryBadge": "Primary",
-                "primaryTooltip": "The primary Goal for this Mission - only one Goal can be primary at a time.",
-                "attach": "Attach",
-                "detach": "Detach",
+                "title": "Doelen",
+                "empty": "Er zijn nog geen Doelen gekoppeld aan deze Missie. Koppel er hieronder een om vast te leggen wat succes betekent.",
+                "attachTitle": "Een Doel koppelen",
+                "goalLabel": "Doel",
+                "goalPlaceholder": "Selecteer een Doel",
+                "primaryLabel": "Instellen als primair",
+                "primaryBadge": "Primair",
+                "primaryTooltip": "Het primaire Doel voor deze Missie - er kan maar één Doel tegelijk primair zijn.",
+                "attach": "Koppelen",
+                "detach": "Loskoppelen",
                 "detachDialog": {
-                    "title": "Detach this Goal?",
-                    "body": "{title} will be removed from this Mission. The Goal itself is not deleted — it stays on the Goals page and on any other Mission it is attached to.",
-                    "confirm": "Detach Goal",
-                    "cancel": "Cancel",
-                    "detaching": "Detaching…",
-                    "error": "Failed to detach Goal"
+                    "title": "Dit Doel loskoppelen?",
+                    "body": "{title} wordt verwijderd uit deze Missie. Het Doel zelf wordt niet verwijderd — het blijft staan op de pagina Doelen en bij elke andere Missie waaraan het gekoppeld is.",
+                    "confirm": "Doel loskoppelen",
+                    "cancel": "Annuleren",
+                    "detaching": "Loskoppelen…",
+                    "error": "Loskoppelen van Doel mislukt"
                 },
-                "alreadyLinkedOption": "{title} (already attached)",
-                "noGoalsToAttach": "You have no Goals yet. Create one on the Goals page, then attach it here.",
-                "pickerTruncated": "Showing your 100 most recent Goals - open the Goals page for the full list.",
-                "invariantNote": "Attaching a Goal never changes this Mission's status - completing a Mission stays an explicit action.",
+                "alreadyLinkedOption": "{title} (al gekoppeld)",
+                "noGoalsToAttach": "Je hebt nog geen Doelen. Maak er een aan op de pagina Doelen en koppel het hier.",
+                "pickerTruncated": "Je 100 meest recente Doelen worden getoond - open de pagina Doelen voor de volledige lijst.",
+                "invariantNote": "Een Doel koppelen verandert nooit de status van deze Missie - een Missie voltooien blijft een expliciete actie.",
                 "toasts": {
-                    "attached": "Goal attached",
-                    "attachError": "Couldn't attach Goal",
-                    "detached": "Goal detached",
-                    "detachError": "Couldn't detach Goal"
+                    "attached": "Doel gekoppeld",
+                    "attachError": "Kan Doel niet koppelen",
+                    "detached": "Doel losgekoppeld",
+                    "detachError": "Kan Doel niet loskoppelen"
                 }
             }
         },

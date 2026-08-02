@@ -1444,12 +1444,12 @@
                 "attach": "Attach",
                 "detach": "Detach",
                 "detachDialog": {
-                    "title": "Detach this Work?",
-                    "body": "{title} will be removed from this Mission. The Work itself is never touched — this only removes the reference.",
-                    "confirm": "Detach Work",
-                    "cancel": "Cancel",
-                    "detaching": "Detaching…",
-                    "error": "Failed to detach Work"
+                    "title": "Bu İş ayrılsın mı?",
+                    "body": "{title} bu Görevden kaldırılacak. İşin kendisine asla dokunulmaz — bu işlem yalnızca bağlantıyı kaldırır.",
+                    "confirm": "İşi Ayır",
+                    "cancel": "İptal",
+                    "detaching": "Ayrılıyor…",
+                    "error": "İş ayrılamadı"
                 },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
@@ -1500,12 +1500,12 @@
                 "clone": "Clone"
             },
             "deleteDialog": {
-                "title": "Delete this Mission?",
-                "body": "{title} will be permanently deleted. Child Ideas and Works are preserved, but their back-link to this Mission is broken. This cannot be undone.",
-                "confirm": "Delete Mission",
-                "cancel": "Cancel",
-                "deleting": "Deleting…",
-                "error": "Failed to delete Mission"
+                "title": "Bu Görev silinsin mi?",
+                "body": "{title} kalıcı olarak silinecek. Alt Fikirler ve İşler korunur, ancak bu Göreve olan geri bağlantıları kopar. Bu işlem geri alınamaz.",
+                "confirm": "Görevi Sil",
+                "cancel": "İptal",
+                "deleting": "Siliniyor…",
+                "error": "Görev silinemedi"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1579,33 +1579,33 @@
                 }
             },
             "goals": {
-                "title": "Goals",
-                "empty": "No Goals attached to this Mission yet. Attach one below to track what success means.",
-                "attachTitle": "Attach a Goal",
-                "goalLabel": "Goal",
-                "goalPlaceholder": "Select a Goal",
-                "primaryLabel": "Set as primary",
-                "primaryBadge": "Primary",
-                "primaryTooltip": "The primary Goal for this Mission - only one Goal can be primary at a time.",
-                "attach": "Attach",
-                "detach": "Detach",
+                "title": "Hedefler",
+                "empty": "Bu Göreve henüz Hedef eklenmedi. Başarının ne anlama geldiğini takip etmek için aşağıdan bir Hedef ekleyin.",
+                "attachTitle": "Hedef Ekle",
+                "goalLabel": "Hedef",
+                "goalPlaceholder": "Bir Hedef seçin",
+                "primaryLabel": "Birincil olarak ayarla",
+                "primaryBadge": "Birincil",
+                "primaryTooltip": "Bu Görevin birincil Hedefi - aynı anda yalnızca bir Hedef birincil olabilir.",
+                "attach": "Ekle",
+                "detach": "Ayır",
                 "detachDialog": {
-                    "title": "Detach this Goal?",
-                    "body": "{title} will be removed from this Mission. The Goal itself is not deleted — it stays on the Goals page and on any other Mission it is attached to.",
-                    "confirm": "Detach Goal",
-                    "cancel": "Cancel",
-                    "detaching": "Detaching…",
-                    "error": "Failed to detach Goal"
+                    "title": "Bu Hedef ayrılsın mı?",
+                    "body": "{title} bu Görevden kaldırılacak. Hedefin kendisi silinmez — Hedefler sayfasında ve eklendiği diğer tüm Görevlerde kalmaya devam eder.",
+                    "confirm": "Hedefi Ayır",
+                    "cancel": "İptal",
+                    "detaching": "Ayrılıyor…",
+                    "error": "Hedef ayrılamadı"
                 },
-                "alreadyLinkedOption": "{title} (already attached)",
-                "noGoalsToAttach": "You have no Goals yet. Create one on the Goals page, then attach it here.",
-                "pickerTruncated": "Showing your 100 most recent Goals - open the Goals page for the full list.",
-                "invariantNote": "Attaching a Goal never changes this Mission's status - completing a Mission stays an explicit action.",
+                "alreadyLinkedOption": "{title} (zaten ekli)",
+                "noGoalsToAttach": "Henüz Hedefiniz yok. Hedefler sayfasında bir Hedef oluşturun, ardından buraya ekleyin.",
+                "pickerTruncated": "En son 100 Hedefiniz gösteriliyor - tam liste için Hedefler sayfasını açın.",
+                "invariantNote": "Bir Hedef eklemek bu Görevin durumunu asla değiştirmez - bir Görevi tamamlamak açık bir eylem olarak kalır.",
                 "toasts": {
-                    "attached": "Goal attached",
-                    "attachError": "Couldn't attach Goal",
-                    "detached": "Goal detached",
-                    "detachError": "Couldn't detach Goal"
+                    "attached": "Hedef eklendi",
+                    "attachError": "Hedef eklenemedi",
+                    "detached": "Hedef ayrıldı",
+                    "detachError": "Hedef ayrılamadı"
                 }
             }
         },

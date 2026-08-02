@@ -1475,12 +1475,12 @@
                 "attach": "Attach",
                 "detach": "Detach",
                 "detachDialog": {
-                    "title": "Detach this Work?",
-                    "body": "{title} will be removed from this Mission. The Work itself is never touched — this only removes the reference.",
-                    "confirm": "Detach Work",
-                    "cancel": "Cancel",
-                    "detaching": "Detaching…",
-                    "error": "Failed to detach Work"
+                    "title": "Dieses Werk trennen?",
+                    "body": "{title} wird aus dieser Mission entfernt. Das Werk selbst bleibt unverändert — nur die Verknüpfung wird aufgehoben.",
+                    "confirm": "Werk trennen",
+                    "cancel": "Abbrechen",
+                    "detaching": "Wird getrennt…",
+                    "error": "Werk konnte nicht getrennt werden"
                 },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
@@ -1531,12 +1531,12 @@
                 "clone": "Clone"
             },
             "deleteDialog": {
-                "title": "Delete this Mission?",
-                "body": "{title} will be permanently deleted. Child Ideas and Works are preserved, but their back-link to this Mission is broken. This cannot be undone.",
-                "confirm": "Delete Mission",
-                "cancel": "Cancel",
-                "deleting": "Deleting…",
-                "error": "Failed to delete Mission"
+                "title": "Diese Mission löschen?",
+                "body": "{title} wird dauerhaft gelöscht. Untergeordnete Ideen und Werke bleiben erhalten, aber ihre Rückverknüpfung zu dieser Mission geht verloren. Dies kann nicht rückgängig gemacht werden.",
+                "confirm": "Mission löschen",
+                "cancel": "Abbrechen",
+                "deleting": "Wird gelöscht…",
+                "error": "Mission konnte nicht gelöscht werden"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1610,33 +1610,33 @@
                 }
             },
             "goals": {
-                "title": "Goals",
-                "empty": "No Goals attached to this Mission yet. Attach one below to track what success means.",
-                "attachTitle": "Attach a Goal",
-                "goalLabel": "Goal",
-                "goalPlaceholder": "Select a Goal",
-                "primaryLabel": "Set as primary",
-                "primaryBadge": "Primary",
-                "primaryTooltip": "The primary Goal for this Mission - only one Goal can be primary at a time.",
-                "attach": "Attach",
-                "detach": "Detach",
+                "title": "Ziele",
+                "empty": "Dieser Mission sind noch keine Ziele zugeordnet. Ordnen Sie unten eines zu, um festzuhalten, was Erfolg bedeutet.",
+                "attachTitle": "Ziel zuordnen",
+                "goalLabel": "Ziel",
+                "goalPlaceholder": "Ziel auswählen",
+                "primaryLabel": "Als primär festlegen",
+                "primaryBadge": "Primär",
+                "primaryTooltip": "Das primäre Ziel dieser Mission – es kann immer nur ein Ziel primär sein.",
+                "attach": "Zuordnen",
+                "detach": "Trennen",
                 "detachDialog": {
-                    "title": "Detach this Goal?",
-                    "body": "{title} will be removed from this Mission. The Goal itself is not deleted — it stays on the Goals page and on any other Mission it is attached to.",
-                    "confirm": "Detach Goal",
-                    "cancel": "Cancel",
-                    "detaching": "Detaching…",
-                    "error": "Failed to detach Goal"
+                    "title": "Dieses Ziel trennen?",
+                    "body": "{title} wird aus dieser Mission entfernt. Das Ziel selbst wird nicht gelöscht — es bleibt auf der Ziele-Seite und in jeder anderen Mission erhalten, der es zugeordnet ist.",
+                    "confirm": "Ziel trennen",
+                    "cancel": "Abbrechen",
+                    "detaching": "Wird getrennt…",
+                    "error": "Ziel konnte nicht getrennt werden"
                 },
-                "alreadyLinkedOption": "{title} (already attached)",
-                "noGoalsToAttach": "You have no Goals yet. Create one on the Goals page, then attach it here.",
-                "pickerTruncated": "Showing your 100 most recent Goals - open the Goals page for the full list.",
-                "invariantNote": "Attaching a Goal never changes this Mission's status - completing a Mission stays an explicit action.",
+                "alreadyLinkedOption": "{title} (bereits zugeordnet)",
+                "noGoalsToAttach": "Sie haben noch keine Ziele. Erstellen Sie eines auf der Ziele-Seite und ordnen Sie es anschließend hier zu.",
+                "pickerTruncated": "Es werden Ihre 100 zuletzt erstellten Ziele angezeigt – die vollständige Liste finden Sie auf der Ziele-Seite.",
+                "invariantNote": "Das Zuordnen eines Ziels ändert niemals den Status dieser Mission – das Abschließen einer Mission bleibt eine explizite Aktion.",
                 "toasts": {
-                    "attached": "Goal attached",
-                    "attachError": "Couldn't attach Goal",
-                    "detached": "Goal detached",
-                    "detachError": "Couldn't detach Goal"
+                    "attached": "Ziel zugeordnet",
+                    "attachError": "Ziel konnte nicht zugeordnet werden",
+                    "detached": "Ziel getrennt",
+                    "detachError": "Ziel konnte nicht getrennt werden"
                 }
             }
         },

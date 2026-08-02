@@ -1444,12 +1444,12 @@
                 "attach": "Attach",
                 "detach": "Detach",
                 "detachDialog": {
-                    "title": "Detach this Work?",
-                    "body": "{title} will be removed from this Mission. The Work itself is never touched — this only removes the reference.",
-                    "confirm": "Detach Work",
-                    "cancel": "Cancel",
-                    "detaching": "Detaching…",
-                    "error": "Failed to detach Work"
+                    "title": "इस कार्य को अलग करें?",
+                    "body": "{title} को इस मिशन से हटा दिया जाएगा। कार्य स्वयं कभी नहीं बदला जाता — इससे केवल संदर्भ हटता है।",
+                    "confirm": "कार्य अलग करें",
+                    "cancel": "रद्द करें",
+                    "detaching": "अलग किया जा रहा है…",
+                    "error": "कार्य अलग नहीं किया जा सका"
                 },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
@@ -1500,12 +1500,12 @@
                 "clone": "Clone"
             },
             "deleteDialog": {
-                "title": "Delete this Mission?",
-                "body": "{title} will be permanently deleted. Child Ideas and Works are preserved, but their back-link to this Mission is broken. This cannot be undone.",
-                "confirm": "Delete Mission",
-                "cancel": "Cancel",
-                "deleting": "Deleting…",
-                "error": "Failed to delete Mission"
+                "title": "इस मिशन को हटाएँ?",
+                "body": "{title} को स्थायी रूप से हटा दिया जाएगा। चाइल्ड विचार और कार्य सुरक्षित रहते हैं, लेकिन इस मिशन से उनका बैक-लिंक टूट जाता है। इसे पूर्ववत नहीं किया जा सकता।",
+                "confirm": "मिशन हटाएँ",
+                "cancel": "रद्द करें",
+                "deleting": "हटाया जा रहा है…",
+                "error": "मिशन हटाया नहीं जा सका"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1579,33 +1579,33 @@
                 }
             },
             "goals": {
-                "title": "Goals",
-                "empty": "No Goals attached to this Mission yet. Attach one below to track what success means.",
-                "attachTitle": "Attach a Goal",
-                "goalLabel": "Goal",
-                "goalPlaceholder": "Select a Goal",
-                "primaryLabel": "Set as primary",
-                "primaryBadge": "Primary",
-                "primaryTooltip": "The primary Goal for this Mission - only one Goal can be primary at a time.",
-                "attach": "Attach",
-                "detach": "Detach",
+                "title": "लक्ष्य",
+                "empty": "इस मिशन से अभी तक कोई लक्ष्य नहीं जुड़ा है। सफलता का अर्थ ट्रैक करने के लिए नीचे एक लक्ष्य जोड़ें।",
+                "attachTitle": "एक लक्ष्य जोड़ें",
+                "goalLabel": "लक्ष्य",
+                "goalPlaceholder": "एक लक्ष्य चुनें",
+                "primaryLabel": "प्राथमिक के रूप में सेट करें",
+                "primaryBadge": "प्राथमिक",
+                "primaryTooltip": "इस मिशन का प्राथमिक लक्ष्य - एक समय में केवल एक ही लक्ष्य प्राथमिक हो सकता है।",
+                "attach": "जोड़ें",
+                "detach": "अलग करें",
                 "detachDialog": {
-                    "title": "Detach this Goal?",
-                    "body": "{title} will be removed from this Mission. The Goal itself is not deleted — it stays on the Goals page and on any other Mission it is attached to.",
-                    "confirm": "Detach Goal",
-                    "cancel": "Cancel",
-                    "detaching": "Detaching…",
-                    "error": "Failed to detach Goal"
+                    "title": "इस लक्ष्य को अलग करें?",
+                    "body": "{title} को इस मिशन से हटा दिया जाएगा। लक्ष्य स्वयं हटाया नहीं जाता — यह लक्ष्य पृष्ठ पर और किसी भी अन्य मिशन में बना रहता है जिससे यह जुड़ा है।",
+                    "confirm": "लक्ष्य अलग करें",
+                    "cancel": "रद्द करें",
+                    "detaching": "अलग किया जा रहा है…",
+                    "error": "लक्ष्य अलग नहीं किया जा सका"
                 },
-                "alreadyLinkedOption": "{title} (already attached)",
-                "noGoalsToAttach": "You have no Goals yet. Create one on the Goals page, then attach it here.",
-                "pickerTruncated": "Showing your 100 most recent Goals - open the Goals page for the full list.",
-                "invariantNote": "Attaching a Goal never changes this Mission's status - completing a Mission stays an explicit action.",
+                "alreadyLinkedOption": "{title} (पहले से जुड़ा हुआ)",
+                "noGoalsToAttach": "आपके पास अभी तक कोई लक्ष्य नहीं है। लक्ष्य पृष्ठ पर एक बनाएँ, फिर उसे यहाँ जोड़ें।",
+                "pickerTruncated": "आपके 100 सबसे नए लक्ष्य दिखाए जा रहे हैं - पूरी सूची के लिए लक्ष्य पृष्ठ खोलें।",
+                "invariantNote": "लक्ष्य जोड़ने से इस मिशन की स्थिति कभी नहीं बदलती - मिशन पूरा करना एक स्पष्ट क्रिया बनी रहती है।",
                 "toasts": {
-                    "attached": "Goal attached",
-                    "attachError": "Couldn't attach Goal",
-                    "detached": "Goal detached",
-                    "detachError": "Couldn't detach Goal"
+                    "attached": "लक्ष्य जोड़ा गया",
+                    "attachError": "लक्ष्य जोड़ा नहीं जा सका",
+                    "detached": "लक्ष्य अलग किया गया",
+                    "detachError": "लक्ष्य अलग नहीं किया जा सका"
                 }
             }
         },

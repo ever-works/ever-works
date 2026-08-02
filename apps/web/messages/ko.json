@@ -1444,12 +1444,12 @@
                 "attach": "Attach",
                 "detach": "Detach",
                 "detachDialog": {
-                    "title": "Detach this Work?",
-                    "body": "{title} will be removed from this Mission. The Work itself is never touched — this only removes the reference.",
-                    "confirm": "Detach Work",
-                    "cancel": "Cancel",
-                    "detaching": "Detaching…",
-                    "error": "Failed to detach Work"
+                    "title": "이 워크를 분리할까요?",
+                    "body": "{title}이(가) 이 미션에서 제거됩니다. 워크 자체는 변경되지 않으며 — 연결만 해제됩니다.",
+                    "confirm": "워크 분리",
+                    "cancel": "취소",
+                    "detaching": "분리하는 중…",
+                    "error": "워크를 분리하지 못했습니다"
                 },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
@@ -1500,12 +1500,12 @@
                 "clone": "Clone"
             },
             "deleteDialog": {
-                "title": "Delete this Mission?",
-                "body": "{title} will be permanently deleted. Child Ideas and Works are preserved, but their back-link to this Mission is broken. This cannot be undone.",
-                "confirm": "Delete Mission",
-                "cancel": "Cancel",
-                "deleting": "Deleting…",
-                "error": "Failed to delete Mission"
+                "title": "이 미션을 삭제할까요?",
+                "body": "{title}이(가) 영구적으로 삭제됩니다. 하위 아이디어와 워크는 유지되지만 이 미션으로 연결된 링크는 끊어집니다. 이 작업은 되돌릴 수 없습니다.",
+                "confirm": "미션 삭제",
+                "cancel": "취소",
+                "deleting": "삭제하는 중…",
+                "error": "미션을 삭제하지 못했습니다"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1579,33 +1579,33 @@
                 }
             },
             "goals": {
-                "title": "Goals",
-                "empty": "No Goals attached to this Mission yet. Attach one below to track what success means.",
-                "attachTitle": "Attach a Goal",
-                "goalLabel": "Goal",
-                "goalPlaceholder": "Select a Goal",
-                "primaryLabel": "Set as primary",
-                "primaryBadge": "Primary",
-                "primaryTooltip": "The primary Goal for this Mission - only one Goal can be primary at a time.",
-                "attach": "Attach",
-                "detach": "Detach",
+                "title": "목표",
+                "empty": "이 미션에 연결된 목표가 아직 없습니다. 성공의 기준을 추적하려면 아래에서 목표를 연결하세요.",
+                "attachTitle": "목표 연결",
+                "goalLabel": "목표",
+                "goalPlaceholder": "목표 선택",
+                "primaryLabel": "기본으로 설정",
+                "primaryBadge": "기본",
+                "primaryTooltip": "이 미션의 기본 목표 - 한 번에 하나의 목표만 기본이 될 수 있습니다.",
+                "attach": "연결",
+                "detach": "분리",
                 "detachDialog": {
-                    "title": "Detach this Goal?",
-                    "body": "{title} will be removed from this Mission. The Goal itself is not deleted — it stays on the Goals page and on any other Mission it is attached to.",
-                    "confirm": "Detach Goal",
-                    "cancel": "Cancel",
-                    "detaching": "Detaching…",
-                    "error": "Failed to detach Goal"
+                    "title": "이 목표를 분리할까요?",
+                    "body": "{title}이(가) 이 미션에서 제거됩니다. 목표 자체는 삭제되지 않으며 — 목표 페이지와 연결된 다른 미션에 그대로 남아 있습니다.",
+                    "confirm": "목표 분리",
+                    "cancel": "취소",
+                    "detaching": "분리하는 중…",
+                    "error": "목표를 분리하지 못했습니다"
                 },
-                "alreadyLinkedOption": "{title} (already attached)",
-                "noGoalsToAttach": "You have no Goals yet. Create one on the Goals page, then attach it here.",
-                "pickerTruncated": "Showing your 100 most recent Goals - open the Goals page for the full list.",
-                "invariantNote": "Attaching a Goal never changes this Mission's status - completing a Mission stays an explicit action.",
+                "alreadyLinkedOption": "{title} (이미 연결됨)",
+                "noGoalsToAttach": "아직 목표가 없습니다. 목표 페이지에서 만든 다음 여기에 연결하세요.",
+                "pickerTruncated": "가장 최근 목표 100개를 표시하고 있습니다 - 전체 목록은 목표 페이지에서 확인하세요.",
+                "invariantNote": "목표를 연결해도 이 미션의 상태는 변경되지 않습니다 - 미션 완료는 명시적인 작업으로 유지됩니다.",
                 "toasts": {
-                    "attached": "Goal attached",
-                    "attachError": "Couldn't attach Goal",
-                    "detached": "Goal detached",
-                    "detachError": "Couldn't detach Goal"
+                    "attached": "목표가 연결되었습니다",
+                    "attachError": "목표를 연결할 수 없습니다",
+                    "detached": "목표가 분리되었습니다",
+                    "detachError": "목표를 분리할 수 없습니다"
                 }
             }
         },
