@@ -27,6 +27,7 @@ import { WorkKnowledgeCitation } from '../work-knowledge-citation.entity';
 import { WorkKnowledgeTag } from '../work-knowledge-tag.entity';
 import { WorkKnowledgeUpload } from '../work-knowledge-upload.entity';
 import { WorkMember } from '../work-member.entity';
+import { Workflow } from '../workflow.entity';
 
 /**
  * EW-657 (Tenants & Organizations Phase 5a) — Tier C scope-column
@@ -82,6 +83,7 @@ describe('Tier C entities — Phase 5a scope columns', () => {
         { name: 'UsageLedgerEntry', target: UsageLedgerEntry },
         { name: 'PluginUsageEvent', target: PluginUsageEvent },
         { name: 'ActivityLog', target: ActivityLog },
+        { name: 'Workflow', target: Workflow },
     ];
 
     for (const { name, target } of tierC) {

@@ -184,4 +184,5 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'WorkProposal',
     'WorkProposalAttachment',
     'WorkSchedule',
+    'Workflow',
 ] as const;
