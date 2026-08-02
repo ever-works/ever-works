@@ -177,9 +177,9 @@ describe('ActivityFeedClient', () => {
         expect(await screen.findByText('Generation finished')).toBeInTheDocument();
 
         // Open the status dropdown, then pick the "failed" option from the
-        // portalled listbox. The trigger is named by the Select's aria-label
-        // ("Status"), not by the selected value it displays.
-        await userEvent.click(screen.getByRole('button', { name: 'columns.status' }));
+        // portalled listbox. The trigger's accessible name is the Select's
+        // aria-label composed with the selected value ("Status: All").
+        await userEvent.click(screen.getByRole('button', { name: /^columns\.status/ }));
         await userEvent.click(screen.getByRole('option', { name: /failed/ }));
 
         expect(screen.getByText('Generation blew up')).toBeInTheDocument();
