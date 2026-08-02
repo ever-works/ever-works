@@ -138,6 +138,19 @@ export class SubAgentDelegationRunnerService implements SubAgentDelegationRunner
 
         const dispatch = await this.transitions.dispatchAgentRun(childTask as never, childAgentId, {
             dedupKey: `delegation:${request.delegationId}`,
+            // The EFFECTIVE scope — `SubAgentDelegationService` already
+            // narrowed it against the parent, and the port contract says
+            // never to re-widen it.
+            //
+            // Passing it here is what makes "privilege can only ever
+            // shrink going down the tree" true at RUNTIME. Until now this
+            // runner read only `request.scope.workId` and dropped the
+            // rest, so the narrowed tool list was computed and discarded:
+            // an over-broad request was refused, but a child that WAS
+            // admitted ran with its own agent's full tool set — and
+            // `childAgentId` defaults to the parent, so by default the
+            // child was the parent with every permission it holds.
+            delegationScope: request.scope,
         });
 
         if (!dispatch.runId) {

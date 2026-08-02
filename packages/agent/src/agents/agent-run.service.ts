@@ -42,6 +42,7 @@ import { TOOL_GRANT_ENFORCER, type ToolGrantEnforcer } from '../policy/tool-gran
 import { filterSkillsByToolGrants } from '../policy/skill-activation';
 import { isGenerationCancelledError } from '../utils/generation-cancellation.utils';
 import { redactSecrets } from '../utils/secret-scan';
+import { filterToolNamesBySubAgentScope, type SubAgentScope } from '@ever-works/contracts';
 
 export interface AgentRunContext {
     runId: string;
@@ -63,6 +64,19 @@ export interface AgentRunContext {
      * this null/undefined.
      */
     taskId?: string | null;
+    /**
+     * Judgment layer G9 — the effective scope a DELEGATED run was
+     * admitted under, read off `agent_runs.delegationScope` by the host
+     * that starts the run.
+     *
+     * Carried on the CONTEXT rather than re-read here so an ordinary run
+     * — the overwhelmingly common case — pays no extra query, and so the
+     * tool loop performs no database work it did not already do (a
+     * cooperative-abort test pins exactly that).
+     *
+     * Absent / null ⇒ no additional restriction.
+     */
+    delegationScope?: SubAgentScope | null;
     /**
      * Originating chat message — supplied for `chat` kinds. Reserved
      * for the LLM-dispatch path so the worker can tie its reply to
@@ -615,7 +629,12 @@ export class AgentRunService {
         });
         const editsThisRunByFile = new Set<string>();
         const baseDescriptors: AgentToolDescriptor[] = this.toolService
-            ? await this.resolveToolsForRun(agent, context.runId, editsThisRunByFile)
+            ? await this.resolveToolsForRun(
+                  agent,
+                  context.runId,
+                  editsThisRunByFile,
+                  context.delegationScope,
+              )
             : [];
         // Virtual transitionTask descriptor — only exposed on `task`
         // kind runs. It captures the model's transition intent rather
@@ -1453,12 +1472,17 @@ export class AgentRunService {
         agent: Agent,
         runId: string,
         editsThisRunByFile: Set<string>,
+        delegationScope?: SubAgentScope | null,
     ): Promise<AgentToolDescriptor[]> {
         const service = this.toolService;
         if (!service) return [];
         const runContext = { runId, editsThisRunByFile };
         if (typeof service.resolveGrantedTools !== 'function') {
-            return service.resolveAllowedTools(agent, runContext);
+            return this.applyDelegationScope(
+                await service.resolveAllowedTools(agent, runContext),
+                runId,
+                delegationScope,
+            );
         }
 
         const { tools, refused } = await service.resolveGrantedTools(agent, runContext);
@@ -1477,7 +1501,58 @@ export class AgentRunService {
                 })
                 .catch(() => undefined);
         }
-        return tools;
+        return this.applyDelegationScope(tools, runId, delegationScope);
+    }
+
+    /**
+     * Narrow a delegated run's tools to the scope it was admitted under
+     * (judgment layer G9).
+     *
+     * Applied HERE because this is the single funnel every run's tools
+     * pass through — built-in and domain alike, after the permission
+     * gates and after the tool-grant matrix. Filtering earlier would miss
+     * the domain tools; filtering in the tool service would duplicate the
+     * grant seam.
+     *
+     * Until this existed, `narrowSubAgentScope` produced a correct
+     * narrowed scope that the delegation runner then discarded, so a
+     * child that was admitted executed with its own agent's FULL tool
+     * set. The contract's "privilege can only ever shrink going down the
+     * tree" held at the admission boundary and nowhere else.
+     *
+     * Fail-open by construction, and deliberately so: a run with no
+     * `delegationScope` (every ordinary run, and every run predating the
+     * column) is returned untouched. Treating "no scope" as "no tools"
+     * would strip the tool loop from the overwhelmingly common path on
+     * the first read that came back empty.
+     */
+    private applyDelegationScope(
+        tools: AgentToolDescriptor[],
+        runId: string,
+        scope: SubAgentScope | null | undefined,
+    ): AgentToolDescriptor[] {
+        if (!scope) return tools;
+
+        const permitted = new Set(
+            filterToolNamesBySubAgentScope(
+                tools.map((tool) => tool.name),
+                scope,
+            ),
+        );
+        if (permitted.size === tools.length) return tools;
+
+        const withheld = tools.filter((tool) => !permitted.has(tool.name)).map((tool) => tool.name);
+        void this.runLogs
+            ?.append({
+                runId,
+                level: 'WARN',
+                step: 'tools',
+                message: `${withheld.length} tool(s) withheld by the delegation scope this run was admitted under.`,
+                metadata: { withheld, allowedTools: scope.allowedTools ?? null },
+            })
+            .catch(() => undefined);
+
+        return tools.filter((tool) => permitted.has(tool.name));
     }
 
     /**
