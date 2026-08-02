@@ -31,6 +31,7 @@ import { TaskRunDenormService } from './task-run-denorm.service';
 // real class reference. No cycle: run-dispatch-gate.service imports only
 // task-dispatcher (leaf), the run repository, and config.
 import { RunDispatchGateService } from '../agents/run-dispatch-gate.service';
+import type { SubAgentScope } from '@ever-works/contracts';
 
 /**
  * Tasks feature — Phase 12.1.
@@ -322,7 +323,21 @@ export class TaskTransitionService {
     async dispatchAgentRun(
         task: Task,
         agentId: string,
-        opts: { generation?: number; dedupKey?: string } = {},
+        opts: {
+            generation?: number;
+            dedupKey?: string;
+            /**
+             * Judgment layer G9 — the EFFECTIVE (already-narrowed) scope a
+             * delegated run must execute under. Snapshotted onto the run
+             * row here so the tool loop can intersect the run's resolved
+             * tools against it.
+             *
+             * Omitted for every ordinary dispatch, which the filter reads
+             * as "no additional restriction" — so the common path is
+             * byte-for-byte unchanged.
+             */
+            delegationScope?: SubAgentScope | null;
+        } = {},
     ): Promise<{
         runId: string | null;
         /** True when the job runtime accepted the run this call. */
@@ -371,6 +386,7 @@ export class TaskTransitionService {
                               queuedReason: verdict.admitted
                                   ? null
                                   : (verdict.queuedReason ?? 'concurrency-limit'),
+                              delegationScope: opts.delegationScope ?? null,
                           })
                         : null;
                 };
