@@ -172,6 +172,36 @@ function isUnderAnyPrefix(path: string, prefixes: readonly string[]): boolean {
 }
 
 /**
+ * Which of `toolNames` a run under `scope` may actually call.
+ *
+ * Narrowing a delegation decides what a child is ALLOWED; this is what
+ * turns that decision into the concrete tool list handed to a child's
+ * run. Without it the narrowed scope is computed and then dropped, and a
+ * child executes with its own agent's full tool set — the contract's
+ * "privilege can only ever shrink going down the tree" holding at the
+ * admission boundary and nowhere else.
+ *
+ * Lives HERE, next to `narrowSubAgentScope`, because the wildcard rule is
+ * contract semantics: `['*']` means "everything the parent had", so it
+ * imposes no additional restriction. Reimplementing that in the run loop
+ * would let the two definitions drift.
+ *
+ * Absent / non-array `allowedTools` also imposes no restriction — the
+ * caller has not expressed a scope, and inventing an empty one would
+ * silently strip every tool from a run that never asked to be limited.
+ */
+export function filterToolNamesBySubAgentScope(
+	toolNames: readonly string[],
+	scope: Pick<SubAgentScope, 'allowedTools'> | null | undefined
+): readonly string[] {
+	const allowed = scope?.allowedTools;
+	if (!Array.isArray(allowed)) return toolNames;
+	if (hasWildcard(allowed)) return toolNames;
+	const permitted = new Set(allowed);
+	return toolNames.filter((name) => permitted.has(name));
+}
+
+/**
  * Compute the scope a child ACTUALLY runs under: the intersection of
  * what it asked for and what the parent had. Never widens — an entry
  * the parent lacks is dropped, and `networkAccess` can only go from
