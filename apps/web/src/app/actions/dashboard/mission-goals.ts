@@ -27,6 +27,14 @@ async function requireMissionAuth() {
     }
 }
 
+// Route patterns, not rendered paths: the locale is unknown here, so
+// interpolating a real ID next to an unresolved `[locale]` matches
+// nothing. Passing the whole filesystem pattern with 'page' revalidates
+// the route across every locale — same convention as ADMIN_PAGE_PATTERN
+// in ../admin/tenant-runtime-allowlist.ts.
+const MISSION_DETAIL_PATTERN = '/[locale]/(dashboard)/missions/[id]';
+const GOAL_DETAIL_PATTERN = '/[locale]/(dashboard)/goals/[id]';
+
 /** `GET /me/missions/:id/goals` — the Goals attached to this Mission. */
 export async function listMissionGoalsAction(missionId: string): Promise<MissionGoalLinkDto[]> {
     await requireMissionAuth();
@@ -50,8 +58,8 @@ export async function linkGoalToMissionAction(
     const links = await missionsAPI.listGoals(missionId);
     // Mission detail renders the "Goals" panel; the Goal detail page
     // may surface the reverse link once that view grows one.
-    revalidatePath(`/[locale]/(dashboard)/missions/${missionId}`, 'page');
-    revalidatePath(`/[locale]/(dashboard)/goals/${input.goalId}`, 'page');
+    revalidatePath(MISSION_DETAIL_PATTERN, 'page');
+    revalidatePath(GOAL_DETAIL_PATTERN, 'page');
     return links;
 }
 
@@ -72,7 +80,7 @@ export async function unlinkGoalFromMissionAction(
 ): Promise<{ deleted: true }> {
     await requireMissionAuth();
     const result = await missionsAPI.unlinkGoal(missionId, goalId);
-    revalidatePath(`/[locale]/(dashboard)/missions/${missionId}`, 'page');
-    revalidatePath(`/[locale]/(dashboard)/goals/${goalId}`, 'page');
+    revalidatePath(MISSION_DETAIL_PATTERN, 'page');
+    revalidatePath(GOAL_DETAIL_PATTERN, 'page');
     return result;
 }

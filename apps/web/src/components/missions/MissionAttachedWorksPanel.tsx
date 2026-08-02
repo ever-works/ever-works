@@ -30,6 +30,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Select } from '@/components/ui/select';
+import { ShowDateTime } from '@/components/ui/show-datetime';
 import { WORK_KIND_PRESENTATION, normalizeWorkKind } from '@/lib/work-kinds/catalog';
 import {
     attachWorkToMissionAction,
@@ -58,6 +59,14 @@ const RELATIONS: readonly MissionWorkRelation[] = [
     'researches',
     'retires',
 ];
+
+// Date-only formatter for the edge's `createdAt`. Fed to `ShowDateTime`
+// rather than called during render: this is a client component, so a
+// bare `toLocaleDateString()` would format with the server's locale and
+// time zone on the SSR pass and the browser's on hydration, which is a
+// mismatch. `ShowDateTime` renders nothing until mounted.
+const formatAttachedAt = (date: string, locale: string) =>
+    new Date(date).toLocaleDateString(locale);
 
 export interface AttachableWorkOption {
     readonly id: string;
@@ -251,7 +260,10 @@ export function MissionAttachedWorksPanel({
                                 </Link>
                                 <RelationBadge label={t(`relations.${r.relation}`)} />
                                 <span className="hidden sm:block shrink-0 text-[11px] text-text-muted dark:text-text-muted-dark tabular-nums">
-                                    {new Date(r.createdAt).toLocaleDateString()}
+                                    <ShowDateTime
+                                        value={r.createdAt}
+                                        customFormatter={formatAttachedAt}
+                                    />
                                 </span>
                                 <button
                                     type="button"

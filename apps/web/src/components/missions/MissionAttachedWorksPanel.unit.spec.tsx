@@ -3,6 +3,9 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 vi.mock('next-intl', () => ({
     useTranslations: () => (key: string) => key,
+    // The attached-at cell renders through `ShowDateTime`, which reads
+    // the active locale.
+    useLocale: () => 'en',
 }));
 
 vi.mock('@/i18n/navigation', () => ({

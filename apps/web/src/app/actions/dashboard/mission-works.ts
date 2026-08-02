@@ -26,11 +26,19 @@ async function requireMissionAuth() {
     }
 }
 
-function revalidateMissionWorkSurfaces(missionId: string, workId: string) {
+// Route patterns, not rendered paths: the locale is unknown here, so
+// interpolating a real ID next to an unresolved `[locale]` matches
+// nothing. Passing the whole filesystem pattern with 'page' revalidates
+// the route across every locale — same convention as ADMIN_PAGE_PATTERN
+// in ../admin/tenant-runtime-allowlist.ts.
+const MISSION_DETAIL_PATTERN = '/[locale]/(dashboard)/missions/[id]';
+const WORK_DETAIL_PATTERN = '/[locale]/(dashboard)/works/[id]';
+
+function revalidateMissionWorkSurfaces() {
     // Mission detail renders the "Attached Works" panel; the Work
     // Overview tab renders the reverse "Missions" panel.
-    revalidatePath(`/[locale]/(dashboard)/missions/${missionId}`, 'page');
-    revalidatePath(`/[locale]/(dashboard)/works/${workId}`, 'page');
+    revalidatePath(MISSION_DETAIL_PATTERN, 'page');
+    revalidatePath(WORK_DETAIL_PATTERN, 'page');
 }
 
 export async function attachWorkToMissionAction(
@@ -39,7 +47,7 @@ export async function attachWorkToMissionAction(
 ) {
     await requireMissionAuth();
     const relations = await missionsAPI.attachWork(missionId, input);
-    revalidateMissionWorkSurfaces(missionId, input.workId);
+    revalidateMissionWorkSurfaces();
     return relations;
 }
 
@@ -50,6 +58,6 @@ export async function detachWorkFromMissionAction(
 ) {
     await requireMissionAuth();
     const result = await missionsAPI.detachWork(missionId, workId, relation);
-    revalidateMissionWorkSurfaces(missionId, workId);
+    revalidateMissionWorkSurfaces();
     return result;
 }
