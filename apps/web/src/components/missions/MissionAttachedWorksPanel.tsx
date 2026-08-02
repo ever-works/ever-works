@@ -313,6 +313,7 @@ export function MissionAttachedWorksPanel({
                                     onValueChange={setWorkDraft}
                                     placeholder={t('workPlaceholder')}
                                     iconMap={WORK_ICON_MAP}
+                                    aria-label={t('workLabel')}
                                     data-testid="mission-attach-work-select"
                                 >
                                     {attachableWorks.map((w) => (
@@ -337,6 +338,7 @@ export function MissionAttachedWorksPanel({
                                         setRelationDraft(v as MissionWorkRelation)
                                     }
                                     iconMap={RELATION_ICONS}
+                                    aria-label={t('relationLabel')}
                                     data-testid="mission-attach-relation-select"
                                 >
                                     {RELATIONS.map((rel) => (

@@ -54,6 +54,12 @@ export interface SelectProps {
      */
     'data-testid'?: string;
     /**
+     * Names the trigger for assistive tech. A wrapping `<label>` cannot do
+     * this — the trigger is a `<button>`, not a labellable form control, and
+     * the listbox is portalled out of the label entirely.
+     */
+    'aria-label'?: string;
+    /**
      * Optional leading icons, keyed by an option's `data-icon` value. When an
      * option declares `data-icon="foo"` and `iconMap.foo` is provided, that
      * node renders before the label in both the trigger and the dropdown row.
@@ -132,6 +138,7 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
             id,
             name,
             'data-testid': dataTestId,
+            'aria-label': ariaLabel,
             iconMap,
         },
         ref,
@@ -229,6 +236,7 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                     type="button"
                     disabled={disabled}
                     data-testid={dataTestId}
+                    aria-label={ariaLabel}
                     onClick={() => {
                         if (!open) updatePos();
                         setOpen((v) => !v);
