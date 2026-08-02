@@ -17,12 +17,18 @@
 
 const betterAuthMock = jest.fn().mockReturnValue({ __betterAuthInstance: true });
 const bearerMock = jest.fn().mockReturnValue({ __bearerPlugin: true });
+const termsAcceptancePluginMock = jest
+    .fn()
+    .mockReturnValue({ __termsAcceptancePlugin: true });
 
 jest.mock('better-auth', () => ({
     betterAuth: betterAuthMock,
 }));
 jest.mock('better-auth/plugins', () => ({
     bearer: bearerMock,
+}));
+jest.mock('terms-acceptance/better-auth', () => ({
+    termsAcceptancePlugin: (...args: unknown[]) => termsAcceptancePluginMock(...args),
 }));
 
 const bcryptHash = jest.fn();
@@ -674,14 +680,45 @@ describe('createAuthRuntimeInstance', () => {
     });
 
     describe('plugins', () => {
-        it('registers exactly one bearer plugin via `bearer()`', () => {
+        it('registers the bearer plugin via `bearer()`', () => {
             createAuthRuntimeInstance(makeDataSource('postgres', { master: {} }) as any);
 
             expect(bearerMock).toHaveBeenCalledTimes(1);
             const plugins = getCapturedOptions().plugins;
             expect(Array.isArray(plugins)).toBe(true);
-            expect(plugins).toHaveLength(1);
+            expect(plugins).toHaveLength(2);
             expect(plugins[0]).toEqual({ __bearerPlugin: true });
+        });
+
+        /**
+         * The terms-acceptance plugin declares the `terms_acceptance` model so
+         * Better Auth's own database layer knows the table its adapter writes
+         * into. Losing it means signup acceptance rows silently stop being
+         * written — which is exactly the failure this whole change exists to
+         * end — so pin it here rather than trusting it stays.
+         */
+        it('registers the terms-acceptance plugin against the terms_acceptance model', () => {
+            createAuthRuntimeInstance(makeDataSource('postgres', { master: {} }) as any);
+
+            expect(termsAcceptancePluginMock).toHaveBeenCalledTimes(1);
+            expect(termsAcceptancePluginMock).toHaveBeenCalledWith(
+                expect.objectContaining({ model: 'terms_acceptance' }),
+            );
+            expect(getCapturedOptions().plugins[1]).toEqual({ __termsAcceptancePlugin: true });
+        });
+
+        /**
+         * The plugin's own `/terms-acceptance/*` endpoints require a session,
+         * and signup has none — recording happens on the API's `/auth/register`
+         * path instead. Passing `createAuthEndpoint` would silently mount routes
+         * that can never serve the case this exists for.
+         */
+        it('does not mount the plugin endpoints (no session exists at signup)', () => {
+            createAuthRuntimeInstance(makeDataSource('postgres', { master: {} }) as any);
+
+            const options = termsAcceptancePluginMock.mock.calls[0][0];
+            expect(options.createAuthEndpoint).toBeUndefined();
+            expect(options.sessionMiddleware).toBeUndefined();
         });
 
         it('calls `bearer()` with no arguments', () => {

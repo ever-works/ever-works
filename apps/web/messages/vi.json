@@ -217,7 +217,8 @@
             "errors": {
                 "passwordsDoNotMatch": "Mật khẩu không khớp",
                 "passwordTooShort": "Mật khẩu phải có ít nhất 8 ký tự",
-                "generic": "Đã xảy ra lỗi. Vui lòng thử lại."
+                "generic": "Đã xảy ra lỗi. Vui lòng thử lại.",
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
             }
         }
     },
@@ -7118,6 +7119,9 @@
             },
             "token": {
                 "required": "Token cannot be empty"
+            },
+            "terms": {
+                "required": "You must accept the Terms of Service and Privacy Policy to create an account."
             }
         }
     },

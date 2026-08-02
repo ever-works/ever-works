@@ -217,7 +217,8 @@
             "errors": {
                 "passwordsDoNotMatch": "パスワードが一致しません",
                 "passwordTooShort": "パスワードは最低8文字必要です",
-                "generic": "エラーが発生しました。もう一度お試しください。"
+                "generic": "エラーが発生しました。もう一度お試しください。",
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
             }
         }
     },
@@ -7118,6 +7119,9 @@
             },
             "token": {
                 "required": "Token cannot be empty"
+            },
+            "terms": {
+                "required": "You must accept the Terms of Service and Privacy Policy to create an account."
             }
         }
     },

@@ -217,7 +217,8 @@
             "errors": {
                 "passwordsDoNotMatch": "Hasła nie pasują",
                 "passwordTooShort": "Hasło musi mieć co najmniej 8 znaków",
-                "generic": "Wystąpił błąd. Spróbuj ponownie."
+                "generic": "Wystąpił błąd. Spróbuj ponownie.",
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
             }
         }
     },
@@ -7118,6 +7119,9 @@
             },
             "token": {
                 "required": "Token cannot be empty"
+            },
+            "terms": {
+                "required": "You must accept the Terms of Service and Privacy Policy to create an account."
             }
         }
     },

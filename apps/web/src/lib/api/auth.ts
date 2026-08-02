@@ -3,12 +3,43 @@ import { serverFetch, serverMutation } from './server-api';
 import { MessageResponse } from './types';
 import { OAuthProvider } from './enums';
 
+/**
+ * One legal document the signup form displayed next to the terms checkbox.
+ *
+ * Echoed back to the API verbatim so the acceptance record can be pinned to the
+ * exact text: the `sha256` is the digest of the document source as published by
+ * `@ever-co/legal`, which is what lets the wording someone agreed to be
+ * reproduced byte for byte years later. The API re-checks every field against
+ * the corpus — a value that arrived from a browser is a claim, not evidence.
+ */
+export interface TermsAcceptanceClaim {
+    documentId: string;
+    version: string;
+    sha256: string;
+    locale: string;
+}
+
+/** A required document as published by `GET /terms/required`. */
+export interface TermsAcceptanceDocument extends TermsAcceptanceClaim {
+    url?: string;
+    title?: string;
+    effectiveDate?: string;
+}
+
 // DTOs - Auth
 export interface RegisterDto {
     username: string;
     email: string;
     password: string;
     emailVerificationCallbackUrl?: string;
+    /**
+     * What the user ticked the box for.
+     *
+     * The signup checkbox was an uncontrolled `<input type="checkbox" required>`
+     * that never entered `formData` and never reached this DTO — the submit was
+     * gated and the value discarded. This is the field that was missing.
+     */
+    terms?: TermsAcceptanceClaim[];
 }
 
 export interface LoginDto {
@@ -109,6 +140,18 @@ export interface TokenValidationResponse {
 }
 
 export const authAPI = {
+    /**
+     * The legal documents a new account must accept, as currently published.
+     *
+     * Fetched rather than hard-coded so the version and digest the user is shown
+     * are the ones the server will accept, and so the object that gates the
+     * submit button is the object that gets posted back.
+     */
+    getRequiredTerms: async (locale?: string) => {
+        const query = locale ? `?locale=${encodeURIComponent(locale)}` : '';
+        return serverFetch<TermsAcceptanceDocument[]>(`/terms/required${query}`);
+    },
+
     // Authentication
     register: async (data: RegisterDto) => {
         return serverMutation<AuthResponse>({

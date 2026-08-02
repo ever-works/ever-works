@@ -217,7 +217,8 @@
             "errors": {
                 "passwordsDoNotMatch": "पासवर्ड मेल नहीं खाते",
                 "passwordTooShort": "पासवर्ड कम से कम 8 अक्षरों का होना चाहिए",
-                "generic": "एक त्रुटि हुई। कृपया पुनः प्रयास करें।"
+                "generic": "एक त्रुटि हुई। कृपया पुनः प्रयास करें।",
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
             }
         }
     },
@@ -7118,6 +7119,9 @@
             },
             "token": {
                 "required": "Token cannot be empty"
+            },
+            "terms": {
+                "required": "You must accept the Terms of Service and Privacy Policy to create an account."
             }
         }
     },

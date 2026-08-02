@@ -1,6 +1,11 @@
 import { betterAuth } from 'better-auth';
 import type { BetterAuthOptions } from 'better-auth';
 import { bearer } from 'better-auth/plugins';
+import { termsAcceptancePlugin } from 'terms-acceptance/better-auth';
+import {
+    TERMS_ACCEPTANCE_MODEL,
+    getRequiredTermsDocuments,
+} from '../../terms/terms-acceptance.corpus';
 import { randomBytes, randomUUID } from 'node:crypto';
 import { DataSource } from 'typeorm';
 import { AUTH_RUNTIME_BASE_PATH } from './auth-provider.constants';
@@ -306,7 +311,25 @@ export function createAuthRuntimeInstance(dataSource: DataSource) {
                   }
                 : {}),
         },
-        plugins: [bearer()],
+        plugins: [
+            bearer(),
+            // Declares the `terms_acceptance` model so Better Auth's own
+            // database layer knows the table and its columns, and so
+            // `better-auth generate` stays in step with the TypeORM migration
+            // (1785000000000-CreateTermsAcceptance) that actually creates it.
+            //
+            // `createAuthEndpoint` / `sessionMiddleware` are deliberately NOT
+            // passed: the plugin's built-in `/terms-acceptance/*` routes require
+            // a session, and the case being fixed here is signup — where no
+            // session exists yet. Registration records through
+            // `TermsAcceptanceService` on the API's own `/auth/register` path
+            // instead, and this plugin contributes the schema and the adapter.
+            termsAcceptancePlugin({
+                required: () => getRequiredTermsDocuments(),
+                model: TERMS_ACCEPTANCE_MODEL,
+                ipSalt: process.env.TERMS_IP_SALT,
+            }),
+        ],
     };
 
     return betterAuth(options);

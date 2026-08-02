@@ -217,7 +217,8 @@
             "errors": {
                 "passwordsDoNotMatch": "รหัสผ่านไม่ตรงกัน",
                 "passwordTooShort": "รหัสผ่านต้องมีอย่างน้อย 8 ตัวอักษร",
-                "generic": "เกิดข้อผิดพลาด กรุณาลองอีกครั้ง"
+                "generic": "เกิดข้อผิดพลาด กรุณาลองอีกครั้ง",
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
             }
         }
     },
@@ -7118,6 +7119,9 @@
             },
             "token": {
                 "required": "Token cannot be empty"
+            },
+            "terms": {
+                "required": "You must accept the Terms of Service and Privacy Policy to create an account."
             }
         }
     },

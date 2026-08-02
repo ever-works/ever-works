@@ -217,7 +217,8 @@
             "errors": {
                 "passwordsDoNotMatch": "Пароли не совпадают",
                 "passwordTooShort": "Пароль должен содержать минимум 8 символов",
-                "generic": "Произошла ошибка. Пожалуйста, попробуйте снова."
+                "generic": "Произошла ошибка. Пожалуйста, попробуйте снова.",
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
             }
         }
     },
@@ -7118,6 +7119,9 @@
             },
             "token": {
                 "required": "Token cannot be empty"
+            },
+            "terms": {
+                "required": "You must accept the Terms of Service and Privacy Policy to create an account."
             }
         }
     },

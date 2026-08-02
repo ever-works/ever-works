@@ -217,7 +217,8 @@
             "errors": {
                 "passwordsDoNotMatch": "Wachtwoorden komen niet overeen",
                 "passwordTooShort": "Wachtwoord moet minimaal 8 tekens bevatten",
-                "generic": "Er is een fout opgetreden. Probeer het opnieuw."
+                "generic": "Er is een fout opgetreden. Probeer het opnieuw.",
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
             }
         }
     },
@@ -7118,6 +7119,9 @@
             },
             "token": {
                 "required": "Token cannot be empty"
+            },
+            "terms": {
+                "required": "You must accept the Terms of Service and Privacy Policy to create an account."
             }
         }
     },

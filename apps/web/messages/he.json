@@ -217,7 +217,8 @@
             "errors": {
                 "passwordsDoNotMatch": "סיסמאות לא תואמות",
                 "passwordTooShort": "סיסמה חייבת להיות לפחות 8 תווים",
-                "generic": "אירעה שגיאה. נסה שוב."
+                "generic": "אירעה שגיאה. נסה שוב.",
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
             }
         }
     },
@@ -7117,6 +7118,9 @@
             },
             "token": {
                 "required": "Token cannot be empty"
+            },
+            "terms": {
+                "required": "You must accept the Terms of Service and Privacy Policy to create an account."
             }
         }
     },
