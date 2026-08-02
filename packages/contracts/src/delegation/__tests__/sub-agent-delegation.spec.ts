@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	filterToolNamesBySubAgentScope,
 	isSubAgentDelegationSuccessful,
 	isSubAgentScopeSubset,
 	narrowSubAgentScope,
@@ -201,5 +202,51 @@ describe('result helpers', () => {
 				})
 			).toBe(status === 'completed');
 		}
+	});
+});
+
+describe('filterToolNamesBySubAgentScope', () => {
+	const TOOLS = ['read_file', 'write_file', 'deploy', 'searchWeb'];
+
+	it('keeps only the tools the scope allows', () => {
+		expect(filterToolNamesBySubAgentScope(TOOLS, { allowedTools: ['read_file', 'deploy'] })).toEqual([
+			'read_file',
+			'deploy'
+		]);
+	});
+
+	it('treats the wildcard as no restriction at all', () => {
+		// `['*']` means "everything the parent had" — it is a statement
+		// that nothing extra is being taken away, not an allowlist of one.
+		expect(filterToolNamesBySubAgentScope(TOOLS, { allowedTools: ['*'] })).toEqual(TOOLS);
+	});
+
+	it('imposes no restriction when no scope is supplied', () => {
+		// The overwhelmingly common case: an ordinary run that was never
+		// delegated. Inventing an empty allowlist here would strip every
+		// tool from a run that never asked to be limited.
+		expect(filterToolNamesBySubAgentScope(TOOLS, null)).toEqual(TOOLS);
+		expect(filterToolNamesBySubAgentScope(TOOLS, undefined)).toEqual(TOOLS);
+		expect(filterToolNamesBySubAgentScope(TOOLS, {} as never)).toEqual(TOOLS);
+	});
+
+	it('yields nothing when the scope allows nothing', () => {
+		// Distinct from "no scope": an explicit empty list is a real
+		// decision, and the delegation contract refuses it upstream as
+		// `scope-empty` rather than dispatching a toolless child.
+		expect(filterToolNamesBySubAgentScope(TOOLS, { allowedTools: [] })).toEqual([]);
+	});
+
+	it('ignores names the run does not actually have', () => {
+		expect(filterToolNamesBySubAgentScope(TOOLS, { allowedTools: ['read_file', 'not_a_real_tool'] })).toEqual([
+			'read_file'
+		]);
+	});
+
+	it('never widens — a scope cannot add a tool the run lacks', () => {
+		const result = filterToolNamesBySubAgentScope(['read_file'], {
+			allowedTools: ['read_file', 'deploy']
+		});
+		expect(result).toEqual(['read_file']);
 	});
 });

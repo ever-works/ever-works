@@ -546,6 +546,12 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                 immediateInput,
                 workspaceCwd,
                 scopeContext,
+                // Judgment layer G9 — the scope this run was ADMITTED
+                // under, snapshotted onto the run row at dispatch. Read
+                // from the row we already loaded, so no extra query and
+                // nothing rides the queue payload (an old worker
+                // re-delivering an old payload could not carry it).
+                delegationScope: run.delegationScope ?? null,
             });
 
             // Wave 3 M3 — the PR gate: "a red check opens no PR". After the
@@ -775,6 +781,11 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                                 immediateInput: iterateMessage,
                                 workspaceCwd,
                                 scopeContext,
+                                // Same scope on the gate-retry iteration:
+                                // omitting it here would silently restore
+                                // the child's full tool set after the
+                                // first failed quality gate.
+                                delegationScope: run.delegationScope ?? null,
                             });
                             iterateSucceeded =
                                 iterateResult.status === 'assembled' ||

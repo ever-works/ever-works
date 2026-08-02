@@ -5,6 +5,7 @@ import type { QueryDeepPartialEntity } from 'typeorm/query-builder/QueryPartialE
 import type { GateStatus, TaskAcceptanceCheck, TaskCheckResult } from '@ever-works/contracts';
 import { AgentRun, AgentRunStatus, AgentRunTriggerKind } from '../../entities/agent-run.entity';
 import { RUN_COST_SETTLER, type RunCostSettler } from '../run-cost-settler';
+import type { SubAgentScope } from '@ever-works/contracts';
 
 /**
  * Statuses a run may be transitioned OUT OF by a normal terminal write.
@@ -551,6 +552,12 @@ export class AgentRunRepository {
          * behaviour for every existing call site.
          */
         persistent?: boolean;
+        /**
+         * Judgment layer G9 — the already-narrowed scope a DELEGATED run
+         * executes under. Omitted (⇒ null) for every ordinary run, which
+         * the tool filter reads as "no additional restriction".
+         */
+        delegationScope?: SubAgentScope | null;
     }): Promise<AgentRun> {
         const run = this.repository.create({
             agentId: args.agentId,
@@ -560,6 +567,7 @@ export class AgentRunRepository {
             taskId: args.taskId ?? null,
             chatMessageId: args.chatMessageId ?? null,
             workId: args.workId ?? null,
+            delegationScope: args.delegationScope ?? null,
             queuedReason: args.queuedReason ?? null,
             runnerKind: args.runnerKind ?? null,
             ...(args.persistent === true ? { persistent: true } : {}),
