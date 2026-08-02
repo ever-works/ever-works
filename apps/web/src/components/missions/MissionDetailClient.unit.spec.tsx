@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 
 vi.mock('next-intl', () => ({
     useTranslations: () => (key: string) => key,
@@ -174,8 +174,7 @@ describe('MissionDetailClient (Phase 6 PR R)', () => {
         render(<MissionDetailClient mission={mkMission()} ideas={[]} />);
         fireEvent.click(screen.getByTestId('mission-delete-button'));
         fireEvent.click(screen.getByTestId('mission-delete-confirm'));
-        await Promise.resolve();
-        expect(deleteMock).toHaveBeenCalledWith('m1');
+        await waitFor(() => expect(deleteMock).toHaveBeenCalledWith('m1'));
     });
 
     it('a failed delete surfaces the error inline and keeps the dialog open', async () => {
