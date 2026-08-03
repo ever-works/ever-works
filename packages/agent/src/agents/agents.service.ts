@@ -316,9 +316,11 @@ export class AgentsService {
                 throw err;
             });
 
-        // Materialize tenant-Agent memberships into the join table for
-        // indexed lookup from the per-target tabs.
-        if (input.scope === AgentScope.TENANT && input.targets && input.targets.length > 0) {
+        // Materialize memberships into the join table for indexed lookup
+        // from the per-target tabs. Every scope, not just tenant: an
+        // Agent pinned to one Work can be lent to another (see
+        // `addTarget`), and the index is what those surfaces read.
+        if (input.targets && input.targets.length > 0) {
             await this.memberships.replaceForAgent(
                 created.id,
                 input.targets
@@ -463,8 +465,9 @@ export class AgentsService {
 
         await this.agents.updateById(id, patch);
 
-        // Reconcile memberships if targets changed.
-        if (input.targets !== undefined && agent.scope === AgentScope.TENANT) {
+        // Reconcile memberships if targets changed — every scope, for the
+        // same reason `create` materializes them for every scope.
+        if (input.targets !== undefined) {
             await this.memberships.replaceForAgent(
                 id,
                 (input.targets ?? [])
@@ -476,6 +479,114 @@ export class AgentsService {
         const refreshed = await this.agents.findById(id);
         if (!refreshed) throw new NotFoundException('Agent vanished after update');
         return toAgentDto(refreshed);
+    }
+
+    /**
+     * Add ONE reach target to an Agent (idempotent).
+     *
+     * The read-modify-write of the whole `targets` array lives here
+     * rather than in the caller: the Work header's "Assign existing
+     * Agent" picker only knows the Work it is attaching to, and making
+     * it PATCH the full array would mean two round-trips racing every
+     * other editor of the same Agent.
+     *
+     * Any owned Agent can be lent out, whatever its own scope — an
+     * operator whose Agents were all created from a Work would otherwise
+     * have nothing to assign. The one thing rejected is lending an Agent
+     * to the parent it is ALREADY pinned to, which would record reach it
+     * has by scope and then let `removeTarget` appear to revoke it.
+     */
+    async addTarget(userId: string, id: string, target: AgentTarget): Promise<AgentDto> {
+        const agent = await this.requireOwned(userId, id);
+        this.assertNotOwnScopeParent(agent, target);
+        await this.assertTargetExists(userId, target);
+
+        const current = agent.targets ?? [];
+        if (current.some((t) => t.type === target.type && (t.id ?? null) === (target.id ?? null))) {
+            return toAgentDto(agent);
+        }
+        const next = [...current, target];
+
+        await this.agents.updateById(id, { targets: next });
+        if (target.type !== 'wildcard') {
+            await this.memberships.addMembership(id, target.type, target.id ?? null);
+        }
+
+        const refreshed = await this.agents.findById(id);
+        if (!refreshed) throw new NotFoundException('Agent vanished after update');
+        return toAgentDto(refreshed);
+    }
+
+    /**
+     * Remove ONE reach target from an Agent (idempotent — removing a
+     * target the Agent never had is a no-op, not a 404).
+     */
+    async removeTarget(userId: string, id: string, target: AgentTarget): Promise<AgentDto> {
+        const agent = await this.requireOwned(userId, id);
+
+        const current = agent.targets ?? [];
+        const next = current.filter(
+            (t) => !(t.type === target.type && (t.id ?? null) === (target.id ?? null)),
+        );
+        if (next.length !== current.length) {
+            await this.agents.updateById(id, { targets: next.length > 0 ? next : null });
+        }
+        if (target.type !== 'wildcard') {
+            await this.memberships.removeMembership(id, target.type, target.id ?? null);
+        }
+
+        const refreshed = await this.agents.findById(id);
+        if (!refreshed) throw new NotFoundException('Agent vanished after update');
+        return toAgentDto(refreshed);
+    }
+
+    /**
+     * An Agent already reaches the parent it is scoped to; recording that
+     * as a target would double-count the relationship and hand the caller
+     * an "unassign" it cannot honor.
+     */
+    private assertNotOwnScopeParent(agent: Agent, target: AgentTarget): void {
+        const ownParent =
+            (agent.scope === AgentScope.WORK && target.type === 'work' && agent.workId) ||
+            (agent.scope === AgentScope.MISSION && target.type === 'mission' && agent.missionId) ||
+            (agent.scope === AgentScope.IDEA && target.type === 'idea' && agent.ideaId);
+        if (ownParent && ownParent === target.id) {
+            throw new BadRequestException(
+                `Agent "${agent.name}" already belongs to this ${target.type} by scope.`,
+            );
+        }
+    }
+
+    /**
+     * The target row must exist AND belong to the caller — otherwise an
+     * assignment would advertise reach into someone else's Work (and
+     * `findOne({ id, userId })` returning null is also how we avoid
+     * confirming that another user's Work exists).
+     */
+    private async assertTargetExists(userId: string, target: AgentTarget): Promise<void> {
+        switch (target.type) {
+            case 'work':
+                await this.assertScopeParentExists(userId, {
+                    scope: AgentScope.WORK,
+                    workId: target.id,
+                });
+                break;
+            case 'mission':
+                await this.assertScopeParentExists(userId, {
+                    scope: AgentScope.MISSION,
+                    missionId: target.id,
+                });
+                break;
+            case 'idea':
+                await this.assertScopeParentExists(userId, {
+                    scope: AgentScope.IDEA,
+                    ideaId: target.id,
+                });
+                break;
+            default:
+                // `wildcard` has no row to validate.
+                break;
+        }
     }
 
     /**
