@@ -64,7 +64,26 @@ const DEFAULT_MIN_DB_INTERVAL_MS = 0;
 export function createAgentRunAbortSource(
     opts: CreateAgentRunAbortSourceOptions,
 ): AgentRunAbortSource {
-    const { runId, signal, readStatus, now = () => Date.now() } = opts;
+    const { runId, readStatus, now = () => Date.now() } = opts;
+    // Accept ONLY a real AbortSignal. A run dispatched from the Trigger.dev
+    // worker reaches this service through the internal RPC proxy, and
+    // SuperJSON has no transformer for `AbortSignal` — it encodes to `{}`, so
+    // what arrives is a plain object that is truthy but has no `aborted` and
+    // no `addEventListener`. That is strictly worse than nothing: `{}` reports
+    // `aborted === undefined` forever, and `signal` is handed onward to the AI
+    // provider chain, where a truthy non-signal reaches
+    // `signal.addEventListener(...)` and throws.
+    //
+    // The worker no longer sends one, but it deploys on its own release
+    // workflow — so during any skew window an OLDER worker is still sending
+    // `{}` to a NEWER API. This guard is what makes that window safe, and it
+    // is why the check lives here rather than only at the sender.
+    //
+    // Degrading to `undefined` is a documented, already-supported state (see
+    // the `signal` docs above): every `signal?.aborted` guard short-circuits
+    // and the `readStatus` fallback becomes the sole cancellation path — which
+    // is the one that actually works across the RPC boundary.
+    const signal = opts.signal instanceof AbortSignal ? opts.signal : undefined;
     const minDbIntervalMs = opts.minDbIntervalMs ?? DEFAULT_MIN_DB_INTERVAL_MS;
 
     // Latched: once cancelled, always cancelled. Prevents a flaky status read
