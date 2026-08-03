@@ -2878,7 +2878,7 @@
                 "statusUpdateFailed": "ステータスを更新できませんでした",
                 "newAgent": "新しいエージェント",
                 "moreAgents": "他 {count} 件",
-                "assignExisting": "Assign existing Agent",
+                "assignExisting": "Assign existing",
                 "assignTitle": "Assign an Agent to this Work",
                 "assignSubtitle": "Put an Agent you already have on this Work instead of creating another one.",
                 "assignSearchPlaceholder": "Search Agents…",

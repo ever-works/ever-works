@@ -2878,7 +2878,7 @@
                 "statusUpdateFailed": "Не вдалося оновити статус",
                 "newAgent": "Новий Агент",
                 "moreAgents": "+ще {count}",
-                "assignExisting": "Assign existing Agent",
+                "assignExisting": "Assign existing",
                 "assignTitle": "Assign an Agent to this Work",
                 "assignSubtitle": "Put an Agent you already have on this Work instead of creating another one.",
                 "assignSearchPlaceholder": "Search Agents…",

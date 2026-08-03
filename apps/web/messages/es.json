@@ -2946,7 +2946,7 @@
                 "statusUpdateFailed": "No se pudo actualizar el estado",
                 "newAgent": "Nuevo Agente",
                 "moreAgents": "+{count} más",
-                "assignExisting": "Assign existing Agent",
+                "assignExisting": "Assign existing",
                 "assignTitle": "Assign an Agent to this Work",
                 "assignSubtitle": "Put an Agent you already have on this Work instead of creating another one.",
                 "assignSearchPlaceholder": "Search Agents…",

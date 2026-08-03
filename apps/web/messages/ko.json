@@ -2878,7 +2878,7 @@
                 "statusUpdateFailed": "상태를 업데이트할 수 없습니다",
                 "newAgent": "새 에이전트",
                 "moreAgents": "+{count}개 더",
-                "assignExisting": "Assign existing Agent",
+                "assignExisting": "Assign existing",
                 "assignTitle": "Assign an Agent to this Work",
                 "assignSubtitle": "Put an Agent you already have on this Work instead of creating another one.",
                 "assignSearchPlaceholder": "Search Agents…",

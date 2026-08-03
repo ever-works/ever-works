@@ -3019,7 +3019,7 @@
                 "activatedToast": "Agent activated",
                 "statusUpdateFailed": "Could not update status",
                 "newAgent": "New Agent",
-                "assignExisting": "Assign existing Agent",
+                "assignExisting": "Assign existing",
                 "assignTitle": "Assign an Agent to this Work",
                 "assignSubtitle": "Put an Agent you already have on this Work instead of creating another one.",
                 "assignSearchPlaceholder": "Search Agents…",

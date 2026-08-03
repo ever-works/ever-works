@@ -2878,7 +2878,7 @@
                 "statusUpdateFailed": "无法更新状态",
                 "newAgent": "新代理",
                 "moreAgents": "还有 {count} 个",
-                "assignExisting": "Assign existing Agent",
+                "assignExisting": "Assign existing",
                 "assignTitle": "Assign an Agent to this Work",
                 "assignSubtitle": "Put an Agent you already have on this Work instead of creating another one.",
                 "assignSearchPlaceholder": "Search Agents…",
