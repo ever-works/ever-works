@@ -434,6 +434,89 @@ describe('AgentsService', () => {
         });
     });
 
+    describe('addTarget / removeTarget (assign an existing Agent to a Work)', () => {
+        it('appends the target and materializes the membership row', async () => {
+            const agent = makeAgent({ scope: AgentScope.TENANT, targets: null });
+            agents.findByIdAndUser.mockResolvedValue(agent);
+            agents.findById.mockResolvedValue(agent);
+
+            await svc.addTarget('u1', 'a1', { type: 'work', id: 'w1' });
+
+            expect(agents.updateById).toHaveBeenCalledWith('a1', {
+                targets: [{ type: 'work', id: 'w1' }],
+            });
+            expect(memberships.addMembership).toHaveBeenCalledWith('a1', 'work', 'w1');
+        });
+
+        it('is idempotent — re-assigning an existing target writes nothing', async () => {
+            const agent = makeAgent({
+                scope: AgentScope.TENANT,
+                targets: [{ type: 'work', id: 'w1' }],
+            });
+            agents.findByIdAndUser.mockResolvedValue(agent);
+
+            await svc.addTarget('u1', 'a1', { type: 'work', id: 'w1' });
+
+            expect(agents.updateById).not.toHaveBeenCalled();
+            expect(memberships.addMembership).not.toHaveBeenCalled();
+        });
+
+        it('keeps the other targets when one is removed, and clears to null when last', async () => {
+            const agent = makeAgent({
+                scope: AgentScope.TENANT,
+                targets: [
+                    { type: 'work', id: 'w1' },
+                    { type: 'work', id: 'w2' },
+                ],
+            });
+            agents.findByIdAndUser.mockResolvedValue(agent);
+            agents.findById.mockResolvedValue(agent);
+
+            await svc.removeTarget('u1', 'a1', { type: 'work', id: 'w1' });
+            expect(agents.updateById).toHaveBeenCalledWith('a1', {
+                targets: [{ type: 'work', id: 'w2' }],
+            });
+            expect(memberships.removeMembership).toHaveBeenCalledWith('a1', 'work', 'w1');
+
+            agents.updateById.mockClear();
+            agents.findByIdAndUser.mockResolvedValue(
+                makeAgent({ scope: AgentScope.TENANT, targets: [{ type: 'work', id: 'w2' }] }),
+            );
+            await svc.removeTarget('u1', 'a1', { type: 'work', id: 'w2' });
+            expect(agents.updateById).toHaveBeenCalledWith('a1', { targets: null });
+        });
+
+        it('lends out an Agent pinned to ANOTHER Work — scope is not a barrier', async () => {
+            const agent = makeAgent({ scope: AgentScope.WORK, workId: 'w9' });
+            agents.findByIdAndUser.mockResolvedValue(agent);
+            agents.findById.mockResolvedValue(agent);
+
+            await svc.addTarget('u1', 'a1', { type: 'work', id: 'w1' });
+
+            expect(agents.updateById).toHaveBeenCalledWith('a1', {
+                targets: [{ type: 'work', id: 'w1' }],
+            });
+            expect(memberships.addMembership).toHaveBeenCalledWith('a1', 'work', 'w1');
+        });
+
+        it('rejects assigning an Agent to the parent it is already pinned to', async () => {
+            agents.findByIdAndUser.mockResolvedValue(
+                makeAgent({ scope: AgentScope.WORK, workId: 'w1' }),
+            );
+            await expect(svc.addTarget('u1', 'a1', { type: 'work', id: 'w1' })).rejects.toThrow(
+                BadRequestException,
+            );
+            expect(agents.updateById).not.toHaveBeenCalled();
+        });
+
+        it('404s on another user’s Agent rather than leaking its existence', async () => {
+            agents.findByIdAndUser.mockResolvedValue(null);
+            await expect(svc.addTarget('u1', 'a1', { type: 'work', id: 'w1' })).rejects.toThrow(
+                NotFoundException,
+            );
+        });
+    });
+
     describe('assertCanAssignAcrossScope', () => {
         it('rejects cross-user assignment', async () => {
             const actor = makeAgent({ userId: 'u1', scope: AgentScope.TENANT });
