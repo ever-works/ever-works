@@ -1,14 +1,18 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { Bot, ChevronDown, Loader2, Pause, Play, Plus } from 'lucide-react';
+import { Bot, ChevronDown, Link2, Loader2, Pause, Play, Plus, Unlink } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { Link, useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
 import type { Agent } from '@/lib/api/agents';
-import { pauseAgentAction, resumeAgentAction } from '@/app/actions/agents';
+import {
+    pauseAgentAction,
+    resumeAgentAction,
+    unassignAgentFromWorkAction,
+} from '@/app/actions/agents';
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -17,14 +21,23 @@ import {
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+import { AssignWorkAgentDialog } from './AssignWorkAgentDialog';
 
 /**
  * Work header "Agents" dropdown — the visibility counterpart of the
- * header's "+ New Agent" affordance (FU-3). Agents created pinned to
- * this Work (`scope: 'work'` + `workId`) surface here; each row links
- * to the Agent detail page and the footer keeps the create flow one
- * click away. The list is server-fetched by `works/[id]/layout.tsx`
- * and threaded down through WorkLayoutClient → WorkHeader.
+ * header's "+ New Agent" affordance (FU-3). Two populations surface
+ * here: Agents created PINNED to this Work (`scope: 'work'` +
+ * `workId`), and Agents from elsewhere in the roster ASSIGNED to it via
+ * their `targets`. Each row links to the Agent detail page. The list is
+ * server-fetched by `works/[id]/layout.tsx` and threaded down through
+ * WorkLayoutClient → WorkHeader.
+ *
+ * The footer carries BOTH on-ramps, because "create another Agent" is
+ * the wrong default for an operator who already has a roster: "Assign
+ * existing Agent" opens a picker of it (AssignWorkAgentDialog), "New
+ * Agent" keeps the create flow one click away. Assigned rows can be
+ * taken back off the Work from their hover action; pinned rows cannot —
+ * their placement IS their scope, so it is changed by editing the Agent.
  *
  * Rows reuse the AgentCard design language (bot avatar tile tinted by
  * the Agent's status tone, tone-mapped status badge with the translated
@@ -52,6 +65,13 @@ const STATUS_DOT_CLASS: Record<Agent['status'], string> = {
     archived: 'bg-text-muted/60',
 };
 
+/** Shared look for the hover-revealed per-row actions (pause/resume, unassign). */
+const QUICK_ACTION_CLASS = cn(
+    'flex h-7 w-7 items-center justify-center rounded-md border border-transparent text-text-muted dark:text-text-muted-dark transition-all',
+    'opacity-0 group-hover/agent:opacity-100 focus-visible:opacity-100',
+    'hover:border-border dark:hover:border-border-dark hover:text-text dark:hover:text-text-dark hover:bg-surface-hover dark:hover:bg-surface-hover-dark',
+);
+
 const STATUS_AVATAR_CLASS: Record<Agent['status'], string> = {
     draft: 'bg-text-muted/10 border-text-muted/20 text-text-muted',
     active: 'bg-success/10 border-success/20 text-success',
@@ -65,19 +85,24 @@ export function WorkAgentsDropdown({
     workId,
     agents,
     total,
+    assignedAgentIds = [],
 }: {
     workId: string;
     agents: Agent[];
     /** Upstream total — may exceed agents.length when the fetch was capped. */
     total?: number;
+    /** Which of `agents` are ASSIGNED (detachable) rather than pinned by scope. */
+    assignedAgentIds?: string[];
 }) {
     const t = useTranslations('dashboard.agentsPage.card');
     const tDropdown = useTranslations('dashboard.workDetail.agentsDropdown');
     const router = useRouter();
     const [pendingId, setPendingId] = useState<string | null>(null);
+    const [assignOpen, setAssignOpen] = useState(false);
     const [, startTransition] = useTransition();
     const agentsTotal = Math.max(total ?? agents.length, agents.length);
     const omittedCount = agentsTotal - agents.length;
+    const assignedIds = new Set(assignedAgentIds);
 
     const statusLabel: Record<Agent['status'], string> = {
         draft: t('statusDraft'),
@@ -105,6 +130,21 @@ export function WorkAgentsDropdown({
                 toast.error(
                     error instanceof Error ? error.message : tDropdown('statusUpdateFailed'),
                 );
+            } finally {
+                setPendingId(null);
+            }
+        });
+    };
+
+    const unassign = (agent: Agent) => {
+        setPendingId(agent.id);
+        startTransition(async () => {
+            try {
+                await unassignAgentFromWorkAction(agent.id, workId);
+                toast.success(tDropdown('unassignedToast', { name: agent.name }));
+                router.refresh();
+            } catch (error) {
+                toast.error(error instanceof Error ? error.message : tDropdown('unassignFailed'));
             } finally {
                 setPendingId(null);
             }
@@ -152,21 +192,25 @@ export function WorkAgentsDropdown({
                                     agent.status === 'paused' ||
                                     agent.status === 'error';
                                 const isPending = pendingId === agent.id;
+                                const isAssigned = assignedIds.has(agent.id);
                                 const hasQuickAction = canPause || canResume;
+                                const quickActionCount =
+                                    (hasQuickAction ? 1 : 0) + (isAssigned ? 1 : 0);
                                 return (
-                                    // The quick action is a positioned SIBLING of the row
-                                    // Link (not a child) so the DOM never nests a button
-                                    // inside an anchor: the Link stays the menu item and
-                                    // navigates on click/Enter, while button clicks never
-                                    // reach the anchor or close the menu — no
-                                    // preventDefault/stopPropagation needed.
+                                    // The quick actions are positioned SIBLINGS of the
+                                    // row Link (not children) so the DOM never nests a
+                                    // button inside an anchor: the Link stays the menu
+                                    // item and navigates on click/Enter, while button
+                                    // clicks never reach the anchor or close the menu —
+                                    // no preventDefault/stopPropagation needed.
                                     <div key={agent.id} className="group/agent relative">
                                         <DropdownMenuItem asChild>
                                             <Link
                                                 href={ROUTES.DASHBOARD_AGENT(agent.id)}
                                                 className={cn(
                                                     'cursor-pointer items-center gap-2.5 py-2',
-                                                    hasQuickAction && 'pr-10',
+                                                    quickActionCount === 1 && 'pr-10',
+                                                    quickActionCount === 2 && 'pr-18',
                                                 )}
                                             >
                                                 <span
@@ -197,42 +241,78 @@ export function WorkAgentsDropdown({
                                                             {statusLabel[agent.status]}
                                                         </span>
                                                     </span>
-                                                    <span className="mt-0.5 block truncate text-[11px] text-text-muted dark:text-text-muted-dark">
-                                                        {agent.title ?? t('noTitle')}
+                                                    <span className="mt-0.5 flex items-center gap-1.5 text-[11px] text-text-muted dark:text-text-muted-dark">
+                                                        <span className="truncate">
+                                                            {agent.title ?? t('noTitle')}
+                                                        </span>
+                                                        {isAssigned && (
+                                                            <span
+                                                                className="inline-flex shrink-0 items-center gap-0.5"
+                                                                title={tDropdown('assignedHint')}
+                                                            >
+                                                                <Link2 className="h-2.5 w-2.5" />
+                                                                {tDropdown('assignedLabel')}
+                                                            </span>
+                                                        )}
                                                     </span>
                                                 </span>
                                             </Link>
                                         </DropdownMenuItem>
-                                        {hasQuickAction && (
-                                            <button
-                                                type="button"
-                                                aria-label={
-                                                    canPause
-                                                        ? tDropdown('pause')
-                                                        : tDropdown('activate')
-                                                }
-                                                title={
-                                                    canPause
-                                                        ? tDropdown('pause')
-                                                        : tDropdown('activate')
-                                                }
-                                                disabled={isPending}
-                                                onClick={() => toggleStatus(agent)}
-                                                className={cn(
-                                                    'absolute right-2 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md border border-transparent text-text-muted dark:text-text-muted-dark transition-all',
-                                                    'opacity-0 group-hover/agent:opacity-100 focus-visible:opacity-100',
-                                                    'hover:border-border dark:hover:border-border-dark hover:text-text dark:hover:text-text-dark hover:bg-surface-hover dark:hover:bg-surface-hover-dark',
-                                                    isPending && 'opacity-100',
+                                        {quickActionCount > 0 && (
+                                            <div className="absolute right-2 top-1/2 z-10 flex -translate-y-1/2 items-center gap-0.5">
+                                                {hasQuickAction && (
+                                                    <button
+                                                        type="button"
+                                                        aria-label={
+                                                            canPause
+                                                                ? tDropdown('pause')
+                                                                : tDropdown('activate')
+                                                        }
+                                                        title={
+                                                            canPause
+                                                                ? tDropdown('pause')
+                                                                : tDropdown('activate')
+                                                        }
+                                                        disabled={isPending}
+                                                        onClick={() => toggleStatus(agent)}
+                                                        className={cn(
+                                                            QUICK_ACTION_CLASS,
+                                                            isPending && 'opacity-100',
+                                                        )}
+                                                    >
+                                                        {isPending ? (
+                                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                        ) : canPause ? (
+                                                            <Pause className="h-3.5 w-3.5" />
+                                                        ) : (
+                                                            <Play className="h-3.5 w-3.5" />
+                                                        )}
+                                                    </button>
                                                 )}
-                                            >
-                                                {isPending ? (
-                                                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                                ) : canPause ? (
-                                                    <Pause className="h-3.5 w-3.5" />
-                                                ) : (
-                                                    <Play className="h-3.5 w-3.5" />
+                                                {/* Only ASSIGNED Agents can be taken off the
+                                                    Work here — a pinned Agent's placement is
+                                                    its scope, changed on the Agent itself. */}
+                                                {isAssigned && (
+                                                    <button
+                                                        type="button"
+                                                        aria-label={tDropdown('unassign')}
+                                                        title={tDropdown('unassign')}
+                                                        disabled={isPending}
+                                                        onClick={() => unassign(agent)}
+                                                        className={cn(
+                                                            QUICK_ACTION_CLASS,
+                                                            'hover:text-danger dark:hover:text-danger',
+                                                            isPending && 'opacity-100',
+                                                        )}
+                                                    >
+                                                        {isPending && !hasQuickAction ? (
+                                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                        ) : (
+                                                            <Unlink className="h-3.5 w-3.5" />
+                                                        )}
+                                                    </button>
                                                 )}
-                                            </button>
+                                            </div>
                                         )}
                                     </div>
                                 );
@@ -250,6 +330,17 @@ export function WorkAgentsDropdown({
                         )}
                     </div>
                     <DropdownMenuSeparator />
+                    {/* Assign first: reusing an Agent you already run is the
+                        cheaper move, and it's the one the old footer hid. */}
+                    <DropdownMenuItem
+                        onClick={() => setAssignOpen(true)}
+                        className="cursor-pointer gap-2 text-sm font-medium text-text-secondary dark:text-text-secondary-dark"
+                    >
+                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-dashed border-border dark:border-border-dark">
+                            <Link2 className="h-3.5 w-3.5" />
+                        </span>
+                        {tDropdown('assignExisting')}
+                    </DropdownMenuItem>
                     <DropdownMenuItem asChild>
                         <Link
                             href={`/works/${workId}/agents/new`}
@@ -263,6 +354,7 @@ export function WorkAgentsDropdown({
                     </DropdownMenuItem>
                 </DropdownMenuContent>
             </DropdownMenu>
+            <AssignWorkAgentDialog workId={workId} open={assignOpen} onOpenChange={setAssignOpen} />
         </span>
     );
 }
