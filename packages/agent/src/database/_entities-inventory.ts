@@ -133,6 +133,7 @@ import { TerminalTranscriptChunk } from '../entities/terminal-transcript-chunk.e
 import { FleetJob } from '../entities/fleet-job.entity';
 import { ToolGrant } from '../entities/tool-grant.entity';
 import { Workflow } from '../entities/workflow.entity';
+import { WorkflowRun } from '../entities/workflow-run.entity';
 
 import {
     PluginEntity,
@@ -324,4 +325,7 @@ export const ENTITIES = [
     // Workflows (judgment layer G5) — saved graphs. Until this row
     // existed a graph could be executed but never KEPT.
     Workflow,
+    // One execution of a saved graph. The row is created `queued` by the
+    // API and finished by the `workflow-run` Trigger.dev task.
+    WorkflowRun,
 ];

@@ -36,6 +36,13 @@ export * from './run-dispatch-gate.service';
 export * from './workflow-graph.ports';
 export * from './workflow-graph-executor.service';
 export * from './workflow-ai-decision.adapter';
+// The real node runner. It lives here rather than api-side because the
+// Trigger.dev worker that executes a saved graph has to bind
+// WORKFLOW_NODE_RUNNER too, and a worker cannot import from apps/api.
+export * from './workflow-node.runner';
+// What of a run is worth persisting — the cap that keeps a run row from
+// scaling with the size of the data the graph touched.
+export * from './workflow-run-trace';
 // Judgment layer G9 — scoped sub-agent delegation with a typed result.
 export * from './sub-agent-delegation.port';
 export * from './sub-agent-delegation.service';

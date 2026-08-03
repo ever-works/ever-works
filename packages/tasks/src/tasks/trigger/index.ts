@@ -36,6 +36,9 @@ export * from './work-import.task';
 export * from './work-onboarding.task';
 export * from './work-schedule-dispatcher.task';
 export * from './webhook-delivery.task';
+// Judgment layer G5 — execute a SAVED workflow graph. The walk can run
+// for ~40 minutes, so it cannot live in an API request.
+export * from './workflow-run.task';
 // EW-693 — long-running plugin execution (Phase 7 / T27).
 export * from './run-plugin-operation.task';
 // Pricing Wave 9 M1 — daily free-credit grant (idempotent per user/day).

@@ -149,6 +149,9 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     // ──────────────────────────────────────────────────────────
     // Streaming-terminal M9 / D1 — persisted terminal transcripts.
     'TerminalTranscriptChunk',
+    // Signup terms acceptance. Already in `_entities-inventory.ts`; this
+    // list was the missed half of the two-step registration.
+    'TermsAcceptance',
     // Tool-grant matrix (audit item G4) — per-scope tool allow/deny rows.
     'ToolGrant',
     'UsageLedgerEntry',
@@ -185,4 +188,5 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'WorkProposalAttachment',
     'WorkSchedule',
     'Workflow',
+    'WorkflowRun',
 ] as const;

@@ -10,7 +10,11 @@ import { BetterAuthAcceptanceAdapter } from 'terms-acceptance/better-auth';
 import type { BetterAuthDatabase } from 'terms-acceptance/better-auth';
 import { AUTH_RUNTIME_INSTANCE } from '../auth/providers/auth-provider.constants';
 import type { createAuthRuntimeInstance } from '../auth/providers/auth-runtime.instance';
-import { TERMS_ACCEPTANCE_MODEL, corpus, getRequiredTermsDocuments } from './terms-acceptance.corpus';
+import {
+    TERMS_ACCEPTANCE_MODEL,
+    corpus,
+    getRequiredTermsDocuments,
+} from './terms-acceptance.corpus';
 
 /** One document a signup form says it displayed. */
 export interface TermsAcceptanceClaim {
@@ -114,12 +118,14 @@ export class TermsAcceptanceService {
     ): Promise<AcceptanceRecord[]> {
         const recorder = await this.getRecorder();
 
-        const documents: RequiredDocument[] = claims.map(({ documentId, version, sha256, locale }) => ({
-            documentId,
-            version,
-            sha256,
-            locale,
-        }));
+        const documents: RequiredDocument[] = claims.map(
+            ({ documentId, version, sha256, locale }) => ({
+                documentId,
+                version,
+                sha256,
+                locale,
+            }),
+        );
 
         return recorder.recordMany(documents, {
             subjectId: userId,
