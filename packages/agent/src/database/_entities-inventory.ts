@@ -43,6 +43,7 @@ import { ConversationMessage } from '../entities/conversation-message.entity';
 import { AuthAccount } from '../entities/auth-account.entity';
 import { AuthSession } from '../entities/auth-session.entity';
 import { AuthVerification } from '../entities/auth-verification.entity';
+import { TermsAcceptance } from '../entities/terms-acceptance.entity';
 import { GitHubAppInstallation } from '../entities/github-app-installation.entity';
 import { GitHubAppInstallationRepository } from '../entities/github-app-installation-repository.entity';
 import { GitHubAppUserLink } from '../entities/github-app-user-link.entity';
@@ -168,6 +169,7 @@ export const ENTITIES = [
     AuthAccount,
     AuthSession,
     AuthVerification,
+    TermsAcceptance,
     GitHubAppInstallation,
     GitHubAppInstallationRepository,
     GitHubAppUserLink,

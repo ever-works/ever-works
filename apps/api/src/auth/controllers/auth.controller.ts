@@ -43,6 +43,7 @@ import { Inject } from '@nestjs/common';
 import { Throttle } from '@nestjs/throttler';
 import { toHeaders } from '../providers/request-headers';
 import { SocialAuthService } from '../services/social-auth.service';
+import { TermsAcceptanceService } from '../../terms/terms-acceptance.service';
 import type { AuthenticatedUser } from '../types/auth.types';
 
 @ApiTags('Auth')
@@ -58,6 +59,7 @@ export class AuthController {
         private readonly captchaVerifier: CaptchaVerifierService,
         private readonly funnel: ZeroFrictionFunnelService,
         private activityLogService: ActivityLogService,
+        private readonly termsAcceptanceService: TermsAcceptanceService,
         @Inject(AUTH_PROVIDER)
         private readonly authProvider: AuthProvider,
     ) {}
@@ -121,12 +123,48 @@ export class AuthController {
     @ApiResponse({ status: 400, description: 'Invalid input or email already exists' })
     async register(@Body() registerDto: RegisterDto, @Request() req) {
         await this.authService.assertCanRegister(registerDto.email);
+
+        // Validate the terms claims BEFORE the account exists. The signup form's
+        // checkbox was uncontrolled and never reached this endpoint at all, so
+        // this field is new; checking it here rather than after `signUpEmail`
+        // means a malformed or unpublished claim rejects the registration
+        // outright instead of stranding a created user whose retry would be
+        // told the email is already taken.
+        if (registerDto.terms?.length) {
+            this.termsAcceptanceService.assertClaimsArePublished(registerDto.terms);
+        }
+
         const response = await this.authProvider.signUpEmail(
             registerDto.username,
             registerDto.email,
             registerDto.password,
             toHeaders(req.headers || {}),
         );
+
+        // Record the acceptance, now that the user has an id. This is the row
+        // that makes the tick provable: which document, at which version, of
+        // which exact text (pinned by sha256 to the published corpus), in which
+        // language, and by what mechanism.
+        //
+        // Failures are logged and swallowed on purpose — the claims were
+        // already validated above, so anything failing here is infrastructure,
+        // and the user row now exists. Throwing would abandon a created account.
+        // The write is idempotent, so a later retry is safe.
+        if (registerDto.terms?.length) {
+            try {
+                await this.termsAcceptanceService.record(response.user.id, registerDto.terms, {
+                    method: 'signup-checkbox',
+                    ip: req.ip ?? null,
+                    userAgent: req.headers?.['user-agent'] ?? null,
+                });
+            } catch (error) {
+                this.logger.error(
+                    `Failed to record terms acceptance for user ${response.user.id}: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+            }
+        }
 
         // EW-743 Phase A — dev-mode platform-admin bootstrap. When
         // EVER_WORKS_BOOTSTRAP_PLATFORM_ADMIN_EMAILS lists this email,

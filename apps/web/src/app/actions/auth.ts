@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { removeAuthAccessCookies, setOAuthStateCookie, setAuthCookies } from '@/lib/auth';
 import { ALLOWED_REDIRECT_URLS, ROUTES, withAppUrl } from '@/lib/constants';
 import { VALIDATION_RULES } from './validation';
-import { authAPI, AuthResponse } from '@/lib/api';
+import { authAPI, AuthResponse, type TermsAcceptanceClaim } from '@/lib/api';
 import { redirect } from '@/i18n/navigation';
 import { getLocale, getTranslations } from 'next-intl/server';
 import { isValidRedirectUrl } from '@/lib/utils';
@@ -109,8 +109,32 @@ export async function login(identifier: string, password: string, redirectUrl: s
     };
 }
 
-export async function register(username: string, email: string, password: string) {
+export async function register(
+    username: string,
+    email: string,
+    password: string,
+    /**
+     * The legal documents the user ticked the box for, exactly as the form
+     * displayed them.
+     *
+     * This parameter is the missing link in the chain the terms checkbox never
+     * travelled: the input was uncontrolled, so it never entered `formData`,
+     * so this action never saw it, so `authAPI.register` never sent it, so
+     * nothing was ever recorded.
+     */
+    terms: TermsAcceptanceClaim[] = [],
+) {
     const t = await getTranslations('validation.auth');
+
+    const termsClaimSchema = z.object({
+        documentId: z.string().min(1),
+        version: z.string().min(1),
+        // Shape only — the API is what checks the digest against the published
+        // corpus. Validating it twice against a client-side copy would just be
+        // a second place to drift.
+        sha256: z.string().regex(/^[0-9a-f]{64}$/),
+        locale: z.string().min(1),
+    });
 
     const registerSchema = z.object({
         username: z
@@ -126,10 +150,11 @@ export async function register(username: string, email: string, password: string
             .regex(/[a-z]/, t('password.lowercase'))
             .regex(/(\d|\W)/, t('password.numberOrSpecial'))
             .regex(/^[^.\n]/, t('password.cannotStartWith')),
+        terms: z.array(termsClaimSchema).min(1, t('terms.required')),
     });
 
     // Validate input
-    const validation = registerSchema.safeParse({ username, email, password });
+    const validation = registerSchema.safeParse({ username, email, password, terms });
     if (!validation.success) {
         return {
             success: false,
@@ -144,6 +169,7 @@ export async function register(username: string, email: string, password: string
             username: validation.data.username,
             email: validation.data.email,
             password: validation.data.password,
+            terms: validation.data.terms,
             emailVerificationCallbackUrl: withAppUrl(ROUTES.API_AUTH_VERIFY_EMAIL),
         });
 

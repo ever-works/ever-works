@@ -217,7 +217,8 @@
             "errors": {
                 "passwordsDoNotMatch": "Şifreler eşleşmiyor",
                 "passwordTooShort": "Şifre en az 8 karakter olmalıdır",
-                "generic": "Bir hata oluştu. Lütfen tekrar deneyin."
+                "generic": "Bir hata oluştu. Lütfen tekrar deneyin.",
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
             }
         }
     },
@@ -7118,6 +7119,9 @@
             },
             "token": {
                 "required": "Token cannot be empty"
+            },
+            "terms": {
+                "required": "You must accept the Terms of Service and Privacy Policy to create an account."
             }
         }
     },

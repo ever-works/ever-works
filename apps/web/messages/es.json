@@ -217,7 +217,8 @@
             "errors": {
                 "passwordsDoNotMatch": "Las contraseñas no coinciden",
                 "passwordTooShort": "La contraseña debe tener al menos 8 caracteres",
-                "generic": "Ocurrió un error. Inténtalo de nuevo."
+                "generic": "Ocurrió un error. Inténtalo de nuevo.",
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
             }
         }
     },
@@ -7117,6 +7118,9 @@
             },
             "token": {
                 "required": "Token cannot be empty"
+            },
+            "terms": {
+                "required": "You must accept the Terms of Service and Privacy Policy to create an account."
             }
         }
     },

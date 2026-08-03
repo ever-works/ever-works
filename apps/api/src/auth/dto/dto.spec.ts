@@ -100,6 +100,53 @@ describe('apps/api auth DTO validation', () => {
             const errs = await validate(dto);
             expect(constraintsFor(errs, 'emailVerificationCallbackUrl').isString).toBeDefined();
         });
+
+        /**
+         * `terms` carries the identity of the exact text the signup form showed.
+         * These checks only reject obvious rubbish — the corpus check that turns
+         * a claim into evidence lives in `TermsAcceptanceService`. What they do
+         * guarantee is that a malformed digest never gets that far.
+         */
+        describe('terms', () => {
+            const claim = {
+                documentId: 'tos:ever-works',
+                version: '1.0.0',
+                sha256: 'a'.repeat(64),
+                locale: 'en',
+            };
+
+            it('accepts a well-formed claim', async () => {
+                const dto = plainToInstance(RegisterDto, { ...valid, terms: [claim] });
+                expect(await validate(dto)).toHaveLength(0);
+            });
+
+            it('is optional (machine-driven registration shows no checkbox)', async () => {
+                const dto = plainToInstance(RegisterDto, valid);
+                expect(await validate(dto)).toHaveLength(0);
+            });
+
+            it('rejects an empty array — an empty acceptance is not an acceptance', async () => {
+                const dto = plainToInstance(RegisterDto, { ...valid, terms: [] });
+                const errs = await validate(dto);
+                expect(constraintsFor(errs, 'terms').arrayNotEmpty).toBeDefined();
+            });
+
+            it('rejects a digest that is not 64 lowercase hex chars', async () => {
+                const dto = plainToInstance(RegisterDto, {
+                    ...valid,
+                    terms: [{ ...claim, sha256: 'A'.repeat(64) }],
+                });
+                expect(await validate(dto)).not.toHaveLength(0);
+            });
+
+            it('rejects a claim missing its documentId', async () => {
+                const dto = plainToInstance(RegisterDto, {
+                    ...valid,
+                    terms: [{ version: '1.0.0', sha256: 'a'.repeat(64), locale: 'en' }],
+                });
+                expect(await validate(dto)).not.toHaveLength(0);
+            });
+        });
     });
 
     describe('LoginDto', () => {

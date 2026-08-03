@@ -11,12 +11,22 @@ import { Button } from '@/components/ui/button';
 import { ROUTES } from '@/lib/constants';
 import { ThemeToggle } from '@/components/theme-toggle';
 import { OAuthProvider } from '@/lib/api/enums';
+import type { TermsAcceptanceDocument } from '@/lib/api/types-only';
 
 interface RegisterFormProps {
     availableSocialProviders: OAuthProvider[];
+    /**
+     * The legal documents this signup must accept, resolved server-side from the
+     * published corpus. Empty means they could not be loaded, and registration
+     * is blocked — see `termsUnavailable` below.
+     */
+    termsDocuments: TermsAcceptanceDocument[];
 }
 
-export default function RegisterForm({ availableSocialProviders }: RegisterFormProps) {
+export default function RegisterForm({
+    availableSocialProviders,
+    termsDocuments,
+}: RegisterFormProps) {
     const t = useTranslations('auth.register');
     const [isPending, startTransition] = useTransition();
 
@@ -25,9 +35,19 @@ export default function RegisterForm({ availableSocialProviders }: RegisterFormP
         email: '',
         password: '',
         confirmPassword: '',
+        // The terms checkbox used to be uncontrolled — rendered with a bare
+        // HTML5 `required`, absent from this object, never posted. It gated the
+        // submit button and its value went nowhere, so the account was created
+        // with no record that anything had been accepted. It is part of the form
+        // state now, and the value it carries reaches the server.
+        acceptedTerms: false,
     });
 
     const [error, setError] = useState('');
+
+    // Nothing to pin an acceptance to means nothing truthful to record, so the
+    // form refuses rather than registering silently.
+    const termsUnavailable = termsDocuments.length === 0;
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -44,8 +64,26 @@ export default function RegisterForm({ availableSocialProviders }: RegisterFormP
             return;
         }
 
+        if (!formData.acceptedTerms || termsUnavailable) {
+            setError(t('errors.termsNotAccepted'));
+            return;
+        }
+
         startTransition(async () => {
-            const response = await registerAction(formData.name, formData.email, formData.password);
+            const response = await registerAction(
+                formData.name,
+                formData.email,
+                formData.password,
+                // Exactly what was displayed: document id, version, digest and
+                // locale. The API re-checks each against the published corpus
+                // before it becomes a row.
+                termsDocuments.map(({ documentId, version, sha256, locale }) => ({
+                    documentId,
+                    version,
+                    sha256,
+                    locale,
+                })),
+            );
 
             if (response && !response.success) {
                 setError(response.error || t('errors.generic'));
@@ -123,10 +161,22 @@ export default function RegisterForm({ availableSocialProviders }: RegisterFormP
                 </div>
 
                 <div className="flex items-center mb-6">
+                    {/*
+                        Controlled, and its value is submitted. Previously this
+                        was uncontrolled with only HTML5 `required`: the browser
+                        blocked the submit until it was ticked and then the tick
+                        was discarded, which is the appearance of consent with
+                        none of the evidence.
+                    */}
                     <input
                         id="terms"
                         type="checkbox"
                         required
+                        checked={formData.acceptedTerms}
+                        onChange={(e) =>
+                            setFormData({ ...formData, acceptedTerms: e.target.checked })
+                        }
+                        disabled={isPending || termsUnavailable}
                         className="w-4 h-4 mt-0.5 bg-surface-secondary dark:bg-surface-secondary-dark border-border dark:border-border-dark rounded text-primary focus:ring-primary"
                     />
 
@@ -147,7 +197,7 @@ export default function RegisterForm({ availableSocialProviders }: RegisterFormP
 
                 <Button
                     type="submit"
-                    disabled={isPending}
+                    disabled={isPending || termsUnavailable}
                     loading={isPending}
                     fullWidth
                     className="bg-primary hover:bg-primary-hover"
