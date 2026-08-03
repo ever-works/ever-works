@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsWhere, In, IsNull, LessThanOrEqual, Not, Repository } from 'typeorm';
 import { Agent, AgentScope, AgentStatus } from '../../entities/agent.entity';
+import { AgentMembership } from '../../entities/agent-membership.entity';
 import { sanitizeLikePattern } from '../utils';
 
 /**
@@ -15,6 +16,14 @@ export interface ListAgentsFilter {
     missionId?: string;
     ideaId?: string;
     workId?: string;
+    /**
+     * "Which Agents REACH this Work?" — Agents whose
+     * `targets` include this Work, resolved through the indexed
+     * `agent_memberships` join rather than a JSON scan. Distinct from
+     * `workId`, which matches Agents PINNED to the Work by scope; the
+     * Work header's Agents dropdown unions the two.
+     */
+    assignedWorkId?: string;
     search?: string;
     limit?: number;
     offset?: number;
@@ -95,6 +104,25 @@ export class AgentRepository {
         }
         if (filter.workId) {
             qb.andWhere('agent.workId = :workId', { workId: filter.workId });
+        }
+        if (filter.assignedWorkId) {
+            // EXISTS over the membership join (idx_agent_memberships_target)
+            // — built through the query builder so the column identifiers
+            // come from entity metadata instead of hand-quoted SQL.
+            qb.andWhere((sub) => {
+                const sql = sub
+                    .subQuery()
+                    .select('1')
+                    .from(AgentMembership, 'membership')
+                    .where('membership.agentId = agent.id')
+                    .andWhere('membership.targetType = :assignedTargetType')
+                    .andWhere('membership.targetId = :assignedWorkId')
+                    .getQuery();
+                return `EXISTS ${sql}`;
+            }).setParameters({
+                assignedTargetType: 'work',
+                assignedWorkId: filter.assignedWorkId,
+            });
         }
         if (filter.search) {
             // Security: escape LIKE wildcards (%/_/\) in the user-supplied
