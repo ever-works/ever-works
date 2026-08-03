@@ -65,6 +65,20 @@ const STATUS_DOT_CLASS: Record<Agent['status'], string> = {
     archived: 'bg-text-muted/60',
 };
 
+/**
+ * The two footer actions. Deliberately the SAME control shape as the
+ * dropdown's own trigger button (h-8, rounded-lg, hairline border,
+ * 12px medium label) so the popup ends in something that reads as part
+ * of the header chrome rather than as two more menu rows.
+ */
+const FOOTER_ACTION_CLASS = cn(
+    'flex-1 h-8 justify-center gap-1.5 rounded-lg px-2 whitespace-nowrap',
+    'border border-border dark:border-border-dark',
+    'text-[12px] font-medium text-text-secondary dark:text-text-secondary-dark',
+    'hover:border-border-hover dark:hover:border-border-hover-dark hover:text-text dark:hover:text-text-dark',
+    'cursor-pointer transition-colors',
+);
+
 /** Shared look for the hover-revealed per-row actions (pause/resume, unassign). */
 const QUICK_ACTION_CLASS = cn(
     'flex h-7 w-7 items-center justify-center rounded-md border border-transparent text-text-muted dark:text-text-muted-dark transition-all',
@@ -330,28 +344,31 @@ export function WorkAgentsDropdown({
                         )}
                     </div>
                     <DropdownMenuSeparator />
-                    {/* Assign first: reusing an Agent you already run is the
-                        cheaper move, and it's the one the old footer hid. */}
-                    <DropdownMenuItem
-                        onClick={() => setAssignOpen(true)}
-                        className="cursor-pointer gap-2 text-sm font-medium text-text-secondary dark:text-text-secondary-dark"
-                    >
-                        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-dashed border-border dark:border-border-dark">
-                            <Link2 className="h-3.5 w-3.5" />
-                        </span>
-                        {tDropdown('assignExisting')}
-                    </DropdownMenuItem>
-                    <DropdownMenuItem asChild>
-                        <Link
-                            href={`/works/${workId}/agents/new`}
-                            className="cursor-pointer gap-2 text-sm font-medium text-text-secondary dark:text-text-secondary-dark"
+                    {/* An action BAR, not two more list rows: the items above
+                        navigate, these two commit a change, and matching the
+                        header's own control style (same height, radius, and
+                        border as the trigger) is what makes the footer read as
+                        controls. Assign comes first — reusing an Agent you
+                        already run is the cheaper move, and it's the one the
+                        original footer hid. */}
+                    <div className="flex items-center gap-1.5">
+                        <DropdownMenuItem
+                            onClick={() => setAssignOpen(true)}
+                            className={FOOTER_ACTION_CLASS}
                         >
-                            <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-dashed border-border dark:border-border-dark">
-                                <Plus className="h-3.5 w-3.5" />
-                            </span>
-                            {tDropdown('newAgent')}
-                        </Link>
-                    </DropdownMenuItem>
+                            <Link2 className="h-3.5 w-3.5 shrink-0" />
+                            {tDropdown('assignExisting')}
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                            <Link
+                                href={`/works/${workId}/agents/new`}
+                                className={FOOTER_ACTION_CLASS}
+                            >
+                                <Plus className="h-3.5 w-3.5 shrink-0" />
+                                {tDropdown('newAgent')}
+                            </Link>
+                        </DropdownMenuItem>
+                    </div>
                 </DropdownMenuContent>
             </DropdownMenu>
             <AssignWorkAgentDialog workId={workId} open={assignOpen} onOpenChange={setAssignOpen} />
