@@ -123,7 +123,12 @@ export function WorkAgentsDropdown({
     const t = useTranslations('dashboard.agentsPage.card');
     const tDropdown = useTranslations('dashboard.workDetail.agentsDropdown');
     const router = useRouter();
-    const [pendingId, setPendingId] = useState<string | null>(null);
+    // Both the row AND which of its two quick actions is in flight — a row
+    // can be pausable and assigned at once, so the id alone cannot tell the
+    // pause/resume button apart from the unassign button when spinning.
+    const [pending, setPending] = useState<{ id: string; kind: 'status' | 'unassign' } | null>(
+        null,
+    );
     const [assignOpen, setAssignOpen] = useState(false);
     const [, startTransition] = useTransition();
     const agentsTotal = Math.max(total ?? agents.length, agents.length);
@@ -141,7 +146,7 @@ export function WorkAgentsDropdown({
 
     const toggleStatus = (agent: Agent) => {
         const action = agent.status === 'active' ? 'pause' : 'resume';
-        setPendingId(agent.id);
+        setPending({ id: agent.id, kind: 'status' });
         startTransition(async () => {
             try {
                 if (action === 'pause') {
@@ -157,13 +162,13 @@ export function WorkAgentsDropdown({
                     error instanceof Error ? error.message : tDropdown('statusUpdateFailed'),
                 );
             } finally {
-                setPendingId(null);
+                setPending(null);
             }
         });
     };
 
     const unassign = (agent: Agent) => {
-        setPendingId(agent.id);
+        setPending({ id: agent.id, kind: 'unassign' });
         startTransition(async () => {
             try {
                 await unassignAgentFromWorkAction(agent.id, workId);
@@ -172,7 +177,7 @@ export function WorkAgentsDropdown({
             } catch (error) {
                 toast.error(error instanceof Error ? error.message : tDropdown('unassignFailed'));
             } finally {
-                setPendingId(null);
+                setPending(null);
             }
         });
     };
@@ -217,7 +222,9 @@ export function WorkAgentsDropdown({
                                     agent.status === 'draft' ||
                                     agent.status === 'paused' ||
                                     agent.status === 'error';
-                                const isPending = pendingId === agent.id;
+                                const isPending = pending?.id === agent.id;
+                                const isStatusPending = isPending && pending?.kind === 'status';
+                                const isUnassignPending = isPending && pending?.kind === 'unassign';
                                 const isAssigned = assignedIds.has(agent.id);
                                 const hasQuickAction = canPause || canResume;
                                 const quickActionCount =
@@ -306,7 +313,7 @@ export function WorkAgentsDropdown({
                                                             isPending && 'opacity-100',
                                                         )}
                                                     >
-                                                        {isPending ? (
+                                                        {isStatusPending ? (
                                                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                                         ) : canPause ? (
                                                             <Pause className="h-3.5 w-3.5" />
@@ -331,7 +338,7 @@ export function WorkAgentsDropdown({
                                                             isPending && 'opacity-100',
                                                         )}
                                                     >
-                                                        {isPending && !hasQuickAction ? (
+                                                        {isUnassignPending ? (
                                                             <Loader2 className="h-3.5 w-3.5 animate-spin" />
                                                         ) : (
                                                             <Unlink className="h-3.5 w-3.5" />
