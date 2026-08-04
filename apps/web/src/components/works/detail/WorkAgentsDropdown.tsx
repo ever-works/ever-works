@@ -66,16 +66,28 @@ const STATUS_DOT_CLASS: Record<Agent['status'], string> = {
 };
 
 /**
- * The two footer actions. Deliberately the SAME control shape as the
- * dropdown's own trigger button (h-8, rounded-lg, hairline border,
- * 12px medium label) so the popup ends in something that reads as part
- * of the header chrome rather than as two more menu rows.
+ * The two footer actions. Same control shape as the dropdown's own
+ * trigger button (h-8, rounded-lg, 12px medium label) so the popup ends
+ * in something that reads as part of the header chrome rather than as
+ * two more menu rows — but filled with the app's primary button tokens
+ * (solid black on light, solid white on dark) so the commit actions
+ * clearly outrank the navigating rows above them.
+ *
+ * `border` is kept, coloured to match the fill, purely so the box stays
+ * the exact size of the bordered trigger it echoes.
+ *
+ * `data-[focus]` is Headless UI v2's keyboard-highlight hook: the base
+ * `MenuItem` highlight (`bg-surface-hover`) loses to the fill below in
+ * the tailwind-merge pass, so the footer restates it in its own palette.
  */
 const FOOTER_ACTION_CLASS = cn(
     'flex-1 h-8 justify-center gap-1.5 rounded-lg px-2 whitespace-nowrap',
-    'border border-border dark:border-border-dark',
-    'text-[12px] font-medium text-text-secondary dark:text-text-secondary-dark',
-    'hover:border-border-hover dark:hover:border-border-hover-dark hover:text-text dark:hover:text-text-dark',
+    'border border-button-primary dark:border-button-primary-dark',
+    'bg-button-primary dark:bg-button-primary-dark',
+    'text-[12px] font-medium text-button-primary-foreground dark:text-button-primary-foreground-dark',
+    'hover:bg-button-primary-hover dark:hover:bg-button-primary-hover-dark',
+    'hover:border-button-primary-hover dark:hover:border-button-primary-hover-dark',
+    'data-[focus]:bg-button-primary-hover dark:data-[focus]:bg-button-primary-hover-dark',
     'cursor-pointer transition-colors',
 );
 
