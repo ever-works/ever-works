@@ -34,6 +34,9 @@ function makeRepo<T extends object>(overrides: Partial<T> = {}): jest.Mocked<T> 
         archiveById: jest.fn(),
         deleteById: jest.fn(),
         transitionStatus: jest.fn(),
+        // CAS write behind addTarget/removeTarget — defaults to "we won
+        // the race" so tests opt in to contention explicitly.
+        casUpdateTargets: jest.fn().mockResolvedValue(true),
         incrementErrorCount: jest.fn(),
         tryClaimForRun: jest.fn(),
         releaseAfterRun: jest.fn(),
@@ -442,9 +445,9 @@ describe('AgentsService', () => {
 
             await svc.addTarget('u1', 'a1', { type: 'work', id: 'w1' });
 
-            expect(agents.updateById).toHaveBeenCalledWith('a1', {
-                targets: [{ type: 'work', id: 'w1' }],
-            });
+            expect(agents.casUpdateTargets).toHaveBeenCalledWith('a1', null, [
+                { type: 'work', id: 'w1' },
+            ]);
             expect(memberships.addMembership).toHaveBeenCalledWith('a1', 'work', 'w1');
         });
 
@@ -457,7 +460,7 @@ describe('AgentsService', () => {
 
             await svc.addTarget('u1', 'a1', { type: 'work', id: 'w1' });
 
-            expect(agents.updateById).not.toHaveBeenCalled();
+            expect(agents.casUpdateTargets).not.toHaveBeenCalled();
             expect(memberships.addMembership).not.toHaveBeenCalled();
         });
 
@@ -473,17 +476,26 @@ describe('AgentsService', () => {
             agents.findById.mockResolvedValue(agent);
 
             await svc.removeTarget('u1', 'a1', { type: 'work', id: 'w1' });
-            expect(agents.updateById).toHaveBeenCalledWith('a1', {
-                targets: [{ type: 'work', id: 'w2' }],
-            });
+            expect(agents.casUpdateTargets).toHaveBeenCalledWith(
+                'a1',
+                [
+                    { type: 'work', id: 'w1' },
+                    { type: 'work', id: 'w2' },
+                ],
+                [{ type: 'work', id: 'w2' }],
+            );
             expect(memberships.removeMembership).toHaveBeenCalledWith('a1', 'work', 'w1');
 
-            agents.updateById.mockClear();
+            agents.casUpdateTargets.mockClear();
             agents.findByIdAndUser.mockResolvedValue(
                 makeAgent({ scope: AgentScope.TENANT, targets: [{ type: 'work', id: 'w2' }] }),
             );
             await svc.removeTarget('u1', 'a1', { type: 'work', id: 'w2' });
-            expect(agents.updateById).toHaveBeenCalledWith('a1', { targets: null });
+            expect(agents.casUpdateTargets).toHaveBeenCalledWith(
+                'a1',
+                [{ type: 'work', id: 'w2' }],
+                null,
+            );
         });
 
         it('lends out an Agent pinned to ANOTHER Work — scope is not a barrier', async () => {
@@ -493,9 +505,9 @@ describe('AgentsService', () => {
 
             await svc.addTarget('u1', 'a1', { type: 'work', id: 'w1' });
 
-            expect(agents.updateById).toHaveBeenCalledWith('a1', {
-                targets: [{ type: 'work', id: 'w1' }],
-            });
+            expect(agents.casUpdateTargets).toHaveBeenCalledWith('a1', null, [
+                { type: 'work', id: 'w1' },
+            ]);
             expect(memberships.addMembership).toHaveBeenCalledWith('a1', 'work', 'w1');
         });
 
@@ -506,13 +518,81 @@ describe('AgentsService', () => {
             await expect(svc.addTarget('u1', 'a1', { type: 'work', id: 'w1' })).rejects.toThrow(
                 BadRequestException,
             );
-            expect(agents.updateById).not.toHaveBeenCalled();
+            expect(agents.casUpdateTargets).not.toHaveBeenCalled();
         });
 
         it('404s on another user’s Agent rather than leaking its existence', async () => {
             agents.findByIdAndUser.mockResolvedValue(null);
             await expect(svc.addTarget('u1', 'a1', { type: 'work', id: 'w1' })).rejects.toThrow(
                 NotFoundException,
+            );
+        });
+
+        it('re-reads and retries when a concurrent writer wins the CAS', async () => {
+            // First read sees an empty Agent; the CAS loses because
+            // another editor committed `w9` in between. The retry must
+            // build on THAT array, not on the stale snapshot.
+            const stale = makeAgent({ scope: AgentScope.TENANT, targets: null });
+            const fresh = makeAgent({
+                scope: AgentScope.TENANT,
+                targets: [{ type: 'work', id: 'w9' }],
+            });
+            agents.findByIdAndUser.mockResolvedValueOnce(stale).mockResolvedValueOnce(fresh);
+            agents.findById.mockResolvedValue(fresh);
+            agents.casUpdateTargets.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+
+            await svc.addTarget('u1', 'a1', { type: 'work', id: 'w1' });
+
+            expect(agents.casUpdateTargets).toHaveBeenNthCalledWith(
+                2,
+                'a1',
+                [{ type: 'work', id: 'w9' }],
+                [
+                    { type: 'work', id: 'w9' },
+                    { type: 'work', id: 'w1' },
+                ],
+            );
+            expect(memberships.addMembership).toHaveBeenCalledTimes(1);
+        });
+
+        it('does not write the membership row for a CAS that never landed', async () => {
+            const agent = makeAgent({ scope: AgentScope.TENANT, targets: null });
+            agents.findByIdAndUser.mockResolvedValue(agent);
+            agents.casUpdateTargets.mockResolvedValue(false);
+
+            await expect(svc.addTarget('u1', 'a1', { type: 'work', id: 'w1' })).rejects.toThrow(
+                ConflictException,
+            );
+            expect(memberships.addMembership).not.toHaveBeenCalled();
+        });
+
+        it('removeTarget retries on a lost CAS instead of dropping the concurrent edit', async () => {
+            const stale = makeAgent({
+                scope: AgentScope.TENANT,
+                targets: [{ type: 'work', id: 'w1' }],
+            });
+            const fresh = makeAgent({
+                scope: AgentScope.TENANT,
+                targets: [
+                    { type: 'work', id: 'w1' },
+                    { type: 'work', id: 'w9' },
+                ],
+            });
+            agents.findByIdAndUser.mockResolvedValueOnce(stale).mockResolvedValueOnce(fresh);
+            agents.findById.mockResolvedValue(fresh);
+            agents.casUpdateTargets.mockResolvedValueOnce(false).mockResolvedValueOnce(true);
+
+            await svc.removeTarget('u1', 'a1', { type: 'work', id: 'w1' });
+
+            // `w9` survives the unassign — the whole point of the guard.
+            expect(agents.casUpdateTargets).toHaveBeenNthCalledWith(
+                2,
+                'a1',
+                [
+                    { type: 'work', id: 'w1' },
+                    { type: 'work', id: 'w9' },
+                ],
+                [{ type: 'work', id: 'w9' }],
             );
         });
     });

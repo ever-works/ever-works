@@ -176,6 +176,15 @@ const USER_TRANSITIONS: Record<AgentStatus, AgentStatus[]> = {
 export class AgentsService {
     private readonly logger = new Logger(AgentsService.name);
 
+    /**
+     * How many times `addTarget` / `removeTarget` re-read and retry their
+     * CAS write before giving up. Two operators editing the same Agent's
+     * reach at once is the realistic contention (the Work header picker
+     * and the Agent detail page); past a few rounds it's a hot row we'd
+     * rather report as a conflict than spin on.
+     */
+    private static readonly TARGETS_CAS_ATTEMPTS = 3;
+
     constructor(
         private readonly agents: AgentRepository,
         private readonly memberships: AgentMembershipRepository,
@@ -490,6 +499,14 @@ export class AgentsService {
      * it PATCH the full array would mean two round-trips racing every
      * other editor of the same Agent.
      *
+     * The write goes through `casUpdateTargets` rather than a plain
+     * update: a concurrent writer that committed between our read and
+     * our write loses its target otherwise, while the membership row it
+     * already wrote survives — leaving `agent_memberships` (what the
+     * `assignedWorkId` filter reads) disagreeing with `AgentDto.targets`.
+     * A lost CAS re-reads and recomputes, and the membership write only
+     * happens on the attempt whose array actually landed.
+     *
      * Any owned Agent can be lent out, whatever its own scope — an
      * operator whose Agents were all created from a Work would otherwise
      * have nothing to assign. The one thing rejected is lending an Agent
@@ -497,24 +514,42 @@ export class AgentsService {
      * has by scope and then let `removeTarget` appear to revoke it.
      */
     async addTarget(userId: string, id: string, target: AgentTarget): Promise<AgentDto> {
-        const agent = await this.requireOwned(userId, id);
-        this.assertNotOwnScopeParent(agent, target);
+        let agent = await this.requireOwned(userId, id);
         await this.assertTargetExists(userId, target);
 
-        const current = agent.targets ?? [];
-        if (current.some((t) => t.type === target.type && (t.id ?? null) === (target.id ?? null))) {
-            return toAgentDto(agent);
-        }
-        const next = [...current, target];
+        for (let attempt = 0; attempt < AgentsService.TARGETS_CAS_ATTEMPTS; attempt++) {
+            this.assertNotOwnScopeParent(agent, target);
 
-        await this.agents.updateById(id, { targets: next });
-        if (target.type !== 'wildcard') {
-            await this.memberships.addMembership(id, target.type, target.id ?? null);
+            const current = agent.targets ?? [];
+            if (
+                current.some(
+                    (t) => t.type === target.type && (t.id ?? null) === (target.id ?? null),
+                )
+            ) {
+                return toAgentDto(agent);
+            }
+
+            const won = await this.agents.casUpdateTargets(id, agent.targets ?? null, [
+                ...current,
+                target,
+            ]);
+            if (!won) {
+                agent = await this.requireOwned(userId, id);
+                continue;
+            }
+
+            if (target.type !== 'wildcard') {
+                await this.memberships.addMembership(id, target.type, target.id ?? null);
+            }
+
+            const refreshed = await this.agents.findById(id);
+            if (!refreshed) throw new NotFoundException('Agent vanished after update');
+            return toAgentDto(refreshed);
         }
 
-        const refreshed = await this.agents.findById(id);
-        if (!refreshed) throw new NotFoundException('Agent vanished after update');
-        return toAgentDto(refreshed);
+        throw new ConflictException(
+            `Agent ${id} is being reassigned by someone else — retry the assignment.`,
+        );
     }
 
     /**
@@ -522,22 +557,41 @@ export class AgentsService {
      * target the Agent never had is a no-op, not a 404).
      */
     async removeTarget(userId: string, id: string, target: AgentTarget): Promise<AgentDto> {
-        const agent = await this.requireOwned(userId, id);
+        let agent = await this.requireOwned(userId, id);
 
-        const current = agent.targets ?? [];
-        const next = current.filter(
-            (t) => !(t.type === target.type && (t.id ?? null) === (target.id ?? null)),
+        for (let attempt = 0; attempt < AgentsService.TARGETS_CAS_ATTEMPTS; attempt++) {
+            const current = agent.targets ?? [];
+            const next = current.filter(
+                (t) => !(t.type === target.type && (t.id ?? null) === (target.id ?? null)),
+            );
+
+            if (next.length !== current.length) {
+                const won = await this.agents.casUpdateTargets(
+                    id,
+                    agent.targets ?? null,
+                    next.length > 0 ? next : null,
+                );
+                if (!won) {
+                    agent = await this.requireOwned(userId, id);
+                    continue;
+                }
+            }
+
+            // Unconditional even when `targets` never listed it — this is
+            // also the repair path for a membership row left behind by an
+            // older non-atomic write.
+            if (target.type !== 'wildcard') {
+                await this.memberships.removeMembership(id, target.type, target.id ?? null);
+            }
+
+            const refreshed = await this.agents.findById(id);
+            if (!refreshed) throw new NotFoundException('Agent vanished after update');
+            return toAgentDto(refreshed);
+        }
+
+        throw new ConflictException(
+            `Agent ${id} is being reassigned by someone else — retry the unassignment.`,
         );
-        if (next.length !== current.length) {
-            await this.agents.updateById(id, { targets: next.length > 0 ? next : null });
-        }
-        if (target.type !== 'wildcard') {
-            await this.memberships.removeMembership(id, target.type, target.id ?? null);
-        }
-
-        const refreshed = await this.agents.findById(id);
-        if (!refreshed) throw new NotFoundException('Agent vanished after update');
-        return toAgentDto(refreshed);
     }
 
     /**

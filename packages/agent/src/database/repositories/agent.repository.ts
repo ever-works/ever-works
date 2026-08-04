@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { FindOptionsWhere, In, IsNull, LessThanOrEqual, Not, Repository } from 'typeorm';
-import { Agent, AgentScope, AgentStatus } from '../../entities/agent.entity';
+import { Agent, AgentScope, AgentStatus, type AgentTarget } from '../../entities/agent.entity';
 import { AgentMembership } from '../../entities/agent-membership.entity';
 import { sanitizeLikePattern } from '../utils';
 
@@ -359,6 +359,44 @@ export class AgentRepository {
             .where('id = :id', { id: agentId })
             .andWhere('status IN (:...from)', { from: fromList })
             .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * CAS-swap the whole `targets` array — succeeds only if the row still
+     * holds `expected` at write time. Same guard `transitionStatus` and
+     * `tryClaimForRun` put on the status column, applied to the column
+     * two concurrent assign/unassign calls read-modify-write: without it
+     * the later commit silently drops the earlier one's target, while its
+     * `agent_memberships` row (what the `assignedWorkId` filter reads)
+     * stays behind and disagrees with `Agent.targets`.
+     *
+     * `targets` is a `simple-json` column, so TypeORM stores it as the
+     * `JSON.stringify` of the array — or SQL NULL when the value is null,
+     * which no `=` comparison matches, hence the explicit `IS NULL` arm.
+     * Comparing against `JSON.stringify(expected)` therefore compares
+     * against exactly what the write we read from put in the row.
+     */
+    async casUpdateTargets(
+        agentId: string,
+        expected: AgentTarget[] | null | undefined,
+        next: AgentTarget[] | null,
+    ): Promise<boolean> {
+        const qb = this.repository
+            .createQueryBuilder()
+            .update(Agent)
+            .set({ targets: next, updatedAt: new Date() })
+            .where('id = :id', { id: agentId });
+
+        if (expected === null || expected === undefined) {
+            qb.andWhere('targets IS NULL');
+        } else {
+            qb.andWhere('targets = :expectedTargets', {
+                expectedTargets: JSON.stringify(expected),
+            });
+        }
+
+        const result = await qb.execute();
         return (result.affected ?? 0) > 0;
     }
 
