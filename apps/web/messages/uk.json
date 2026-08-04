@@ -1447,7 +1447,14 @@
                 "relationLabel": "Relation",
                 "attach": "Attach",
                 "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "detachDialog": {
+                    "title": "Від'єднати цю Роботу?",
+                    "body": "{title} буде вилучено з цієї Місії. Сама Робота не змінюється — вилучається лише посилання.",
+                    "confirm": "Від'єднати Роботу",
+                    "cancel": "Скасувати",
+                    "detaching": "Від'єднання…",
+                    "error": "Не вдалося від'єднати Роботу"
+                },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
                     "created": "Created",
@@ -1496,8 +1503,13 @@
                 "runNow": "Run now",
                 "clone": "Clone"
             },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            "deleteDialog": {
+                "title": "Видалити цю Місію?",
+                "body": "{title} буде видалено назавжди. Дочірні Ідеї та Роботи збережуться, але їхній зворотний зв'язок із цією Місією буде втрачено. Цю дію неможливо скасувати.",
+                "confirm": "Видалити Місію",
+                "cancel": "Скасувати",
+                "deleting": "Видалення…",
+                "error": "Не вдалося видалити Місію"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1568,6 +1580,36 @@
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)"
+                }
+            },
+            "goals": {
+                "title": "Цілі",
+                "empty": "До цієї Місії ще не приєднано жодної Цілі. Приєднайте Ціль нижче, щоб визначити, що вважати успіхом.",
+                "attachTitle": "Приєднати Ціль",
+                "goalLabel": "Ціль",
+                "goalPlaceholder": "Виберіть Ціль",
+                "primaryLabel": "Зробити основною",
+                "primaryBadge": "Основна",
+                "primaryTooltip": "Основна Ціль цієї Місії - основною може бути лише одна Ціль одночасно.",
+                "attach": "Приєднати",
+                "detach": "Від'єднати",
+                "detachDialog": {
+                    "title": "Від'єднати цю Ціль?",
+                    "body": "{title} буде вилучено з цієї Місії. Сама Ціль не видаляється — вона залишається на сторінці Цілей та в усіх інших Місіях, до яких приєднана.",
+                    "confirm": "Від'єднати Ціль",
+                    "cancel": "Скасувати",
+                    "detaching": "Від'єднання…",
+                    "error": "Не вдалося від'єднати Ціль"
+                },
+                "alreadyLinkedOption": "{title} (уже приєднана)",
+                "noGoalsToAttach": "У вас ще немає Цілей. Створіть Ціль на сторінці Цілей, а потім приєднайте її тут.",
+                "pickerTruncated": "Показано 100 найновіших Цілей - відкрийте сторінку Цілей, щоб побачити повний список.",
+                "invariantNote": "Приєднання Цілі ніколи не змінює статус цієї Місії - завершення Місії залишається явною дією.",
+                "toasts": {
+                    "attached": "Ціль приєднано",
+                    "attachError": "Не вдалося приєднати Ціль",
+                    "detached": "Ціль від'єднано",
+                    "detachError": "Не вдалося від'єднати Ціль"
                 }
             }
         },

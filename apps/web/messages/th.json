@@ -1447,7 +1447,14 @@
                 "relationLabel": "Relation",
                 "attach": "Attach",
                 "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "detachDialog": {
+                    "title": "ยกเลิกการแนบงานนี้?",
+                    "body": "{title} จะถูกนำออกจากภารกิจนี้ ตัวงานเองจะไม่ถูกแตะต้อง — การดำเนินการนี้เพียงลบการอ้างอิงเท่านั้น",
+                    "confirm": "ยกเลิกการแนบงาน",
+                    "cancel": "ยกเลิก",
+                    "detaching": "กำลังยกเลิกการแนบ…",
+                    "error": "ไม่สามารถยกเลิกการแนบงานได้"
+                },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
                     "created": "Created",
@@ -1496,8 +1503,13 @@
                 "runNow": "Run now",
                 "clone": "Clone"
             },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            "deleteDialog": {
+                "title": "ลบภารกิจนี้?",
+                "body": "{title} จะถูกลบอย่างถาวร ไอเดียและงานย่อยจะยังคงอยู่ แต่ลิงก์ย้อนกลับมายังภารกิจนี้จะขาดหายไป การดำเนินการนี้ไม่สามารถย้อนกลับได้",
+                "confirm": "ลบภารกิจ",
+                "cancel": "ยกเลิก",
+                "deleting": "กำลังลบ…",
+                "error": "ไม่สามารถลบภารกิจได้"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1568,6 +1580,36 @@
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)"
+                }
+            },
+            "goals": {
+                "title": "เป้าหมาย",
+                "empty": "ยังไม่มีเป้าหมายแนบกับภารกิจนี้ แนบเป้าหมายด้านล่างเพื่อกำหนดว่าความสำเร็จคืออะไร",
+                "attachTitle": "แนบเป้าหมาย",
+                "goalLabel": "เป้าหมาย",
+                "goalPlaceholder": "เลือกเป้าหมาย",
+                "primaryLabel": "ตั้งเป็นเป้าหมายหลัก",
+                "primaryBadge": "หลัก",
+                "primaryTooltip": "เป้าหมายหลักของภารกิจนี้ - มีเป้าหมายหลักได้เพียงหนึ่งเดียวในแต่ละครั้ง",
+                "attach": "แนบ",
+                "detach": "ยกเลิกการแนบ",
+                "detachDialog": {
+                    "title": "ยกเลิกการแนบเป้าหมายนี้?",
+                    "body": "{title} จะถูกนำออกจากภารกิจนี้ ตัวเป้าหมายเองจะไม่ถูกลบ — ยังคงอยู่ในหน้าเป้าหมายและในภารกิจอื่น ๆ ที่แนบไว้",
+                    "confirm": "ยกเลิกการแนบเป้าหมาย",
+                    "cancel": "ยกเลิก",
+                    "detaching": "กำลังยกเลิกการแนบ…",
+                    "error": "ไม่สามารถยกเลิกการแนบเป้าหมายได้"
+                },
+                "alreadyLinkedOption": "{title} (แนบอยู่แล้ว)",
+                "noGoalsToAttach": "คุณยังไม่มีเป้าหมาย สร้างเป้าหมายในหน้าเป้าหมาย แล้วนำมาแนบที่นี่",
+                "pickerTruncated": "กำลังแสดงเป้าหมายล่าสุด 100 รายการของคุณ - เปิดหน้าเป้าหมายเพื่อดูรายการทั้งหมด",
+                "invariantNote": "การแนบเป้าหมายจะไม่เปลี่ยนสถานะของภารกิจนี้ - การทำภารกิจให้เสร็จสิ้นยังคงเป็นการดำเนินการที่ต้องระบุอย่างชัดเจน",
+                "toasts": {
+                    "attached": "แนบเป้าหมายแล้ว",
+                    "attachError": "ไม่สามารถแนบเป้าหมายได้",
+                    "detached": "ยกเลิกการแนบเป้าหมายแล้ว",
+                    "detachError": "ไม่สามารถยกเลิกการแนบเป้าหมายได้"
                 }
             }
         },

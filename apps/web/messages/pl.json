@@ -1447,7 +1447,14 @@
                 "relationLabel": "Relation",
                 "attach": "Attach",
                 "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "detachDialog": {
+                    "title": "Odłączyć tę Pracę?",
+                    "body": "{title} zostanie usunięta z tej Misji. Sama Praca nigdy nie jest modyfikowana — usuwane jest wyłącznie powiązanie.",
+                    "confirm": "Odłącz Pracę",
+                    "cancel": "Anuluj",
+                    "detaching": "Odłączanie…",
+                    "error": "Nie udało się odłączyć Pracy"
+                },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
                     "created": "Created",
@@ -1496,8 +1503,13 @@
                 "runNow": "Run now",
                 "clone": "Clone"
             },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            "deleteDialog": {
+                "title": "Usunąć tę Misję?",
+                "body": "{title} zostanie trwale usunięta. Podrzędne Pomysły i Prace zostaną zachowane, ale ich powiązanie zwrotne z tą Misją zostanie utracone. Tej operacji nie można cofnąć.",
+                "confirm": "Usuń Misję",
+                "cancel": "Anuluj",
+                "deleting": "Usuwanie…",
+                "error": "Nie udało się usunąć Misji"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1568,6 +1580,36 @@
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)"
+                }
+            },
+            "goals": {
+                "title": "Cele",
+                "empty": "Do tej Misji nie dołączono jeszcze żadnych Celów. Dołącz Cel poniżej, aby określić, co oznacza sukces.",
+                "attachTitle": "Dołącz Cel",
+                "goalLabel": "Cel",
+                "goalPlaceholder": "Wybierz Cel",
+                "primaryLabel": "Ustaw jako główny",
+                "primaryBadge": "Główny",
+                "primaryTooltip": "Główny Cel tej Misji - tylko jeden Cel może być główny w danym momencie.",
+                "attach": "Dołącz",
+                "detach": "Odłącz",
+                "detachDialog": {
+                    "title": "Odłączyć ten Cel?",
+                    "body": "{title} zostanie usunięty z tej Misji. Sam Cel nie zostanie usunięty — pozostanie na stronie Cele oraz w każdej innej Misji, do której jest dołączony.",
+                    "confirm": "Odłącz Cel",
+                    "cancel": "Anuluj",
+                    "detaching": "Odłączanie…",
+                    "error": "Nie udało się odłączyć Celu"
+                },
+                "alreadyLinkedOption": "{title} (już dołączony)",
+                "noGoalsToAttach": "Nie masz jeszcze żadnych Celów. Utwórz Cel na stronie Cele, a następnie dołącz go tutaj.",
+                "pickerTruncated": "Wyświetlanych jest 100 najnowszych Celów - otwórz stronę Cele, aby zobaczyć pełną listę.",
+                "invariantNote": "Dołączenie Celu nigdy nie zmienia statusu tej Misji - ukończenie Misji pozostaje działaniem jawnym.",
+                "toasts": {
+                    "attached": "Cel dołączony",
+                    "attachError": "Nie udało się dołączyć Celu",
+                    "detached": "Cel odłączony",
+                    "detachError": "Nie udało się odłączyć Celu"
                 }
             }
         },
