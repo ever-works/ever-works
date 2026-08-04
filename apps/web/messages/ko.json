@@ -1447,7 +1447,14 @@
                 "relationLabel": "Relation",
                 "attach": "Attach",
                 "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "detachDialog": {
+                    "title": "이 워크를 분리할까요?",
+                    "body": "{title}이(가) 이 미션에서 제거됩니다. 워크 자체는 변경되지 않으며 — 연결만 해제됩니다.",
+                    "confirm": "워크 분리",
+                    "cancel": "취소",
+                    "detaching": "분리하는 중…",
+                    "error": "워크를 분리하지 못했습니다"
+                },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
                     "created": "Created",
@@ -1496,8 +1503,13 @@
                 "runNow": "Run now",
                 "clone": "Clone"
             },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            "deleteDialog": {
+                "title": "이 미션을 삭제할까요?",
+                "body": "{title}이(가) 영구적으로 삭제됩니다. 하위 아이디어와 워크는 유지되지만 이 미션으로 연결된 링크는 끊어집니다. 이 작업은 되돌릴 수 없습니다.",
+                "confirm": "미션 삭제",
+                "cancel": "취소",
+                "deleting": "삭제하는 중…",
+                "error": "미션을 삭제하지 못했습니다"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1568,6 +1580,36 @@
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)"
+                }
+            },
+            "goals": {
+                "title": "목표",
+                "empty": "이 미션에 연결된 목표가 아직 없습니다. 성공의 기준을 추적하려면 아래에서 목표를 연결하세요.",
+                "attachTitle": "목표 연결",
+                "goalLabel": "목표",
+                "goalPlaceholder": "목표 선택",
+                "primaryLabel": "기본으로 설정",
+                "primaryBadge": "기본",
+                "primaryTooltip": "이 미션의 기본 목표 - 한 번에 하나의 목표만 기본이 될 수 있습니다.",
+                "attach": "연결",
+                "detach": "분리",
+                "detachDialog": {
+                    "title": "이 목표를 분리할까요?",
+                    "body": "{title}이(가) 이 미션에서 제거됩니다. 목표 자체는 삭제되지 않으며 — 목표 페이지와 연결된 다른 미션에 그대로 남아 있습니다.",
+                    "confirm": "목표 분리",
+                    "cancel": "취소",
+                    "detaching": "분리하는 중…",
+                    "error": "목표를 분리하지 못했습니다"
+                },
+                "alreadyLinkedOption": "{title} (이미 연결됨)",
+                "noGoalsToAttach": "아직 목표가 없습니다. 목표 페이지에서 만든 다음 여기에 연결하세요.",
+                "pickerTruncated": "가장 최근 목표 100개를 표시하고 있습니다 - 전체 목록은 목표 페이지에서 확인하세요.",
+                "invariantNote": "목표를 연결해도 이 미션의 상태는 변경되지 않습니다 - 미션 완료는 명시적인 작업으로 유지됩니다.",
+                "toasts": {
+                    "attached": "목표가 연결되었습니다",
+                    "attachError": "목표를 연결할 수 없습니다",
+                    "detached": "목표가 분리되었습니다",
+                    "detachError": "목표를 분리할 수 없습니다"
                 }
             }
         },
@@ -2877,7 +2919,23 @@
                 "activatedToast": "에이전트가 활성화되었습니다",
                 "statusUpdateFailed": "상태를 업데이트할 수 없습니다",
                 "newAgent": "새 에이전트",
-                "moreAgents": "+{count}개 더"
+                "moreAgents": "+{count}개 더",
+                "assignExisting": "기존 에이전트 할당",
+                "assignTitle": "이 작업에 에이전트 할당",
+                "assignSubtitle": "새로 만드는 대신 이미 있는 에이전트를 이 작업에 배치하세요.",
+                "assignSearchPlaceholder": "에이전트 검색…",
+                "assignLoading": "에이전트 불러오는 중…",
+                "assignNoneAvailable": "할당할 다른 에이전트가 없습니다.",
+                "assignNoMatches": "검색과 일치하는 에이전트가 없습니다.",
+                "assignLoadFailed": "에이전트를 불러올 수 없습니다",
+                "assignedToast": "{name}을(를) 이 작업에 할당했습니다",
+                "assignFailed": "에이전트를 할당할 수 없습니다",
+                "assignCancel": "취소",
+                "assignedLabel": "할당됨",
+                "assignedHint": "이 작업에 할당됨 — 여기서 만든 것이 아님",
+                "unassign": "이 작업에서 제거",
+                "unassignedToast": "{name}을(를) 이 작업에서 제거했습니다",
+                "unassignFailed": "에이전트를 제거할 수 없습니다"
             },
             "failedToGenerateItems": "항목 생성에 실패했습니다. 다시 시도해 주세요.",
             "generationCompleted": "생성 완료",

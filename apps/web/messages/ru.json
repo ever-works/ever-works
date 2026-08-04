@@ -1447,7 +1447,14 @@
                 "relationLabel": "Relation",
                 "attach": "Attach",
                 "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "detachDialog": {
+                    "title": "Открепить эту Работу?",
+                    "body": "{title} будет удалена из этой Миссии. Сама Работа не изменяется — удаляется только связь.",
+                    "confirm": "Открепить Работу",
+                    "cancel": "Отмена",
+                    "detaching": "Открепление…",
+                    "error": "Не удалось открепить Работу"
+                },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
                     "created": "Created",
@@ -1496,8 +1503,13 @@
                 "runNow": "Run now",
                 "clone": "Clone"
             },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            "deleteDialog": {
+                "title": "Удалить эту Миссию?",
+                "body": "{title} будет удалена безвозвратно. Дочерние Идеи и Работы сохранятся, но их обратная связь с этой Миссией будет потеряна. Это действие нельзя отменить.",
+                "confirm": "Удалить Миссию",
+                "cancel": "Отмена",
+                "deleting": "Удаление…",
+                "error": "Не удалось удалить Миссию"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1568,6 +1580,36 @@
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)"
+                }
+            },
+            "goals": {
+                "title": "Цели",
+                "empty": "К этой Миссии пока не прикреплено ни одной Цели. Прикрепите Цель ниже, чтобы определить, что считать успехом.",
+                "attachTitle": "Прикрепить Цель",
+                "goalLabel": "Цель",
+                "goalPlaceholder": "Выберите Цель",
+                "primaryLabel": "Сделать основной",
+                "primaryBadge": "Основная",
+                "primaryTooltip": "Основная Цель этой Миссии - основной может быть только одна Цель одновременно.",
+                "attach": "Прикрепить",
+                "detach": "Открепить",
+                "detachDialog": {
+                    "title": "Открепить эту Цель?",
+                    "body": "{title} будет удалена из этой Миссии. Сама Цель не удаляется — она останется на странице Целей и во всех других Миссиях, к которым прикреплена.",
+                    "confirm": "Открепить Цель",
+                    "cancel": "Отмена",
+                    "detaching": "Открепление…",
+                    "error": "Не удалось открепить Цель"
+                },
+                "alreadyLinkedOption": "{title} (уже прикреплена)",
+                "noGoalsToAttach": "У вас пока нет Целей. Создайте Цель на странице Целей, а затем прикрепите её здесь.",
+                "pickerTruncated": "Показаны 100 последних Целей - откройте страницу Целей, чтобы увидеть полный список.",
+                "invariantNote": "Прикрепление Цели никогда не изменяет статус этой Миссии - завершение Миссии остаётся явным действием.",
+                "toasts": {
+                    "attached": "Цель прикреплена",
+                    "attachError": "Не удалось прикрепить Цель",
+                    "detached": "Цель откреплена",
+                    "detachError": "Не удалось открепить Цель"
                 }
             }
         },
@@ -2877,7 +2919,23 @@
                 "activatedToast": "Агент активирован",
                 "statusUpdateFailed": "Не удалось обновить статус",
                 "newAgent": "Новый агент",
-                "moreAgents": "+ещё {count}"
+                "moreAgents": "+ещё {count}",
+                "assignExisting": "Назначить существующего",
+                "assignTitle": "Назначить агента этой Работе",
+                "assignSubtitle": "Назначьте на эту Работу агента, который у вас уже есть, вместо создания нового.",
+                "assignSearchPlaceholder": "Поиск агентов…",
+                "assignLoading": "Загрузка агентов…",
+                "assignNoneAvailable": "Больше нет агентов для назначения.",
+                "assignNoMatches": "Нет агентов по этому запросу.",
+                "assignLoadFailed": "Не удалось загрузить агентов",
+                "assignedToast": "{name} назначен этой Работе",
+                "assignFailed": "Не удалось назначить агента",
+                "assignCancel": "Отмена",
+                "assignedLabel": "Назначен",
+                "assignedHint": "Назначен этой Работе — создан не здесь",
+                "unassign": "Убрать с этой Работы",
+                "unassignedToast": "{name} убран с этой Работы",
+                "unassignFailed": "Не удалось убрать агента"
             },
             "failedToGenerateItems": "Не удалось сгенерировать элементы. Пожалуйста, попробуйте снова.",
             "generationCompleted": "Генерация успешно завершена",

@@ -1447,7 +1447,14 @@
                 "relationLabel": "Relation",
                 "attach": "Attach",
                 "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "detachDialog": {
+                    "title": "Desanexar este Trabalho?",
+                    "body": "{title} será removido desta Missão. O Trabalho em si nunca é alterado — isso apenas remove a referência.",
+                    "confirm": "Desanexar Trabalho",
+                    "cancel": "Cancelar",
+                    "detaching": "Desanexando…",
+                    "error": "Falha ao desanexar o Trabalho"
+                },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
                     "created": "Created",
@@ -1496,8 +1503,13 @@
                 "runNow": "Run now",
                 "clone": "Clone"
             },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            "deleteDialog": {
+                "title": "Excluir esta Missão?",
+                "body": "{title} será excluída permanentemente. As Ideias e os Trabalhos filhos são preservados, mas o vínculo de retorno com esta Missão é perdido. Esta ação não pode ser desfeita.",
+                "confirm": "Excluir Missão",
+                "cancel": "Cancelar",
+                "deleting": "Excluindo…",
+                "error": "Falha ao excluir a Missão"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1568,6 +1580,36 @@
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)"
+                }
+            },
+            "goals": {
+                "title": "Objetivos",
+                "empty": "Nenhum Objetivo anexado a esta Missão ainda. Anexe um abaixo para acompanhar o que significa ter sucesso.",
+                "attachTitle": "Anexar um Objetivo",
+                "goalLabel": "Objetivo",
+                "goalPlaceholder": "Selecione um Objetivo",
+                "primaryLabel": "Definir como principal",
+                "primaryBadge": "Principal",
+                "primaryTooltip": "O Objetivo principal desta Missão - apenas um Objetivo pode ser principal por vez.",
+                "attach": "Anexar",
+                "detach": "Desanexar",
+                "detachDialog": {
+                    "title": "Desanexar este Objetivo?",
+                    "body": "{title} será removido desta Missão. O Objetivo em si não é excluído — ele permanece na página Objetivos e em qualquer outra Missão à qual esteja anexado.",
+                    "confirm": "Desanexar Objetivo",
+                    "cancel": "Cancelar",
+                    "detaching": "Desanexando…",
+                    "error": "Falha ao desanexar o Objetivo"
+                },
+                "alreadyLinkedOption": "{title} (já anexado)",
+                "noGoalsToAttach": "Você ainda não tem Objetivos. Crie um na página Objetivos e depois anexe-o aqui.",
+                "pickerTruncated": "Exibindo seus 100 Objetivos mais recentes - abra a página Objetivos para ver a lista completa.",
+                "invariantNote": "Anexar um Objetivo nunca altera o status desta Missão - concluir uma Missão continua sendo uma ação explícita.",
+                "toasts": {
+                    "attached": "Objetivo anexado",
+                    "attachError": "Não foi possível anexar o Objetivo",
+                    "detached": "Objetivo desanexado",
+                    "detachError": "Não foi possível desanexar o Objetivo"
                 }
             }
         },
@@ -2877,7 +2919,23 @@
                 "activatedToast": "Agente ativado",
                 "statusUpdateFailed": "Não foi possível atualizar o status",
                 "newAgent": "Novo Agente",
-                "moreAgents": "+{count} mais"
+                "moreAgents": "+{count} mais",
+                "assignExisting": "Atribuir existente",
+                "assignTitle": "Atribuir um Agente a este Trabalho",
+                "assignSubtitle": "Coloque neste Trabalho um Agente que você já tem em vez de criar outro.",
+                "assignSearchPlaceholder": "Buscar Agentes…",
+                "assignLoading": "Carregando Agentes…",
+                "assignNoneAvailable": "Não há outros Agentes para atribuir.",
+                "assignNoMatches": "Nenhum Agente corresponde a essa busca.",
+                "assignLoadFailed": "Não foi possível carregar os Agentes",
+                "assignedToast": "{name} atribuído a este Trabalho",
+                "assignFailed": "Não foi possível atribuir o Agente",
+                "assignCancel": "Cancelar",
+                "assignedLabel": "Atribuído",
+                "assignedHint": "Atribuído a este Trabalho — não foi criado aqui",
+                "unassign": "Remover deste Trabalho",
+                "unassignedToast": "{name} removido deste Trabalho",
+                "unassignFailed": "Não foi possível remover o Agente"
             },
             "failedToGenerateItems": "Falha ao gerar itens. Tente novamente.",
             "generationCompleted": "Geração concluída com sucesso",

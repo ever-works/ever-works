@@ -63,6 +63,7 @@ import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import {
     AddAgentAttachmentDto,
+    AgentTargetBodyDto,
     AssignTaskToAgentDto,
     CreateAgentDto,
     CreateAgentFromTemplateDto,
@@ -85,6 +86,8 @@ import {
  *   DELETE /api/agents/:id          archive (soft-delete) — operator can pass ?hard=true to delete
  *   POST   /api/agents/:id/pause    ACTIVE → PAUSED
  *   POST   /api/agents/:id/resume   PAUSED/ERROR → ACTIVE
+ *   POST   /api/agents/:id/targets  assign an Agent to a Mission/Idea/Work
+ *   DELETE /api/agents/:id/targets/:targetType/:targetId   unassign it
  *
  * Runtime endpoints (`/run-now`, `/dry-run`, `/export`, `/import`,
  * `/files/:name`, `/runs`, `/skills`, `/budget`) land in later phases.
@@ -213,6 +216,7 @@ export class AgentsController {
             missionId: query.missionId,
             ideaId: query.ideaId,
             workId: query.workId,
+            assignedWorkId: query.assignedWorkId,
             search: query.search,
             limit,
             offset,
@@ -460,6 +464,43 @@ export class AgentsController {
             // Merge-policy matrix (Wave 3, D4) — the Agent-scoped slice.
             mergePolicy: body.mergePolicy,
         });
+    }
+
+    /**
+     * Assign an existing Agent to a Mission / Idea / Work
+     * — the write behind the Work header's "Assign existing Agent"
+     * picker. Idempotent: re-assigning an Agent that already reaches the
+     * target returns it unchanged rather than 409-ing.
+     */
+    @Post(':id/targets')
+    @ApiOperation({ summary: 'Assign an existing Agent to a Mission / Idea / Work' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async addTarget(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: AgentTargetBodyDto,
+    ): Promise<AgentDto> {
+        return this.service.addTarget(auth.userId, id, { type: body.type, id: body.id });
+    }
+
+    /** Inverse of `addTarget` — also idempotent. */
+    @Delete(':id/targets/:targetType/:targetId')
+    @ApiOperation({ summary: 'Unassign an Agent from a Mission / Idea / Work' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async removeTarget(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('targetType') targetType: string,
+        @Param('targetId', ParseUUIDPipe) targetId: string,
+    ): Promise<AgentDto> {
+        if (targetType !== 'mission' && targetType !== 'idea' && targetType !== 'work') {
+            throw new BadRequestException(
+                `Unsupported target type "${targetType}" — expected mission, idea or work.`,
+            );
+        }
+        return this.service.removeTarget(auth.userId, id, { type: targetType, id: targetId });
     }
 
     @Put(':id/guardrails')

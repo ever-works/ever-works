@@ -304,7 +304,7 @@ You can also view a full list of our [contributors tracked by GitHub](https://gi
 
 ## ⭐ Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=ever-works/ever-works&type=Date)](https://star-history.com/#ever-works/ever-works&Date)
+[![Star History Chart](https://stats-github.ever.works/svg?repos=ever-works/ever-works&type=Date)](https://stats-github.ever.works/#ever-works/ever-works&Date)
 
 ## ❤️ Powered By
 
