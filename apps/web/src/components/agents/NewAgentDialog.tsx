@@ -488,7 +488,7 @@ export function NewAgentDialog({
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder={t('namePlaceholder')}
-                        className="w-full rounded-md border border-border dark:border-border-dark bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark placeholder-text-muted dark:placeholder-text-muted-dark outline-none transition-colors hover:border-border-secondary dark:hover:border-border-secondary-dark focus:border-primary dark:focus:border-white/9 focus:ring-2 focus:ring-primary-800/20"
+                        className="w-full rounded-md border border-border dark:border-border-dark bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark placeholder:text-text-muted dark:placeholder:text-text-muted-dark outline-none transition-colors hover:border-border-secondary dark:hover:border-border-secondary-dark focus:border-primary dark:focus:border-white/9 focus:ring-2 focus:ring-primary-800/20"
                         maxLength={120}
                         autoFocus
                     />
@@ -497,7 +497,7 @@ export function NewAgentDialog({
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
                         placeholder="Title (optional)"
-                        className="w-full mt-2 rounded-md border border-border dark:border-border-dark bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark placeholder-text-muted dark:placeholder-text-muted-dark outline-none transition-colors hover:border-border-secondary dark:hover:border-border-secondary-dark focus:border-primary dark:focus:border-white/9 focus:ring-2 focus:ring-primary-800/20"
+                        className="w-full mt-2 rounded-md border border-border dark:border-border-dark bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark placeholder:text-text-muted dark:placeholder:text-text-muted-dark outline-none transition-colors hover:border-border-secondary dark:hover:border-border-secondary-dark focus:border-primary dark:focus:border-white/9 focus:ring-2 focus:ring-primary-800/20"
                         maxLength={120}
                     />
                     {/* Teams & Companies spec §4.3 — optional Team +
