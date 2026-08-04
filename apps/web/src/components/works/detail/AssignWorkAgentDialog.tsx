@@ -18,19 +18,6 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 
-/**
- * "Assign existing Agent" — the counterpart to "+ New Agent" in the
- * Work header's Agents dropdown. Creating an Agent per Work is the
- * wrong default for an operator who already has a roster; this dialog
- * suggests that roster and puts one on the Work in a single click.
- *
- * Candidates come from `listAssignableWorkAgentsAction` — every Agent
- * the caller owns, whatever its own scope, minus the archived ones and
- * the ones already on this Work. Search re-queries the server
- * (debounced) rather than filtering the first page client-side, so an
- * Agent past the 100-row page is still reachable by name.
- */
-
 const SEARCH_DEBOUNCE_MS = 250;
 
 export function AssignWorkAgentDialog({
@@ -42,7 +29,6 @@ export function AssignWorkAgentDialog({
     workId: string;
     open: boolean;
     onOpenChange: (open: boolean) => void;
-    /** Fired after a successful assign — lets the opener close its menu. */
     onAssigned?: () => void;
 }) {
     const t = useTranslations('dashboard.workDetail.agentsDropdown');
@@ -81,9 +67,6 @@ export function AssignWorkAgentDialog({
             clearTimeout(timer);
         };
     }, [open, search, load]);
-
-    // A dialog reopened after an assign should not show the previous
-    // search — the list it filters has changed underneath it.
     useEffect(() => {
         if (!open) setSearch('');
     }, [open]);
@@ -94,8 +77,6 @@ export function AssignWorkAgentDialog({
             try {
                 await assignAgentToWorkAction(agent.id, workId);
                 toast.success(t('assignedToast', { name: agent.name }));
-                // Drop the row locally so the list stays truthful even
-                // before the server components re-render.
                 setCandidates((rows) => rows.filter((row) => row.id !== agent.id));
                 onOpenChange(false);
                 onAssigned?.();
@@ -146,7 +127,7 @@ export function AssignWorkAgentDialog({
                             {search ? t('assignNoMatches') : t('assignNoneAvailable')}
                         </p>
                     ) : (
-                        <ul className="space-y-0.5">
+                        <ul className="space-y-1.5">
                             {candidates.map((agent) => {
                                 const isAssigning = assigningId === agent.id;
                                 return (
@@ -156,17 +137,14 @@ export function AssignWorkAgentDialog({
                                             disabled={assigningId !== null}
                                             onClick={() => assign(agent)}
                                             className={cn(
-                                                'flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors',
-                                                'hover:bg-surface-hover dark:hover:bg-surface-hover-dark',
-                                                'focus-visible:bg-surface-hover dark:focus-visible:bg-surface-hover-dark outline-none',
+                                                'flex w-full cursor-pointer items-center gap-2.5 rounded-lg border border-border dark:border-border-dark px-2 py-2 text-left transition-colors',
+                                                'hover:border-border-hover dark:hover:border-border-hover-dark hover:bg-surface-hover dark:hover:bg-surface-hover-dark',
+                                                'focus-visible:border-border-hover dark:focus-visible:border-border-hover-dark focus-visible:bg-surface-hover dark:focus-visible:bg-surface-hover-dark outline-none',
                                                 assigningId !== null &&
                                                     !isAssigning &&
                                                     'opacity-50',
                                             )}
                                         >
-                                            {/* Neutral tile on purpose: in a picker every row is
-                                                an equally valid choice, so an accent colour here
-                                                signals a distinction that isn't there. */}
                                             <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border dark:border-border-dark text-text-muted dark:text-text-muted-dark">
                                                 <Bot className="h-3.5 w-3.5" />
                                             </span>
