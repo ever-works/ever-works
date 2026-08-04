@@ -15,10 +15,14 @@ import {
     SUB_AGENT_DELEGATION_RUNNER,
     SUB_AGENT_DELEGATION_DEPTH_RESOLVER,
     WORKFLOW_NODE_RUNNER,
+    // Moved out of apps/api so the `workflow-run` Trigger.dev task can
+    // bind it too — a worker cannot import from apps/api. The binding
+    // below is unchanged, so the `run_workflow_graph` chat-tool path
+    // behaves exactly as before.
+    WorkflowNodeRunnerService,
 } from '@ever-works/agent/agents';
 import { SubAgentDelegationRunnerService } from '../agents/sub-agent-delegation.runner';
 import { SubAgentDelegationDepthResolverService } from '../agents/sub-agent-delegation-depth.resolver';
-import { WorkflowNodeRunnerService } from '../agents/workflow-node.runner';
 // Memory upgrades M6 — `DecisionConflictService` (the re-litigation
 // guard behind `GET /api/tasks/:id/decision-conflicts`) is provided and
 // exported by `KnowledgeBaseModule`. NestJS only resolves a controller's

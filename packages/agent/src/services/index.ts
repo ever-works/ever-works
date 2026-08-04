@@ -59,3 +59,7 @@ export * from './types/trigger-context.types';
 export type { SourceValidationSettingsDto } from '@ever-works/contracts/api';
 export * from './workflows.service';
 export * from './workflows.module';
+// Graph RUNS — the request side (start/list/read) and the worker side
+// (the walk). Split so the API cannot reach an executor.
+export * from './workflow-runs.service';
+export * from './workflow-run-executor.service';
