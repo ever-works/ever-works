@@ -176,6 +176,15 @@ const USER_TRANSITIONS: Record<AgentStatus, AgentStatus[]> = {
 export class AgentsService {
     private readonly logger = new Logger(AgentsService.name);
 
+    /**
+     * How many times `addTarget` / `removeTarget` re-read and retry their
+     * CAS write before giving up. Two operators editing the same Agent's
+     * reach at once is the realistic contention (the Work header picker
+     * and the Agent detail page); past a few rounds it's a hot row we'd
+     * rather report as a conflict than spin on.
+     */
+    private static readonly TARGETS_CAS_ATTEMPTS = 3;
+
     constructor(
         private readonly agents: AgentRepository,
         private readonly memberships: AgentMembershipRepository,
@@ -316,9 +325,11 @@ export class AgentsService {
                 throw err;
             });
 
-        // Materialize tenant-Agent memberships into the join table for
-        // indexed lookup from the per-target tabs.
-        if (input.scope === AgentScope.TENANT && input.targets && input.targets.length > 0) {
+        // Materialize memberships into the join table for indexed lookup
+        // from the per-target tabs. Every scope, not just tenant: an
+        // Agent pinned to one Work can be lent to another (see
+        // `addTarget`), and the index is what those surfaces read.
+        if (input.targets && input.targets.length > 0) {
             await this.memberships.replaceForAgent(
                 created.id,
                 input.targets
@@ -463,8 +474,9 @@ export class AgentsService {
 
         await this.agents.updateById(id, patch);
 
-        // Reconcile memberships if targets changed.
-        if (input.targets !== undefined && agent.scope === AgentScope.TENANT) {
+        // Reconcile memberships if targets changed — every scope, for the
+        // same reason `create` materializes them for every scope.
+        if (input.targets !== undefined) {
             await this.memberships.replaceForAgent(
                 id,
                 (input.targets ?? [])
@@ -476,6 +488,191 @@ export class AgentsService {
         const refreshed = await this.agents.findById(id);
         if (!refreshed) throw new NotFoundException('Agent vanished after update');
         return toAgentDto(refreshed);
+    }
+
+    /**
+     * Add ONE reach target to an Agent (idempotent).
+     *
+     * The read-modify-write of the whole `targets` array lives here
+     * rather than in the caller: the Work header's "Assign existing
+     * Agent" picker only knows the Work it is attaching to, and making
+     * it PATCH the full array would mean two round-trips racing every
+     * other editor of the same Agent.
+     *
+     * The write goes through `casUpdateTargets` rather than a plain
+     * update: a concurrent writer that committed between our read and
+     * our write loses its target otherwise, while the membership row it
+     * already wrote survives — leaving `agent_memberships` (what the
+     * `assignedWorkId` filter reads) disagreeing with `AgentDto.targets`.
+     * A lost CAS re-reads and recomputes, and the membership write only
+     * happens on the attempt whose array actually landed.
+     *
+     * Any owned Agent can be lent out, whatever its own scope — an
+     * operator whose Agents were all created from a Work would otherwise
+     * have nothing to assign. The one thing rejected is lending an Agent
+     * to the parent it is ALREADY pinned to, which would record reach it
+     * has by scope and then let `removeTarget` appear to revoke it.
+     */
+    async addTarget(userId: string, id: string, target: AgentTarget): Promise<AgentDto> {
+        let agent = await this.requireOwned(userId, id);
+        await this.assertTargetExists(userId, target);
+
+        for (let attempt = 0; attempt < AgentsService.TARGETS_CAS_ATTEMPTS; attempt++) {
+            this.assertNotOwnScopeParent(agent, target);
+
+            const current = agent.targets ?? [];
+            if (
+                current.some(
+                    (t) => t.type === target.type && (t.id ?? null) === (target.id ?? null),
+                )
+            ) {
+                return toAgentDto(agent);
+            }
+
+            // Both writes in ONE transaction: a membership insert that
+            // fails after a won CAS would otherwise leave `targets`
+            // claiming reach that `agent_memberships` (what the
+            // `assignedWorkId` filter reads) has no row for.
+            const won = await this.agents.withTransaction(async (manager) => {
+                const landed = await this.agents.casUpdateTargets(
+                    id,
+                    agent.targets ?? null,
+                    [...current, target],
+                    manager,
+                );
+                if (!landed) {
+                    return false;
+                }
+                if (target.type !== 'wildcard') {
+                    await this.memberships.addMembership(
+                        id,
+                        target.type,
+                        target.id ?? null,
+                        manager,
+                    );
+                }
+                return true;
+            });
+            if (!won) {
+                agent = await this.requireOwned(userId, id);
+                continue;
+            }
+
+            const refreshed = await this.agents.findById(id);
+            if (!refreshed) throw new NotFoundException('Agent vanished after update');
+            return toAgentDto(refreshed);
+        }
+
+        throw new ConflictException(
+            `Agent ${id} is being reassigned by someone else — retry the assignment.`,
+        );
+    }
+
+    /**
+     * Remove ONE reach target from an Agent (idempotent — removing a
+     * target the Agent never had is a no-op, not a 404).
+     */
+    async removeTarget(userId: string, id: string, target: AgentTarget): Promise<AgentDto> {
+        let agent = await this.requireOwned(userId, id);
+
+        for (let attempt = 0; attempt < AgentsService.TARGETS_CAS_ATTEMPTS; attempt++) {
+            const current = agent.targets ?? [];
+            const next = current.filter(
+                (t) => !(t.type === target.type && (t.id ?? null) === (target.id ?? null)),
+            );
+
+            // One transaction for the CAS + the membership delete, so a
+            // failure on either leaves both untouched rather than
+            // stranding a membership row for a target `targets` no
+            // longer lists (or vice versa).
+            const won = await this.agents.withTransaction(async (manager) => {
+                if (next.length !== current.length) {
+                    const landed = await this.agents.casUpdateTargets(
+                        id,
+                        agent.targets ?? null,
+                        next.length > 0 ? next : null,
+                        manager,
+                    );
+                    if (!landed) {
+                        return false;
+                    }
+                }
+
+                // Unconditional even when `targets` never listed it —
+                // this is also the repair path for a membership row left
+                // behind by an older non-atomic write.
+                if (target.type !== 'wildcard') {
+                    await this.memberships.removeMembership(
+                        id,
+                        target.type,
+                        target.id ?? null,
+                        manager,
+                    );
+                }
+                return true;
+            });
+            if (!won) {
+                agent = await this.requireOwned(userId, id);
+                continue;
+            }
+
+            const refreshed = await this.agents.findById(id);
+            if (!refreshed) throw new NotFoundException('Agent vanished after update');
+            return toAgentDto(refreshed);
+        }
+
+        throw new ConflictException(
+            `Agent ${id} is being reassigned by someone else — retry the unassignment.`,
+        );
+    }
+
+    /**
+     * An Agent already reaches the parent it is scoped to; recording that
+     * as a target would double-count the relationship and hand the caller
+     * an "unassign" it cannot honor.
+     */
+    private assertNotOwnScopeParent(agent: Agent, target: AgentTarget): void {
+        const ownParent =
+            (agent.scope === AgentScope.WORK && target.type === 'work' && agent.workId) ||
+            (agent.scope === AgentScope.MISSION && target.type === 'mission' && agent.missionId) ||
+            (agent.scope === AgentScope.IDEA && target.type === 'idea' && agent.ideaId);
+        if (ownParent && ownParent === target.id) {
+            throw new BadRequestException(
+                `Agent "${agent.name}" already belongs to this ${target.type} by scope.`,
+            );
+        }
+    }
+
+    /**
+     * The target row must exist AND belong to the caller — otherwise an
+     * assignment would advertise reach into someone else's Work (and
+     * `findOne({ id, userId })` returning null is also how we avoid
+     * confirming that another user's Work exists).
+     */
+    private async assertTargetExists(userId: string, target: AgentTarget): Promise<void> {
+        switch (target.type) {
+            case 'work':
+                await this.assertScopeParentExists(userId, {
+                    scope: AgentScope.WORK,
+                    workId: target.id,
+                });
+                break;
+            case 'mission':
+                await this.assertScopeParentExists(userId, {
+                    scope: AgentScope.MISSION,
+                    missionId: target.id,
+                });
+                break;
+            case 'idea':
+                await this.assertScopeParentExists(userId, {
+                    scope: AgentScope.IDEA,
+                    ideaId: target.id,
+                });
+                break;
+            default:
+                // `wildcard` has no row to validate.
+                break;
+        }
     }
 
     /**

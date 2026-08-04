@@ -17,9 +17,7 @@
 
 const betterAuthMock = jest.fn().mockReturnValue({ __betterAuthInstance: true });
 const bearerMock = jest.fn().mockReturnValue({ __bearerPlugin: true });
-const termsAcceptancePluginMock = jest
-    .fn()
-    .mockReturnValue({ __termsAcceptancePlugin: true });
+const termsAcceptancePluginMock = jest.fn().mockReturnValue({ __termsAcceptancePlugin: true });
 
 jest.mock('better-auth', () => ({
     betterAuth: betterAuthMock,

@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 import {
     agentsAPI,
     type Agent,
+    type AgentAssignCandidate,
     type AgentExportEnvelope,
     type AgentPickerOption,
     type AgentGuardrails,
@@ -175,6 +176,71 @@ export async function listAgentOptionsAction(limit = 100): Promise<AgentPickerOp
             slug: agent.slug,
             status: agent.status,
         }));
+}
+
+/** Bulk read matching the other Agent picker surfaces. */
+const WORK_AGENT_CANDIDATE_LIMIT = 100;
+
+/**
+ * Candidates for the Work header's "Assign existing Agent" picker:
+ * every Agent the caller owns that is not already on this Work.
+ *
+ * Scope is deliberately NOT filtered. Agents get created from wherever
+ * the operator happened to be — most of them pinned to some Work — so
+ * restricting the picker to tenant-scoped Agents hid nearly the whole
+ * roster. What IS excluded: Agents already assigned here, Agents pinned
+ * here by scope (they are on the Work already), and archived Agents,
+ * dropped for the same reason the Task picker drops them — they can
+ * never pick the work up.
+ */
+export async function listAssignableWorkAgentsAction(
+    workId: string,
+    search?: string,
+): Promise<AgentAssignCandidate[]> {
+    await ensureAuth();
+    const trimmed = search?.trim();
+    const [candidates, assigned] = await Promise.all([
+        agentsAPI.list({
+            limit: WORK_AGENT_CANDIDATE_LIMIT,
+            ...(trimmed ? { search: trimmed } : {}),
+        }),
+        agentsAPI.list({ assignedWorkId: workId, limit: WORK_AGENT_CANDIDATE_LIMIT }),
+    ]);
+    const taken = new Set((assigned.data ?? []).map((agent) => agent.id));
+    return (candidates.data ?? [])
+        .filter(
+            (agent) =>
+                agent.status !== 'archived' &&
+                !taken.has(agent.id) &&
+                !(agent.scope === 'work' && agent.workId === workId),
+        )
+        .map((agent) => ({
+            id: agent.id,
+            name: agent.name,
+            slug: agent.slug,
+            title: agent.title,
+            status: agent.status,
+        }));
+}
+
+/**
+ * Put an existing Agent on this Work / take it back off. Both are
+ * idempotent server-side, so a double-click can't 409.
+ */
+export async function assignAgentToWorkAction(agentId: string, workId: string): Promise<Agent> {
+    await ensureAuth();
+    const agent = await agentsAPI.addTarget(agentId, { type: 'work', id: workId });
+    revalidatePath(`/works/${workId}`, 'layout');
+    revalidatePath(`/agents/${agentId}`);
+    return agent;
+}
+
+export async function unassignAgentFromWorkAction(agentId: string, workId: string): Promise<Agent> {
+    await ensureAuth();
+    const agent = await agentsAPI.removeTarget(agentId, { type: 'work', id: workId });
+    revalidatePath(`/works/${workId}`, 'layout');
+    revalidatePath(`/agents/${agentId}`);
+    return agent;
 }
 
 export async function listAgentRunsAction(
