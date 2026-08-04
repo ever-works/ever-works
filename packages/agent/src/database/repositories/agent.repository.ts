@@ -1,6 +1,14 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, In, IsNull, LessThanOrEqual, Not, Repository } from 'typeorm';
+import {
+    EntityManager,
+    FindOptionsWhere,
+    In,
+    IsNull,
+    LessThanOrEqual,
+    Not,
+    Repository,
+} from 'typeorm';
 import { Agent, AgentScope, AgentStatus, type AgentTarget } from '../../entities/agent.entity';
 import { AgentMembership } from '../../entities/agent-membership.entity';
 import { sanitizeLikePattern } from '../utils';
@@ -363,6 +371,21 @@ export class AgentRepository {
     }
 
     /**
+     * Run `fn` inside a single DB transaction, handing it the tx-scoped
+     * `EntityManager` to pass down to the repository calls that must
+     * commit or roll back together.
+     *
+     * Exposed here (rather than injecting a DataSource into the service)
+     * because `DatabaseModule` deliberately exports repository wrappers
+     * only — see `database.module.spec.ts`. The one caller today is
+     * `AgentsService.addTarget/removeTarget`, which has to land
+     * `agents.targets` and its `agent_memberships` row atomically.
+     */
+    async withTransaction<T>(fn: (manager: EntityManager) => Promise<T>): Promise<T> {
+        return this.repository.manager.transaction(fn);
+    }
+
+    /**
      * CAS-swap the whole `targets` array — succeeds only if the row still
      * holds `expected` at write time. Same guard `transitionStatus` and
      * `tryClaimForRun` put on the status column, applied to the column
@@ -376,13 +399,17 @@ export class AgentRepository {
      * which no `=` comparison matches, hence the explicit `IS NULL` arm.
      * Comparing against `JSON.stringify(expected)` therefore compares
      * against exactly what the write we read from put in the row.
+     *
+     * Pass `manager` to enlist the write in an open transaction — the
+     * membership row that mirrors this array has to commit with it.
      */
     async casUpdateTargets(
         agentId: string,
         expected: AgentTarget[] | null | undefined,
         next: AgentTarget[] | null,
+        manager?: EntityManager,
     ): Promise<boolean> {
-        const qb = this.repository
+        const qb = (manager?.getRepository(Agent) ?? this.repository)
             .createQueryBuilder()
             .update(Agent)
             .set({ targets: next, updatedAt: new Date() })

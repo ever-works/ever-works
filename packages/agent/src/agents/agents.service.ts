@@ -529,17 +529,33 @@ export class AgentsService {
                 return toAgentDto(agent);
             }
 
-            const won = await this.agents.casUpdateTargets(id, agent.targets ?? null, [
-                ...current,
-                target,
-            ]);
+            // Both writes in ONE transaction: a membership insert that
+            // fails after a won CAS would otherwise leave `targets`
+            // claiming reach that `agent_memberships` (what the
+            // `assignedWorkId` filter reads) has no row for.
+            const won = await this.agents.withTransaction(async (manager) => {
+                const landed = await this.agents.casUpdateTargets(
+                    id,
+                    agent.targets ?? null,
+                    [...current, target],
+                    manager,
+                );
+                if (!landed) {
+                    return false;
+                }
+                if (target.type !== 'wildcard') {
+                    await this.memberships.addMembership(
+                        id,
+                        target.type,
+                        target.id ?? null,
+                        manager,
+                    );
+                }
+                return true;
+            });
             if (!won) {
                 agent = await this.requireOwned(userId, id);
                 continue;
-            }
-
-            if (target.type !== 'wildcard') {
-                await this.memberships.addMembership(id, target.type, target.id ?? null);
             }
 
             const refreshed = await this.agents.findById(id);
@@ -565,23 +581,39 @@ export class AgentsService {
                 (t) => !(t.type === target.type && (t.id ?? null) === (target.id ?? null)),
             );
 
-            if (next.length !== current.length) {
-                const won = await this.agents.casUpdateTargets(
-                    id,
-                    agent.targets ?? null,
-                    next.length > 0 ? next : null,
-                );
-                if (!won) {
-                    agent = await this.requireOwned(userId, id);
-                    continue;
+            // One transaction for the CAS + the membership delete, so a
+            // failure on either leaves both untouched rather than
+            // stranding a membership row for a target `targets` no
+            // longer lists (or vice versa).
+            const won = await this.agents.withTransaction(async (manager) => {
+                if (next.length !== current.length) {
+                    const landed = await this.agents.casUpdateTargets(
+                        id,
+                        agent.targets ?? null,
+                        next.length > 0 ? next : null,
+                        manager,
+                    );
+                    if (!landed) {
+                        return false;
+                    }
                 }
-            }
 
-            // Unconditional even when `targets` never listed it — this is
-            // also the repair path for a membership row left behind by an
-            // older non-atomic write.
-            if (target.type !== 'wildcard') {
-                await this.memberships.removeMembership(id, target.type, target.id ?? null);
+                // Unconditional even when `targets` never listed it —
+                // this is also the repair path for a membership row left
+                // behind by an older non-atomic write.
+                if (target.type !== 'wildcard') {
+                    await this.memberships.removeMembership(
+                        id,
+                        target.type,
+                        target.id ?? null,
+                        manager,
+                    );
+                }
+                return true;
+            });
+            if (!won) {
+                agent = await this.requireOwned(userId, id);
+                continue;
             }
 
             const refreshed = await this.agents.findById(id);
