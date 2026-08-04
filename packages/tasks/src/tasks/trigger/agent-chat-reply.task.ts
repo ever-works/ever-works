@@ -71,7 +71,14 @@ export const agentChatReplyTask = task<'agent-chat-reply', AgentChatReplyPayload
         payload: AgentChatReplyPayload,
         // NOTE: this annotation replaces the SDK RunFnParams, so anything omitted
         // here is silently invisible — which is exactly how `signal` went unused.
-        { ctx, signal }: { ctx?: { run?: { id?: string } }; signal?: AbortSignal } = {},
+        //
+        // `signal` stays in the type but is deliberately NOT destructured:
+        // `AgentRunService` is a remote proxy here, so an `AbortSignal` would
+        // SuperJSON-encode to `{}` and land API-side as a permanently
+        // un-aborted object. Cancellation crosses this boundary through the
+        // `agent_runs.status` poll in `createAgentRunAbortSource` instead. See
+        // the full note in `agent-task-execute.task.ts`.
+        { ctx }: { ctx?: { run?: { id?: string } }; signal?: AbortSignal } = {},
     ) => {
         // Security: validate payload IDs before any DB access (defense-in-depth, mirrors agent-heartbeat).
         // triggeringMessageId is also asserted: it is a TaskChatMessage uuid PK and its raw value
@@ -182,7 +189,7 @@ export const agentChatReplyTask = task<'agent-chat-reply', AgentChatReplyPayload
                 agentId: agent.id,
                 userId: payload.userId,
                 kind: 'chat',
-                signal,
+                // No `signal` — see the note on the `run` params above.
                 taskId: payload.taskId,
                 chatMessageId: payload.triggeringMessageId,
                 immediateInput,
