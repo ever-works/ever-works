@@ -168,7 +168,7 @@ jobs:
         run: ls -la apps/desktop/release || true
 
       - name: Upload installers
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ever-works-desktop-${{ matrix.label }}
           path: ${{ matrix.artifacts }}
