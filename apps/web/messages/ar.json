@@ -1478,7 +1478,14 @@
                 "relationLabel": "Relation",
                 "attach": "Attach",
                 "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "detachDialog": {
+                    "title": "فصل هذا العمل؟",
+                    "body": "ستتم إزالة {title} من هذه المهمة. لن يتأثر العمل نفسه إطلاقًا — هذا يزيل المرجع فقط.",
+                    "confirm": "فصل العمل",
+                    "cancel": "إلغاء",
+                    "detaching": "جارٍ الفصل…",
+                    "error": "فشل فصل العمل"
+                },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
                     "created": "Created",
@@ -1527,8 +1534,13 @@
                 "runNow": "Run now",
                 "clone": "Clone"
             },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            "deleteDialog": {
+                "title": "حذف هذه المهمة؟",
+                "body": "سيتم حذف {title} نهائيًا. يتم الاحتفاظ بالأفكار والأعمال الفرعية، لكن يُفقد ارتباطها العكسي بهذه المهمة. لا يمكن التراجع عن هذا الإجراء.",
+                "confirm": "حذف المهمة",
+                "cancel": "إلغاء",
+                "deleting": "جارٍ الحذف…",
+                "error": "فشل حذف المهمة"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1599,6 +1611,36 @@
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)"
+                }
+            },
+            "goals": {
+                "title": "الأهداف",
+                "empty": "لا توجد أهداف مرفقة بهذه المهمة بعد. أرفق هدفًا أدناه لتتبّع معنى النجاح.",
+                "attachTitle": "إرفاق هدف",
+                "goalLabel": "الهدف",
+                "goalPlaceholder": "اختر هدفًا",
+                "primaryLabel": "تعيين كهدف رئيسي",
+                "primaryBadge": "رئيسي",
+                "primaryTooltip": "الهدف الرئيسي لهذه المهمة - يمكن أن يكون هدف واحد فقط رئيسيًا في كل مرة.",
+                "attach": "إرفاق",
+                "detach": "فصل",
+                "detachDialog": {
+                    "title": "فصل هذا الهدف؟",
+                    "body": "ستتم إزالة {title} من هذه المهمة. لن يُحذف الهدف نفسه — سيبقى في صفحة الأهداف وفي أي مهمة أخرى مرفق بها.",
+                    "confirm": "فصل الهدف",
+                    "cancel": "إلغاء",
+                    "detaching": "جارٍ الفصل…",
+                    "error": "فشل فصل الهدف"
+                },
+                "alreadyLinkedOption": "{title} (مُرفق بالفعل)",
+                "noGoalsToAttach": "ليس لديك أهداف بعد. أنشئ هدفًا في صفحة الأهداف ثم أرفقه هنا.",
+                "pickerTruncated": "يتم عرض أحدث 100 هدف لديك - افتح صفحة الأهداف للاطلاع على القائمة الكاملة.",
+                "invariantNote": "إرفاق هدف لا يغيّر أبدًا حالة هذه المهمة - إكمال المهمة يظل إجراءً صريحًا.",
+                "toasts": {
+                    "attached": "تم إرفاق الهدف",
+                    "attachError": "تعذّر إرفاق الهدف",
+                    "detached": "تم فصل الهدف",
+                    "detachError": "تعذّر فصل الهدف"
                 }
             }
         },
@@ -2945,7 +2987,23 @@
                 "activatedToast": "تم تفعيل الوكيل",
                 "statusUpdateFailed": "تعذر تحديث الحالة",
                 "newAgent": "وكيل جديد",
-                "moreAgents": "+{count} أخرى"
+                "moreAgents": "+{count} أخرى",
+                "assignExisting": "تعيين وكيل موجود",
+                "assignTitle": "تعيين وكيل لهذا العمل",
+                "assignSubtitle": "عيّن لهذا العمل وكيلاً لديك بالفعل بدلاً من إنشاء وكيل آخر.",
+                "assignSearchPlaceholder": "البحث عن وكلاء…",
+                "assignLoading": "جارٍ تحميل الوكلاء…",
+                "assignNoneAvailable": "لا يوجد وكلاء آخرون للتعيين.",
+                "assignNoMatches": "لا يوجد وكلاء مطابقون لهذا البحث.",
+                "assignLoadFailed": "تعذر تحميل الوكلاء",
+                "assignedToast": "تم تعيين {name} لهذا العمل",
+                "assignFailed": "تعذر تعيين الوكيل",
+                "assignCancel": "إلغاء",
+                "assignedLabel": "معيّن",
+                "assignedHint": "معيّن لهذا العمل — لم يُنشأ هنا",
+                "unassign": "إزالة من هذا العمل",
+                "unassignedToast": "تمت إزالة {name} من هذا العمل",
+                "unassignFailed": "تعذرت إزالة الوكيل"
             },
             "failedToGenerateItems": "فشل في توليد العناصر. يرجى المحاولة مرة أخرى.",
             "generationCompleted": "اكتمل التوليد بنجاح",

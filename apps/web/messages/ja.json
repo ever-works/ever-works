@@ -1447,7 +1447,14 @@
                 "relationLabel": "Relation",
                 "attach": "Attach",
                 "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "detachDialog": {
+                    "title": "このワークを切り離しますか？",
+                    "body": "{title} はこのミッションから削除されます。ワーク自体には一切影響しません — 参照が解除されるだけです。",
+                    "confirm": "ワークを切り離す",
+                    "cancel": "キャンセル",
+                    "detaching": "切り離しています…",
+                    "error": "ワークを切り離せませんでした"
+                },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
                     "created": "Created",
@@ -1496,8 +1503,13 @@
                 "runNow": "Run now",
                 "clone": "Clone"
             },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            "deleteDialog": {
+                "title": "このミッションを削除しますか？",
+                "body": "{title} は完全に削除されます。子のアイデアとワークは保持されますが、このミッションへの逆リンクは失われます。この操作は取り消せません。",
+                "confirm": "ミッションを削除",
+                "cancel": "キャンセル",
+                "deleting": "削除しています…",
+                "error": "ミッションを削除できませんでした"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1568,6 +1580,36 @@
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)"
+                }
+            },
+            "goals": {
+                "title": "ゴール",
+                "empty": "このミッションにはまだゴールが紐付けられていません。成功の基準を追跡するには、下からゴールを紐付けてください。",
+                "attachTitle": "ゴールを紐付ける",
+                "goalLabel": "ゴール",
+                "goalPlaceholder": "ゴールを選択",
+                "primaryLabel": "主要に設定",
+                "primaryBadge": "主要",
+                "primaryTooltip": "このミッションの主要ゴール - 主要にできるゴールは同時に 1 つだけです。",
+                "attach": "紐付ける",
+                "detach": "切り離す",
+                "detachDialog": {
+                    "title": "このゴールを切り離しますか？",
+                    "body": "{title} はこのミッションから削除されます。ゴール自体は削除されません — ゴールページや、紐付けられている他のミッションには残ります。",
+                    "confirm": "ゴールを切り離す",
+                    "cancel": "キャンセル",
+                    "detaching": "切り離しています…",
+                    "error": "ゴールを切り離せませんでした"
+                },
+                "alreadyLinkedOption": "{title}（紐付け済み）",
+                "noGoalsToAttach": "ゴールがまだありません。ゴールページで作成してから、ここで紐付けてください。",
+                "pickerTruncated": "最近のゴール 100 件を表示しています - すべて見るにはゴールページを開いてください。",
+                "invariantNote": "ゴールを紐付けてもこのミッションのステータスは変わりません - ミッションの完了は明示的な操作のままです。",
+                "toasts": {
+                    "attached": "ゴールを紐付けました",
+                    "attachError": "ゴールを紐付けられませんでした",
+                    "detached": "ゴールを切り離しました",
+                    "detachError": "ゴールを切り離せませんでした"
                 }
             }
         },
@@ -2877,7 +2919,23 @@
                 "activatedToast": "エージェントを有効化しました",
                 "statusUpdateFailed": "ステータスを更新できませんでした",
                 "newAgent": "新しいエージェント",
-                "moreAgents": "他 {count} 件"
+                "moreAgents": "他 {count} 件",
+                "assignExisting": "既存を割り当て",
+                "assignTitle": "この作業にエージェントを割り当て",
+                "assignSubtitle": "新しく作成する代わりに、すでにあるエージェントをこの作業に割り当てます。",
+                "assignSearchPlaceholder": "エージェントを検索…",
+                "assignLoading": "エージェントを読み込み中…",
+                "assignNoneAvailable": "割り当てできるエージェントは他にありません。",
+                "assignNoMatches": "検索に一致するエージェントはありません。",
+                "assignLoadFailed": "エージェントを読み込めませんでした",
+                "assignedToast": "{name} をこの作業に割り当てました",
+                "assignFailed": "エージェントを割り当てられませんでした",
+                "assignCancel": "キャンセル",
+                "assignedLabel": "割り当て済み",
+                "assignedHint": "この作業に割り当て済み — ここで作成されたものではありません",
+                "unassign": "この作業から外す",
+                "unassignedToast": "{name} をこの作業から外しました",
+                "unassignFailed": "エージェントを外せませんでした"
             },
             "failedToGenerateItems": "アイテムの生成に失敗しました。もう一度お試しください。",
             "generationCompleted": "生成が正常に完了しました",

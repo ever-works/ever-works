@@ -1447,7 +1447,14 @@
                 "relationLabel": "Relation",
                 "attach": "Attach",
                 "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "detachDialog": {
+                    "title": "Scollegare questo Lavoro?",
+                    "body": "{title} verrà rimosso da questa Missione. Il Lavoro stesso non viene mai modificato — questa azione rimuove solo il riferimento.",
+                    "confirm": "Scollega Lavoro",
+                    "cancel": "Annulla",
+                    "detaching": "Scollegamento…",
+                    "error": "Impossibile scollegare il Lavoro"
+                },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
                     "created": "Created",
@@ -1496,8 +1503,13 @@
                 "runNow": "Run now",
                 "clone": "Clone"
             },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            "deleteDialog": {
+                "title": "Eliminare questa Missione?",
+                "body": "{title} verrà eliminata definitivamente. Le Idee e i Lavori figli vengono conservati, ma il loro collegamento a questa Missione viene perso. Questa azione non può essere annullata.",
+                "confirm": "Elimina Missione",
+                "cancel": "Annulla",
+                "deleting": "Eliminazione…",
+                "error": "Impossibile eliminare la Missione"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1568,6 +1580,36 @@
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)"
+                }
+            },
+            "goals": {
+                "title": "Obiettivi",
+                "empty": "Nessun Obiettivo è ancora collegato a questa Missione. Collegane uno qui sotto per definire cosa significa avere successo.",
+                "attachTitle": "Collega un Obiettivo",
+                "goalLabel": "Obiettivo",
+                "goalPlaceholder": "Seleziona un Obiettivo",
+                "primaryLabel": "Imposta come principale",
+                "primaryBadge": "Principale",
+                "primaryTooltip": "L'Obiettivo principale di questa Missione - solo un Obiettivo alla volta può essere principale.",
+                "attach": "Collega",
+                "detach": "Scollega",
+                "detachDialog": {
+                    "title": "Scollegare questo Obiettivo?",
+                    "body": "{title} verrà rimosso da questa Missione. L'Obiettivo stesso non viene eliminato — resta nella pagina Obiettivi e in qualsiasi altra Missione a cui è collegato.",
+                    "confirm": "Scollega Obiettivo",
+                    "cancel": "Annulla",
+                    "detaching": "Scollegamento…",
+                    "error": "Impossibile scollegare l'Obiettivo"
+                },
+                "alreadyLinkedOption": "{title} (già collegato)",
+                "noGoalsToAttach": "Non hai ancora Obiettivi. Creane uno nella pagina Obiettivi, poi collegalo qui.",
+                "pickerTruncated": "Vengono mostrati i tuoi 100 Obiettivi più recenti - apri la pagina Obiettivi per l'elenco completo.",
+                "invariantNote": "Collegare un Obiettivo non cambia mai lo stato di questa Missione - completare una Missione resta un'azione esplicita.",
+                "toasts": {
+                    "attached": "Obiettivo collegato",
+                    "attachError": "Impossibile collegare l'Obiettivo",
+                    "detached": "Obiettivo scollegato",
+                    "detachError": "Impossibile scollegare l'Obiettivo"
                 }
             }
         },
@@ -2877,7 +2919,23 @@
                 "activatedToast": "Agente attivato",
                 "statusUpdateFailed": "Impossibile aggiornare lo stato",
                 "newAgent": "Nuovo Agente",
-                "moreAgents": "+{count} altri"
+                "moreAgents": "+{count} altri",
+                "assignExisting": "Assegna esistente",
+                "assignTitle": "Assegna un Agente a questo Lavoro",
+                "assignSubtitle": "Metti su questo Lavoro un Agente che hai già invece di crearne un altro.",
+                "assignSearchPlaceholder": "Cerca Agenti…",
+                "assignLoading": "Caricamento Agenti…",
+                "assignNoneAvailable": "Nessun altro Agente da assegnare.",
+                "assignNoMatches": "Nessun Agente corrisponde alla ricerca.",
+                "assignLoadFailed": "Impossibile caricare gli Agenti",
+                "assignedToast": "{name} assegnato a questo Lavoro",
+                "assignFailed": "Impossibile assegnare l'Agente",
+                "assignCancel": "Annulla",
+                "assignedLabel": "Assegnato",
+                "assignedHint": "Assegnato a questo Lavoro — non creato qui",
+                "unassign": "Rimuovi da questo Lavoro",
+                "unassignedToast": "{name} rimosso da questo Lavoro",
+                "unassignFailed": "Impossibile rimuovere l'Agente"
             },
             "failedToGenerateItems": "Impossibile generare gli elementi. Riprova.",
             "generationCompleted": "Generazione completata con successo",

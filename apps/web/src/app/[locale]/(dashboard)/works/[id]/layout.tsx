@@ -39,6 +39,7 @@ export default async function WorkLayout({ params, children }: LayoutParams) {
     let config = null;
     let agents: Agent[] = [];
     let agentsTotal = 0;
+    let assignedAgentIds: string[] = [];
 
     try {
         const res = await workAPI.get(id);
@@ -49,16 +50,32 @@ export default async function WorkLayout({ params, children }: LayoutParams) {
         config = work.configCache ?? null;
 
         if (work) {
-            // Fetch connection info, provider list, and the Work-scoped
-            // Agents (header dropdown) in parallel
-            const [connectionRes, providersRes, agentsRes] = await Promise.all([
+            // Fetch connection info, provider list, and the Agents on this
+            // Work (header dropdown) in parallel. "On this Work" is two
+            // populations: Agents PINNED here by scope, and tenant-scoped
+            // Agents ASSIGNED here through their `targets`. The dropdown
+            // shows one merged list and tells them apart via
+            // `assignedAgentIds` (assignment is detachable, pinning is not).
+            const [connectionRes, providersRes, agentsRes, assignedRes] = await Promise.all([
                 gitProvidersAPI.checkConnection(work.gitProvider).catch(() => null),
                 gitProvidersAPI.list().catch(() => null),
                 agentsAPI.list({ scope: 'work', workId: id, limit: 50 }).catch(() => null),
+                agentsAPI.list({ assignedWorkId: id, limit: 50 }).catch(() => null),
             ]);
 
-            agents = agentsRes?.data ?? [];
-            agentsTotal = agentsRes?.meta?.total ?? agents.length;
+            const pinned = agentsRes?.data ?? [];
+            const assigned = assignedRes?.data ?? [];
+            const pinnedIds = new Set(pinned.map((agent) => agent.id));
+            const assignedOnly = assigned.filter((agent) => !pinnedIds.has(agent.id));
+
+            agents = [...pinned, ...assignedOnly];
+            assignedAgentIds = assignedOnly.map((agent) => agent.id);
+            agentsTotal =
+                (agentsRes?.meta?.total ?? pinned.length) +
+                // Only the rows we actually merged in can be counted from the
+                // assigned page; a capped assigned fetch is reflected by the
+                // "+N more" row rather than a total the list can't back up.
+                assignedOnly.length;
 
             oauthConnection = connectionRes;
 
@@ -83,6 +100,7 @@ export default async function WorkLayout({ params, children }: LayoutParams) {
             config={config}
             agents={agents}
             agentsTotal={agentsTotal}
+            assignedAgentIds={assignedAgentIds}
         >
             {children}
         </WorkLayoutClient>

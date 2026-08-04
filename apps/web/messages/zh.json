@@ -1447,7 +1447,14 @@
                 "relationLabel": "Relation",
                 "attach": "Attach",
                 "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "detachDialog": {
+                    "title": "解除关联此作品？",
+                    "body": "{title} 将从此任务中移除。作品本身不会受到任何影响 — 此操作仅移除关联引用。",
+                    "confirm": "解除关联作品",
+                    "cancel": "取消",
+                    "detaching": "正在解除关联…",
+                    "error": "解除作品关联失败"
+                },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
                     "created": "Created",
@@ -1496,8 +1503,13 @@
                 "runNow": "Run now",
                 "clone": "Clone"
             },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            "deleteDialog": {
+                "title": "删除此任务？",
+                "body": "{title} 将被永久删除。子创意和作品会被保留，但它们指向此任务的反向链接将失效。此操作无法撤销。",
+                "confirm": "删除任务",
+                "cancel": "取消",
+                "deleting": "正在删除…",
+                "error": "删除任务失败"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1568,6 +1580,36 @@
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)"
+                }
+            },
+            "goals": {
+                "title": "目标",
+                "empty": "此任务尚未关联任何目标。在下方关联一个目标，以明确何为成功。",
+                "attachTitle": "关联目标",
+                "goalLabel": "目标",
+                "goalPlaceholder": "选择目标",
+                "primaryLabel": "设为主要目标",
+                "primaryBadge": "主要",
+                "primaryTooltip": "此任务的主要目标 - 同一时间只能有一个目标为主要目标。",
+                "attach": "关联",
+                "detach": "解除关联",
+                "detachDialog": {
+                    "title": "解除关联此目标？",
+                    "body": "{title} 将从此任务中移除。目标本身不会被删除 — 它仍会保留在目标页面以及关联它的其他任务中。",
+                    "confirm": "解除关联目标",
+                    "cancel": "取消",
+                    "detaching": "正在解除关联…",
+                    "error": "解除目标关联失败"
+                },
+                "alreadyLinkedOption": "{title}（已关联）",
+                "noGoalsToAttach": "您还没有目标。请先在目标页面创建一个，然后在此关联。",
+                "pickerTruncated": "正在显示最近的 100 个目标 - 打开目标页面查看完整列表。",
+                "invariantNote": "关联目标绝不会改变此任务的状态 - 完成任务始终是一项显式操作。",
+                "toasts": {
+                    "attached": "已关联目标",
+                    "attachError": "无法关联目标",
+                    "detached": "已解除目标关联",
+                    "detachError": "无法解除目标关联"
                 }
             }
         },
@@ -2877,7 +2919,23 @@
                 "activatedToast": "代理已激活",
                 "statusUpdateFailed": "无法更新状态",
                 "newAgent": "新代理",
-                "moreAgents": "还有 {count} 个"
+                "moreAgents": "还有 {count} 个",
+                "assignExisting": "分配现有代理",
+                "assignTitle": "为此工作分配代理",
+                "assignSubtitle": "将你已有的代理分配到此工作，而不是再创建一个。",
+                "assignSearchPlaceholder": "搜索代理…",
+                "assignLoading": "正在加载代理…",
+                "assignNoneAvailable": "没有其他可分配的代理。",
+                "assignNoMatches": "没有与该搜索匹配的代理。",
+                "assignLoadFailed": "无法加载代理",
+                "assignedToast": "已将 {name} 分配到此工作",
+                "assignFailed": "无法分配代理",
+                "assignCancel": "取消",
+                "assignedLabel": "已分配",
+                "assignedHint": "已分配到此工作 — 并非在此创建",
+                "unassign": "从此工作中移除",
+                "unassignedToast": "已将 {name} 从此工作中移除",
+                "unassignFailed": "无法移除代理"
             },
             "failedToGenerateItems": "生成项目失败。请重试。",
             "generationCompleted": "生成成功完成",
