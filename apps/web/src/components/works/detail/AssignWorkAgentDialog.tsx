@@ -35,7 +35,10 @@ export function AssignWorkAgentDialog({
     const router = useRouter();
     const [search, setSearch] = useState('');
     const [candidates, setCandidates] = useState<AgentAssignCandidate[]>([]);
-    const [loading, setLoading] = useState(false);
+    // Starts true so the first paint of a session is the spinner, not the
+    // "none available" empty state: the fetch is scheduled on a timer and so
+    // lands a paint after the dialog opens.
+    const [loading, setLoading] = useState(true);
     const [loadError, setLoadError] = useState<string | null>(null);
     const [assigningId, setAssigningId] = useState<string | null>(null);
     const [, startTransition] = useTransition();
@@ -67,9 +70,28 @@ export function AssignWorkAgentDialog({
             clearTimeout(timer);
         };
     }, [open, search, load]);
-    useEffect(() => {
-        if (!open) setSearch('');
-    }, [open]);
+
+    // Every close path funnels through here so the next open starts a fresh
+    // session. Without the reset the previous run's list — or its error —
+    // renders for the moment before the new fetch resolves.
+    const closeDialog = useCallback(() => {
+        setSearch('');
+        setCandidates([]);
+        setLoadError(null);
+        setLoading(true);
+        onOpenChange(false);
+    }, [onOpenChange]);
+
+    const handleOpenChange = useCallback(
+        (next: boolean) => {
+            if (next) {
+                onOpenChange(true);
+                return;
+            }
+            closeDialog();
+        },
+        [closeDialog, onOpenChange],
+    );
 
     const assign = (agent: AgentAssignCandidate) => {
         setAssigningId(agent.id);
@@ -77,8 +99,7 @@ export function AssignWorkAgentDialog({
             try {
                 await assignAgentToWorkAction(agent.id, workId);
                 toast.success(t('assignedToast', { name: agent.name }));
-                setCandidates((rows) => rows.filter((row) => row.id !== agent.id));
-                onOpenChange(false);
+                closeDialog();
                 onAssigned?.();
                 router.refresh();
             } catch (error) {
@@ -90,9 +111,9 @@ export function AssignWorkAgentDialog({
     };
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
+        <Dialog open={open} onOpenChange={handleOpenChange}>
             <DialogContent className="max-w-md p-5">
-                <DialogClose onClose={() => onOpenChange(false)} />
+                <DialogClose onClose={closeDialog} />
                 <DialogHeader className="mb-3">
                     <DialogTitle className="text-sm font-semibold text-text dark:text-text-dark">
                         {t('assignTitle')}
@@ -170,7 +191,7 @@ export function AssignWorkAgentDialog({
                 </div>
 
                 <div className="mt-4 flex justify-end">
-                    <Button variant="ghost" size="sm" onClick={() => onOpenChange(false)}>
+                    <Button variant="ghost" size="sm" onClick={closeDialog}>
                         {t('assignCancel')}
                     </Button>
                 </div>
