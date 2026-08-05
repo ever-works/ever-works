@@ -1025,6 +1025,22 @@
                 "title": "Belum ada Tugas.",
                 "subtitle": "Tugas akan tersedia di fase berikutnya dari peluncuran Agen/Keterampilan/Tugas. Halaman ini telah disiapkan agar rute navigasi sidebar dapat teratasi."
             },
+            "scopedSection": {
+                "addExisting": "Tambah yang ada",
+                "assignTitle": "Tambahkan Tugas yang ada",
+                "assignSubtitle": "Pilih Tugas dari backlog Anda alih-alih membuat yang baru.",
+                "assignSearchPlaceholder": "Cari Tugas…",
+                "assignSearchLabel": "Cari Tugas",
+                "assignLoading": "Memuat Tugas…",
+                "assignLoadFailed": "Tidak dapat memuat Tugas",
+                "assignNoneAvailable": "Tidak ada Tugas lain untuk ditambahkan.",
+                "assignNoMatches": "Tidak ada Tugas yang cocok dengan pencarian itu.",
+                "assignedToast": "{title} ditambahkan",
+                "assignFailed": "Tidak dapat menambahkan Tugas",
+                "assignCancel": "Batal",
+                "movesLabel": "dipindahkan",
+                "movesHint": "Tercatat di tempat lain — menambahkannya di sini akan memindahkannya."
+            },
             "list": {
                 "newTask": "+ Tugas Baru",
                 "noDescription": "Belum ada deskripsi",

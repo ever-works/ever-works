@@ -1025,6 +1025,22 @@
                 "title": "还没有任务。",
                 "subtitle": "任务将在代理/技能/任务推出的后期阶段提供。该页面已保留，以便侧边栏导航路由能够解析。"
             },
+            "scopedSection": {
+                "addExisting": "添加已有",
+                "assignTitle": "添加已有任务",
+                "assignSubtitle": "从待办列表中选择一个任务，而不是再创建一个。",
+                "assignSearchPlaceholder": "搜索任务…",
+                "assignSearchLabel": "搜索任务",
+                "assignLoading": "正在加载任务…",
+                "assignLoadFailed": "无法加载任务",
+                "assignNoneAvailable": "没有其他可添加的任务。",
+                "assignNoMatches": "没有匹配该搜索的任务。",
+                "assignedToast": "已添加 {title}",
+                "assignFailed": "无法添加任务",
+                "assignCancel": "取消",
+                "movesLabel": "移动",
+                "movesHint": "已归属其他位置 — 添加到此处会将其移动。"
+            },
             "list": {
                 "newTask": "+ 新任务",
                 "noDescription": "暂无描述",

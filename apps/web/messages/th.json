@@ -1025,6 +1025,22 @@
                 "title": "ยังไม่มีงาน",
                 "subtitle": "งานจะถูกเปิดใช้ในระยะหลังของการเปิดตัวเอเจนต์/ทักษะ/งาน หน้านี้ถูกจองไว้เพื่อให้เส้นทางนำทางของแถบด้านข้ามีความสมบูรณ์"
             },
+            "scopedSection": {
+                "addExisting": "เพิ่มงานที่มีอยู่",
+                "assignTitle": "เพิ่มงานที่มีอยู่",
+                "assignSubtitle": "เลือกงานจากแบ็คล็อกของคุณ แทนการสร้างงานใหม่",
+                "assignSearchPlaceholder": "ค้นหางาน…",
+                "assignSearchLabel": "ค้นหางาน",
+                "assignLoading": "กำลังโหลดงาน…",
+                "assignLoadFailed": "ไม่สามารถโหลดงานได้",
+                "assignNoneAvailable": "ไม่มีงานอื่นให้เพิ่มแล้ว",
+                "assignNoMatches": "ไม่มีงานที่ตรงกับการค้นหานี้",
+                "assignedToast": "เพิ่ม {title} แล้ว",
+                "assignFailed": "ไม่สามารถเพิ่มงานได้",
+                "assignCancel": "ยกเลิก",
+                "movesLabel": "ย้าย",
+                "movesHint": "อยู่ที่อื่นอยู่แล้ว — การเพิ่มที่นี่จะย้ายงานนั้นมา"
+            },
             "list": {
                 "newTask": "+ งานใหม่",
                 "noDescription": "ยังไม่มีคำอธิบาย",

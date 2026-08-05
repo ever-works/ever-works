@@ -1025,6 +1025,22 @@
                 "title": "Chưa có Task nào.",
                 "subtitle": "Tasks sẽ được phát hành trong giai đoạn sau của việc triển khai Agents/Skills/Tasks. Trang này được giữ lại để định tuyến điều hướng thanh bên được giải quyết."
             },
+            "scopedSection": {
+                "addExisting": "Thêm Task có sẵn",
+                "assignTitle": "Thêm một Task có sẵn",
+                "assignSubtitle": "Chọn một Task từ backlog của bạn thay vì tạo thêm Task mới.",
+                "assignSearchPlaceholder": "Tìm Task…",
+                "assignSearchLabel": "Tìm Task",
+                "assignLoading": "Đang tải Task…",
+                "assignLoadFailed": "Không thể tải Task",
+                "assignNoneAvailable": "Không còn Task nào khác để thêm.",
+                "assignNoMatches": "Không có Task nào khớp với tìm kiếm đó.",
+                "assignedToast": "Đã thêm {title}",
+                "assignFailed": "Không thể thêm Task",
+                "assignCancel": "Hủy",
+                "movesLabel": "sẽ chuyển",
+                "movesHint": "Đang thuộc nơi khác — thêm vào đây sẽ chuyển nó."
+            },
             "list": {
                 "newTask": "+ Task mới",
                 "noDescription": "Chưa có mô tả",
