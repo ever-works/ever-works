@@ -196,6 +196,49 @@ export async function assignTaskToScopeAction(
     return task;
 }
 
+/**
+ * Result of taking a Task back off a scope.
+ *
+ * A DISCRIMINATED UNION rather than a thrown error, for the same reason
+ * `RunTaskActionResult` is one: the likely refusal here is the API's
+ * sub-task guard — "Task X has N sub-task(s); re-file or detach them
+ * before changing its owners" — and that sentence IS the value of the
+ * failure. Next redacts thrown Server-Action messages in production, so
+ * a UI branching on `err.message` would explain the problem in dev and
+ * say nothing in prod. The message travels in the return value instead.
+ */
+export type UnassignTaskActionResult = { ok: true; task: Task } | { ok: false; message: string };
+
+/**
+ * Detach a Task from this scope — the inverse of
+ * `assignTaskToScopeAction`, and the same endpoint: Task ownership is a
+ * nullable column, not a join row, so `null` clears exactly this one
+ * owner and leaves any others (Work, Team, Agent…) untouched.
+ *
+ * The Task itself survives; it returns to the global backlog and can be
+ * pulled back in from the same "Add existing" picker. That is why this
+ * is a one-click action rather than a confirm dialog.
+ */
+export async function unassignTaskFromScopeAction(
+    taskId: string,
+    scopeKey: TaskScopeKey,
+    scopeId: string,
+): Promise<UnassignTaskActionResult> {
+    // Security: verify session server-side before mutating data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
+    try {
+        const task = await tasksAPI.update(taskId, { [scopeKey]: null });
+        revalidatePath('/tasks');
+        revalidatePath(`/tasks/${taskId}`);
+        revalidatePath(`/${SCOPE_SEGMENT[scopeKey]}/${scopeId}`, 'layout');
+        return { ok: true, task };
+    } catch (err) {
+        return { ok: false, message: err instanceof Error ? err.message : String(err) };
+    }
+}
+
 // ── Board dispatch (kanban M3 / M4) ───────────────────────────────
 
 /**
