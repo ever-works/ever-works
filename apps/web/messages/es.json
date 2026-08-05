@@ -1056,6 +1056,22 @@
                 "title": "Aún no hay Tareas.",
                 "subtitle": "Las Tareas se lanzarán en una fase posterior de la implementación de Agentes/Habilidades/Tareas. La página está reservada para que la ruta de navegación lateral se resuelva."
             },
+            "scopedSection": {
+                "addExisting": "Añadir existente",
+                "assignTitle": "Añadir una Tarea existente",
+                "assignSubtitle": "Elige una Tarea de tu backlog en lugar de crear otra.",
+                "assignSearchPlaceholder": "Buscar Tareas…",
+                "assignSearchLabel": "Buscar Tareas",
+                "assignLoading": "Cargando Tareas…",
+                "assignLoadFailed": "No se pudieron cargar las Tareas",
+                "assignNoneAvailable": "No quedan otras Tareas para añadir.",
+                "assignNoMatches": "Ninguna Tarea coincide con esa búsqueda.",
+                "assignedToast": "{title} añadida",
+                "assignFailed": "No se pudo añadir la Tarea",
+                "assignCancel": "Cancelar",
+                "movesLabel": "se mueve",
+                "movesHint": "Está en otro sitio: añadirla aquí la moverá."
+            },
             "list": {
                 "newTask": "+ Nueva Tarea",
                 "noDescription": "Aún no hay descripción",

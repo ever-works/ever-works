@@ -1025,6 +1025,22 @@
                 "title": "Nog geen Taken.",
                 "subtitle": "Taken komen in een latere fase van de Agents/Skills/Tasks uitrol. De pagina is gereserveerd zodat de zijbalk navigatie route werkt."
             },
+            "scopedSection": {
+                "addExisting": "Bestaande toevoegen",
+                "assignTitle": "Een bestaande Taak toevoegen",
+                "assignSubtitle": "Kies een Taak uit je backlog in plaats van een nieuwe te maken.",
+                "assignSearchPlaceholder": "Taken zoeken…",
+                "assignSearchLabel": "Taken zoeken",
+                "assignLoading": "Taken laden…",
+                "assignLoadFailed": "Kon Taken niet laden",
+                "assignNoneAvailable": "Geen andere Taken meer om toe te voegen.",
+                "assignNoMatches": "Geen Taken komen overeen met die zoekopdracht.",
+                "assignedToast": "{title} toegevoegd",
+                "assignFailed": "Kon Taak niet toevoegen",
+                "assignCancel": "Annuleren",
+                "movesLabel": "wordt verplaatst",
+                "movesHint": "Staat ergens anders — hier toevoegen verplaatst hem."
+            },
             "list": {
                 "newTask": "+ Nieuwe Taak",
                 "noDescription": "Nog geen beschrijving",

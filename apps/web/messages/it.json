@@ -1025,6 +1025,22 @@
                 "title": "Nessun Task ancora.",
                 "subtitle": "I Task saranno disponibili in una fase successiva del rollout Agenti/Competenze/Task. La pagina è riservata in modo che il percorso di navigazione laterale si risolva."
             },
+            "scopedSection": {
+                "addExisting": "Aggiungi esistente",
+                "assignTitle": "Aggiungi un Task esistente",
+                "assignSubtitle": "Scegli un Task dal tuo backlog invece di crearne un altro.",
+                "assignSearchPlaceholder": "Cerca Task…",
+                "assignSearchLabel": "Cerca Task",
+                "assignLoading": "Caricamento dei Task…",
+                "assignLoadFailed": "Impossibile caricare i Task",
+                "assignNoneAvailable": "Non ci sono altri Task da aggiungere.",
+                "assignNoMatches": "Nessun Task corrisponde a questa ricerca.",
+                "assignedToast": "{title} aggiunto",
+                "assignFailed": "Impossibile aggiungere il Task",
+                "assignCancel": "Annulla",
+                "movesLabel": "viene spostato",
+                "movesHint": "È archiviato altrove: aggiungerlo qui lo sposterà."
+            },
             "list": {
                 "newTask": "+ Nuovo Task",
                 "noDescription": "Nessuna descrizione",

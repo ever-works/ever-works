@@ -1056,6 +1056,22 @@
                 "title": "Noch keine Aufgaben.",
                 "subtitle": "Aufgaben erscheinen in einer späteren Phase der Agenten/Fähigkeiten/Aufgaben-Einführung. Die Seite ist reserviert, damit der Navigationsweg der Seitenleiste aufgelöst wird."
             },
+            "scopedSection": {
+                "addExisting": "Vorhandene hinzufügen",
+                "assignTitle": "Vorhandene Aufgabe hinzufügen",
+                "assignSubtitle": "Wählen Sie eine Aufgabe aus Ihrem Backlog, statt eine neue zu erstellen.",
+                "assignSearchPlaceholder": "Aufgaben suchen…",
+                "assignSearchLabel": "Aufgaben suchen",
+                "assignLoading": "Aufgaben werden geladen…",
+                "assignLoadFailed": "Aufgaben konnten nicht geladen werden",
+                "assignNoneAvailable": "Keine weiteren Aufgaben zum Hinzufügen vorhanden.",
+                "assignNoMatches": "Keine Aufgaben passen zu dieser Suche.",
+                "assignedToast": "{title} hinzugefügt",
+                "assignFailed": "Aufgabe konnte nicht hinzugefügt werden",
+                "assignCancel": "Abbrechen",
+                "movesLabel": "wird verschoben",
+                "movesHint": "Bereits anderswo abgelegt — durch Hinzufügen wird sie verschoben."
+            },
             "list": {
                 "newTask": "+ Neue Aufgabe",
                 "noDescription": "Noch keine Beschreibung",

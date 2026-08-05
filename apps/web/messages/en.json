@@ -1108,6 +1108,22 @@
                 "title": "No Tasks yet.",
                 "subtitle": "Tasks ship in a later phase of the Agents/Skills/Tasks rollout. The page is reserved so the sidebar nav route resolves."
             },
+            "scopedSection": {
+                "addExisting": "Add existing",
+                "assignTitle": "Add an existing Task",
+                "assignSubtitle": "Pick a Task from your backlog instead of creating another one.",
+                "assignSearchPlaceholder": "Search Tasks…",
+                "assignSearchLabel": "Search Tasks",
+                "assignLoading": "Loading Tasks…",
+                "assignLoadFailed": "Could not load Tasks",
+                "assignNoneAvailable": "No other Tasks left to add.",
+                "assignNoMatches": "No Tasks match that search.",
+                "assignedToast": "{title} added",
+                "assignFailed": "Could not add Task",
+                "assignCancel": "Cancel",
+                "movesLabel": "moves",
+                "movesHint": "Filed elsewhere — adding it here moves it."
+            },
             "runChip": {
                 "queued": "Queued",
                 "running": "Running",
