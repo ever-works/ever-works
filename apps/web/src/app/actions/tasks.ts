@@ -10,10 +10,12 @@ import {
     type RunCandidateAgent,
     type RunTaskResult,
     type Task,
+    type TaskAssignCandidate,
     type TaskChatMessage,
     type TaskDiff,
     type TaskPriority,
     type TaskPrStatus,
+    type TaskScopeKey,
     type TaskStatus,
 } from '@/lib/api/tasks';
 import { ApiResponseError } from '@/lib/api/server-api';
@@ -57,6 +59,8 @@ export async function updateTaskAction(
             | 'acceptanceChecks'
             | 'maxGateAttempts'
             | 'workId'
+            | 'missionId'
+            | 'ideaId'
             | 'agentId'
         >
     >,
@@ -116,6 +120,80 @@ export async function listTasksWithRunsAction(
         includeRun: true,
     });
     return result.data;
+}
+
+// ── Scoped "Add existing Task" picker ─────────────────────────────
+
+/** Bulk read matching the other Task picker surfaces. */
+const SCOPE_TASK_CANDIDATE_LIMIT = 100;
+
+/** Which dashboard section owns each scope key, for cache invalidation. */
+const SCOPE_SEGMENT: Record<TaskScopeKey, string> = {
+    workId: 'works',
+    missionId: 'missions',
+    ideaId: 'ideas',
+};
+
+/**
+ * Candidates for a Tasks tab's "Add existing Task" picker: every Task the
+ * caller owns that is not already filed under THIS scope.
+ *
+ * Nothing else is filtered by scope on purpose — the whole point is to
+ * surface Tasks that were raised somewhere else (or nowhere) so they can
+ * be pulled in, exactly like the Work header's Agent picker deliberately
+ * ignores Agent scope. What IS dropped: Tasks already on this scope
+ * (nothing to do) and `cancelled` Tasks, which can never progress —
+ * the same reason that picker drops archived Agents.
+ *
+ * A Task already filed under a different owner of this kind is KEPT but
+ * flagged `reassigns`, because picking it moves it rather than adding it.
+ */
+export async function listAssignableScopeTasksAction(
+    scopeKey: TaskScopeKey,
+    scopeId: string,
+    search?: string,
+): Promise<TaskAssignCandidate[]> {
+    // Security: verify session server-side before reading data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
+    const trimmed = search?.trim();
+    const result = await tasksAPI.list({
+        limit: SCOPE_TASK_CANDIDATE_LIMIT,
+        ...(trimmed ? { search: trimmed } : {}),
+    });
+    return (result.data ?? [])
+        .filter((task) => task.status !== 'cancelled' && task[scopeKey] !== scopeId)
+        .map((task) => ({
+            id: task.id,
+            slug: task.slug,
+            title: task.title,
+            status: task.status,
+            priority: task.priority,
+            reassigns: task[scopeKey] !== null,
+        }));
+}
+
+/**
+ * File an existing Task under this scope. The API re-validates that the
+ * scope is reachable by the caller and refuses moves that would strand a
+ * sub-task hierarchy, so failures here are real and must reach the user
+ * — this deliberately does NOT swallow them.
+ */
+export async function assignTaskToScopeAction(
+    taskId: string,
+    scopeKey: TaskScopeKey,
+    scopeId: string,
+): Promise<Task> {
+    // Security: verify session server-side before mutating data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
+    const task = await tasksAPI.update(taskId, { [scopeKey]: scopeId });
+    revalidatePath('/tasks');
+    revalidatePath(`/tasks/${taskId}`);
+    revalidatePath(`/${SCOPE_SEGMENT[scopeKey]}/${scopeId}`, 'layout');
+    return task;
 }
 
 // ── Board dispatch (kanban M3 / M4) ───────────────────────────────
