@@ -1056,6 +1056,22 @@
                 "title": "אין משימות עדיין.",
                 "subtitle": "משימות ייכנסו בשלב מאוחר יותר של השקת סוכנים/מיומנויות/משימות. הדף שמור כדי שנתיב הניווט בסרגל הצדדי יוכל להתפתר."
             },
+            "scopedSection": {
+                "addExisting": "הוספת משימה קיימת",
+                "assignTitle": "הוספת משימה קיימת",
+                "assignSubtitle": "בחרו משימה מהבקלוג שלכם במקום ליצור משימה נוספת.",
+                "assignSearchPlaceholder": "חיפוש משימות…",
+                "assignSearchLabel": "חיפוש משימות",
+                "assignLoading": "טוען משימות…",
+                "assignLoadFailed": "לא ניתן היה לטעון משימות",
+                "assignNoneAvailable": "אין משימות נוספות להוספה.",
+                "assignNoMatches": "אין משימות התואמות לחיפוש הזה.",
+                "assignedToast": "{title} נוספה",
+                "assignFailed": "לא ניתן היה להוסיף את המשימה",
+                "assignCancel": "ביטול",
+                "movesLabel": "מועברת",
+                "movesHint": "משויכת למקום אחר — הוספה כאן תעביר אותה."
+            },
             "list": {
                 "newTask": "+ משימה חדשה",
                 "noDescription": "אין תיאור עדיין",
