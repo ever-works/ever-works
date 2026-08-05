@@ -1039,7 +1039,17 @@
                 "assignFailed": "タスクを追加できませんでした",
                 "assignCancel": "キャンセル",
                 "movesLabel": "移動",
-                "movesHint": "別の場所に登録されています。ここに追加すると移動します。"
+                "movesHint": "別の場所に登録されています。ここに追加すると移動します。",
+                "removedToast": "{title} をこのリストから外しました",
+                "removeFailed": "タスクを外せませんでした",
+                "rowMenuColumn": "操作",
+                "rowMenuLabel": "{title} の操作",
+                "removeMenuItem": "このリストから外す",
+                "confirmTitle": "このタスクを外しますか？",
+                "confirmBody": "{title} をこのリストから外します。タスク自体は残り、後で再び追加できます。",
+                "confirmCancel": "キャンセル",
+                "confirmSubmit": "外す",
+                "confirmPending": "処理中…"
             },
             "list": {
                 "newTask": "+ 新しいタスク",

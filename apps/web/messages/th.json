@@ -1039,7 +1039,17 @@
                 "assignFailed": "ไม่สามารถเพิ่มงานได้",
                 "assignCancel": "ยกเลิก",
                 "movesLabel": "ย้าย",
-                "movesHint": "อยู่ที่อื่นอยู่แล้ว — การเพิ่มที่นี่จะย้ายงานนั้นมา"
+                "movesHint": "อยู่ที่อื่นอยู่แล้ว — การเพิ่มที่นี่จะย้ายงานนั้นมา",
+                "removedToast": "นำ {title} ออกจากรายการนี้แล้ว",
+                "removeFailed": "ไม่สามารถนำงานออกได้",
+                "rowMenuColumn": "การดำเนินการ",
+                "rowMenuLabel": "การดำเนินการสำหรับ {title}",
+                "removeMenuItem": "นำออกจากรายการนี้",
+                "confirmTitle": "นำงานนี้ออกหรือไม่",
+                "confirmBody": "{title} จะถูกนำออกจากรายการนี้ ตัวงานยังคงอยู่และเพิ่มกลับได้ในภายหลัง",
+                "confirmCancel": "ยกเลิก",
+                "confirmSubmit": "นำออก",
+                "confirmPending": "กำลังนำออก…"
             },
             "list": {
                 "newTask": "+ งานใหม่",

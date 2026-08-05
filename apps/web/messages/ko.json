@@ -1039,7 +1039,17 @@
                 "assignFailed": "작업을 추가하지 못했습니다",
                 "assignCancel": "취소",
                 "movesLabel": "이동",
-                "movesHint": "다른 곳에 등록되어 있습니다 — 여기에 추가하면 이동합니다."
+                "movesHint": "다른 곳에 등록되어 있습니다 — 여기에 추가하면 이동합니다.",
+                "removedToast": "{title}을(를) 이 목록에서 제거했습니다",
+                "removeFailed": "작업을 제거하지 못했습니다",
+                "rowMenuColumn": "관리",
+                "rowMenuLabel": "{title} 관리 메뉴",
+                "removeMenuItem": "이 목록에서 제거",
+                "confirmTitle": "이 작업을 제거할까요?",
+                "confirmBody": "{title}을(를) 이 목록에서 제거합니다. 작업 자체는 유지되며 나중에 다시 추가할 수 있습니다.",
+                "confirmCancel": "취소",
+                "confirmSubmit": "제거",
+                "confirmPending": "제거 중…"
             },
             "list": {
                 "newTask": "+ 새 작업",

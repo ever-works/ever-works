@@ -1039,7 +1039,17 @@
                 "assignFailed": "Không thể thêm Task",
                 "assignCancel": "Hủy",
                 "movesLabel": "sẽ chuyển",
-                "movesHint": "Đang thuộc nơi khác — thêm vào đây sẽ chuyển nó."
+                "movesHint": "Đang thuộc nơi khác — thêm vào đây sẽ chuyển nó.",
+                "removedToast": "Đã gỡ {title} khỏi danh sách này",
+                "removeFailed": "Không thể gỡ Task",
+                "rowMenuColumn": "Hành động",
+                "rowMenuLabel": "Hành động cho {title}",
+                "removeMenuItem": "Gỡ khỏi danh sách này",
+                "confirmTitle": "Gỡ Task này?",
+                "confirmBody": "{title} sẽ được gỡ khỏi danh sách này. Bản thân Task vẫn được giữ lại và có thể thêm lại sau.",
+                "confirmCancel": "Hủy",
+                "confirmSubmit": "Gỡ",
+                "confirmPending": "Đang gỡ…"
             },
             "list": {
                 "newTask": "+ Task mới",
