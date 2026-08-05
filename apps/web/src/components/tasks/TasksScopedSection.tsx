@@ -105,7 +105,9 @@ export function TasksScopedSection({
             <div className="border-t border-border/60 dark:border-border-dark/60" />
 
             {/* ── Tasks list ───────────────────────────────────────────────── */}
-            <TasksList tasks={tasks} />
+            {/* `scope` turns on the per-row detach — the inverse of the
+                "Add existing" button above, and only meaningful here. */}
+            <TasksList tasks={tasks} scope={{ key: scopeParam, id: scopeId }} />
         </div>
     );
 }
