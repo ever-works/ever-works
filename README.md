@@ -17,7 +17,7 @@
 
 ## 🌟 What is it
 
-[Ever® Works™][uri_everworks] is an open-source, extensible, **agentic runtime** that autonomously researches, ships, and maintains content-rich websites and Git repositories.
+[Ever® Works™][uri_everworks] is an open-source, extensible, **agentic runtime** that autonomously researches, ships, and maintains entire businesses, 24/7.
 
 Give it an idea, and AI agents handle the rest:
 
@@ -30,7 +30,7 @@ Give it an idea, and AI agents handle the rest:
 
 Think of it as a **workshop for AI**: it runs on your machine, your cloud, or ours, and keeps the whole content-and-code lifecycle version-controlled from the first idea to every future update.
 
-Ever® Works™ is a part of our larger Open Platform for **Collaborative, On-Demand and Sharing Economies** — [Ever® Platform™](https://ever.co).
+Ever® Works™ is a part of [Ever® Platform™](https://ever.co) - The everything platform for businesses™.
 
 ## ✨ Features
 
