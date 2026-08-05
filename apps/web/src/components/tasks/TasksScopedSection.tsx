@@ -2,8 +2,10 @@ import { ListChecks, Plus } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import type { Task } from '@/lib/api/tasks';
+import type { TaskScopeKey } from '@/lib/api/tasks.shared';
 import type { WorkRunsSummary } from '@/lib/api/types-only';
 import { WorkRunsSummaryBadges } from '@/components/works/detail/WorkRunsSummaryBadges';
+import { AddExistingTaskButton } from './AddExistingTaskButton';
 import { TasksList } from './TasksList';
 
 /**
@@ -30,7 +32,7 @@ export function TasksScopedSection({
     const doneCount = tasks.filter((t) => t.status === 'done').length;
     const openCount = tasks.filter((t) => !['done', 'cancelled'].includes(t.status)).length;
     const progressPct = tasks.length > 0 ? Math.round((doneCount / tasks.length) * 100) : 0;
-    const scopeParam =
+    const scopeParam: TaskScopeKey =
         scopeLabel === 'Work' ? 'workId' : scopeLabel === 'Mission' ? 'missionId' : 'ideaId';
     const newTaskHref = `${ROUTES.DASHBOARD_TASK_NEW}?${scopeParam}=${encodeURIComponent(scopeId)}`;
 
@@ -68,13 +70,20 @@ export function TasksScopedSection({
                     </div>
                 </div>
 
-                <Link
-                    href={newTaskHref}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-border dark:border-border-dark text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors whitespace-nowrap shrink-0"
-                >
-                    <Plus className="w-3.5 h-3.5" />
-                    New Task
-                </Link>
+                {/* Two on-ramps, because "create another one" is the wrong
+                    default for an operator who already has a backlog: most of
+                    what a scope wants was raised elsewhere long before the
+                    scope existed. "Add existing" opens a picker of it. */}
+                <div className="flex items-center gap-2 shrink-0">
+                    <AddExistingTaskButton scopeKey={scopeParam} scopeId={scopeId} />
+                    <Link
+                        href={newTaskHref}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-border dark:border-border-dark text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors whitespace-nowrap shrink-0"
+                    >
+                        <Plus className="w-3.5 h-3.5" />
+                        New Task
+                    </Link>
+                </div>
             </div>
 
             {/* ── Progress bar ─────────────────────────────────────────────── */}
