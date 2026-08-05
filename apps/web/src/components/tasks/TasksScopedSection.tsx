@@ -78,7 +78,7 @@ export function TasksScopedSection({
                     <AddExistingTaskButton scopeKey={scopeParam} scopeId={scopeId} />
                     <Link
                         href={newTaskHref}
-                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-border dark:border-border-dark text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors whitespace-nowrap shrink-0"
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-button-primary dark:bg-button-primary-dark text-button-primary-foreground dark:text-button-primary-foreground-dark hover:bg-button-primary-hover dark:hover:bg-button-primary-hover-dark transition-colors whitespace-nowrap shrink-0"
                     >
                         <Plus className="w-3.5 h-3.5" />
                         New Task
