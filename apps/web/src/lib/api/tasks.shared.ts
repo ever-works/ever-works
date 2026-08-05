@@ -32,3 +32,31 @@ export interface RunCandidateAgent {
     status?: string;
     source: 'assignee' | 'task' | 'work-default';
 }
+
+// ── Scoped "Add existing Task" picker ─────────────────────────────
+
+/**
+ * The three owners a Tasks tab can be scoped by. Mirrors the
+ * `scopeParam` mapping in `TasksScopedSection` — one union so the
+ * picker, the server action, and the section cannot drift apart.
+ */
+export type TaskScopeKey = 'workId' | 'missionId' | 'ideaId';
+
+/**
+ * One row of the "Add existing Task" picker — the narrow projection of
+ * `Task` the dialog renders. Not the full DTO: the list crosses a
+ * Server-Action boundary on every keystroke and nothing else on the Task
+ * is needed to label a row.
+ *
+ * `reassigns` is the honest part: the Task is already filed under a
+ * DIFFERENT owner of this kind, so picking it MOVES it rather than
+ * simply adding it. The row says so before the click, not after.
+ */
+export interface TaskAssignCandidate {
+    id: string;
+    slug: string;
+    title: string;
+    status: string;
+    priority: string;
+    reassigns: boolean;
+}
