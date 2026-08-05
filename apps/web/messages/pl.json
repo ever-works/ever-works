@@ -1025,6 +1025,22 @@
                 "title": "Brak Zadań.",
                 "subtitle": "Zadania będą dostępne w późniejszej fazie wdrożenia Agentów/Umiejętności/Zadań. Strona jest zarezerwowana, aby trasa nawigacji paska bocznego była dostępna."
             },
+            "scopedSection": {
+                "addExisting": "Dodaj istniejące",
+                "assignTitle": "Dodaj istniejące Zadanie",
+                "assignSubtitle": "Wybierz Zadanie ze swojego backlogu zamiast tworzyć nowe.",
+                "assignSearchPlaceholder": "Szukaj Zadań…",
+                "assignSearchLabel": "Szukaj Zadań",
+                "assignLoading": "Ładowanie Zadań…",
+                "assignLoadFailed": "Nie udało się wczytać Zadań",
+                "assignNoneAvailable": "Brak innych Zadań do dodania.",
+                "assignNoMatches": "Żadne Zadanie nie pasuje do tego wyszukiwania.",
+                "assignedToast": "{title} dodane",
+                "assignFailed": "Nie udało się dodać Zadania",
+                "assignCancel": "Anuluj",
+                "movesLabel": "zostanie przeniesione",
+                "movesHint": "Jest przypisane gdzie indziej — dodanie tutaj je przeniesie."
+            },
             "list": {
                 "newTask": "+ Nowe Zadanie",
                 "noDescription": "Brak opisu",

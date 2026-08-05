@@ -1025,6 +1025,22 @@
                 "title": "Henüz hiç Görev yok.",
                 "subtitle": "Görevler, Ajanlar/Yetenekler/Görevler dağıtımının daha sonraki bir aşamasında gelecek. Sayfa, kenar çubuğu gezinme rotasının çözülmesi için ayrılmıştır."
             },
+            "scopedSection": {
+                "addExisting": "Mevcut olanı ekle",
+                "assignTitle": "Mevcut bir Görev ekle",
+                "assignSubtitle": "Yenisini oluşturmak yerine biriktirme listenizden bir Görev seçin.",
+                "assignSearchPlaceholder": "Görev ara…",
+                "assignSearchLabel": "Görev ara",
+                "assignLoading": "Görevler yükleniyor…",
+                "assignLoadFailed": "Görevler yüklenemedi",
+                "assignNoneAvailable": "Eklenecek başka Görev kalmadı.",
+                "assignNoMatches": "Bu aramayla eşleşen Görev yok.",
+                "assignedToast": "{title} eklendi",
+                "assignFailed": "Görev eklenemedi",
+                "assignCancel": "İptal",
+                "movesLabel": "taşınır",
+                "movesHint": "Başka bir yerde kayıtlı — buraya eklemek onu taşır."
+            },
             "list": {
                 "newTask": "+ Yeni Görev",
                 "noDescription": "Henüz açıklama yok",
