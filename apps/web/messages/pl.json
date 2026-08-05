@@ -1039,7 +1039,17 @@
                 "assignFailed": "Nie udało się dodać Zadania",
                 "assignCancel": "Anuluj",
                 "movesLabel": "zostanie przeniesione",
-                "movesHint": "Jest przypisane gdzie indziej — dodanie tutaj je przeniesie."
+                "movesHint": "Jest przypisane gdzie indziej — dodanie tutaj je przeniesie.",
+                "removedToast": "{title} usunięte z tej listy",
+                "removeFailed": "Nie udało się usunąć Zadania",
+                "rowMenuColumn": "Akcje",
+                "rowMenuLabel": "Akcje dla {title}",
+                "removeMenuItem": "Usuń z tej listy",
+                "confirmTitle": "Usunąć to Zadanie?",
+                "confirmBody": "{title} zostanie usunięte z tej listy. Samo Zadanie zostaje zachowane i można je dodać ponownie później.",
+                "confirmCancel": "Anuluj",
+                "confirmSubmit": "Usuń",
+                "confirmPending": "Usuwanie…"
             },
             "list": {
                 "newTask": "+ Nowe Zadanie",

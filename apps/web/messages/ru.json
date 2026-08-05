@@ -1039,7 +1039,17 @@
                 "assignFailed": "Не удалось добавить Задачу",
                 "assignCancel": "Отмена",
                 "movesLabel": "переносится",
-                "movesHint": "Закреплена в другом месте — добавление сюда перенесёт её."
+                "movesHint": "Закреплена в другом месте — добавление сюда перенесёт её.",
+                "removedToast": "{title} убрана из этого списка",
+                "removeFailed": "Не удалось убрать Задачу",
+                "rowMenuColumn": "Действия",
+                "rowMenuLabel": "Действия для {title}",
+                "removeMenuItem": "Убрать из этого списка",
+                "confirmTitle": "Убрать эту Задачу?",
+                "confirmBody": "{title} будет убрана из этого списка. Сама Задача сохраняется, её можно добавить снова позже.",
+                "confirmCancel": "Отмена",
+                "confirmSubmit": "Убрать",
+                "confirmPending": "Убираем…"
             },
             "list": {
                 "newTask": "+ Новая задача",

@@ -1039,7 +1039,17 @@
                 "assignFailed": "Görev eklenemedi",
                 "assignCancel": "İptal",
                 "movesLabel": "taşınır",
-                "movesHint": "Başka bir yerde kayıtlı — buraya eklemek onu taşır."
+                "movesHint": "Başka bir yerde kayıtlı — buraya eklemek onu taşır.",
+                "removedToast": "{title} bu listeden kaldırıldı",
+                "removeFailed": "Görev kaldırılamadı",
+                "rowMenuColumn": "İşlemler",
+                "rowMenuLabel": "{title} için işlemler",
+                "removeMenuItem": "Bu listeden kaldır",
+                "confirmTitle": "Bu Görev kaldırılsın mı?",
+                "confirmBody": "{title} bu listeden kaldırılacak. Görevin kendisi korunur ve daha sonra yeniden eklenebilir.",
+                "confirmCancel": "İptal",
+                "confirmSubmit": "Kaldır",
+                "confirmPending": "Kaldırılıyor…"
             },
             "list": {
                 "newTask": "+ Yeni Görev",
