@@ -1070,7 +1070,17 @@
                 "assignFailed": "تعذّر إضافة المهمة",
                 "assignCancel": "إلغاء",
                 "movesLabel": "يتم نقلها",
-                "movesHint": "مسجّلة في مكان آخر — إضافتها هنا ستنقلها."
+                "movesHint": "مسجّلة في مكان آخر — إضافتها هنا ستنقلها.",
+                "removedToast": "تمت إزالة {title} من هذه القائمة",
+                "removeFailed": "تعذّر إزالة المهمة",
+                "rowMenuColumn": "الإجراءات",
+                "rowMenuLabel": "إجراءات {title}",
+                "removeMenuItem": "إزالة من هذه القائمة",
+                "confirmTitle": "إزالة هذه المهمة؟",
+                "confirmBody": "ستتم إزالة {title} من هذه القائمة. تبقى المهمة نفسها محفوظة ويمكن إضافتها لاحقًا.",
+                "confirmCancel": "إلغاء",
+                "confirmSubmit": "إزالة",
+                "confirmPending": "جارٍ الإزالة…"
             },
             "list": {
                 "newTask": "+ مهمة جديدة",
