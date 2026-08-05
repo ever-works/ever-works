@@ -1070,7 +1070,17 @@
                 "assignFailed": "Aufgabe konnte nicht hinzugefügt werden",
                 "assignCancel": "Abbrechen",
                 "movesLabel": "wird verschoben",
-                "movesHint": "Bereits anderswo abgelegt — durch Hinzufügen wird sie verschoben."
+                "movesHint": "Bereits anderswo abgelegt — durch Hinzufügen wird sie verschoben.",
+                "removedToast": "{title} aus dieser Liste entfernt",
+                "removeFailed": "Aufgabe konnte nicht entfernt werden",
+                "rowMenuColumn": "Aktionen",
+                "rowMenuLabel": "Aktionen für {title}",
+                "removeMenuItem": "Aus dieser Liste entfernen",
+                "confirmTitle": "Diese Aufgabe entfernen?",
+                "confirmBody": "{title} wird aus dieser Liste entfernt. Die Aufgabe selbst bleibt erhalten und kann später wieder hinzugefügt werden.",
+                "confirmCancel": "Abbrechen",
+                "confirmSubmit": "Entfernen",
+                "confirmPending": "Wird entfernt…"
             },
             "list": {
                 "newTask": "+ Neue Aufgabe",

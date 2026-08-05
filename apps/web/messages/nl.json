@@ -1039,7 +1039,17 @@
                 "assignFailed": "Kon Taak niet toevoegen",
                 "assignCancel": "Annuleren",
                 "movesLabel": "wordt verplaatst",
-                "movesHint": "Staat ergens anders — hier toevoegen verplaatst hem."
+                "movesHint": "Staat ergens anders — hier toevoegen verplaatst hem.",
+                "removedToast": "{title} verwijderd uit deze lijst",
+                "removeFailed": "Kon Taak niet verwijderen",
+                "rowMenuColumn": "Acties",
+                "rowMenuLabel": "Acties voor {title}",
+                "removeMenuItem": "Uit deze lijst verwijderen",
+                "confirmTitle": "Deze Taak verwijderen?",
+                "confirmBody": "{title} wordt uit deze lijst verwijderd. De Taak zelf blijft bestaan en kan later opnieuw worden toegevoegd.",
+                "confirmCancel": "Annuleren",
+                "confirmSubmit": "Verwijderen",
+                "confirmPending": "Verwijderen…"
             },
             "list": {
                 "newTask": "+ Nieuwe Taak",

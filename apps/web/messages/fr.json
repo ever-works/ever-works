@@ -1070,7 +1070,17 @@
                 "assignFailed": "Impossible d'ajouter la Tâche",
                 "assignCancel": "Annuler",
                 "movesLabel": "déplacée",
-                "movesHint": "Classée ailleurs — l'ajouter ici la déplacera."
+                "movesHint": "Classée ailleurs — l'ajouter ici la déplacera.",
+                "removedToast": "{title} retirée de cette liste",
+                "removeFailed": "Impossible de retirer la Tâche",
+                "rowMenuColumn": "Actions",
+                "rowMenuLabel": "Actions pour {title}",
+                "removeMenuItem": "Retirer de cette liste",
+                "confirmTitle": "Retirer cette Tâche ?",
+                "confirmBody": "{title} sera retirée de cette liste. La Tâche elle-même est conservée et peut être rajoutée plus tard.",
+                "confirmCancel": "Annuler",
+                "confirmSubmit": "Retirer",
+                "confirmPending": "Retrait…"
             },
             "list": {
                 "newTask": "+ Nouvelle Tâche",

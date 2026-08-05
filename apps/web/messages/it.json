@@ -1039,7 +1039,17 @@
                 "assignFailed": "Impossibile aggiungere il Task",
                 "assignCancel": "Annulla",
                 "movesLabel": "viene spostato",
-                "movesHint": "È archiviato altrove: aggiungerlo qui lo sposterà."
+                "movesHint": "È archiviato altrove: aggiungerlo qui lo sposterà.",
+                "removedToast": "{title} rimosso da questo elenco",
+                "removeFailed": "Impossibile rimuovere il Task",
+                "rowMenuColumn": "Azioni",
+                "rowMenuLabel": "Azioni per {title}",
+                "removeMenuItem": "Rimuovi da questo elenco",
+                "confirmTitle": "Rimuovere questo Task?",
+                "confirmBody": "{title} verrà rimosso da questo elenco. Il Task viene conservato e può essere aggiunto di nuovo in seguito.",
+                "confirmCancel": "Annulla",
+                "confirmSubmit": "Rimuovi",
+                "confirmPending": "Rimozione…"
             },
             "list": {
                 "newTask": "+ Nuovo Task",

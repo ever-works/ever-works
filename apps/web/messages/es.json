@@ -1070,7 +1070,17 @@
                 "assignFailed": "No se pudo añadir la Tarea",
                 "assignCancel": "Cancelar",
                 "movesLabel": "se mueve",
-                "movesHint": "Está en otro sitio: añadirla aquí la moverá."
+                "movesHint": "Está en otro sitio: añadirla aquí la moverá.",
+                "removedToast": "{title} quitada de esta lista",
+                "removeFailed": "No se pudo quitar la Tarea",
+                "rowMenuColumn": "Acciones",
+                "rowMenuLabel": "Acciones para {title}",
+                "removeMenuItem": "Quitar de esta lista",
+                "confirmTitle": "¿Quitar esta Tarea?",
+                "confirmBody": "{title} se quitará de esta lista. La Tarea se conserva y puede volver a añadirse más tarde.",
+                "confirmCancel": "Cancelar",
+                "confirmSubmit": "Quitar",
+                "confirmPending": "Quitando…"
             },
             "list": {
                 "newTask": "+ Nueva Tarea",
