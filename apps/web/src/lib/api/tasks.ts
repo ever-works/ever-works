@@ -127,6 +127,7 @@ export {
     type RunCandidateAgent,
     type TaskAssignCandidate,
     type TaskScopeKey,
+    type TaskScopeRef,
 } from './tasks.shared';
 import type { RunCandidateAgent } from './tasks.shared';
 
