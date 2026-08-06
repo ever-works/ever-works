@@ -1,5 +1,6 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { Bot } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
@@ -11,8 +12,14 @@ import type { Agent } from '@/lib/api/agents';
  * patterned after MissionCard. Avatar mode is rendered as initials
  * for v1 — icon + uploaded image modes (H3 override) wire in later
  * once the avatar-icon picker + image upload UX lands.
+ *
+ * The whole card is a link, implemented as a full-bleed overlay
+ * anchor rather than an anchor wrapping the content — that keeps the
+ * optional `actions` slot (the archived view's ⋯ menu) OUTSIDE the
+ * link, since a button nested in an anchor is invalid markup and
+ * swallows keyboard activation.
  */
-export function AgentCard({ agent }: { agent: Agent }) {
+export function AgentCard({ agent, actions }: { agent: Agent; actions?: ReactNode }) {
     const t = useTranslations('dashboard.agentsPage.card');
 
     const scopeLabel: Record<Agent['scope'], string> = {
@@ -47,10 +54,15 @@ export function AgentCard({ agent }: { agent: Agent }) {
             .toUpperCase() || 'A';
 
     return (
-        <Link
-            href={ROUTES.DASHBOARD_AGENT(agent.id)}
-            className="group block rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 hover:border-border dark:hover:border-border-dark transition-colors"
-        >
+        <div className="group relative rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 hover:border-border dark:hover:border-border-dark transition-colors">
+            {/* Full-card hit area. Positioned, so it paints above the
+                in-flow content — anything interactive in `actions` has
+                to opt back on top with its own stacking context. */}
+            <Link
+                href={ROUTES.DASHBOARD_AGENT(agent.id)}
+                className="absolute inset-0 rounded-xl"
+                aria-label={agent.name}
+            />
             <div className="flex items-start gap-3">
                 <div className="shrink-0 w-9 h-9 rounded-lg bg-concept-agents/10 border border-concept-agents/20 flex items-center justify-center">
                     {agent.avatarMode === 'initials' ? (
@@ -66,11 +78,14 @@ export function AgentCard({ agent }: { agent: Agent }) {
                         <h3 className="text-sm font-semibold text-text dark:text-text-dark truncate">
                             {agent.name}
                         </h3>
-                        <span
-                            className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded ${statusToneClass[agent.status]}`}
-                        >
-                            {statusLabel[agent.status]}
-                        </span>
+                        <div className="flex items-center gap-1 shrink-0">
+                            <span
+                                className={`text-[10px] uppercase tracking-wide px-1.5 py-0.5 rounded ${statusToneClass[agent.status]}`}
+                            >
+                                {statusLabel[agent.status]}
+                            </span>
+                            {actions ? <div className="relative z-10">{actions}</div> : null}
+                        </div>
                     </div>
                     <p className="text-xs text-text-muted dark:text-text-muted-dark mt-1 truncate">
                         {agent.title ?? t('noTitle')}
@@ -87,6 +102,6 @@ export function AgentCard({ agent }: { agent: Agent }) {
                     </div>
                 </div>
             </div>
-        </Link>
+        </div>
     );
 }
