@@ -1027,6 +1027,7 @@
             },
             "scopedSection": {
                 "addExisting": "Thêm Task có sẵn",
+                "newTask": "Task mới",
                 "assignTitle": "Thêm một Task có sẵn",
                 "assignSubtitle": "Chọn một Task từ backlog của bạn thay vì tạo thêm Task mới.",
                 "assignSearchPlaceholder": "Tìm Task…",

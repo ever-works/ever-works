@@ -1058,6 +1058,7 @@
             },
             "scopedSection": {
                 "addExisting": "Добавяне на съществуваща",
+                "newTask": "Нова Задача",
                 "assignTitle": "Добавяне на съществуваща Задача",
                 "assignSubtitle": "Изберете Задача от списъка си, вместо да създавате нова.",
                 "assignSearchPlaceholder": "Търсене на Задачи…",

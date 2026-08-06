@@ -1027,6 +1027,7 @@
             },
             "scopedSection": {
                 "addExisting": "Tambah yang ada",
+                "newTask": "Tugas Baru",
                 "assignTitle": "Tambahkan Tugas yang ada",
                 "assignSubtitle": "Pilih Tugas dari backlog Anda alih-alih membuat yang baru.",
                 "assignSearchPlaceholder": "Cari Tugas…",

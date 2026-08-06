@@ -1027,6 +1027,7 @@
             },
             "scopedSection": {
                 "addExisting": "既存を追加",
+                "newTask": "新しいタスク",
                 "assignTitle": "既存のタスクを追加",
                 "assignSubtitle": "新しく作成する代わりに、バックログからタスクを選びます。",
                 "assignSearchPlaceholder": "タスクを検索…",

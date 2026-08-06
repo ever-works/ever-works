@@ -1027,6 +1027,7 @@
             },
             "scopedSection": {
                 "addExisting": "Додати наявне",
+                "newTask": "Нове завдання",
                 "assignTitle": "Додати наявне Завдання",
                 "assignSubtitle": "Оберіть Завдання зі свого беклогу замість створення нового.",
                 "assignSearchPlaceholder": "Пошук Завдань…",

@@ -1027,6 +1027,7 @@
             },
             "scopedSection": {
                 "addExisting": "मौजूदा जोड़ें",
+                "newTask": "नया कार्य",
                 "assignTitle": "मौजूदा कार्य जोड़ें",
                 "assignSubtitle": "नया बनाने के बजाय अपने बैकलॉग से कोई कार्य चुनें।",
                 "assignSearchPlaceholder": "कार्य खोजें…",

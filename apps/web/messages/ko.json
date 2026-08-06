@@ -1027,6 +1027,7 @@
             },
             "scopedSection": {
                 "addExisting": "기존 작업 추가",
+                "newTask": "새 작업",
                 "assignTitle": "기존 작업 추가",
                 "assignSubtitle": "새로 만드는 대신 백로그에서 작업을 선택하세요.",
                 "assignSearchPlaceholder": "작업 검색…",

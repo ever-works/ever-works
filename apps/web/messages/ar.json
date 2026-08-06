@@ -1058,6 +1058,7 @@
             },
             "scopedSection": {
                 "addExisting": "إضافة مهمة موجودة",
+                "newTask": "مهمة جديدة",
                 "assignTitle": "إضافة مهمة موجودة",
                 "assignSubtitle": "اختر مهمة من قائمة أعمالك المتراكمة بدلاً من إنشاء مهمة جديدة.",
                 "assignSearchPlaceholder": "البحث في المهام…",

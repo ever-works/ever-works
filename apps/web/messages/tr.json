@@ -1027,6 +1027,7 @@
             },
             "scopedSection": {
                 "addExisting": "Mevcut olanı ekle",
+                "newTask": "Yeni Görev",
                 "assignTitle": "Mevcut bir Görev ekle",
                 "assignSubtitle": "Yenisini oluşturmak yerine biriktirme listenizden bir Görev seçin.",
                 "assignSearchPlaceholder": "Görev ara…",

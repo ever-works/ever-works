@@ -1058,6 +1058,7 @@
             },
             "scopedSection": {
                 "addExisting": "הוספת משימה קיימת",
+                "newTask": "משימה חדשה",
                 "assignTitle": "הוספת משימה קיימת",
                 "assignSubtitle": "בחרו משימה מהבקלוג שלכם במקום ליצור משימה נוספת.",
                 "assignSearchPlaceholder": "חיפוש משימות…",

@@ -1027,6 +1027,7 @@
             },
             "scopedSection": {
                 "addExisting": "添加已有",
+                "newTask": "新任务",
                 "assignTitle": "添加已有任务",
                 "assignSubtitle": "从待办列表中选择一个任务，而不是再创建一个。",
                 "assignSearchPlaceholder": "搜索任务…",

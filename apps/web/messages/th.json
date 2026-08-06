@@ -1027,6 +1027,7 @@
             },
             "scopedSection": {
                 "addExisting": "เพิ่มงานที่มีอยู่",
+                "newTask": "งานใหม่",
                 "assignTitle": "เพิ่มงานที่มีอยู่",
                 "assignSubtitle": "เลือกงานจากแบ็คล็อกของคุณ แทนการสร้างงานใหม่",
                 "assignSearchPlaceholder": "ค้นหางาน…",

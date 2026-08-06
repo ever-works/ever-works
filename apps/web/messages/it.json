@@ -1027,6 +1027,7 @@
             },
             "scopedSection": {
                 "addExisting": "Aggiungi esistente",
+                "newTask": "Nuovo Task",
                 "assignTitle": "Aggiungi un Task esistente",
                 "assignSubtitle": "Scegli un Task dal tuo backlog invece di crearne un altro.",
                 "assignSearchPlaceholder": "Cerca Task…",

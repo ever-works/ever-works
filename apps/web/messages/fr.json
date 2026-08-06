@@ -1058,6 +1058,7 @@
             },
             "scopedSection": {
                 "addExisting": "Ajouter une existante",
+                "newTask": "Nouvelle Tâche",
                 "assignTitle": "Ajouter une Tâche existante",
                 "assignSubtitle": "Choisissez une Tâche de votre backlog au lieu d'en créer une autre.",
                 "assignSearchPlaceholder": "Rechercher des Tâches…",

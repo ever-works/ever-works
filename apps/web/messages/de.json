@@ -1058,6 +1058,7 @@
             },
             "scopedSection": {
                 "addExisting": "Vorhandene hinzufügen",
+                "newTask": "Neue Aufgabe",
                 "assignTitle": "Vorhandene Aufgabe hinzufügen",
                 "assignSubtitle": "Wählen Sie eine Aufgabe aus Ihrem Backlog, statt eine neue zu erstellen.",
                 "assignSearchPlaceholder": "Aufgaben suchen…",

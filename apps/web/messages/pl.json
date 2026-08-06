@@ -1027,6 +1027,7 @@
             },
             "scopedSection": {
                 "addExisting": "Dodaj istniejące",
+                "newTask": "Nowe Zadanie",
                 "assignTitle": "Dodaj istniejące Zadanie",
                 "assignSubtitle": "Wybierz Zadanie ze swojego backlogu zamiast tworzyć nowe.",
                 "assignSearchPlaceholder": "Szukaj Zadań…",

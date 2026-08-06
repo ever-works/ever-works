@@ -1027,6 +1027,7 @@
             },
             "scopedSection": {
                 "addExisting": "Добавить существующую Задачу",
+                "newTask": "Новая задача",
                 "assignTitle": "Добавить существующую Задачу",
                 "assignSubtitle": "Выберите Задачу из своего бэклога вместо создания новой.",
                 "assignSearchPlaceholder": "Поиск Задач…",
