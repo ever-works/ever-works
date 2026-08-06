@@ -20,8 +20,19 @@ import {
 
 const SEARCH_DEBOUNCE_MS = 250;
 
-/** Compact tones for the row's status pill; unknown statuses fall back. */
-const STATUS_TONE: Record<string, string> = {
+/** Fallback prettifier for the statuses and priorities below. */
+const UNDERSCORES = /_/g;
+
+/** The default status tone, for a status this file has not heard of. */
+const STATUS_TONE_FALLBACK = 'bg-text-muted/10 text-text-muted';
+
+/**
+ * Compact tones for the row's status pill. Doubles as the roster of
+ * statuses that HAVE a translated label — the candidate rows arrive
+ * loosely typed (`status: string`), so a value outside this map is
+ * rendered raw rather than as a missing-message key path.
+ */
+const STATUS_TONE = {
     backlog: 'bg-text-muted/10 text-text-muted',
     todo: 'bg-info/10 text-info',
     in_progress: 'bg-warning/10 text-warning',
@@ -30,6 +41,34 @@ const STATUS_TONE: Record<string, string> = {
     done: 'bg-success/10 text-success',
     cancelled: 'bg-text-muted/10 text-text-muted',
 };
+
+/**
+ * Same roster for priorities — the `p0`…`p4` the API actually returns.
+ * An object rather than a Set so the keys survive into the type system.
+ */
+const PRIORITY_LABELLED = {
+    p0: true,
+    p1: true,
+    p2: true,
+    p3: true,
+    p4: true,
+};
+
+type KnownStatus = keyof typeof STATUS_TONE;
+type KnownPriority = keyof typeof PRIORITY_LABELLED;
+
+/**
+ * Narrow a loosely-typed column value onto the message keys that exist.
+ * `hasOwn`, not `in`: `in` would wave `toString` through and hand
+ * next-intl a key it has no message for.
+ */
+function knownStatus(value: string): KnownStatus | null {
+    return Object.hasOwn(STATUS_TONE, value) ? (value as KnownStatus) : null;
+}
+
+function knownPriority(value: string): KnownPriority | null {
+    return Object.hasOwn(PRIORITY_LABELLED, value) ? (value as KnownPriority) : null;
+}
 
 export function AssignScopeTaskDialog({
     scopeKey,
@@ -45,6 +84,12 @@ export function AssignScopeTaskDialog({
     onAssigned?: () => void;
 }) {
     const t = useTranslations('dashboard.tasksPage.scopedSection');
+    // The shared Task label namespaces, same as `TaskDetailClient` reads:
+    // a row here shows the same statuses and priorities the Task page
+    // does, and a picker that spelled them `in_progress` / `p1` would be
+    // the only place in the app that leaks the raw column values.
+    const tStatus = useTranslations('dashboard.tasksPage.status');
+    const tPriority = useTranslations('dashboard.tasksPage.priority');
     const router = useRouter();
     const [search, setSearch] = useState('');
     const [candidates, setCandidates] = useState<TaskAssignCandidate[]>([]);
@@ -173,6 +218,8 @@ export function AssignScopeTaskDialog({
                         <ul className="space-y-1.5">
                             {candidates.map((task) => {
                                 const isAssigning = assigningId === task.id;
+                                const status = knownStatus(task.status);
+                                const priority = knownPriority(task.priority);
                                 return (
                                     <li key={task.id}>
                                         <button
@@ -199,11 +246,14 @@ export function AssignScopeTaskDialog({
                                                     <span
                                                         className={cn(
                                                             'shrink-0 rounded-full px-1.5 py-px text-[8px] font-medium uppercase tracking-wide',
-                                                            STATUS_TONE[task.status] ??
-                                                                'bg-text-muted/10 text-text-muted',
+                                                            status
+                                                                ? STATUS_TONE[status]
+                                                                : STATUS_TONE_FALLBACK,
                                                         )}
                                                     >
-                                                        {task.status.replace('_', ' ')}
+                                                        {status
+                                                            ? tStatus(status)
+                                                            : task.status.replace(UNDERSCORES, ' ')}
                                                     </span>
                                                 </span>
                                                 <span className="mt-0.5 flex items-center gap-1.5 text-[11px] text-text-muted dark:text-text-muted-dark">
@@ -211,7 +261,9 @@ export function AssignScopeTaskDialog({
                                                         {task.slug}
                                                     </span>
                                                     <span className="uppercase">
-                                                        {task.priority}
+                                                        {priority
+                                                            ? tPriority(priority)
+                                                            : task.priority}
                                                     </span>
                                                     {/* Picking a Task that already belongs to
                                                         another owner of this kind MOVES it —
