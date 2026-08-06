@@ -124,8 +124,30 @@ export async function listTasksWithRunsAction(
 
 // ── Scoped "Add existing Task" picker ─────────────────────────────
 
-/** Bulk read matching the other Task picker surfaces. */
-const SCOPE_TASK_CANDIDATE_LIMIT = 100;
+/**
+ * The API's per-page maximum (it clamps `limit` to 200), not the 100 the
+ * other pickers ask for: this list is filtered AGAIN below — Tasks
+ * already on this scope drop out — so an unsearched picker on a busy
+ * backlog can hide assignable Tasks behind the page boundary. Reading
+ * the largest page the API will serve, and excluding the other discarded
+ * class (`cancelled`) server-side, spends the whole budget on rows the
+ * picker can actually show.
+ */
+const SCOPE_TASK_CANDIDATE_LIMIT = 200;
+
+/**
+ * Every status a candidate may hold — i.e. all of them except
+ * `cancelled`, which can never progress. Filtering it out server-side
+ * keeps cancelled Tasks from consuming the page budget above.
+ */
+const SCOPE_TASK_CANDIDATE_STATUSES: TaskStatus[] = [
+    'backlog',
+    'todo',
+    'in_progress',
+    'in_review',
+    'blocked',
+    'done',
+];
 
 /** Which dashboard section owns each scope key, for cache invalidation. */
 const SCOPE_SEGMENT: Record<TaskScopeKey, string> = {
@@ -160,6 +182,7 @@ export async function listAssignableScopeTasksAction(
     const trimmed = search?.trim();
     const result = await tasksAPI.list({
         limit: SCOPE_TASK_CANDIDATE_LIMIT,
+        status: SCOPE_TASK_CANDIDATE_STATUSES,
         ...(trimmed ? { search: trimmed } : {}),
     });
     return (result.data ?? [])
@@ -170,30 +193,43 @@ export async function listAssignableScopeTasksAction(
             title: task.title,
             status: task.status,
             priority: task.priority,
-            reassigns: task[scopeKey] !== null,
+            // `!= null`, not `!== null`: an owner column the response
+            // omits arrives as `undefined`, and calling that a MOVE
+            // would promise the user a reassignment that is not one.
+            reassigns: task[scopeKey] != null,
         }));
 }
 
 /**
- * File an existing Task under this scope. The API re-validates that the
- * scope is reachable by the caller and refuses moves that would strand a
- * sub-task hierarchy, so failures here are real and must reach the user
- * — this deliberately does NOT swallow them.
+ * Result of filing a Task under a scope — a DISCRIMINATED UNION for the
+ * same reason `UnassignTaskActionResult` is one. The API re-validates
+ * that the scope is reachable by the caller and refuses moves that would
+ * strand a sub-task hierarchy; those refusals ARE the value of the
+ * failure, and Next redacts thrown Server-Action messages in production.
+ * Thrown, they would explain the problem in dev and show an opaque error
+ * digest in prod. The message travels in the return value instead.
  */
+export type AssignTaskActionResult = { ok: true; task: Task } | { ok: false; message: string };
+
+/** File an existing Task under this scope. */
 export async function assignTaskToScopeAction(
     taskId: string,
     scopeKey: TaskScopeKey,
     scopeId: string,
-): Promise<Task> {
+): Promise<AssignTaskActionResult> {
     // Security: verify session server-side before mutating data
     const user = await getAuthFromCookie();
     if (!user) redirect(ROUTES.AUTH_LOGIN);
 
-    const task = await tasksAPI.update(taskId, { [scopeKey]: scopeId });
-    revalidatePath('/tasks');
-    revalidatePath(`/tasks/${taskId}`);
-    revalidatePath(`/${SCOPE_SEGMENT[scopeKey]}/${scopeId}`, 'layout');
-    return task;
+    try {
+        const task = await tasksAPI.update(taskId, { [scopeKey]: scopeId });
+        revalidatePath('/tasks');
+        revalidatePath(`/tasks/${taskId}`);
+        revalidatePath(`/${SCOPE_SEGMENT[scopeKey]}/${scopeId}`, 'layout');
+        return { ok: true, task };
+    } catch (err) {
+        return { ok: false, message: err instanceof Error ? err.message : String(err) };
+    }
 }
 
 /**

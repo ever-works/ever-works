@@ -110,7 +110,16 @@ export function AssignScopeTaskDialog({
         setAssigningId(task.id);
         startTransition(async () => {
             try {
-                await assignTaskToScopeAction(task.id, scopeKey, scopeId);
+                // A discriminated result, not a throw: the API's refusals
+                // (sub-task guard, unreachable scope) are the whole point
+                // of the message, and Next redacts thrown Server-Action
+                // messages in production.
+                const result = await assignTaskToScopeAction(task.id, scopeKey, scopeId);
+                if (!result.ok) {
+                    // Stay open — the row is still there to retry or skip.
+                    toast.error(result.message || t('assignFailed'));
+                    return;
+                }
                 toast.success(t('assignedToast', { title: task.title }));
                 closeDialog();
                 onAssigned?.();

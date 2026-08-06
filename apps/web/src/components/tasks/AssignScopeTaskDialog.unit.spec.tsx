@@ -66,7 +66,10 @@ describe('AssignScopeTaskDialog', () => {
     beforeEach(() => {
         vi.clearAllMocks();
         vi.mocked(listAssignableScopeTasksAction).mockResolvedValue(CANDIDATES);
-        vi.mocked(assignTaskToScopeAction).mockResolvedValue({ id: 'task-1' } as never);
+        vi.mocked(assignTaskToScopeAction).mockResolvedValue({
+            ok: true,
+            task: { id: 'task-1' },
+        } as never);
     });
 
     it('suggests the existing Tasks that are not already on the Mission', async () => {
@@ -99,8 +102,14 @@ describe('AssignScopeTaskDialog', () => {
         expect(toastSuccess).toHaveBeenCalledWith(`${T}.assignedToast`);
     });
 
+    // A RESOLVED failure, not a rejection: the action returns its refusal
+    // so the message survives Next's production redaction of thrown
+    // Server-Action errors.
     it('surfaces a failed assign without closing the dialog', async () => {
-        vi.mocked(assignTaskToScopeAction).mockRejectedValue(new Error('parent scope mismatch'));
+        vi.mocked(assignTaskToScopeAction).mockResolvedValue({
+            ok: false,
+            message: 'parent scope mismatch',
+        });
         const onOpenChange = renderDialog();
 
         await waitFor(() => expect(screen.getByText('Audit the docs sidebar')).toBeTruthy());
