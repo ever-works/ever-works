@@ -89,10 +89,22 @@ export class AgentRepository {
         userId: string,
         filter: ListAgentsFilter = {},
     ): Promise<{ rows: Agent[]; total: number }> {
+        // Archived Agents are hidden from every catalog surface by
+        // default — EXCEPT when the caller explicitly asks for them
+        // (`?status=archived`), which is what the `/agents/archived`
+        // tab does. Without this carve-out the two predicates
+        // contradict each other and the archived view is always empty.
+        const wantsArchived = Array.isArray(filter.status)
+            ? filter.status.includes(AgentStatus.ARCHIVED)
+            : filter.status === AgentStatus.ARCHIVED;
+
         const qb = this.repository
             .createQueryBuilder('agent')
-            .where('agent.userId = :userId', { userId })
-            .andWhere('agent.status != :archived', { archived: AgentStatus.ARCHIVED });
+            .where('agent.userId = :userId', { userId });
+
+        if (!wantsArchived) {
+            qb.andWhere('agent.status != :archived', { archived: AgentStatus.ARCHIVED });
+        }
 
         if (filter.scope) {
             qb.andWhere('agent.scope = :scope', { scope: filter.scope });
