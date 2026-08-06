@@ -914,6 +914,11 @@
                     "reportsToNone": "マネージャーなし",
                     "save": "保存",
                     "saving": "保存中…"
+                },
+                "danger": {
+                    "title": "危険な操作",
+                    "description": "このエージェントを、予算・メンバーシップ・実行履歴とともに完全に削除します。カタログから外すだけであればアーカイブしてください。",
+                    "delete": "完全に削除"
                 }
             },
             "guardrails": {
@@ -993,7 +998,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "アーカイブ済み"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1016,6 +1022,29 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "アーカイブ済みエージェント",
+                "subtitle": "アーカイブしたエージェントです。実行されず、カタログにも表示されません。復元すると一時停止状態で戻り、削除すると完全に消去されます。",
+                "empty": {
+                    "title": "アーカイブ済みのエージェントはありません",
+                    "subtitle": "設定ページからエージェントをアーカイブすると、ここに移動します。"
+                },
+                "delete": "完全に削除",
+                "deleteAria": "{name} を完全に削除",
+                "unarchive": "復元",
+                "menuAria": "{name} の操作",
+                "unarchiveSuccess": "{name} を復元しました",
+                "unarchiveError": "エージェントを復元できませんでした"
+            },
+            "deleteDialog": {
+                "title": "{name} を削除しますか？",
+                "description": "エージェントと、その予算・メンバーシップ・実行履歴が完全に削除されます。",
+                "hint": "この操作は取り消せません。カタログから隠したいだけの場合はアーカイブしてください。",
+                "cancel": "キャンセル",
+                "confirm": "完全に削除",
+                "success": "{name} を削除しました",
+                "error": "エージェントを削除できませんでした"
             }
         },
         "tasksPage": {

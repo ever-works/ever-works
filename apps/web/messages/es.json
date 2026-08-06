@@ -962,6 +962,11 @@
                     "reportsToNone": "Sin responsable",
                     "save": "Guardar",
                     "saving": "Guardando…"
+                },
+                "danger": {
+                    "title": "Zona de peligro",
+                    "description": "Elimina definitivamente este agente junto con sus presupuestos, membresías e historial de ejecuciones. Archívalo si solo quieres quitarlo del catálogo.",
+                    "delete": "Eliminar definitivamente"
                 }
             },
             "guardrails": {
@@ -1024,7 +1029,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "Archivados"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1047,6 +1053,29 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "Agentes archivados",
+                "subtitle": "Agentes que has archivado. No se ejecutan ni aparecen en el catálogo. Restaura uno para recuperarlo en pausa o elimínalo definitivamente.",
+                "empty": {
+                    "title": "No hay agentes archivados",
+                    "subtitle": "Archivar un agente desde su página de configuración lo mueve aquí."
+                },
+                "delete": "Eliminar definitivamente",
+                "deleteAria": "Eliminar {name} definitivamente",
+                "unarchive": "Restaurar",
+                "menuAria": "Acciones para {name}",
+                "unarchiveSuccess": "{name} restaurado",
+                "unarchiveError": "No se pudo restaurar el agente"
+            },
+            "deleteDialog": {
+                "title": "¿Eliminar {name}?",
+                "description": "Esto elimina definitivamente el agente junto con sus presupuestos, membresías e historial de ejecuciones.",
+                "hint": "Esta acción no se puede deshacer. Archiva el agente si solo quieres ocultarlo del catálogo.",
+                "cancel": "Cancelar",
+                "confirm": "Eliminar definitivamente",
+                "success": "{name} eliminado",
+                "error": "No se pudo eliminar el agente"
             }
         },
         "tasksPage": {

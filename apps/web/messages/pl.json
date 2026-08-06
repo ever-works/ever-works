@@ -914,6 +914,11 @@
                     "reportsToNone": "Brak menedżera",
                     "save": "Zapisz",
                     "saving": "Zapisywanie…"
+                },
+                "danger": {
+                    "title": "Strefa zagrożenia",
+                    "description": "Trwale usuń tego agenta wraz z jego budżetami, członkostwami i historią uruchomień. Zarchiwizuj go, jeśli chcesz tylko usunąć go z katalogu.",
+                    "delete": "Usuń trwale"
                 }
             },
             "guardrails": {
@@ -993,7 +998,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "Zarchiwizowane"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1016,6 +1022,29 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "Zarchiwizowani agenci",
+                "subtitle": "Agenci, których zarchiwizowano. Nie działają i nie pojawiają się w katalogu. Przywróć agenta, aby wrócił jako wstrzymany, albo usuń go trwale.",
+                "empty": {
+                    "title": "Brak zarchiwizowanych agentów",
+                    "subtitle": "Zarchiwizowanie agenta na jego stronie ustawień przenosi go tutaj."
+                },
+                "delete": "Usuń trwale",
+                "deleteAria": "Usuń trwale {name}",
+                "unarchive": "Przywróć",
+                "menuAria": "Akcje dla {name}",
+                "unarchiveSuccess": "Przywrócono {name}",
+                "unarchiveError": "Nie udało się przywrócić agenta"
+            },
+            "deleteDialog": {
+                "title": "Usunąć {name}?",
+                "description": "Ta operacja trwale usuwa agenta wraz z jego budżetami, członkostwami i historią uruchomień.",
+                "hint": "Tej operacji nie można cofnąć. Zarchiwizuj agenta, jeśli chcesz go tylko ukryć w katalogu.",
+                "cancel": "Anuluj",
+                "confirm": "Usuń trwale",
+                "success": "Usunięto {name}",
+                "error": "Nie udało się usunąć agenta"
             }
         },
         "tasksPage": {

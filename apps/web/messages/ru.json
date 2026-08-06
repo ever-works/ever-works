@@ -914,6 +914,11 @@
                     "reportsToNone": "Без менеджера",
                     "save": "Сохранить",
                     "saving": "Сохранение…"
+                },
+                "danger": {
+                    "title": "Опасная зона",
+                    "description": "Удалить этого агента навсегда вместе с его бюджетами, участием в командах и историей запусков. Отправьте его в архив, если хотите лишь убрать его из каталога.",
+                    "delete": "Удалить навсегда"
                 }
             },
             "guardrails": {
@@ -993,7 +998,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "Архив"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1016,6 +1022,29 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "Архивные агенты",
+                "subtitle": "Агенты, отправленные вами в архив. Они не запускаются и не отображаются в каталоге. Восстановите агента — он вернётся на паузе — или удалите его навсегда.",
+                "empty": {
+                    "title": "Архивных агентов нет",
+                    "subtitle": "Архивация агента на странице его настроек перемещает его сюда."
+                },
+                "delete": "Удалить навсегда",
+                "deleteAria": "Удалить {name} навсегда",
+                "unarchive": "Восстановить",
+                "menuAria": "Действия для {name}",
+                "unarchiveSuccess": "{name} восстановлен",
+                "unarchiveError": "Не удалось восстановить агента"
+            },
+            "deleteDialog": {
+                "title": "Удалить {name}?",
+                "description": "Агент, а также его бюджеты, участие в командах и история запусков будут удалены навсегда.",
+                "hint": "Это действие нельзя отменить. Отправьте агента в архив, если хотите только скрыть его из каталога.",
+                "cancel": "Отмена",
+                "confirm": "Удалить навсегда",
+                "success": "{name} удалён",
+                "error": "Не удалось удалить агента"
             }
         },
         "tasksPage": {

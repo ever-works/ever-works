@@ -962,6 +962,11 @@
                     "reportsToNone": "Kein Manager",
                     "save": "Speichern",
                     "saving": "Wird gespeichert…"
+                },
+                "danger": {
+                    "title": "Gefahrenzone",
+                    "description": "Diesen Agenten mitsamt Budgets, Mitgliedschaften und Ausführungsverlauf endgültig löschen. Archiviere ihn stattdessen, wenn du ihn nur aus dem Katalog nehmen möchtest.",
+                    "delete": "Endgültig löschen"
                 }
             },
             "guardrails": {
@@ -1024,7 +1029,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "Archiviert"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1047,6 +1053,29 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "Archivierte Agenten",
+                "subtitle": "Von dir archivierte Agenten. Sie laufen nicht und erscheinen nicht im Katalog. Stelle einen Agenten wieder her – er kehrt pausiert zurück – oder lösche ihn endgültig.",
+                "empty": {
+                    "title": "Keine archivierten Agenten",
+                    "subtitle": "Wenn du einen Agenten auf seiner Einstellungsseite archivierst, erscheint er hier."
+                },
+                "delete": "Endgültig löschen",
+                "deleteAria": "{name} endgültig löschen",
+                "unarchive": "Wiederherstellen",
+                "menuAria": "Aktionen für {name}",
+                "unarchiveSuccess": "{name} wiederhergestellt",
+                "unarchiveError": "Agent konnte nicht wiederhergestellt werden"
+            },
+            "deleteDialog": {
+                "title": "{name} löschen?",
+                "description": "Damit werden der Agent sowie seine Budgets, Mitgliedschaften und sein Ausführungsverlauf endgültig gelöscht.",
+                "hint": "Das lässt sich nicht rückgängig machen. Archiviere den Agenten, wenn du ihn nur aus dem Katalog ausblenden möchtest.",
+                "cancel": "Abbrechen",
+                "confirm": "Endgültig löschen",
+                "success": "{name} gelöscht",
+                "error": "Agent konnte nicht gelöscht werden"
             }
         },
         "tasksPage": {

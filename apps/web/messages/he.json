@@ -962,6 +962,11 @@
                     "reportsToNone": "ללא מנהל",
                     "save": "שמור",
                     "saving": "שומר…"
+                },
+                "danger": {
+                    "title": "אזור מסוכן",
+                    "description": "מחק סוכן זה לצמיתות יחד עם התקציבים, החברויות והיסטוריית ההרצות שלו. העבר אותו לארכיון אם ברצונך רק להסירו מהקטלוג.",
+                    "delete": "מחיקה לצמיתות"
                 }
             },
             "guardrails": {
@@ -1024,7 +1029,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "בארכיון"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1047,6 +1053,29 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "סוכנים בארכיון",
+                "subtitle": "סוכנים שהעברת לארכיון. הם אינם פועלים ואינם מופיעים בקטלוג. שחזר סוכן כדי להחזירו במצב מושהה, או מחק אותו לצמיתות.",
+                "empty": {
+                    "title": "אין סוכנים בארכיון",
+                    "subtitle": "העברת סוכן לארכיון מדף ההגדרות שלו מעבירה אותו לכאן."
+                },
+                "delete": "מחיקה לצמיתות",
+                "deleteAria": "מחיקת {name} לצמיתות",
+                "unarchive": "שחזור",
+                "menuAria": "פעולות עבור {name}",
+                "unarchiveSuccess": "{name} שוחזר",
+                "unarchiveError": "לא ניתן היה לשחזר את הסוכן"
+            },
+            "deleteDialog": {
+                "title": "למחוק את {name}?",
+                "description": "פעולה זו מוחקת לצמיתות את הסוכן ואת התקציבים, החברויות והיסטוריית ההרצות שלו.",
+                "hint": "לא ניתן לבטל פעולה זו. העבר את הסוכן לארכיון אם ברצונך רק להסתירו מהקטלוג.",
+                "cancel": "ביטול",
+                "confirm": "מחיקה לצמיתות",
+                "success": "{name} נמחק",
+                "error": "לא ניתן היה למחוק את הסוכן"
             }
         },
         "tasksPage": {

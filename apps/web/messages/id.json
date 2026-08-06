@@ -914,6 +914,11 @@
                     "reportsToNone": "Tanpa manajer",
                     "save": "Simpan",
                     "saving": "Menyimpan…"
+                },
+                "danger": {
+                    "title": "Zona berbahaya",
+                    "description": "Hapus agen ini secara permanen beserta anggaran, keanggotaan, dan riwayat prosesnya. Arsipkan saja jika Anda hanya ingin mengeluarkannya dari katalog.",
+                    "delete": "Hapus permanen"
                 }
             },
             "guardrails": {
@@ -993,7 +998,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "Diarsipkan"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1016,6 +1022,29 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "Agen yang diarsipkan",
+                "subtitle": "Agen yang Anda arsipkan. Mereka tidak berjalan dan tidak muncul di katalog. Pulihkan agen untuk mengembalikannya dalam status dijeda, atau hapus secara permanen.",
+                "empty": {
+                    "title": "Belum ada agen yang diarsipkan",
+                    "subtitle": "Mengarsipkan agen dari halaman pengaturannya akan memindahkannya ke sini."
+                },
+                "delete": "Hapus permanen",
+                "deleteAria": "Hapus {name} secara permanen",
+                "unarchive": "Pulihkan",
+                "menuAria": "Tindakan untuk {name}",
+                "unarchiveSuccess": "{name} dipulihkan",
+                "unarchiveError": "Tidak dapat memulihkan agen"
+            },
+            "deleteDialog": {
+                "title": "Hapus {name}?",
+                "description": "Tindakan ini menghapus agen beserta anggaran, keanggotaan, dan riwayat prosesnya secara permanen.",
+                "hint": "Tindakan ini tidak dapat dibatalkan. Arsipkan agen jika Anda hanya ingin menyembunyikannya dari katalog.",
+                "cancel": "Batal",
+                "confirm": "Hapus permanen",
+                "success": "{name} dihapus",
+                "error": "Tidak dapat menghapus agen"
             }
         },
         "tasksPage": {

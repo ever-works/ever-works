@@ -1047,6 +1047,11 @@
                     "reportsToNone": "No manager",
                     "save": "Save",
                     "saving": "Saving…"
+                },
+                "danger": {
+                    "title": "Danger zone",
+                    "description": "Permanently delete this agent along with its budgets, memberships and run history. Archive it instead if you only want to take it out of the catalog.",
+                    "delete": "Delete permanently"
                 }
             },
             "guardrails": {
@@ -1076,7 +1081,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "Archived"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1099,6 +1105,29 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "Archived agents",
+                "subtitle": "Agents you archived. They don't run and don't appear in the catalog. Restore one to bring it back paused, or delete it permanently.",
+                "empty": {
+                    "title": "No archived agents",
+                    "subtitle": "Archiving an agent from its settings page moves it here."
+                },
+                "delete": "Delete permanently",
+                "deleteAria": "Delete {name} permanently",
+                "unarchive": "Restore",
+                "menuAria": "Actions for {name}",
+                "unarchiveSuccess": "{name} restored",
+                "unarchiveError": "Could not restore agent"
+            },
+            "deleteDialog": {
+                "title": "Delete {name}?",
+                "description": "This permanently deletes the agent along with its budgets, memberships and run history.",
+                "hint": "This can't be undone. Archive the agent instead if you only want to hide it from the catalog.",
+                "cancel": "Cancel",
+                "confirm": "Delete permanently",
+                "success": "{name} deleted",
+                "error": "Could not delete agent"
             }
         },
         "tasksPage": {

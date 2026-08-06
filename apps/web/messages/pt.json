@@ -914,6 +914,11 @@
                     "reportsToNone": "Sem gerente",
                     "save": "Salvar",
                     "saving": "Salvando…"
+                },
+                "danger": {
+                    "title": "Zona de perigo",
+                    "description": "Exclua definitivamente este agente junto com seus orçamentos, associações e histórico de execuções. Arquive-o se quiser apenas tirá-lo do catálogo.",
+                    "delete": "Excluir definitivamente"
                 }
             },
             "guardrails": {
@@ -993,7 +998,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "Arquivados"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1016,6 +1022,29 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "Agentes arquivados",
+                "subtitle": "Agentes que você arquivou. Eles não são executados e não aparecem no catálogo. Restaure um para trazê-lo de volta pausado ou exclua-o definitivamente.",
+                "empty": {
+                    "title": "Nenhum agente arquivado",
+                    "subtitle": "Arquivar um agente na página de configurações dele o move para cá."
+                },
+                "delete": "Excluir definitivamente",
+                "deleteAria": "Excluir {name} definitivamente",
+                "unarchive": "Restaurar",
+                "menuAria": "Ações para {name}",
+                "unarchiveSuccess": "{name} restaurado",
+                "unarchiveError": "Não foi possível restaurar o agente"
+            },
+            "deleteDialog": {
+                "title": "Excluir {name}?",
+                "description": "Isto exclui definitivamente o agente junto com seus orçamentos, associações e histórico de execuções.",
+                "hint": "Esta ação não pode ser desfeita. Arquive o agente se quiser apenas ocultá-lo do catálogo.",
+                "cancel": "Cancelar",
+                "confirm": "Excluir definitivamente",
+                "success": "{name} excluído",
+                "error": "Não foi possível excluir o agente"
             }
         },
         "tasksPage": {

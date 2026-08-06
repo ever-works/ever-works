@@ -914,6 +914,11 @@
                     "reportsToNone": "Yönetici yok",
                     "save": "Kaydet",
                     "saving": "Kaydediliyor…"
+                },
+                "danger": {
+                    "title": "Tehlikeli bölge",
+                    "description": "Bu ajanı bütçeleri, üyelikleri ve çalışma geçmişiyle birlikte kalıcı olarak silin. Yalnızca katalogdan çıkarmak istiyorsanız arşivleyin.",
+                    "delete": "Kalıcı olarak sil"
                 }
             },
             "guardrails": {
@@ -993,7 +998,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "Arşivlenenler"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1016,6 +1022,29 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "Arşivlenen ajanlar",
+                "subtitle": "Arşivlediğiniz ajanlar. Çalışmazlar ve katalogda görünmezler. Bir ajanı geri yükleyerek duraklatılmış olarak geri getirin veya kalıcı olarak silin.",
+                "empty": {
+                    "title": "Arşivlenmiş ajan yok",
+                    "subtitle": "Bir ajanı ayarlar sayfasından arşivlemek onu buraya taşır."
+                },
+                "delete": "Kalıcı olarak sil",
+                "deleteAria": "{name} ajanını kalıcı olarak sil",
+                "unarchive": "Geri yükle",
+                "menuAria": "{name} için işlemler",
+                "unarchiveSuccess": "{name} geri yüklendi",
+                "unarchiveError": "Ajan geri yüklenemedi"
+            },
+            "deleteDialog": {
+                "title": "{name} silinsin mi?",
+                "description": "Bu işlem ajanı; bütçeleri, üyelikleri ve çalışma geçmişiyle birlikte kalıcı olarak siler.",
+                "hint": "Bu işlem geri alınamaz. Yalnızca katalogdan gizlemek istiyorsanız ajanı arşivleyin.",
+                "cancel": "İptal",
+                "confirm": "Kalıcı olarak sil",
+                "success": "{name} silindi",
+                "error": "Ajan silinemedi"
             }
         },
         "tasksPage": {

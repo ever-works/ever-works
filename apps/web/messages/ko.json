@@ -914,6 +914,11 @@
                     "reportsToNone": "관리자 없음",
                     "save": "저장",
                     "saving": "저장 중…"
+                },
+                "danger": {
+                    "title": "위험 구역",
+                    "description": "이 에이전트를 예산, 멤버십, 실행 기록과 함께 영구적으로 삭제합니다. 카탈로그에서만 제외하려면 보관하세요.",
+                    "delete": "영구 삭제"
                 }
             },
             "guardrails": {
@@ -993,7 +998,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "보관됨"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1016,6 +1022,29 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "보관된 에이전트",
+                "subtitle": "보관한 에이전트입니다. 실행되지 않고 카탈로그에도 표시되지 않습니다. 복원하면 일시중지 상태로 돌아오며, 삭제하면 영구적으로 제거됩니다.",
+                "empty": {
+                    "title": "보관된 에이전트가 없습니다",
+                    "subtitle": "설정 페이지에서 에이전트를 보관하면 여기로 이동합니다."
+                },
+                "delete": "영구 삭제",
+                "deleteAria": "{name} 영구 삭제",
+                "unarchive": "복원",
+                "menuAria": "{name} 작업",
+                "unarchiveSuccess": "{name}이(가) 복원되었습니다",
+                "unarchiveError": "에이전트를 복원할 수 없습니다"
+            },
+            "deleteDialog": {
+                "title": "{name}을(를) 삭제할까요?",
+                "description": "에이전트와 예산, 멤버십, 실행 기록이 영구적으로 삭제됩니다.",
+                "hint": "이 작업은 되돌릴 수 없습니다. 카탈로그에서 숨기기만 하려면 에이전트를 보관하세요.",
+                "cancel": "취소",
+                "confirm": "영구 삭제",
+                "success": "{name}이(가) 삭제되었습니다",
+                "error": "에이전트를 삭제할 수 없습니다"
             }
         },
         "tasksPage": {

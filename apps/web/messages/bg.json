@@ -962,6 +962,11 @@
                     "reportsToNone": "Без мениджър",
                     "save": "Запазване",
                     "saving": "Запазване…"
+                },
+                "danger": {
+                    "title": "Опасна зона",
+                    "description": "Изтрийте този агент завинаги заедно с бюджетите, членствата и историята на изпълненията му. Архивирайте го, ако само искате да го премахнете от каталога.",
+                    "delete": "Изтрий завинаги"
                 }
             },
             "guardrails": {
@@ -1024,7 +1029,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "Архивирани"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1047,6 +1053,29 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "Архивирани агенти",
+                "subtitle": "Агенти, които сте архивирали. Те не се изпълняват и не се показват в каталога. Възстановете агент, за да се върне на пауза, или го изтрийте завинаги.",
+                "empty": {
+                    "title": "Няма архивирани агенти",
+                    "subtitle": "Архивирането на агент от страницата с неговите настройки го премества тук."
+                },
+                "delete": "Изтрий завинаги",
+                "deleteAria": "Изтрий {name} завинаги",
+                "unarchive": "Възстанови",
+                "menuAria": "Действия за {name}",
+                "unarchiveSuccess": "{name} е възстановен",
+                "unarchiveError": "Агентът не можа да бъде възстановен"
+            },
+            "deleteDialog": {
+                "title": "Да се изтрие ли {name}?",
+                "description": "Това изтрива завинаги агента, както и бюджетите, членствата и историята на изпълненията му.",
+                "hint": "Действието е необратимо. Архивирайте агента, ако само искате да го скриете от каталога.",
+                "cancel": "Отказ",
+                "confirm": "Изтрий завинаги",
+                "success": "{name} е изтрит",
+                "error": "Агентът не можа да бъде изтрит"
             }
         },
         "tasksPage": {
