@@ -1026,7 +1026,7 @@
                 "subtitle": "Taken komen in een latere fase van de Agents/Skills/Tasks uitrol. De pagina is gereserveerd zodat de zijbalk navigatie route werkt."
             },
             "scopedSection": {
-                "addExisting": "Bestaande toevoegen",
+                "addExisting": "Bestaande Taak toevoegen",
                 "assignTitle": "Een bestaande Taak toevoegen",
                 "assignSubtitle": "Kies een Taak uit je backlog in plaats van een nieuwe te maken.",
                 "assignSearchPlaceholder": "Taken zoeken…",
@@ -1045,7 +1045,7 @@
                 "rowMenuColumn": "Acties",
                 "rowMenuLabel": "Acties voor {title}",
                 "removeMenuItem": "Uit deze lijst verwijderen",
-                "confirmTitle": "Deze Taak verwijderen?",
+                "confirmTitle": "Deze Taak uit deze lijst verwijderen?",
                 "confirmBody": "{title} wordt uit deze lijst verwijderd. De Taak zelf blijft bestaan en kan later opnieuw worden toegevoegd.",
                 "confirmCancel": "Annuleren",
                 "confirmSubmit": "Verwijderen",

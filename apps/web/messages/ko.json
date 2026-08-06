@@ -1026,7 +1026,7 @@
                 "subtitle": "작업은 에이전트/기술/작업 롤아웃의 후반 단계에서 제공됩니다. 페이지는 사이드바 네비게이션 경로가 해결되도록 예약되어 있습니다."
             },
             "scopedSection": {
-                "addExisting": "기존 항목 추가",
+                "addExisting": "기존 작업 추가",
                 "assignTitle": "기존 작업 추가",
                 "assignSubtitle": "새로 만드는 대신 백로그에서 작업을 선택하세요.",
                 "assignSearchPlaceholder": "작업 검색…",
