@@ -22,33 +22,28 @@ vi.mock('sonner', () => ({
 
 vi.mock('@/app/actions/tasks', () => ({
     unassignTaskFromScopeAction: vi.fn(),
-    transitionTaskAction: vi.fn(),
 }));
 
-import type { TaskStatus } from '@/lib/api/tasks';
 import { TaskScopeRowMenu } from './TaskScopeRowMenu';
-import { transitionTaskAction, unassignTaskFromScopeAction } from '@/app/actions/tasks';
+import { unassignTaskFromScopeAction } from '@/app/actions/tasks';
 
 /** The mocked `useTranslations` renders every key as `namespace.key`. */
 const T = 'dashboard.tasksPage.scopedSection';
 
-function renderMenu(props: { status?: TaskStatus } = {}) {
+function renderMenu() {
     render(
         <TaskScopeRowMenu
             taskId="task-1"
             taskTitle="Ship the pricing page"
-            taskStatus={props.status ?? 'todo'}
             scopeKey="missionId"
             scopeId="m1"
         />,
     );
 }
 
-const openMenu = () => fireEvent.click(screen.getByRole('button', { name: `${T}.rowMenuLabel` }));
-
-/** Open the kebab, then pick its detach item. */
+/** Open the kebab, then pick its only item. */
 async function openConfirm() {
-    openMenu();
+    fireEvent.click(screen.getByRole('button', { name: `${T}.rowMenuLabel` }));
     await waitFor(() => expect(screen.getByText(`${T}.removeMenuItem`)).toBeTruthy());
     fireEvent.click(screen.getByText(`${T}.removeMenuItem`));
     await waitFor(() => expect(screen.getByText(`${T}.confirmTitle`)).toBeTruthy());
@@ -61,63 +56,6 @@ describe('TaskScopeRowMenu', () => {
             ok: true,
             task: { id: 'task-1' } as never,
         });
-        vi.mocked(transitionTaskAction).mockResolvedValue({ id: 'task-1' } as never);
-    });
-
-    it('offers the one move each status is actually reached for', async () => {
-        // `backlog` cannot jump to in_progress under the server's state
-        // machine, so its slot must read as the legal move, not "Start".
-        renderMenu({ status: 'backlog' });
-        openMenu();
-
-        await waitFor(() => expect(screen.getByText(`${T}.moveToTodoMenuItem`)).toBeTruthy());
-        expect(screen.queryByText(`${T}.startMenuItem`)).toBeNull();
-    });
-
-    it('offers no move on a terminal Task, so the menu is never a lone red verb', async () => {
-        renderMenu({ status: 'cancelled' });
-        openMenu();
-
-        await waitFor(() => expect(screen.getByText(`${T}.openMenuItem`)).toBeTruthy());
-        expect(screen.getByText(`${T}.removeMenuItem`)).toBeTruthy();
-        for (const key of ['moveToTodoMenuItem', 'startMenuItem', 'markDoneMenuItem']) {
-            expect(screen.queryByText(`${T}.${key}`)).toBeNull();
-        }
-    });
-
-    it('starts a todo Task from the menu, then refreshes', async () => {
-        renderMenu({ status: 'todo' });
-        openMenu();
-        await waitFor(() => expect(screen.getByText(`${T}.startMenuItem`)).toBeTruthy());
-        fireEvent.click(screen.getByText(`${T}.startMenuItem`));
-
-        await waitFor(() =>
-            expect(transitionTaskAction).toHaveBeenCalledWith('task-1', 'in_progress'),
-        );
-        expect(toastSuccess).toHaveBeenCalledWith(`${T}.statusUpdatedToast`);
-        expect(routerRefreshMock).toHaveBeenCalled();
-    });
-
-    it('closes an in-progress Task from the same slot', async () => {
-        renderMenu({ status: 'in_progress' });
-        openMenu();
-        await waitFor(() => expect(screen.getByText(`${T}.markDoneMenuItem`)).toBeTruthy());
-        fireEvent.click(screen.getByText(`${T}.markDoneMenuItem`));
-
-        await waitFor(() => expect(transitionTaskAction).toHaveBeenCalledWith('task-1', 'done'));
-    });
-
-    it("reports the server's gate refusal instead of pretending the move landed", async () => {
-        vi.mocked(transitionTaskAction).mockRejectedValue(new Error('Task has 2 open blocker(s)'));
-
-        renderMenu({ status: 'in_progress' });
-        openMenu();
-        await waitFor(() => expect(screen.getByText(`${T}.markDoneMenuItem`)).toBeTruthy());
-        fireEvent.click(screen.getByText(`${T}.markDoneMenuItem`));
-
-        await waitFor(() => expect(toastError).toHaveBeenCalledWith('Task has 2 open blocker(s)'));
-        expect(toastSuccess).not.toHaveBeenCalled();
-        expect(routerRefreshMock).not.toHaveBeenCalled();
     });
 
     it('asks in a dialog before detaching, never on the menu click alone', async () => {
