@@ -92,7 +92,19 @@ export async function archiveAgentAction(id: string): Promise<{ archived?: true;
     await ensureAuth();
     const res = await agentsAPI.archive(id);
     revalidatePath('/agents');
+    // The archived tab gains a row on archive and loses one on hard
+    // delete — both lists must be refetched, not just the catalog.
+    revalidatePath('/agents/archived');
     return res;
+}
+
+export async function unarchiveAgentAction(id: string): Promise<Agent> {
+    await ensureAuth();
+    const agent = await agentsAPI.unarchive(id);
+    revalidatePath('/agents');
+    revalidatePath('/agents/archived');
+    revalidatePath(`/agents/${id}`);
+    return agent;
 }
 
 export async function deleteAgentHardAction(
@@ -101,6 +113,7 @@ export async function deleteAgentHardAction(
     await ensureAuth();
     const res = await agentsAPI.deleteHard(id);
     revalidatePath('/agents');
+    revalidatePath('/agents/archived');
     return res;
 }
 
