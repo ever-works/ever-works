@@ -576,6 +576,27 @@ export class AgentsController {
         return dto;
     }
 
+    @Post(':id/unarchive')
+    @ApiOperation({
+        summary:
+            'Restore an archived Agent (ARCHIVED → PAUSED). Lands on PAUSED, not ACTIVE, so a cron-cadence Agent does not resume firing heartbeats on restore.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async unarchive(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<AgentDto> {
+        const dto = await this.service.unarchive(auth.userId, id);
+        void this.tryLog({
+            userId: auth.userId,
+            agentId: id,
+            actionType: ActivityActionType.AGENT_UNARCHIVED,
+            details: { status: dto.status },
+        });
+        return dto;
+    }
+
     // ── Phase 4 — Agent file storage (5 canonical MD files + agent.yml) ─
 
     @Get(':id/files/:name')

@@ -743,6 +743,29 @@ export class AgentsService {
         return this.transition(userId, id, AgentStatus.ACTIVE);
     }
 
+    /**
+     * Inverse of `archive`. Deliberately NOT routed through
+     * `transition`/`USER_TRANSITIONS`: opening ARCHIVED in that table
+     * would also make `pause`/`resume` silently un-archive an Agent.
+     * This is its own explicit move, and it lands on PAUSED rather
+     * than ACTIVE so an Agent with a cron cadence never resumes firing
+     * heartbeats as a side effect of being pulled out of the archive —
+     * the operator activates it deliberately afterwards.
+     */
+    async unarchive(userId: string, id: string): Promise<AgentDto> {
+        const agent = await this.requireOwned(userId, id);
+        if (agent.status !== AgentStatus.ARCHIVED) {
+            throw new BadRequestException('Only archived Agents can be unarchived.');
+        }
+        const ok = await this.agents.transitionStatus(id, AgentStatus.ARCHIVED, AgentStatus.PAUSED);
+        if (!ok) {
+            throw new ConflictException('Agent status changed between read and write — retry.');
+        }
+        const refreshed = await this.agents.findById(id);
+        if (!refreshed) throw new NotFoundException('Agent vanished after unarchive');
+        return toAgentDto(refreshed);
+    }
+
     async archive(userId: string, id: string): Promise<{ archived: true }> {
         await this.requireOwned(userId, id);
         await this.agents.archiveById(id);
