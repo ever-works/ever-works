@@ -2,7 +2,17 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
-import { Archive, Building2, Cpu, IdCard, Pause, Play, Save, ShieldCheck } from 'lucide-react';
+import {
+    Archive,
+    Building2,
+    Cpu,
+    IdCard,
+    Pause,
+    Play,
+    Save,
+    ShieldCheck,
+    Trash2,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -20,6 +30,7 @@ import {
 // card's Team select (v1 UI: one team per Agent).
 import { addTeamMemberAction, removeTeamMemberAction } from '@/app/actions/dashboard/teams';
 import { AgentScorecardCard } from '@/components/agents/AgentScorecardCard';
+import { DeleteAgentDialog } from '@/components/agents/DeleteAgentDialog';
 import { MergePolicyCard } from '@/components/policy/MergePolicyCard';
 import type { MergePolicyOverride } from '@ever-works/contracts';
 import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select';
@@ -113,6 +124,11 @@ export function AgentSettingsClient({
     );
     const [pauseAfterFailures, setPauseAfterFailures] = useState(String(agent.pauseAfterFailures));
     const [permissions, setPermissions] = useState<AgentPermissions>(agent.permissions);
+    // Permanent delete lives behind a confirmation dialog (not the
+    // `window.confirm` the archive path uses) — it is the only
+    // irreversible action on this page.
+    const tDanger = useTranslations('dashboard.agentsPage.settings.danger');
+    const [isDeleteOpen, setIsDeleteOpen] = useState(false);
 
     // Teams & Companies spec §4.3 — Organization card state. Explicit
     // isSubmitting (house rule for detached-async submits), '' = none.
@@ -586,6 +602,47 @@ export function AgentSettingsClient({
 
             {/* Scorecard (Agent Scorecards increment 1 — additive section) */}
             <AgentScorecardCard agent={agent} />
+
+            {/* Danger zone — permanent delete. Kept apart from the
+                Identity header's Archive so the reversible action and
+                the irreversible one are never adjacent. */}
+            <section className="rounded-xl border border-danger/30 bg-card dark:bg-card-primary-dark p-5">
+                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                    <div className="flex items-start gap-3">
+                        <div className="shrink-0 w-9 h-9 rounded-lg bg-danger/10 border border-danger/20 flex items-center justify-center">
+                            <Trash2 className="w-4 h-4 text-danger" />
+                        </div>
+                        <div>
+                            <h2 className="text-sm font-medium text-text dark:text-text-dark">
+                                {tDanger('title')}
+                            </h2>
+                            <p className="text-xs text-text-muted dark:text-text-muted-dark max-w-2xl">
+                                {tDanger('description')}
+                            </p>
+                        </div>
+                    </div>
+                    <Button
+                        variant="danger"
+                        size="sm"
+                        onClick={() => setIsDeleteOpen(true)}
+                        className="gap-1.5 px-2.5 py-1 text-xs shrink-0"
+                        data-testid="agent-settings-delete"
+                    >
+                        <Trash2 className="h-3.5 w-3.5" />
+                        {tDanger('delete')}
+                    </Button>
+                </div>
+            </section>
+
+            <DeleteAgentDialog
+                agent={agent}
+                open={isDeleteOpen}
+                onOpenChange={setIsDeleteOpen}
+                onDeleted={() => {
+                    router.push('/agents');
+                    router.refresh();
+                }}
+            />
         </div>
     );
 }
