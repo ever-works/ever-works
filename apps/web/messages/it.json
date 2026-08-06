@@ -906,6 +906,13 @@
                 "nextDisabledReason": "Pick a parent or choose Workspace scope to continue."
             },
             "settings": {
+                "identity": {
+                    "pause": "Pausa",
+                    "resume": "Riprendi",
+                    "activate": "Attiva",
+                    "archive": "Archivia",
+                    "delete": "Elimina"
+                },
                 "orgCard": {
                     "title": "Organizzazione",
                     "teamLabel": "Team",
@@ -914,11 +921,6 @@
                     "reportsToNone": "Nessun manager",
                     "save": "Salva",
                     "saving": "Salvataggio…"
-                },
-                "danger": {
-                    "title": "Zona pericolosa",
-                    "description": "Elimina definitivamente questo agente insieme ai suoi budget, alle appartenenze e alla cronologia delle esecuzioni. Archivialo se vuoi soltanto toglierlo dal catalogo.",
-                    "delete": "Elimina definitivamente"
                 }
             },
             "guardrails": {
@@ -1036,6 +1038,15 @@
                 "menuAria": "Azioni per {name}",
                 "unarchiveSuccess": "{name} ripristinato",
                 "unarchiveError": "Impossibile ripristinare l'agente"
+            },
+            "archiveDialog": {
+                "title": "Archiviare {name}?",
+                "description": "L'agente smette di funzionare ed esce dal catalogo. Esecuzioni, budget e appartenenze vengono conservati.",
+                "hint": "Puoi ripristinarlo dalla scheda Archiviati in qualsiasi momento: torna in pausa.",
+                "cancel": "Annulla",
+                "confirm": "Archivia agente",
+                "success": "{name} archiviato",
+                "error": "Impossibile archiviare l'agente"
             },
             "deleteDialog": {
                 "title": "Eliminare {name}?",

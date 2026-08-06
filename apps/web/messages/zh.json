@@ -906,6 +906,13 @@
                 "nextDisabledReason": "Pick a parent or choose Workspace scope to continue."
             },
             "settings": {
+                "identity": {
+                    "pause": "暂停",
+                    "resume": "恢复",
+                    "activate": "激活",
+                    "archive": "归档",
+                    "delete": "删除"
+                },
                 "orgCard": {
                     "title": "组织",
                     "teamLabel": "团队",
@@ -914,11 +921,6 @@
                     "reportsToNone": "无管理者",
                     "save": "保存",
                     "saving": "保存中…"
-                },
-                "danger": {
-                    "title": "危险区域",
-                    "description": "永久删除该代理及其预算、成员关系和运行记录。如果只想将其移出目录，请改为归档。",
-                    "delete": "永久删除"
                 }
             },
             "guardrails": {
@@ -1036,6 +1038,15 @@
                 "menuAria": "{name} 的操作",
                 "unarchiveSuccess": "已恢复 {name}",
                 "unarchiveError": "无法恢复该代理"
+            },
+            "archiveDialog": {
+                "title": "归档 {name}？",
+                "description": "该代理将停止运行并从目录中移除。其运行记录、预算和团队成员关系都会保留。",
+                "hint": "你可以随时在“已归档”标签页中恢复它——恢复后处于暂停状态。",
+                "cancel": "取消",
+                "confirm": "归档代理",
+                "success": "已归档 {name}",
+                "error": "无法归档代理"
             },
             "deleteDialog": {
                 "title": "确定删除 {name}？",

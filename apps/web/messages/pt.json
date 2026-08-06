@@ -906,6 +906,13 @@
                 "nextDisabledReason": "Pick a parent or choose Workspace scope to continue."
             },
             "settings": {
+                "identity": {
+                    "pause": "Pausar",
+                    "resume": "Retomar",
+                    "activate": "Ativar",
+                    "archive": "Arquivar",
+                    "delete": "Excluir"
+                },
                 "orgCard": {
                     "title": "Organização",
                     "teamLabel": "Equipe",
@@ -914,11 +921,6 @@
                     "reportsToNone": "Sem gerente",
                     "save": "Salvar",
                     "saving": "Salvando…"
-                },
-                "danger": {
-                    "title": "Zona de perigo",
-                    "description": "Exclua definitivamente este agente junto com seus orçamentos, associações e histórico de execuções. Arquive-o se quiser apenas tirá-lo do catálogo.",
-                    "delete": "Excluir definitivamente"
                 }
             },
             "guardrails": {
@@ -1036,6 +1038,15 @@
                 "menuAria": "Ações para {name}",
                 "unarchiveSuccess": "{name} restaurado",
                 "unarchiveError": "Não foi possível restaurar o agente"
+            },
+            "archiveDialog": {
+                "title": "Arquivar {name}?",
+                "description": "O agente para de executar e sai do catálogo. As execuções, os orçamentos e as associações são mantidos.",
+                "hint": "Você pode restaurá-lo na aba Arquivados a qualquer momento — ele volta pausado.",
+                "cancel": "Cancelar",
+                "confirm": "Arquivar agente",
+                "success": "{name} arquivado",
+                "error": "Não foi possível arquivar o agente"
             },
             "deleteDialog": {
                 "title": "Excluir {name}?",

@@ -954,6 +954,13 @@
                 "openInWizard": "Assistent öffnen"
             },
             "settings": {
+                "identity": {
+                    "pause": "Pausieren",
+                    "resume": "Fortsetzen",
+                    "activate": "Aktivieren",
+                    "archive": "Archivieren",
+                    "delete": "Löschen"
+                },
                 "orgCard": {
                     "title": "Organisation",
                     "teamLabel": "Team",
@@ -962,11 +969,6 @@
                     "reportsToNone": "Kein Manager",
                     "save": "Speichern",
                     "saving": "Wird gespeichert…"
-                },
-                "danger": {
-                    "title": "Gefahrenzone",
-                    "description": "Diesen Agenten mitsamt Budgets, Mitgliedschaften und Ausführungsverlauf endgültig löschen. Archiviere ihn stattdessen, wenn du ihn nur aus dem Katalog nehmen möchtest.",
-                    "delete": "Endgültig löschen"
                 }
             },
             "guardrails": {
@@ -1067,6 +1069,15 @@
                 "menuAria": "Aktionen für {name}",
                 "unarchiveSuccess": "{name} wiederhergestellt",
                 "unarchiveError": "Agent konnte nicht wiederhergestellt werden"
+            },
+            "archiveDialog": {
+                "title": "{name} archivieren?",
+                "description": "Der Agent läuft nicht mehr und verschwindet aus dem Katalog. Ausführungen, Budgets und Mitgliedschaften bleiben erhalten.",
+                "hint": "Du kannst ihn jederzeit im Tab „Archiviert“ wiederherstellen – er kehrt pausiert zurück.",
+                "cancel": "Abbrechen",
+                "confirm": "Agent archivieren",
+                "success": "{name} archiviert",
+                "error": "Agent konnte nicht archiviert werden"
             },
             "deleteDialog": {
                 "title": "{name} löschen?",

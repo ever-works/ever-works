@@ -906,6 +906,13 @@
                 "nextDisabledReason": "Pick a parent or choose Workspace scope to continue."
             },
             "settings": {
+                "identity": {
+                    "pause": "Jeda",
+                    "resume": "Lanjutkan",
+                    "activate": "Aktifkan",
+                    "archive": "Arsipkan",
+                    "delete": "Hapus"
+                },
                 "orgCard": {
                     "title": "Organisasi",
                     "teamLabel": "Tim",
@@ -914,11 +921,6 @@
                     "reportsToNone": "Tanpa manajer",
                     "save": "Simpan",
                     "saving": "Menyimpan…"
-                },
-                "danger": {
-                    "title": "Zona berbahaya",
-                    "description": "Hapus agen ini secara permanen beserta anggaran, keanggotaan, dan riwayat prosesnya. Arsipkan saja jika Anda hanya ingin mengeluarkannya dari katalog.",
-                    "delete": "Hapus permanen"
                 }
             },
             "guardrails": {
@@ -1036,6 +1038,15 @@
                 "menuAria": "Tindakan untuk {name}",
                 "unarchiveSuccess": "{name} dipulihkan",
                 "unarchiveError": "Tidak dapat memulihkan agen"
+            },
+            "archiveDialog": {
+                "title": "Arsipkan {name}?",
+                "description": "Agen berhenti berjalan dan tidak lagi muncul di katalog. Riwayat run, anggaran, dan keanggotaannya tetap disimpan.",
+                "hint": "Anda dapat memulihkannya dari tab Arsip kapan saja — agen kembali dalam status dijeda.",
+                "cancel": "Batal",
+                "confirm": "Arsipkan agen",
+                "success": "{name} diarsipkan",
+                "error": "Tidak dapat mengarsipkan agen"
             },
             "deleteDialog": {
                 "title": "Hapus {name}?",

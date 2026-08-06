@@ -1039,6 +1039,13 @@
                 "openInWizard": "Open in wizard"
             },
             "settings": {
+                "identity": {
+                    "pause": "Pause",
+                    "resume": "Resume",
+                    "activate": "Activate",
+                    "archive": "Archive",
+                    "delete": "Delete"
+                },
                 "orgCard": {
                     "title": "Organization",
                     "teamLabel": "Team",
@@ -1047,11 +1054,6 @@
                     "reportsToNone": "No manager",
                     "save": "Save",
                     "saving": "Saving…"
-                },
-                "danger": {
-                    "title": "Danger zone",
-                    "description": "Permanently delete this agent along with its budgets, memberships and run history. Archive it instead if you only want to take it out of the catalog.",
-                    "delete": "Delete permanently"
                 }
             },
             "guardrails": {
@@ -1119,6 +1121,15 @@
                 "menuAria": "Actions for {name}",
                 "unarchiveSuccess": "{name} restored",
                 "unarchiveError": "Could not restore agent"
+            },
+            "archiveDialog": {
+                "title": "Archive {name}?",
+                "description": "The agent stops running and leaves the catalog. Its runs, budgets and memberships are kept.",
+                "hint": "You can restore it from the Archived tab at any time — it comes back paused.",
+                "cancel": "Cancel",
+                "confirm": "Archive agent",
+                "success": "{name} archived",
+                "error": "Could not archive agent"
             },
             "deleteDialog": {
                 "title": "Delete {name}?",

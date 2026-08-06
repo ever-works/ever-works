@@ -954,6 +954,13 @@
                 "openInWizard": "Abrir en el asistente"
             },
             "settings": {
+                "identity": {
+                    "pause": "Pausar",
+                    "resume": "Reanudar",
+                    "activate": "Activar",
+                    "archive": "Archivar",
+                    "delete": "Eliminar"
+                },
                 "orgCard": {
                     "title": "Organización",
                     "teamLabel": "Equipo",
@@ -962,11 +969,6 @@
                     "reportsToNone": "Sin responsable",
                     "save": "Guardar",
                     "saving": "Guardando…"
-                },
-                "danger": {
-                    "title": "Zona de peligro",
-                    "description": "Elimina definitivamente este agente junto con sus presupuestos, membresías e historial de ejecuciones. Archívalo si solo quieres quitarlo del catálogo.",
-                    "delete": "Eliminar definitivamente"
                 }
             },
             "guardrails": {
@@ -1067,6 +1069,15 @@
                 "menuAria": "Acciones para {name}",
                 "unarchiveSuccess": "{name} restaurado",
                 "unarchiveError": "No se pudo restaurar el agente"
+            },
+            "archiveDialog": {
+                "title": "¿Archivar {name}?",
+                "description": "El agente deja de ejecutarse y desaparece del catálogo. Se conservan sus ejecuciones, presupuestos y membresías.",
+                "hint": "Puedes restaurarlo desde la pestaña Archivados en cualquier momento: volverá en pausa.",
+                "cancel": "Cancelar",
+                "confirm": "Archivar agente",
+                "success": "{name} archivado",
+                "error": "No se pudo archivar el agente"
             },
             "deleteDialog": {
                 "title": "¿Eliminar {name}?",

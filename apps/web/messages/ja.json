@@ -906,6 +906,13 @@
                 "nextDisabledReason": "Pick a parent or choose Workspace scope to continue."
             },
             "settings": {
+                "identity": {
+                    "pause": "一時停止",
+                    "resume": "再開",
+                    "activate": "有効化",
+                    "archive": "アーカイブ",
+                    "delete": "削除"
+                },
                 "orgCard": {
                     "title": "組織",
                     "teamLabel": "チーム",
@@ -914,11 +921,6 @@
                     "reportsToNone": "マネージャーなし",
                     "save": "保存",
                     "saving": "保存中…"
-                },
-                "danger": {
-                    "title": "危険な操作",
-                    "description": "このエージェントを、予算・メンバーシップ・実行履歴とともに完全に削除します。カタログから外すだけであればアーカイブしてください。",
-                    "delete": "完全に削除"
                 }
             },
             "guardrails": {
@@ -1036,6 +1038,15 @@
                 "menuAria": "{name} の操作",
                 "unarchiveSuccess": "{name} を復元しました",
                 "unarchiveError": "エージェントを復元できませんでした"
+            },
+            "archiveDialog": {
+                "title": "{name} をアーカイブしますか？",
+                "description": "エージェントは実行を停止し、カタログから外れます。実行履歴、予算、メンバーシップは保持されます。",
+                "hint": "アーカイブタブからいつでも復元できます。復元後は一時停止状態で戻ります。",
+                "cancel": "キャンセル",
+                "confirm": "エージェントをアーカイブ",
+                "success": "{name} をアーカイブしました",
+                "error": "エージェントをアーカイブできませんでした"
             },
             "deleteDialog": {
                 "title": "{name} を削除しますか？",

@@ -906,6 +906,13 @@
                 "nextDisabledReason": "Pick a parent or choose Workspace scope to continue."
             },
             "settings": {
+                "identity": {
+                    "pause": "Duraklat",
+                    "resume": "Sürdür",
+                    "activate": "Etkinleştir",
+                    "archive": "Arşivle",
+                    "delete": "Sil"
+                },
                 "orgCard": {
                     "title": "Organizasyon",
                     "teamLabel": "Ekip",
@@ -914,11 +921,6 @@
                     "reportsToNone": "Yönetici yok",
                     "save": "Kaydet",
                     "saving": "Kaydediliyor…"
-                },
-                "danger": {
-                    "title": "Tehlikeli bölge",
-                    "description": "Bu ajanı bütçeleri, üyelikleri ve çalışma geçmişiyle birlikte kalıcı olarak silin. Yalnızca katalogdan çıkarmak istiyorsanız arşivleyin.",
-                    "delete": "Kalıcı olarak sil"
                 }
             },
             "guardrails": {
@@ -1036,6 +1038,15 @@
                 "menuAria": "{name} için işlemler",
                 "unarchiveSuccess": "{name} geri yüklendi",
                 "unarchiveError": "Ajan geri yüklenemedi"
+            },
+            "archiveDialog": {
+                "title": "{name} arşivlensin mi?",
+                "description": "Ajan çalışmayı durdurur ve katalogdan çıkar. Çalıştırmaları, bütçeleri ve üyelikleri korunur.",
+                "hint": "Arşiv sekmesinden istediğiniz zaman geri yükleyebilirsiniz — ajan duraklatılmış olarak döner.",
+                "cancel": "İptal",
+                "confirm": "Ajanı arşivle",
+                "success": "{name} arşivlendi",
+                "error": "Ajan arşivlenemedi"
             },
             "deleteDialog": {
                 "title": "{name} silinsin mi?",

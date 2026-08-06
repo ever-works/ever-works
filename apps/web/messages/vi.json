@@ -906,6 +906,13 @@
                 "nextDisabledReason": "Pick a parent or choose Workspace scope to continue."
             },
             "settings": {
+                "identity": {
+                    "pause": "Tạm dừng",
+                    "resume": "Tiếp tục",
+                    "activate": "Kích hoạt",
+                    "archive": "Lưu trữ",
+                    "delete": "Xóa"
+                },
                 "orgCard": {
                     "title": "Tổ chức",
                     "teamLabel": "Nhóm",
@@ -914,11 +921,6 @@
                     "reportsToNone": "Không có quản lý",
                     "save": "Lưu",
                     "saving": "Đang lưu…"
-                },
-                "danger": {
-                    "title": "Vùng nguy hiểm",
-                    "description": "Xóa vĩnh viễn Agent này cùng với ngân sách, tư cách thành viên và lịch sử chạy của nó. Hãy lưu trữ nếu bạn chỉ muốn đưa nó ra khỏi danh mục.",
-                    "delete": "Xóa vĩnh viễn"
                 }
             },
             "guardrails": {
@@ -1036,6 +1038,15 @@
                 "menuAria": "Hành động cho {name}",
                 "unarchiveSuccess": "Đã khôi phục {name}",
                 "unarchiveError": "Không thể khôi phục Agent"
+            },
+            "archiveDialog": {
+                "title": "Lưu trữ {name}?",
+                "description": "Agent sẽ ngừng chạy và không còn xuất hiện trong danh mục. Lịch sử chạy, ngân sách và thành viên nhóm vẫn được giữ lại.",
+                "hint": "Bạn có thể khôi phục từ tab Đã lưu trữ bất cứ lúc nào — Agent quay lại ở trạng thái tạm dừng.",
+                "cancel": "Hủy",
+                "confirm": "Lưu trữ agent",
+                "success": "Đã lưu trữ {name}",
+                "error": "Không thể lưu trữ agent"
             },
             "deleteDialog": {
                 "title": "Xóa {name}?",

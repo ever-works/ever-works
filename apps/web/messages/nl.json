@@ -906,6 +906,13 @@
                 "nextDisabledReason": "Pick a parent or choose Workspace scope to continue."
             },
             "settings": {
+                "identity": {
+                    "pause": "Pauzeren",
+                    "resume": "Hervatten",
+                    "activate": "Activeren",
+                    "archive": "Archiveren",
+                    "delete": "Verwijderen"
+                },
                 "orgCard": {
                     "title": "Organisatie",
                     "teamLabel": "Team",
@@ -914,11 +921,6 @@
                     "reportsToNone": "Geen manager",
                     "save": "Opslaan",
                     "saving": "Opslaan…"
-                },
-                "danger": {
-                    "title": "Gevarenzone",
-                    "description": "Verwijder deze agent definitief, samen met zijn budgetten, lidmaatschappen en uitvoeringsgeschiedenis. Archiveer hem als je hem alleen uit de catalogus wilt halen.",
-                    "delete": "Definitief verwijderen"
                 }
             },
             "guardrails": {
@@ -1036,6 +1038,15 @@
                 "menuAria": "Acties voor {name}",
                 "unarchiveSuccess": "{name} hersteld",
                 "unarchiveError": "Kan de agent niet herstellen"
+            },
+            "archiveDialog": {
+                "title": "{name} archiveren?",
+                "description": "De agent stopt met draaien en verdwijnt uit de catalogus. Runs, budgetten en lidmaatschappen blijven bewaard.",
+                "hint": "Je kunt hem op elk moment herstellen via het tabblad Gearchiveerd — hij komt gepauzeerd terug.",
+                "cancel": "Annuleren",
+                "confirm": "Agent archiveren",
+                "success": "{name} gearchiveerd",
+                "error": "Kon de agent niet archiveren"
             },
             "deleteDialog": {
                 "title": "{name} verwijderen?",

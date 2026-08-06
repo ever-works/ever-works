@@ -906,6 +906,13 @@
                 "nextDisabledReason": "Pick a parent or choose Workspace scope to continue."
             },
             "settings": {
+                "identity": {
+                    "pause": "일시중지",
+                    "resume": "재개",
+                    "activate": "활성화",
+                    "archive": "보관",
+                    "delete": "삭제"
+                },
                 "orgCard": {
                     "title": "조직",
                     "teamLabel": "팀",
@@ -914,11 +921,6 @@
                     "reportsToNone": "관리자 없음",
                     "save": "저장",
                     "saving": "저장 중…"
-                },
-                "danger": {
-                    "title": "위험 구역",
-                    "description": "이 에이전트를 예산, 멤버십, 실행 기록과 함께 영구적으로 삭제합니다. 카탈로그에서만 제외하려면 보관하세요.",
-                    "delete": "영구 삭제"
                 }
             },
             "guardrails": {
@@ -1036,6 +1038,15 @@
                 "menuAria": "{name} 작업",
                 "unarchiveSuccess": "{name}이(가) 복원되었습니다",
                 "unarchiveError": "에이전트를 복원할 수 없습니다"
+            },
+            "archiveDialog": {
+                "title": "{name}을(를) 보관할까요?",
+                "description": "에이전트가 실행을 멈추고 카탈로그에서 사라집니다. 실행 기록, 예산, 멤버십은 유지됩니다.",
+                "hint": "보관함 탭에서 언제든지 복원할 수 있으며, 복원하면 일시중지 상태로 돌아옵니다.",
+                "cancel": "취소",
+                "confirm": "에이전트 보관",
+                "success": "{name}을(를) 보관했습니다",
+                "error": "에이전트를 보관할 수 없습니다"
             },
             "deleteDialog": {
                 "title": "{name}을(를) 삭제할까요?",
