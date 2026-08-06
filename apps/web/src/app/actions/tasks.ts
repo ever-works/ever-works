@@ -10,10 +10,12 @@ import {
     type RunCandidateAgent,
     type RunTaskResult,
     type Task,
+    type TaskAssignCandidate,
     type TaskChatMessage,
     type TaskDiff,
     type TaskPriority,
     type TaskPrStatus,
+    type TaskScopeKey,
     type TaskStatus,
 } from '@/lib/api/tasks';
 import { ApiResponseError } from '@/lib/api/server-api';
@@ -57,6 +59,8 @@ export async function updateTaskAction(
             | 'acceptanceChecks'
             | 'maxGateAttempts'
             | 'workId'
+            | 'missionId'
+            | 'ideaId'
             | 'agentId'
         >
     >,
@@ -116,6 +120,187 @@ export async function listTasksWithRunsAction(
         includeRun: true,
     });
     return result.data;
+}
+
+// ── Scoped "Add existing Task" picker ─────────────────────────────
+
+/**
+ * The API's per-page maximum (it clamps `limit` to 200), not the 100 the
+ * other pickers ask for: this list is filtered AGAIN below — Tasks
+ * already on this scope drop out — so an unsearched picker on a busy
+ * backlog can hide assignable Tasks behind the page boundary. Reading
+ * the largest page the API will serve, and excluding the other discarded
+ * class (`cancelled`) server-side, spends the whole budget on rows the
+ * picker can actually show.
+ */
+const SCOPE_TASK_CANDIDATE_LIMIT = 200;
+
+/**
+ * Every status a candidate may hold — i.e. all of them except
+ * `cancelled`, which can never progress. Filtering it out server-side
+ * keeps cancelled Tasks from consuming the page budget above.
+ */
+const SCOPE_TASK_CANDIDATE_STATUSES: TaskStatus[] = [
+    'backlog',
+    'todo',
+    'in_progress',
+    'in_review',
+    'blocked',
+    'done',
+];
+
+/** Which dashboard section owns each scope key, for cache invalidation. */
+const SCOPE_SEGMENT: Record<TaskScopeKey, string> = {
+    workId: 'works',
+    missionId: 'missions',
+    ideaId: 'ideas',
+};
+
+/**
+ * Invalidate the pages a scope-membership change is visible on: the
+ * scope's Tasks tab, which is its own route (`<scope>/[id]/tasks`), and
+ * the scope's detail page, whose header counts the same Tasks.
+ *
+ * These are ROUTE PATTERNS, not URLs. Every dashboard page sits under
+ * `[locale]` and the `(dashboard)` route group, so a literal
+ * `/missions/${scopeId}` matches nothing once next-intl prefixes the
+ * locale — it would silently revalidate no page at all. Next matches the
+ * segment shape instead, which is also why one call covers all 21
+ * locales. Same form as the settings actions
+ * (`app/actions/settings/fleet.ts`) and `app/actions/admin/
+ * tenant-runtime-allowlist.ts` use.
+ */
+function revalidateScopeTasks(scopeKey: TaskScopeKey): void {
+    const scope = `/[locale]/(dashboard)/${SCOPE_SEGMENT[scopeKey]}/[id]`;
+    revalidatePath(`${scope}/tasks`, 'page');
+    revalidatePath(scope, 'page');
+}
+
+/**
+ * Candidates for a Tasks tab's "Add existing Task" picker: every Task the
+ * caller owns that is not already filed under THIS scope.
+ *
+ * Nothing else is filtered by scope on purpose — the whole point is to
+ * surface Tasks that were raised somewhere else (or nowhere) so they can
+ * be pulled in, exactly like the Work header's Agent picker deliberately
+ * ignores Agent scope. What IS dropped: Tasks already on this scope
+ * (nothing to do) and `cancelled` Tasks, which can never progress —
+ * the same reason that picker drops archived Agents.
+ *
+ * A Task already filed under a different owner of this kind is KEPT but
+ * flagged `reassigns`, because picking it moves it rather than adding it.
+ */
+export async function listAssignableScopeTasksAction(
+    scopeKey: TaskScopeKey,
+    scopeId: string,
+    search?: string,
+): Promise<TaskAssignCandidate[]> {
+    // Security: verify session server-side before reading data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
+    const trimmed = search?.trim();
+    const result = await tasksAPI.list({
+        limit: SCOPE_TASK_CANDIDATE_LIMIT,
+        status: SCOPE_TASK_CANDIDATE_STATUSES,
+        ...(trimmed ? { search: trimmed } : {}),
+    });
+    return (result.data ?? [])
+        .filter((task) => task.status !== 'cancelled' && task[scopeKey] !== scopeId)
+        .map((task) => ({
+            id: task.id,
+            slug: task.slug,
+            title: task.title,
+            status: task.status,
+            priority: task.priority,
+            // `!= null`, not `!== null`: an owner column the response
+            // omits arrives as `undefined`, and calling that a MOVE
+            // would promise the user a reassignment that is not one.
+            reassigns: task[scopeKey] != null,
+        }));
+}
+
+/**
+ * Result of filing a Task under a scope — a DISCRIMINATED UNION for the
+ * same reason `UnassignTaskActionResult` is one. The API re-validates
+ * that the scope is reachable by the caller and refuses moves that would
+ * strand a sub-task hierarchy; those refusals ARE the value of the
+ * failure, and Next redacts thrown Server-Action messages in production.
+ * Thrown, they would explain the problem in dev and show an opaque error
+ * digest in prod. The message travels in the return value instead.
+ */
+export type AssignTaskActionResult = { ok: true; task: Task } | { ok: false; message: string };
+
+/** File an existing Task under this scope. */
+export async function assignTaskToScopeAction(
+    taskId: string,
+    scopeKey: TaskScopeKey,
+    scopeId: string,
+): Promise<AssignTaskActionResult> {
+    // Security: verify session server-side before mutating data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
+    try {
+        const task = await tasksAPI.update(taskId, { [scopeKey]: scopeId });
+        revalidatePath('/tasks');
+        revalidatePath(`/tasks/${taskId}`);
+        revalidateScopeTasks(scopeKey);
+        return { ok: true, task };
+    } catch (err) {
+        return { ok: false, message: err instanceof Error ? err.message : String(err) };
+    }
+}
+
+/**
+ * Result of taking a Task back off a scope.
+ *
+ * A DISCRIMINATED UNION rather than a thrown error, for the same reason
+ * `RunTaskActionResult` is one: the likely refusal here is the API's
+ * sub-task guard — "Task X has N sub-task(s); re-file or detach them
+ * before changing its owners" — and that sentence IS the value of the
+ * failure. Next redacts thrown Server-Action messages in production, so
+ * a UI branching on `err.message` would explain the problem in dev and
+ * say nothing in prod. The message travels in the return value instead.
+ */
+export type UnassignTaskActionResult = { ok: true; task: Task } | { ok: false; message: string };
+
+/**
+ * Detach a Task from this scope — the inverse of
+ * `assignTaskToScopeAction`, and the same endpoint: Task ownership is a
+ * nullable column, not a join row, so `null` clears exactly this one
+ * owner and leaves any others (Work, Team, Agent…) untouched.
+ *
+ * The Task itself survives; it returns to the global backlog and can be
+ * pulled back in from the same "Add existing" picker. `TaskScopeRowMenu`
+ * still puts a confirm dialog in front of it — not because the change is
+ * unrecoverable, but because the API's sub-task refusal has to land
+ * somewhere the operator can read it, and this action returns that
+ * sentence rather than throwing it.
+ */
+export async function unassignTaskFromScopeAction(
+    taskId: string,
+    scopeKey: TaskScopeKey,
+    // Read by neither the update (which writes `null`) nor the
+    // revalidation (which invalidates route patterns, not one scope's
+    // URL). Kept so callers pass the same triple to both halves of the
+    // pair — a detach that took two arguments where the attach takes
+    // three is a call-site mix-up waiting to happen.
+    _scopeId: string,
+): Promise<UnassignTaskActionResult> {
+    // Security: verify session server-side before mutating data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
+    try {
+        const task = await tasksAPI.update(taskId, { [scopeKey]: null });
+        revalidatePath('/tasks');
+        revalidatePath(`/tasks/${taskId}`);
+        revalidateScopeTasks(scopeKey);
+        return { ok: true, task };
+    } catch (err) {
+        return { ok: false, message: err instanceof Error ? err.message : String(err) };
+    }
 }
 
 // ── Board dispatch (kanban M3 / M4) ───────────────────────────────
