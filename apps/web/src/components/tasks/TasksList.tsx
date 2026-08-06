@@ -239,6 +239,7 @@ function TaskCard({ task, scope }: { task: Task; scope?: TaskScopeRef }) {
             <TaskScopeRowMenu
                 taskId={task.id}
                 taskTitle={task.title}
+                taskStatus={task.status}
                 scopeKey={scope.key}
                 scopeId={scope.id}
                 className="absolute bottom-3 right-3"
@@ -314,6 +315,7 @@ function TaskTable({ tasks, scope }: { tasks: Task[]; scope?: TaskScopeRef }) {
                                     <TaskScopeRowMenu
                                         taskId={t.id}
                                         taskTitle={t.title}
+                                        taskStatus={t.status}
                                         scopeKey={scope.key}
                                         scopeId={scope.id}
                                     />
