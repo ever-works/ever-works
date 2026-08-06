@@ -157,6 +157,26 @@ const SCOPE_SEGMENT: Record<TaskScopeKey, string> = {
 };
 
 /**
+ * Invalidate the pages a scope-membership change is visible on: the
+ * scope's Tasks tab, which is its own route (`<scope>/[id]/tasks`), and
+ * the scope's detail page, whose header counts the same Tasks.
+ *
+ * These are ROUTE PATTERNS, not URLs. Every dashboard page sits under
+ * `[locale]` and the `(dashboard)` route group, so a literal
+ * `/missions/${scopeId}` matches nothing once next-intl prefixes the
+ * locale — it would silently revalidate no page at all. Next matches the
+ * segment shape instead, which is also why one call covers all 21
+ * locales. Same form as the settings actions
+ * (`app/actions/settings/fleet.ts`) and `app/actions/admin/
+ * tenant-runtime-allowlist.ts` use.
+ */
+function revalidateScopeTasks(scopeKey: TaskScopeKey): void {
+    const scope = `/[locale]/(dashboard)/${SCOPE_SEGMENT[scopeKey]}/[id]`;
+    revalidatePath(`${scope}/tasks`, 'page');
+    revalidatePath(scope, 'page');
+}
+
+/**
  * Candidates for a Tasks tab's "Add existing Task" picker: every Task the
  * caller owns that is not already filed under THIS scope.
  *
@@ -225,7 +245,7 @@ export async function assignTaskToScopeAction(
         const task = await tasksAPI.update(taskId, { [scopeKey]: scopeId });
         revalidatePath('/tasks');
         revalidatePath(`/tasks/${taskId}`);
-        revalidatePath(`/${SCOPE_SEGMENT[scopeKey]}/${scopeId}`, 'layout');
+        revalidateScopeTasks(scopeKey);
         return { ok: true, task };
     } catch (err) {
         return { ok: false, message: err instanceof Error ? err.message : String(err) };
@@ -252,13 +272,21 @@ export type UnassignTaskActionResult = { ok: true; task: Task } | { ok: false; m
  * owner and leaves any others (Work, Team, Agent…) untouched.
  *
  * The Task itself survives; it returns to the global backlog and can be
- * pulled back in from the same "Add existing" picker. That is why this
- * is a one-click action rather than a confirm dialog.
+ * pulled back in from the same "Add existing" picker. `TaskScopeRowMenu`
+ * still puts a confirm dialog in front of it — not because the change is
+ * unrecoverable, but because the API's sub-task refusal has to land
+ * somewhere the operator can read it, and this action returns that
+ * sentence rather than throwing it.
  */
 export async function unassignTaskFromScopeAction(
     taskId: string,
     scopeKey: TaskScopeKey,
-    scopeId: string,
+    // Read by neither the update (which writes `null`) nor the
+    // revalidation (which invalidates route patterns, not one scope's
+    // URL). Kept so callers pass the same triple to both halves of the
+    // pair — a detach that took two arguments where the attach takes
+    // three is a call-site mix-up waiting to happen.
+    _scopeId: string,
 ): Promise<UnassignTaskActionResult> {
     // Security: verify session server-side before mutating data
     const user = await getAuthFromCookie();
@@ -268,7 +296,7 @@ export async function unassignTaskFromScopeAction(
         const task = await tasksAPI.update(taskId, { [scopeKey]: null });
         revalidatePath('/tasks');
         revalidatePath(`/tasks/${taskId}`);
-        revalidatePath(`/${SCOPE_SEGMENT[scopeKey]}/${scopeId}`, 'layout');
+        revalidateScopeTasks(scopeKey);
         return { ok: true, task };
     } catch (err) {
         return { ok: false, message: err instanceof Error ? err.message : String(err) };
