@@ -962,6 +962,24 @@ export class WorkProposalService {
         return this.ideaWorks.listForIdeaWithWork(proposalId, userId);
     }
 
+    /**
+     * Per-Idea provenance summary for a batch of Ideas — how many Works
+     * each one produced and the most recent of them. Feeds the
+     * `linkedWorksCount` / `latestLinkedWorkId` response fields so the
+     * Ideas list and cards can answer "is this built?" from the
+     * authoritative `idea_works` table instead of the denormalized
+     * `acceptedWorkId` (which is null for every Idea whose build never
+     * transitioned its status — see `acceptInternal`).
+     *
+     * Owner-scoped and batched: one query for the whole page.
+     */
+    async summarizeLinks(
+        userId: string,
+        ideaIds: string[],
+    ): Promise<Map<string, { count: number; latestWorkId: string }>> {
+        return this.ideaWorks.summarizeForIdeas(ideaIds, userId);
+    }
+
     async countPending(userId: string): Promise<number> {
         return this.repo.countPendingByUser(userId);
     }
