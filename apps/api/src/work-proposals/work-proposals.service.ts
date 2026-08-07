@@ -153,6 +153,18 @@ export class WorkProposalsApiService {
     }
 
     /**
+     * Batched `idea_works` summary keyed by Idea id — drives the
+     * `linkedWorksCount` / `latestLinkedWorkId` response fields on the
+     * list and detail endpoints.
+     */
+    async summarizeLinks(
+        userId: string,
+        ideaIds: string[],
+    ): Promise<Map<string, { count: number; latestWorkId: string }>> {
+        return this.proposals.summarizeLinks(userId, ideaIds);
+    }
+
+    /**
      * Phase 1 PR B — `POST /me/work-proposals` user-manual Idea
      * create. The user types a description; the service derives
      * a title (placeholder until the AI titler ships in PR I),
