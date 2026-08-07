@@ -109,16 +109,6 @@ export class WorkProposalsApiService {
     }
 
     /**
-     * Hard-delete an Idea. Guards (build in flight / linked Works /
-     * Idea-scoped Agents) live in the agent-side service, which throws
-     * `NotFoundException` or a `ConflictException` carrying a
-     * machine-readable `reason` — both map straight to HTTP.
-     */
-    async delete(userId: string, proposalId: string): Promise<{ deleted: true }> {
-        return this.proposals.delete(userId, proposalId);
-    }
-
-    /**
      * Idea (WorkProposal) attachment surface — thin forwarders to the
      * agent-side service. The controller maps these to
      * `POST/GET/DELETE /api/me/work-proposals/:id/attachments[/:attachmentId]`.
@@ -150,18 +140,6 @@ export class WorkProposalsApiService {
     /** Linked Works for the Idea (review §23.1 provenance panel). */
     async listLinkedWorks(userId: string, proposalId: string) {
         return this.proposals.listLinkedWorks(userId, proposalId);
-    }
-
-    /**
-     * Batched `idea_works` summary keyed by Idea id — drives the
-     * `linkedWorksCount` / `latestLinkedWorkId` response fields on the
-     * list and detail endpoints.
-     */
-    async summarizeLinks(
-        userId: string,
-        ideaIds: string[],
-    ): Promise<Map<string, { count: number; latestWorkId: string }>> {
-        return this.proposals.summarizeLinks(userId, ideaIds);
     }
 
     /**

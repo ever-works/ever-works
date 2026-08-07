@@ -274,31 +274,6 @@ export class WorkProposalResponseDto {
     @ApiProperty({ required: false, nullable: true, enum: IdeaFailureKind })
     failureKind?: IdeaFailureKind | null;
 
-    /**
-     * How many Works this Idea has produced, read from the
-     * authoritative `idea_works` provenance table.
-     *
-     * Prefer this over `acceptedWorkId` when asking "was this Idea
-     * built?". `acceptedWorkId` is only written when the Idea's status
-     * legally transitions to ACCEPTED, so it is null for Works built
-     * from a queued / building / failed / dismissed Idea — all of which
-     * the Ideas list routes through the same build flow. `0` means the
-     * Idea has genuinely never produced a Work.
-     */
-    @ApiProperty({
-        description: 'Number of Works produced by this Idea (idea_works provenance rows).',
-        minimum: 0,
-    })
-    linkedWorksCount: number;
-
-    /**
-     * The most recently linked Work, or null when there is none. The
-     * "View Work" target for a built Idea whose `acceptedWorkId` was
-     * never stamped.
-     */
-    @ApiProperty({ required: false, nullable: true })
-    latestLinkedWorkId?: string | null;
-
     @ApiProperty()
     generatedAt: Date;
 }

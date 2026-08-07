@@ -44,15 +44,12 @@ const GENERIC_PROPOSAL_PROMPT =
  * (the Idea after the state transition + the freshly-created Goal).
  * Extracted so the three controller methods stay one-liners.
  */
-function toBuildResponseDto(
-    result: {
-        proposal: WorkProposal;
-        goal: { id: string; instruction: string; status: string; dryRun: boolean; createdAt: Date };
-    },
-    links?: LinkSummary,
-): BuildWorkProposalResponseDto {
+function toBuildResponseDto(result: {
+    proposal: WorkProposal;
+    goal: { id: string; instruction: string; status: string; dryRun: boolean; createdAt: Date };
+}): BuildWorkProposalResponseDto {
     return {
-        proposal: toResponseDto(result.proposal, links),
+        proposal: toResponseDto(result.proposal),
         goal: {
             id: result.goal.id,
             instruction: result.goal.instruction,
@@ -63,22 +60,14 @@ function toBuildResponseDto(
     };
 }
 
-/** One Idea's `idea_works` rollup, as returned by `summarizeLinks`. */
-type LinkSummary = { count: number; latestWorkId: string };
-
 /**
  * Shared map from WorkProposal entity → response DTO. Extracted in
  * Phase 1 PR B so the three controller paths (`list()`, `getOne()`,
  * `build()`) and the user-manual `createUserManual()` all return
  * the same shape with the new missionId / failureMessage /
  * failureKind fields.
- *
- * `links` is the Idea's `idea_works` rollup. Omitted only where the
- * Idea provably has none — the just-created user-manual Idea — since
- * reporting a stale `linkedWorksCount: 0` on an Idea that IS built
- * would make the client flash "not built".
  */
-function toResponseDto(proposal: WorkProposal, links?: LinkSummary): WorkProposalResponseDto {
+function toResponseDto(proposal: WorkProposal): WorkProposalResponseDto {
     return {
         id: proposal.id,
         title: proposal.title,
@@ -97,8 +86,6 @@ function toResponseDto(proposal: WorkProposal, links?: LinkSummary): WorkProposa
         missionId: proposal.missionId ?? null,
         failureMessage: proposal.failureMessage ?? null,
         failureKind: proposal.failureKind ?? null,
-        linkedWorksCount: links?.count ?? 0,
-        latestLinkedWorkId: links?.latestWorkId ?? null,
         generatedAt: proposal.generatedAt,
     };
 }
@@ -131,19 +118,6 @@ export class WorkProposalsController {
         // Phase 7 PR U — per-Idea budget summary.
         private readonly budgetService: BudgetService,
     ) {}
-
-    /**
-     * `idea_works` rollup for a single Idea. Degrades to `undefined`
-     * (→ `linkedWorksCount: 0`) on failure rather than erroring the
-     * whole response: the count is a display refinement, and the Idea
-     * itself is what the caller asked for.
-     */
-    private async linkSummary(userId: string, ideaId: string): Promise<LinkSummary | undefined> {
-        const summary = await this.service
-            .summarizeLinks(userId, [ideaId])
-            .catch(() => new Map<string, LinkSummary>());
-        return summary.get(ideaId);
-    }
 
     /**
      * Phase 1 PR B — `POST /me/work-proposals` user-manual Idea
@@ -188,16 +162,7 @@ export class WorkProposalsController {
             limit: query.limit,
             offset: query.offset,
         });
-        // One batched provenance query for the whole page — the cards need
-        // it to show built / not built without an N+1. Degrades to "no
-        // links known" rather than failing the list.
-        const links = await this.service
-            .summarizeLinks(
-                auth.userId,
-                proposals.map((p) => p.id),
-            )
-            .catch(() => new Map<string, LinkSummary>());
-        return proposals.map((p) => toResponseDto(p, links.get(p.id)));
+        return proposals.map(toResponseDto);
     }
 
     @Get('status')
@@ -267,7 +232,7 @@ export class WorkProposalsController {
     ): Promise<WorkProposalResponseDto> {
         const proposal = await this.service.getForUser(auth.userId, id);
         if (!proposal) throw new NotFoundException('Proposal not found');
-        return toResponseDto(proposal, await this.linkSummary(auth.userId, id));
+        return toResponseDto(proposal);
     }
 
     @Get(':id/budget')
@@ -306,30 +271,6 @@ export class WorkProposalsController {
     }
 
     /**
-     * `DELETE /me/work-proposals/:id` — hard-delete an Idea, mirroring
-     * `DELETE /me/missions/:id`. Unlike the Mission endpoint this one is
-     * GUARDED: the service returns 409 with a machine-readable `reason`
-     * (`build-in-flight` | `linked-works` | `idea-agents`) rather than
-     * stranding Agents / Tasks that reference the Idea by a
-     * FK-less `ideaId` column. Dismiss (`PATCH :id/dismiss`) remains the
-     * reversible "hide it" path; this one destroys the row.
-     */
-    @Delete(':id')
-    @ApiOperation({
-        summary: 'Delete an Idea (refused while it has linked Works, Agents or a live build)',
-    })
-    @ApiResponse({ status: 200, description: 'Deleted' })
-    @ApiResponse({ status: 409, description: 'Blocked — body carries `reason` and `count`' })
-    @HttpCode(HttpStatus.OK)
-    @Throttle({ long: { limit: 30, ttl: 60_000 } })
-    async remove(
-        @CurrentUser() auth: AuthenticatedUser,
-        @Param('id', ParseUUIDPipe) id: string,
-    ): Promise<{ deleted: true }> {
-        return this.service.delete(auth.userId, id);
-    }
-
-    /**
      * Phase 1 PR B — `POST /me/work-proposals/:id/build` queue
      * an Idea for build. Transitions to QUEUED + creates a
      * WorkBuildRequest (`maxWorksPerRun=1`, `ideaId` set) so the
@@ -348,7 +289,7 @@ export class WorkProposalsController {
         if (!result) {
             throw new NotFoundException('Proposal not found');
         }
-        return toBuildResponseDto(result, await this.linkSummary(auth.userId, id));
+        return toBuildResponseDto(result);
     }
 
     /**
@@ -369,7 +310,7 @@ export class WorkProposalsController {
         if (!result) {
             throw new NotFoundException('Proposal not found');
         }
-        return toBuildResponseDto(result, await this.linkSummary(auth.userId, id));
+        return toBuildResponseDto(result);
     }
 
     /**
@@ -390,7 +331,7 @@ export class WorkProposalsController {
         if (!result) {
             throw new NotFoundException('Proposal not found');
         }
-        return toBuildResponseDto(result, await this.linkSummary(auth.userId, id));
+        return toBuildResponseDto(result);
     }
 
     @Post(':id/accept')
@@ -407,14 +348,9 @@ export class WorkProposalsController {
         if (!body?.workId) {
             throw new BadRequestException('workId is required');
         }
-        // `ok === false` now means only "no such Idea for this user, or
-        // that Work isn't theirs". An Idea whose status can't legally move
-        // to ACCEPTED (queued / building / failed / dismissed) still gets
-        // the provenance link recorded and reports success — the link is
-        // what makes the Idea read as built. See `acceptInternal`.
         const ok = await this.service.accept(auth.userId, id, body.workId);
         if (!ok) {
-            throw new NotFoundException('Proposal not found');
+            throw new NotFoundException('Proposal not found or already finalized');
         }
         return { ok: true };
     }
