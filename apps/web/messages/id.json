@@ -1041,8 +1041,8 @@
             },
             "archiveDialog": {
                 "title": "Arsipkan {name}?",
-                "description": "Agen berhenti berjalan dan tidak lagi muncul di katalog. Riwayat run, anggaran, dan keanggotaannya tetap disimpan.",
-                "hint": "Anda dapat memulihkannya dari tab Arsip kapan saja — agen kembali dalam status dijeda.",
+                "description": "Agen berhenti berjalan dan tidak lagi muncul di katalog. Riwayat proses, anggaran, dan keanggotaannya tetap disimpan.",
+                "hint": "Anda dapat memulihkannya dari tab Diarsipkan kapan saja — agen kembali dalam status dijeda.",
                 "cancel": "Batal",
                 "confirm": "Arsipkan agen",
                 "success": "{name} diarsipkan",

@@ -1058,10 +1058,10 @@
             },
             "archived": {
                 "title": "Archivierte Agenten",
-                "subtitle": "Von dir archivierte Agenten. Sie laufen nicht und erscheinen nicht im Katalog. Stelle einen Agenten wieder her – er kehrt pausiert zurück – oder lösche ihn endgültig.",
+                "subtitle": "Von Ihnen archivierte Agenten. Sie laufen nicht und erscheinen nicht im Katalog. Stellen Sie einen Agenten wieder her – er kehrt pausiert zurück – oder löschen Sie ihn endgültig.",
                 "empty": {
                     "title": "Keine archivierten Agenten",
-                    "subtitle": "Wenn du einen Agenten auf seiner Einstellungsseite archivierst, erscheint er hier."
+                    "subtitle": "Wenn Sie einen Agenten auf seiner Einstellungsseite archivieren, erscheint er hier."
                 },
                 "delete": "Endgültig löschen",
                 "deleteAria": "{name} endgültig löschen",
@@ -1073,7 +1073,7 @@
             "archiveDialog": {
                 "title": "{name} archivieren?",
                 "description": "Der Agent läuft nicht mehr und verschwindet aus dem Katalog. Ausführungen, Budgets und Mitgliedschaften bleiben erhalten.",
-                "hint": "Du kannst ihn jederzeit im Tab „Archiviert“ wiederherstellen – er kehrt pausiert zurück.",
+                "hint": "Sie können ihn jederzeit im Tab „Archiviert“ wiederherstellen – er kehrt pausiert zurück.",
                 "cancel": "Abbrechen",
                 "confirm": "Agent archivieren",
                 "success": "{name} archiviert",
@@ -1082,7 +1082,7 @@
             "deleteDialog": {
                 "title": "{name} löschen?",
                 "description": "Damit werden der Agent sowie seine Budgets, Mitgliedschaften und sein Ausführungsverlauf endgültig gelöscht.",
-                "hint": "Das lässt sich nicht rückgängig machen. Archiviere den Agenten, wenn du ihn nur aus dem Katalog ausblenden möchtest.",
+                "hint": "Das lässt sich nicht rückgängig machen. Archivieren Sie den Agenten, wenn Sie ihn nur aus dem Katalog ausblenden möchten.",
                 "cancel": "Abbrechen",
                 "confirm": "Endgültig löschen",
                 "success": "{name} gelöscht",

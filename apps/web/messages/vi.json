@@ -1044,9 +1044,9 @@
                 "description": "Agent sẽ ngừng chạy và không còn xuất hiện trong danh mục. Lịch sử chạy, ngân sách và thành viên nhóm vẫn được giữ lại.",
                 "hint": "Bạn có thể khôi phục từ tab Đã lưu trữ bất cứ lúc nào — Agent quay lại ở trạng thái tạm dừng.",
                 "cancel": "Hủy",
-                "confirm": "Lưu trữ agent",
+                "confirm": "Lưu trữ Agent",
                 "success": "Đã lưu trữ {name}",
-                "error": "Không thể lưu trữ agent"
+                "error": "Không thể lưu trữ Agent"
             },
             "deleteDialog": {
                 "title": "Xóa {name}?",
