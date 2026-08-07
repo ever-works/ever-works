@@ -634,9 +634,12 @@ export class WorkProposalService {
      * the Goal-completion handler (Phase 1 PR FF, passing
      * `fromStatuses = [BUILDING]`). PLAN Decision A3.
      *
-     * Returns `false` when the proposal doesn't exist for this
-     * user or is not currently in one of the allowed source
-     * statuses (idempotent — re-acceptance is a no-op).
+     * Returns `false` only when the Idea doesn't exist for this user
+     * or the supplied Work isn't theirs — i.e. the cases that are
+     * genuinely "not found". A legal-but-refused STATUS transition no
+     * longer fails the call: the Idea↔Work link is still recorded and
+     * the call reports success, because the link (not the status) is
+     * what "this Idea produced a Work" means. See `recordProvenance`.
      */
     async acceptInternal(
         userId: string,
@@ -658,16 +661,36 @@ export class WorkProposalService {
         // Work owned by this user, so the legitimate path is unaffected.
         const work = await this.works.findById(workId);
         if (!work || work.userId !== userId) return false;
-        const ok = await this.repo.markAccepted(proposalId, userId, workId, fromStatuses);
-        if (!ok) return false;
-        // Review §23.1 — provenance is authoritative in `idea_works` (0..N),
-        // and the Work-side back-pointer is stamped first-writer-wins.
-        // `acceptedWorkId` (written by markAccepted above) stays as the
-        // denormalized "primary / most recent" pointer.
-        await this.recordProvenance(userId, proposalId, workId, opts.linkKind ?? 'linked', {
-            workAlreadyLoadedFromIdeaId: work.acceptedFromIdeaId ?? null,
-        });
-        // PR-3 — audit trail for a successful accept (ok is guaranteed true here).
+        // The status transition stays governed by `fromStatuses` exactly as
+        // before — a BUILDING Idea must not be yanked to ACCEPTED behind the
+        // build that is still running.
+        await this.repo.markAccepted(proposalId, userId, workId, fromStatuses);
+
+        // ...but the provenance link is recorded REGARDLESS of that outcome.
+        // Review §23.1 — `idea_works` is the authoritative 0..N record that
+        // this Idea produced this Work; `status` answers a different
+        // question (where the Idea is in its own lifecycle) and
+        // `acceptedWorkId` is only the denormalized pointer at the most
+        // recent link.
+        //
+        // This used to be gated on the transition succeeding, which lost the
+        // link entirely whenever the Idea wasn't in `fromStatuses`. That is
+        // not an edge case: `IdeaCard` routes queued / building / failed /
+        // dismissed Ideas to `/works/new?proposal=…` too, so a Work built
+        // from any of them vanished from the Idea and it kept reading "not
+        // built" forever. Recording is idempotent (unique on
+        // (ideaId, workId), `orIgnore`), so a retry is free.
+        const linked = await this.recordProvenance(
+            userId,
+            proposalId,
+            workId,
+            opts.linkKind ?? 'linked',
+            { workAlreadyLoadedFromIdeaId: work.acceptedFromIdeaId ?? null },
+        );
+        if (!linked) return false;
+
+        // PR-3 — audit trail. Keyed on the link, not the status transition,
+        // so the accepts that previously disappeared are now auditable.
         await this.recordIdeaActivity(userId, ActivityActionType.IDEA_ACCEPTED, 'accept', {
             proposalId,
             workId,
@@ -679,11 +702,19 @@ export class WorkProposalService {
      * Append the Idea↔Work provenance link and stamp the Work-side
      * back-pointer (`works.acceptedFromIdeaId`) when the Work has no
      * source Idea yet (a Work keeps at most ONE source Idea — review
-     * §23.1). Best-effort by design: the primary state transition
-     * (`markAccepted`) has already committed when this runs, so a
-     * failure here must not surface as a 5xx on an accept that DID
-     * succeed — it is logged and the backfill-shaped migration can
-     * repair stragglers.
+     * §23.1).
+     *
+     * Returns whether the LINK was written. The two writes have
+     * deliberately different failure contracts:
+     *
+     *   - `recordLink` is the authoritative one. A failure here means
+     *     the Idea has no record of the Work, so the caller reports
+     *     failure and the client's retry gets a real second chance
+     *     (the insert is `orIgnore`, so retrying is free).
+     *   - the back-pointer stamp is denormalized convenience. A
+     *     failure there is logged and swallowed — the link already
+     *     committed, and reporting failure would push callers into
+     *     retrying a write that succeeded.
      */
     private async recordProvenance(
         userId: string,
@@ -691,9 +722,19 @@ export class WorkProposalService {
         workId: string,
         kind: IdeaWorkKind,
         opts: { workAlreadyLoadedFromIdeaId?: string | null } = {},
-    ): Promise<void> {
+    ): Promise<boolean> {
         try {
             await this.ideaWorks.recordLink({ ideaId, workId, userId, kind });
+        } catch (error) {
+            this.logger.warn(
+                `Failed to record Idea↔Work provenance (idea=${ideaId}, work=${workId}, kind=${kind}): ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return false;
+        }
+
+        try {
             let sourceIdeaId = opts.workAlreadyLoadedFromIdeaId;
             if (sourceIdeaId === undefined) {
                 sourceIdeaId = (await this.works.findById(workId))?.acceptedFromIdeaId ?? null;
@@ -703,11 +744,12 @@ export class WorkProposalService {
             }
         } catch (error) {
             this.logger.warn(
-                `Failed to record Idea↔Work provenance (idea=${ideaId}, work=${workId}, kind=${kind}): ${
+                `Recorded the Idea↔Work link but failed to stamp works.acceptedFromIdeaId (idea=${ideaId}, work=${workId}): ${
                     error instanceof Error ? error.message : String(error)
                 }`,
             );
         }
+        return true;
     }
 
     /**
@@ -923,6 +965,7 @@ export class WorkProposalService {
     async countPending(userId: string): Promise<number> {
         return this.repo.countPendingByUser(userId);
     }
+
     /**
      * Hard-delete an Idea (`DELETE /me/work-proposals/:id`), mirroring
      * the Mission delete contract (`MissionsService.delete`) but
