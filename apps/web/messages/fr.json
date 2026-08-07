@@ -1719,6 +1719,79 @@
                     "linked": "Linked",
                     "rebuilt": "Rebuilt"
                 }
+            },
+            "detail": {
+                "live": "En direct",
+                "fromMission": "Issue d'une Mission",
+                "sections": {
+                    "description": "Idée",
+                    "build": "État de la construction",
+                    "agents": "Agents",
+                    "details": "Détails"
+                },
+                "stages": {
+                    "drafted": "Rédigée",
+                    "queued": "En file d'attente",
+                    "building": "Construction",
+                    "built": "Construite",
+                    "failed": "Échec de la construction",
+                    "builtDirect": "Construite"
+                },
+                "stageHints": {
+                    "drafted": "L'Idée existe et est prête à être construite.",
+                    "queued": "En attente d'un constructeur.",
+                    "building": "L'Agent Work génère le Work.",
+                    "built": "Un Work a été produit à partir de cette Idée.",
+                    "failed": "La construction s'est arrêtée. Réessayez.",
+                    "builtDirect": "Créé dans le générateur de Works — la file d'attente de build a été ignorée."
+                },
+                "built": {
+                    "badge": "Construite ({count})",
+                    "none": "Pas encore construite"
+                },
+                "actions": {
+                    "build": "Construire",
+                    "retry": "Réessayer",
+                    "rebuild": "Reconstruire",
+                    "rebuildHint": "Crée un nouveau Work. L'existant est conservé.",
+                    "newAgent": "Nouvel Agent",
+                    "delete": "Supprimer"
+                },
+                "works": {
+                    "empty": "Aucun Work lié à cette Idée pour le moment."
+                },
+                "agents": {
+                    "empty": "Aucun Agent rattaché à cette Idée."
+                },
+                "meta": {
+                    "source": "Source",
+                    "slug": "Slug",
+                    "fields": "Champs",
+                    "categories": "Catégories suggérées"
+                },
+                "deleteDialog": {
+                    "title": "Supprimer cette Idée ?",
+                    "body": "{title} sera définitivement supprimée. Cette action est irréversible.",
+                    "confirm": "Supprimer l'Idée",
+                    "cancel": "Annuler",
+                    "deleting": "Suppression…",
+                    "error": "Échec de la suppression de l'Idée",
+                    "blocked": {
+                        "linked-works": "Suppression impossible : cette Idée est liée à {count} Work(s). Supprimez-les ou dissociez-les d'abord.",
+                        "idea-agents": "Suppression impossible : {count} Agent(s) sont rattachés à cette Idée. Supprimez-les ou changez leur portée.",
+                        "build-in-flight": "Suppression impossible pendant une construction. Attendez la fin.",
+                        "unknown": "Impossible de supprimer cette Idée pour le moment."
+                    }
+                },
+                "toasts": {
+                    "built": "Work construit à partir de cette Idée",
+                    "buildFailed": "La construction a échoué",
+                    "buildQueued": "Construction mise en file",
+                    "retryQueued": "Nouvelle tentative mise en file",
+                    "rebuildQueued": "Reconstruction mise en file",
+                    "deleted": "Idée supprimée",
+                    "actionError": "Action impossible. Veuillez réessayer."
+                }
             }
         },
         "header": {
