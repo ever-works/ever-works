@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { getTranslations } from 'next-intl/server';
-import { agentsAPI, type Agent } from '@/lib/api/agents';
+import { agentsAPI } from '@/lib/api/agents';
 import { ArchivedAgentsList } from '@/components/agents/ArchivedAgentsList';
 import { AgentsPageTabs } from '@/components/agents/AgentsPageTabs';
 
@@ -16,14 +16,14 @@ export async function generateMetadata(): Promise<Metadata> {
  * reachable, and where the permanent delete
  * (`DELETE /api/agents/:id?hard=true`) is offered.
  *
- * Same defensive fetch as the catalog page — a flaky API renders the
- * empty state rather than a 500.
+ * Unlike the catalog page, this fetch is deliberately not caught. An
+ * empty archive and an unreachable API must not render the same, or
+ * the restore / permanent-delete actions silently disappear with no
+ * indication they are only temporarily unavailable. A rejection falls
+ * through to the dashboard error boundary, which offers a retry.
  */
 export default async function ArchivedAgentsPage() {
-    const result = await agentsAPI.list({ status: 'archived', limit: 50 }).catch(() => ({
-        data: [] as Agent[],
-        meta: { total: 0, limit: 50, offset: 0 },
-    }));
+    const result = await agentsAPI.list({ status: 'archived', limit: 50 });
 
     return (
         <div className="w-full">
