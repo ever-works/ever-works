@@ -408,6 +408,16 @@ export const agentsAPI = {
         });
     },
 
+    /** Inverse of `archive` — restores an archived Agent as PAUSED. */
+    async unarchive(id: string): Promise<Agent> {
+        return serverMutation<Agent>({
+            endpoint: `/agents/${id}/unarchive`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
     async deleteHard(id: string): Promise<{ archived?: true; deleted?: true }> {
         return serverMutation<{ archived?: true; deleted?: true }>({
             endpoint: `/agents/${id}?hard=true`,

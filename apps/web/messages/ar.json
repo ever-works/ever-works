@@ -954,6 +954,13 @@
                 "openInWizard": "افتح في المعالج"
             },
             "settings": {
+                "identity": {
+                    "pause": "إيقاف مؤقت",
+                    "resume": "استئناف",
+                    "activate": "تفعيل",
+                    "archive": "أرشفة",
+                    "delete": "حذف"
+                },
                 "orgCard": {
                     "title": "المؤسسة",
                     "teamLabel": "الفريق",
@@ -1024,7 +1031,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "المؤرشفة"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1047,6 +1055,38 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "الوكلاء المؤرشفون",
+                "subtitle": "الوكلاء الذين قمت بأرشفتهم. لا يعملون ولا يظهرون في الكتالوج. استعد أحدهم ليعود موقوفًا مؤقتًا، أو احذفه نهائيًا.",
+                "empty": {
+                    "title": "لا يوجد وكلاء مؤرشفون",
+                    "subtitle": "أرشفة وكيل من صفحة إعداداته تنقله إلى هنا."
+                },
+                "delete": "حذف نهائي",
+                "deleteAria": "حذف {name} نهائيًا",
+                "unarchive": "استعادة",
+                "menuAria": "إجراءات {name}",
+                "unarchiveSuccess": "تمت استعادة {name}",
+                "unarchiveError": "تعذرت استعادة الوكيل"
+            },
+            "archiveDialog": {
+                "title": "أرشفة {name}؟",
+                "description": "سيتوقف الوكيل عن العمل ولن يظهر في الكتالوج. يتم الاحتفاظ بسجل تشغيله وميزانياته وعضوياته.",
+                "hint": "يمكنك استعادته من تبويب المؤرشفة في أي وقت — سيعود موقوفًا مؤقتًا.",
+                "cancel": "إلغاء",
+                "confirm": "أرشفة الوكيل",
+                "success": "تمت أرشفة {name}",
+                "error": "تعذرت أرشفة الوكيل"
+            },
+            "deleteDialog": {
+                "title": "حذف {name}؟",
+                "description": "سيؤدي هذا إلى حذف الوكيل نهائيًا مع ميزانياته وعضوياته وسجل تشغيله.",
+                "hint": "لا يمكن التراجع عن هذا الإجراء. قم بأرشفة الوكيل بدلًا من ذلك إذا كنت تريد إخفاءه من الكتالوج فقط.",
+                "cancel": "إلغاء",
+                "confirm": "حذف نهائي",
+                "success": "تم حذف {name}",
+                "error": "تعذر حذف الوكيل"
             }
         },
         "tasksPage": {

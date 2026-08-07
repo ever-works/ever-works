@@ -906,6 +906,13 @@
                 "nextDisabledReason": "Pick a parent or choose Workspace scope to continue."
             },
             "settings": {
+                "identity": {
+                    "pause": "Wstrzymaj",
+                    "resume": "Wznów",
+                    "activate": "Aktywuj",
+                    "archive": "Archiwizuj",
+                    "delete": "Usuń"
+                },
                 "orgCard": {
                     "title": "Organizacja",
                     "teamLabel": "Zespół",
@@ -993,7 +1000,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "Zarchiwizowane"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1016,6 +1024,38 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "Zarchiwizowani agenci",
+                "subtitle": "Agenci, których zarchiwizowano. Nie działają i nie pojawiają się w katalogu. Przywróć agenta, aby wrócił jako wstrzymany, albo usuń go trwale.",
+                "empty": {
+                    "title": "Brak zarchiwizowanych agentów",
+                    "subtitle": "Zarchiwizowanie agenta na jego stronie ustawień przenosi go tutaj."
+                },
+                "delete": "Usuń trwale",
+                "deleteAria": "Usuń trwale {name}",
+                "unarchive": "Przywróć",
+                "menuAria": "Akcje dla {name}",
+                "unarchiveSuccess": "Przywrócono {name}",
+                "unarchiveError": "Nie udało się przywrócić agenta"
+            },
+            "archiveDialog": {
+                "title": "Zarchiwizować agenta {name}?",
+                "description": "Agent przestaje działać i znika z katalogu. Jego uruchomienia, budżety i członkostwa zostają zachowane.",
+                "hint": "Możesz go przywrócić z karty Zarchiwizowane w dowolnym momencie — wróci jako wstrzymany.",
+                "cancel": "Anuluj",
+                "confirm": "Zarchiwizuj agenta",
+                "success": "Zarchiwizowano agenta {name}",
+                "error": "Nie udało się zarchiwizować agenta"
+            },
+            "deleteDialog": {
+                "title": "Usunąć {name}?",
+                "description": "Ta operacja trwale usuwa agenta wraz z jego budżetami, członkostwami i historią uruchomień.",
+                "hint": "Tej operacji nie można cofnąć. Zarchiwizuj agenta, jeśli chcesz go tylko ukryć w katalogu.",
+                "cancel": "Anuluj",
+                "confirm": "Usuń trwale",
+                "success": "Usunięto {name}",
+                "error": "Nie udało się usunąć agenta"
             }
         },
         "tasksPage": {

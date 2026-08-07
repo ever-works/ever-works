@@ -954,6 +954,13 @@
                 "openInWizard": "פתח באשף"
             },
             "settings": {
+                "identity": {
+                    "pause": "השהה",
+                    "resume": "המשך",
+                    "activate": "הפעל",
+                    "archive": "העבר לארכיון",
+                    "delete": "מחק"
+                },
                 "orgCard": {
                     "title": "ארגון",
                     "teamLabel": "צוות",
@@ -1024,7 +1031,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "בארכיון"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1047,6 +1055,38 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "סוכנים בארכיון",
+                "subtitle": "סוכנים שהעברת לארכיון. הם אינם פועלים ואינם מופיעים בקטלוג. שחזר סוכן כדי להחזירו במצב מושהה, או מחק אותו לצמיתות.",
+                "empty": {
+                    "title": "אין סוכנים בארכיון",
+                    "subtitle": "העברת סוכן לארכיון מדף ההגדרות שלו מעבירה אותו לכאן."
+                },
+                "delete": "מחיקה לצמיתות",
+                "deleteAria": "מחיקת {name} לצמיתות",
+                "unarchive": "שחזור",
+                "menuAria": "פעולות עבור {name}",
+                "unarchiveSuccess": "{name} שוחזר",
+                "unarchiveError": "לא ניתן היה לשחזר את הסוכן"
+            },
+            "archiveDialog": {
+                "title": "להעביר את {name} לארכיון?",
+                "description": "הסוכן יפסיק לפעול ולא יופיע בקטלוג. ההרצות, התקציבים והחברויות שלו יישמרו.",
+                "hint": "אפשר לשחזר אותו מלשונית הארכיון בכל עת — הוא יחזור במצב מושהה.",
+                "cancel": "ביטול",
+                "confirm": "העבר לארכיון",
+                "success": "{name} הועבר לארכיון",
+                "error": "לא ניתן להעביר את הסוכן לארכיון"
+            },
+            "deleteDialog": {
+                "title": "למחוק את {name}?",
+                "description": "פעולה זו מוחקת לצמיתות את הסוכן ואת התקציבים, החברויות והיסטוריית ההרצות שלו.",
+                "hint": "לא ניתן לבטל פעולה זו. העבר את הסוכן לארכיון אם ברצונך רק להסתירו מהקטלוג.",
+                "cancel": "ביטול",
+                "confirm": "מחיקה לצמיתות",
+                "success": "{name} נמחק",
+                "error": "לא ניתן היה למחוק את הסוכן"
             }
         },
         "tasksPage": {

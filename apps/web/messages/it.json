@@ -906,6 +906,13 @@
                 "nextDisabledReason": "Pick a parent or choose Workspace scope to continue."
             },
             "settings": {
+                "identity": {
+                    "pause": "Pausa",
+                    "resume": "Riprendi",
+                    "activate": "Attiva",
+                    "archive": "Archivia",
+                    "delete": "Elimina"
+                },
                 "orgCard": {
                     "title": "Organizzazione",
                     "teamLabel": "Team",
@@ -993,7 +1000,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "Archiviati"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1016,6 +1024,38 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "Agenti archiviati",
+                "subtitle": "Gli agenti che hai archiviato. Non vengono eseguiti e non compaiono nel catalogo. Ripristinane uno per riportarlo in pausa oppure eliminalo definitivamente.",
+                "empty": {
+                    "title": "Nessun agente archiviato",
+                    "subtitle": "Archiviando un agente dalla sua pagina delle impostazioni verrà spostato qui."
+                },
+                "delete": "Elimina definitivamente",
+                "deleteAria": "Elimina definitivamente {name}",
+                "unarchive": "Ripristina",
+                "menuAria": "Azioni per {name}",
+                "unarchiveSuccess": "{name} ripristinato",
+                "unarchiveError": "Impossibile ripristinare l'agente"
+            },
+            "archiveDialog": {
+                "title": "Archiviare {name}?",
+                "description": "L'agente smette di funzionare ed esce dal catalogo. Esecuzioni, budget e appartenenze vengono conservati.",
+                "hint": "Puoi ripristinarlo dalla scheda Archiviati in qualsiasi momento: torna in pausa.",
+                "cancel": "Annulla",
+                "confirm": "Archivia agente",
+                "success": "{name} archiviato",
+                "error": "Impossibile archiviare l'agente"
+            },
+            "deleteDialog": {
+                "title": "Eliminare {name}?",
+                "description": "Questa operazione elimina definitivamente l'agente insieme ai suoi budget, alle appartenenze e alla cronologia delle esecuzioni.",
+                "hint": "L'operazione non può essere annullata. Archivia l'agente se vuoi soltanto nasconderlo dal catalogo.",
+                "cancel": "Annulla",
+                "confirm": "Elimina definitivamente",
+                "success": "{name} eliminato",
+                "error": "Impossibile eliminare l'agente"
             }
         },
         "tasksPage": {

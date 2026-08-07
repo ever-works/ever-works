@@ -51,6 +51,7 @@ jest.mock('@ever-works/agent/activity-log', () => ({
         AGENT_PAUSED: 'agent_paused',
         AGENT_RESUMED: 'agent_resumed',
         AGENT_ARCHIVED: 'agent_archived',
+        AGENT_UNARCHIVED: 'agent_unarchived',
         AGENT_EXPORTED: 'agent_exported',
         AGENT_IMPORTED: 'agent_imported',
         AGENT_BUDGET_EXCEEDED: 'agent_budget_exceeded',
@@ -674,6 +675,14 @@ describe('AgentsController — runtime endpoints (FU-2)', () => {
                     'agent_run_cancelled',
                     'agent_task_assigned',
                 ]),
+            );
+        });
+
+        it('queries for agent_unarchived so restored agents surface in the feed', async () => {
+            await controller.listEvents(auth, agentId, {});
+            const { actionTypes } = activityLog.findAgentEvents.mock.calls[0][0];
+            expect(actionTypes).toEqual(
+                expect.arrayContaining(['agent_archived', 'agent_unarchived']),
             );
         });
 

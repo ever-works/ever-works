@@ -2,7 +2,18 @@
 
 import { useMemo, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
-import { Archive, Building2, Cpu, IdCard, Pause, Play, Save, ShieldCheck } from 'lucide-react';
+import {
+    Archive,
+    ArchiveRestore,
+    Building2,
+    Cpu,
+    IdCard,
+    Pause,
+    Play,
+    Save,
+    ShieldCheck,
+    Trash2,
+} from 'lucide-react';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -11,15 +22,17 @@ import { Select } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { useRouter } from '@/i18n/navigation';
 import {
-    archiveAgentAction,
     pauseAgentAction,
     resumeAgentAction,
+    unarchiveAgentAction,
     updateAgentAction,
 } from '@/app/actions/agents';
 // Teams & Companies spec §4.3 — roster mutations for the Organization
 // card's Team select (v1 UI: one team per Agent).
 import { addTeamMemberAction, removeTeamMemberAction } from '@/app/actions/dashboard/teams';
 import { AgentScorecardCard } from '@/components/agents/AgentScorecardCard';
+import { ArchiveAgentDialog } from '@/components/agents/ArchiveAgentDialog';
+import { DeleteAgentDialog } from '@/components/agents/DeleteAgentDialog';
 import { MergePolicyCard } from '@/components/policy/MergePolicyCard';
 import type { MergePolicyOverride } from '@ever-works/contracts';
 import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/searchable-select';
@@ -113,6 +126,18 @@ export function AgentSettingsClient({
     );
     const [pauseAfterFailures, setPauseAfterFailures] = useState(String(agent.pauseAfterFailures));
     const [permissions, setPermissions] = useState<AgentPermissions>(agent.permissions);
+    // Both terminal actions in the Identity header confirm through a
+    // dialog rather than `window.confirm`: archive because it takes the
+    // Agent out of the catalog, delete because it is the one
+    // irreversible action on this page.
+    const tIdentity = useTranslations('dashboard.agentsPage.settings.identity');
+    // Restore borrows the Archived tab's strings rather than minting a
+    // second set: it is literally the same action, and reading
+    // differently in the two places it can be triggered from would be
+    // the bug, not the reuse.
+    const tArchived = useTranslations('dashboard.agentsPage.archived');
+    const [isArchiveOpen, setIsArchiveOpen] = useState(false);
+    const [isDeleteOpen, setIsDeleteOpen] = useState(false);
 
     // Teams & Companies spec §4.3 — Organization card state. Explicit
     // isSubmitting (house rule for detached-async submits), '' = none.
@@ -218,18 +243,9 @@ export function AgentSettingsClient({
         }
     };
 
-    const changeStatus = (action: 'pause' | 'resume' | 'archive') => {
+    const changeStatus = (action: 'pause' | 'resume') => {
         startChangingStatus(async () => {
             try {
-                if (action === 'archive') {
-                    const confirmed = window.confirm('Archive this agent?');
-                    if (!confirmed) return;
-                    await archiveAgentAction(agent.id);
-                    toast.success('Agent archived');
-                    router.push('/agents');
-                    router.refresh();
-                    return;
-                }
                 const updated =
                     action === 'pause'
                         ? await pauseAgentAction(agent.id)
@@ -243,6 +259,25 @@ export function AgentSettingsClient({
         });
     };
 
+    /**
+     * Restore is the archive button's counterpart, so it lives in the
+     * same slot. No confirmation: it puts the Agent back paused, which
+     * is exactly what Archive promised and is itself undoable.
+     */
+    const restore = () => {
+        startChangingStatus(async () => {
+            try {
+                const updated = await unarchiveAgentAction(agent.id);
+                setAgent(updated);
+                toast.success(tArchived('unarchiveSuccess', { name: updated.name }));
+                router.refresh();
+            } catch (error) {
+                toast.error(error instanceof Error ? error.message : tArchived('unarchiveError'));
+            }
+        });
+    };
+
+    const isArchived = agent.status === 'archived';
     const canPause = agent.status === 'active';
     const canResume =
         agent.status === 'draft' || agent.status === 'paused' || agent.status === 'error';
@@ -278,7 +313,7 @@ export function AgentSettingsClient({
                                 className="gap-1.5 px-2.5 py-1 text-xs"
                             >
                                 <Pause className="h-3.5 w-3.5" />
-                                Pause
+                                {tIdentity('pause')}
                             </Button>
                         ) : null}
                         {canResume ? (
@@ -290,18 +325,53 @@ export function AgentSettingsClient({
                                 className="gap-1.5 px-2.5 py-1 text-xs"
                             >
                                 <Play className="h-3.5 w-3.5" />
-                                {agent.status === 'draft' ? 'Activate' : 'Resume'}
+                                {agent.status === 'draft'
+                                    ? tIdentity('activate')
+                                    : tIdentity('resume')}
                             </Button>
                         ) : null}
+                        {/* Archive is reversible (the archived tab restores
+                            it), so it stays a secondary control and only
+                            Delete carries the danger treatment — otherwise
+                            two identically-red buttons sit side by side.
+                            On an already-archived Agent the slot flips to
+                            Restore: archiving it again is a no-op, and
+                            undoing is the only move left besides Delete. */}
+                        {isArchived ? (
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={restore}
+                                loading={isChangingStatus}
+                                className="gap-1.5 px-2.5 py-1 text-xs"
+                                data-testid="agent-settings-restore"
+                            >
+                                <ArchiveRestore className="h-3.5 w-3.5" />
+                                {tArchived('unarchive')}
+                            </Button>
+                        ) : (
+                            <Button
+                                variant="secondary"
+                                size="sm"
+                                onClick={() => setIsArchiveOpen(true)}
+                                disabled={isChangingStatus}
+                                className="gap-1.5 px-2.5 py-1 text-xs"
+                                data-testid="agent-settings-archive"
+                            >
+                                <Archive className="h-3.5 w-3.5" />
+                                {tIdentity('archive')}
+                            </Button>
+                        )}
                         <Button
                             variant="danger"
                             size="sm"
-                            onClick={() => changeStatus('archive')}
-                            loading={isChangingStatus}
+                            onClick={() => setIsDeleteOpen(true)}
+                            disabled={isChangingStatus}
                             className="gap-1.5 px-2.5 py-1 text-xs"
+                            data-testid="agent-settings-delete"
                         >
-                            <Archive className="h-3.5 w-3.5" />
-                            Archive
+                            <Trash2 className="h-3.5 w-3.5" />
+                            {tIdentity('delete')}
                         </Button>
                     </div>
                 </div>
@@ -586,6 +656,30 @@ export function AgentSettingsClient({
 
             {/* Scorecard (Agent Scorecards increment 1 — additive section) */}
             <AgentScorecardCard agent={agent} />
+
+            {/* Both lifecycle confirmations. The former Danger-zone
+                section is gone: Delete now lives in the Identity header
+                beside Pause and Archive, and a second delete button
+                further down was the same action twice. */}
+            <ArchiveAgentDialog
+                agent={agent}
+                open={isArchiveOpen}
+                onOpenChange={setIsArchiveOpen}
+                onArchived={() => {
+                    router.push('/agents');
+                    router.refresh();
+                }}
+            />
+
+            <DeleteAgentDialog
+                agent={agent}
+                open={isDeleteOpen}
+                onOpenChange={setIsDeleteOpen}
+                onDeleted={() => {
+                    router.push('/agents');
+                    router.refresh();
+                }}
+            />
         </div>
     );
 }
