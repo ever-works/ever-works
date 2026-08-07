@@ -113,6 +113,7 @@ const AGENT_LIFECYCLE_EVENT_TYPES: ActivityActionType[] = [
     ActivityActionType.AGENT_PAUSED,
     ActivityActionType.AGENT_RESUMED,
     ActivityActionType.AGENT_ARCHIVED,
+    ActivityActionType.AGENT_UNARCHIVED,
     ActivityActionType.AGENT_EXPORTED,
     ActivityActionType.AGENT_IMPORTED,
     ActivityActionType.AGENT_BUDGET_EXCEEDED,
