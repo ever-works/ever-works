@@ -30,14 +30,14 @@ export function ArchivedAgentsList({ agents }: { agents: Agent[] }) {
     const t = useTranslations('dashboard.agentsPage.archived');
     const router = useRouter();
     const [pendingDelete, setPendingDelete] = useState<Agent | null>(null);
-    // Which row is mid-restore — the menu item is disabled for that
-    // row only, so a slow call can't be double-submitted while the
-    // other cards stay usable.
-    const [restoringId, setRestoringId] = useState<string | null>(null);
+    // Which rows are mid-restore — tracked per Agent so a slow call
+    // can't be double-submitted on its own row while the other cards
+    // stay usable, matching the per-row `disabled` on the menu item.
+    const [restoringIds, setRestoringIds] = useState<ReadonlySet<string>>(() => new Set());
 
     const unarchive = async (agent: Agent) => {
-        if (restoringId) return;
-        setRestoringId(agent.id);
+        if (restoringIds.has(agent.id)) return;
+        setRestoringIds((prev) => new Set(prev).add(agent.id));
         try {
             await unarchiveAgentAction(agent.id);
             toast.success(t('unarchiveSuccess', { name: agent.name }));
@@ -45,7 +45,11 @@ export function ArchivedAgentsList({ agents }: { agents: Agent[] }) {
         } catch (error) {
             toast.error(error instanceof Error ? error.message : t('unarchiveError'));
         } finally {
-            setRestoringId(null);
+            setRestoringIds((prev) => {
+                const next = new Set(prev);
+                next.delete(agent.id);
+                return next;
+            });
         }
     };
 
@@ -82,7 +86,7 @@ export function ArchivedAgentsList({ agents }: { agents: Agent[] }) {
                                     <DropdownMenuContent align="end" className="min-w-[10rem]">
                                         <DropdownMenuItem
                                             onClick={() => void unarchive(agent)}
-                                            disabled={restoringId === agent.id}
+                                            disabled={restoringIds.has(agent.id)}
                                             className="gap-2 py-1 text-xs"
                                         >
                                             <ArchiveRestore className="h-3.5 w-3.5" />

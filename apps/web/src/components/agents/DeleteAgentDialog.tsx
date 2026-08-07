@@ -60,8 +60,15 @@ export function DeleteAgentDialog({
         }
     };
 
+    // Escape and outside clicks reach `onOpenChange` too, so the dialog
+    // could otherwise vanish mid-request and hide the outcome toast.
+    const requestClose = (next: boolean) => {
+        if (!next && isDeleting) return;
+        onOpenChange(next);
+    };
+
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
+        <Dialog open={open} onOpenChange={requestClose}>
             <DialogContent className="max-w-md">
                 <DialogHeader>
                     <div className="flex items-start gap-3">
