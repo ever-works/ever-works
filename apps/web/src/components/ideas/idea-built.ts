@@ -41,6 +41,13 @@ export interface IdeaBuiltState {
  * NOTE on link kinds: every kind counts, not just `built` / `rebuilt`.
  * A Work created through `/works/new?proposal=…` is recorded as
  * `linked`, and that is the most common way users build an Idea.
+ *
+ * `matchedWorkId` is the last resort: a Work whose name and description
+ * match this Idea's title and description (see `idea-work-match.ts`).
+ * Nothing links a Work the user built outside the Idea flow, so without
+ * it those Ideas read "Not built yet" next to the Work they produced.
+ * It is consulted only when provenance has nothing to say, and it never
+ * overrides the link target.
  */
 export function deriveIdeaBuiltState(
     idea: Pick<
@@ -48,6 +55,7 @@ export function deriveIdeaBuiltState(
         'status' | 'acceptedWorkId' | 'linkedWorksCount' | 'latestLinkedWorkId'
     >,
     links?: ReadonlyArray<Pick<IdeaWorkLink, 'workId'>>,
+    matchedWorkId?: string | null,
 ): IdeaBuiltState {
     const acceptedWorkId =
         typeof idea.acceptedWorkId === 'string' && idea.acceptedWorkId.length > 0
@@ -61,13 +69,16 @@ export function deriveIdeaBuiltState(
     // not flip a built Idea back to "not built". The reverse also holds:
     // links refreshed after a build land before the rollup does.
     const count = Math.max(links?.length ?? 0, idea.linkedWorksCount ?? 0);
-    const workId = acceptedWorkId ?? links?.[0]?.workId ?? idea.latestLinkedWorkId ?? null;
+    const matched =
+        typeof matchedWorkId === 'string' && matchedWorkId.length > 0 ? matchedWorkId : null;
+    const workId = acceptedWorkId ?? links?.[0]?.workId ?? idea.latestLinkedWorkId ?? matched;
 
     // `acceptedWorkId` counts on its own, at any status — it is only ever
     // written alongside a real Work, and a queued / building / failed Idea
     // that already produced one must still offer "View Work" rather than
-    // sending the user to rebuild something that exists.
-    const isBuilt = count > 0 || acceptedWorkId !== null;
+    // sending the user to rebuild something that exists. A content match
+    // counts the same way, for the same reason: the Work exists.
+    const isBuilt = count > 0 || acceptedWorkId !== null || matched !== null;
 
     return {
         isBuilt,

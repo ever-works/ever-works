@@ -188,6 +188,35 @@ describe('IdeaCard (Phase 5 PR M)', () => {
             expect(routerPushMock).toHaveBeenCalledWith('/works/work-9');
         });
 
+        it('shows View Work for a Work matched by title + description', () => {
+            // Nothing links a Work the user built outside the Idea flow, so
+            // provenance is empty; the page matched it by content instead.
+            routerPushMock.mockClear();
+            render(<IdeaCard proposal={minimalProposal} matchedWorkId="work-5" />);
+
+            expect(screen.getByText('actions.viewWork')).toBeTruthy();
+            expect(screen.getByTestId('idea-card-built-badge')).toBeTruthy();
+            fireEvent.click(screen.getByText('actions.viewWork'));
+            expect(routerPushMock).toHaveBeenCalledWith('/works/work-5');
+        });
+
+        it('prefers the provenance link over a content match for the View Work target', () => {
+            routerPushMock.mockClear();
+            render(
+                <IdeaCard
+                    proposal={{
+                        ...minimalProposal,
+                        status: 'accepted',
+                        acceptedWorkId: 'work-1',
+                    }}
+                    matchedWorkId="work-5"
+                />,
+            );
+
+            fireEvent.click(screen.getByText('actions.viewWork'));
+            expect(routerPushMock).toHaveBeenCalledWith('/works/work-1');
+        });
+
         it('keeps the Build CTA and no badge when the Idea produced nothing', () => {
             render(<IdeaCard proposal={{ ...minimalProposal, linkedWorksCount: 0 }} />);
 

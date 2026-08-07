@@ -30,9 +30,16 @@ import { deriveIdeaBuiltState } from './idea-built';
 interface IdeaCardProps {
     proposal: WorkProposal;
     onDismissed?: (id: string) => void;
+    /**
+     * A Work whose name + description match this Idea's title +
+     * description, resolved server-side by the page that renders the
+     * list (`idea-work-match.ts`). Covers Works built outside the Idea
+     * flow, which leave no provenance link behind. Absent ⇒ no match.
+     */
+    matchedWorkId?: string | null;
 }
 
-export function IdeaCard({ proposal, onDismissed }: IdeaCardProps) {
+export function IdeaCard({ proposal, onDismissed, matchedWorkId = null }: IdeaCardProps) {
     const t = useTranslations('dashboard.proposals');
     const tPage = useTranslations('dashboard.ideasPage');
     const router = useRouter();
@@ -51,7 +58,7 @@ export function IdeaCard({ proposal, onDismissed }: IdeaCardProps) {
     // ACCEPTED, so it is null for Works built from the queued/building/
     // failed/dismissed Ideas this very card routes to /works/new. Those
     // builds used to leave the card stuck on "Build" forever.
-    const { isBuilt, workCount, workId } = deriveIdeaBuiltState(proposal);
+    const { isBuilt, workCount, workId } = deriveIdeaBuiltState(proposal, undefined, matchedWorkId);
     const hasWork = isBuilt && workId !== null;
 
     // Status marks shown on the CTA label. Derived purely from the
