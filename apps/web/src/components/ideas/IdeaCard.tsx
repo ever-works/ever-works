@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils/cn';
 import type { WorkProposal } from '@/lib/api/work-proposals';
 import { dismissProposalAction } from '@/app/actions/dashboard/work-proposals';
 import { STATUS_STYLES } from './idea-status';
+import { deriveIdeaBuiltState } from './idea-built';
 
 /**
  * Phase 5 PR M — `IdeaCard` is the canonical name for what used
@@ -37,15 +38,21 @@ export function IdeaCard({ proposal, onDismissed }: IdeaCardProps) {
     const router = useRouter();
     const [isPending, startTransition] = useTransition();
 
-    // "View Work" CTA. Whenever the Idea already points at a generated
-    // Work — regardless of its status — the "Build" CTA is swapped for
+    // "View Work" CTA. Whenever the Idea already produced a Work —
+    // regardless of its status — the "Build" CTA is swapped for
     // "View Work →" linking directly to the /works/<id> detail page. This
     // covers a Done (accepted) Idea, but also a queued/building/failed
     // Idea whose earlier build already produced a Work: there's no point
     // re-building something that already exists, so we send the user
-    // straight to it. Ideas without a Work id keep the Build CTA.
-    const hasWork =
-        typeof proposal.acceptedWorkId === 'string' && proposal.acceptedWorkId.length > 0;
+    // straight to it. Ideas without a Work keep the Build CTA.
+    //
+    // Read through the shared derivation rather than `acceptedWorkId`
+    // directly: that field is only stamped on a legal transition to
+    // ACCEPTED, so it is null for Works built from the queued/building/
+    // failed/dismissed Ideas this very card routes to /works/new. Those
+    // builds used to leave the card stuck on "Build" forever.
+    const { isBuilt, workCount, workId } = deriveIdeaBuiltState(proposal);
+    const hasWork = isBuilt && workId !== null;
 
     // Status marks shown on the CTA label. Derived purely from the
     // Idea's persisted status (server truth) so the "Queued"/"Building"
@@ -65,8 +72,8 @@ export function IdeaCard({ proposal, onDismissed }: IdeaCardProps) {
         // /works/new form collects — so an in-place queue attempt errors
         // for un-configured accounts and for queued/building Ideas.
         // Routing to /works/new is reliable for every status.
-        if (hasWork && proposal.acceptedWorkId) {
-            router.push(ROUTES.DASHBOARD_WORK(proposal.acceptedWorkId));
+        if (hasWork && workId) {
+            router.push(ROUTES.DASHBOARD_WORK(workId));
             return;
         }
         router.push(`/works/new?proposal=${proposal.id}`);
@@ -122,7 +129,7 @@ export function IdeaCard({ proposal, onDismissed }: IdeaCardProps) {
 
             {/* Status badge — meaningful now that the home preview surfaces
                 Ideas of every status (pending / building / accepted / …). */}
-            <div className="mb-3 pr-7">
+            <div className="mb-3 pr-7 flex flex-wrap items-center gap-1.5">
                 <span
                     className={cn(
                         'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset capitalize',
@@ -135,6 +142,22 @@ export function IdeaCard({ proposal, onDismissed }: IdeaCardProps) {
                     />
                     {tPage(`filters.${proposal.status}`)}
                 </span>
+
+                {/* Built marker. Only rendered when the status doesn't
+                    already say so — an `accepted` Idea reads "Done" in the
+                    badge above, so a second green pill would be noise. It
+                    earns its place on a queued / building / failed Idea
+                    that HAS produced a Work, which the status alone can
+                    never convey. */}
+                {isBuilt && proposal.status !== 'accepted' && (
+                    <span
+                        data-testid="idea-card-built-badge"
+                        className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success ring-1 ring-inset ring-success/20"
+                    >
+                        <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
+                        {tPage('detail.built.badge', { count: workCount })}
+                    </span>
+                )}
             </div>
 
             <h3 className="mb-2 pr-1 min-w-0 text-sm font-semibold text-text dark:text-text-dark leading-snug line-clamp-2">
@@ -146,7 +169,7 @@ export function IdeaCard({ proposal, onDismissed }: IdeaCardProps) {
             </p>
 
             {topCategories.length > 0 && (
-                <div className="flex flex-wrap gap-1.5 mb-3">
+                <div data-testid="idea-card-categories" className="flex flex-wrap gap-1.5 mb-3">
                     {topCategories.map((cat) => (
                         <span
                             key={cat.slug}
