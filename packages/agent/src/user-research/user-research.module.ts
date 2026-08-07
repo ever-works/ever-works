@@ -10,6 +10,7 @@ import { IdeaWork } from '../entities/idea-work.entity';
 import { IdeaWorkRepository } from '../database/repositories/idea-work.repository';
 import { UserUpload } from '../entities/user-upload.entity';
 import { User } from '../entities/user.entity';
+import { Agent } from '../entities/agent.entity';
 import { Organization } from '../entities/organization.entity';
 import { WorkProposalAttachmentRepository } from '../database/repositories/attachment.repositories';
 import { VisionContextService } from '../services/vision-context.service';
@@ -44,6 +45,10 @@ import {
             IdeaWork,
             User,
             Organization,
+            // Idea delete guard — `WorkProposalService.delete` refuses
+            // while Idea-scoped Agents still point at the Idea
+            // (`agents.ideaId` carries no DB FK).
+            Agent,
         ]),
     ],
     providers: [

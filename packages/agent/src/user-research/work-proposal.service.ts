@@ -1,5 +1,6 @@
 import {
     BadRequestException,
+    ConflictException,
     Injectable,
     Logger,
     NotFoundException,
@@ -17,8 +18,9 @@ import type { IdeaWorkKind } from '../entities/idea-work.entity';
 import { WorkProposalAttachmentRepository } from '../database/repositories/attachment.repositories';
 import { WorkProposalAttachment } from '../entities/work-proposal-attachment.entity';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { Not, Repository } from 'typeorm';
 import { UserUpload } from '../entities/user-upload.entity';
+import { Agent, AgentStatus } from '../entities/agent.entity';
 import { VisionContextService } from '../services/vision-context.service';
 
 // Upload IDs are SHA-256 hex strings (the `id` field returned by
@@ -90,6 +92,13 @@ import {
     WorkProposalSource,
     type WorkProposal,
 } from '../entities/work-proposal.entity';
+
+/**
+ * Why `WorkProposalService.delete` refused. Travels to the client in
+ * the 409 body (`{ reason, count, message }`) so the confirm dialog can
+ * name the blocker instead of showing a generic error.
+ */
+export type IdeaDeleteBlockedReason = 'build-in-flight' | 'linked-works' | 'idea-agents';
 
 export interface GenerateProposalsResult {
     status:
@@ -194,6 +203,13 @@ export class WorkProposalService {
         // no active Org / no vision) generation proceeds vision-less.
         @Optional()
         private readonly visionContext?: VisionContextService,
+        // Idea-scoped Agent guard for `delete()` — `agents.ideaId` has no
+        // DB FK, so a hard delete must check for stragglers itself.
+        // TRAILING + `@Optional()` for the same reason as the params
+        // above: hand-rolled tests construct this service positionally.
+        @Optional()
+        @InjectRepository(Agent)
+        private readonly agentsRepo?: Repository<Agent>,
     ) {}
 
     /**
@@ -906,5 +922,86 @@ export class WorkProposalService {
 
     async countPending(userId: string): Promise<number> {
         return this.repo.countPendingByUser(userId);
+    }
+    /**
+     * Hard-delete an Idea (`DELETE /me/work-proposals/:id`), mirroring
+     * the Mission delete contract (`MissionsService.delete`) but
+     * GUARDED — unlike a Mission, an Idea has satellites that hold a
+     * plain `ideaId` uuid with NO database FK (`agents.ideaId`,
+     * `tasks.ideaId`), so an unconditional delete would silently strand
+     * them pointing at a row that no longer exists.
+     *
+     * Refuses (409 + a machine-readable `reason`) when:
+     *   - a build is in flight (QUEUED / BUILDING) — the Goal-completion
+     *     handler would later try to accept an Idea that's gone;
+     *   - the Idea has `idea_works` provenance links — those rows DO
+     *     cascade, but deleting silently destroys the record of which
+     *     Idea a live Work came from. Deleting the Works (or unlinking)
+     *     is an explicit user decision, not a side effect of this call;
+     *   - Idea-scoped Agents still exist (`agents.scope = 'idea'`).
+     *
+     * The web UI reads `reason` to tell the user exactly what blocks
+     * the delete instead of showing a generic failure.
+     */
+    async delete(userId: string, proposalId: string): Promise<{ deleted: true }> {
+        const proposal = await this.repo.findByIdForUser(proposalId, userId);
+        if (!proposal) {
+            throw new NotFoundException('Idea not found');
+        }
+
+        if (
+            proposal.status === WorkProposalStatus.QUEUED ||
+            proposal.status === WorkProposalStatus.BUILDING
+        ) {
+            throw new ConflictException({
+                reason: 'build-in-flight' satisfies IdeaDeleteBlockedReason,
+                count: 0,
+                message: 'This Idea is being built. Wait for the build to finish, then delete it.',
+            });
+        }
+
+        const linkedWorks = await this.ideaWorks.countForIdea(proposalId, userId);
+        if (linkedWorks > 0) {
+            throw new ConflictException({
+                reason: 'linked-works' satisfies IdeaDeleteBlockedReason,
+                count: linkedWorks,
+                message: `This Idea is linked to ${linkedWorks} Work(s). Unlink or delete them first.`,
+            });
+        }
+
+        const ideaAgents = await this.countIdeaAgents(userId, proposalId);
+        if (ideaAgents > 0) {
+            throw new ConflictException({
+                reason: 'idea-agents' satisfies IdeaDeleteBlockedReason,
+                count: ideaAgents,
+                message: `This Idea has ${ideaAgents} Agent(s) scoped to it. Delete or re-scope them first.`,
+            });
+        }
+
+        const ok = await this.repo.deleteForUser(proposalId, userId);
+        if (!ok) {
+            // Lost a race with a concurrent delete — same shape as a
+            // never-existed id, which is what the caller now sees.
+            throw new NotFoundException('Idea not found');
+        }
+
+        await this.recordIdeaActivity(userId, ActivityActionType.IDEA_DELETED, 'delete', {
+            proposalId,
+            title: proposal.title,
+        });
+        return { deleted: true };
+    }
+
+    /**
+     * Count non-archived Agents scoped to this Idea. Returns 0 when the
+     * Agent repository isn't wired (hand-rolled test constructors) —
+     * the delete then proceeds on its other guards, exactly as it did
+     * before Agents existed.
+     */
+    private async countIdeaAgents(userId: string, proposalId: string): Promise<number> {
+        if (!this.agentsRepo) return 0;
+        return this.agentsRepo.count({
+            where: { userId, ideaId: proposalId, status: Not(AgentStatus.ARCHIVED) },
+        });
     }
 }
