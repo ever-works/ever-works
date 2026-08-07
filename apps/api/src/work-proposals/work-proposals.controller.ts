@@ -271,6 +271,30 @@ export class WorkProposalsController {
     }
 
     /**
+     * `DELETE /me/work-proposals/:id` — hard-delete an Idea, mirroring
+     * `DELETE /me/missions/:id`. Unlike the Mission endpoint this one is
+     * GUARDED: the service returns 409 with a machine-readable `reason`
+     * (`build-in-flight` | `linked-works` | `idea-agents`) rather than
+     * stranding Agents / Tasks that reference the Idea by a
+     * FK-less `ideaId` column. Dismiss (`PATCH :id/dismiss`) remains the
+     * reversible "hide it" path; this one destroys the row.
+     */
+    @Delete(':id')
+    @ApiOperation({
+        summary: 'Delete an Idea (refused while it has linked Works, Agents or a live build)',
+    })
+    @ApiResponse({ status: 200, description: 'Deleted' })
+    @ApiResponse({ status: 409, description: 'Blocked — body carries `reason` and `count`' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async remove(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<{ deleted: true }> {
+        return this.service.delete(auth.userId, id);
+    }
+
+    /**
      * Phase 1 PR B — `POST /me/work-proposals/:id/build` queue
      * an Idea for build. Transitions to QUEUED + creates a
      * WorkBuildRequest (`maxWorksPerRun=1`, `ideaId` set) so the
