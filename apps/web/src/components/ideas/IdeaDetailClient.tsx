@@ -33,7 +33,6 @@ import type {
 import type { Agent } from '@/lib/api/agents';
 import {
     attachUploadToIdeaAction,
-    buildIdeaAction,
     deleteIdeaAction,
     detachIdeaAttachmentAction,
     getProposalAction,
@@ -390,13 +389,33 @@ export function IdeaDetailClient({
 
     const canBuild = !isLive && !isBuilt && idea.status !== 'failed';
     const canRetry = !isLive && hasFailed;
-    const canRebuild = !isLive && isBuilt;
+    // `POST :id/rebuild` refuses any status but ACCEPTED. Built-ness alone
+    // is a weaker condition than that — a `pending` Idea counts as built
+    // off a `linked` provenance row or a content match — so gating Rebuild
+    // on `isBuilt` alone offered a button that always 400s. What exists is
+    // still reachable through the View Work link next to it.
+    const canRebuild = !isLive && isBuilt && idea.status === 'accepted';
 
     // ── Actions ───────────────────────────────────────────────────────
 
+    // Build — identical behaviour to the `IdeaCard` CTA on /ideas: open
+    // the manual build flow at `/works/new?proposal=…` rather than
+    // queueing through the build endpoint.
+    //
+    // Why not call the endpoint from here: it (a) rejects any status
+    // other than pending/failed and (b) needs the git/provider config
+    // that only the /works/new form collects — so an in-place queue
+    // attempt errors for un-configured accounts. Routing to the form is
+    // reliable for every status, and it's already what the card does, so
+    // a card and the page it opens no longer build an Idea two different
+    // ways. Retry and Rebuild keep their dedicated endpoints.
+    const handleBuild = () => {
+        router.push(`/works/new?proposal=${idea.id}`);
+    };
+
     const runBuildAction = (
         action: () => Promise<{ idea: WorkProposal }>,
-        successKey: 'buildQueued' | 'retryQueued' | 'rebuildQueued',
+        successKey: 'retryQueued' | 'rebuildQueued',
     ) => {
         startBuild(async () => {
             try {
@@ -469,10 +488,7 @@ export function IdeaDetailClient({
                             <button
                                 type="button"
                                 data-testid="idea-build-button"
-                                onClick={() =>
-                                    runBuildAction(() => buildIdeaAction(idea.id), 'buildQueued')
-                                }
-                                disabled={pendingBuild}
+                                onClick={handleBuild}
                                 className={cn(btnPrimary, 'shrink-0')}
                             >
                                 <Hammer className="w-3.5 h-3.5" />

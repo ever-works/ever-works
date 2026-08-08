@@ -96,6 +96,19 @@ describe('IdeaDetailClient', () => {
         expect(screen.queryByTestId('idea-built-work-link')).not.toBeInTheDocument();
     });
 
+    it('Build opens the same /works/new flow the Idea card uses', () => {
+        // The card and the page it opens must build an Idea the same way.
+        // Queueing through the build endpoint from here errored for
+        // un-configured accounts; only the /works/new form collects the
+        // git/provider config a build needs.
+        render(<IdeaDetailClient idea={baseIdea} />);
+
+        fireEvent.click(screen.getByTestId('idea-build-button'));
+
+        expect(routerPushMock).toHaveBeenCalledWith('/works/new?proposal=idea-1');
+        expect(buildIdeaMock).not.toHaveBeenCalled();
+    });
+
     it('reads as built off the idea_works link, and swaps Build for Rebuild', () => {
         render(
             <IdeaDetailClient
@@ -124,8 +137,10 @@ describe('IdeaDetailClient', () => {
         );
 
         expect(screen.getByTestId('idea-built-badge')).toHaveTextContent('built.badge');
-        expect(screen.getByTestId('idea-rebuild-button')).toBeInTheDocument();
         expect(screen.queryByTestId('idea-build-button')).not.toBeInTheDocument();
+        // Rebuild refuses any status but ACCEPTED, so a built-but-pending
+        // Idea must not offer a button that can only 400.
+        expect(screen.queryByTestId('idea-rebuild-button')).not.toBeInTheDocument();
         expect(screen.getByTestId('idea-built-work-link')).toHaveAttribute('href', '/works/work-1');
     });
 
