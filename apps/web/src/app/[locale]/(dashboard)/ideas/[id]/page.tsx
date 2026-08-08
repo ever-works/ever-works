@@ -9,7 +9,9 @@ import {
 } from '@/lib/api/work-proposals';
 import { agentsAPI, type Agent } from '@/lib/api/agents';
 import { missionsAPI } from '@/lib/api/missions';
+import { workAPI, type Work } from '@/lib/api/work';
 import { IdeaDetailClient } from '@/components/ideas';
+import { findMatchingWork } from '@/components/ideas/idea-work-match';
 
 /**
  * `/ideas/[id]` — Idea detail page.
@@ -48,6 +50,23 @@ const getIdeaWorks = cache(
         workProposalsAPI.listWorks(id).catch(() => ({ links: [] })),
 );
 
+/**
+ * Candidate Works for the title/description match that backstops
+ * provenance (`idea-work-match.ts`). Searched by the Idea's title rather
+ * than listing the whole catalog — the match requires the name to be
+ * identical anyway, so anything the search misses could never have
+ * matched. Degrades to `[]`: a missing match only costs the Built badge.
+ */
+const MATCH_CANDIDATE_LIMIT = 25;
+
+const getWorkCandidates = cache(
+    (title: string): Promise<Work[]> =>
+        workAPI
+            .getAll({ search: title, limit: MATCH_CANDIDATE_LIMIT })
+            .then((r) => r.works)
+            .catch(() => []),
+);
+
 const getAgents = cache(
     (id: string): Promise<Agent[]> =>
         agentsAPI
@@ -80,8 +99,9 @@ export default async function IdeaDetailPage({ params }: { params: Params }) {
 
     // Satellites only — the Idea itself is already resolved above, and
     // the parent Mission lookup needs its `missionId`.
-    const [ideaWorks, agents, attachments, mission] = await Promise.all([
+    const [ideaWorks, workCandidates, agents, attachments, mission] = await Promise.all([
         getIdeaWorks(id),
+        getWorkCandidates(idea.title),
         getAgents(id),
         getAttachments(id),
         idea.missionId ? missionsAPI.get(idea.missionId).catch(() => null) : Promise.resolve(null),
@@ -91,6 +111,7 @@ export default async function IdeaDetailPage({ params }: { params: Params }) {
         <IdeaDetailClient
             idea={idea}
             initialLinks={ideaWorks.links}
+            matchedWorkId={findMatchingWork(idea, workCandidates)?.id ?? null}
             agents={agents}
             attachments={attachments}
             missionTitle={mission?.title ?? null}

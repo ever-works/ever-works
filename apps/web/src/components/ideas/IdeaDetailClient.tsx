@@ -253,6 +253,14 @@ interface IdeaDetailClientProps {
      * denormalized `acceptedWorkId` was later cleared.
      */
     initialLinks?: IdeaWorkLink[];
+    /**
+     * A Work whose name + description match this Idea's title +
+     * description, resolved server-side by the page
+     * (`idea-work-match.ts`). The fallback answer to "was this built?"
+     * for a Work created outside the Idea flow, which leaves no
+     * provenance link behind. `null` ⇒ no match.
+     */
+    matchedWorkId?: string | null;
     /** Idea-scoped Agents (`GET /agents?ideaId=`). */
     agents?: Agent[];
     /** Uploads attached to this Idea (`GET :id/attachments`). */
@@ -275,6 +283,7 @@ interface IdeaDetailClientProps {
 export function IdeaDetailClient({
     idea: initialIdea,
     initialLinks = [],
+    matchedWorkId = null,
     agents = [],
     attachments = [],
     missionTitle = null,
@@ -366,7 +375,11 @@ export function IdeaDetailClient({
     // Shared with `IdeaCard` so a card and the page it opens can't
     // disagree. Every link kind counts: a Work built through
     // `/works/new?proposal=…` is recorded as `linked`, not `built`.
-    const { isBuilt, workCount, workId: primaryWorkId } = deriveIdeaBuiltState(idea, links);
+    const {
+        isBuilt,
+        workCount,
+        workId: primaryWorkId,
+    } = deriveIdeaBuiltState(idea, links, matchedWorkId);
     const hasFailed = idea.status === 'failed';
 
     // A pipeline run stamps `built` / `rebuilt`; the Work builder form

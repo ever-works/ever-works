@@ -129,6 +129,28 @@ describe('IdeaDetailClient', () => {
         expect(screen.getByTestId('idea-built-work-link')).toHaveAttribute('href', '/works/work-1');
     });
 
+    it('counts a Work matched by title + description as built', () => {
+        // A Work built outside the Idea flow leaves no provenance link.
+        // The page matches it on content and hands the id down.
+        render(<IdeaDetailClient idea={baseIdea} matchedWorkId="work-5" />);
+
+        expect(screen.getByTestId('idea-built-badge')).toHaveTextContent('built.badge');
+        expect(screen.queryByTestId('idea-build-button')).not.toBeInTheDocument();
+        expect(screen.getByTestId('idea-built-work-link')).toHaveAttribute('href', '/works/work-5');
+    });
+
+    it('prefers the provenance link over a content match', () => {
+        render(
+            <IdeaDetailClient
+                idea={{ ...baseIdea, status: 'accepted', acceptedWorkId: 'work-1' }}
+                initialLinks={[builtLink]}
+                matchedWorkId="work-5"
+            />,
+        );
+
+        expect(screen.getByTestId('idea-built-work-link')).toHaveAttribute('href', '/works/work-1');
+    });
+
     it('falls back to the rollup count when the link list is unavailable', () => {
         // The detail page degrades a failed `listWorks` to an empty list;
         // the Idea's own `linkedWorksCount` still answers "is it built?".
