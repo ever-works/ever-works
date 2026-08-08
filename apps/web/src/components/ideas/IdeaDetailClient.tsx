@@ -843,13 +843,10 @@ export function IdeaDetailClient({
                             <Link
                                 href={ROUTES.DASHBOARD_WORK(primaryWorkId)}
                                 data-testid="idea-built-work-link"
-                                className="mt-4 flex items-center gap-2 rounded-lg border border-success/20 bg-success/5 px-3 py-2.5 text-sm font-medium text-success hover:bg-success/10 transition-colors"
+                                className="mt-4 inline-flex max-w-full items-center gap-0.5 text-xs font-medium text-success hover:text-success/80 transition-colors"
                             >
-                                <CheckCircle2 className="w-4 h-4 shrink-0" />
-                                <span className="min-w-0 flex-1 truncate">
-                                    {t('actions.viewWork')}
-                                </span>
-                                <ChevronRight className="w-4 h-4 shrink-0" />
+                                <span className="min-w-0 truncate">{t('actions.viewWork')}</span>
+                                <ChevronRight className="w-3 h-3 shrink-0" />
                             </Link>
                         )}
                     </section>
