@@ -1771,6 +1771,79 @@
                     "linked": "Linked",
                     "rebuilt": "Rebuilt"
                 }
+            },
+            "detail": {
+                "live": "Live",
+                "fromMission": "From a Mission",
+                "sections": {
+                    "description": "Idea",
+                    "build": "Build status",
+                    "agents": "Agents",
+                    "details": "Details"
+                },
+                "stages": {
+                    "drafted": "Drafted",
+                    "queued": "Queued",
+                    "building": "Building",
+                    "built": "Built",
+                    "failed": "Build failed",
+                    "builtDirect": "Built"
+                },
+                "stageHints": {
+                    "drafted": "The Idea exists and is ready to build.",
+                    "queued": "Waiting for a builder to pick it up.",
+                    "building": "The Work Agent is generating the Work.",
+                    "built": "A Work was produced from this Idea.",
+                    "failed": "The build stopped. Retry to try again.",
+                    "builtDirect": "Created in the Work builder — it skipped the build queue."
+                },
+                "built": {
+                    "badge": "Built ({count})",
+                    "none": "Not built yet"
+                },
+                "actions": {
+                    "build": "Build",
+                    "retry": "Retry",
+                    "rebuild": "Rebuild",
+                    "rebuildHint": "Builds a new Work. The existing one is kept.",
+                    "newAgent": "New Agent",
+                    "delete": "Delete"
+                },
+                "works": {
+                    "empty": "No Works linked to this Idea yet."
+                },
+                "agents": {
+                    "empty": "No Agents scoped to this Idea."
+                },
+                "meta": {
+                    "source": "Source",
+                    "slug": "Slug",
+                    "fields": "Fields",
+                    "categories": "Suggested categories"
+                },
+                "deleteDialog": {
+                    "title": "Delete this Idea?",
+                    "body": "{title} will be permanently deleted. This cannot be undone.",
+                    "confirm": "Delete Idea",
+                    "cancel": "Cancel",
+                    "deleting": "Deleting…",
+                    "error": "Failed to delete Idea",
+                    "blocked": {
+                        "linked-works": "Can't delete: this Idea is linked to {count} Work(s). Delete or unlink them first.",
+                        "idea-agents": "Can't delete: {count} Agent(s) are scoped to this Idea. Delete or re-scope them first.",
+                        "build-in-flight": "Can't delete while a build is running. Wait for it to finish.",
+                        "unknown": "Can't delete this Idea right now."
+                    }
+                },
+                "toasts": {
+                    "built": "Work built from this Idea",
+                    "buildFailed": "The build failed",
+                    "buildQueued": "Build queued",
+                    "retryQueued": "Retry queued",
+                    "rebuildQueued": "Rebuild queued",
+                    "deleted": "Idea deleted",
+                    "actionError": "Couldn't complete that action. Please try again."
+                }
             }
         },
         "header": {

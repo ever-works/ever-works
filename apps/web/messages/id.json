@@ -1688,6 +1688,79 @@
                     "linked": "Linked",
                     "rebuilt": "Rebuilt"
                 }
+            },
+            "detail": {
+                "live": "Langsung",
+                "fromMission": "Dari Misi",
+                "sections": {
+                    "description": "Ide",
+                    "build": "Status build",
+                    "agents": "Agen",
+                    "details": "Detail"
+                },
+                "stages": {
+                    "drafted": "Dibuat",
+                    "queued": "Antre",
+                    "building": "Membangun",
+                    "built": "Dibangun",
+                    "failed": "Build gagal",
+                    "builtDirect": "Dibangun"
+                },
+                "stageHints": {
+                    "drafted": "Ide ada dan siap dibangun.",
+                    "queued": "Menunggu pembangun.",
+                    "building": "Work Agent sedang membuat Work.",
+                    "built": "Sebuah Work dihasilkan dari Ide ini.",
+                    "failed": "Build berhenti. Coba lagi.",
+                    "builtDirect": "Dibuat di pembuat Work — melewati antrean build."
+                },
+                "built": {
+                    "badge": "Dibangun ({count})",
+                    "none": "Belum dibangun"
+                },
+                "actions": {
+                    "build": "Bangun",
+                    "retry": "Coba lagi",
+                    "rebuild": "Bangun ulang",
+                    "rebuildHint": "Membuat Work baru. Yang lama tetap ada.",
+                    "newAgent": "Agen baru",
+                    "delete": "Hapus"
+                },
+                "works": {
+                    "empty": "Belum ada Work yang terhubung ke Ide ini."
+                },
+                "agents": {
+                    "empty": "Tidak ada Agen untuk Ide ini."
+                },
+                "meta": {
+                    "source": "Sumber",
+                    "slug": "Slug",
+                    "fields": "Bidang",
+                    "categories": "Kategori yang disarankan"
+                },
+                "deleteDialog": {
+                    "title": "Hapus Ide ini?",
+                    "body": "{title} akan dihapus permanen. Tindakan ini tidak dapat dibatalkan.",
+                    "confirm": "Hapus Ide",
+                    "cancel": "Batal",
+                    "deleting": "Menghapus…",
+                    "error": "Gagal menghapus Ide",
+                    "blocked": {
+                        "linked-works": "Tidak bisa dihapus: Ide ini terhubung ke {count} Work. Hapus atau putuskan tautannya dulu.",
+                        "idea-agents": "Tidak bisa dihapus: {count} Agen terikat pada Ide ini. Hapus atau ubah cakupannya dulu.",
+                        "build-in-flight": "Tidak bisa dihapus saat build berjalan. Tunggu hingga selesai.",
+                        "unknown": "Ide ini tidak bisa dihapus sekarang."
+                    }
+                },
+                "toasts": {
+                    "built": "Work dibangun dari Ide ini",
+                    "buildFailed": "Build gagal",
+                    "buildQueued": "Build diantrekan",
+                    "retryQueued": "Percobaan ulang diantrekan",
+                    "rebuildQueued": "Bangun ulang diantrekan",
+                    "deleted": "Ide dihapus",
+                    "actionError": "Tindakan gagal. Silakan coba lagi."
+                }
             }
         },
         "header": {

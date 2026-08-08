@@ -1719,6 +1719,79 @@
                     "linked": "Linked",
                     "rebuilt": "Rebuilt"
                 }
+            },
+            "detail": {
+                "live": "En vivo",
+                "fromMission": "De una Misión",
+                "sections": {
+                    "description": "Idea",
+                    "build": "Estado de la construcción",
+                    "agents": "Agentes",
+                    "details": "Detalles"
+                },
+                "stages": {
+                    "drafted": "Redactada",
+                    "queued": "En cola",
+                    "building": "Construyendo",
+                    "built": "Construida",
+                    "failed": "Construcción fallida",
+                    "builtDirect": "Construida"
+                },
+                "stageHints": {
+                    "drafted": "La Idea existe y está lista para construirse.",
+                    "queued": "Esperando a un constructor.",
+                    "building": "El Agente Work está generando el Work.",
+                    "built": "Se produjo un Work a partir de esta Idea.",
+                    "failed": "La construcción se detuvo. Reintenta.",
+                    "builtDirect": "Creado en el constructor de Works: omitió la cola de compilación."
+                },
+                "built": {
+                    "badge": "Construida ({count})",
+                    "none": "Aún no construida"
+                },
+                "actions": {
+                    "build": "Construir",
+                    "retry": "Reintentar",
+                    "rebuild": "Reconstruir",
+                    "rebuildHint": "Crea un Work nuevo. El existente se conserva.",
+                    "newAgent": "Nuevo Agente",
+                    "delete": "Eliminar"
+                },
+                "works": {
+                    "empty": "Todavía no hay Works vinculados a esta Idea."
+                },
+                "agents": {
+                    "empty": "No hay Agentes asignados a esta Idea."
+                },
+                "meta": {
+                    "source": "Origen",
+                    "slug": "Slug",
+                    "fields": "Campos",
+                    "categories": "Categorías sugeridas"
+                },
+                "deleteDialog": {
+                    "title": "¿Eliminar esta Idea?",
+                    "body": "{title} se eliminará permanentemente. Esto no se puede deshacer.",
+                    "confirm": "Eliminar Idea",
+                    "cancel": "Cancelar",
+                    "deleting": "Eliminando…",
+                    "error": "No se pudo eliminar la Idea",
+                    "blocked": {
+                        "linked-works": "No se puede eliminar: esta Idea está vinculada a {count} Work(s). Elimínalos o desvincúlalos primero.",
+                        "idea-agents": "No se puede eliminar: {count} Agente(s) están asignados a esta Idea. Elimínalos o cambia su alcance.",
+                        "build-in-flight": "No se puede eliminar mientras se construye. Espera a que termine.",
+                        "unknown": "No se puede eliminar esta Idea ahora mismo."
+                    }
+                },
+                "toasts": {
+                    "built": "Work construido a partir de esta Idea",
+                    "buildFailed": "La construcción falló",
+                    "buildQueued": "Construcción en cola",
+                    "retryQueued": "Reintento en cola",
+                    "rebuildQueued": "Reconstrucción en cola",
+                    "deleted": "Idea eliminada",
+                    "actionError": "No se pudo completar la acción. Inténtalo de nuevo."
+                }
             }
         },
         "header": {

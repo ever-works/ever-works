@@ -124,6 +124,51 @@ export async function buildIdeaAction(proposalId: string) {
     return result;
 }
 
+// Manual Retry for a FAILED Idea. Same shape as buildIdeaAction —
+// the detail page swaps its CTA to the live "building" state on the
+// returned Idea without waiting for the next poll tick.
+export async function retryIdeaAction(proposalId: string) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    const result = await workProposalsAPI.retry(proposalId);
+    revalidateIdeaSurfaces();
+    revalidatePath(`/[locale]/(dashboard)/ideas/${proposalId}`, 'page');
+    return result;
+}
+
+// Re-build an already-built Idea into a NEW Work. The original Work
+// is preserved — both stay in the Idea's linked-Works history.
+export async function rebuildIdeaAction(proposalId: string) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    const result = await workProposalsAPI.rebuild(proposalId);
+    revalidateIdeaSurfaces();
+    revalidatePath(`/[locale]/(dashboard)/ideas/${proposalId}`, 'page');
+    return result;
+}
+
+// Hard-delete an Idea. Returns the API's structured refusal
+// (`{ deleted: false, reason, count }`) instead of throwing when the
+// delete is blocked, so the confirm dialog can name the blocker.
+export async function deleteIdeaAction(proposalId: string) {
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    const result = await workProposalsAPI.remove(proposalId);
+    if (result.deleted) {
+        revalidateIdeaSurfaces();
+    }
+    return result;
+}
+
 // Attachment actions — used by the PromptComposer-driven flow on
 // /new (Idea chip) and the standalone /ideas quick-add. Lets the
 // caller wire uploads to a freshly-created Idea once we have its id.

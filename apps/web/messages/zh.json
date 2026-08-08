@@ -1688,6 +1688,79 @@
                     "linked": "Linked",
                     "rebuilt": "Rebuilt"
                 }
+            },
+            "detail": {
+                "live": "实时",
+                "fromMission": "来自任务",
+                "sections": {
+                    "description": "想法",
+                    "build": "构建状态",
+                    "agents": "智能体",
+                    "details": "详情"
+                },
+                "stages": {
+                    "drafted": "已创建",
+                    "queued": "排队中",
+                    "building": "构建中",
+                    "built": "已构建",
+                    "failed": "构建失败",
+                    "builtDirect": "已构建"
+                },
+                "stageHints": {
+                    "drafted": "想法已存在，可以开始构建。",
+                    "queued": "正在等待构建器。",
+                    "building": "Work 智能体正在生成 Work。",
+                    "built": "已从该想法生成了一个 Work。",
+                    "failed": "构建已停止。请重试。",
+                    "builtDirect": "在 Work 构建器中创建 — 跳过了构建队列。"
+                },
+                "built": {
+                    "badge": "已构建（{count}）",
+                    "none": "尚未构建"
+                },
+                "actions": {
+                    "build": "构建",
+                    "retry": "重试",
+                    "rebuild": "重新构建",
+                    "rebuildHint": "创建新的 Work，原有的会保留。",
+                    "newAgent": "新建智能体",
+                    "delete": "删除"
+                },
+                "works": {
+                    "empty": "还没有与该想法关联的 Work。"
+                },
+                "agents": {
+                    "empty": "该想法下没有智能体。"
+                },
+                "meta": {
+                    "source": "来源",
+                    "slug": "Slug",
+                    "fields": "字段",
+                    "categories": "建议分类"
+                },
+                "deleteDialog": {
+                    "title": "删除这个想法？",
+                    "body": "{title} 将被永久删除，此操作无法撤销。",
+                    "confirm": "删除想法",
+                    "cancel": "取消",
+                    "deleting": "正在删除…",
+                    "error": "删除想法失败",
+                    "blocked": {
+                        "linked-works": "无法删除：该想法关联了 {count} 个 Work。请先删除或取消关联。",
+                        "idea-agents": "无法删除：有 {count} 个智能体属于该想法。请先删除或更改其范围。",
+                        "build-in-flight": "构建进行中无法删除，请等待完成。",
+                        "unknown": "当前无法删除该想法。"
+                    }
+                },
+                "toasts": {
+                    "built": "已从该想法构建 Work",
+                    "buildFailed": "构建失败",
+                    "buildQueued": "构建已排队",
+                    "retryQueued": "重试已排队",
+                    "rebuildQueued": "重新构建已排队",
+                    "deleted": "想法已删除",
+                    "actionError": "操作未完成，请重试。"
+                }
             }
         },
         "header": {

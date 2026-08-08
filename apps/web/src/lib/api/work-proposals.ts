@@ -54,6 +54,20 @@ export interface WorkProposal {
     // when status === 'failed'.
     failureMessage?: string | null;
     failureKind?: IdeaFailureKind | null;
+    /**
+     * How many Works this Idea produced, from the authoritative
+     * `idea_works` table. This — not `acceptedWorkId` — is the answer to
+     * "was this Idea built?": `acceptedWorkId` is only stamped when the
+     * Idea's status legally transitions to ACCEPTED, so it stays null for
+     * Works built from a queued / building / failed / dismissed Idea.
+     *
+     * Optional because responses generated before this field shipped (and
+     * any cached page) simply omit it; treat a missing value as unknown
+     * and fall back to `acceptedWorkId`.
+     */
+    linkedWorksCount?: number;
+    /** Most recent linked Work — the "View Work" target when `acceptedWorkId` is null. */
+    latestLinkedWorkId?: string | null;
     generatedAt: string;
 }
 
@@ -91,6 +105,22 @@ export interface IdeaWorkLink {
     workName: string | null;
     workSlug: string | null;
 }
+
+/**
+ * Why the API refused to delete an Idea (409 body `reason`). Mirrors
+ * `IdeaDeleteBlockedReason` in `@ever-works/agent/user-research`;
+ * `unknown` covers a body we couldn't parse so the UI still has a
+ * branch to render.
+ */
+export type IdeaDeleteBlockedReason =
+    | 'build-in-flight'
+    | 'linked-works'
+    | 'idea-agents'
+    | 'unknown';
+
+export type DeleteIdeaResult =
+    | { deleted: true }
+    | { deleted: false; reason: IdeaDeleteBlockedReason; count: number };
 
 export const workProposalsAPI = {
     async get(id: string): Promise<WorkProposal | null> {
@@ -231,6 +261,62 @@ export const workProposalsAPI = {
             wrapInData: false,
         });
         return { idea: raw.proposal, buildRequestId: raw.goal.id };
+    },
+
+    // Manually retry a FAILED Idea (`POST :id/retry`) — clears
+    // failureMessage/failureKind and re-queues a fresh build.
+    async retry(id: string): Promise<BuildIdeaResponse> {
+        const raw = await serverMutation<BuildApiResponse>({
+            endpoint: `/me/work-proposals/${id}/retry`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+        return { idea: raw.proposal, buildRequestId: raw.goal.id };
+    },
+
+    // Re-build an already-built Idea (`POST :id/rebuild`). Produces a
+    // NEW Work; the original is preserved and stays in the Idea's
+    // `idea_works` history with kind `built`, while the new one lands
+    // as `rebuilt`.
+    async rebuild(id: string): Promise<BuildIdeaResponse> {
+        const raw = await serverMutation<BuildApiResponse>({
+            endpoint: `/me/work-proposals/${id}/rebuild`,
+            data: {},
+            method: 'POST',
+            wrapInData: false,
+        });
+        return { idea: raw.proposal, buildRequestId: raw.goal.id };
+    },
+
+    // Hard-delete an Idea (`DELETE :id`). The API refuses with 409 +
+    // `{ reason, count }` when the Idea still has linked Works,
+    // Idea-scoped Agents, or a build in flight — that's an expected
+    // outcome the confirm dialog renders, not an error, so it is
+    // translated into a result object instead of a throw. Every other
+    // failure still propagates.
+    async remove(id: string): Promise<DeleteIdeaResult> {
+        try {
+            await serverMutation<{ deleted: true }>({
+                endpoint: `/me/work-proposals/${id}`,
+                data: {},
+                method: 'DELETE',
+                wrapInData: false,
+            });
+            return { deleted: true };
+        } catch (err) {
+            if (err instanceof ApiResponseError && err.statusCode === 409) {
+                const details = err.details as
+                    | { reason?: IdeaDeleteBlockedReason; count?: number }
+                    | undefined;
+                return {
+                    deleted: false,
+                    reason: details?.reason ?? 'unknown',
+                    count: typeof details?.count === 'number' ? details.count : 0,
+                };
+            }
+            throw err;
+        }
     },
 
     // Phase 7 PR U — per-Idea current-period spend + GLOBAL cap
