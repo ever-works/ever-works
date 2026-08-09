@@ -94,6 +94,12 @@ describe('createAuthRuntimeInstance', () => {
         betterAuthMock.mockReturnValue({ __betterAuthInstance: true });
         bearerMock.mockClear();
         bearerMock.mockReturnValue({ __bearerPlugin: true });
+        // `mockClear`, not `mockReset`: the return value is set once at
+        // declaration, and resetting would strip it. Without this the call
+        // count accumulates across every test in this file that builds a
+        // runtime, so `toHaveBeenCalledTimes(1)` sees one call per preceding
+        // test and `mock.calls[0]` refers to some other test's invocation.
+        termsAcceptancePluginMock.mockClear();
         bcryptHash.mockReset();
         bcryptCompare.mockReset();
         randomUUIDMock.mockReset();
