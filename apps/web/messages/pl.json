@@ -1682,11 +1682,12 @@
                 "error": "Nie udało się utworzyć Idea. Spróbuj ponownie."
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "Powiązane Works",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "Utworzony",
+                    "linked": "Powiązany",
+                    "rebuilt": "Odtworzony",
+                    "matched": "Dopasowany"
                 }
             },
             "detail": {

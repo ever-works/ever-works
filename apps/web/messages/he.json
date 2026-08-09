@@ -1713,11 +1713,12 @@
                 "error": "לא ניתן ליצור את ה-Idea. נסה שוב."
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "Works מקושרים",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "נבנה",
+                    "linked": "מקושר",
+                    "rebuilt": "נבנה מחדש",
+                    "matched": "התאמה"
                 }
             },
             "detail": {

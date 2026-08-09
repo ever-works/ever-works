@@ -1682,11 +1682,12 @@
                 "error": "Tidak dapat membuat Idea. Silakan coba lagi."
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "Works Tertaut",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "Dibangun",
+                    "linked": "Tertaut",
+                    "rebuilt": "Dibangun ulang",
+                    "matched": "Cocok"
                 }
             },
             "detail": {

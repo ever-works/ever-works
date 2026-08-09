@@ -1682,11 +1682,12 @@
                 "error": "Impossibile creare la Idea. Riprova."
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "Works collegati",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "Creato",
+                    "linked": "Collegato",
+                    "rebuilt": "Ricreato",
+                    "matched": "Corrispondenza"
                 }
             },
             "detail": {

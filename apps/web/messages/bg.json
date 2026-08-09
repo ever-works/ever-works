@@ -1713,11 +1713,12 @@
                 "error": "Idea не може да бъде създадена. Моля, опитайте отново."
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "Свързани Works",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "Създаден",
+                    "linked": "Свързан",
+                    "rebuilt": "Пресъздаден",
+                    "matched": "Съвпадение"
                 }
             },
             "detail": {

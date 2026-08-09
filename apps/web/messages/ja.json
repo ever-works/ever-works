@@ -1682,11 +1682,12 @@
                 "error": "Idea を作成できませんでした。もう一度お試しください。"
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "関連する Works",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "構築済み",
+                    "linked": "リンク済み",
+                    "rebuilt": "再構築済み",
+                    "matched": "一致"
                 }
             },
             "detail": {

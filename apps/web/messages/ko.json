@@ -1682,11 +1682,12 @@
                 "error": "Idea를 만들 수 없습니다. 다시 시도해 주세요."
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "연결된 Works",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "생성됨",
+                    "linked": "연결됨",
+                    "rebuilt": "재생성됨",
+                    "matched": "일치"
                 }
             },
             "detail": {

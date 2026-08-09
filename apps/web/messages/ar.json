@@ -1713,11 +1713,12 @@
                 "error": "تعذّر إنشاء الـ Idea. يُرجى المحاولة مرة أخرى."
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "الـ Works المرتبطة",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "تم البناء",
+                    "linked": "مرتبط",
+                    "rebuilt": "أعيد البناء",
+                    "matched": "مطابق"
                 }
             },
             "detail": {

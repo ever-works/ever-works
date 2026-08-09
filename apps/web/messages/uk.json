@@ -1682,11 +1682,12 @@
                 "error": "Не вдалося створити Idea. Будь ласка, спробуйте ще раз."
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "Пов'язані Works",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "Створено",
+                    "linked": "Пов'язано",
+                    "rebuilt": "Створено повторно",
+                    "matched": "Збіг"
                 }
             },
             "detail": {

@@ -1682,11 +1682,12 @@
                 "error": "Không thể tạo Idea. Vui lòng thử lại."
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "Works đã liên kết",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "Đã tạo",
+                    "linked": "Đã liên kết",
+                    "rebuilt": "Đã tạo lại",
+                    "matched": "Khớp"
                 }
             },
             "detail": {

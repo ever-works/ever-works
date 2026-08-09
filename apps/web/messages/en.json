@@ -1769,7 +1769,8 @@
                 "kind": {
                     "built": "Built",
                     "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "rebuilt": "Rebuilt",
+                    "matched": "Matched"
                 }
             },
             "detail": {

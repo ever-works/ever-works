@@ -1713,11 +1713,12 @@
                 "error": "Die Idea konnte nicht erstellt werden. Bitte versuche es erneut."
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "Verknüpfte Works",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "Erstellt",
+                    "linked": "Verknüpft",
+                    "rebuilt": "Neu erstellt",
+                    "matched": "Zugeordnet"
                 }
             },
             "detail": {

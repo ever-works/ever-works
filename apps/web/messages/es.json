@@ -1713,11 +1713,12 @@
                 "error": "No se pudo crear la Idea. Inténtalo de nuevo."
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "Works vinculados",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "Creado",
+                    "linked": "Vinculado",
+                    "rebuilt": "Recreado",
+                    "matched": "Coincidencia"
                 }
             },
             "detail": {

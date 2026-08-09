@@ -1682,11 +1682,12 @@
                 "error": "Kan de Idea niet aanmaken. Probeer het opnieuw."
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "Gekoppelde Works",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "Gebouwd",
+                    "linked": "Gekoppeld",
+                    "rebuilt": "Opnieuw gebouwd",
+                    "matched": "Overeenkomst"
                 }
             },
             "detail": {
