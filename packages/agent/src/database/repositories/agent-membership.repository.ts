@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { In, IsNull, Repository } from 'typeorm';
+import { EntityManager, In, IsNull, Repository } from 'typeorm';
 import { AgentMembership, AgentMembershipTargetType } from '../../entities/agent-membership.entity';
 
 @Injectable()
@@ -9,6 +9,16 @@ export class AgentMembershipRepository {
         @InjectRepository(AgentMembership)
         private readonly repository: Repository<AgentMembership>,
     ) {}
+
+    /**
+     * Resolve the repository to write through: the tx-scoped one when the
+     * caller is mid-transaction (membership rows mirror `Agent.targets`,
+     * so both writes have to commit together), otherwise the injected
+     * connection-scoped default.
+     */
+    private repoFor(manager?: EntityManager): Repository<AgentMembership> {
+        return manager?.getRepository(AgentMembership) ?? this.repository;
+    }
 
     async findByAgent(agentId: string): Promise<AgentMembership[]> {
         return this.repository.find({ where: { agentId } });
@@ -37,24 +47,27 @@ export class AgentMembershipRepository {
         agentId: string,
         targetType: AgentMembershipTargetType,
         targetId: string | null,
+        manager?: EntityManager,
     ): Promise<AgentMembership> {
+        const repo = this.repoFor(manager);
         // Idempotent insert — UNIQUE(agentId, targetType, targetId).
-        const existing = await this.repository.findOne({
+        const existing = await repo.findOne({
             where: { agentId, targetType, targetId: targetId ?? IsNull() },
         });
         if (existing) {
             return existing;
         }
-        const row = this.repository.create({ agentId, targetType, targetId });
-        return this.repository.save(row);
+        const row = repo.create({ agentId, targetType, targetId });
+        return repo.save(row);
     }
 
     async removeMembership(
         agentId: string,
         targetType: AgentMembershipTargetType,
         targetId: string | null,
+        manager?: EntityManager,
     ): Promise<void> {
-        await this.repository.delete({
+        await this.repoFor(manager).delete({
             agentId,
             targetType,
             targetId: targetId ?? IsNull(),

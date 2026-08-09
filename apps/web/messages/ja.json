@@ -906,6 +906,13 @@
                 "nextDisabledReason": "Pick a parent or choose Workspace scope to continue."
             },
             "settings": {
+                "identity": {
+                    "pause": "一時停止",
+                    "resume": "再開",
+                    "activate": "有効化",
+                    "archive": "アーカイブ",
+                    "delete": "削除"
+                },
                 "orgCard": {
                     "title": "組織",
                     "teamLabel": "チーム",
@@ -993,7 +1000,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "アーカイブ済み"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1016,6 +1024,38 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "アーカイブ済みエージェント",
+                "subtitle": "アーカイブしたエージェントです。実行されず、カタログにも表示されません。復元すると一時停止状態で戻り、削除すると完全に消去されます。",
+                "empty": {
+                    "title": "アーカイブ済みのエージェントはありません",
+                    "subtitle": "設定ページからエージェントをアーカイブすると、ここに移動します。"
+                },
+                "delete": "完全に削除",
+                "deleteAria": "{name} を完全に削除",
+                "unarchive": "復元",
+                "menuAria": "{name} の操作",
+                "unarchiveSuccess": "{name} を復元しました",
+                "unarchiveError": "エージェントを復元できませんでした"
+            },
+            "archiveDialog": {
+                "title": "{name} をアーカイブしますか？",
+                "description": "エージェントは実行を停止し、カタログから外れます。実行履歴、予算、メンバーシップは保持されます。",
+                "hint": "アーカイブタブからいつでも復元できます。復元後は一時停止状態で戻ります。",
+                "cancel": "キャンセル",
+                "confirm": "エージェントをアーカイブ",
+                "success": "{name} をアーカイブしました",
+                "error": "エージェントをアーカイブできませんでした"
+            },
+            "deleteDialog": {
+                "title": "{name} を削除しますか？",
+                "description": "エージェントと、その予算・メンバーシップ・実行履歴が完全に削除されます。",
+                "hint": "この操作は取り消せません。カタログから隠したいだけの場合はアーカイブしてください。",
+                "cancel": "キャンセル",
+                "confirm": "完全に削除",
+                "success": "{name} を削除しました",
+                "error": "エージェントを削除できませんでした"
             }
         },
         "tasksPage": {
@@ -1024,6 +1064,33 @@
             "empty": {
                 "title": "まだタスクがありません。",
                 "subtitle": "タスクはエージェント/スキル/タスクロールアウトの後のフェーズで提供されます。サイドバーのナビゲーションルートが解決されるように、ページは予約されています。"
+            },
+            "scopedSection": {
+                "addExisting": "既存を追加",
+                "newTask": "新しいタスク",
+                "assignTitle": "既存のタスクを追加",
+                "assignSubtitle": "新しく作成する代わりに、バックログからタスクを選びます。",
+                "assignSearchPlaceholder": "タスクを検索…",
+                "assignSearchLabel": "タスクを検索",
+                "assignLoading": "タスクを読み込み中…",
+                "assignLoadFailed": "タスクを読み込めませんでした",
+                "assignNoneAvailable": "追加できるタスクは他にありません。",
+                "assignNoMatches": "この検索に一致するタスクはありません。",
+                "assignedToast": "{title} を追加しました",
+                "assignFailed": "タスクを追加できませんでした",
+                "assignCancel": "キャンセル",
+                "movesLabel": "移動",
+                "movesHint": "別の場所に登録されています。ここに追加すると移動します。",
+                "removedToast": "{title} をこのリストから外しました",
+                "removeFailed": "タスクを外せませんでした",
+                "rowMenuColumn": "操作",
+                "rowMenuLabel": "{title} の操作",
+                "removeMenuItem": "このリストから外す",
+                "confirmTitle": "このタスクを外しますか？",
+                "confirmBody": "{title} をこのリストから外します。タスク自体は残り、後で再び追加できます。",
+                "confirmCancel": "キャンセル",
+                "confirmSubmit": "外す",
+                "confirmPending": "処理中…"
             },
             "list": {
                 "newTask": "+ 新しいタスク",
@@ -1447,7 +1514,14 @@
                 "relationLabel": "Relation",
                 "attach": "Attach",
                 "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "detachDialog": {
+                    "title": "このワークを切り離しますか？",
+                    "body": "{title} はこのミッションから削除されます。ワーク自体には一切影響しません — 参照が解除されるだけです。",
+                    "confirm": "ワークを切り離す",
+                    "cancel": "キャンセル",
+                    "detaching": "切り離しています…",
+                    "error": "ワークを切り離せませんでした"
+                },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
                     "created": "Created",
@@ -1496,8 +1570,13 @@
                 "runNow": "Run now",
                 "clone": "Clone"
             },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            "deleteDialog": {
+                "title": "このミッションを削除しますか？",
+                "body": "{title} は完全に削除されます。子のアイデアとワークは保持されますが、このミッションへの逆リンクは失われます。この操作は取り消せません。",
+                "confirm": "ミッションを削除",
+                "cancel": "キャンセル",
+                "deleting": "削除しています…",
+                "error": "ミッションを削除できませんでした"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1568,6 +1647,36 @@
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)"
+                }
+            },
+            "goals": {
+                "title": "ゴール",
+                "empty": "このミッションにはまだゴールが紐付けられていません。成功の基準を追跡するには、下からゴールを紐付けてください。",
+                "attachTitle": "ゴールを紐付ける",
+                "goalLabel": "ゴール",
+                "goalPlaceholder": "ゴールを選択",
+                "primaryLabel": "主要に設定",
+                "primaryBadge": "主要",
+                "primaryTooltip": "このミッションの主要ゴール - 主要にできるゴールは同時に 1 つだけです。",
+                "attach": "紐付ける",
+                "detach": "切り離す",
+                "detachDialog": {
+                    "title": "このゴールを切り離しますか？",
+                    "body": "{title} はこのミッションから削除されます。ゴール自体は削除されません — ゴールページや、紐付けられている他のミッションには残ります。",
+                    "confirm": "ゴールを切り離す",
+                    "cancel": "キャンセル",
+                    "detaching": "切り離しています…",
+                    "error": "ゴールを切り離せませんでした"
+                },
+                "alreadyLinkedOption": "{title}（紐付け済み）",
+                "noGoalsToAttach": "ゴールがまだありません。ゴールページで作成してから、ここで紐付けてください。",
+                "pickerTruncated": "最近のゴール 100 件を表示しています - すべて見るにはゴールページを開いてください。",
+                "invariantNote": "ゴールを紐付けてもこのミッションのステータスは変わりません - ミッションの完了は明示的な操作のままです。",
+                "toasts": {
+                    "attached": "ゴールを紐付けました",
+                    "attachError": "ゴールを紐付けられませんでした",
+                    "detached": "ゴールを切り離しました",
+                    "detachError": "ゴールを切り離せませんでした"
                 }
             }
         },
@@ -1640,11 +1749,85 @@
                 "error": "Idea を作成できませんでした。もう一度お試しください。"
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "関連する Works",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "構築済み",
+                    "linked": "リンク済み",
+                    "rebuilt": "再構築済み",
+                    "matched": "一致"
+                }
+            },
+            "detail": {
+                "live": "ライブ",
+                "fromMission": "ミッション由来",
+                "sections": {
+                    "description": "アイデア",
+                    "build": "ビルド状況",
+                    "agents": "エージェント",
+                    "details": "詳細"
+                },
+                "stages": {
+                    "drafted": "作成済み",
+                    "queued": "待機中",
+                    "building": "ビルド中",
+                    "built": "ビルド完了",
+                    "failed": "ビルド失敗",
+                    "builtDirect": "ビルド完了"
+                },
+                "stageHints": {
+                    "drafted": "アイデアは作成済みで、ビルドの準備ができています。",
+                    "queued": "ビルダーの空きを待っています。",
+                    "building": "Work エージェントが Work を生成しています。",
+                    "built": "このアイデアから Work が作成されました。",
+                    "failed": "ビルドが停止しました。再試行してください。",
+                    "builtDirect": "Work ビルダーで作成されました — ビルドキューをスキップしました。"
+                },
+                "built": {
+                    "badge": "ビルド済み ({count})",
+                    "none": "未ビルド"
+                },
+                "actions": {
+                    "build": "ビルド",
+                    "retry": "再試行",
+                    "rebuild": "再ビルド",
+                    "rebuildHint": "新しい Work を作成します。既存のものは保持されます。",
+                    "newAgent": "新規エージェント",
+                    "delete": "削除"
+                },
+                "works": {
+                    "empty": "このアイデアに紐づく Work はまだありません。"
+                },
+                "agents": {
+                    "empty": "このアイデアに紐づくエージェントはありません。"
+                },
+                "meta": {
+                    "source": "ソース",
+                    "slug": "スラッグ",
+                    "fields": "フィールド",
+                    "categories": "推奨カテゴリ"
+                },
+                "deleteDialog": {
+                    "title": "このアイデアを削除しますか？",
+                    "body": "{title} は完全に削除されます。この操作は取り消せません。",
+                    "confirm": "アイデアを削除",
+                    "cancel": "キャンセル",
+                    "deleting": "削除中…",
+                    "error": "アイデアを削除できませんでした",
+                    "blocked": {
+                        "linked-works": "削除できません: このアイデアは {count} 件の Work にリンクしています。先に削除またはリンク解除してください。",
+                        "idea-agents": "削除できません: {count} 件のエージェントがこのアイデアに紐づいています。先に削除またはスコープを変更してください。",
+                        "build-in-flight": "ビルド実行中は削除できません。完了までお待ちください。",
+                        "unknown": "現在このアイデアは削除できません。"
+                    }
+                },
+                "toasts": {
+                    "built": "このアイデアから Work をビルドしました",
+                    "buildFailed": "ビルドに失敗しました",
+                    "buildQueued": "ビルドをキューに追加しました",
+                    "retryQueued": "再試行をキューに追加しました",
+                    "rebuildQueued": "再ビルドをキューに追加しました",
+                    "deleted": "アイデアを削除しました",
+                    "actionError": "操作を完了できませんでした。もう一度お試しください。"
                 }
             }
         },
@@ -2877,7 +3060,23 @@
                 "activatedToast": "エージェントを有効化しました",
                 "statusUpdateFailed": "ステータスを更新できませんでした",
                 "newAgent": "新しいエージェント",
-                "moreAgents": "他 {count} 件"
+                "moreAgents": "他 {count} 件",
+                "assignExisting": "既存を割り当て",
+                "assignTitle": "この作業にエージェントを割り当て",
+                "assignSubtitle": "新しく作成する代わりに、すでにあるエージェントをこの作業に割り当てます。",
+                "assignSearchPlaceholder": "エージェントを検索…",
+                "assignLoading": "エージェントを読み込み中…",
+                "assignNoneAvailable": "割り当てできるエージェントは他にありません。",
+                "assignNoMatches": "検索に一致するエージェントはありません。",
+                "assignLoadFailed": "エージェントを読み込めませんでした",
+                "assignedToast": "{name} をこの作業に割り当てました",
+                "assignFailed": "エージェントを割り当てられませんでした",
+                "assignCancel": "キャンセル",
+                "assignedLabel": "割り当て済み",
+                "assignedHint": "この作業に割り当て済み — ここで作成されたものではありません",
+                "unassign": "この作業から外す",
+                "unassignedToast": "{name} をこの作業から外しました",
+                "unassignFailed": "エージェントを外せませんでした"
             },
             "failedToGenerateItems": "アイテムの生成に失敗しました。もう一度お試しください。",
             "generationCompleted": "生成が正常に完了しました",

@@ -112,6 +112,27 @@ export class AgentTargetDto {
     id?: string;
 }
 
+/**
+ * Body of `POST /api/agents/:id/targets` (and of the matching DELETE) —
+ * ONE reach target to add to, or remove from, an Agent.
+ * Single-target rather than a whole-array PATCH so the Work header's
+ * "Assign existing Agent" picker doesn't have to read-modify-write
+ * `targets` and race every other editor of the same Agent.
+ *
+ * `wildcard` is deliberately NOT accepted here: granting an Agent reach
+ * over everything is a different decision from putting it on one Work,
+ * and it belongs on the Agent's own settings surface.
+ */
+export class AgentTargetBodyDto {
+    @ApiProperty({ enum: ['mission', 'idea', 'work'] })
+    @IsIn(['mission', 'idea', 'work'] as const)
+    type: 'mission' | 'idea' | 'work';
+
+    @ApiProperty()
+    @IsUUID()
+    id: string;
+}
+
 export class CreateAgentDto {
     @ApiProperty({ enum: AgentScope })
     @IsEnum(AgentScope)
@@ -448,6 +469,15 @@ export class ListAgentsQueryDto {
     @ApiProperty({ required: false }) @IsOptional() @IsUUID() missionId?: string;
     @ApiProperty({ required: false }) @IsOptional() @IsUUID() ideaId?: string;
     @ApiProperty({ required: false }) @IsOptional() @IsUUID() workId?: string;
+
+    @ApiProperty({
+        required: false,
+        description:
+            'Tenant-scoped Agents ASSIGNED to this Work (their `targets` include it), as opposed to `workId`, which matches Agents pinned to the Work by scope.',
+    })
+    @IsOptional()
+    @IsUUID()
+    assignedWorkId?: string;
 
     @ApiProperty({ required: false, maxLength: 80 })
     @IsOptional()

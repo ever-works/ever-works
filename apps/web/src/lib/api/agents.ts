@@ -30,6 +30,7 @@ export {
     type AgentGuardrailActionType,
     type AgentGuardrailsMode,
     type AgentGuardrails,
+    type AgentAssignCandidate,
     type AgentPickerOption,
     type AgentStatus,
     type AgentRunSession,
@@ -135,6 +136,12 @@ export interface ListAgentsQuery {
     missionId?: string;
     ideaId?: string;
     workId?: string;
+    /**
+     * Agents ASSIGNED to this Work (their `targets` include
+     * it) — as opposed to `workId`, which matches Agents pinned to the
+     * Work by scope. The Work header's Agents dropdown unions the two.
+     */
+    assignedWorkId?: string;
     search?: string;
     limit?: number;
     offset?: number;
@@ -295,6 +302,7 @@ function buildQuery(q: ListAgentsQuery = {}): string {
     if (q.missionId) params.set('missionId', q.missionId);
     if (q.ideaId) params.set('ideaId', q.ideaId);
     if (q.workId) params.set('workId', q.workId);
+    if (q.assignedWorkId) params.set('assignedWorkId', q.assignedWorkId);
     if (q.search) params.set('search', q.search);
     if (q.limit !== undefined) params.set('limit', String(q.limit));
     if (q.offset !== undefined) params.set('offset', String(q.offset));
@@ -355,6 +363,30 @@ export const agentsAPI = {
     },
 
     /**
+     * Assign an existing Agent to a Mission / Idea / Work.
+     * Idempotent, and single-target on purpose so the caller never has to
+     * read-modify-write the Agent's whole `targets` array.
+     */
+    async addTarget(id: string, target: { type: 'mission' | 'idea' | 'work'; id: string }) {
+        return serverMutation<Agent>({
+            endpoint: `/agents/${id}/targets`,
+            data: target,
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /** Inverse of `addTarget` — also idempotent. */
+    async removeTarget(id: string, target: { type: 'mission' | 'idea' | 'work'; id: string }) {
+        return serverMutation<Agent>({
+            endpoint: `/agents/${id}/targets/${target.type}/${target.id}`,
+            data: {},
+            method: 'DELETE',
+            wrapInData: false,
+        });
+    },
+
+    /**
      * PUT semantics — replaces the whole guardrails policy;
      * `null` clears back to the default queue-everything posture.
      */
@@ -372,6 +404,16 @@ export const agentsAPI = {
             endpoint: `/agents/${id}`,
             data: {},
             method: 'DELETE',
+            wrapInData: false,
+        });
+    },
+
+    /** Inverse of `archive` — restores an archived Agent as PAUSED. */
+    async unarchive(id: string): Promise<Agent> {
+        return serverMutation<Agent>({
+            endpoint: `/agents/${id}/unarchive`,
+            data: {},
+            method: 'POST',
             wrapInData: false,
         });
     },

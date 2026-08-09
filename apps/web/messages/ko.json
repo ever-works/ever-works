@@ -906,6 +906,13 @@
                 "nextDisabledReason": "Pick a parent or choose Workspace scope to continue."
             },
             "settings": {
+                "identity": {
+                    "pause": "일시중지",
+                    "resume": "재개",
+                    "activate": "활성화",
+                    "archive": "보관",
+                    "delete": "삭제"
+                },
                 "orgCard": {
                     "title": "조직",
                     "teamLabel": "팀",
@@ -993,7 +1000,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "보관됨"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1016,6 +1024,38 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "보관된 에이전트",
+                "subtitle": "보관한 에이전트입니다. 실행되지 않고 카탈로그에도 표시되지 않습니다. 복원하면 일시중지 상태로 돌아오며, 삭제하면 영구적으로 제거됩니다.",
+                "empty": {
+                    "title": "보관된 에이전트가 없습니다",
+                    "subtitle": "설정 페이지에서 에이전트를 보관하면 여기로 이동합니다."
+                },
+                "delete": "영구 삭제",
+                "deleteAria": "{name} 영구 삭제",
+                "unarchive": "복원",
+                "menuAria": "{name} 작업",
+                "unarchiveSuccess": "{name}이(가) 복원되었습니다",
+                "unarchiveError": "에이전트를 복원할 수 없습니다"
+            },
+            "archiveDialog": {
+                "title": "{name}을(를) 보관할까요?",
+                "description": "에이전트가 실행을 멈추고 카탈로그에서 사라집니다. 실행 기록, 예산, 멤버십은 유지됩니다.",
+                "hint": "보관함 탭에서 언제든지 복원할 수 있으며, 복원하면 일시중지 상태로 돌아옵니다.",
+                "cancel": "취소",
+                "confirm": "에이전트 보관",
+                "success": "{name}을(를) 보관했습니다",
+                "error": "에이전트를 보관할 수 없습니다"
+            },
+            "deleteDialog": {
+                "title": "{name}을(를) 삭제할까요?",
+                "description": "에이전트와 예산, 멤버십, 실행 기록이 영구적으로 삭제됩니다.",
+                "hint": "이 작업은 되돌릴 수 없습니다. 카탈로그에서 숨기기만 하려면 에이전트를 보관하세요.",
+                "cancel": "취소",
+                "confirm": "영구 삭제",
+                "success": "{name}이(가) 삭제되었습니다",
+                "error": "에이전트를 삭제할 수 없습니다"
             }
         },
         "tasksPage": {
@@ -1024,6 +1064,33 @@
             "empty": {
                 "title": "아직 작업이 없습니다.",
                 "subtitle": "작업은 에이전트/기술/작업 롤아웃의 후반 단계에서 제공됩니다. 페이지는 사이드바 네비게이션 경로가 해결되도록 예약되어 있습니다."
+            },
+            "scopedSection": {
+                "addExisting": "기존 작업 추가",
+                "newTask": "새 작업",
+                "assignTitle": "기존 작업 추가",
+                "assignSubtitle": "새로 만드는 대신 백로그에서 작업을 선택하세요.",
+                "assignSearchPlaceholder": "작업 검색…",
+                "assignSearchLabel": "작업 검색",
+                "assignLoading": "작업 불러오는 중…",
+                "assignLoadFailed": "작업을 불러오지 못했습니다",
+                "assignNoneAvailable": "추가할 다른 작업이 없습니다.",
+                "assignNoMatches": "검색과 일치하는 작업이 없습니다.",
+                "assignedToast": "{title}을(를) 추가했습니다",
+                "assignFailed": "작업을 추가하지 못했습니다",
+                "assignCancel": "취소",
+                "movesLabel": "이동",
+                "movesHint": "다른 곳에 등록되어 있습니다 — 여기에 추가하면 이동합니다.",
+                "removedToast": "{title}을(를) 이 목록에서 제거했습니다",
+                "removeFailed": "작업을 제거하지 못했습니다",
+                "rowMenuColumn": "관리",
+                "rowMenuLabel": "{title} 관리 메뉴",
+                "removeMenuItem": "이 목록에서 제거",
+                "confirmTitle": "이 작업을 제거할까요?",
+                "confirmBody": "{title}을(를) 이 목록에서 제거합니다. 작업 자체는 유지되며 나중에 다시 추가할 수 있습니다.",
+                "confirmCancel": "취소",
+                "confirmSubmit": "제거",
+                "confirmPending": "제거 중…"
             },
             "list": {
                 "newTask": "+ 새 작업",
@@ -1447,7 +1514,14 @@
                 "relationLabel": "Relation",
                 "attach": "Attach",
                 "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "detachDialog": {
+                    "title": "이 워크를 분리할까요?",
+                    "body": "{title}이(가) 이 미션에서 제거됩니다. 워크 자체는 변경되지 않으며 — 연결만 해제됩니다.",
+                    "confirm": "워크 분리",
+                    "cancel": "취소",
+                    "detaching": "분리하는 중…",
+                    "error": "워크를 분리하지 못했습니다"
+                },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
                     "created": "Created",
@@ -1496,8 +1570,13 @@
                 "runNow": "Run now",
                 "clone": "Clone"
             },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            "deleteDialog": {
+                "title": "이 미션을 삭제할까요?",
+                "body": "{title}이(가) 영구적으로 삭제됩니다. 하위 아이디어와 워크는 유지되지만 이 미션으로 연결된 링크는 끊어집니다. 이 작업은 되돌릴 수 없습니다.",
+                "confirm": "미션 삭제",
+                "cancel": "취소",
+                "deleting": "삭제하는 중…",
+                "error": "미션을 삭제하지 못했습니다"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1568,6 +1647,36 @@
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)"
+                }
+            },
+            "goals": {
+                "title": "목표",
+                "empty": "이 미션에 연결된 목표가 아직 없습니다. 성공의 기준을 추적하려면 아래에서 목표를 연결하세요.",
+                "attachTitle": "목표 연결",
+                "goalLabel": "목표",
+                "goalPlaceholder": "목표 선택",
+                "primaryLabel": "기본으로 설정",
+                "primaryBadge": "기본",
+                "primaryTooltip": "이 미션의 기본 목표 - 한 번에 하나의 목표만 기본이 될 수 있습니다.",
+                "attach": "연결",
+                "detach": "분리",
+                "detachDialog": {
+                    "title": "이 목표를 분리할까요?",
+                    "body": "{title}이(가) 이 미션에서 제거됩니다. 목표 자체는 삭제되지 않으며 — 목표 페이지와 연결된 다른 미션에 그대로 남아 있습니다.",
+                    "confirm": "목표 분리",
+                    "cancel": "취소",
+                    "detaching": "분리하는 중…",
+                    "error": "목표를 분리하지 못했습니다"
+                },
+                "alreadyLinkedOption": "{title} (이미 연결됨)",
+                "noGoalsToAttach": "아직 목표가 없습니다. 목표 페이지에서 만든 다음 여기에 연결하세요.",
+                "pickerTruncated": "가장 최근 목표 100개를 표시하고 있습니다 - 전체 목록은 목표 페이지에서 확인하세요.",
+                "invariantNote": "목표를 연결해도 이 미션의 상태는 변경되지 않습니다 - 미션 완료는 명시적인 작업으로 유지됩니다.",
+                "toasts": {
+                    "attached": "목표가 연결되었습니다",
+                    "attachError": "목표를 연결할 수 없습니다",
+                    "detached": "목표가 분리되었습니다",
+                    "detachError": "목표를 분리할 수 없습니다"
                 }
             }
         },
@@ -1640,11 +1749,85 @@
                 "error": "Idea를 만들 수 없습니다. 다시 시도해 주세요."
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "연결된 Works",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "생성됨",
+                    "linked": "연결됨",
+                    "rebuilt": "재생성됨",
+                    "matched": "일치"
+                }
+            },
+            "detail": {
+                "live": "실시간",
+                "fromMission": "미션에서 생성",
+                "sections": {
+                    "description": "아이디어",
+                    "build": "빌드 상태",
+                    "agents": "에이전트",
+                    "details": "세부 정보"
+                },
+                "stages": {
+                    "drafted": "작성됨",
+                    "queued": "대기 중",
+                    "building": "빌드 중",
+                    "built": "빌드 완료",
+                    "failed": "빌드 실패",
+                    "builtDirect": "빌드 완료"
+                },
+                "stageHints": {
+                    "drafted": "아이디어가 있으며 빌드할 준비가 되었습니다.",
+                    "queued": "빌더를 기다리는 중입니다.",
+                    "building": "Work 에이전트가 Work를 생성하고 있습니다.",
+                    "built": "이 아이디어로 Work가 생성되었습니다.",
+                    "failed": "빌드가 중단되었습니다. 다시 시도하세요.",
+                    "builtDirect": "Work 빌더에서 생성되었습니다 — 빌드 대기열을 건너뛰었습니다."
+                },
+                "built": {
+                    "badge": "빌드됨 ({count})",
+                    "none": "아직 빌드되지 않음"
+                },
+                "actions": {
+                    "build": "빌드",
+                    "retry": "다시 시도",
+                    "rebuild": "다시 빌드",
+                    "rebuildHint": "새 Work를 만듭니다. 기존 Work는 유지됩니다.",
+                    "newAgent": "새 에이전트",
+                    "delete": "삭제"
+                },
+                "works": {
+                    "empty": "이 아이디어에 연결된 Work가 없습니다."
+                },
+                "agents": {
+                    "empty": "이 아이디어에 연결된 에이전트가 없습니다."
+                },
+                "meta": {
+                    "source": "출처",
+                    "slug": "슬러그",
+                    "fields": "필드",
+                    "categories": "추천 카테고리"
+                },
+                "deleteDialog": {
+                    "title": "이 아이디어를 삭제할까요?",
+                    "body": "{title}이(가) 영구적으로 삭제됩니다. 되돌릴 수 없습니다.",
+                    "confirm": "아이디어 삭제",
+                    "cancel": "취소",
+                    "deleting": "삭제 중…",
+                    "error": "아이디어를 삭제하지 못했습니다",
+                    "blocked": {
+                        "linked-works": "삭제할 수 없습니다: 이 아이디어는 {count}개의 Work와 연결되어 있습니다. 먼저 삭제하거나 연결을 해제하세요.",
+                        "idea-agents": "삭제할 수 없습니다: {count}개의 에이전트가 이 아이디어에 연결되어 있습니다. 먼저 삭제하거나 범위를 변경하세요.",
+                        "build-in-flight": "빌드 중에는 삭제할 수 없습니다. 완료될 때까지 기다리세요.",
+                        "unknown": "지금은 이 아이디어를 삭제할 수 없습니다."
+                    }
+                },
+                "toasts": {
+                    "built": "이 아이디어로 Work를 빌드했습니다",
+                    "buildFailed": "빌드에 실패했습니다",
+                    "buildQueued": "빌드를 대기열에 추가했습니다",
+                    "retryQueued": "재시도를 대기열에 추가했습니다",
+                    "rebuildQueued": "다시 빌드를 대기열에 추가했습니다",
+                    "deleted": "아이디어를 삭제했습니다",
+                    "actionError": "작업을 완료하지 못했습니다. 다시 시도하세요."
                 }
             }
         },
@@ -2877,7 +3060,23 @@
                 "activatedToast": "에이전트가 활성화되었습니다",
                 "statusUpdateFailed": "상태를 업데이트할 수 없습니다",
                 "newAgent": "새 에이전트",
-                "moreAgents": "+{count}개 더"
+                "moreAgents": "+{count}개 더",
+                "assignExisting": "기존 에이전트 할당",
+                "assignTitle": "이 작업에 에이전트 할당",
+                "assignSubtitle": "새로 만드는 대신 이미 있는 에이전트를 이 작업에 배치하세요.",
+                "assignSearchPlaceholder": "에이전트 검색…",
+                "assignLoading": "에이전트 불러오는 중…",
+                "assignNoneAvailable": "할당할 다른 에이전트가 없습니다.",
+                "assignNoMatches": "검색과 일치하는 에이전트가 없습니다.",
+                "assignLoadFailed": "에이전트를 불러올 수 없습니다",
+                "assignedToast": "{name}을(를) 이 작업에 할당했습니다",
+                "assignFailed": "에이전트를 할당할 수 없습니다",
+                "assignCancel": "취소",
+                "assignedLabel": "할당됨",
+                "assignedHint": "이 작업에 할당됨 — 여기서 만든 것이 아님",
+                "unassign": "이 작업에서 제거",
+                "unassignedToast": "{name}을(를) 이 작업에서 제거했습니다",
+                "unassignFailed": "에이전트를 제거할 수 없습니다"
             },
             "failedToGenerateItems": "항목 생성에 실패했습니다. 다시 시도해 주세요.",
             "generationCompleted": "생성 완료",

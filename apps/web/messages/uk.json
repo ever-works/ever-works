@@ -906,6 +906,13 @@
                 "nextDisabledReason": "Pick a parent or choose Workspace scope to continue."
             },
             "settings": {
+                "identity": {
+                    "pause": "Призупинити",
+                    "resume": "Відновити",
+                    "activate": "Активувати",
+                    "archive": "Архівувати",
+                    "delete": "Видалити"
+                },
                 "orgCard": {
                     "title": "Організація",
                     "teamLabel": "Команда",
@@ -993,7 +1000,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "Архів"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1016,6 +1024,38 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "Архівні агенти",
+                "subtitle": "Агенти, які ви заархівували. Вони не виконуються та не показуються в каталозі. Відновіть агента, щоб повернути його на паузі, або видаліть назавжди.",
+                "empty": {
+                    "title": "Архівних агентів немає",
+                    "subtitle": "Архівування агента на сторінці його налаштувань переносить його сюди."
+                },
+                "delete": "Видалити назавжди",
+                "deleteAria": "Видалити {name} назавжди",
+                "unarchive": "Відновити",
+                "menuAria": "Дії для {name}",
+                "unarchiveSuccess": "{name} відновлено",
+                "unarchiveError": "Не вдалося відновити агента"
+            },
+            "archiveDialog": {
+                "title": "Архівувати {name}?",
+                "description": "Агент перестане запускатися та зникне з каталогу. Його запуски, бюджети та членства збережуться.",
+                "hint": "Ви можете відновити його на вкладці «Архів» будь-коли — він повернеться призупиненим.",
+                "cancel": "Скасувати",
+                "confirm": "Архівувати агента",
+                "success": "{name} заархівовано",
+                "error": "Не вдалося заархівувати агента"
+            },
+            "deleteDialog": {
+                "title": "Видалити {name}?",
+                "description": "Це остаточно видалить агента разом із його бюджетами, членством та історією запусків.",
+                "hint": "Цю дію не можна скасувати. Заархівуйте агента, якщо хочете лише сховати його з каталогу.",
+                "cancel": "Скасувати",
+                "confirm": "Видалити назавжди",
+                "success": "{name} видалено",
+                "error": "Не вдалося видалити агента"
             }
         },
         "tasksPage": {
@@ -1024,6 +1064,33 @@
             "empty": {
                 "title": "Ще немає завдань.",
                 "subtitle": "Завдання будуть доступні на пізнішому етапі впровадження Агентів/Навичок/Завдань. Сторінка зарезервована для вирішення маршруту навігації бічної панелі."
+            },
+            "scopedSection": {
+                "addExisting": "Додати наявне",
+                "newTask": "Нове завдання",
+                "assignTitle": "Додати наявне Завдання",
+                "assignSubtitle": "Оберіть Завдання зі свого беклогу замість створення нового.",
+                "assignSearchPlaceholder": "Пошук Завдань…",
+                "assignSearchLabel": "Пошук Завдань",
+                "assignLoading": "Завантаження Завдань…",
+                "assignLoadFailed": "Не вдалося завантажити Завдання",
+                "assignNoneAvailable": "Більше немає Завдань для додавання.",
+                "assignNoMatches": "Немає Завдань, що відповідають цьому запиту.",
+                "assignedToast": "{title} додано",
+                "assignFailed": "Не вдалося додати Завдання",
+                "assignCancel": "Скасувати",
+                "movesLabel": "переноситься",
+                "movesHint": "Закріплене в іншому місці — додавання сюди перенесе його.",
+                "removedToast": "{title} прибрано з цього списку",
+                "removeFailed": "Не вдалося прибрати Завдання",
+                "rowMenuColumn": "Дії",
+                "rowMenuLabel": "Дії для {title}",
+                "removeMenuItem": "Прибрати з цього списку",
+                "confirmTitle": "Прибрати це Завдання?",
+                "confirmBody": "{title} буде прибрано з цього списку. Саме Завдання зберігається, його можна додати знову пізніше.",
+                "confirmCancel": "Скасувати",
+                "confirmSubmit": "Прибрати",
+                "confirmPending": "Прибираємо…"
             },
             "list": {
                 "newTask": "+ Нове завдання",
@@ -1447,7 +1514,14 @@
                 "relationLabel": "Relation",
                 "attach": "Attach",
                 "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "detachDialog": {
+                    "title": "Від'єднати цю Роботу?",
+                    "body": "{title} буде вилучено з цієї Місії. Сама Робота не змінюється — вилучається лише посилання.",
+                    "confirm": "Від'єднати Роботу",
+                    "cancel": "Скасувати",
+                    "detaching": "Від'єднання…",
+                    "error": "Не вдалося від'єднати Роботу"
+                },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
                     "created": "Created",
@@ -1496,8 +1570,13 @@
                 "runNow": "Run now",
                 "clone": "Clone"
             },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            "deleteDialog": {
+                "title": "Видалити цю Місію?",
+                "body": "{title} буде видалено назавжди. Дочірні Ідеї та Роботи збережуться, але їхній зворотний зв'язок із цією Місією буде втрачено. Цю дію неможливо скасувати.",
+                "confirm": "Видалити Місію",
+                "cancel": "Скасувати",
+                "deleting": "Видалення…",
+                "error": "Не вдалося видалити Місію"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1568,6 +1647,36 @@
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)"
+                }
+            },
+            "goals": {
+                "title": "Цілі",
+                "empty": "До цієї Місії ще не приєднано жодної Цілі. Приєднайте Ціль нижче, щоб визначити, що вважати успіхом.",
+                "attachTitle": "Приєднати Ціль",
+                "goalLabel": "Ціль",
+                "goalPlaceholder": "Виберіть Ціль",
+                "primaryLabel": "Зробити основною",
+                "primaryBadge": "Основна",
+                "primaryTooltip": "Основна Ціль цієї Місії - основною може бути лише одна Ціль одночасно.",
+                "attach": "Приєднати",
+                "detach": "Від'єднати",
+                "detachDialog": {
+                    "title": "Від'єднати цю Ціль?",
+                    "body": "{title} буде вилучено з цієї Місії. Сама Ціль не видаляється — вона залишається на сторінці Цілей та в усіх інших Місіях, до яких приєднана.",
+                    "confirm": "Від'єднати Ціль",
+                    "cancel": "Скасувати",
+                    "detaching": "Від'єднання…",
+                    "error": "Не вдалося від'єднати Ціль"
+                },
+                "alreadyLinkedOption": "{title} (уже приєднана)",
+                "noGoalsToAttach": "У вас ще немає Цілей. Створіть Ціль на сторінці Цілей, а потім приєднайте її тут.",
+                "pickerTruncated": "Показано 100 найновіших Цілей - відкрийте сторінку Цілей, щоб побачити повний список.",
+                "invariantNote": "Приєднання Цілі ніколи не змінює статус цієї Місії - завершення Місії залишається явною дією.",
+                "toasts": {
+                    "attached": "Ціль приєднано",
+                    "attachError": "Не вдалося приєднати Ціль",
+                    "detached": "Ціль від'єднано",
+                    "detachError": "Не вдалося від'єднати Ціль"
                 }
             }
         },
@@ -1640,11 +1749,85 @@
                 "error": "Не вдалося створити Idea. Будь ласка, спробуйте ще раз."
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "Пов'язані Works",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "Створено",
+                    "linked": "Пов'язано",
+                    "rebuilt": "Створено повторно",
+                    "matched": "Збіг"
+                }
+            },
+            "detail": {
+                "live": "У прямому ефірі",
+                "fromMission": "З Місії",
+                "sections": {
+                    "description": "Ідея",
+                    "build": "Статус збірки",
+                    "agents": "Агенти",
+                    "details": "Деталі"
+                },
+                "stages": {
+                    "drafted": "Створена",
+                    "queued": "У черзі",
+                    "building": "Збірка",
+                    "built": "Зібрана",
+                    "failed": "Збірка не вдалася",
+                    "builtDirect": "Зібрана"
+                },
+                "stageHints": {
+                    "drafted": "Ідея створена та готова до збірки.",
+                    "queued": "Очікує на виконавця.",
+                    "building": "Work Agent генерує Work.",
+                    "built": "З цієї Ідеї створено Work.",
+                    "failed": "Збірку зупинено. Спробуйте ще раз.",
+                    "builtDirect": "Створено в конструкторі Works — чергу збірки пропущено."
+                },
+                "built": {
+                    "badge": "Зібрана ({count})",
+                    "none": "Ще не зібрана"
+                },
+                "actions": {
+                    "build": "Зібрати",
+                    "retry": "Повторити",
+                    "rebuild": "Перезібрати",
+                    "rebuildHint": "Створює новий Work. Наявний зберігається.",
+                    "newAgent": "Новий Агент",
+                    "delete": "Видалити"
+                },
+                "works": {
+                    "empty": "З цією Ідеєю ще не пов’язано жодного Work."
+                },
+                "agents": {
+                    "empty": "Немає Агентів, прив’язаних до цієї Ідеї."
+                },
+                "meta": {
+                    "source": "Джерело",
+                    "slug": "Slug",
+                    "fields": "Поля",
+                    "categories": "Пропоновані категорії"
+                },
+                "deleteDialog": {
+                    "title": "Видалити цю Ідею?",
+                    "body": "{title} буде видалено назавжди. Цю дію не можна скасувати.",
+                    "confirm": "Видалити Ідею",
+                    "cancel": "Скасувати",
+                    "deleting": "Видалення…",
+                    "error": "Не вдалося видалити Ідею",
+                    "blocked": {
+                        "linked-works": "Видалення неможливе: Ідея пов’язана з {count} Work. Спершу видаліть або від’єднайте їх.",
+                        "idea-agents": "Видалення неможливе: до Ідеї прив’язано {count} Агент(ів). Видаліть їх або змініть область.",
+                        "build-in-flight": "Не можна видалити під час збірки. Дочекайтеся завершення.",
+                        "unknown": "Зараз видалити цю Ідею неможливо."
+                    }
+                },
+                "toasts": {
+                    "built": "Work зібрано з цієї Ідеї",
+                    "buildFailed": "Збірка не вдалася",
+                    "buildQueued": "Збірку поставлено в чергу",
+                    "retryQueued": "Повтор поставлено в чергу",
+                    "rebuildQueued": "Перезбірку поставлено в чергу",
+                    "deleted": "Ідею видалено",
+                    "actionError": "Не вдалося виконати дію. Спробуйте ще раз."
                 }
             }
         },
@@ -2877,7 +3060,23 @@
                 "activatedToast": "Агента активовано",
                 "statusUpdateFailed": "Не вдалося оновити статус",
                 "newAgent": "Новий Агент",
-                "moreAgents": "+ще {count}"
+                "moreAgents": "+ще {count}",
+                "assignExisting": "Призначити наявного",
+                "assignTitle": "Призначити агента цій Роботі",
+                "assignSubtitle": "Призначте на цю Роботу агента, який у вас уже є, замість створювати нового.",
+                "assignSearchPlaceholder": "Пошук агентів…",
+                "assignLoading": "Завантаження агентів…",
+                "assignNoneAvailable": "Більше немає агентів для призначення.",
+                "assignNoMatches": "Немає агентів за цим запитом.",
+                "assignLoadFailed": "Не вдалося завантажити агентів",
+                "assignedToast": "{name} призначено цій Роботі",
+                "assignFailed": "Не вдалося призначити агента",
+                "assignCancel": "Скасувати",
+                "assignedLabel": "Призначено",
+                "assignedHint": "Призначено цій Роботі — створено не тут",
+                "unassign": "Прибрати з цієї Роботи",
+                "unassignedToast": "{name} прибрано з цієї Роботи",
+                "unassignFailed": "Не вдалося прибрати агента"
             },
             "failedToGenerateItems": "Не вдалося згенерувати елементи. Спробуйте ще раз.",
             "generationCompleted": "Генерацію завершено успішно",

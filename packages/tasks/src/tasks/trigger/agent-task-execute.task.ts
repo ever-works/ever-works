@@ -280,7 +280,24 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
         payload: AgentTaskExecutePayload,
         // NOTE: this annotation replaces the SDK RunFnParams, so anything omitted
         // here is silently invisible — which is exactly how `signal` went unused.
-        { ctx, signal }: { ctx?: { run?: { id?: string } }; signal?: AbortSignal } = {},
+        //
+        // `signal` stays in the type but is deliberately NOT destructured: it
+        // cannot reach the code that would act on it. `AgentRunService` is a
+        // remote proxy in worker scope (see `trigger-internal.module.ts`), so
+        // every argument to `runner.execute` is SuperJSON-serialized over HTTP,
+        // and SuperJSON has no transformer for `AbortSignal` — it encodes to
+        // `{}`, losing even an already-aborted state. Passing it would look
+        // like cancellation worked while `signal?.aborted` was permanently
+        // `undefined` on the far side. (`createRemoteProxy` now strips signals
+        // defensively; this is the call site not pretending in the first place.)
+        //
+        // Cancellation still works, out of band and API-side:
+        // `createAgentRunAbortSource` is built with a `readStatus` reader over
+        // `agent_runs.status` and is consulted once per model round-trip, so a
+        // run cancelled via `POST /agents/:id/runs/:runId/cancel` stops at the
+        // next checkpoint. That DB path is the authoritative one across this
+        // boundary — the signal never was.
+        { ctx }: { ctx?: { run?: { id?: string } }; signal?: AbortSignal } = {},
     ) => {
         // Security: validate payload IDs before any DB access (defense-in-depth, mirrors agent-heartbeat)
         assertUuid(payload.agentId, 'payload.agentId');
@@ -541,7 +558,7 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                 agentId: agent.id,
                 userId: payload.userId,
                 kind: 'task',
-                signal,
+                // No `signal` — see the note on the `run` params above.
                 taskId: payload.taskId,
                 immediateInput,
                 workspaceCwd,
@@ -776,7 +793,7 @@ export const agentTaskExecuteTask = task<'agent-task-execute', AgentTaskExecuteP
                                 agentId: agent.id,
                                 userId: payload.userId,
                                 kind: 'task',
-                                signal,
+                                // No `signal` — see the note on the `run` params above.
                                 taskId: payload.taskId,
                                 immediateInput: iterateMessage,
                                 workspaceCwd,

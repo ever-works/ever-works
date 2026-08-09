@@ -906,6 +906,13 @@
                 "nextDisabledReason": "Pick a parent or choose Workspace scope to continue."
             },
             "settings": {
+                "identity": {
+                    "pause": "Приостановить",
+                    "resume": "Возобновить",
+                    "activate": "Активировать",
+                    "archive": "Архивировать",
+                    "delete": "Удалить"
+                },
                 "orgCard": {
                     "title": "Организация",
                     "teamLabel": "Команда",
@@ -993,7 +1000,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "Архив"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1016,6 +1024,38 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "Архивные агенты",
+                "subtitle": "Агенты, отправленные вами в архив. Они не запускаются и не отображаются в каталоге. Восстановите агента — он вернётся на паузе — или удалите его навсегда.",
+                "empty": {
+                    "title": "Архивных агентов нет",
+                    "subtitle": "Архивация агента на странице его настроек перемещает его сюда."
+                },
+                "delete": "Удалить навсегда",
+                "deleteAria": "Удалить {name} навсегда",
+                "unarchive": "Восстановить",
+                "menuAria": "Действия для {name}",
+                "unarchiveSuccess": "{name} восстановлен",
+                "unarchiveError": "Не удалось восстановить агента"
+            },
+            "archiveDialog": {
+                "title": "Отправить {name} в архив?",
+                "description": "Агент перестанет запускаться и исчезнет из каталога. Его запуски, бюджеты и членства в командах сохранятся.",
+                "hint": "Вы можете восстановить его на вкладке «Архив» в любой момент — он вернётся на паузе.",
+                "cancel": "Отмена",
+                "confirm": "Отправить в архив",
+                "success": "{name} отправлен в архив",
+                "error": "Не удалось отправить агента в архив"
+            },
+            "deleteDialog": {
+                "title": "Удалить {name}?",
+                "description": "Агент, а также его бюджеты, участие в командах и история запусков будут удалены навсегда.",
+                "hint": "Это действие нельзя отменить. Отправьте агента в архив, если хотите только скрыть его из каталога.",
+                "cancel": "Отмена",
+                "confirm": "Удалить навсегда",
+                "success": "{name} удалён",
+                "error": "Не удалось удалить агента"
             }
         },
         "tasksPage": {
@@ -1024,6 +1064,33 @@
             "empty": {
                 "title": "Пока нет задач.",
                 "subtitle": "Задачи будут доступны в более поздней фазе внедрения Агентов/Навыков/Задач. Страница зарезервирована для разрешения маршрута навигации в боковой панели."
+            },
+            "scopedSection": {
+                "addExisting": "Добавить существующую Задачу",
+                "newTask": "Новая задача",
+                "assignTitle": "Добавить существующую Задачу",
+                "assignSubtitle": "Выберите Задачу из своего бэклога вместо создания новой.",
+                "assignSearchPlaceholder": "Поиск Задач…",
+                "assignSearchLabel": "Поиск Задач",
+                "assignLoading": "Загрузка Задач…",
+                "assignLoadFailed": "Не удалось загрузить Задачи",
+                "assignNoneAvailable": "Больше нет Задач для добавления.",
+                "assignNoMatches": "Нет Задач, соответствующих этому запросу.",
+                "assignedToast": "Задача «{title}» добавлена",
+                "assignFailed": "Не удалось добавить Задачу",
+                "assignCancel": "Отмена",
+                "movesLabel": "переносится",
+                "movesHint": "Закреплена в другом месте — добавление сюда перенесёт её.",
+                "removedToast": "Задача «{title}» убрана из этого списка",
+                "removeFailed": "Не удалось убрать Задачу",
+                "rowMenuColumn": "Действия",
+                "rowMenuLabel": "Действия для {title}",
+                "removeMenuItem": "Убрать из этого списка",
+                "confirmTitle": "Убрать эту Задачу?",
+                "confirmBody": "Задача «{title}» будет убрана из этого списка. Сама Задача сохраняется, её можно добавить снова позже.",
+                "confirmCancel": "Отмена",
+                "confirmSubmit": "Убрать",
+                "confirmPending": "Убираем…"
             },
             "list": {
                 "newTask": "+ Новая задача",
@@ -1447,7 +1514,14 @@
                 "relationLabel": "Relation",
                 "attach": "Attach",
                 "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "detachDialog": {
+                    "title": "Открепить эту Работу?",
+                    "body": "{title} будет удалена из этой Миссии. Сама Работа не изменяется — удаляется только связь.",
+                    "confirm": "Открепить Работу",
+                    "cancel": "Отмена",
+                    "detaching": "Открепление…",
+                    "error": "Не удалось открепить Работу"
+                },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
                     "created": "Created",
@@ -1496,8 +1570,13 @@
                 "runNow": "Run now",
                 "clone": "Clone"
             },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            "deleteDialog": {
+                "title": "Удалить эту Миссию?",
+                "body": "{title} будет удалена безвозвратно. Дочерние Идеи и Работы сохранятся, но их обратная связь с этой Миссией будет потеряна. Это действие нельзя отменить.",
+                "confirm": "Удалить Миссию",
+                "cancel": "Отмена",
+                "deleting": "Удаление…",
+                "error": "Не удалось удалить Миссию"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1568,6 +1647,36 @@
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)"
+                }
+            },
+            "goals": {
+                "title": "Цели",
+                "empty": "К этой Миссии пока не прикреплено ни одной Цели. Прикрепите Цель ниже, чтобы определить, что считать успехом.",
+                "attachTitle": "Прикрепить Цель",
+                "goalLabel": "Цель",
+                "goalPlaceholder": "Выберите Цель",
+                "primaryLabel": "Сделать основной",
+                "primaryBadge": "Основная",
+                "primaryTooltip": "Основная Цель этой Миссии - основной может быть только одна Цель одновременно.",
+                "attach": "Прикрепить",
+                "detach": "Открепить",
+                "detachDialog": {
+                    "title": "Открепить эту Цель?",
+                    "body": "{title} будет удалена из этой Миссии. Сама Цель не удаляется — она останется на странице Целей и во всех других Миссиях, к которым прикреплена.",
+                    "confirm": "Открепить Цель",
+                    "cancel": "Отмена",
+                    "detaching": "Открепление…",
+                    "error": "Не удалось открепить Цель"
+                },
+                "alreadyLinkedOption": "{title} (уже прикреплена)",
+                "noGoalsToAttach": "У вас пока нет Целей. Создайте Цель на странице Целей, а затем прикрепите её здесь.",
+                "pickerTruncated": "Показаны 100 последних Целей - откройте страницу Целей, чтобы увидеть полный список.",
+                "invariantNote": "Прикрепление Цели никогда не изменяет статус этой Миссии - завершение Миссии остаётся явным действием.",
+                "toasts": {
+                    "attached": "Цель прикреплена",
+                    "attachError": "Не удалось прикрепить Цель",
+                    "detached": "Цель откреплена",
+                    "detachError": "Не удалось открепить Цель"
                 }
             }
         },
@@ -1640,11 +1749,85 @@
                 "error": "Не удалось создать Idea. Пожалуйста, попробуйте ещё раз."
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "Связанные Works",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "Создан",
+                    "linked": "Связан",
+                    "rebuilt": "Пересоздан",
+                    "matched": "Совпадение"
+                }
+            },
+            "detail": {
+                "live": "В эфире",
+                "fromMission": "Из Миссии",
+                "sections": {
+                    "description": "Идея",
+                    "build": "Статус сборки",
+                    "agents": "Агенты",
+                    "details": "Детали"
+                },
+                "stages": {
+                    "drafted": "Создана",
+                    "queued": "В очереди",
+                    "building": "Сборка",
+                    "built": "Собрана",
+                    "failed": "Сборка не удалась",
+                    "builtDirect": "Собрана"
+                },
+                "stageHints": {
+                    "drafted": "Идея создана и готова к сборке.",
+                    "queued": "Ожидает исполнителя.",
+                    "building": "Work Agent генерирует Work.",
+                    "built": "Из этой Идеи создан Work.",
+                    "failed": "Сборка остановлена. Повторите попытку.",
+                    "builtDirect": "Создано в конструкторе Works — очередь сборки пропущена."
+                },
+                "built": {
+                    "badge": "Собрана ({count})",
+                    "none": "Ещё не собрана"
+                },
+                "actions": {
+                    "build": "Собрать",
+                    "retry": "Повторить",
+                    "rebuild": "Пересобрать",
+                    "rebuildHint": "Создаёт новый Work. Существующий сохраняется.",
+                    "newAgent": "Новый Агент",
+                    "delete": "Удалить"
+                },
+                "works": {
+                    "empty": "С этой Идеей пока не связано ни одного Work."
+                },
+                "agents": {
+                    "empty": "Нет Агентов, привязанных к этой Идее."
+                },
+                "meta": {
+                    "source": "Источник",
+                    "slug": "Slug",
+                    "fields": "Поля",
+                    "categories": "Предлагаемые категории"
+                },
+                "deleteDialog": {
+                    "title": "Удалить эту Идею?",
+                    "body": "{title} будет удалена безвозвратно. Это действие нельзя отменить.",
+                    "confirm": "Удалить Идею",
+                    "cancel": "Отмена",
+                    "deleting": "Удаление…",
+                    "error": "Не удалось удалить Идею",
+                    "blocked": {
+                        "linked-works": "Удаление невозможно: Идея связана с {count} Work. Сначала удалите или отвяжите их.",
+                        "idea-agents": "Удаление невозможно: к Идее привязано {count} Агент(ов). Удалите их или измените область.",
+                        "build-in-flight": "Нельзя удалить во время сборки. Дождитесь её завершения.",
+                        "unknown": "Сейчас удалить эту Идею нельзя."
+                    }
+                },
+                "toasts": {
+                    "built": "Work собран из этой Идеи",
+                    "buildFailed": "Сборка не удалась",
+                    "buildQueued": "Сборка поставлена в очередь",
+                    "retryQueued": "Повтор поставлен в очередь",
+                    "rebuildQueued": "Пересборка поставлена в очередь",
+                    "deleted": "Идея удалена",
+                    "actionError": "Не удалось выполнить действие. Попробуйте снова."
                 }
             }
         },
@@ -2877,7 +3060,23 @@
                 "activatedToast": "Агент активирован",
                 "statusUpdateFailed": "Не удалось обновить статус",
                 "newAgent": "Новый агент",
-                "moreAgents": "+ещё {count}"
+                "moreAgents": "+ещё {count}",
+                "assignExisting": "Назначить существующего",
+                "assignTitle": "Назначить агента этой Работе",
+                "assignSubtitle": "Назначьте на эту Работу агента, который у вас уже есть, вместо создания нового.",
+                "assignSearchPlaceholder": "Поиск агентов…",
+                "assignLoading": "Загрузка агентов…",
+                "assignNoneAvailable": "Больше нет агентов для назначения.",
+                "assignNoMatches": "Нет агентов по этому запросу.",
+                "assignLoadFailed": "Не удалось загрузить агентов",
+                "assignedToast": "{name} назначен этой Работе",
+                "assignFailed": "Не удалось назначить агента",
+                "assignCancel": "Отмена",
+                "assignedLabel": "Назначен",
+                "assignedHint": "Назначен этой Работе — создан не здесь",
+                "unassign": "Убрать с этой Работы",
+                "unassignedToast": "{name} убран с этой Работы",
+                "unassignFailed": "Не удалось убрать агента"
             },
             "failedToGenerateItems": "Не удалось сгенерировать элементы. Пожалуйста, попробуйте снова.",
             "generationCompleted": "Генерация успешно завершена",

@@ -1039,6 +1039,13 @@
                 "openInWizard": "Open in wizard"
             },
             "settings": {
+                "identity": {
+                    "pause": "Pause",
+                    "resume": "Resume",
+                    "activate": "Activate",
+                    "archive": "Archive",
+                    "delete": "Delete"
+                },
                 "orgCard": {
                     "title": "Organization",
                     "teamLabel": "Team",
@@ -1076,7 +1083,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "Archived"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1099,6 +1107,38 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "Archived agents",
+                "subtitle": "Agents you archived. They don't run and don't appear in the catalog. Restore one to bring it back paused, or delete it permanently.",
+                "empty": {
+                    "title": "No archived agents",
+                    "subtitle": "Archiving an agent from its settings page moves it here."
+                },
+                "delete": "Delete permanently",
+                "deleteAria": "Delete {name} permanently",
+                "unarchive": "Restore",
+                "menuAria": "Actions for {name}",
+                "unarchiveSuccess": "{name} restored",
+                "unarchiveError": "Could not restore agent"
+            },
+            "archiveDialog": {
+                "title": "Archive {name}?",
+                "description": "The agent stops running and leaves the catalog. Its runs, budgets and memberships are kept.",
+                "hint": "You can restore it from the Archived tab at any time — it comes back paused.",
+                "cancel": "Cancel",
+                "confirm": "Archive agent",
+                "success": "{name} archived",
+                "error": "Could not archive agent"
+            },
+            "deleteDialog": {
+                "title": "Delete {name}?",
+                "description": "This permanently deletes the agent along with its budgets, memberships and run history.",
+                "hint": "This can't be undone. Archive the agent instead if you only want to hide it from the catalog.",
+                "cancel": "Cancel",
+                "confirm": "Delete permanently",
+                "success": "{name} deleted",
+                "error": "Could not delete agent"
             }
         },
         "tasksPage": {
@@ -1107,6 +1147,33 @@
             "empty": {
                 "title": "No Tasks yet.",
                 "subtitle": "Tasks ship in a later phase of the Agents/Skills/Tasks rollout. The page is reserved so the sidebar nav route resolves."
+            },
+            "scopedSection": {
+                "addExisting": "Add existing",
+                "newTask": "New Task",
+                "assignTitle": "Add an existing Task",
+                "assignSubtitle": "Pick a Task from your backlog instead of creating another one.",
+                "assignSearchPlaceholder": "Search Tasks…",
+                "assignSearchLabel": "Search Tasks",
+                "assignLoading": "Loading Tasks…",
+                "assignLoadFailed": "Could not load Tasks",
+                "assignNoneAvailable": "No other Tasks left to add.",
+                "assignNoMatches": "No Tasks match that search.",
+                "assignedToast": "{title} added",
+                "assignFailed": "Could not add Task",
+                "assignCancel": "Cancel",
+                "movesLabel": "moves",
+                "movesHint": "Filed elsewhere — adding it here moves it.",
+                "removedToast": "{title} removed from this list",
+                "removeFailed": "Could not remove Task",
+                "rowMenuColumn": "Actions",
+                "rowMenuLabel": "Actions for {title}",
+                "removeMenuItem": "Remove from this list",
+                "confirmTitle": "Remove this Task?",
+                "confirmBody": "{title} will be removed from this list. The Task itself is kept and can be added back later.",
+                "confirmCancel": "Cancel",
+                "confirmSubmit": "Remove",
+                "confirmPending": "Removing…"
             },
             "runChip": {
                 "queued": "Queued",
@@ -1530,7 +1597,14 @@
                 "relationLabel": "Relation",
                 "attach": "Attach",
                 "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "detachDialog": {
+                    "title": "Detach this Work?",
+                    "body": "{title} will be removed from this Mission. The Work itself is never touched — this only removes the reference.",
+                    "confirm": "Detach Work",
+                    "cancel": "Cancel",
+                    "detaching": "Detaching…",
+                    "error": "Failed to detach Work"
+                },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
                     "created": "Created",
@@ -1579,8 +1653,13 @@
                 "runNow": "Run now",
                 "clone": "Clone"
             },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            "deleteDialog": {
+                "title": "Delete this Mission?",
+                "body": "{title} will be permanently deleted. Child Ideas and Works are preserved, but their back-link to this Mission is broken. This cannot be undone.",
+                "confirm": "Delete Mission",
+                "cancel": "Cancel",
+                "deleting": "Deleting…",
+                "error": "Failed to delete Mission"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1651,6 +1730,36 @@
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)"
+                }
+            },
+            "goals": {
+                "title": "Goals",
+                "empty": "No Goals attached to this Mission yet. Attach one below to track what success means.",
+                "attachTitle": "Attach a Goal",
+                "goalLabel": "Goal",
+                "goalPlaceholder": "Select a Goal",
+                "primaryLabel": "Set as primary",
+                "primaryBadge": "Primary",
+                "primaryTooltip": "The primary Goal for this Mission - only one Goal can be primary at a time.",
+                "attach": "Attach",
+                "detach": "Detach",
+                "detachDialog": {
+                    "title": "Detach this Goal?",
+                    "body": "{title} will be removed from this Mission. The Goal itself is not deleted — it stays on the Goals page and on any other Mission it is attached to.",
+                    "confirm": "Detach Goal",
+                    "cancel": "Cancel",
+                    "detaching": "Detaching…",
+                    "error": "Failed to detach Goal"
+                },
+                "alreadyLinkedOption": "{title} (already attached)",
+                "noGoalsToAttach": "You have no Goals yet. Create one on the Goals page, then attach it here.",
+                "pickerTruncated": "Showing your 100 most recent Goals - open the Goals page for the full list.",
+                "invariantNote": "Attaching a Goal never changes this Mission's status - completing a Mission stays an explicit action.",
+                "toasts": {
+                    "attached": "Goal attached",
+                    "attachError": "Couldn't attach Goal",
+                    "detached": "Goal detached",
+                    "detachError": "Couldn't detach Goal"
                 }
             }
         },
@@ -1727,7 +1836,81 @@
                 "kind": {
                     "built": "Built",
                     "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "rebuilt": "Rebuilt",
+                    "matched": "Matched"
+                }
+            },
+            "detail": {
+                "live": "Live",
+                "fromMission": "From a Mission",
+                "sections": {
+                    "description": "Idea",
+                    "build": "Build status",
+                    "agents": "Agents",
+                    "details": "Details"
+                },
+                "stages": {
+                    "drafted": "Drafted",
+                    "queued": "Queued",
+                    "building": "Building",
+                    "built": "Built",
+                    "failed": "Build failed",
+                    "builtDirect": "Built"
+                },
+                "stageHints": {
+                    "drafted": "The Idea exists and is ready to build.",
+                    "queued": "Waiting for a builder to pick it up.",
+                    "building": "The Work Agent is generating the Work.",
+                    "built": "A Work was produced from this Idea.",
+                    "failed": "The build stopped. Retry to try again.",
+                    "builtDirect": "Created in the Work builder — it skipped the build queue."
+                },
+                "built": {
+                    "badge": "Built ({count})",
+                    "none": "Not built yet"
+                },
+                "actions": {
+                    "build": "Build",
+                    "retry": "Retry",
+                    "rebuild": "Rebuild",
+                    "rebuildHint": "Builds a new Work. The existing one is kept.",
+                    "newAgent": "New Agent",
+                    "delete": "Delete"
+                },
+                "works": {
+                    "empty": "No Works linked to this Idea yet."
+                },
+                "agents": {
+                    "empty": "No Agents scoped to this Idea."
+                },
+                "meta": {
+                    "source": "Source",
+                    "slug": "Slug",
+                    "fields": "Fields",
+                    "categories": "Suggested categories"
+                },
+                "deleteDialog": {
+                    "title": "Delete this Idea?",
+                    "body": "{title} will be permanently deleted. This cannot be undone.",
+                    "confirm": "Delete Idea",
+                    "cancel": "Cancel",
+                    "deleting": "Deleting…",
+                    "error": "Failed to delete Idea",
+                    "blocked": {
+                        "linked-works": "Can't delete: this Idea is linked to {count} Work(s). Delete or unlink them first.",
+                        "idea-agents": "Can't delete: {count} Agent(s) are scoped to this Idea. Delete or re-scope them first.",
+                        "build-in-flight": "Can't delete while a build is running. Wait for it to finish.",
+                        "unknown": "Can't delete this Idea right now."
+                    }
+                },
+                "toasts": {
+                    "built": "Work built from this Idea",
+                    "buildFailed": "The build failed",
+                    "buildQueued": "Build queued",
+                    "retryQueued": "Retry queued",
+                    "rebuildQueued": "Rebuild queued",
+                    "deleted": "Idea deleted",
+                    "actionError": "Couldn't complete that action. Please try again."
                 }
             }
         },
@@ -3019,6 +3202,22 @@
                 "activatedToast": "Agent activated",
                 "statusUpdateFailed": "Could not update status",
                 "newAgent": "New Agent",
+                "assignExisting": "Assign existing",
+                "assignTitle": "Assign an Agent to this Work",
+                "assignSubtitle": "Put an Agent you already have on this Work instead of creating another one.",
+                "assignSearchPlaceholder": "Search Agents…",
+                "assignLoading": "Loading Agents…",
+                "assignNoneAvailable": "No other Agents left to assign.",
+                "assignNoMatches": "No Agents match that search.",
+                "assignLoadFailed": "Could not load Agents",
+                "assignedToast": "{name} assigned to this Work",
+                "assignFailed": "Could not assign Agent",
+                "assignCancel": "Cancel",
+                "assignedLabel": "Assigned",
+                "assignedHint": "Assigned to this Work — not created here",
+                "unassign": "Remove from this Work",
+                "unassignedToast": "{name} removed from this Work",
+                "unassignFailed": "Could not remove Agent",
                 "moreAgents": "+{count} more"
             },
             "failedToGenerateItems": "Failed to generate items. Please try again.",

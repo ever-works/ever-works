@@ -77,3 +77,4 @@ export * from './repositories/organization-notification-default.repository';
 export * from './repositories/organization-onboarding-profile.repository';
 export * from './database-init.service';
 export * from './repositories/workflow.repository';
+export * from './repositories/workflow-run.repository';

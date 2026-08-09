@@ -7,3 +7,4 @@ export { MissionsList } from './MissionsList';
 export { MissionDetailClient } from './MissionDetailClient';
 export { MissionsPreviewSection } from './MissionsPreviewSection';
 export { NewMissionForm } from './NewMissionForm';
+export { MissionGoalsPanel, type AttachableGoalOption } from './MissionGoalsPanel';

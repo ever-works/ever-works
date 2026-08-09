@@ -149,3 +149,6 @@ export * from './fleet-job.entity';
 // Tool-grant matrix (audit item G4) — per-scope tool allow/deny rows.
 export * from './tool-grant.entity';
 export * from './workflow.entity';
+// One execution of a saved graph — what makes running a workflow leave a
+// trace instead of vanishing into a chat tool's return value.
+export * from './workflow-run.entity';

@@ -954,6 +954,13 @@
                 "openInWizard": "Abrir en el asistente"
             },
             "settings": {
+                "identity": {
+                    "pause": "Pausar",
+                    "resume": "Reanudar",
+                    "activate": "Activar",
+                    "archive": "Archivar",
+                    "delete": "Eliminar"
+                },
                 "orgCard": {
                     "title": "Organización",
                     "teamLabel": "Equipo",
@@ -1024,7 +1031,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "Archivados"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1047,6 +1055,38 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "Agentes archivados",
+                "subtitle": "Agentes que has archivado. No se ejecutan ni aparecen en el catálogo. Restaura uno para recuperarlo en pausa o elimínalo definitivamente.",
+                "empty": {
+                    "title": "No hay agentes archivados",
+                    "subtitle": "Archivar un agente desde su página de configuración lo mueve aquí."
+                },
+                "delete": "Eliminar definitivamente",
+                "deleteAria": "Eliminar {name} definitivamente",
+                "unarchive": "Restaurar",
+                "menuAria": "Acciones para {name}",
+                "unarchiveSuccess": "{name} restaurado",
+                "unarchiveError": "No se pudo restaurar el agente"
+            },
+            "archiveDialog": {
+                "title": "¿Archivar {name}?",
+                "description": "El agente deja de ejecutarse y desaparece del catálogo. Se conservan sus ejecuciones, presupuestos y membresías.",
+                "hint": "Puedes restaurarlo desde la pestaña Archivados en cualquier momento: volverá en pausa.",
+                "cancel": "Cancelar",
+                "confirm": "Archivar agente",
+                "success": "{name} archivado",
+                "error": "No se pudo archivar el agente"
+            },
+            "deleteDialog": {
+                "title": "¿Eliminar {name}?",
+                "description": "Esto elimina definitivamente el agente junto con sus presupuestos, membresías e historial de ejecuciones.",
+                "hint": "Esta acción no se puede deshacer. Archiva el agente si solo quieres ocultarlo del catálogo.",
+                "cancel": "Cancelar",
+                "confirm": "Eliminar definitivamente",
+                "success": "{name} eliminado",
+                "error": "No se pudo eliminar el agente"
             }
         },
         "tasksPage": {
@@ -1055,6 +1095,33 @@
             "empty": {
                 "title": "Aún no hay Tareas.",
                 "subtitle": "Las Tareas se lanzarán en una fase posterior de la implementación de Agentes/Habilidades/Tareas. La página está reservada para que la ruta de navegación lateral se resuelva."
+            },
+            "scopedSection": {
+                "addExisting": "Añadir existente",
+                "newTask": "Nueva Tarea",
+                "assignTitle": "Añadir una Tarea existente",
+                "assignSubtitle": "Elige una Tarea de tu backlog en lugar de crear otra.",
+                "assignSearchPlaceholder": "Buscar Tareas…",
+                "assignSearchLabel": "Buscar Tareas",
+                "assignLoading": "Cargando Tareas…",
+                "assignLoadFailed": "No se pudieron cargar las Tareas",
+                "assignNoneAvailable": "No quedan otras Tareas para añadir.",
+                "assignNoMatches": "Ninguna Tarea coincide con esa búsqueda.",
+                "assignedToast": "{title} añadida",
+                "assignFailed": "No se pudo añadir la Tarea",
+                "assignCancel": "Cancelar",
+                "movesLabel": "se mueve",
+                "movesHint": "Está en otro sitio: añadirla aquí la moverá.",
+                "removedToast": "{title} quitada de esta lista",
+                "removeFailed": "No se pudo quitar la Tarea",
+                "rowMenuColumn": "Acciones",
+                "rowMenuLabel": "Acciones para {title}",
+                "removeMenuItem": "Quitar de esta lista",
+                "confirmTitle": "¿Quitar esta Tarea?",
+                "confirmBody": "{title} se quitará de esta lista. La Tarea se conserva y puede volver a añadirse más tarde.",
+                "confirmCancel": "Cancelar",
+                "confirmSubmit": "Quitar",
+                "confirmPending": "Quitando…"
             },
             "list": {
                 "newTask": "+ Nueva Tarea",
@@ -1478,7 +1545,14 @@
                 "relationLabel": "Relation",
                 "attach": "Attach",
                 "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "detachDialog": {
+                    "title": "¿Desvincular este Trabajo?",
+                    "body": "{title} se eliminará de esta Misión. El Trabajo en sí nunca se modifica — esto solo elimina la referencia.",
+                    "confirm": "Desvincular Trabajo",
+                    "cancel": "Cancelar",
+                    "detaching": "Desvinculando…",
+                    "error": "No se pudo desvincular el Trabajo"
+                },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
                     "created": "Created",
@@ -1527,8 +1601,13 @@
                 "runNow": "Run now",
                 "clone": "Clone"
             },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            "deleteDialog": {
+                "title": "¿Eliminar esta Misión?",
+                "body": "{title} se eliminará de forma permanente. Las Ideas y los Trabajos secundarios se conservan, pero se pierde su vínculo con esta Misión. Esta acción no se puede deshacer.",
+                "confirm": "Eliminar Misión",
+                "cancel": "Cancelar",
+                "deleting": "Eliminando…",
+                "error": "No se pudo eliminar la Misión"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1599,6 +1678,36 @@
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)"
+                }
+            },
+            "goals": {
+                "title": "Objetivos",
+                "empty": "Todavía no hay Objetivos vinculados a esta Misión. Vincula uno a continuación para definir qué significa el éxito.",
+                "attachTitle": "Vincular un Objetivo",
+                "goalLabel": "Objetivo",
+                "goalPlaceholder": "Selecciona un Objetivo",
+                "primaryLabel": "Establecer como principal",
+                "primaryBadge": "Principal",
+                "primaryTooltip": "El Objetivo principal de esta Misión - solo un Objetivo puede ser principal a la vez.",
+                "attach": "Vincular",
+                "detach": "Desvincular",
+                "detachDialog": {
+                    "title": "¿Desvincular este Objetivo?",
+                    "body": "{title} se eliminará de esta Misión. El Objetivo en sí no se elimina — permanece en la página de Objetivos y en cualquier otra Misión a la que esté vinculado.",
+                    "confirm": "Desvincular Objetivo",
+                    "cancel": "Cancelar",
+                    "detaching": "Desvinculando…",
+                    "error": "No se pudo desvincular el Objetivo"
+                },
+                "alreadyLinkedOption": "{title} (ya vinculado)",
+                "noGoalsToAttach": "Todavía no tienes Objetivos. Crea uno en la página de Objetivos y luego vincúlalo aquí.",
+                "pickerTruncated": "Se muestran tus 100 Objetivos más recientes - abre la página de Objetivos para ver la lista completa.",
+                "invariantNote": "Vincular un Objetivo nunca cambia el estado de esta Misión - completar una Misión sigue siendo una acción explícita.",
+                "toasts": {
+                    "attached": "Objetivo vinculado",
+                    "attachError": "No se pudo vincular el Objetivo",
+                    "detached": "Objetivo desvinculado",
+                    "detachError": "No se pudo desvincular el Objetivo"
                 }
             }
         },
@@ -1671,11 +1780,85 @@
                 "error": "No se pudo crear la Idea. Inténtalo de nuevo."
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "Works vinculados",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "Creado",
+                    "linked": "Vinculado",
+                    "rebuilt": "Recreado",
+                    "matched": "Coincidencia"
+                }
+            },
+            "detail": {
+                "live": "En vivo",
+                "fromMission": "De una Misión",
+                "sections": {
+                    "description": "Idea",
+                    "build": "Estado de la construcción",
+                    "agents": "Agentes",
+                    "details": "Detalles"
+                },
+                "stages": {
+                    "drafted": "Redactada",
+                    "queued": "En cola",
+                    "building": "Construyendo",
+                    "built": "Construida",
+                    "failed": "Construcción fallida",
+                    "builtDirect": "Construida"
+                },
+                "stageHints": {
+                    "drafted": "La Idea existe y está lista para construirse.",
+                    "queued": "Esperando a un constructor.",
+                    "building": "El Agente Work está generando el Work.",
+                    "built": "Se produjo un Work a partir de esta Idea.",
+                    "failed": "La construcción se detuvo. Reintenta.",
+                    "builtDirect": "Creado en el constructor de Works: omitió la cola de compilación."
+                },
+                "built": {
+                    "badge": "Construida ({count})",
+                    "none": "Aún no construida"
+                },
+                "actions": {
+                    "build": "Construir",
+                    "retry": "Reintentar",
+                    "rebuild": "Reconstruir",
+                    "rebuildHint": "Crea un Work nuevo. El existente se conserva.",
+                    "newAgent": "Nuevo Agente",
+                    "delete": "Eliminar"
+                },
+                "works": {
+                    "empty": "Todavía no hay Works vinculados a esta Idea."
+                },
+                "agents": {
+                    "empty": "No hay Agentes asignados a esta Idea."
+                },
+                "meta": {
+                    "source": "Origen",
+                    "slug": "Slug",
+                    "fields": "Campos",
+                    "categories": "Categorías sugeridas"
+                },
+                "deleteDialog": {
+                    "title": "¿Eliminar esta Idea?",
+                    "body": "{title} se eliminará permanentemente. Esto no se puede deshacer.",
+                    "confirm": "Eliminar Idea",
+                    "cancel": "Cancelar",
+                    "deleting": "Eliminando…",
+                    "error": "No se pudo eliminar la Idea",
+                    "blocked": {
+                        "linked-works": "No se puede eliminar: esta Idea está vinculada a {count} Work(s). Elimínalos o desvincúlalos primero.",
+                        "idea-agents": "No se puede eliminar: {count} Agente(s) están asignados a esta Idea. Elimínalos o cambia su alcance.",
+                        "build-in-flight": "No se puede eliminar mientras se construye. Espera a que termine.",
+                        "unknown": "No se puede eliminar esta Idea ahora mismo."
+                    }
+                },
+                "toasts": {
+                    "built": "Work construido a partir de esta Idea",
+                    "buildFailed": "La construcción falló",
+                    "buildQueued": "Construcción en cola",
+                    "retryQueued": "Reintento en cola",
+                    "rebuildQueued": "Reconstrucción en cola",
+                    "deleted": "Idea eliminada",
+                    "actionError": "No se pudo completar la acción. Inténtalo de nuevo."
                 }
             }
         },
@@ -2945,7 +3128,23 @@
                 "activatedToast": "Agente activado",
                 "statusUpdateFailed": "No se pudo actualizar el estado",
                 "newAgent": "Nuevo Agente",
-                "moreAgents": "+{count} más"
+                "moreAgents": "+{count} más",
+                "assignExisting": "Asignar existente",
+                "assignTitle": "Asignar un Agente a este Trabajo",
+                "assignSubtitle": "Añade a este Trabajo un Agente que ya tienes en lugar de crear otro.",
+                "assignSearchPlaceholder": "Buscar Agentes…",
+                "assignLoading": "Cargando Agentes…",
+                "assignNoneAvailable": "No quedan otros Agentes para asignar.",
+                "assignNoMatches": "Ningún Agente coincide con esa búsqueda.",
+                "assignLoadFailed": "No se pudieron cargar los Agentes",
+                "assignedToast": "{name} asignado a este Trabajo",
+                "assignFailed": "No se pudo asignar el Agente",
+                "assignCancel": "Cancelar",
+                "assignedLabel": "Asignado",
+                "assignedHint": "Asignado a este Trabajo — no se creó aquí",
+                "unassign": "Quitar de este Trabajo",
+                "unassignedToast": "{name} quitado de este Trabajo",
+                "unassignFailed": "No se pudo quitar el Agente"
             },
             "failedToGenerateItems": "No se pudieron generar los elementos. Inténtalo de nuevo.",
             "generationCompleted": "Generación completada exitosamente",

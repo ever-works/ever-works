@@ -6,6 +6,8 @@ import {
     type WorkProposalStatus,
 } from '@/lib/api/work-proposals';
 import { IdeasPageClient } from '@/components/ideas/IdeasPageClient';
+import { matchIdeasToWorks } from '@/components/ideas/idea-work-match';
+import { workAPI, type Work } from '@/lib/api/work';
 import { ROUTES } from '@/lib/constants';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -23,6 +25,15 @@ const IDEA_STATUSES: WorkProposalStatus[] = [
 ];
 const ACTIONABLE_STATUSES: WorkProposalStatus[] = ['pending', 'queued', 'building', 'failed'];
 const PAGE_SIZE = 24;
+
+/**
+ * How many Works to pull for the title/description match that backstops
+ * provenance (`idea-work-match.ts`). One bounded list matched in memory,
+ * rather than a search per card — 24 cards would otherwise mean 24 extra
+ * requests. A user past this many Works may see an older one stop
+ * matching; the cost is a missing Built badge, never a wrong one.
+ */
+const MATCH_CANDIDATE_LIMIT = 100;
 
 type IdeasStatusFilter = 'actionable' | 'all' | 'done' | WorkProposalStatus;
 type IdeasSearchParams = Promise<{
@@ -79,12 +90,22 @@ export default async function IdeasPage({ searchParams }: { searchParams: IdeasS
 
     let allIdeas: WorkProposal[] = [];
     let loadError: string | null = null;
+    // The Works list only feeds the built-state match, so it is fetched
+    // alongside the Ideas and degraded to `[]` on failure — a flaky
+    // /works must not take down the Ideas catalog.
+    let works: Work[] = [];
     try {
-        allIdeas = await workProposalsAPI.list(statusesForFilter(status), {
-            search,
-            offset,
-            limit: PAGE_SIZE + 1,
-        });
+        [allIdeas, works] = await Promise.all([
+            workProposalsAPI.list(statusesForFilter(status), {
+                search,
+                offset,
+                limit: PAGE_SIZE + 1,
+            }),
+            workAPI
+                .getAll({ limit: MATCH_CANDIDATE_LIMIT })
+                .then((r) => r.works)
+                .catch(() => []),
+        ]);
     } catch (err) {
         loadError = err instanceof Error ? err.message : 'Failed to load Ideas.';
     }
@@ -98,6 +119,7 @@ export default async function IdeasPage({ searchParams }: { searchParams: IdeasS
         <IdeasPageClient
             initialIdeas={pageIdeas}
             loadError={loadError}
+            matchedWorkIds={matchIdeasToWorks(pageIdeas, works)}
             filters={{ status, search }}
             pagination={{
                 offset,

@@ -5,6 +5,7 @@ const { triggerConfig } = vi.hoisted(() => ({
     triggerConfig: {
         getInternalBaseUrl: vi.fn(),
         getInternalSecret: vi.fn(),
+        getInternalRequestTimeoutMs: vi.fn(),
     },
 }));
 
@@ -44,6 +45,7 @@ describe('TriggerInternalApiClient', () => {
         vi.clearAllMocks();
         triggerConfig.getInternalBaseUrl.mockReturnValue('https://api.example.com/');
         triggerConfig.getInternalSecret.mockReturnValue('secret-1');
+        triggerConfig.getInternalRequestTimeoutMs.mockReturnValue(45000);
 
         fetchSpy = vi.fn();
         // @ts-expect-error - install fetch on global
@@ -386,6 +388,223 @@ describe('TriggerInternalApiClient', () => {
 
             const result = await promise;
             expect(result).toEqual({ ok: true });
+        });
+    });
+
+    describe('request deadline', () => {
+        /** A fetch that never settles on its own — only the abort ends it. */
+        const hangUntilAborted = (init: { signal: AbortSignal }) =>
+            new Promise<Response>((_resolve, reject) => {
+                init.signal.addEventListener('abort', () => {
+                    const err = new Error('This operation was aborted');
+                    err.name = 'AbortError';
+                    reject(err);
+                });
+            });
+
+        it('passes an AbortSignal to fetch on every request', async () => {
+            const client = new TriggerInternalApiClient();
+            fetchSpy.mockResolvedValueOnce(okJsonResponse(200, { ok: true }));
+
+            await client.fetchWorkContext('w', 'u');
+
+            const [, init] = fetchSpy.mock.calls[0];
+            expect(init.signal).toBeInstanceOf(AbortSignal);
+            expect(init.signal.aborted).toBe(false);
+        });
+
+        it('aborts the request once the configured deadline elapses and names the budget', async () => {
+            vi.useFakeTimers();
+            const client = new TriggerInternalApiClient();
+            fetchSpy.mockImplementation((_url: string, init: { signal: AbortSignal }) =>
+                hangUntilAborted(init),
+            );
+
+            // A non-retry-safe method, so this is a single attempt.
+            const promise = client.callRemote('AgentRunService', 'execute', { json: [] });
+            promise.catch(() => undefined);
+
+            await vi.advanceTimersByTimeAsync(44999);
+            expect(fetchSpy.mock.calls[0][1].signal.aborted).toBe(false);
+
+            await vi.advanceTimersByTimeAsync(1);
+
+            await expect(promise).rejects.toThrow(
+                'Trigger internal API request timed out after 45000ms',
+            );
+            expect(fetchSpy).toHaveBeenCalledTimes(1);
+        });
+
+        it('honours a custom timeout from config', async () => {
+            vi.useFakeTimers();
+            triggerConfig.getInternalRequestTimeoutMs.mockReturnValue(1000);
+            const client = new TriggerInternalApiClient();
+            fetchSpy.mockImplementation((_url: string, init: { signal: AbortSignal }) =>
+                hangUntilAborted(init),
+            );
+
+            const promise = client.callRemote('AgentRunService', 'execute', { json: [] });
+            promise.catch(() => undefined);
+            await vi.advanceTimersByTimeAsync(1000);
+
+            await expect(promise).rejects.toThrow(
+                'Trigger internal API request timed out after 1000ms',
+            );
+        });
+
+        it('clears the deadline once the response lands, so a slow later call is unaffected', async () => {
+            vi.useFakeTimers();
+            const client = new TriggerInternalApiClient();
+            fetchSpy.mockResolvedValueOnce(okJsonResponse(200, { ok: true }));
+
+            await client.fetchWorkContext('w', 'u');
+            const { signal } = fetchSpy.mock.calls[0][1];
+
+            // Well past the deadline: a leaked timer would abort a settled request.
+            await vi.advanceTimersByTimeAsync(120_000);
+
+            expect(signal.aborted).toBe(false);
+        });
+
+        it('reports a genuine network error unchanged rather than as a timeout', async () => {
+            const client = new TriggerInternalApiClient();
+            fetchSpy.mockRejectedValueOnce(new Error('ECONNREFUSED'));
+
+            await expect(
+                client.callRemote('AgentRunService', 'execute', { json: [] }),
+            ).rejects.toThrow('ECONNREFUSED');
+        });
+    });
+
+    describe('retry safety — non-idempotent remote calls are never re-issued', () => {
+        beforeEach(() => {
+            vi.useFakeTimers();
+        });
+
+        const flushAll = async () => {
+            for (let i = 0; i < 10; i++) {
+                await vi.advanceTimersByTimeAsync(2000);
+            }
+        };
+
+        // The dangerous case: an entire billed agent loop with real tool side
+        // effects. Re-issuing it starts a SECOND run of work the API is very
+        // likely still executing.
+        it('does NOT retry AgentRunService.execute on a 5xx', async () => {
+            const client = new TriggerInternalApiClient();
+            fetchSpy.mockResolvedValue(errorResponse(503, 'unavailable'));
+
+            const promise = client.callRemote('AgentRunService', 'execute', { json: [] });
+            promise.catch(() => undefined);
+            await flushAll();
+
+            await expect(promise).rejects.toThrow(
+                'Trigger internal API request failed (503): unavailable',
+            );
+            expect(fetchSpy).toHaveBeenCalledTimes(1);
+        });
+
+        // A proxy timeout is the exact signature this guard exists for: nginx
+        // answers 504 (and Cloudflare 524) while the work keeps running on the
+        // API pod, so the status code alone must not authorise a retry.
+        it('does NOT retry AgentRunService.execute on a 504 gateway timeout', async () => {
+            const client = new TriggerInternalApiClient();
+            fetchSpy.mockResolvedValue(errorResponse(504, 'gateway timeout'));
+
+            const promise = client.callRemote('AgentRunService', 'execute', { json: [] });
+            promise.catch(() => undefined);
+            await flushAll();
+
+            await expect(promise).rejects.toThrow('(504)');
+            expect(fetchSpy).toHaveBeenCalledTimes(1);
+        });
+
+        it('does NOT retry AgentRunService.execute on a network error', async () => {
+            const client = new TriggerInternalApiClient();
+            fetchSpy.mockRejectedValue(new Error('ECONNRESET'));
+
+            const promise = client.callRemote('AgentRunService', 'execute', { json: [] });
+            promise.catch(() => undefined);
+            await flushAll();
+
+            await expect(promise).rejects.toThrow('ECONNRESET');
+            expect(fetchSpy).toHaveBeenCalledTimes(1);
+        });
+
+        it.each([
+            ['TaskWorkspaceService', 'finalizeRun'],
+            ['TaskChatService', 'post'],
+            ['RunDispatchGateService', 'drainForWork'],
+            ['AgentRunRepository', 'createQueued'],
+            ['AgentRepository', 'incrementErrorCount'],
+            ['TaskGateRunnerService', 'runChecks'],
+            ['TaskGateJudgeService', 'judge'],
+            ['NotificationChannelFacadeService', 'deliverToChannelOrThrow'],
+            // Sibling of the allow-listed `updateTelemetry`, but it accumulates.
+            ['AgentRunRepository', 'addTokens'],
+        ])('does NOT retry %s.%s', async (name, method) => {
+            const client = new TriggerInternalApiClient();
+            fetchSpy.mockResolvedValue(errorResponse(500, 'down'));
+
+            const promise = client.callRemote(name, method, { json: [] });
+            promise.catch(() => undefined);
+            await flushAll();
+
+            await expect(promise).rejects.toThrow('(500)');
+            expect(fetchSpy).toHaveBeenCalledTimes(1);
+        });
+
+        it.each([
+            // Pure reads.
+            ['AgentRepository', 'findByIdAndUser'],
+            ['AgentRunRepository', 'findById'],
+            ['TasksService', 'getOne'],
+            ['WorkRepository', 'findById'],
+            ['AgentRunService', 'checkBudget'],
+            // Structurally idempotent writers.
+            ['AgentRunRepository', 'markStarted'],
+            ['AgentRunRepository', 'markCompleted'],
+            ['AgentRunRepository', 'updateTelemetry'],
+            ['TaskRunDenormService', 'recordTerminal'],
+            ['AgentEscalationService', 'record'],
+        ])('DOES retry the declared-safe %s.%s', async (name, method) => {
+            const client = new TriggerInternalApiClient();
+            fetchSpy.mockResolvedValue(errorResponse(503, 'unavailable'));
+
+            const promise = client.callRemote(name, method, { json: [] });
+            promise.catch(() => undefined);
+            await flushAll();
+
+            await expect(promise).rejects.toThrow('(503)');
+            // initial + 3 retries
+            expect(fetchSpy).toHaveBeenCalledTimes(4);
+        });
+
+        it('still resolves a declared-safe call that succeeds on a later attempt', async () => {
+            const client = new TriggerInternalApiClient();
+            fetchSpy
+                .mockResolvedValueOnce(errorResponse(500, 'down'))
+                .mockResolvedValueOnce(
+                    okJsonResponse(200, { result: superjson.serialize('recovered') }),
+                );
+
+            const promise = client.callRemote('AgentRunRepository', 'markStarted', { json: [] });
+            await flushAll();
+
+            await expect(promise).resolves.toBe('recovered');
+            expect(fetchSpy).toHaveBeenCalledTimes(2);
+        });
+
+        it('never retries a 4xx, even for a declared-safe method', async () => {
+            const client = new TriggerInternalApiClient();
+            fetchSpy.mockResolvedValue(errorResponse(400, 'bad request'));
+
+            const promise = client.callRemote('AgentRunRepository', 'findById', { json: [] });
+            promise.catch(() => undefined);
+            await flushAll();
+
+            await expect(promise).rejects.toThrow('(400)');
+            expect(fetchSpy).toHaveBeenCalledTimes(1);
         });
     });
 });

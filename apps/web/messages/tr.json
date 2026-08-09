@@ -906,6 +906,13 @@
                 "nextDisabledReason": "Pick a parent or choose Workspace scope to continue."
             },
             "settings": {
+                "identity": {
+                    "pause": "Duraklat",
+                    "resume": "Sürdür",
+                    "activate": "Etkinleştir",
+                    "archive": "Arşivle",
+                    "delete": "Sil"
+                },
                 "orgCard": {
                     "title": "Organizasyon",
                     "teamLabel": "Ekip",
@@ -993,7 +1000,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "Arşivlenenler"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1016,6 +1024,38 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "Arşivlenen ajanlar",
+                "subtitle": "Arşivlediğiniz ajanlar. Çalışmazlar ve katalogda görünmezler. Bir ajanı geri yükleyerek duraklatılmış olarak geri getirin veya kalıcı olarak silin.",
+                "empty": {
+                    "title": "Arşivlenmiş ajan yok",
+                    "subtitle": "Bir ajanı ayarlar sayfasından arşivlemek onu buraya taşır."
+                },
+                "delete": "Kalıcı olarak sil",
+                "deleteAria": "{name} ajanını kalıcı olarak sil",
+                "unarchive": "Geri yükle",
+                "menuAria": "{name} için işlemler",
+                "unarchiveSuccess": "{name} geri yüklendi",
+                "unarchiveError": "Ajan geri yüklenemedi"
+            },
+            "archiveDialog": {
+                "title": "{name} arşivlensin mi?",
+                "description": "Ajan çalışmayı durdurur ve katalogdan çıkar. Çalıştırmaları, bütçeleri ve üyelikleri korunur.",
+                "hint": "Arşiv sekmesinden istediğiniz zaman geri yükleyebilirsiniz — ajan duraklatılmış olarak döner.",
+                "cancel": "İptal",
+                "confirm": "Ajanı arşivle",
+                "success": "{name} arşivlendi",
+                "error": "Ajan arşivlenemedi"
+            },
+            "deleteDialog": {
+                "title": "{name} silinsin mi?",
+                "description": "Bu işlem ajanı; bütçeleri, üyelikleri ve çalışma geçmişiyle birlikte kalıcı olarak siler.",
+                "hint": "Bu işlem geri alınamaz. Yalnızca katalogdan gizlemek istiyorsanız ajanı arşivleyin.",
+                "cancel": "İptal",
+                "confirm": "Kalıcı olarak sil",
+                "success": "{name} silindi",
+                "error": "Ajan silinemedi"
             }
         },
         "tasksPage": {
@@ -1024,6 +1064,33 @@
             "empty": {
                 "title": "Henüz hiç Görev yok.",
                 "subtitle": "Görevler, Ajanlar/Yetenekler/Görevler dağıtımının daha sonraki bir aşamasında gelecek. Sayfa, kenar çubuğu gezinme rotasının çözülmesi için ayrılmıştır."
+            },
+            "scopedSection": {
+                "addExisting": "Mevcut olanı ekle",
+                "newTask": "Yeni Görev",
+                "assignTitle": "Mevcut bir Görev ekle",
+                "assignSubtitle": "Yenisini oluşturmak yerine biriktirme listenizden bir Görev seçin.",
+                "assignSearchPlaceholder": "Görev ara…",
+                "assignSearchLabel": "Görev ara",
+                "assignLoading": "Görevler yükleniyor…",
+                "assignLoadFailed": "Görevler yüklenemedi",
+                "assignNoneAvailable": "Eklenecek başka Görev kalmadı.",
+                "assignNoMatches": "Bu aramayla eşleşen Görev yok.",
+                "assignedToast": "{title} eklendi",
+                "assignFailed": "Görev eklenemedi",
+                "assignCancel": "İptal",
+                "movesLabel": "taşınır",
+                "movesHint": "Başka bir yerde kayıtlı — buraya eklemek onu taşır.",
+                "removedToast": "{title} bu listeden kaldırıldı",
+                "removeFailed": "Görev kaldırılamadı",
+                "rowMenuColumn": "İşlemler",
+                "rowMenuLabel": "{title} için işlemler",
+                "removeMenuItem": "Bu listeden kaldır",
+                "confirmTitle": "Bu Görev kaldırılsın mı?",
+                "confirmBody": "{title} bu listeden kaldırılacak. Görevin kendisi korunur ve daha sonra yeniden eklenebilir.",
+                "confirmCancel": "İptal",
+                "confirmSubmit": "Kaldır",
+                "confirmPending": "Kaldırılıyor…"
             },
             "list": {
                 "newTask": "+ Yeni Görev",
@@ -1447,7 +1514,14 @@
                 "relationLabel": "Relation",
                 "attach": "Attach",
                 "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "detachDialog": {
+                    "title": "Bu İş ayrılsın mı?",
+                    "body": "{title} bu Görevden kaldırılacak. İşin kendisine asla dokunulmaz — bu işlem yalnızca bağlantıyı kaldırır.",
+                    "confirm": "İşi Ayır",
+                    "cancel": "İptal",
+                    "detaching": "Ayrılıyor…",
+                    "error": "İş ayrılamadı"
+                },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
                     "created": "Created",
@@ -1496,8 +1570,13 @@
                 "runNow": "Run now",
                 "clone": "Clone"
             },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            "deleteDialog": {
+                "title": "Bu Görev silinsin mi?",
+                "body": "{title} kalıcı olarak silinecek. Alt Fikirler ve İşler korunur, ancak bu Göreve olan geri bağlantıları kopar. Bu işlem geri alınamaz.",
+                "confirm": "Görevi Sil",
+                "cancel": "İptal",
+                "deleting": "Siliniyor…",
+                "error": "Görev silinemedi"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1568,6 +1647,36 @@
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)"
+                }
+            },
+            "goals": {
+                "title": "Hedefler",
+                "empty": "Bu Göreve henüz Hedef eklenmedi. Başarının ne anlama geldiğini takip etmek için aşağıdan bir Hedef ekleyin.",
+                "attachTitle": "Hedef Ekle",
+                "goalLabel": "Hedef",
+                "goalPlaceholder": "Bir Hedef seçin",
+                "primaryLabel": "Birincil olarak ayarla",
+                "primaryBadge": "Birincil",
+                "primaryTooltip": "Bu Görevin birincil Hedefi - aynı anda yalnızca bir Hedef birincil olabilir.",
+                "attach": "Ekle",
+                "detach": "Ayır",
+                "detachDialog": {
+                    "title": "Bu Hedef ayrılsın mı?",
+                    "body": "{title} bu Görevden kaldırılacak. Hedefin kendisi silinmez — Hedefler sayfasında ve eklendiği diğer tüm Görevlerde kalmaya devam eder.",
+                    "confirm": "Hedefi Ayır",
+                    "cancel": "İptal",
+                    "detaching": "Ayrılıyor…",
+                    "error": "Hedef ayrılamadı"
+                },
+                "alreadyLinkedOption": "{title} (zaten ekli)",
+                "noGoalsToAttach": "Henüz Hedefiniz yok. Hedefler sayfasında bir Hedef oluşturun, ardından buraya ekleyin.",
+                "pickerTruncated": "En son 100 Hedefiniz gösteriliyor - tam liste için Hedefler sayfasını açın.",
+                "invariantNote": "Bir Hedef eklemek bu Görevin durumunu asla değiştirmez - bir Görevi tamamlamak açık bir eylem olarak kalır.",
+                "toasts": {
+                    "attached": "Hedef eklendi",
+                    "attachError": "Hedef eklenemedi",
+                    "detached": "Hedef ayrıldı",
+                    "detachError": "Hedef ayrılamadı"
                 }
             }
         },
@@ -1640,11 +1749,85 @@
                 "error": "Idea oluşturulamadı. Lütfen tekrar deneyin."
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "Bağlı Works",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "Oluşturuldu",
+                    "linked": "Bağlandı",
+                    "rebuilt": "Yeniden oluşturuldu",
+                    "matched": "Eşleşen"
+                }
+            },
+            "detail": {
+                "live": "Canlı",
+                "fromMission": "Bir Görevden",
+                "sections": {
+                    "description": "Fikir",
+                    "build": "Yapım durumu",
+                    "agents": "Ajanlar",
+                    "details": "Ayrıntılar"
+                },
+                "stages": {
+                    "drafted": "Taslak",
+                    "queued": "Sırada",
+                    "building": "Yapılıyor",
+                    "built": "Yapıldı",
+                    "failed": "Yapım başarısız",
+                    "builtDirect": "Yapıldı"
+                },
+                "stageHints": {
+                    "drafted": "Fikir mevcut ve yapılmaya hazır.",
+                    "queued": "Bir yapıcı bekleniyor.",
+                    "building": "Work Agent, Work üretiyor.",
+                    "built": "Bu Fikirden bir Work üretildi.",
+                    "failed": "Yapım durdu. Tekrar deneyin.",
+                    "builtDirect": "Work oluşturucusunda oluşturuldu — derleme kuyruğu atlandı."
+                },
+                "built": {
+                    "badge": "Yapıldı ({count})",
+                    "none": "Henüz yapılmadı"
+                },
+                "actions": {
+                    "build": "Yap",
+                    "retry": "Yeniden dene",
+                    "rebuild": "Yeniden yap",
+                    "rebuildHint": "Yeni bir Work oluşturur. Mevcut olan korunur.",
+                    "newAgent": "Yeni Ajan",
+                    "delete": "Sil"
+                },
+                "works": {
+                    "empty": "Bu Fikre bağlı Work yok."
+                },
+                "agents": {
+                    "empty": "Bu Fikre atanmış Ajan yok."
+                },
+                "meta": {
+                    "source": "Kaynak",
+                    "slug": "Slug",
+                    "fields": "Alanlar",
+                    "categories": "Önerilen kategoriler"
+                },
+                "deleteDialog": {
+                    "title": "Bu Fikir silinsin mi?",
+                    "body": "{title} kalıcı olarak silinecek. Bu işlem geri alınamaz.",
+                    "confirm": "Fikri sil",
+                    "cancel": "İptal",
+                    "deleting": "Siliniyor…",
+                    "error": "Fikir silinemedi",
+                    "blocked": {
+                        "linked-works": "Silinemiyor: bu Fikir {count} Work ile bağlantılı. Önce onları silin veya bağlantıyı kaldırın.",
+                        "idea-agents": "Silinemiyor: {count} Ajan bu Fikre atanmış. Önce onları silin veya kapsamını değiştirin.",
+                        "build-in-flight": "Yapım sürerken silinemez. Bitmesini bekleyin.",
+                        "unknown": "Bu Fikir şu anda silinemiyor."
+                    }
+                },
+                "toasts": {
+                    "built": "Bu Fikirden Work üretildi",
+                    "buildFailed": "Yapım başarısız oldu",
+                    "buildQueued": "Yapım sıraya alındı",
+                    "retryQueued": "Yeniden deneme sıraya alındı",
+                    "rebuildQueued": "Yeniden yapım sıraya alındı",
+                    "deleted": "Fikir silindi",
+                    "actionError": "İşlem tamamlanamadı. Lütfen tekrar deneyin."
                 }
             }
         },
@@ -2877,7 +3060,23 @@
                 "activatedToast": "Ajan etkinleştirildi",
                 "statusUpdateFailed": "Durum güncellenemedi",
                 "newAgent": "Yeni Ajan",
-                "moreAgents": "+{count} daha"
+                "moreAgents": "+{count} daha",
+                "assignExisting": "Mevcut olanı ata",
+                "assignTitle": "Bu İşe bir Ajan ata",
+                "assignSubtitle": "Yenisini oluşturmak yerine hâlihazırda sahip olduğunuz bir Ajanı bu İşe ekleyin.",
+                "assignSearchPlaceholder": "Ajan ara…",
+                "assignLoading": "Ajanlar yükleniyor…",
+                "assignNoneAvailable": "Atanacak başka Ajan kalmadı.",
+                "assignNoMatches": "Bu aramayla eşleşen Ajan yok.",
+                "assignLoadFailed": "Ajanlar yüklenemedi",
+                "assignedToast": "{name} bu İşe atandı",
+                "assignFailed": "Ajan atanamadı",
+                "assignCancel": "İptal",
+                "assignedLabel": "Atandı",
+                "assignedHint": "Bu İşe atandı — burada oluşturulmadı",
+                "unassign": "Bu İşten kaldır",
+                "unassignedToast": "{name} bu İşten kaldırıldı",
+                "unassignFailed": "Ajan kaldırılamadı"
             },
             "failedToGenerateItems": "Öğeleri oluşturma başarısız oldu. Lütfen tekrar deneyin.",
             "generationCompleted": "Oluşturma başarıyla tamamlandı",

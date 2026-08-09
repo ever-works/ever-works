@@ -954,6 +954,13 @@
                 "openInWizard": "افتح في المعالج"
             },
             "settings": {
+                "identity": {
+                    "pause": "إيقاف مؤقت",
+                    "resume": "استئناف",
+                    "activate": "تفعيل",
+                    "archive": "أرشفة",
+                    "delete": "حذف"
+                },
                 "orgCard": {
                     "title": "المؤسسة",
                     "teamLabel": "الفريق",
@@ -1024,7 +1031,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "المؤرشفة"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1047,6 +1055,38 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "الوكلاء المؤرشفون",
+                "subtitle": "الوكلاء الذين قمت بأرشفتهم. لا يعملون ولا يظهرون في الكتالوج. استعد أحدهم ليعود موقوفًا مؤقتًا، أو احذفه نهائيًا.",
+                "empty": {
+                    "title": "لا يوجد وكلاء مؤرشفون",
+                    "subtitle": "أرشفة وكيل من صفحة إعداداته تنقله إلى هنا."
+                },
+                "delete": "حذف نهائي",
+                "deleteAria": "حذف {name} نهائيًا",
+                "unarchive": "استعادة",
+                "menuAria": "إجراءات {name}",
+                "unarchiveSuccess": "تمت استعادة {name}",
+                "unarchiveError": "تعذرت استعادة الوكيل"
+            },
+            "archiveDialog": {
+                "title": "أرشفة {name}؟",
+                "description": "سيتوقف الوكيل عن العمل ولن يظهر في الكتالوج. يتم الاحتفاظ بسجل تشغيله وميزانياته وعضوياته.",
+                "hint": "يمكنك استعادته من تبويب المؤرشفة في أي وقت — سيعود موقوفًا مؤقتًا.",
+                "cancel": "إلغاء",
+                "confirm": "أرشفة الوكيل",
+                "success": "تمت أرشفة {name}",
+                "error": "تعذرت أرشفة الوكيل"
+            },
+            "deleteDialog": {
+                "title": "حذف {name}؟",
+                "description": "سيؤدي هذا إلى حذف الوكيل نهائيًا مع ميزانياته وعضوياته وسجل تشغيله.",
+                "hint": "لا يمكن التراجع عن هذا الإجراء. قم بأرشفة الوكيل بدلًا من ذلك إذا كنت تريد إخفاءه من الكتالوج فقط.",
+                "cancel": "إلغاء",
+                "confirm": "حذف نهائي",
+                "success": "تم حذف {name}",
+                "error": "تعذر حذف الوكيل"
             }
         },
         "tasksPage": {
@@ -1055,6 +1095,33 @@
             "empty": {
                 "title": "لا توجد مهام بعد.",
                 "subtitle": "سيتم شحن المهام في مرحلة لاحقة من طرح الوكلاء/المهارات/المهام. تم حجز الصفحة بحيث يتم حل مسار التنقل في الشريط الجانبي."
+            },
+            "scopedSection": {
+                "addExisting": "إضافة مهمة موجودة",
+                "newTask": "مهمة جديدة",
+                "assignTitle": "إضافة مهمة موجودة",
+                "assignSubtitle": "اختر مهمة من قائمة أعمالك المتراكمة بدلاً من إنشاء مهمة جديدة.",
+                "assignSearchPlaceholder": "البحث في المهام…",
+                "assignSearchLabel": "البحث في المهام",
+                "assignLoading": "جارٍ تحميل المهام…",
+                "assignLoadFailed": "تعذّر تحميل المهام",
+                "assignNoneAvailable": "لا توجد مهام أخرى لإضافتها.",
+                "assignNoMatches": "لا توجد مهام تطابق هذا البحث.",
+                "assignedToast": "تمت إضافة {title}",
+                "assignFailed": "تعذّر إضافة المهمة",
+                "assignCancel": "إلغاء",
+                "movesLabel": "يتم نقلها",
+                "movesHint": "مسجّلة في مكان آخر — إضافتها هنا ستنقلها.",
+                "removedToast": "تمت إزالة {title} من هذه القائمة",
+                "removeFailed": "تعذّر إزالة المهمة",
+                "rowMenuColumn": "الإجراءات",
+                "rowMenuLabel": "إجراءات {title}",
+                "removeMenuItem": "إزالة من هذه القائمة",
+                "confirmTitle": "إزالة هذه المهمة؟",
+                "confirmBody": "ستتم إزالة {title} من هذه القائمة. تبقى المهمة نفسها محفوظة ويمكن إضافتها لاحقًا.",
+                "confirmCancel": "إلغاء",
+                "confirmSubmit": "إزالة",
+                "confirmPending": "جارٍ الإزالة…"
             },
             "list": {
                 "newTask": "+ مهمة جديدة",
@@ -1478,7 +1545,14 @@
                 "relationLabel": "Relation",
                 "attach": "Attach",
                 "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "detachDialog": {
+                    "title": "فصل هذا العمل؟",
+                    "body": "ستتم إزالة {title} من هذه المهمة. لن يتأثر العمل نفسه إطلاقًا — هذا يزيل المرجع فقط.",
+                    "confirm": "فصل العمل",
+                    "cancel": "إلغاء",
+                    "detaching": "جارٍ الفصل…",
+                    "error": "فشل فصل العمل"
+                },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
                     "created": "Created",
@@ -1527,8 +1601,13 @@
                 "runNow": "Run now",
                 "clone": "Clone"
             },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            "deleteDialog": {
+                "title": "حذف هذه المهمة؟",
+                "body": "سيتم حذف {title} نهائيًا. يتم الاحتفاظ بالأفكار والأعمال الفرعية، لكن يُفقد ارتباطها العكسي بهذه المهمة. لا يمكن التراجع عن هذا الإجراء.",
+                "confirm": "حذف المهمة",
+                "cancel": "إلغاء",
+                "deleting": "جارٍ الحذف…",
+                "error": "فشل حذف المهمة"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1599,6 +1678,36 @@
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)"
+                }
+            },
+            "goals": {
+                "title": "الأهداف",
+                "empty": "لا توجد أهداف مرفقة بهذه المهمة بعد. أرفق هدفًا أدناه لتتبّع معنى النجاح.",
+                "attachTitle": "إرفاق هدف",
+                "goalLabel": "الهدف",
+                "goalPlaceholder": "اختر هدفًا",
+                "primaryLabel": "تعيين كهدف رئيسي",
+                "primaryBadge": "رئيسي",
+                "primaryTooltip": "الهدف الرئيسي لهذه المهمة - يمكن أن يكون هدف واحد فقط رئيسيًا في كل مرة.",
+                "attach": "إرفاق",
+                "detach": "فصل",
+                "detachDialog": {
+                    "title": "فصل هذا الهدف؟",
+                    "body": "ستتم إزالة {title} من هذه المهمة. لن يُحذف الهدف نفسه — سيبقى في صفحة الأهداف وفي أي مهمة أخرى مرفق بها.",
+                    "confirm": "فصل الهدف",
+                    "cancel": "إلغاء",
+                    "detaching": "جارٍ الفصل…",
+                    "error": "فشل فصل الهدف"
+                },
+                "alreadyLinkedOption": "{title} (مُرفق بالفعل)",
+                "noGoalsToAttach": "ليس لديك أهداف بعد. أنشئ هدفًا في صفحة الأهداف ثم أرفقه هنا.",
+                "pickerTruncated": "يتم عرض أحدث 100 هدف لديك - افتح صفحة الأهداف للاطلاع على القائمة الكاملة.",
+                "invariantNote": "إرفاق هدف لا يغيّر أبدًا حالة هذه المهمة - إكمال المهمة يظل إجراءً صريحًا.",
+                "toasts": {
+                    "attached": "تم إرفاق الهدف",
+                    "attachError": "تعذّر إرفاق الهدف",
+                    "detached": "تم فصل الهدف",
+                    "detachError": "تعذّر فصل الهدف"
                 }
             }
         },
@@ -1671,11 +1780,85 @@
                 "error": "تعذّر إنشاء الـ Idea. يُرجى المحاولة مرة أخرى."
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "الـ Works المرتبطة",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "تم البناء",
+                    "linked": "مرتبط",
+                    "rebuilt": "أعيد البناء",
+                    "matched": "مطابق"
+                }
+            },
+            "detail": {
+                "live": "مباشر",
+                "fromMission": "من مهمة",
+                "sections": {
+                    "description": "الفكرة",
+                    "build": "حالة البناء",
+                    "agents": "الوكلاء",
+                    "details": "التفاصيل"
+                },
+                "stages": {
+                    "drafted": "مسودة",
+                    "queued": "في قائمة الانتظار",
+                    "building": "قيد البناء",
+                    "built": "تم البناء",
+                    "failed": "فشل البناء",
+                    "builtDirect": "تم البناء"
+                },
+                "stageHints": {
+                    "drafted": "الفكرة موجودة وجاهزة للبناء.",
+                    "queued": "في انتظار المنفّذ.",
+                    "building": "وكيل Work يقوم بإنشاء الـ Work.",
+                    "built": "تم إنتاج Work من هذه الفكرة.",
+                    "failed": "توقف البناء. أعد المحاولة.",
+                    "builtDirect": "أُنشئ في منشئ الأعمال — تخطّى قائمة انتظار البناء."
+                },
+                "built": {
+                    "badge": "تم البناء ({count})",
+                    "none": "لم يتم البناء بعد"
+                },
+                "actions": {
+                    "build": "بناء",
+                    "retry": "إعادة المحاولة",
+                    "rebuild": "إعادة البناء",
+                    "rebuildHint": "ينشئ Work جديدًا. يتم الاحتفاظ بالحالي.",
+                    "newAgent": "وكيل جديد",
+                    "delete": "حذف"
+                },
+                "works": {
+                    "empty": "لا توجد Works مرتبطة بهذه الفكرة بعد."
+                },
+                "agents": {
+                    "empty": "لا يوجد وكلاء مرتبطون بهذه الفكرة."
+                },
+                "meta": {
+                    "source": "المصدر",
+                    "slug": "المعرف",
+                    "fields": "الحقول",
+                    "categories": "الفئات المقترحة"
+                },
+                "deleteDialog": {
+                    "title": "حذف هذه الفكرة؟",
+                    "body": "سيتم حذف {title} نهائيًا. لا يمكن التراجع عن ذلك.",
+                    "confirm": "حذف الفكرة",
+                    "cancel": "إلغاء",
+                    "deleting": "جارٍ الحذف…",
+                    "error": "تعذّر حذف الفكرة",
+                    "blocked": {
+                        "linked-works": "تعذّر الحذف: هذه الفكرة مرتبطة بـ {count} من الـ Works. احذفها أو افصلها أولًا.",
+                        "idea-agents": "تعذّر الحذف: {count} من الوكلاء مرتبطون بهذه الفكرة. احذفهم أو غيّر نطاقهم.",
+                        "build-in-flight": "لا يمكن الحذف أثناء البناء. انتظر حتى ينتهي.",
+                        "unknown": "لا يمكن حذف هذه الفكرة الآن."
+                    }
+                },
+                "toasts": {
+                    "built": "تم بناء Work من هذه الفكرة",
+                    "buildFailed": "فشل البناء",
+                    "buildQueued": "تمت جدولة البناء",
+                    "retryQueued": "تمت جدولة إعادة المحاولة",
+                    "rebuildQueued": "تمت جدولة إعادة البناء",
+                    "deleted": "تم حذف الفكرة",
+                    "actionError": "تعذّر إتمام الإجراء. حاول مرة أخرى."
                 }
             }
         },
@@ -2945,7 +3128,23 @@
                 "activatedToast": "تم تفعيل الوكيل",
                 "statusUpdateFailed": "تعذر تحديث الحالة",
                 "newAgent": "وكيل جديد",
-                "moreAgents": "+{count} أخرى"
+                "moreAgents": "+{count} أخرى",
+                "assignExisting": "تعيين وكيل موجود",
+                "assignTitle": "تعيين وكيل لهذا العمل",
+                "assignSubtitle": "عيّن لهذا العمل وكيلاً لديك بالفعل بدلاً من إنشاء وكيل آخر.",
+                "assignSearchPlaceholder": "البحث عن وكلاء…",
+                "assignLoading": "جارٍ تحميل الوكلاء…",
+                "assignNoneAvailable": "لا يوجد وكلاء آخرون للتعيين.",
+                "assignNoMatches": "لا يوجد وكلاء مطابقون لهذا البحث.",
+                "assignLoadFailed": "تعذر تحميل الوكلاء",
+                "assignedToast": "تم تعيين {name} لهذا العمل",
+                "assignFailed": "تعذر تعيين الوكيل",
+                "assignCancel": "إلغاء",
+                "assignedLabel": "معيّن",
+                "assignedHint": "معيّن لهذا العمل — لم يُنشأ هنا",
+                "unassign": "إزالة من هذا العمل",
+                "unassignedToast": "تمت إزالة {name} من هذا العمل",
+                "unassignFailed": "تعذرت إزالة الوكيل"
             },
             "failedToGenerateItems": "فشل في توليد العناصر. يرجى المحاولة مرة أخرى.",
             "generationCompleted": "اكتمل التوليد بنجاح",

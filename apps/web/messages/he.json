@@ -954,6 +954,13 @@
                 "openInWizard": "פתח באשף"
             },
             "settings": {
+                "identity": {
+                    "pause": "השהה",
+                    "resume": "המשך",
+                    "activate": "הפעל",
+                    "archive": "העבר לארכיון",
+                    "delete": "מחק"
+                },
                 "orgCard": {
                     "title": "ארגון",
                     "teamLabel": "צוות",
@@ -1024,7 +1031,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "בארכיון"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1047,6 +1055,38 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "סוכנים בארכיון",
+                "subtitle": "סוכנים שהעברת לארכיון. הם אינם פועלים ואינם מופיעים בקטלוג. שחזר סוכן כדי להחזירו במצב מושהה, או מחק אותו לצמיתות.",
+                "empty": {
+                    "title": "אין סוכנים בארכיון",
+                    "subtitle": "העברת סוכן לארכיון מדף ההגדרות שלו מעבירה אותו לכאן."
+                },
+                "delete": "מחיקה לצמיתות",
+                "deleteAria": "מחיקת {name} לצמיתות",
+                "unarchive": "שחזור",
+                "menuAria": "פעולות עבור {name}",
+                "unarchiveSuccess": "{name} שוחזר",
+                "unarchiveError": "לא ניתן היה לשחזר את הסוכן"
+            },
+            "archiveDialog": {
+                "title": "להעביר את {name} לארכיון?",
+                "description": "הסוכן יפסיק לפעול ולא יופיע בקטלוג. ההרצות, התקציבים והחברויות שלו יישמרו.",
+                "hint": "אפשר לשחזר אותו מלשונית הארכיון בכל עת — הוא יחזור במצב מושהה.",
+                "cancel": "ביטול",
+                "confirm": "העבר לארכיון",
+                "success": "{name} הועבר לארכיון",
+                "error": "לא ניתן להעביר את הסוכן לארכיון"
+            },
+            "deleteDialog": {
+                "title": "למחוק את {name}?",
+                "description": "פעולה זו מוחקת לצמיתות את הסוכן ואת התקציבים, החברויות והיסטוריית ההרצות שלו.",
+                "hint": "לא ניתן לבטל פעולה זו. העבר את הסוכן לארכיון אם ברצונך רק להסתירו מהקטלוג.",
+                "cancel": "ביטול",
+                "confirm": "מחיקה לצמיתות",
+                "success": "{name} נמחק",
+                "error": "לא ניתן היה למחוק את הסוכן"
             }
         },
         "tasksPage": {
@@ -1055,6 +1095,33 @@
             "empty": {
                 "title": "אין משימות עדיין.",
                 "subtitle": "משימות ייכנסו בשלב מאוחר יותר של השקת סוכנים/מיומנויות/משימות. הדף שמור כדי שנתיב הניווט בסרגל הצדדי יוכל להתפתר."
+            },
+            "scopedSection": {
+                "addExisting": "הוספת משימה קיימת",
+                "newTask": "משימה חדשה",
+                "assignTitle": "הוספת משימה קיימת",
+                "assignSubtitle": "בחרו משימה מהבקלוג שלכם במקום ליצור משימה נוספת.",
+                "assignSearchPlaceholder": "חיפוש משימות…",
+                "assignSearchLabel": "חיפוש משימות",
+                "assignLoading": "טוען משימות…",
+                "assignLoadFailed": "לא ניתן היה לטעון משימות",
+                "assignNoneAvailable": "אין משימות נוספות להוספה.",
+                "assignNoMatches": "אין משימות התואמות לחיפוש הזה.",
+                "assignedToast": "{title} נוספה",
+                "assignFailed": "לא ניתן היה להוסיף את המשימה",
+                "assignCancel": "ביטול",
+                "movesLabel": "מועברת",
+                "movesHint": "משויכת למקום אחר — הוספה כאן תעביר אותה.",
+                "removedToast": "{title} הוסרה מהרשימה הזו",
+                "removeFailed": "לא ניתן היה להסיר את המשימה",
+                "rowMenuColumn": "פעולות",
+                "rowMenuLabel": "פעולות עבור {title}",
+                "removeMenuItem": "הסרה מהרשימה הזו",
+                "confirmTitle": "להסיר את המשימה הזו?",
+                "confirmBody": "{title} תוסר מהרשימה הזו. המשימה עצמה נשמרת וניתן להוסיף אותה שוב מאוחר יותר.",
+                "confirmCancel": "ביטול",
+                "confirmSubmit": "הסרה",
+                "confirmPending": "מסיר…"
             },
             "list": {
                 "newTask": "+ משימה חדשה",
@@ -1478,7 +1545,14 @@
                 "relationLabel": "Relation",
                 "attach": "Attach",
                 "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "detachDialog": {
+                    "title": "לנתק את העבודה הזו?",
+                    "body": "{title} תוסר מהמשימה הזו. העבודה עצמה לא מושפעת כלל — הפעולה מסירה רק את הקישור.",
+                    "confirm": "נתק עבודה",
+                    "cancel": "ביטול",
+                    "detaching": "מנתק…",
+                    "error": "ניתוק העבודה נכשל"
+                },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
                     "created": "Created",
@@ -1527,8 +1601,13 @@
                 "runNow": "Run now",
                 "clone": "Clone"
             },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            "deleteDialog": {
+                "title": "למחוק את המשימה הזו?",
+                "body": "{title} תימחק לצמיתות. רעיונות ועבודות מקושרים נשמרים, אך הקישור שלהם חזרה למשימה הזו יאבד. לא ניתן לבטל פעולה זו.",
+                "confirm": "מחק משימה",
+                "cancel": "ביטול",
+                "deleting": "מוחק…",
+                "error": "מחיקת המשימה נכשלה"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1599,6 +1678,36 @@
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)"
+                }
+            },
+            "goals": {
+                "title": "יעדים",
+                "empty": "עדיין לא מחוברים יעדים למשימה הזו. חבר יעד למטה כדי להגדיר מהי הצלחה.",
+                "attachTitle": "חיבור יעד",
+                "goalLabel": "יעד",
+                "goalPlaceholder": "בחר יעד",
+                "primaryLabel": "הגדר כיעד ראשי",
+                "primaryBadge": "ראשי",
+                "primaryTooltip": "היעד הראשי של המשימה הזו - רק יעד אחד יכול להיות ראשי בכל רגע.",
+                "attach": "חבר",
+                "detach": "נתק",
+                "detachDialog": {
+                    "title": "לנתק את היעד הזה?",
+                    "body": "{title} יוסר מהמשימה הזו. היעד עצמו לא נמחק — הוא נשאר בעמוד היעדים ובכל משימה אחרת שאליה הוא מחובר.",
+                    "confirm": "נתק יעד",
+                    "cancel": "ביטול",
+                    "detaching": "מנתק…",
+                    "error": "ניתוק היעד נכשל"
+                },
+                "alreadyLinkedOption": "{title} (כבר מחובר)",
+                "noGoalsToAttach": "אין לך עדיין יעדים. צור יעד בעמוד היעדים ולאחר מכן חבר אותו כאן.",
+                "pickerTruncated": "מוצגים 100 היעדים האחרונים שלך - פתח את עמוד היעדים לרשימה המלאה.",
+                "invariantNote": "חיבור יעד לעולם אינו משנה את הסטטוס של המשימה הזו - סיום משימה נשאר פעולה מפורשת.",
+                "toasts": {
+                    "attached": "היעד חובר",
+                    "attachError": "לא ניתן היה לחבר את היעד",
+                    "detached": "היעד נותק",
+                    "detachError": "לא ניתן היה לנתק את היעד"
                 }
             }
         },
@@ -1671,11 +1780,85 @@
                 "error": "לא ניתן ליצור את ה-Idea. נסה שוב."
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "Works מקושרים",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "נבנה",
+                    "linked": "מקושר",
+                    "rebuilt": "נבנה מחדש",
+                    "matched": "התאמה"
+                }
+            },
+            "detail": {
+                "live": "חי",
+                "fromMission": "ממשימה",
+                "sections": {
+                    "description": "רעיון",
+                    "build": "סטטוס בנייה",
+                    "agents": "סוכנים",
+                    "details": "פרטים"
+                },
+                "stages": {
+                    "drafted": "נוסח",
+                    "queued": "בתור",
+                    "building": "בבנייה",
+                    "built": "נבנה",
+                    "failed": "הבנייה נכשלה",
+                    "builtDirect": "נבנה"
+                },
+                "stageHints": {
+                    "drafted": "הרעיון קיים ומוכן לבנייה.",
+                    "queued": "ממתין לבנאי.",
+                    "building": "סוכן ה-Work מייצר את ה-Work.",
+                    "built": "נוצר Work מהרעיון הזה.",
+                    "failed": "הבנייה נעצרה. נסה שוב.",
+                    "builtDirect": "נוצר בבונה ה-Works — דילג על תור הבנייה."
+                },
+                "built": {
+                    "badge": "נבנה ({count})",
+                    "none": "עדיין לא נבנה"
+                },
+                "actions": {
+                    "build": "בנה",
+                    "retry": "נסה שוב",
+                    "rebuild": "בנה מחדש",
+                    "rebuildHint": "יוצר Work חדש. הקיים נשמר.",
+                    "newAgent": "סוכן חדש",
+                    "delete": "מחק"
+                },
+                "works": {
+                    "empty": "אין Works מקושרים לרעיון הזה."
+                },
+                "agents": {
+                    "empty": "אין סוכנים המשויכים לרעיון הזה."
+                },
+                "meta": {
+                    "source": "מקור",
+                    "slug": "Slug",
+                    "fields": "שדות",
+                    "categories": "קטגוריות מוצעות"
+                },
+                "deleteDialog": {
+                    "title": "למחוק את הרעיון הזה?",
+                    "body": "{title} יימחק לצמיתות. לא ניתן לבטל פעולה זו.",
+                    "confirm": "מחק רעיון",
+                    "cancel": "ביטול",
+                    "deleting": "מוחק…",
+                    "error": "מחיקת הרעיון נכשלה",
+                    "blocked": {
+                        "linked-works": "לא ניתן למחוק: הרעיון מקושר ל-{count} Works. מחק או נתק אותם קודם.",
+                        "idea-agents": "לא ניתן למחוק: {count} סוכנים משויכים לרעיון. מחק אותם או שנה את ההיקף.",
+                        "build-in-flight": "לא ניתן למחוק בזמן בנייה. המתן לסיום.",
+                        "unknown": "לא ניתן למחוק את הרעיון כרגע."
+                    }
+                },
+                "toasts": {
+                    "built": "נבנה Work מהרעיון הזה",
+                    "buildFailed": "הבנייה נכשלה",
+                    "buildQueued": "הבנייה נכנסה לתור",
+                    "retryQueued": "הניסיון החוזר נכנס לתור",
+                    "rebuildQueued": "הבנייה מחדש נכנסה לתור",
+                    "deleted": "הרעיון נמחק",
+                    "actionError": "הפעולה נכשלה. נסה שוב."
                 }
             }
         },
@@ -2945,7 +3128,23 @@
                 "activatedToast": "הסוכן הופעל",
                 "statusUpdateFailed": "לא ניתן לעדכן את הסטטוס",
                 "newAgent": "סוכן חדש",
-                "moreAgents": "+{count} נוספים"
+                "moreAgents": "+{count} נוספים",
+                "assignExisting": "שיוך סוכן קיים",
+                "assignTitle": "שיוך סוכן לעבודה זו",
+                "assignSubtitle": "שייכו לעבודה זו סוכן שכבר יש לכם במקום ליצור סוכן נוסף.",
+                "assignSearchPlaceholder": "חיפוש סוכנים…",
+                "assignLoading": "טוען סוכנים…",
+                "assignNoneAvailable": "אין סוכנים נוספים לשיוך.",
+                "assignNoMatches": "אין סוכנים התואמים לחיפוש זה.",
+                "assignLoadFailed": "לא ניתן לטעון סוכנים",
+                "assignedToast": "{name} שויך לעבודה זו",
+                "assignFailed": "לא ניתן לשייך את הסוכן",
+                "assignCancel": "ביטול",
+                "assignedLabel": "משויך",
+                "assignedHint": "משויך לעבודה זו — לא נוצר כאן",
+                "unassign": "הסרה מעבודה זו",
+                "unassignedToast": "{name} הוסר מעבודה זו",
+                "unassignFailed": "לא ניתן להסיר את הסוכן"
             },
             "failedToGenerateItems": "נכשל ביצירת פריטים. נסה שוב.",
             "generationCompleted": "היצירה הושלמה בהצלחה",

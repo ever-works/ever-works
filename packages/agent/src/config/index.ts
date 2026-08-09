@@ -61,6 +61,32 @@ export const config = {
         getInternalSecret() {
             return process.env.TRIGGER_INTERNAL_SECRET;
         },
+        /**
+         * Per-attempt deadline for one worker → API internal-RPC request.
+         *
+         * Chosen to sit BELOW the infrastructure timeouts so the client is the
+         * thing that gives up first, predictably and with an error that names
+         * the deadline — instead of inheriting whatever the hop in front of it
+         * decides. In production the worker runs on Trigger.dev cloud and
+         * reaches `https://api.ever.works/internal/trigger`, so the request
+         * crosses two proxies that will each kill it on their own schedule:
+         *
+         *  - nginx-ingress, whose `proxy_read_timeout` default is **60s** (no
+         *    override annotation exists in `.deploy/`) → 504.
+         *  - Cloudflare in front of it, ~**100s** origin read → 524.
+         *
+         * 45s leaves ~15s of headroom under the tighter of the two so TLS
+         * setup and Cloudflare→origin latency can never push us past it.
+         *
+         * A deadline does NOT cancel the work already running on the API pod —
+         * it only stops the worker waiting for it. That is precisely why
+         * timing out must not imply retrying; see `RETRY_SAFE_REMOTE_METHODS`
+         * in `trigger-internal-api.client.ts`.
+         */
+        getInternalRequestTimeoutMs() {
+            const raw = parseInt(process.env.TRIGGER_INTERNAL_REQUEST_TIMEOUT_MS || '45000', 10);
+            return Number.isFinite(raw) && raw > 0 ? raw : 45000;
+        },
         shouldUseTrigger() {
             return this.isEnabled() && Boolean(this.getInternalSecret());
         },

@@ -1,16 +1,16 @@
-// Mock the agent barrels this spec injects through. Importing
-// `@ever-works/agent/services` for real pulls the whole services barrel,
-// which reaches `@src/*` path aliases that do not resolve under the API
-// jest config. The classes are only needed as DI tokens here.
-jest.mock('@ever-works/agent/services', () => ({ KnowledgeBaseService: class {} }));
-jest.mock('@ever-works/agent/agents', () => ({ SubAgentDelegationService: class {} }));
-jest.mock('@ever-works/agent/facades', () => ({ AiFacadeService: class {} }));
+// The three collaborators are only needed as DI TOKENS here — every test
+// injects a stub. Mocking them keeps this spec from dragging in the real
+// KB service and AI facade (and their repository/plugin chains) just to
+// have a class to key the provider off.
+jest.mock('../services/knowledge-base.service', () => ({ KnowledgeBaseService: class {} }));
+jest.mock('./sub-agent-delegation.service', () => ({ SubAgentDelegationService: class {} }));
+jest.mock('../facades/ai.facade', () => ({ AiFacadeService: class {} }));
 
 import { Test, TestingModule } from '@nestjs/testing';
 import { WorkflowNodeRunnerService } from './workflow-node.runner';
-import { SubAgentDelegationService } from '@ever-works/agent/agents';
-import { AiFacadeService } from '@ever-works/agent/facades';
-import { KnowledgeBaseService } from '@ever-works/agent/services';
+import { SubAgentDelegationService } from './sub-agent-delegation.service';
+import { AiFacadeService } from '../facades/ai.facade';
+import { KnowledgeBaseService } from '../services/knowledge-base.service';
 
 /**
  * The real workflow node runner.

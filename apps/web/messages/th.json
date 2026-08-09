@@ -906,6 +906,13 @@
                 "nextDisabledReason": "Pick a parent or choose Workspace scope to continue."
             },
             "settings": {
+                "identity": {
+                    "pause": "หยุดชั่วคราว",
+                    "resume": "ดำเนินการต่อ",
+                    "activate": "เปิดใช้งาน",
+                    "archive": "เก็บถาวร",
+                    "delete": "ลบ"
+                },
                 "orgCard": {
                     "title": "องค์กร",
                     "teamLabel": "ทีม",
@@ -993,7 +1000,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "เก็บถาวรแล้ว"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1016,6 +1024,38 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "เอเจนต์ที่เก็บถาวร",
+                "subtitle": "เอเจนต์ที่คุณเก็บถาวรไว้ จะไม่ทำงานและไม่แสดงในแค็ตตาล็อก กู้คืนเพื่อให้กลับมาในสถานะหยุดชั่วคราว หรือลบอย่างถาวร",
+                "empty": {
+                    "title": "ไม่มีเอเจนต์ที่เก็บถาวร",
+                    "subtitle": "การเก็บถาวรเอเจนต์จากหน้าการตั้งค่าจะย้ายเอเจนต์มาที่นี่"
+                },
+                "delete": "ลบถาวร",
+                "deleteAria": "ลบ {name} อย่างถาวร",
+                "unarchive": "กู้คืน",
+                "menuAria": "การดำเนินการสำหรับ {name}",
+                "unarchiveSuccess": "กู้คืน {name} แล้ว",
+                "unarchiveError": "ไม่สามารถกู้คืนเอเจนต์ได้"
+            },
+            "archiveDialog": {
+                "title": "เก็บถาวร {name} หรือไม่?",
+                "description": "เอเจนต์จะหยุดทำงานและหายไปจากแค็ตตาล็อก ประวัติการทำงาน งบประมาณ และการเป็นสมาชิกยังคงอยู่",
+                "hint": "คุณกู้คืนได้จากแท็บที่เก็บถาวรเมื่อใดก็ได้ — เอเจนต์จะกลับมาในสถานะหยุดชั่วคราว",
+                "cancel": "ยกเลิก",
+                "confirm": "เก็บถาวรเอเจนต์",
+                "success": "เก็บถาวร {name} แล้ว",
+                "error": "ไม่สามารถเก็บถาวรเอเจนต์ได้"
+            },
+            "deleteDialog": {
+                "title": "ลบ {name} หรือไม่?",
+                "description": "การดำเนินการนี้จะลบเอเจนต์พร้อมงบประมาณ การเป็นสมาชิก และประวัติการทำงานอย่างถาวร",
+                "hint": "ไม่สามารถเลิกทำได้ หากต้องการเพียงซ่อนจากแค็ตตาล็อก ให้เก็บถาวรเอเจนต์แทน",
+                "cancel": "ยกเลิก",
+                "confirm": "ลบถาวร",
+                "success": "ลบ {name} แล้ว",
+                "error": "ไม่สามารถลบเอเจนต์ได้"
             }
         },
         "tasksPage": {
@@ -1024,6 +1064,33 @@
             "empty": {
                 "title": "ยังไม่มีงาน",
                 "subtitle": "งานจะถูกเปิดใช้ในระยะหลังของการเปิดตัวเอเจนต์/ทักษะ/งาน หน้านี้ถูกจองไว้เพื่อให้เส้นทางนำทางของแถบด้านข้ามีความสมบูรณ์"
+            },
+            "scopedSection": {
+                "addExisting": "เพิ่มงานที่มีอยู่",
+                "newTask": "งานใหม่",
+                "assignTitle": "เพิ่มงานที่มีอยู่",
+                "assignSubtitle": "เลือกงานจากแบ็คล็อกของคุณ แทนการสร้างงานใหม่",
+                "assignSearchPlaceholder": "ค้นหางาน…",
+                "assignSearchLabel": "ค้นหางาน",
+                "assignLoading": "กำลังโหลดงาน…",
+                "assignLoadFailed": "ไม่สามารถโหลดงานได้",
+                "assignNoneAvailable": "ไม่มีงานอื่นให้เพิ่มแล้ว",
+                "assignNoMatches": "ไม่มีงานที่ตรงกับการค้นหานี้",
+                "assignedToast": "เพิ่ม {title} แล้ว",
+                "assignFailed": "ไม่สามารถเพิ่มงานได้",
+                "assignCancel": "ยกเลิก",
+                "movesLabel": "ย้าย",
+                "movesHint": "อยู่ที่อื่นอยู่แล้ว — การเพิ่มที่นี่จะย้ายงานนั้นมา",
+                "removedToast": "นำ {title} ออกจากรายการนี้แล้ว",
+                "removeFailed": "ไม่สามารถนำงานออกได้",
+                "rowMenuColumn": "การดำเนินการ",
+                "rowMenuLabel": "การดำเนินการสำหรับ {title}",
+                "removeMenuItem": "นำออกจากรายการนี้",
+                "confirmTitle": "นำงานนี้ออกหรือไม่",
+                "confirmBody": "{title} จะถูกนำออกจากรายการนี้ ตัวงานยังคงอยู่และเพิ่มกลับได้ในภายหลัง",
+                "confirmCancel": "ยกเลิก",
+                "confirmSubmit": "นำออก",
+                "confirmPending": "กำลังนำออก…"
             },
             "list": {
                 "newTask": "+ งานใหม่",
@@ -1447,7 +1514,14 @@
                 "relationLabel": "Relation",
                 "attach": "Attach",
                 "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "detachDialog": {
+                    "title": "ยกเลิกการแนบงานนี้?",
+                    "body": "{title} จะถูกนำออกจากภารกิจนี้ ตัวงานเองจะไม่ถูกแตะต้อง — การดำเนินการนี้เพียงลบการอ้างอิงเท่านั้น",
+                    "confirm": "ยกเลิกการแนบงาน",
+                    "cancel": "ยกเลิก",
+                    "detaching": "กำลังยกเลิกการแนบ…",
+                    "error": "ไม่สามารถยกเลิกการแนบงานได้"
+                },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
                     "created": "Created",
@@ -1496,8 +1570,13 @@
                 "runNow": "Run now",
                 "clone": "Clone"
             },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            "deleteDialog": {
+                "title": "ลบภารกิจนี้?",
+                "body": "{title} จะถูกลบอย่างถาวร ไอเดียและงานย่อยจะยังคงอยู่ แต่ลิงก์ย้อนกลับมายังภารกิจนี้จะขาดหายไป การดำเนินการนี้ไม่สามารถย้อนกลับได้",
+                "confirm": "ลบภารกิจ",
+                "cancel": "ยกเลิก",
+                "deleting": "กำลังลบ…",
+                "error": "ไม่สามารถลบภารกิจได้"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1568,6 +1647,36 @@
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)"
+                }
+            },
+            "goals": {
+                "title": "เป้าหมาย",
+                "empty": "ยังไม่มีเป้าหมายแนบกับภารกิจนี้ แนบเป้าหมายด้านล่างเพื่อกำหนดว่าความสำเร็จคืออะไร",
+                "attachTitle": "แนบเป้าหมาย",
+                "goalLabel": "เป้าหมาย",
+                "goalPlaceholder": "เลือกเป้าหมาย",
+                "primaryLabel": "ตั้งเป็นเป้าหมายหลัก",
+                "primaryBadge": "หลัก",
+                "primaryTooltip": "เป้าหมายหลักของภารกิจนี้ - มีเป้าหมายหลักได้เพียงหนึ่งเดียวในแต่ละครั้ง",
+                "attach": "แนบ",
+                "detach": "ยกเลิกการแนบ",
+                "detachDialog": {
+                    "title": "ยกเลิกการแนบเป้าหมายนี้?",
+                    "body": "{title} จะถูกนำออกจากภารกิจนี้ ตัวเป้าหมายเองจะไม่ถูกลบ — ยังคงอยู่ในหน้าเป้าหมายและในภารกิจอื่น ๆ ที่แนบไว้",
+                    "confirm": "ยกเลิกการแนบเป้าหมาย",
+                    "cancel": "ยกเลิก",
+                    "detaching": "กำลังยกเลิกการแนบ…",
+                    "error": "ไม่สามารถยกเลิกการแนบเป้าหมายได้"
+                },
+                "alreadyLinkedOption": "{title} (แนบอยู่แล้ว)",
+                "noGoalsToAttach": "คุณยังไม่มีเป้าหมาย สร้างเป้าหมายในหน้าเป้าหมาย แล้วนำมาแนบที่นี่",
+                "pickerTruncated": "กำลังแสดงเป้าหมายล่าสุด 100 รายการของคุณ - เปิดหน้าเป้าหมายเพื่อดูรายการทั้งหมด",
+                "invariantNote": "การแนบเป้าหมายจะไม่เปลี่ยนสถานะของภารกิจนี้ - การทำภารกิจให้เสร็จสิ้นยังคงเป็นการดำเนินการที่ต้องระบุอย่างชัดเจน",
+                "toasts": {
+                    "attached": "แนบเป้าหมายแล้ว",
+                    "attachError": "ไม่สามารถแนบเป้าหมายได้",
+                    "detached": "ยกเลิกการแนบเป้าหมายแล้ว",
+                    "detachError": "ไม่สามารถยกเลิกการแนบเป้าหมายได้"
                 }
             }
         },
@@ -1640,11 +1749,85 @@
                 "error": "ไม่สามารถสร้าง Idea ได้ โปรดลองอีกครั้ง"
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "Works ที่เชื่อมโยง",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "สร้างแล้ว",
+                    "linked": "เชื่อมโยง",
+                    "rebuilt": "สร้างใหม่แล้ว",
+                    "matched": "ตรงกัน"
+                }
+            },
+            "detail": {
+                "live": "สด",
+                "fromMission": "จากภารกิจ",
+                "sections": {
+                    "description": "ไอเดีย",
+                    "build": "สถานะการสร้าง",
+                    "agents": "เอเจนต์",
+                    "details": "รายละเอียด"
+                },
+                "stages": {
+                    "drafted": "ร่างแล้ว",
+                    "queued": "อยู่ในคิว",
+                    "building": "กำลังสร้าง",
+                    "built": "สร้างแล้ว",
+                    "failed": "การสร้างล้มเหลว",
+                    "builtDirect": "สร้างแล้ว"
+                },
+                "stageHints": {
+                    "drafted": "ไอเดียพร้อมสำหรับการสร้างแล้ว",
+                    "queued": "กำลังรอผู้สร้าง",
+                    "building": "Work Agent กำลังสร้าง Work",
+                    "built": "มี Work ที่สร้างจากไอเดียนี้แล้ว",
+                    "failed": "การสร้างหยุดลง ลองใหม่อีกครั้ง",
+                    "builtDirect": "สร้างในตัวสร้าง Work — ข้ามคิวการสร้าง"
+                },
+                "built": {
+                    "badge": "สร้างแล้ว ({count})",
+                    "none": "ยังไม่ได้สร้าง"
+                },
+                "actions": {
+                    "build": "สร้าง",
+                    "retry": "ลองใหม่",
+                    "rebuild": "สร้างใหม่",
+                    "rebuildHint": "สร้าง Work ใหม่ โดยยังเก็บอันเดิมไว้",
+                    "newAgent": "เอเจนต์ใหม่",
+                    "delete": "ลบ"
+                },
+                "works": {
+                    "empty": "ยังไม่มี Work ที่เชื่อมกับไอเดียนี้"
+                },
+                "agents": {
+                    "empty": "ไม่มีเอเจนต์ที่ผูกกับไอเดียนี้"
+                },
+                "meta": {
+                    "source": "แหล่งที่มา",
+                    "slug": "สลัก",
+                    "fields": "ฟิลด์",
+                    "categories": "หมวดหมู่ที่แนะนำ"
+                },
+                "deleteDialog": {
+                    "title": "ลบไอเดียนี้หรือไม่?",
+                    "body": "{title} จะถูกลบถาวร ไม่สามารถย้อนกลับได้",
+                    "confirm": "ลบไอเดีย",
+                    "cancel": "ยกเลิก",
+                    "deleting": "กำลังลบ…",
+                    "error": "ลบไอเดียไม่สำเร็จ",
+                    "blocked": {
+                        "linked-works": "ลบไม่ได้: ไอเดียนี้เชื่อมกับ {count} Work กรุณาลบหรือยกเลิกการเชื่อมก่อน",
+                        "idea-agents": "ลบไม่ได้: มี {count} เอเจนต์ผูกกับไอเดียนี้ กรุณาลบหรือเปลี่ยนขอบเขตก่อน",
+                        "build-in-flight": "ลบไม่ได้ขณะกำลังสร้าง กรุณารอให้เสร็จ",
+                        "unknown": "ไม่สามารถลบไอเดียนี้ได้ในขณะนี้"
+                    }
+                },
+                "toasts": {
+                    "built": "สร้าง Work จากไอเดียนี้แล้ว",
+                    "buildFailed": "การสร้างล้มเหลว",
+                    "buildQueued": "เข้าคิวการสร้างแล้ว",
+                    "retryQueued": "เข้าคิวลองใหม่แล้ว",
+                    "rebuildQueued": "เข้าคิวสร้างใหม่แล้ว",
+                    "deleted": "ลบไอเดียแล้ว",
+                    "actionError": "ดำเนินการไม่สำเร็จ กรุณาลองใหม่"
                 }
             }
         },
@@ -2877,7 +3060,23 @@
                 "activatedToast": "เปิดใช้งานเอเจนต์แล้ว",
                 "statusUpdateFailed": "ไม่สามารถอัปเดตสถานะได้",
                 "newAgent": "เอเจนต์ใหม่",
-                "moreAgents": "+อีก {count}"
+                "moreAgents": "+อีก {count}",
+                "assignExisting": "กำหนดเอเจนต์ที่มีอยู่",
+                "assignTitle": "กำหนดเอเจนต์ให้งานนี้",
+                "assignSubtitle": "นำเอเจนต์ที่คุณมีอยู่แล้วมาใช้กับงานนี้ แทนการสร้างใหม่",
+                "assignSearchPlaceholder": "ค้นหาเอเจนต์…",
+                "assignLoading": "กำลังโหลดเอเจนต์…",
+                "assignNoneAvailable": "ไม่มีเอเจนต์อื่นให้กำหนดแล้ว",
+                "assignNoMatches": "ไม่พบเอเจนต์ที่ตรงกับการค้นหา",
+                "assignLoadFailed": "ไม่สามารถโหลดเอเจนต์ได้",
+                "assignedToast": "กำหนด {name} ให้งานนี้แล้ว",
+                "assignFailed": "ไม่สามารถกำหนดเอเจนต์ได้",
+                "assignCancel": "ยกเลิก",
+                "assignedLabel": "กำหนดแล้ว",
+                "assignedHint": "กำหนดให้งานนี้ — ไม่ได้สร้างที่นี่",
+                "unassign": "นำออกจากงานนี้",
+                "unassignedToast": "นำ {name} ออกจากงานนี้แล้ว",
+                "unassignFailed": "ไม่สามารถนำเอเจนต์ออกได้"
             },
             "failedToGenerateItems": "ไม่สามารถสร้างรายการได้ โปรดลองอีกครั้ง",
             "generationCompleted": "การสร้างเสร็จสิ้นเรียบร้อยแล้ว",

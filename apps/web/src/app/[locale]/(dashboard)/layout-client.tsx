@@ -28,6 +28,7 @@ import type { GitProviderConnectionInfo } from '@/lib/api/plugins-capabilities/g
 import type { PluginDeviceAuthStatus } from '@/lib/api/plugins-capabilities/device-auth';
 import type { ApiVersion } from '@/lib/api/version';
 import { JobRuntimeDegradedBanner } from '@/components/dashboard/JobRuntimeDegradedBanner';
+import { ScrollTopOnNavigate } from '@/components/dashboard/ScrollTopOnNavigate';
 
 interface DashboardLayoutClientProps {
     user: AuthUser;
@@ -515,6 +516,11 @@ export function DashboardLayoutClient({
                             </div>
 
                             <Footer apiVersion={apiVersion} />
+
+                            {/* Must stay the last child of <main>: its layout
+                                effect has to run after the App Router's own
+                                per-segment scroll handler in the same commit. */}
+                            <ScrollTopOnNavigate />
                         </main>
                     </div>
                 </div>

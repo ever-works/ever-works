@@ -906,6 +906,13 @@
                 "nextDisabledReason": "Pick a parent or choose Workspace scope to continue."
             },
             "settings": {
+                "identity": {
+                    "pause": "Wstrzymaj",
+                    "resume": "Wznów",
+                    "activate": "Aktywuj",
+                    "archive": "Archiwizuj",
+                    "delete": "Usuń"
+                },
                 "orgCard": {
                     "title": "Organizacja",
                     "teamLabel": "Zespół",
@@ -993,7 +1000,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "Zarchiwizowane"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1016,6 +1024,38 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "Zarchiwizowani agenci",
+                "subtitle": "Agenci, których zarchiwizowano. Nie działają i nie pojawiają się w katalogu. Przywróć agenta, aby wrócił jako wstrzymany, albo usuń go trwale.",
+                "empty": {
+                    "title": "Brak zarchiwizowanych agentów",
+                    "subtitle": "Zarchiwizowanie agenta na jego stronie ustawień przenosi go tutaj."
+                },
+                "delete": "Usuń trwale",
+                "deleteAria": "Usuń trwale {name}",
+                "unarchive": "Przywróć",
+                "menuAria": "Akcje dla {name}",
+                "unarchiveSuccess": "Przywrócono {name}",
+                "unarchiveError": "Nie udało się przywrócić agenta"
+            },
+            "archiveDialog": {
+                "title": "Zarchiwizować agenta {name}?",
+                "description": "Agent przestaje działać i znika z katalogu. Jego uruchomienia, budżety i członkostwa zostają zachowane.",
+                "hint": "Możesz go przywrócić z karty Zarchiwizowane w dowolnym momencie — wróci jako wstrzymany.",
+                "cancel": "Anuluj",
+                "confirm": "Zarchiwizuj agenta",
+                "success": "Zarchiwizowano agenta {name}",
+                "error": "Nie udało się zarchiwizować agenta"
+            },
+            "deleteDialog": {
+                "title": "Usunąć {name}?",
+                "description": "Ta operacja trwale usuwa agenta wraz z jego budżetami, członkostwami i historią uruchomień.",
+                "hint": "Tej operacji nie można cofnąć. Zarchiwizuj agenta, jeśli chcesz go tylko ukryć w katalogu.",
+                "cancel": "Anuluj",
+                "confirm": "Usuń trwale",
+                "success": "Usunięto {name}",
+                "error": "Nie udało się usunąć agenta"
             }
         },
         "tasksPage": {
@@ -1024,6 +1064,33 @@
             "empty": {
                 "title": "Brak Zadań.",
                 "subtitle": "Zadania będą dostępne w późniejszej fazie wdrożenia Agentów/Umiejętności/Zadań. Strona jest zarezerwowana, aby trasa nawigacji paska bocznego była dostępna."
+            },
+            "scopedSection": {
+                "addExisting": "Dodaj istniejące",
+                "newTask": "Nowe Zadanie",
+                "assignTitle": "Dodaj istniejące Zadanie",
+                "assignSubtitle": "Wybierz Zadanie ze swojego backlogu zamiast tworzyć nowe.",
+                "assignSearchPlaceholder": "Szukaj Zadań…",
+                "assignSearchLabel": "Szukaj Zadań",
+                "assignLoading": "Ładowanie Zadań…",
+                "assignLoadFailed": "Nie udało się wczytać Zadań",
+                "assignNoneAvailable": "Brak innych Zadań do dodania.",
+                "assignNoMatches": "Żadne Zadanie nie pasuje do tego wyszukiwania.",
+                "assignedToast": "Dodano Zadanie „{title}”",
+                "assignFailed": "Nie udało się dodać Zadania",
+                "assignCancel": "Anuluj",
+                "movesLabel": "zostanie przeniesione",
+                "movesHint": "Jest przypisane gdzie indziej — dodanie tutaj je przeniesie.",
+                "removedToast": "Usunięto Zadanie „{title}” z tej listy",
+                "removeFailed": "Nie udało się usunąć Zadania z tej listy",
+                "rowMenuColumn": "Akcje",
+                "rowMenuLabel": "Akcje dla {title}",
+                "removeMenuItem": "Usuń z tej listy",
+                "confirmTitle": "Usunąć to Zadanie?",
+                "confirmBody": "Zadanie „{title}” zostanie usunięte z tej listy. Samo Zadanie zostaje zachowane i można je dodać ponownie później.",
+                "confirmCancel": "Anuluj",
+                "confirmSubmit": "Usuń",
+                "confirmPending": "Usuwanie…"
             },
             "list": {
                 "newTask": "+ Nowe Zadanie",
@@ -1447,7 +1514,14 @@
                 "relationLabel": "Relation",
                 "attach": "Attach",
                 "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "detachDialog": {
+                    "title": "Odłączyć tę Pracę?",
+                    "body": "{title} zostanie usunięta z tej Misji. Sama Praca nigdy nie jest modyfikowana — usuwane jest wyłącznie powiązanie.",
+                    "confirm": "Odłącz Pracę",
+                    "cancel": "Anuluj",
+                    "detaching": "Odłączanie…",
+                    "error": "Nie udało się odłączyć Pracy"
+                },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
                     "created": "Created",
@@ -1496,8 +1570,13 @@
                 "runNow": "Run now",
                 "clone": "Clone"
             },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            "deleteDialog": {
+                "title": "Usunąć tę Misję?",
+                "body": "{title} zostanie trwale usunięta. Podrzędne Pomysły i Prace zostaną zachowane, ale ich powiązanie zwrotne z tą Misją zostanie utracone. Tej operacji nie można cofnąć.",
+                "confirm": "Usuń Misję",
+                "cancel": "Anuluj",
+                "deleting": "Usuwanie…",
+                "error": "Nie udało się usunąć Misji"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1568,6 +1647,36 @@
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)"
+                }
+            },
+            "goals": {
+                "title": "Cele",
+                "empty": "Do tej Misji nie dołączono jeszcze żadnych Celów. Dołącz Cel poniżej, aby określić, co oznacza sukces.",
+                "attachTitle": "Dołącz Cel",
+                "goalLabel": "Cel",
+                "goalPlaceholder": "Wybierz Cel",
+                "primaryLabel": "Ustaw jako główny",
+                "primaryBadge": "Główny",
+                "primaryTooltip": "Główny Cel tej Misji - tylko jeden Cel może być główny w danym momencie.",
+                "attach": "Dołącz",
+                "detach": "Odłącz",
+                "detachDialog": {
+                    "title": "Odłączyć ten Cel?",
+                    "body": "{title} zostanie usunięty z tej Misji. Sam Cel nie zostanie usunięty — pozostanie na stronie Cele oraz w każdej innej Misji, do której jest dołączony.",
+                    "confirm": "Odłącz Cel",
+                    "cancel": "Anuluj",
+                    "detaching": "Odłączanie…",
+                    "error": "Nie udało się odłączyć Celu"
+                },
+                "alreadyLinkedOption": "{title} (już dołączony)",
+                "noGoalsToAttach": "Nie masz jeszcze żadnych Celów. Utwórz Cel na stronie Cele, a następnie dołącz go tutaj.",
+                "pickerTruncated": "Wyświetlanych jest 100 najnowszych Celów - otwórz stronę Cele, aby zobaczyć pełną listę.",
+                "invariantNote": "Dołączenie Celu nigdy nie zmienia statusu tej Misji - ukończenie Misji pozostaje działaniem jawnym.",
+                "toasts": {
+                    "attached": "Cel dołączony",
+                    "attachError": "Nie udało się dołączyć Celu",
+                    "detached": "Cel odłączony",
+                    "detachError": "Nie udało się odłączyć Celu"
                 }
             }
         },
@@ -1640,11 +1749,85 @@
                 "error": "Nie udało się utworzyć Idea. Spróbuj ponownie."
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "Powiązane Works",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "Utworzony",
+                    "linked": "Powiązany",
+                    "rebuilt": "Odtworzony",
+                    "matched": "Dopasowany"
+                }
+            },
+            "detail": {
+                "live": "Na żywo",
+                "fromMission": "Z Misji",
+                "sections": {
+                    "description": "Pomysł",
+                    "build": "Status budowy",
+                    "agents": "Agenci",
+                    "details": "Szczegóły"
+                },
+                "stages": {
+                    "drafted": "Utworzony",
+                    "queued": "W kolejce",
+                    "building": "Budowanie",
+                    "built": "Zbudowany",
+                    "failed": "Budowa nieudana",
+                    "builtDirect": "Zbudowany"
+                },
+                "stageHints": {
+                    "drafted": "Pomysł istnieje i jest gotowy do budowy.",
+                    "queued": "Czeka na wykonawcę.",
+                    "building": "Work Agent generuje Work.",
+                    "built": "Z tego Pomysłu powstał Work.",
+                    "failed": "Budowa została przerwana. Spróbuj ponownie.",
+                    "builtDirect": "Utworzono w kreatorze Works — pominięto kolejkę kompilacji."
+                },
+                "built": {
+                    "badge": "Zbudowany ({count})",
+                    "none": "Jeszcze nie zbudowany"
+                },
+                "actions": {
+                    "build": "Zbuduj",
+                    "retry": "Ponów",
+                    "rebuild": "Zbuduj ponownie",
+                    "rebuildHint": "Tworzy nowy Work. Istniejący zostaje zachowany.",
+                    "newAgent": "Nowy Agent",
+                    "delete": "Usuń"
+                },
+                "works": {
+                    "empty": "Brak Works powiązanych z tym Pomysłem."
+                },
+                "agents": {
+                    "empty": "Brak Agentów przypisanych do tego Pomysłu."
+                },
+                "meta": {
+                    "source": "Źródło",
+                    "slug": "Slug",
+                    "fields": "Pola",
+                    "categories": "Sugerowane kategorie"
+                },
+                "deleteDialog": {
+                    "title": "Usunąć ten Pomysł?",
+                    "body": "{title} zostanie trwale usunięty. Tej operacji nie można cofnąć.",
+                    "confirm": "Usuń Pomysł",
+                    "cancel": "Anuluj",
+                    "deleting": "Usuwanie…",
+                    "error": "Nie udało się usunąć Pomysłu",
+                    "blocked": {
+                        "linked-works": "Nie można usunąć: ten Pomysł jest powiązany z {count} Work(s). Najpierw usuń lub odłącz je.",
+                        "idea-agents": "Nie można usunąć: {count} Agent(ów) jest przypisanych do tego Pomysłu. Usuń ich lub zmień zakres.",
+                        "build-in-flight": "Nie można usunąć podczas budowy. Poczekaj na jej zakończenie.",
+                        "unknown": "Nie można teraz usunąć tego Pomysłu."
+                    }
+                },
+                "toasts": {
+                    "built": "Work zbudowany z tego Pomysłu",
+                    "buildFailed": "Budowa nie powiodła się",
+                    "buildQueued": "Budowa w kolejce",
+                    "retryQueued": "Ponowna próba w kolejce",
+                    "rebuildQueued": "Ponowna budowa w kolejce",
+                    "deleted": "Pomysł usunięty",
+                    "actionError": "Nie udało się wykonać akcji. Spróbuj ponownie."
                 }
             }
         },
@@ -2877,7 +3060,23 @@
                 "activatedToast": "Agent aktywowany",
                 "statusUpdateFailed": "Nie udało się zaktualizować statusu",
                 "newAgent": "Nowy Agent",
-                "moreAgents": "+{count} więcej"
+                "moreAgents": "+{count} więcej",
+                "assignExisting": "Przypisz istniejącego",
+                "assignTitle": "Przypisz Agenta do tej Pracy",
+                "assignSubtitle": "Przypisz do tej Pracy Agenta, którego już masz, zamiast tworzyć nowego.",
+                "assignSearchPlaceholder": "Szukaj Agentów…",
+                "assignLoading": "Ładowanie Agentów…",
+                "assignNoneAvailable": "Brak innych Agentów do przypisania.",
+                "assignNoMatches": "Żaden Agent nie pasuje do tego wyszukiwania.",
+                "assignLoadFailed": "Nie udało się załadować Agentów",
+                "assignedToast": "{name} przypisany do tej Pracy",
+                "assignFailed": "Nie udało się przypisać Agenta",
+                "assignCancel": "Anuluj",
+                "assignedLabel": "Przypisany",
+                "assignedHint": "Przypisany do tej Pracy — nie utworzony tutaj",
+                "unassign": "Usuń z tej Pracy",
+                "unassignedToast": "{name} usunięty z tej Pracy",
+                "unassignFailed": "Nie udało się usunąć Agenta"
             },
             "failedToGenerateItems": "Nie udało się wygenerować elementów. Spróbuj ponownie.",
             "generationCompleted": "Wygenerowano pomyślnie",

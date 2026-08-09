@@ -125,6 +125,9 @@ export {
     RUN_NO_AGENT,
     RUN_AGENT_NOT_FOUND,
     type RunCandidateAgent,
+    type TaskAssignCandidate,
+    type TaskScopeKey,
+    type TaskScopeRef,
 } from './tasks.shared';
 import type { RunCandidateAgent } from './tasks.shared';
 
@@ -295,6 +298,8 @@ export const tasksAPI = {
                 | 'acceptanceChecks'
                 | 'maxGateAttempts'
                 | 'workId'
+                | 'missionId'
+                | 'ideaId'
                 | 'agentId'
             >
         >,

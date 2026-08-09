@@ -4,10 +4,14 @@ import type {
     WorkflowNodeRunContext,
     WorkflowNodeRunResult,
     WorkflowNodeRunner,
-} from '@ever-works/agent/agents';
-import { SubAgentDelegationService } from '@ever-works/agent/agents';
-import { AiFacadeService } from '@ever-works/agent/facades';
-import { KnowledgeBaseService } from '@ever-works/agent/services';
+} from './workflow-graph.ports';
+import { SubAgentDelegationService } from './sub-agent-delegation.service';
+import { AiFacadeService } from '../facades/ai.facade';
+// `agents/ -> services/` is an established value-import direction here
+// (`agent-run.service.ts` imports VisionContextService and memory-recall
+// the same way). The forbidden direction is `agents/ -> tasks-domain`,
+// which is what AGENT_DOMAIN_TOOL_SOURCES exists to prevent.
+import { KnowledgeBaseService } from '../services/knowledge-base.service';
 
 /**
  * The real workflow node runner (judgment layer G5).
