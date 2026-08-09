@@ -97,6 +97,12 @@ import {
  * Why `WorkProposalService.delete` refused. Travels to the client in
  * the 409 body (`{ reason, count, message }`) so the confirm dialog can
  * name the blocker instead of showing a generic error.
+ *
+ * `linked-works` is no longer produced — linked Works stopped blocking
+ * the delete (see `delete`). It is retained in the union, and its
+ * translations are retained in the web app, so a newer web build talking
+ * to an older API during a rolling deploy still renders the refusal it
+ * gets instead of falling through to a missing i18n key.
  */
 export type IdeaDeleteBlockedReason = 'build-in-flight' | 'linked-works' | 'idea-agents';
 
