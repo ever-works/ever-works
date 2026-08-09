@@ -100,10 +100,29 @@ describe('IdeaDetailClient', () => {
     it('reads as not built, and offers Build, when no Work was produced', () => {
         render(<IdeaDetailClient idea={baseIdea} />);
 
-        expect(screen.getByTestId('idea-built-badge')).toHaveTextContent('built.none');
+        // Not built ⇒ the lifecycle status stands, alongside an explicit
+        // "Not built yet". No Built pill exists to contradict it.
+        expect(screen.getByTestId('idea-status-badge')).toHaveTextContent('filters.pending');
+        expect(screen.getByTestId('idea-not-built-badge')).toHaveTextContent('built.none');
+        expect(screen.queryByTestId('idea-built-badge')).not.toBeInTheDocument();
         expect(screen.getByTestId('idea-build-button')).toBeInTheDocument();
         expect(screen.queryByTestId('idea-rebuild-button')).not.toBeInTheDocument();
         expect(screen.queryByTestId('idea-built-work-link')).not.toBeInTheDocument();
+    });
+
+    it('replaces the lifecycle status with Built once a Work exists', () => {
+        // The reported bug, on the detail page: a dismissed Idea that had
+        // produced a Work rendered "Dismissed" beside "Built (1)".
+        render(
+            <IdeaDetailClient
+                idea={{ ...baseIdea, status: 'dismissed' }}
+                initialLinks={[{ ...builtLink, kind: 'linked' }]}
+            />,
+        );
+
+        expect(screen.getByTestId('idea-built-badge')).toHaveTextContent('built.badge');
+        expect(screen.queryByTestId('idea-status-badge')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('idea-not-built-badge')).not.toBeInTheDocument();
     });
 
     it('Build opens the same /works/new flow the Idea card uses', () => {

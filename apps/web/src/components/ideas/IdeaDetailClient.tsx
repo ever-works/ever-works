@@ -54,7 +54,7 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { ShowDateTime } from '@/components/ui/show-datetime';
-import { STATUS_STYLES } from './idea-status';
+import { BUILT_BADGE_STYLE, STATUS_STYLES, deriveIdeaBadge } from './idea-status';
 import { deriveIdeaBuiltState } from './idea-built';
 
 /**
@@ -517,6 +517,7 @@ export function IdeaDetailClient({
     };
 
     const statusStyle = STATUS_STYLES[idea.status] ?? STATUS_STYLES.pending;
+    const badge = deriveIdeaBadge(idea.status, { isBuilt, workCount });
 
     return (
         <div className="w-full p-6 max-w-screen-2xl mx-auto space-y-6">
@@ -629,42 +630,53 @@ export function IdeaDetailClient({
                             {idea.title}
                         </h1>
                         <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                            <span
-                                data-testid="idea-status-badge"
-                                className={cn(
-                                    'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset capitalize',
-                                    statusStyle.badge,
-                                )}
-                            >
+                            {/* Exactly ONE pill (see `deriveIdeaBadge`).
+                                A Work that exists outranks the Idea's own
+                                lifecycle status, so a built Idea reads
+                                "Built (1)" instead of "Dismissed" — the
+                                two used to render side by side and read as
+                                a contradiction. A live build is the sole
+                                exception and keeps its status. */}
+                            {badge.kind === 'built' ? (
                                 <span
-                                    aria-hidden="true"
-                                    className={cn('h-1.5 w-1.5 rounded-full', statusStyle.dot)}
-                                />
-                                {tPage(`filters.${idea.status}`)}
-                            </span>
-
-                            {/* The answer to "is it built?", stated rather
-                                than implied — a green Built pill with the
-                                number of Works produced, or a neutral
-                                "Not built yet". */}
-                            <span
-                                data-testid="idea-built-badge"
-                                className={cn(
-                                    'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset',
-                                    isBuilt
-                                        ? 'bg-success/10 text-success ring-success/20'
-                                        : 'bg-surface-secondary dark:bg-surface-secondary-dark text-text-muted dark:text-text-muted-dark ring-border/60 dark:ring-border-dark/60',
-                                )}
-                            >
-                                {isBuilt ? (
+                                    data-testid="idea-built-badge"
+                                    className={cn(
+                                        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset',
+                                        BUILT_BADGE_STYLE,
+                                    )}
+                                >
                                     <CheckCircle2 className="w-3 h-3" />
-                                ) : (
+                                    {tDetail('built.badge', { count: badge.count })}
+                                </span>
+                            ) : (
+                                <span
+                                    data-testid="idea-status-badge"
+                                    className={cn(
+                                        'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset capitalize',
+                                        statusStyle.badge,
+                                    )}
+                                >
+                                    <span
+                                        aria-hidden="true"
+                                        className={cn('h-1.5 w-1.5 rounded-full', statusStyle.dot)}
+                                    />
+                                    {tPage(`filters.${badge.status}`)}
+                                </span>
+                            )}
+
+                            {/* Detail-page-only: state the negative
+                                explicitly. It can never sit next to a
+                                Built pill, so there is no contradiction to
+                                reintroduce here. */}
+                            {!isBuilt && (
+                                <span
+                                    data-testid="idea-not-built-badge"
+                                    className="inline-flex items-center gap-1 rounded-full bg-surface-secondary dark:bg-surface-secondary-dark px-2 py-0.5 text-[11px] font-medium text-text-muted dark:text-text-muted-dark ring-1 ring-inset ring-border/60 dark:ring-border-dark/60"
+                                >
                                     <CircleDashed className="w-3 h-3" />
-                                )}
-                                {isBuilt
-                                    ? tDetail('built.badge', { count: workCount })
-                                    : tDetail('built.none')}
-                            </span>
+                                    {tDetail('built.none')}
+                                </span>
+                            )}
 
                             {isLive && (
                                 <span
