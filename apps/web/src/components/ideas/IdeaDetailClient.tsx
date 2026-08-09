@@ -11,6 +11,7 @@ import {
     ChevronLeft,
     ChevronRight,
     CircleDashed,
+    FolderClosed,
     Hammer,
     Info,
     Lightbulb,
@@ -775,6 +776,21 @@ export function IdeaDetailClient({
                                             data-testid="idea-linked-work-row"
                                             className="group flex items-center gap-3 rounded-lg border border-border/60 dark:border-border-dark/60 bg-surface/30 dark:bg-surface-dark/30 px-3 py-2.5 hover:border-border dark:hover:border-border-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
                                         >
+                                            {/* Same folder mark the Work cards
+                                                carry on /works, so a row here
+                                                reads as the Work it points at. */}
+                                            <span
+                                                aria-hidden
+                                                className={cn(
+                                                    'shrink-0 w-7 h-7 rounded-md flex items-center justify-center border',
+                                                    SECTION_ICON_TILE,
+                                                )}
+                                            >
+                                                <FolderClosed
+                                                    strokeWidth={1.5}
+                                                    className="w-3.5 h-3.5 text-text-secondary dark:text-text-secondary-dark"
+                                                />
+                                            </span>
                                             <span className="min-w-0 flex-1 truncate text-sm font-medium text-text dark:text-text-dark group-hover:text-primary transition-colors">
                                                 {row.label}
                                             </span>
