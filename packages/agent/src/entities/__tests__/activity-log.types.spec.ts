@@ -112,7 +112,8 @@ describe('activity-log.types', () => {
             // +2 task_merged / task_merge_refused (agent-merge path, #1874) -> 118.
             // +3 git_pushed / git_committed / git_merged (git activity
             //    ingestion, audit item j) -> 121.
-            expect(literals).toHaveLength(121);
+            // +1 agent_unarchived (Agent archive/restore, #1994) -> 122.
+            expect(literals).toHaveLength(122);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {
