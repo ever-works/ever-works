@@ -1,9 +1,12 @@
 import { ListChecks, Plus } from 'lucide-react';
+import { useTranslations } from 'next-intl';
 import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import type { Task } from '@/lib/api/tasks';
+import type { TaskScopeKey } from '@/lib/api/tasks.shared';
 import type { WorkRunsSummary } from '@/lib/api/types-only';
 import { WorkRunsSummaryBadges } from '@/components/works/detail/WorkRunsSummaryBadges';
+import { AddExistingTaskButton } from './AddExistingTaskButton';
 import { TasksList } from './TasksList';
 
 /**
@@ -27,10 +30,13 @@ export function TasksScopedSection({
     /** Wave 4 M4 — per-Work AgentRun summary counts (Work scope only). */
     runsSummary?: WorkRunsSummary | null;
 }) {
-    const doneCount = tasks.filter((t) => t.status === 'done').length;
-    const openCount = tasks.filter((t) => !['done', 'cancelled'].includes(t.status)).length;
+    // Shared with `AddExistingTaskButton` next to it in the header: the
+    // two CTAs sit side by side, so they have to speak the same language.
+    const t = useTranslations('dashboard.tasksPage.scopedSection');
+    const doneCount = tasks.filter((task) => task.status === 'done').length;
+    const openCount = tasks.filter((task) => !['done', 'cancelled'].includes(task.status)).length;
     const progressPct = tasks.length > 0 ? Math.round((doneCount / tasks.length) * 100) : 0;
-    const scopeParam =
+    const scopeParam: TaskScopeKey =
         scopeLabel === 'Work' ? 'workId' : scopeLabel === 'Mission' ? 'missionId' : 'ideaId';
     const newTaskHref = `${ROUTES.DASHBOARD_TASK_NEW}?${scopeParam}=${encodeURIComponent(scopeId)}`;
 
@@ -68,13 +74,20 @@ export function TasksScopedSection({
                     </div>
                 </div>
 
-                <Link
-                    href={newTaskHref}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg border border-border dark:border-border-dark text-text dark:text-text-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors whitespace-nowrap shrink-0"
-                >
-                    <Plus className="w-3.5 h-3.5" />
-                    New Task
-                </Link>
+                {/* Two on-ramps, because "create another one" is the wrong
+                    default for an operator who already has a backlog: most of
+                    what a scope wants was raised elsewhere long before the
+                    scope existed. "Add existing" opens a picker of it. */}
+                <div className="flex items-center gap-2 shrink-0">
+                    <AddExistingTaskButton scopeKey={scopeParam} scopeId={scopeId} />
+                    <Link
+                        href={newTaskHref}
+                        className="inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-button-primary dark:bg-button-primary-dark text-button-primary-foreground dark:text-button-primary-foreground-dark hover:bg-button-primary-hover dark:hover:bg-button-primary-hover-dark transition-colors whitespace-nowrap shrink-0"
+                    >
+                        <Plus className="w-3.5 h-3.5" />
+                        {t('newTask')}
+                    </Link>
+                </div>
             </div>
 
             {/* ── Progress bar ─────────────────────────────────────────────── */}
@@ -96,7 +109,9 @@ export function TasksScopedSection({
             <div className="border-t border-border/60 dark:border-border-dark/60" />
 
             {/* ── Tasks list ───────────────────────────────────────────────── */}
-            <TasksList tasks={tasks} />
+            {/* `scope` turns on the per-row detach — the inverse of the
+                "Add existing" button above, and only meaningful here. */}
+            <TasksList tasks={tasks} scope={{ key: scopeParam, id: scopeId }} />
         </div>
     );
 }
