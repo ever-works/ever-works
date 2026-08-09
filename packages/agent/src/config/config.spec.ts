@@ -120,6 +120,29 @@ describe('agent/config', () => {
             expect(config.trigger.getInternalSecret()).toBe('shared-secret');
         });
 
+        describe('getInternalRequestTimeoutMs', () => {
+            // Must stay under the nginx-ingress 60s proxy_read_timeout default
+            // so the client, not the proxy, is what gives up first.
+            it('defaults to 45s, comfortably below the 60s ingress ceiling', () => {
+                delete process.env.TRIGGER_INTERNAL_REQUEST_TIMEOUT_MS;
+                expect(config.trigger.getInternalRequestTimeoutMs()).toBe(45000);
+                expect(config.trigger.getInternalRequestTimeoutMs()).toBeLessThan(60000);
+            });
+
+            it('honours a valid override', () => {
+                process.env.TRIGGER_INTERNAL_REQUEST_TIMEOUT_MS = '30000';
+                expect(config.trigger.getInternalRequestTimeoutMs()).toBe(30000);
+            });
+
+            it.each(['not-a-number', '0', '-1', ''])(
+                'falls back to the default for the unusable value %p',
+                (raw) => {
+                    process.env.TRIGGER_INTERNAL_REQUEST_TIMEOUT_MS = raw;
+                    expect(config.trigger.getInternalRequestTimeoutMs()).toBe(45000);
+                },
+            );
+        });
+
         describe('shouldUseTrigger', () => {
             it('returns true only when isEnabled() AND getInternalSecret() is set', () => {
                 process.env.TRIGGER_ENABLED = 'true';
