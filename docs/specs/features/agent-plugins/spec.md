@@ -44,7 +44,7 @@
 > validator, `PLUGIN_ID_PATTERN`), the Skills subsystem (entities, API, UI, bindings,
 > prompt injection), `skills-lock.json`, the checked-in `.agents/.claude/.cursor`
 > skill dirs, and `apps/mcp` all keep working **exactly as they do now**. Agent Plugins
-> packages are a **second, parallel format**: inert *data* packages read by new code —
+> packages are a **second, parallel format**: inert _data_ packages read by new code —
 > they are never loaded as Ever Works code plugins, and Ever Works code plugins do not
 > gain `plugin.json` files.
 
@@ -57,13 +57,13 @@ classes with capabilities, settings schemas, lifecycle hooks). Agent Plugins pac
 are **inert data directories** (a manifest + markdown skills + MCP connection configs).
 These are different species and MUST stay separate:
 
-| | Native Ever Works plugin | Agent Plugins package |
-|---|---|---|
-| Manifest | `everworks.plugin` block in `package.json` (open schema) | `plugin.json` (closed schema, spec §4) |
-| Content | Executable JS/TS (`dist/index.js`) | Data: `skills/*/SKILL.md`, `mcp.json`, assets |
-| Loaded by | `PluginLoaderService` (`import()`) | New spec-package reader (fs reads only) |
-| Validated by | `PluginManifestValidator` (unchanged) | New closed-schema validator (parallel, per spec §4) |
-| Trust | First-party / ADR-016 allowlist; code runs in-process | Data is safe to parse; **only** stdio MCP servers execute anything, behind an explicit gate (§4.4) |
+|              | Native Ever Works plugin                                 | Agent Plugins package                                                                              |
+| ------------ | -------------------------------------------------------- | -------------------------------------------------------------------------------------------------- |
+| Manifest     | `everworks.plugin` block in `package.json` (open schema) | `plugin.json` (closed schema, spec §4)                                                             |
+| Content      | Executable JS/TS (`dist/index.js`)                       | Data: `skills/*/SKILL.md`, `mcp.json`, assets                                                      |
+| Loaded by    | `PluginLoaderService` (`import()`)                       | New spec-package reader (fs reads only)                                                            |
+| Validated by | `PluginManifestValidator` (unchanged)                    | New closed-schema validator (parallel, per spec §4)                                                |
+| Trust        | First-party / ADR-016 allowlist; code runs in-process    | Data is safe to parse; **only** stdio MCP servers execute anything, behind an explicit gate (§4.4) |
 
 The bridge between the two worlds is a **new platform module**
 (`packages/agent/src/agent-plugins/`) whose services read installed spec packages
@@ -84,12 +84,12 @@ rejects non-semver versions — which the spec forbids a client to reject, §4.4
 
 1. **Consume (import)** — any conformant Agent Plugins package can be installed into
    Ever Works from:
-   - a **local directory** (self-hosted / desktop / dev: point at a folder on disk),
-   - a **git repository** (any host; ref-pinned),
-   - an **npm package** (any registry we allow; version-pinned).
-   Both component types are supported: its Skills appear in the existing Skills
-   catalog and install/bind/inject exactly like catalog skills today; its MCP servers
-   become bindable tool sources for Agents.
+    - a **local directory** (self-hosted / desktop / dev: point at a folder on disk),
+    - a **git repository** (any host; ref-pinned),
+    - an **npm package** (any registry we allow; version-pinned).
+      Both component types are supported: its Skills appear in the existing Skills
+      catalog and install/bind/inject exactly like catalog skills today; its MCP servers
+      become bindable tool sources for Agents.
 2. **Execute (MCP)** — Agents bound to a package's MCP server get that server's tools
    in their runs, via the official `@modelcontextprotocol/sdk` client, with all three
    transports (`stdio`, `streamable-http`, and legacy `sse` — the spec makes `sse`
@@ -103,7 +103,7 @@ rejects non-semver versions — which the spec forbids a client to reject, §4.4
    packages) proves every MUST.
 
 **Non-goals** (v1): hosting a public registry of Agent Plugins packages; converting
-native Ever Works plugins into spec packages; supporting spec packages as a *code*
+native Ever Works plugins into spec packages; supporting spec packages as a _code_
 distribution channel (spec packages never contain platform-executable plugin code);
 a marketplace UI beyond the sources/install surface described here.
 
@@ -113,9 +113,9 @@ a marketplace UI beyond the sources/install surface described here.
 
 ### 2.1 Installing a package
 
-- **US-1 (local dir)**: A self-hosted operator sets one or more *package source
-  directories* (env/setting). Every immediate child directory containing a valid
-  `plugin.json` is listed as an *available package*. Install = register + validate +
+- **US-1 (local dir)**: A self-hosted operator sets one or more _package source
+  directories_ (env/setting). Every immediate child directory containing a valid
+  `plugin.json` is listed as an _available package_. Install = register + validate +
   (skills) surface in catalog. No copy needed for local sources.
 - **US-2 (git)**: A user pastes a git URL (+ optional ref/subdirectory) in
   **Settings → Agent Plugins → Sources**. The platform clones/fetches it into the
@@ -134,7 +134,7 @@ a marketplace UI beyond the sources/install surface described here.
 ### 2.2 Using package skills
 
 - **US-5**: Installed packages' skills appear in the existing `/skills` catalog UI
-  (source-labeled with the package name/version), and behave *identically* to
+  (source-labeled with the package name/version), and behave _identically_ to
   `everworks-skills` catalog entries: install-to-scope, bind to Agents/Works/Missions,
   prompt injection under the existing token budget, the `getSkillBody` on-demand tool,
   `allowed-tools` gating. (Note: today's injection is full-body-within-budget, with
@@ -160,7 +160,7 @@ a marketplace UI beyond the sources/install surface described here.
 - **US-8 (secrets)**: Packages cannot ship credentials (spec §6.2.1). When a server
   needs auth, the user provides it in Ever Works per-server settings (encrypted at
   rest like plugin `x-secret` settings). At connect time Ever Works injects them as
-  *client-generated* headers/env — which the spec explicitly permits and gives
+  _client-generated_ headers/env — which the spec explicitly permits and gives
   precedence over package-configured values.
 - **US-9 (stdio gate)**: `stdio` servers execute a subprocess. This is OFF by default
   and gated per ADR-018: enabled by operator setting on self-hosted/desktop. On the
@@ -182,8 +182,8 @@ a marketplace UI beyond the sources/install surface described here.
   `env: {EVER_WORKS_API_KEY: "ew_live_…"}` example currently in
   `docs/features/mcp-server.md` would violate the spec's producer rule (plugins
   MUST NOT embed credentials in `env`/`headers`) if shipped in a package; the new
-  package is the conformant path and the existing doc gains a pointer *by
-  addition* — nothing is removed.
+  package is the conformant path and the existing doc gains a pointer _by
+  addition_ — nothing is removed.
 
 ### 2.5 Where this runs
 
@@ -196,21 +196,21 @@ configuration, not code paths.
 
 ## 3. Component model mapping (spec → Ever Works)
 
-| Agent Plugins concept | Ever Works representation |
-|---|---|
-| Plugin (package) | New `agent_plugin_packages` row + files under the managed packages dir (or a registered local source dir) |
-| `plugin.json` manifest | Parsed by the new conformance library; stored on the package row (`manifest` json column) |
-| Skill (`skills/<name>/SKILL.md`) | `SkillCatalogEntry` via the catalog facade's additive platform source (plan §2.2) → existing `Skill` row on install (frontmatter preserved verbatim in the open `frontmatter` json column, body in `instructionsMd`) |
-| Skill sidecar files (`scripts/`, `references/`, `assets/`) | Stored with the package; materialized into CLI-runner workspaces (plan §4.5) |
-| MCP server (`mcp.json` entry) | New `McpServerConfigService` output → bindable via new `agent_mcp_server_bindings`; connected at run time by the new MCP client service in `packages/agent` |
-| `extensions["works.ever"]` | Ever Works' reverse-domain namespace (our domain `ever.works` reversed). Carries EW-specific package/skill metadata on export; ignored-if-absent on import |
-| `works.ever/` extension directory | Reserved for future EW-specific package files; v1 writes none, reads none (spec-legal) |
-| `PLUGIN_ROOT` / `PLUGIN_DATA` | Absolute package dir / new per-package persistent data dir (plan §3) |
+| Agent Plugins concept                                      | Ever Works representation                                                                                                                                                                                            |
+| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Plugin (package)                                           | New `agent_plugin_packages` row + files under the managed packages dir (or a registered local source dir)                                                                                                            |
+| `plugin.json` manifest                                     | Parsed by the new conformance library; stored on the package row (`manifest` json column)                                                                                                                            |
+| Skill (`skills/<name>/SKILL.md`)                           | `SkillCatalogEntry` via the catalog facade's additive platform source (plan §2.2) → existing `Skill` row on install (frontmatter preserved verbatim in the open `frontmatter` json column, body in `instructionsMd`) |
+| Skill sidecar files (`scripts/`, `references/`, `assets/`) | Stored with the package; materialized into CLI-runner workspaces (plan §4.5)                                                                                                                                         |
+| MCP server (`mcp.json` entry)                              | New `McpServerConfigService` output → bindable via new `agent_mcp_server_bindings`; connected at run time by the new MCP client service in `packages/agent`                                                          |
+| `extensions["works.ever"]`                                 | Ever Works' reverse-domain namespace (our domain `ever.works` reversed). Carries EW-specific package/skill metadata on export; ignored-if-absent on import                                                           |
+| `works.ever/` extension directory                          | Reserved for future EW-specific package files; v1 writes none, reads none (spec-legal)                                                                                                                               |
+| `PLUGIN_ROOT` / `PLUGIN_DATA`                              | Absolute package dir / new per-package persistent data dir (plan §3)                                                                                                                                                 |
 
 **Namespace decision**: the reverse-domain namespace is **`works.ever`** (from
 `ever.works`). All Ever Works-specific manifest data lives under
 `extensions["works.ever"]`; we never add unknown top-level keys to `plugin.json`
-(that would be spec-invalid to *emit* even though clients must tolerate it).
+(that would be spec-invalid to _emit_ even though clients must tolerate it).
 
 ---
 
@@ -269,15 +269,15 @@ suite (tasks.md). References are to Agent Plugins v1.0.0 sections.
   mismatch (or any top-level violation) disables MCP for the package **only** —
   skills keep loading.
 - **AP-13**: Server entries form a closed union on `type`:
-  - `stdio`: required `command` (single executable token: bare name OR `./`-relative;
-    NO placeholder expansion in `command`); optional `args: string[]`,
-    `env: {string: string}` (MUST NOT contain keys `PLUGIN_ROOT`/`PLUGIN_DATA`),
-    `cwd` (must be `./…`, `${PLUGIN_ROOT}[/…]`, or `${PLUGIN_DATA}[/…]`; containment
-    enforced post-expansion; omitted → package root).
-  - `streamable-http` / `sse`: required `url` (absolute http(s); no userinfo; no
-    fragment; https mandatory unless loopback); optional `headers` (valid header
-    names; case-insensitive duplicate names invalid; no expansion performed).
-  Unknown fields or unknown `type` → that entry invalid → **skip it, keep others**.
+    - `stdio`: required `command` (single executable token: bare name OR `./`-relative;
+      NO placeholder expansion in `command`); optional `args: string[]`,
+      `env: {string: string}` (MUST NOT contain keys `PLUGIN_ROOT`/`PLUGIN_DATA`),
+      `cwd` (must be `./…`, `${PLUGIN_ROOT}[/…]`, or `${PLUGIN_DATA}[/…]`; containment
+      enforced post-expansion; omitted → package root).
+    - `streamable-http` / `sse`: required `url` (absolute http(s); no userinfo; no
+      fragment; https mandatory unless loopback); optional `headers` (valid header
+      names; case-insensitive duplicate names invalid; no expansion performed).
+      Unknown fields or unknown `type` → that entry invalid → **skip it, keep others**.
 - **AP-14**: Transports: we support all three (`stdio`, `streamable-http`, `sse`);
   initial connection uses the declared transport; no fallback. A server that fails to
   start/connect/handshake is reported and does not affect other servers/components.
@@ -377,8 +377,8 @@ new UI tabs/pages, new env vars, new capability interface — enumerated in plan
 4. **Terminology**: Agent Plugins v1.0.0 has exactly two component types. "Agents"
    (e.g. Claude Code's `agents/` subagent dirs) are NOT a spec component type. A
    directory like `agents/` is simply an unrecognized directory we ignore (only
-   reverse-domain-named dirs like `com.example.client/` are formal *extension
-   directories*; manifest `extensions` namespaces are governed by AP-6 — all three
+   reverse-domain-named dirs like `com.example.client/` are formal _extension
+   directories_; manifest `extensions` namespaces are governed by AP-6 — all three
    are ignored when unimplemented). If a future spec version adds component types,
    AP-20's version registry is the extension point.
 

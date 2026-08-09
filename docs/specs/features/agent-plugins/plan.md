@@ -76,15 +76,15 @@ MCP tool sources MUST no-op there rather than fail).
 useful OSS artifact on its own: a TypeScript reference loader for Agent Plugins
 v1.0.0). Contents:
 
-| Module | Responsibility |
-|---|---|
-| `src/manifest.ts` | Closed `plugin.json` parse + validate with the spec's exact severity split (AP-4): returns `{ manifest, warnings[] }` or a typed fatal error. Vendored canonical JSON Schemas under `src/schemas/1.0.0/` (imported via `resolveJsonModule` so they ship in `dist/` — do NOT place at package root: both packaging scripts copy `dist/` only, `scripts/prepare-docker-plugins.js:39-62`, `packages/tasks/scripts/prepare-plugins.js:50-67`) |
-| `src/skills.ts` | `skills/` discovery (immediate children only, `SKILL.md` regular-file check) + Agent Skills frontmatter validation (name/dir match, charset, description length, `allowed-tools` **space-separated-string → string[]** tokenizer). Skip-one semantics (AP-9) |
-| `src/mcp.ts` | Closed `mcp.json` parse; per-server closed-union validation (stdio / streamable-http / sse); URL rules (https-unless-loopback, no userinfo/fragment); header case-insensitive dup detection; reserved-env-key rejection |
-| `src/paths.ts` | Containment: `resolveWithinRoot(root, rel)` with `realpath` symlink resolution (AP-10). Modeled on `confinePluginEntry` (`plugin-loader.service.ts:832-860`) but exported + covering non-js files |
-| `src/expand.ts` | `${PLUGIN_ROOT}`/`${PLUGIN_DATA}` single-pass non-recursive expansion for args elements / env values / cwd only (AP-17) |
-| `src/serialize.ts` | Export side: `plugin.json` emitter, SKILL.md emitter (frontmatter YAML via `gray-matter` — new dep **of this package**; today only `packages/plugins/everworks-skills/package.json:35` has it, and `matter.stringify` has zero uses repo-wide), slug→spec-name guard (≤64, no `--`) |
-| `fixtures/` | Conformance corpus: valid + malformed packages for every AP requirement. **Add `packages/agent-plugins/fixtures/` to `.prettierignore`** — the root glob `**/*.{ts,tsx,jsx,json,css,md}` (root `package.json:45`) makes `format:check` FAIL on deliberately-malformed fixtures and `pnpm format` would rewrite them |
+| Module             | Responsibility                                                                                                                                                                                                                                                                                                                                                                                                                             |
+| ------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `src/manifest.ts`  | Closed `plugin.json` parse + validate with the spec's exact severity split (AP-4): returns `{ manifest, warnings[] }` or a typed fatal error. Vendored canonical JSON Schemas under `src/schemas/1.0.0/` (imported via `resolveJsonModule` so they ship in `dist/` — do NOT place at package root: both packaging scripts copy `dist/` only, `scripts/prepare-docker-plugins.js:39-62`, `packages/tasks/scripts/prepare-plugins.js:50-67`) |
+| `src/skills.ts`    | `skills/` discovery (immediate children only, `SKILL.md` regular-file check) + Agent Skills frontmatter validation (name/dir match, charset, description length, `allowed-tools` **space-separated-string → string[]** tokenizer). Skip-one semantics (AP-9)                                                                                                                                                                               |
+| `src/mcp.ts`       | Closed `mcp.json` parse; per-server closed-union validation (stdio / streamable-http / sse); URL rules (https-unless-loopback, no userinfo/fragment); header case-insensitive dup detection; reserved-env-key rejection                                                                                                                                                                                                                    |
+| `src/paths.ts`     | Containment: `resolveWithinRoot(root, rel)` with `realpath` symlink resolution (AP-10). Modeled on `confinePluginEntry` (`plugin-loader.service.ts:832-860`) but exported + covering non-js files                                                                                                                                                                                                                                          |
+| `src/expand.ts`    | `${PLUGIN_ROOT}`/`${PLUGIN_DATA}` single-pass non-recursive expansion for args elements / env values / cwd only (AP-17)                                                                                                                                                                                                                                                                                                                    |
+| `src/serialize.ts` | Export side: `plugin.json` emitter, SKILL.md emitter (frontmatter YAML via `gray-matter` — new dep **of this package**; today only `packages/plugins/everworks-skills/package.json:35` has it, and `matter.stringify` has zero uses repo-wide), slug→spec-name guard (≤64, no `--`)                                                                                                                                                        |
+| `fixtures/`        | Conformance corpus: valid + malformed packages for every AP requirement. **Add `packages/agent-plugins/fixtures/` to `.prettierignore`** — the root glob `**/*.{ts,tsx,jsx,json,css,md}` (root `package.json:45`) makes `format:check` FAIL on deliberately-malformed fixtures and `pnpm format` would rewrite them                                                                                                                        |
 
 Validation engine: Ajv 8 (own declared dep — pnpm strict node_modules means we
 cannot lean on `packages/agent`'s copy) for the two JSON schemas, plus hand-rolled
@@ -108,7 +108,7 @@ secret-scan.ts`) directly, which a standalone plugin package cannot import.
 - **`AgentPluginCatalogService`**: reads registered package rows (scoped through
   the caller's request scope) + package files via the conformance library →
   `SkillCatalogEntry[]` with provenance. Wired into `SkillsFacadeService.
-  listEntries` as an **additive, `@Optional()`-injected second source**, merged
+listEntries` as an **additive, `@Optional()`-injected second source**, merged
   LAST so the existing first-wins slug dedupe (`skills.facade.ts:88-92`) and the
   `defaultForCapabilities`-first plugin ordering (`base.facade.ts:284-289`)
   guarantee package entries can never displace `everworks-skills` entries.
@@ -143,7 +143,7 @@ secret-scan.ts`) directly, which a standalone plugin package cannot import.
   (`apps/node/src/core/config-store.ts:80-97`).
 - **git**: new URL-first clone entry point built on isomorphic-git primitives
   (`packages/plugin/src/git/git-operations.ts:68-76` `git.clone({fs, http,
-  onAuth})`; `cloneBranch` :269-295 is the closest existing function). The existing
+onAuth})`; `cloneBranch` :269-295 is the closest existing function). The existing
   `GitFacade.cloneOrPull` path is provider-account-centric and does NOT fit
   arbitrary URLs — do not force it. Ref-pinned; shallow; clone into
   `<AGENT_PLUGINS_DIR>/<name>/<ref>` then validate.
@@ -155,7 +155,7 @@ secret-scan.ts`) directly, which a standalone plugin package cannot import.
   `PluginsModuleOptions` shape (registryUrl/github/token).
 - **Allowlist**: new sibling table `agent_plugin_package_allowlist` mirroring
   `plugin-allowlist.entity.ts:26-71` (packageName/versionRange/integrity/source/
-  enabled). **Never reuse `plugin_allowlist`** — a row there authorizes *code*
+  enabled). **Never reuse `plugin_allowlist`** — a row there authorizes _code_
   install. Local-dir sources bypass allowlists by nature → gated by deployment
   mode (operator-configured dirs only).
 - Boot: `warmupFromDb()`-style re-materialization for git/npm sources
@@ -221,12 +221,12 @@ Register every one in **`packages/agent/src/database/_entities-inventory.ts`**
 in the SAME PR (`apps/api/src/migrations/`, latest is
 `1785000000000-CreateTermsAcceptance.ts`).
 
-| Entity | Tier | Shape (template) |
-|---|---|---|
-| `agent_plugin_packages` | **A** (`tenantId`+`organizationId` nullable uuid, no `@ManyToOne`, **no XOR CHECK** — known migration-abort bug class) | Mirrors `PluginEntity`'s EW-693 columns (`plugin.entity.ts:132-174`): `name` (spec name), `version` nullable, `manifest` json, `source: 'local'\|'git'\|'npm'`, `sourceRef` (dir path / git url#ref / npm spec), `integrity` nullable, `installPath`, `dataPath`, `installState`, `installError`, `contentHash`, per-component findings json (skipped skills, disabled MCP reasons), `dataManifest` json (PLUGIN_DATA object-storage key manifest — see §3 SaaS persistence) |
-| `agent_plugin_package_allowlist` | D (global, like `plugin_allowlist`) | `packageName`, `versionRange`, `integrity?`, `source: 'npm'\|'git'`, `enabled` |
-| `agent_mcp_server_bindings` | **C** (denorm pair) | `skill_bindings` template (`skill-binding.entity.ts` provides: subject FK CASCADE, `targetType` (5-valued there; restricted here to `'agent'\|'work'\|'tenant'`), `targetId` nullable-for-tenant, `userId`, unique index) **PLUS net-new columns**: `serverName`, `enabled`, `settings`/`secretSettings` json, `credentialsSecretRef` varchar(128) nullable; unique `(packageId, serverName, targetType, targetId)`. v1 API creates agent-scoped bindings only; the column shape supports work/tenant targets later |
-| `skill_files` (Phase 5) | C | Sidecar store: `skillId` FK, `relPath`, `sha256`, `size`, `mime`, bytes via `IStoragePlugin` at `agent-plugins/<sha256>` — copy the `user_uploads` validation shape (`uploads.service.ts`: magic-byte sniff, sha256 naming, size caps). NOTE: the uploads stack does NOT secret-scan — wire `assertNoSecrets` (`packages/agent/src/utils/secret-scan.ts`) as a NEW check on text-like files only; NO injection-token gate on scripts (that gate is for prompt-bound bodies only, `skills.service.ts:394-405`) |
+| Entity                           | Tier                                                                                                                   | Shape (template)                                                                                                                                                                                                                                                                                                                                                                                                                                                                                                    |
+| -------------------------------- | ---------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `agent_plugin_packages`          | **A** (`tenantId`+`organizationId` nullable uuid, no `@ManyToOne`, **no XOR CHECK** — known migration-abort bug class) | Mirrors `PluginEntity`'s EW-693 columns (`plugin.entity.ts:132-174`): `name` (spec name), `version` nullable, `manifest` json, `source: 'local'\|'git'\|'npm'`, `sourceRef` (dir path / git url#ref / npm spec), `integrity` nullable, `installPath`, `dataPath`, `installState`, `installError`, `contentHash`, per-component findings json (skipped skills, disabled MCP reasons), `dataManifest` json (PLUGIN_DATA object-storage key manifest — see §3 SaaS persistence)                                        |
+| `agent_plugin_package_allowlist` | D (global, like `plugin_allowlist`)                                                                                    | `packageName`, `versionRange`, `integrity?`, `source: 'npm'\|'git'`, `enabled`                                                                                                                                                                                                                                                                                                                                                                                                                                      |
+| `agent_mcp_server_bindings`      | **C** (denorm pair)                                                                                                    | `skill_bindings` template (`skill-binding.entity.ts` provides: subject FK CASCADE, `targetType` (5-valued there; restricted here to `'agent'\|'work'\|'tenant'`), `targetId` nullable-for-tenant, `userId`, unique index) **PLUS net-new columns**: `serverName`, `enabled`, `settings`/`secretSettings` json, `credentialsSecretRef` varchar(128) nullable; unique `(packageId, serverName, targetType, targetId)`. v1 API creates agent-scoped bindings only; the column shape supports work/tenant targets later |
+| `skill_files` (Phase 5)          | C                                                                                                                      | Sidecar store: `skillId` FK, `relPath`, `sha256`, `size`, `mime`, bytes via `IStoragePlugin` at `agent-plugins/<sha256>` — copy the `user_uploads` validation shape (`uploads.service.ts`: magic-byte sniff, sha256 naming, size caps). NOTE: the uploads stack does NOT secret-scan — wire `assertNoSecrets` (`packages/agent/src/utils/secret-scan.ts`) as a NEW check on text-like files only; NO injection-token gate on scripts (that gate is for prompt-bound bodies only, `skills.service.ts:394-405`)       |
 
 **Scope model**: package install rows are per-tenant/org (Tier A — the platform's
 `Skill` already is; do NOT copy the unscoped code-plugin tables). Enablement
@@ -236,7 +236,7 @@ resolution copies the `resolvePluginEnabled` pure-function shape
 **Account transfer**: new tables need explicit whitelist entries in ALL of:
 `packages/agent/src/account-transfer/types.ts` + the export-service literal +
 both import paths + `SyncPushOptions` toggle threading (the 3-place — now
-4-place — whitelist bug class). Export a *reference* (name+version+source), never
+4-place — whitelist bug class). Export a _reference_ (name+version+source), never
 package content; secrets masked by the existing machinery; `credentialsSecretRef`
 pointers deliberately omitted (deployment-local meaning).
 
@@ -277,15 +277,15 @@ pointers deliberately omitted (deployment-local meaning).
 
 ## 3. Data & deployment wiring
 
-| Concern | Design |
-|---|---|
-| Packages dir | `AGENT_PLUGINS_DIR`, **optional-with-default** `/app/agent-plugins` (constants.ts `installDir()` :389 pattern — avoids the required-env crash-loop class). NEVER at `/app/plugins` (prohibition comment, `k8s-manifest.prod.yaml:396-413`) |
-| PLUGIN_DATA root | `AGENT_PLUGINS_DATA_DIR`, default `/app/agent-plugins-data`; per-package dir keyed **per (tenant, package)** — a shared stdio server must never mix tenant data |
-| SaaS persistence | Per-replica local dirs + **DB/object-storage write-through**: package bytes re-materialized on boot (warmupFromDb precedent); PLUGIN_DATA synced through the boot-selected `IStoragePlugin` (`storage.interface.ts` putObject/getObject; no list op → the key manifest is a declared **`dataManifest` json column on `agent_plugin_packages`** — not a separate table, no extra migration). RWO PVC does not fit the 2-replica API; emptyDir alone violates the spec's persistence MUST |
-| Self-host/desktop | Plain disk dirs; desktop bundle staging extended in `apps/desktop/scripts/prepare-bundle.js` (:147-149 copies `plugins/` — add `agent-plugins/`) |
-| Env wiring | The 2026-06-12 checklist: k8s manifests (dev/stage/prod) + deploy workflow env blocks + `.env.example` + compose env files + e2e.yml if boot-required (they are NOT — defaults). ArgoCD-managed live env source is outside this repo — flag to operator explicitly |
-| Feature flag | `FEATURE_AGENT_PLUGINS` default **false** (`FEATURE_DYNAMIC_PLUGINS` precedent, constants.ts:316-325) |
-| Worker tier | **No changes.** Execution is API-side; do not ship packages to the Trigger bundle. (The worker's own lazy-install path for code plugins is structurally unwired today — `TriggerInternalModule` lacks the installer provider — do not copy that trap) |
+| Concern           | Design                                                                                                                                                                                                                                                                                                                                                                                                                                                                                  |
+| ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Packages dir      | `AGENT_PLUGINS_DIR`, **optional-with-default** `/app/agent-plugins` (constants.ts `installDir()` :389 pattern — avoids the required-env crash-loop class). NEVER at `/app/plugins` (prohibition comment, `k8s-manifest.prod.yaml:396-413`)                                                                                                                                                                                                                                              |
+| PLUGIN_DATA root  | `AGENT_PLUGINS_DATA_DIR`, default `/app/agent-plugins-data`; per-package dir keyed **per (tenant, package)** — a shared stdio server must never mix tenant data                                                                                                                                                                                                                                                                                                                         |
+| SaaS persistence  | Per-replica local dirs + **DB/object-storage write-through**: package bytes re-materialized on boot (warmupFromDb precedent); PLUGIN_DATA synced through the boot-selected `IStoragePlugin` (`storage.interface.ts` putObject/getObject; no list op → the key manifest is a declared **`dataManifest` json column on `agent_plugin_packages`** — not a separate table, no extra migration). RWO PVC does not fit the 2-replica API; emptyDir alone violates the spec's persistence MUST |
+| Self-host/desktop | Plain disk dirs; desktop bundle staging extended in `apps/desktop/scripts/prepare-bundle.js` (:147-149 copies `plugins/` — add `agent-plugins/`)                                                                                                                                                                                                                                                                                                                                        |
+| Env wiring        | The 2026-06-12 checklist: k8s manifests (dev/stage/prod) + deploy workflow env blocks + `.env.example` + compose env files + e2e.yml if boot-required (they are NOT — defaults). ArgoCD-managed live env source is outside this repo — flag to operator explicitly                                                                                                                                                                                                                      |
+| Feature flag      | `FEATURE_AGENT_PLUGINS` default **false** (`FEATURE_DYNAMIC_PLUGINS` precedent, constants.ts:316-325)                                                                                                                                                                                                                                                                                                                                                                                   |
+| Worker tier       | **No changes.** Execution is API-side; do not ship packages to the Trigger bundle. (The worker's own lazy-install path for code plugins is structurally unwired today — `TriggerInternalModule` lacks the installer provider — do not copy that trap)                                                                                                                                                                                                                                   |
 
 ---
 
@@ -294,7 +294,7 @@ pointers deliberately omitted (deployment-local meaning).
 1. **Ingest** (catalog service → facade): conformance lib parses; `allowed-tools`
    tokenized to `allowedTools: string[]` **at ingest only** (never a global
    normalizer/backfill — `filterSkillsByToolGrants`
-   (`packages/agent/src/policy/skill-activation.ts:59-97`) *suppresses* skills
+   (`packages/agent/src/policy/skill-activation.ts:59-97`) _suppresses_ skills
    whose declared tools are all refused; a backfill would silently change live
    run behavior); unknown frontmatter keys preserved (open
    `SkillFrontmatter` index sig, `skill.entity.ts:32-38`).
@@ -302,7 +302,7 @@ pointers deliberately omitted (deployment-local meaning).
    (`skills.service.ts:186`) — the 64KB body cap + secret scan + injection-token
    gate (:394-405) apply unchanged. Oversized/gated bodies are surfaced as
    per-skill findings at package validation time (pre-flight the checks in the
-   catalog service's `listEntries` so the card can warn *before* install fails).
+   catalog service's `listEntries` so the card can warn _before_ install fails).
 3. **Slug collision**: spec skill names are `[a-z0-9-]` ≤64 — a strict subset of
    the slug DTO `/^[a-z0-9-]{1,80}$/` (`skill.dto.ts:176`). Facade dedupe is
    first-wins with `defaultForCapabilities` providers sorted first — package
@@ -333,16 +333,16 @@ pointers deliberately omitted (deployment-local meaning).
 
 ## 5. Security model (net-new decisions, per ADR-018)
 
-| Threat | Control |
-|---|---|
+| Threat                                | Control                                                                                                                                                                                                                                                                                  |
+| ------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | stdio = code execution on the API pod | Triple gate: (1) `FEATURE_AGENT_PLUGINS`; (2) deployment-mode setting `AGENT_PLUGINS_STDIO` default off in cloud, on-able for self-host/desktop; (3) per-binding explicit user enable. From-scratch subprocess env; command/cwd containment; no shell interpretation (single-token exec) |
-| Supply chain (git/npm) | Allowlist-before-network (sibling table); sha512 for npm; commit-pin policy for git (record resolved SHA on install; re-fetch compares); local dirs = operator-trust only |
-| Prompt injection via skill bodies | Existing: `neutralizeInjectedBlock` fencing + `assertBody` gates apply unchanged (imports route through `SkillsService`) |
-| Malicious sidecars | Never executed by the platform; uploads-stack validation (sha256 naming, MIME sniff, size caps); text-only secret scan; workspace materialization inherits the run's own execution policy |
-| MCP tool schema injection | Sanitize server-supplied names/descriptions; collision-with-builtin → drop + WARN; tool RESULTS already fenced (`agent-run.service.ts:818-823`) |
-| SSRF via server URLs | Spec URL rules + EW-711-style egress deny for cluster-internal/metadata ranges |
-| Tenant data mixing | PLUGIN_DATA keyed per (tenant, package); Tier A/C scope columns + stamping subscriber (`scope-stamping.subscriber.ts:95-122`) |
-| Credential leakage | Package env/headers treated as visible data (spec); real creds only in encrypted settings / secret-ref; masked reads; masked account-transfer export; never in `mcp.json` we emit |
+| Supply chain (git/npm)                | Allowlist-before-network (sibling table); sha512 for npm; commit-pin policy for git (record resolved SHA on install; re-fetch compares); local dirs = operator-trust only                                                                                                                |
+| Prompt injection via skill bodies     | Existing: `neutralizeInjectedBlock` fencing + `assertBody` gates apply unchanged (imports route through `SkillsService`)                                                                                                                                                                 |
+| Malicious sidecars                    | Never executed by the platform; uploads-stack validation (sha256 naming, MIME sniff, size caps); text-only secret scan; workspace materialization inherits the run's own execution policy                                                                                                |
+| MCP tool schema injection             | Sanitize server-supplied names/descriptions; collision-with-builtin → drop + WARN; tool RESULTS already fenced (`agent-run.service.ts:818-823`)                                                                                                                                          |
+| SSRF via server URLs                  | Spec URL rules + EW-711-style egress deny for cluster-internal/metadata ranges                                                                                                                                                                                                           |
+| Tenant data mixing                    | PLUGIN_DATA keyed per (tenant, package); Tier A/C scope columns + stamping subscriber (`scope-stamping.subscriber.ts:95-122`)                                                                                                                                                            |
+| Credential leakage                    | Package env/headers treated as visible data (spec); real creds only in encrypted settings / secret-ref; masked reads; masked account-transfer export; never in `mcp.json` we emit                                                                                                        |
 
 ---
 

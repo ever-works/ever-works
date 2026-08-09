@@ -84,8 +84,7 @@ appends, locale key appends) are expected and fine.
 - [ ] **T12**. Feature flag `FEATURE_AGENT_PLUGINS` default false in
       `apps/api/src/config/constants.ts` + `.env.example` + compose env files.
 - [ ] **T13**. `AgentPluginCatalogService` (plan §2.2) in
-      `packages/agent/src/agent-plugins/`: entries from registered package rows
-      + conformance lib; version synthesis per AP-21; pre-flight findings by
+      `packages/agent/src/agent-plugins/`: entries from registered package rows + conformance lib; version synthesis per AP-21; pre-flight findings by
       calling the existing gates directly (`MAX_BODY_BYTES`/`assertNoSecrets`/
       `assertNoInjectionTokens` — reachable because this is platform code, not
       a plugin). Wire into `SkillsFacadeService.listEntries` as an
@@ -151,7 +150,7 @@ appends, locale key appends) are expected and fine.
       without explicit authorization; no client-generated credential forwarding
       cross-origin at all — with tests), run-end disconnect.
 - [ ] **T26**. `McpToolSource` injected into `AgentToolService.
-      resolveAllowedTools` as a new optional source (domain-tool-source
+    resolveAllowedTools` as a new optional source (domain-tool-source
       pattern); `mcp__<server>__<tool>` naming; name/description sanitization;
       builtin-collision drop + WARN; run-log WARNs for skipped servers.
       Update module pin specs.
@@ -223,8 +222,7 @@ appends, locale key appends) are expected and fine.
 - [ ] **T40**. Security review pass (stdio gate, SSRF policy, containment
       fuzzing over fixture escapes); Sentry tags; rate-limit re-check.
 - [ ] **T41**. Conformance statement doc: map every §10.1 row + AP-1…AP-23 to
-      test evidence; announce "Agent Plugins v1.0.0 compatible (client: skills
-      + MCP; producer: skills packages, plus the Ever Works MCP-server package
+      test evidence; announce "Agent Plugins v1.0.0 compatible (client: skills + MCP; producer: skills packages, plus the Ever Works MCP-server package
       descriptor)" — the single canonical claim wording, used verbatim in spec
       §1.3, the ADR, and marketing. MUST document client-side policy refusals
       explicitly (64KB body cap, secret/injection gates, stdio-off deployments,
@@ -235,16 +233,16 @@ appends, locale key appends) are expected and fine.
 
 ## Effort estimate (engineer-days, honest)
 
-| Phase | Days |
-|---|---|
-| 0 — conformance lib | 4–5 |
-| 1 — registry + local + skills | 5–6 |
-| 2 — git/npm + updates + UI | 5–6 |
-| 3 — MCP remote + bindings | 6–8 |
-| 4 — stdio + PLUGIN_DATA | 5–7 |
-| 5 — sidecars + export | 5–6 |
-| 6 — hardening + docs | 3–4 |
-| **Total** | **33–42** (plus review/CI wall-clock) |
+| Phase                         | Days                                  |
+| ----------------------------- | ------------------------------------- |
+| 0 — conformance lib           | 4–5                                   |
+| 1 — registry + local + skills | 5–6                                   |
+| 2 — git/npm + updates + UI    | 5–6                                   |
+| 3 — MCP remote + bindings     | 6–8                                   |
+| 4 — stdio + PLUGIN_DATA       | 5–7                                   |
+| 5 — sidecars + export         | 5–6                                   |
+| 6 — hardening + docs          | 3–4                                   |
+| **Total**                     | **33–42** (plus review/CI wall-clock) |
 
 Skills-only value ships at end of Phase 2 (~14–17 d); the full-standard claim
 lands with Phase 4; export completes the producer story in Phase 5.

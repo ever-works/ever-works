@@ -37,12 +37,12 @@ manifests are mutually incompatible by construction:
   (`plugin-manifest-validator.service.ts:45-48`); `id` and `category` are not
   legal top-level keys in the spec manifest at all.
 
-Meanwhile, the *destination* side of skills is already built: the
+Meanwhile, the _destination_ side of skills is already built: the
 `skills-provider` capability seam (`SkillsFacadeService` fan-out, first-wins slug
 dedupe), `Skill` rows with an open `frontmatter` json column, install → bind →
 progressive-disclosure prompt injection + `getSkillBody` tool. The missing pieces
-are a spec-conformant package reader, an MCP *client* (we only ship an MCP
-*server*, `apps/mcp`), and an export serializer.
+are a spec-conformant package reader, an MCP _client_ (we only ship an MCP
+_server_, `apps/mcp`), and an export serializer.
 
 ## Decision
 
@@ -70,8 +70,8 @@ are a spec-conformant package reader, an MCP *client* (we only ship an MCP
    tarball-extracted **without** `npm install` and **without** lifecycle scripts
    (data packages have no dependencies to install). Source configuration and
    allowlisting follow the shape of ADR-016 but form a separate, parallel
-   channel: ADR-016's registry/trust config governs *code* plugins; this ADR's
-   sources govern *data* packages. Neither reuses the other's trust grants.
+   channel: ADR-016's registry/trust config governs _code_ plugins; this ADR's
+   sources govern _data_ packages. Neither reuses the other's trust grants.
 
 4. **Trust boundary: parsing is safe; only stdio executes.** Reading manifests,
    skills, and `mcp.json` is pure data handling and is available everywhere.
