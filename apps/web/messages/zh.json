@@ -1751,7 +1751,8 @@
                         "idea-agents": "无法删除：有 {count} 个智能体属于该想法。请先删除或更改其范围。",
                         "build-in-flight": "构建进行中无法删除，请等待完成。",
                         "unknown": "当前无法删除该想法。"
-                    }
+                    },
+                    "unlinksWorks": "该想法关联了 {count} 个 Work。它们会被保留，仅移除关联。"
                 },
                 "toasts": {
                     "built": "已从该想法构建 Work",

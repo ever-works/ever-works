@@ -1782,7 +1782,8 @@
                         "idea-agents": "Löschen nicht möglich: {count} Agent(en) sind dieser Idee zugeordnet. Zuerst löschen oder umhängen.",
                         "build-in-flight": "Löschen während eines laufenden Builds nicht möglich. Bitte warten.",
                         "unknown": "Diese Idee kann derzeit nicht gelöscht werden."
-                    }
+                    },
+                    "unlinksWorks": "Diese Idee ist mit {count} Work(s) verknüpft. Sie bleiben erhalten — nur die Verknüpfung wird entfernt."
                 },
                 "toasts": {
                     "built": "Work aus dieser Idee gebaut",

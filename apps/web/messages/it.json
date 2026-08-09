@@ -1751,7 +1751,8 @@
                         "idea-agents": "Impossibile eliminare: {count} Agente/i sono associati a questa Idea. Eliminali o cambia ambito.",
                         "build-in-flight": "Impossibile eliminare durante una build. Attendi il completamento.",
                         "unknown": "Impossibile eliminare questa Idea al momento."
-                    }
+                    },
+                    "unlinksWorks": "Questa Idea è collegata a {count} Work. Verranno conservati: viene rimosso solo il collegamento."
                 },
                 "toasts": {
                     "built": "Work costruito da questa Idea",

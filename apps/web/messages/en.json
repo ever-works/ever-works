@@ -1834,7 +1834,8 @@
                         "idea-agents": "Can't delete: {count} Agent(s) are scoped to this Idea. Delete or re-scope them first.",
                         "build-in-flight": "Can't delete while a build is running. Wait for it to finish.",
                         "unknown": "Can't delete this Idea right now."
-                    }
+                    },
+                    "unlinksWorks": "This Idea is linked to {count} Work(s). They will be kept — only the link is removed."
                 },
                 "toasts": {
                     "built": "Work built from this Idea",
