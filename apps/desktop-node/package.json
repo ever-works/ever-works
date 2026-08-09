@@ -2,6 +2,7 @@
 	"name": "ever-works-desktop-node",
 	"version": "0.1.0",
 	"description": "Ever Works Desktop Node - thin Electron shell that enrolls this machine as a platform execution node: setup wizard, status window and tray",
+	"homepage": "https://ever.works",
 	"author": {
 		"name": "Ever Co. LTD",
 		"email": "ever@ever.co",
