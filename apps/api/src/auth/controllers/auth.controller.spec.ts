@@ -19,6 +19,7 @@ import type { CaptchaVerifierService } from '../services/captcha-verifier.servic
 import type { SocialAuthService } from '../services/social-auth.service';
 import type { ActivityLogService } from '@ever-works/agent/activity-log';
 import type { AuthProvider } from '../providers/auth-provider.abstract';
+import type { TermsAcceptanceService } from '../../terms/terms-acceptance.service';
 
 describe('AuthController', () => {
     let controller: AuthController;
@@ -47,6 +48,12 @@ describe('AuthController', () => {
     >;
     let funnel: { emit: jest.Mock };
     let activityLog: jest.Mocked<Pick<ActivityLogService, 'log'>>;
+    let termsAcceptance: jest.Mocked<
+        Pick<
+            TermsAcceptanceService,
+            'getRequiredDocuments' | 'assertClaimsArePublished' | 'record' | 'history'
+        >
+    >;
     let authProvider: jest.Mocked<
         Pick<
             AuthProvider,
@@ -98,6 +105,12 @@ describe('AuthController', () => {
             setPassword: jest.fn().mockResolvedValue(undefined),
             issueSession: jest.fn(),
         } as any;
+        termsAcceptance = {
+            getRequiredDocuments: jest.fn().mockReturnValue([]),
+            assertClaimsArePublished: jest.fn(),
+            record: jest.fn().mockResolvedValue([]),
+            history: jest.fn().mockResolvedValue([]),
+        };
         controller = new AuthController(
             authService as unknown as AuthService,
             socialAuth as unknown as SocialAuthService,
@@ -106,6 +119,7 @@ describe('AuthController', () => {
             captchaVerifier as unknown as CaptchaVerifierService,
             funnel as any,
             activityLog as unknown as ActivityLogService,
+            termsAcceptance as unknown as TermsAcceptanceService,
             authProvider as unknown as AuthProvider,
         );
     });
@@ -399,6 +413,79 @@ describe('AuthController', () => {
             await expect(controller.register(dto, {} as any)).resolves.toBeDefined();
             const headers = (authProvider.signUpEmail as jest.Mock).mock.calls[0][3];
             expect(headers).toBeInstanceOf(Headers);
+        });
+
+        /**
+         * The signup checkbox was uncontrolled and its value never reached this
+         * endpoint at all — the account was created with no record that anything
+         * had been accepted. These pin the wiring that fixes it.
+         */
+        describe('terms acceptance', () => {
+            const claim = {
+                documentId: 'tos:ever-works',
+                version: '1.0.0',
+                sha256: 'a'.repeat(64),
+                locale: 'en',
+            };
+            const dtoWithTerms: any = { ...dto, terms: [claim] };
+            const reqWithIp: any = { ip: '203.0.113.9', headers: { 'user-agent': 'UA' } };
+
+            it('records the acceptance against the created user', async () => {
+                authProvider.signUpEmail.mockResolvedValue({ user: { id: 'u1' } } as any);
+
+                await controller.register(dtoWithTerms, reqWithIp);
+
+                expect(termsAcceptance.record).toHaveBeenCalledWith('u1', [claim], {
+                    method: 'signup-checkbox',
+                    ip: '203.0.113.9',
+                    userAgent: 'UA',
+                });
+            });
+
+            it('validates the claims BEFORE creating the account', async () => {
+                const order: string[] = [];
+                termsAcceptance.assertClaimsArePublished.mockImplementation(() => {
+                    order.push('assertTerms');
+                });
+                authProvider.signUpEmail.mockImplementation(async () => {
+                    order.push('signUp');
+                    return { user: { id: 'u1' } } as any;
+                });
+
+                await controller.register(dtoWithTerms, reqWithIp);
+
+                expect(order).toEqual(['assertTerms', 'signUp']);
+            });
+
+            it('never creates an account when the claim is not published', async () => {
+                termsAcceptance.assertClaimsArePublished.mockImplementation(() => {
+                    throw new BadRequestException('never published');
+                });
+
+                await expect(controller.register(dtoWithTerms, reqWithIp)).rejects.toThrow(
+                    'never published',
+                );
+                expect(authProvider.signUpEmail).not.toHaveBeenCalled();
+                expect(termsAcceptance.record).not.toHaveBeenCalled();
+            });
+
+            it('still returns the account when recording fails (the user row already exists)', async () => {
+                authProvider.signUpEmail.mockResolvedValue({ user: { id: 'u1' } } as any);
+                termsAcceptance.record.mockRejectedValue(new Error('database down'));
+
+                await expect(controller.register(dtoWithTerms, reqWithIp)).resolves.toEqual({
+                    user: { id: 'u1' },
+                });
+            });
+
+            it('records nothing when no claims were submitted', async () => {
+                authProvider.signUpEmail.mockResolvedValue({ user: { id: 'u1' } } as any);
+
+                await controller.register(dto, req);
+
+                expect(termsAcceptance.assertClaimsArePublished).not.toHaveBeenCalled();
+                expect(termsAcceptance.record).not.toHaveBeenCalled();
+            });
         });
     });
 

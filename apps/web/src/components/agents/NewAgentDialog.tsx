@@ -315,7 +315,7 @@ export function NewAgentDialog({
                                 key={tpl.slug}
                                 type="button"
                                 onClick={() => handlePickTemplate(tpl)}
-                                className="text-left rounded-lg border border-border/60 dark:border-border-dark/60 p-3 transition-colors hover:border-primary"
+                                className="text-left rounded-lg border border-border dark:border-border-dark p-3 transition-colors hover:border-border-secondary dark:hover:border-border-secondary-dark hover:bg-surface-secondary/50 dark:hover:bg-surface-secondary-dark/50"
                                 data-testid={`agent-template-step-${tpl.slug}`}
                             >
                                 <div className="text-sm font-medium text-text dark:text-text-dark">
@@ -363,7 +363,7 @@ export function NewAgentDialog({
                                     className={`w-full text-left rounded-lg border p-3 transition-colors ${
                                         scope === c.value
                                             ? 'border-primary bg-primary/5'
-                                            : 'border-border/60 dark:border-border-dark/60 hover:border-border dark:hover:border-border-dark'
+                                            : 'border-border dark:border-border-dark hover:border-border-secondary dark:hover:border-border-secondary-dark hover:bg-surface-secondary/50 dark:hover:bg-surface-secondary-dark/50'
                                     } disabled:opacity-50 disabled:cursor-not-allowed`}
                                 >
                                     <div className="text-sm font-medium text-text dark:text-text-dark capitalize">
@@ -395,7 +395,7 @@ export function NewAgentDialog({
                                 id="agent-scope-parent"
                                 value={parentId}
                                 onChange={(e) => setParentId(e.target.value)}
-                                className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark"
+                                className="w-full rounded-md border border-border dark:border-border-dark bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark outline-none transition-colors hover:border-border-secondary dark:hover:border-border-secondary-dark focus:border-primary dark:focus:border-white/9 focus:ring-2 focus:ring-primary-800/20"
                             >
                                 <option value="">{t('parentPlaceholder')}</option>
                                 {parentOptions.map((opt) => (
@@ -451,7 +451,7 @@ export function NewAgentDialog({
             {step === 'details' && (
                 <section>
                     {pinned && (
-                        <div className="mb-4 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-text-secondary dark:text-text-secondary-dark">
+                        <div className="mb-4 rounded-md border border-border dark:border-border-dark bg-surface-secondary dark:bg-surface-secondary-dark px-3 py-2 text-xs text-text-secondary dark:text-text-secondary-dark">
                             <span className="font-medium text-text dark:text-text-dark capitalize">
                                 {pinned.scope}
                             </span>{' '}
@@ -467,7 +467,7 @@ export function NewAgentDialog({
                         </div>
                     )}
                     {!pinned && scope !== 'tenant' && parentId && (
-                        <div className="mb-4 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-xs text-text-secondary dark:text-text-secondary-dark">
+                        <div className="mb-4 rounded-md border border-border dark:border-border-dark bg-surface-secondary dark:bg-surface-secondary-dark px-3 py-2 text-xs text-text-secondary dark:text-text-secondary-dark">
                             <span className="font-medium text-text dark:text-text-dark capitalize">
                                 {scope}
                             </span>{' '}
@@ -488,7 +488,7 @@ export function NewAgentDialog({
                         value={name}
                         onChange={(e) => setName(e.target.value)}
                         placeholder={t('namePlaceholder')}
-                        className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark"
+                        className="w-full rounded-md border border-border dark:border-border-dark bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark placeholder:text-text-muted dark:placeholder:text-text-muted-dark outline-none transition-colors hover:border-border-secondary dark:hover:border-border-secondary-dark focus:border-primary dark:focus:border-white/9 focus:ring-2 focus:ring-primary-800/20"
                         maxLength={120}
                         autoFocus
                     />
@@ -497,7 +497,7 @@ export function NewAgentDialog({
                         value={title}
                         onChange={(e) => setTitle(e.target.value)}
                         placeholder="Title (optional)"
-                        className="w-full mt-2 rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark"
+                        className="w-full mt-2 rounded-md border border-border dark:border-border-dark bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark placeholder:text-text-muted dark:placeholder:text-text-muted-dark outline-none transition-colors hover:border-border-secondary dark:hover:border-border-secondary-dark focus:border-primary dark:focus:border-white/9 focus:ring-2 focus:ring-primary-800/20"
                         maxLength={120}
                     />
                     {/* Teams & Companies spec §4.3 — optional Team +
@@ -517,7 +517,7 @@ export function NewAgentDialog({
                                 data-testid="agent-create-team"
                                 value={teamId}
                                 onChange={(e) => setTeamId(e.target.value)}
-                                className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark"
+                                className="w-full rounded-md border border-border dark:border-border-dark bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark outline-none transition-colors hover:border-border-secondary dark:hover:border-border-secondary-dark focus:border-primary dark:focus:border-white/9 focus:ring-2 focus:ring-primary-800/20"
                             >
                                 <option value="">{t('teamNone')}</option>
                                 {teams.map((opt) => (
@@ -541,7 +541,7 @@ export function NewAgentDialog({
                                 data-testid="agent-create-reports-to"
                                 value={reportsToId}
                                 onChange={(e) => setReportsToId(e.target.value)}
-                                className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark"
+                                className="w-full rounded-md border border-border dark:border-border-dark bg-card dark:bg-card-primary-dark px-3 h-9 text-sm text-text dark:text-text-dark outline-none transition-colors hover:border-border-secondary dark:hover:border-border-secondary-dark focus:border-primary dark:focus:border-white/9 focus:ring-2 focus:ring-primary-800/20"
                             >
                                 <option value="">{t('reportsToNone')}</option>
                                 {agentOptions.map((opt) => (

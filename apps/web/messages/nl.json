@@ -217,7 +217,8 @@
             "errors": {
                 "passwordsDoNotMatch": "Wachtwoorden komen niet overeen",
                 "passwordTooShort": "Wachtwoord moet minimaal 8 tekens bevatten",
-                "generic": "Er is een fout opgetreden. Probeer het opnieuw."
+                "generic": "Er is een fout opgetreden. Probeer het opnieuw.",
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
             }
         }
     },
@@ -1446,7 +1447,14 @@
                 "relationLabel": "Relation",
                 "attach": "Attach",
                 "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "detachDialog": {
+                    "title": "Dit Werk loskoppelen?",
+                    "body": "{title} wordt verwijderd uit deze Missie. Het Werk zelf wordt nooit aangepast — dit verwijdert alleen de verwijzing.",
+                    "confirm": "Werk loskoppelen",
+                    "cancel": "Annuleren",
+                    "detaching": "Loskoppelen…",
+                    "error": "Loskoppelen van Werk mislukt"
+                },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
                     "created": "Created",
@@ -1495,8 +1503,13 @@
                 "runNow": "Run now",
                 "clone": "Clone"
             },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            "deleteDialog": {
+                "title": "Deze Missie verwijderen?",
+                "body": "{title} wordt permanent verwijderd. Onderliggende Ideeën en Werken blijven behouden, maar hun koppeling terug naar deze Missie gaat verloren. Dit kan niet ongedaan worden gemaakt.",
+                "confirm": "Missie verwijderen",
+                "cancel": "Annuleren",
+                "deleting": "Verwijderen…",
+                "error": "Verwijderen van Missie mislukt"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1567,6 +1580,36 @@
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)"
+                }
+            },
+            "goals": {
+                "title": "Doelen",
+                "empty": "Er zijn nog geen Doelen gekoppeld aan deze Missie. Koppel er hieronder een om vast te leggen wat succes betekent.",
+                "attachTitle": "Een Doel koppelen",
+                "goalLabel": "Doel",
+                "goalPlaceholder": "Selecteer een Doel",
+                "primaryLabel": "Instellen als primair",
+                "primaryBadge": "Primair",
+                "primaryTooltip": "Het primaire Doel voor deze Missie - er kan maar één Doel tegelijk primair zijn.",
+                "attach": "Koppelen",
+                "detach": "Loskoppelen",
+                "detachDialog": {
+                    "title": "Dit Doel loskoppelen?",
+                    "body": "{title} wordt verwijderd uit deze Missie. Het Doel zelf wordt niet verwijderd — het blijft staan op de pagina Doelen en bij elke andere Missie waaraan het gekoppeld is.",
+                    "confirm": "Doel loskoppelen",
+                    "cancel": "Annuleren",
+                    "detaching": "Loskoppelen…",
+                    "error": "Loskoppelen van Doel mislukt"
+                },
+                "alreadyLinkedOption": "{title} (al gekoppeld)",
+                "noGoalsToAttach": "Je hebt nog geen Doelen. Maak er een aan op de pagina Doelen en koppel het hier.",
+                "pickerTruncated": "Je 100 meest recente Doelen worden getoond - open de pagina Doelen voor de volledige lijst.",
+                "invariantNote": "Een Doel koppelen verandert nooit de status van deze Missie - een Missie voltooien blijft een expliciete actie.",
+                "toasts": {
+                    "attached": "Doel gekoppeld",
+                    "attachError": "Kan Doel niet koppelen",
+                    "detached": "Doel losgekoppeld",
+                    "detachError": "Kan Doel niet loskoppelen"
                 }
             }
         },
@@ -2876,7 +2919,23 @@
                 "activatedToast": "Agent geactiveerd",
                 "statusUpdateFailed": "Status kon niet worden bijgewerkt",
                 "newAgent": "Nieuwe Agent",
-                "moreAgents": "+{count} meer"
+                "moreAgents": "+{count} meer",
+                "assignExisting": "Bestaande toewijzen",
+                "assignTitle": "Een Agent aan deze Work toewijzen",
+                "assignSubtitle": "Zet een Agent die je al hebt op deze Work in plaats van een nieuwe te maken.",
+                "assignSearchPlaceholder": "Agenten zoeken…",
+                "assignLoading": "Agenten laden…",
+                "assignNoneAvailable": "Geen andere Agenten meer om toe te wijzen.",
+                "assignNoMatches": "Geen Agenten gevonden voor die zoekopdracht.",
+                "assignLoadFailed": "Kon Agenten niet laden",
+                "assignedToast": "{name} toegewezen aan deze Work",
+                "assignFailed": "Kon Agent niet toewijzen",
+                "assignCancel": "Annuleren",
+                "assignedLabel": "Toegewezen",
+                "assignedHint": "Toegewezen aan deze Work — hier niet aangemaakt",
+                "unassign": "Verwijderen van deze Work",
+                "unassignedToast": "{name} verwijderd van deze Work",
+                "unassignFailed": "Kon Agent niet verwijderen"
             },
             "failedToGenerateItems": "Kon items niet genereren. Probeer het opnieuw.",
             "generationCompleted": "Generatie succesvol voltooid",
@@ -7118,6 +7177,9 @@
             },
             "token": {
                 "required": "Token cannot be empty"
+            },
+            "terms": {
+                "required": "You must accept the Terms of Service and Privacy Policy to create an account."
             }
         }
     },

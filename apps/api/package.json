@@ -32,6 +32,7 @@
     },
     "dependencies": {
         "@composio/core": "^0.10.0",
+        "@ever-co/legal": "^0.1.0",
         "@ever-works/agent": "workspace:*",
         "@ever-works/contracts": "workspace:*",
         "@ever-works/email-templates": "workspace:*",
@@ -82,6 +83,7 @@
         "resend": "^6.9.2",
         "rxjs": "^7.8.2",
         "superjson": "^1.13.3",
+        "terms-acceptance": "^0.1.1",
         "typeorm": "^0.3.31",
         "yaml": "^2.8.3",
         "ws": "^8.21.0"

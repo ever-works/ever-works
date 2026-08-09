@@ -57,3 +57,5 @@ export * from './utils/error-classification.utils';
 export * from './utils/error.utils';
 export * from './types/trigger-context.types';
 export type { SourceValidationSettingsDto } from '@ever-works/contracts/api';
+export * from './workflows.service';
+export * from './workflows.module';

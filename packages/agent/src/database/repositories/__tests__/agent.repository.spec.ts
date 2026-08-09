@@ -174,6 +174,44 @@ describe('AgentRepository', () => {
         });
     });
 
+    describe('casUpdateTargets', () => {
+        it('guards on the exact expected array (simple-json serialization)', async () => {
+            qb.execute.mockResolvedValueOnce({ affected: 1 });
+
+            const ok = await repo.casUpdateTargets(
+                'a1',
+                [{ type: 'work', id: 'w1' }],
+                [
+                    { type: 'work', id: 'w1' },
+                    { type: 'work', id: 'w2' },
+                ],
+            );
+
+            expect(ok).toBe(true);
+            expect(qb.where).toHaveBeenCalledWith('id = :id', { id: 'a1' });
+            expect(qb.andWhere).toHaveBeenCalledWith('targets = :expectedTargets', {
+                expectedTargets: '[{"type":"work","id":"w1"}]',
+            });
+        });
+
+        it('guards with IS NULL when the row is expected to hold no targets', async () => {
+            qb.execute.mockResolvedValueOnce({ affected: 1 });
+
+            await repo.casUpdateTargets('a1', null, [{ type: 'work', id: 'w1' }]);
+
+            // `targets = NULL` matches nothing in SQL, so the null arm
+            // must be a separate predicate or every first assignment
+            // would fail its CAS forever.
+            expect(qb.andWhere).toHaveBeenCalledWith('targets IS NULL');
+        });
+
+        it('returns false when another writer moved the row first', async () => {
+            qb.execute.mockResolvedValueOnce({ affected: 0 });
+            const ok = await repo.casUpdateTargets('a1', null, [{ type: 'work', id: 'w1' }]);
+            expect(ok).toBe(false);
+        });
+    });
+
     describe('transitionStatus', () => {
         it('returns false when the row is not in the `from` set', async () => {
             qb.execute.mockResolvedValueOnce({ affected: 0 });

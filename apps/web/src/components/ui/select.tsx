@@ -54,6 +54,13 @@ export interface SelectProps {
      */
     'data-testid'?: string;
     /**
+     * Names the trigger for assistive tech — use it when no visible `<label>`
+     * is associated with the trigger. It is composed with the selected option
+     * ("Status: Failed") rather than replacing it, so the current value stays
+     * in the accessible name.
+     */
+    'aria-label'?: string;
+    /**
      * Optional leading icons, keyed by an option's `data-icon` value. When an
      * option declares `data-icon="foo"` and `iconMap.foo` is provided, that
      * node renders before the label in both the trigger and the dropdown row.
@@ -132,6 +139,7 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
             id,
             name,
             'data-testid': dataTestId,
+            'aria-label': ariaLabel,
             iconMap,
         },
         ref,
@@ -211,6 +219,14 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
 
         const displayLabel = selected?.label ?? placeholder ?? '';
 
+        /* `aria-label` on the trigger overrides its descendant text, which would
+         * drop the selected value from the accessible name. Compose the two so
+         * screen readers announce both ("Status: Failed"). */
+        const accessibleName =
+            ariaLabel && displayLabel && displayLabel !== ariaLabel
+                ? `${ariaLabel}: ${displayLabel}`
+                : ariaLabel;
+
         return (
             <div
                 ref={containerRef}
@@ -229,6 +245,7 @@ const Select = React.forwardRef<HTMLButtonElement, SelectProps>(
                     type="button"
                     disabled={disabled}
                     data-testid={dataTestId}
+                    aria-label={accessibleName}
                     onClick={() => {
                         if (!open) updatePos();
                         setOpen((v) => !v);

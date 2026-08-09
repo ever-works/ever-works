@@ -217,7 +217,8 @@
             "errors": {
                 "passwordsDoNotMatch": "סיסמאות לא תואמות",
                 "passwordTooShort": "סיסמה חייבת להיות לפחות 8 תווים",
-                "generic": "אירעה שגיאה. נסה שוב."
+                "generic": "אירעה שגיאה. נסה שוב.",
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
             }
         }
     },
@@ -1477,7 +1478,14 @@
                 "relationLabel": "Relation",
                 "attach": "Attach",
                 "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "detachDialog": {
+                    "title": "לנתק את העבודה הזו?",
+                    "body": "{title} תוסר מהמשימה הזו. העבודה עצמה לא מושפעת כלל — הפעולה מסירה רק את הקישור.",
+                    "confirm": "נתק עבודה",
+                    "cancel": "ביטול",
+                    "detaching": "מנתק…",
+                    "error": "ניתוק העבודה נכשל"
+                },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
                     "created": "Created",
@@ -1526,8 +1534,13 @@
                 "runNow": "Run now",
                 "clone": "Clone"
             },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            "deleteDialog": {
+                "title": "למחוק את המשימה הזו?",
+                "body": "{title} תימחק לצמיתות. רעיונות ועבודות מקושרים נשמרים, אך הקישור שלהם חזרה למשימה הזו יאבד. לא ניתן לבטל פעולה זו.",
+                "confirm": "מחק משימה",
+                "cancel": "ביטול",
+                "deleting": "מוחק…",
+                "error": "מחיקת המשימה נכשלה"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1598,6 +1611,36 @@
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)"
+                }
+            },
+            "goals": {
+                "title": "יעדים",
+                "empty": "עדיין לא מחוברים יעדים למשימה הזו. חבר יעד למטה כדי להגדיר מהי הצלחה.",
+                "attachTitle": "חיבור יעד",
+                "goalLabel": "יעד",
+                "goalPlaceholder": "בחר יעד",
+                "primaryLabel": "הגדר כיעד ראשי",
+                "primaryBadge": "ראשי",
+                "primaryTooltip": "היעד הראשי של המשימה הזו - רק יעד אחד יכול להיות ראשי בכל רגע.",
+                "attach": "חבר",
+                "detach": "נתק",
+                "detachDialog": {
+                    "title": "לנתק את היעד הזה?",
+                    "body": "{title} יוסר מהמשימה הזו. היעד עצמו לא נמחק — הוא נשאר בעמוד היעדים ובכל משימה אחרת שאליה הוא מחובר.",
+                    "confirm": "נתק יעד",
+                    "cancel": "ביטול",
+                    "detaching": "מנתק…",
+                    "error": "ניתוק היעד נכשל"
+                },
+                "alreadyLinkedOption": "{title} (כבר מחובר)",
+                "noGoalsToAttach": "אין לך עדיין יעדים. צור יעד בעמוד היעדים ולאחר מכן חבר אותו כאן.",
+                "pickerTruncated": "מוצגים 100 היעדים האחרונים שלך - פתח את עמוד היעדים לרשימה המלאה.",
+                "invariantNote": "חיבור יעד לעולם אינו משנה את הסטטוס של המשימה הזו - סיום משימה נשאר פעולה מפורשת.",
+                "toasts": {
+                    "attached": "היעד חובר",
+                    "attachError": "לא ניתן היה לחבר את היעד",
+                    "detached": "היעד נותק",
+                    "detachError": "לא ניתן היה לנתק את היעד"
                 }
             }
         },
@@ -2944,7 +2987,23 @@
                 "activatedToast": "הסוכן הופעל",
                 "statusUpdateFailed": "לא ניתן לעדכן את הסטטוס",
                 "newAgent": "סוכן חדש",
-                "moreAgents": "+{count} נוספים"
+                "moreAgents": "+{count} נוספים",
+                "assignExisting": "שיוך סוכן קיים",
+                "assignTitle": "שיוך סוכן לעבודה זו",
+                "assignSubtitle": "שייכו לעבודה זו סוכן שכבר יש לכם במקום ליצור סוכן נוסף.",
+                "assignSearchPlaceholder": "חיפוש סוכנים…",
+                "assignLoading": "טוען סוכנים…",
+                "assignNoneAvailable": "אין סוכנים נוספים לשיוך.",
+                "assignNoMatches": "אין סוכנים התואמים לחיפוש זה.",
+                "assignLoadFailed": "לא ניתן לטעון סוכנים",
+                "assignedToast": "{name} שויך לעבודה זו",
+                "assignFailed": "לא ניתן לשייך את הסוכן",
+                "assignCancel": "ביטול",
+                "assignedLabel": "משויך",
+                "assignedHint": "משויך לעבודה זו — לא נוצר כאן",
+                "unassign": "הסרה מעבודה זו",
+                "unassignedToast": "{name} הוסר מעבודה זו",
+                "unassignFailed": "לא ניתן להסיר את הסוכן"
             },
             "failedToGenerateItems": "נכשל ביצירת פריטים. נסה שוב.",
             "generationCompleted": "היצירה הושלמה בהצלחה",
@@ -7117,6 +7176,9 @@
             },
             "token": {
                 "required": "Token cannot be empty"
+            },
+            "terms": {
+                "required": "You must accept the Terms of Service and Privacy Policy to create an account."
             }
         }
     },

@@ -17,13 +17,20 @@ import type { Agent } from '@/lib/api/agents';
 
 interface WorkHeaderProps {
     work: Work;
-    /** Work-scoped Agents shown in the header dropdown. */
+    /** Agents on this Work (pinned by scope + assigned via targets). */
     agents?: Agent[];
-    /** Total Work-scoped Agents upstream — may exceed agents.length. */
+    /** Total Agents on this Work upstream — may exceed agents.length. */
     agentsTotal?: number;
+    /** Which of `agents` are ASSIGNED (detachable) rather than pinned. */
+    assignedAgentIds?: string[];
 }
 
-export function WorkHeader({ work, agents = [], agentsTotal }: WorkHeaderProps) {
+export function WorkHeader({
+    work,
+    agents = [],
+    agentsTotal,
+    assignedAgentIds = [],
+}: WorkHeaderProps) {
     const t = useTranslations('dashboard.workDetail');
     const { repoLinks } = useWorkDetail();
     const { role } = useWorkPermissions();
@@ -161,9 +168,15 @@ export function WorkHeader({ work, agents = [], agentsTotal }: WorkHeaderProps) 
                     </div>
 
                     <div className="flex items-center gap-2 shrink-0">
-                        {/* Agents scoped to this Work — list + "+ New Agent"
-                            (the FU-3 on-ramp lives in the dropdown footer). */}
-                        <WorkAgentsDropdown workId={work.id} agents={agents} total={agentsTotal} />
+                        {/* Agents on this Work — list + the two on-ramps in
+                            the dropdown footer: assign an existing Agent, or
+                            create a new one (the FU-3 flow). */}
+                        <WorkAgentsDropdown
+                            workId={work.id}
+                            agents={agents}
+                            total={agentsTotal}
+                            assignedAgentIds={assignedAgentIds}
+                        />
 
                         {/* External link */}
                         {externalWebsiteUrl && (

@@ -217,7 +217,8 @@
             "errors": {
                 "passwordsDoNotMatch": "Паролите не съвпадат",
                 "passwordTooShort": "Паролата трябва да е поне 8 символа",
-                "generic": "Грешка. Моля, опитайте отново."
+                "generic": "Грешка. Моля, опитайте отново.",
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
             }
         }
     },
@@ -1477,7 +1478,14 @@
                 "relationLabel": "Relation",
                 "attach": "Attach",
                 "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "detachDialog": {
+                    "title": "Да се отдели ли тази Работа?",
+                    "body": "{title} ще бъде премахната от тази Мисия. Самата Работа остава непроменена — това само премахва връзката.",
+                    "confirm": "Отделяне на Работата",
+                    "cancel": "Отказ",
+                    "detaching": "Отделяне…",
+                    "error": "Неуспешно отделяне на Работата"
+                },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
                     "created": "Created",
@@ -1526,8 +1534,13 @@
                 "runNow": "Run now",
                 "clone": "Clone"
             },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            "deleteDialog": {
+                "title": "Да се изтрие ли тази Мисия?",
+                "body": "{title} ще бъде изтрита завинаги. Дъщерните Идеи и Работи се запазват, но обратната им връзка към тази Мисия се губи. Това действие е необратимо.",
+                "confirm": "Изтриване на Мисията",
+                "cancel": "Отказ",
+                "deleting": "Изтриване…",
+                "error": "Неуспешно изтриване на Мисията"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1598,6 +1611,36 @@
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)"
+                }
+            },
+            "goals": {
+                "title": "Цели",
+                "empty": "Към тази Мисия още няма прикачени Цели. Прикачете една по-долу, за да проследявате какво означава успех.",
+                "attachTitle": "Прикачване на Цел",
+                "goalLabel": "Цел",
+                "goalPlaceholder": "Изберете Цел",
+                "primaryLabel": "Задаване като основна",
+                "primaryBadge": "Основна",
+                "primaryTooltip": "Основната Цел за тази Мисия - само една Цел може да бъде основна в даден момент.",
+                "attach": "Прикачване",
+                "detach": "Отделяне",
+                "detachDialog": {
+                    "title": "Да се отдели ли тази Цел?",
+                    "body": "{title} ще бъде премахната от тази Мисия. Самата Цел не се изтрива — тя остава на страницата с Цели и във всяка друга Мисия, към която е прикачена.",
+                    "confirm": "Отделяне на Целта",
+                    "cancel": "Отказ",
+                    "detaching": "Отделяне…",
+                    "error": "Неуспешно отделяне на Целта"
+                },
+                "alreadyLinkedOption": "{title} (вече прикачена)",
+                "noGoalsToAttach": "Все още нямате Цели. Създайте една на страницата с Цели и след това я прикачете тук.",
+                "pickerTruncated": "Показват се последните ви 100 Цели - отворете страницата с Цели за пълния списък.",
+                "invariantNote": "Прикачването на Цел никога не променя статуса на тази Мисия - завършването на Мисия остава изрично действие.",
+                "toasts": {
+                    "attached": "Целта е прикачена",
+                    "attachError": "Целта не можа да бъде прикачена",
+                    "detached": "Целта е отделена",
+                    "detachError": "Целта не можа да бъде отделена"
                 }
             }
         },
@@ -2944,7 +2987,23 @@
                 "activatedToast": "Агентът е активиран",
                 "statusUpdateFailed": "Статусът не можа да бъде обновен",
                 "newAgent": "Нов Агент",
-                "moreAgents": "+{count} още"
+                "moreAgents": "+{count} още",
+                "assignExisting": "Присвои съществуващ",
+                "assignTitle": "Присвояване на Агент към тази Работа",
+                "assignSubtitle": "Добавете към тази Работа Агент, който вече имате, вместо да създавате нов.",
+                "assignSearchPlaceholder": "Търсене на Агенти…",
+                "assignLoading": "Зареждане на Агенти…",
+                "assignNoneAvailable": "Няма други Агенти за присвояване.",
+                "assignNoMatches": "Няма Агенти, отговарящи на това търсене.",
+                "assignLoadFailed": "Агентите не можаха да бъдат заредени",
+                "assignedToast": "{name} е присвоен към тази Работа",
+                "assignFailed": "Агентът не можа да бъде присвоен",
+                "assignCancel": "Отказ",
+                "assignedLabel": "Присвоен",
+                "assignedHint": "Присвоен към тази Работа — не е създаден тук",
+                "unassign": "Премахване от тази Работа",
+                "unassignedToast": "{name} е премахнат от тази Работа",
+                "unassignFailed": "Агентът не можа да бъде премахнат"
             },
             "failedToGenerateItems": "Неуспешно генериране на елементи. Моля, опитайте отново.",
             "generationCompleted": "Генерирането завърши успешно",
@@ -7117,6 +7176,9 @@
             },
             "token": {
                 "required": "Token cannot be empty"
+            },
+            "terms": {
+                "required": "You must accept the Terms of Service and Privacy Policy to create an account."
             }
         }
     },

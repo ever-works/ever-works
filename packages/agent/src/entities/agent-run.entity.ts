@@ -1,6 +1,11 @@
 import { Column, CreateDateColumn, Entity, Index, PrimaryGeneratedColumn } from 'typeorm';
 import { PortableDateColumn } from './_types';
-import type { GateStatus, TaskAcceptanceCheck, TaskCheckResult } from '@ever-works/contracts';
+import type {
+    GateStatus,
+    SubAgentScope,
+    TaskAcceptanceCheck,
+    TaskCheckResult,
+} from '@ever-works/contracts';
 
 /**
  * What kicked off this run.
@@ -318,6 +323,32 @@ export class AgentRun {
      */
     @Column({ type: 'boolean', default: false })
     interruptRequested: boolean;
+
+    /**
+     * The effective scope a DELEGATED run executes under (judgment layer
+     * G9). `null` for every ordinary run — which is the overwhelmingly
+     * common case, and means "no additional restriction".
+     *
+     * Snapshotted at dispatch, not referenced: it is the already-narrowed
+     * scope `validateSubAgentDelegationRequest` produced, so re-deriving
+     * it later (from a parent whose own permissions may since have
+     * changed) could hand an in-flight child something different from
+     * what it was admitted with.
+     *
+     * It lives on the RUN rather than the Task because the run row is
+     * pre-created by `dispatchAgentRun` before the worker starts, and
+     * because `AgentRunService` already holds `AgentRunRepository` — so
+     * the tool loop can read it without `packages/agent/src/agents/`
+     * gaining a runtime import of `tasks-domain`, which the
+     * AGENT_DOMAIN_TOOL_SOURCES seam exists to prevent.
+     *
+     * Without this the delegation contract's headline property —
+     * "privilege can only ever shrink going down the tree" — held only at
+     * the admission boundary: an over-broad REQUEST was refused, but a
+     * child that was admitted ran with its own agent's full tool set.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    delegationScope?: SubAgentScope | null;
 
     @CreateDateColumn()
     createdAt: Date;

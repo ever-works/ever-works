@@ -217,7 +217,8 @@
             "errors": {
                 "passwordsDoNotMatch": "Mật khẩu không khớp",
                 "passwordTooShort": "Mật khẩu phải có ít nhất 8 ký tự",
-                "generic": "Đã xảy ra lỗi. Vui lòng thử lại."
+                "generic": "Đã xảy ra lỗi. Vui lòng thử lại.",
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
             }
         }
     },
@@ -1446,7 +1447,14 @@
                 "relationLabel": "Relation",
                 "attach": "Attach",
                 "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "detachDialog": {
+                    "title": "Gỡ Công việc này?",
+                    "body": "{title} sẽ được gỡ khỏi Nhiệm vụ này. Bản thân Công việc không bao giờ bị thay đổi — thao tác này chỉ xóa liên kết.",
+                    "confirm": "Gỡ Công việc",
+                    "cancel": "Hủy",
+                    "detaching": "Đang gỡ…",
+                    "error": "Không thể gỡ Công việc"
+                },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
                     "created": "Created",
@@ -1495,8 +1503,13 @@
                 "runNow": "Run now",
                 "clone": "Clone"
             },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            "deleteDialog": {
+                "title": "Xóa Nhiệm vụ này?",
+                "body": "{title} sẽ bị xóa vĩnh viễn. Các Ý tưởng và Công việc con vẫn được giữ lại, nhưng liên kết ngược của chúng tới Nhiệm vụ này sẽ bị mất. Không thể hoàn tác thao tác này.",
+                "confirm": "Xóa Nhiệm vụ",
+                "cancel": "Hủy",
+                "deleting": "Đang xóa…",
+                "error": "Không thể xóa Nhiệm vụ"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1567,6 +1580,36 @@
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)"
+                }
+            },
+            "goals": {
+                "title": "Mục tiêu",
+                "empty": "Chưa có Mục tiêu nào được đính kèm vào Nhiệm vụ này. Hãy đính kèm một Mục tiêu bên dưới để xác định thế nào là thành công.",
+                "attachTitle": "Đính kèm Mục tiêu",
+                "goalLabel": "Mục tiêu",
+                "goalPlaceholder": "Chọn một Mục tiêu",
+                "primaryLabel": "Đặt làm chính",
+                "primaryBadge": "Chính",
+                "primaryTooltip": "Mục tiêu chính của Nhiệm vụ này - mỗi lần chỉ có một Mục tiêu được đặt làm chính.",
+                "attach": "Đính kèm",
+                "detach": "Gỡ",
+                "detachDialog": {
+                    "title": "Gỡ Mục tiêu này?",
+                    "body": "{title} sẽ được gỡ khỏi Nhiệm vụ này. Bản thân Mục tiêu không bị xóa — nó vẫn nằm trên trang Mục tiêu và trong mọi Nhiệm vụ khác mà nó được đính kèm.",
+                    "confirm": "Gỡ Mục tiêu",
+                    "cancel": "Hủy",
+                    "detaching": "Đang gỡ…",
+                    "error": "Không thể gỡ Mục tiêu"
+                },
+                "alreadyLinkedOption": "{title} (đã đính kèm)",
+                "noGoalsToAttach": "Bạn chưa có Mục tiêu nào. Hãy tạo một Mục tiêu trên trang Mục tiêu, rồi đính kèm tại đây.",
+                "pickerTruncated": "Đang hiển thị 100 Mục tiêu gần đây nhất của bạn - mở trang Mục tiêu để xem danh sách đầy đủ.",
+                "invariantNote": "Việc đính kèm Mục tiêu không bao giờ thay đổi trạng thái của Nhiệm vụ này - hoàn thành một Nhiệm vụ vẫn là một thao tác rõ ràng.",
+                "toasts": {
+                    "attached": "Đã đính kèm Mục tiêu",
+                    "attachError": "Không thể đính kèm Mục tiêu",
+                    "detached": "Đã gỡ Mục tiêu",
+                    "detachError": "Không thể gỡ Mục tiêu"
                 }
             }
         },
@@ -2876,7 +2919,23 @@
                 "activatedToast": "Đã kích hoạt Agent",
                 "statusUpdateFailed": "Không thể cập nhật trạng thái",
                 "newAgent": "Agent mới",
-                "moreAgents": "+{count} khác"
+                "moreAgents": "+{count} khác",
+                "assignExisting": "Gán Agent có sẵn",
+                "assignTitle": "Gán một Agent cho Công việc này",
+                "assignSubtitle": "Đưa một Agent bạn đã có vào Công việc này thay vì tạo thêm một Agent mới.",
+                "assignSearchPlaceholder": "Tìm Agent…",
+                "assignLoading": "Đang tải Agent…",
+                "assignNoneAvailable": "Không còn Agent nào khác để gán.",
+                "assignNoMatches": "Không có Agent nào khớp với tìm kiếm đó.",
+                "assignLoadFailed": "Không thể tải Agent",
+                "assignedToast": "Đã gán {name} cho Công việc này",
+                "assignFailed": "Không thể gán Agent",
+                "assignCancel": "Hủy",
+                "assignedLabel": "Đã gán",
+                "assignedHint": "Được gán cho Công việc này — không được tạo ở đây",
+                "unassign": "Gỡ khỏi Công việc này",
+                "unassignedToast": "Đã gỡ {name} khỏi Công việc này",
+                "unassignFailed": "Không thể gỡ Agent"
             },
             "failedToGenerateItems": "Không thể tạo các mục. Vui lòng thử lại.",
             "generationCompleted": "Tạo hoàn tất thành công",
@@ -7118,6 +7177,9 @@
             },
             "token": {
                 "required": "Token cannot be empty"
+            },
+            "terms": {
+                "required": "You must accept the Terms of Service and Privacy Policy to create an account."
             }
         }
     },

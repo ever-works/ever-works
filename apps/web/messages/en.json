@@ -217,7 +217,8 @@
             "errors": {
                 "passwordsDoNotMatch": "Passwords do not match",
                 "passwordTooShort": "Password must be at least 8 characters",
-                "generic": "An error occurred. Please try again."
+                "generic": "An error occurred. Please try again.",
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
             }
         }
     },
@@ -1529,7 +1530,14 @@
                 "relationLabel": "Relation",
                 "attach": "Attach",
                 "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "detachDialog": {
+                    "title": "Detach this Work?",
+                    "body": "{title} will be removed from this Mission. The Work itself is never touched — this only removes the reference.",
+                    "confirm": "Detach Work",
+                    "cancel": "Cancel",
+                    "detaching": "Detaching…",
+                    "error": "Failed to detach Work"
+                },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
                     "created": "Created",
@@ -1578,8 +1586,13 @@
                 "runNow": "Run now",
                 "clone": "Clone"
             },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            "deleteDialog": {
+                "title": "Delete this Mission?",
+                "body": "{title} will be permanently deleted. Child Ideas and Works are preserved, but their back-link to this Mission is broken. This cannot be undone.",
+                "confirm": "Delete Mission",
+                "cancel": "Cancel",
+                "deleting": "Deleting…",
+                "error": "Failed to delete Mission"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1650,6 +1663,36 @@
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)"
+                }
+            },
+            "goals": {
+                "title": "Goals",
+                "empty": "No Goals attached to this Mission yet. Attach one below to track what success means.",
+                "attachTitle": "Attach a Goal",
+                "goalLabel": "Goal",
+                "goalPlaceholder": "Select a Goal",
+                "primaryLabel": "Set as primary",
+                "primaryBadge": "Primary",
+                "primaryTooltip": "The primary Goal for this Mission - only one Goal can be primary at a time.",
+                "attach": "Attach",
+                "detach": "Detach",
+                "detachDialog": {
+                    "title": "Detach this Goal?",
+                    "body": "{title} will be removed from this Mission. The Goal itself is not deleted — it stays on the Goals page and on any other Mission it is attached to.",
+                    "confirm": "Detach Goal",
+                    "cancel": "Cancel",
+                    "detaching": "Detaching…",
+                    "error": "Failed to detach Goal"
+                },
+                "alreadyLinkedOption": "{title} (already attached)",
+                "noGoalsToAttach": "You have no Goals yet. Create one on the Goals page, then attach it here.",
+                "pickerTruncated": "Showing your 100 most recent Goals - open the Goals page for the full list.",
+                "invariantNote": "Attaching a Goal never changes this Mission's status - completing a Mission stays an explicit action.",
+                "toasts": {
+                    "attached": "Goal attached",
+                    "attachError": "Couldn't attach Goal",
+                    "detached": "Goal detached",
+                    "detachError": "Couldn't detach Goal"
                 }
             }
         },
@@ -3018,6 +3061,22 @@
                 "activatedToast": "Agent activated",
                 "statusUpdateFailed": "Could not update status",
                 "newAgent": "New Agent",
+                "assignExisting": "Assign existing",
+                "assignTitle": "Assign an Agent to this Work",
+                "assignSubtitle": "Put an Agent you already have on this Work instead of creating another one.",
+                "assignSearchPlaceholder": "Search Agents…",
+                "assignLoading": "Loading Agents…",
+                "assignNoneAvailable": "No other Agents left to assign.",
+                "assignNoMatches": "No Agents match that search.",
+                "assignLoadFailed": "Could not load Agents",
+                "assignedToast": "{name} assigned to this Work",
+                "assignFailed": "Could not assign Agent",
+                "assignCancel": "Cancel",
+                "assignedLabel": "Assigned",
+                "assignedHint": "Assigned to this Work — not created here",
+                "unassign": "Remove from this Work",
+                "unassignedToast": "{name} removed from this Work",
+                "unassignFailed": "Could not remove Agent",
                 "moreAgents": "+{count} more"
             },
             "failedToGenerateItems": "Failed to generate items. Please try again.",
@@ -7117,6 +7176,9 @@
             },
             "token": {
                 "required": "Token cannot be empty"
+            },
+            "terms": {
+                "required": "You must accept the Terms of Service and Privacy Policy to create an account."
             }
         }
     },

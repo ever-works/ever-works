@@ -217,7 +217,8 @@
             "errors": {
                 "passwordsDoNotMatch": "पासवर्ड मेल नहीं खाते",
                 "passwordTooShort": "पासवर्ड कम से कम 8 अक्षरों का होना चाहिए",
-                "generic": "एक त्रुटि हुई। कृपया पुनः प्रयास करें।"
+                "generic": "एक त्रुटि हुई। कृपया पुनः प्रयास करें।",
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
             }
         }
     },
@@ -1446,7 +1447,14 @@
                 "relationLabel": "Relation",
                 "attach": "Attach",
                 "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "detachDialog": {
+                    "title": "इस कार्य को अलग करें?",
+                    "body": "{title} को इस मिशन से हटा दिया जाएगा। कार्य स्वयं कभी नहीं बदला जाता — इससे केवल संदर्भ हटता है।",
+                    "confirm": "कार्य अलग करें",
+                    "cancel": "रद्द करें",
+                    "detaching": "अलग किया जा रहा है…",
+                    "error": "कार्य अलग नहीं किया जा सका"
+                },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
                     "created": "Created",
@@ -1495,8 +1503,13 @@
                 "runNow": "Run now",
                 "clone": "Clone"
             },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            "deleteDialog": {
+                "title": "इस मिशन को हटाएँ?",
+                "body": "{title} को स्थायी रूप से हटा दिया जाएगा। चाइल्ड विचार और कार्य सुरक्षित रहते हैं, लेकिन इस मिशन से उनका बैक-लिंक टूट जाता है। इसे पूर्ववत नहीं किया जा सकता।",
+                "confirm": "मिशन हटाएँ",
+                "cancel": "रद्द करें",
+                "deleting": "हटाया जा रहा है…",
+                "error": "मिशन हटाया नहीं जा सका"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1567,6 +1580,36 @@
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)"
+                }
+            },
+            "goals": {
+                "title": "लक्ष्य",
+                "empty": "इस मिशन से अभी तक कोई लक्ष्य नहीं जुड़ा है। सफलता का अर्थ ट्रैक करने के लिए नीचे एक लक्ष्य जोड़ें।",
+                "attachTitle": "एक लक्ष्य जोड़ें",
+                "goalLabel": "लक्ष्य",
+                "goalPlaceholder": "एक लक्ष्य चुनें",
+                "primaryLabel": "प्राथमिक के रूप में सेट करें",
+                "primaryBadge": "प्राथमिक",
+                "primaryTooltip": "इस मिशन का प्राथमिक लक्ष्य - एक समय में केवल एक ही लक्ष्य प्राथमिक हो सकता है।",
+                "attach": "जोड़ें",
+                "detach": "अलग करें",
+                "detachDialog": {
+                    "title": "इस लक्ष्य को अलग करें?",
+                    "body": "{title} को इस मिशन से हटा दिया जाएगा। लक्ष्य स्वयं हटाया नहीं जाता — यह लक्ष्य पृष्ठ पर और किसी भी अन्य मिशन में बना रहता है जिससे यह जुड़ा है।",
+                    "confirm": "लक्ष्य अलग करें",
+                    "cancel": "रद्द करें",
+                    "detaching": "अलग किया जा रहा है…",
+                    "error": "लक्ष्य अलग नहीं किया जा सका"
+                },
+                "alreadyLinkedOption": "{title} (पहले से जुड़ा हुआ)",
+                "noGoalsToAttach": "आपके पास अभी तक कोई लक्ष्य नहीं है। लक्ष्य पृष्ठ पर एक बनाएँ, फिर उसे यहाँ जोड़ें।",
+                "pickerTruncated": "आपके 100 सबसे नए लक्ष्य दिखाए जा रहे हैं - पूरी सूची के लिए लक्ष्य पृष्ठ खोलें।",
+                "invariantNote": "लक्ष्य जोड़ने से इस मिशन की स्थिति कभी नहीं बदलती - मिशन पूरा करना एक स्पष्ट क्रिया बनी रहती है।",
+                "toasts": {
+                    "attached": "लक्ष्य जोड़ा गया",
+                    "attachError": "लक्ष्य जोड़ा नहीं जा सका",
+                    "detached": "लक्ष्य अलग किया गया",
+                    "detachError": "लक्ष्य अलग नहीं किया जा सका"
                 }
             }
         },
@@ -2876,7 +2919,23 @@
                 "activatedToast": "एजेंट सक्रिय किया गया",
                 "statusUpdateFailed": "स्थिति अपडेट नहीं हो सकी",
                 "newAgent": "नया एजेंट",
-                "moreAgents": "+{count} और"
+                "moreAgents": "+{count} और",
+                "assignExisting": "मौजूदा असाइन करें",
+                "assignTitle": "इस काम को एक एजेंट असाइन करें",
+                "assignSubtitle": "नया बनाने के बजाय अपने पास पहले से मौजूद एजेंट को इस काम पर लगाएं।",
+                "assignSearchPlaceholder": "एजेंट खोजें…",
+                "assignLoading": "एजेंट लोड हो रहे हैं…",
+                "assignNoneAvailable": "असाइन करने के लिए कोई और एजेंट नहीं है।",
+                "assignNoMatches": "इस खोज से कोई एजेंट मेल नहीं खाता।",
+                "assignLoadFailed": "एजेंट लोड नहीं हो सके",
+                "assignedToast": "{name} इस काम को असाइन किया गया",
+                "assignFailed": "एजेंट असाइन नहीं हो सका",
+                "assignCancel": "रद्द करें",
+                "assignedLabel": "असाइन किया गया",
+                "assignedHint": "इस काम को असाइन किया गया — यहाँ नहीं बनाया गया",
+                "unassign": "इस काम से हटाएं",
+                "unassignedToast": "{name} इस काम से हटाया गया",
+                "unassignFailed": "एजेंट हटाया नहीं जा सका"
             },
             "failedToGenerateItems": "आइटम उत्पन्न करने में विफल। कृपया पुनः प्रयास करें।",
             "generationCompleted": "उत्पत्ति सफलतापूर्वक पूर्ण हुई",
@@ -7118,6 +7177,9 @@
             },
             "token": {
                 "required": "Token cannot be empty"
+            },
+            "terms": {
+                "required": "You must accept the Terms of Service and Privacy Policy to create an account."
             }
         }
     },

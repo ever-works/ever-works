@@ -43,6 +43,7 @@ import { ConversationMessage } from '../entities/conversation-message.entity';
 import { AuthAccount } from '../entities/auth-account.entity';
 import { AuthSession } from '../entities/auth-session.entity';
 import { AuthVerification } from '../entities/auth-verification.entity';
+import { TermsAcceptance } from '../entities/terms-acceptance.entity';
 import { GitHubAppInstallation } from '../entities/github-app-installation.entity';
 import { GitHubAppInstallationRepository } from '../entities/github-app-installation-repository.entity';
 import { GitHubAppUserLink } from '../entities/github-app-user-link.entity';
@@ -131,6 +132,7 @@ import { TerminalTranscriptChunk } from '../entities/terminal-transcript-chunk.e
 
 import { FleetJob } from '../entities/fleet-job.entity';
 import { ToolGrant } from '../entities/tool-grant.entity';
+import { Workflow } from '../entities/workflow.entity';
 
 import {
     PluginEntity,
@@ -167,6 +169,7 @@ export const ENTITIES = [
     AuthAccount,
     AuthSession,
     AuthVerification,
+    TermsAcceptance,
     GitHubAppInstallation,
     GitHubAppInstallationRepository,
     GitHubAppUserLink,
@@ -318,4 +321,7 @@ export const ENTITIES = [
     // Tool-grant matrix (audit item G4) — one row per (owner, scope)
     // carrying that scope's tool allow/deny contribution.
     ToolGrant,
+    // Workflows (judgment layer G5) — saved graphs. Until this row
+    // existed a graph could be executed but never KEPT.
+    Workflow,
 ];

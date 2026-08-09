@@ -5,19 +5,15 @@
 [uri_license]: https://www.gnu.org/licenses/agpl-3.0.html
 [uri_license_image]: https://img.shields.io/badge/License-AGPL%20v3-blue.svg
 
-**The Workshop for AI.** An open agentic runtime that autonomously researches, ships, and maintains content-rich websites and Git repositories.
-
 ![visitors](https://visitor-badge.laobi.icu/badge?page_id=ever-co.ever-works-platform)
 [![License: AGPL v3][uri_license_image]][uri_license]
 [![Status](https://img.shields.io/badge/Status-Pre--release-yellow.svg)](https://github.com/ever-works/ever-works/releases)
 [![Ask DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/ever-works/ever-works)
 [![Gitpod Ready-to-Code](https://img.shields.io/badge/Gitpod-Ready--to--Code-blue?logo=gitpod)](https://gitpod.io/#https://github.com/ever-works/ever-works)
 
----
-
 ## 🌟 What is it
 
-[Ever® Works™][uri_everworks] is an open-source, extensible, **agentic runtime** that autonomously researches, ships, and maintains content-rich websites and Git repositories.
+[Ever® Works™][uri_everworks] - **The Workshop for AI** - an open-source, extensible, **agentic runtime** that autonomously researches, ships, and maintains entire businesses, 24/7.
 
 Give it an idea, and AI agents handle the rest:
 
@@ -30,7 +26,7 @@ Give it an idea, and AI agents handle the rest:
 
 Think of it as a **workshop for AI**: it runs on your machine, your cloud, or ours, and keeps the whole content-and-code lifecycle version-controlled from the first idea to every future update.
 
-Ever® Works™ is a part of our larger Open Platform for **Collaborative, On-Demand and Sharing Economies** — [Ever® Platform™](https://ever.co).
+Ever® Works™ is a part of [Ever® Platform™](https://ever.co) - The everything platform for businesses™.
 
 ## ✨ Features
 
@@ -304,7 +300,7 @@ You can also view a full list of our [contributors tracked by GitHub](https://gi
 
 ## ⭐ Star History
 
-[![Star History Chart](https://api.star-history.com/svg?repos=ever-works/ever-works&type=Date)](https://star-history.com/#ever-works/ever-works&Date)
+[![Star History Chart](https://stats-github.ever.works/svg?repos=ever-works/ever-works&type=Date)](https://stats-github.ever.works/#ever-works/ever-works&Date)
 
 ## ❤️ Powered By
 

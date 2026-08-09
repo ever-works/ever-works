@@ -217,7 +217,8 @@
             "errors": {
                 "passwordsDoNotMatch": "Kata sandi tidak cocok",
                 "passwordTooShort": "Kata sandi harus minimal 8 karakter",
-                "generic": "Terjadi kesalahan. Harap coba lagi."
+                "generic": "Terjadi kesalahan. Harap coba lagi.",
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
             }
         }
     },
@@ -1446,7 +1447,14 @@
                 "relationLabel": "Relation",
                 "attach": "Attach",
                 "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "detachDialog": {
+                    "title": "Lepaskan Karya ini?",
+                    "body": "{title} akan dihapus dari Misi ini. Karya itu sendiri tidak pernah diubah — tindakan ini hanya menghapus referensinya.",
+                    "confirm": "Lepaskan Karya",
+                    "cancel": "Batal",
+                    "detaching": "Melepaskan…",
+                    "error": "Gagal melepaskan Karya"
+                },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
                     "created": "Created",
@@ -1495,8 +1503,13 @@
                 "runNow": "Run now",
                 "clone": "Clone"
             },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            "deleteDialog": {
+                "title": "Hapus Misi ini?",
+                "body": "{title} akan dihapus secara permanen. Ide dan Karya turunan tetap dipertahankan, tetapi tautan baliknya ke Misi ini terputus. Tindakan ini tidak dapat dibatalkan.",
+                "confirm": "Hapus Misi",
+                "cancel": "Batal",
+                "deleting": "Menghapus…",
+                "error": "Gagal menghapus Misi"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1567,6 +1580,36 @@
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)"
+                }
+            },
+            "goals": {
+                "title": "Sasaran",
+                "empty": "Belum ada Sasaran yang dilampirkan ke Misi ini. Lampirkan satu di bawah untuk melacak arti keberhasilan.",
+                "attachTitle": "Lampirkan Sasaran",
+                "goalLabel": "Sasaran",
+                "goalPlaceholder": "Pilih Sasaran",
+                "primaryLabel": "Tetapkan sebagai utama",
+                "primaryBadge": "Utama",
+                "primaryTooltip": "Sasaran utama untuk Misi ini - hanya satu Sasaran yang dapat menjadi utama dalam satu waktu.",
+                "attach": "Lampirkan",
+                "detach": "Lepaskan",
+                "detachDialog": {
+                    "title": "Lepaskan Sasaran ini?",
+                    "body": "{title} akan dihapus dari Misi ini. Sasaran itu sendiri tidak dihapus — Sasaran tetap ada di halaman Sasaran dan di Misi lain mana pun yang melampirkannya.",
+                    "confirm": "Lepaskan Sasaran",
+                    "cancel": "Batal",
+                    "detaching": "Melepaskan…",
+                    "error": "Gagal melepaskan Sasaran"
+                },
+                "alreadyLinkedOption": "{title} (sudah dilampirkan)",
+                "noGoalsToAttach": "Anda belum memiliki Sasaran. Buat satu di halaman Sasaran, lalu lampirkan di sini.",
+                "pickerTruncated": "Menampilkan 100 Sasaran terbaru Anda - buka halaman Sasaran untuk daftar lengkap.",
+                "invariantNote": "Melampirkan Sasaran tidak pernah mengubah status Misi ini - menyelesaikan Misi tetap merupakan tindakan eksplisit.",
+                "toasts": {
+                    "attached": "Sasaran dilampirkan",
+                    "attachError": "Tidak dapat melampirkan Sasaran",
+                    "detached": "Sasaran dilepaskan",
+                    "detachError": "Tidak dapat melepaskan Sasaran"
                 }
             }
         },
@@ -2876,7 +2919,23 @@
                 "activatedToast": "Agen diaktifkan",
                 "statusUpdateFailed": "Tidak dapat memperbarui status",
                 "newAgent": "Agen Baru",
-                "moreAgents": "+{count} lainnya"
+                "moreAgents": "+{count} lainnya",
+                "assignExisting": "Tetapkan yang ada",
+                "assignTitle": "Tetapkan Agen ke Karya ini",
+                "assignSubtitle": "Tempatkan Agen yang sudah Anda miliki pada Karya ini alih-alih membuat yang baru.",
+                "assignSearchPlaceholder": "Cari Agen…",
+                "assignLoading": "Memuat Agen…",
+                "assignNoneAvailable": "Tidak ada Agen lain untuk ditetapkan.",
+                "assignNoMatches": "Tidak ada Agen yang cocok dengan pencarian itu.",
+                "assignLoadFailed": "Tidak dapat memuat Agen",
+                "assignedToast": "{name} ditetapkan ke Karya ini",
+                "assignFailed": "Tidak dapat menetapkan Agen",
+                "assignCancel": "Batal",
+                "assignedLabel": "Ditetapkan",
+                "assignedHint": "Ditetapkan ke Karya ini — bukan dibuat di sini",
+                "unassign": "Hapus dari Karya ini",
+                "unassignedToast": "{name} dihapus dari Karya ini",
+                "unassignFailed": "Tidak dapat menghapus Agen"
             },
             "failedToGenerateItems": "Gagal menghasilkan item. Silakan coba lagi.",
             "generationCompleted": "Generasi selesai dengan sukses",
@@ -7118,6 +7177,9 @@
             },
             "token": {
                 "required": "Token cannot be empty"
+            },
+            "terms": {
+                "required": "You must accept the Terms of Service and Privacy Policy to create an account."
             }
         }
     },
