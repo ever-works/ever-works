@@ -2,6 +2,7 @@
 	"name": "ever-works-desktop",
 	"version": "0.1.0",
 	"description": "Ever Works Desktop App - all-in-one Electron shell: install wizard, local service supervisor (API + web), embedded web UI",
+	"homepage": "https://ever.works",
 	"author": {
 		"name": "Ever Co. LTD",
 		"email": "ever@ever.co",
@@ -30,7 +31,7 @@
 		"@types/react": "^19.2.7",
 		"@types/react-dom": "^19.2.3",
 		"@vitejs/plugin-react": "^6.0.1",
-		"electron": "^33.2.0",
+		"electron": "^39.8.10",
 		"electron-builder": "^25.1.8",
 		"react": "19.2.5",
 		"react-dom": "19.2.5",

@@ -1065,6 +1065,33 @@
                 "title": "अभी तक कोई कार्य नहीं।",
                 "subtitle": "कार्य एजेंट/कौशल/कार्य रोलआउट के बाद के चरण में आएंगे। पृष्ठ साइडबार नेविगेशन रूट को हल करने के लिए आरक्षित है।"
             },
+            "scopedSection": {
+                "addExisting": "मौजूदा जोड़ें",
+                "newTask": "नया कार्य",
+                "assignTitle": "मौजूदा कार्य जोड़ें",
+                "assignSubtitle": "नया बनाने के बजाय अपने बैकलॉग से कोई कार्य चुनें।",
+                "assignSearchPlaceholder": "कार्य खोजें…",
+                "assignSearchLabel": "कार्य खोजें",
+                "assignLoading": "कार्य लोड हो रहे हैं…",
+                "assignLoadFailed": "कार्य लोड नहीं हो सके",
+                "assignNoneAvailable": "जोड़ने के लिए कोई और कार्य नहीं है।",
+                "assignNoMatches": "इस खोज से कोई कार्य मेल नहीं खाता।",
+                "assignedToast": "{title} जोड़ा गया",
+                "assignFailed": "कार्य नहीं जोड़ा जा सका",
+                "assignCancel": "रद्द करें",
+                "movesLabel": "स्थानांतरित",
+                "movesHint": "यह कहीं और दर्ज है — इसे यहाँ जोड़ने पर यह स्थानांतरित हो जाएगा।",
+                "removedToast": "{title} को इस सूची से हटा दिया गया",
+                "removeFailed": "कार्य नहीं हटाया जा सका",
+                "rowMenuColumn": "क्रियाएँ",
+                "rowMenuLabel": "{title} के लिए क्रियाएँ",
+                "removeMenuItem": "इस सूची से हटाएँ",
+                "confirmTitle": "क्या यह कार्य हटाना है?",
+                "confirmBody": "{title} को इस सूची से हटा दिया जाएगा। कार्य स्वयं सुरक्षित रहता है और बाद में दोबारा जोड़ा जा सकता है।",
+                "confirmCancel": "रद्द करें",
+                "confirmSubmit": "हटाएँ",
+                "confirmPending": "हटाया जा रहा है…"
+            },
             "list": {
                 "newTask": "+ नया कार्य",
                 "noDescription": "अभी तक कोई विवरण नहीं",
@@ -1722,11 +1749,85 @@
                 "error": "Idea नहीं बनाया जा सका। कृपया पुनः प्रयास करें।"
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "लिंक किए गए Works",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "बनाया गया",
+                    "linked": "लिंक किया गया",
+                    "rebuilt": "पुनः बनाया गया",
+                    "matched": "मिलान"
+                }
+            },
+            "detail": {
+                "live": "लाइव",
+                "fromMission": "एक मिशन से",
+                "sections": {
+                    "description": "आइडिया",
+                    "build": "बिल्ड स्थिति",
+                    "agents": "एजेंट",
+                    "details": "विवरण"
+                },
+                "stages": {
+                    "drafted": "तैयार",
+                    "queued": "कतार में",
+                    "building": "बन रहा है",
+                    "built": "बन गया",
+                    "failed": "बिल्ड विफल",
+                    "builtDirect": "बन गया"
+                },
+                "stageHints": {
+                    "drafted": "आइडिया मौजूद है और बनाने के लिए तैयार है।",
+                    "queued": "बिल्डर की प्रतीक्षा में।",
+                    "building": "Work एजेंट Work बना रहा है।",
+                    "built": "इस आइडिया से एक Work बनाया गया।",
+                    "failed": "बिल्ड रुक गया। पुनः प्रयास करें।",
+                    "builtDirect": "Work बिल्डर में बनाया गया — यह बिल्ड कतार को छोड़ गया।"
+                },
+                "built": {
+                    "badge": "बना ({count})",
+                    "none": "अभी तक नहीं बना"
+                },
+                "actions": {
+                    "build": "बनाएं",
+                    "retry": "पुनः प्रयास",
+                    "rebuild": "फिर से बनाएं",
+                    "rebuildHint": "नया Work बनाता है। मौजूदा सुरक्षित रहता है।",
+                    "newAgent": "नया एजेंट",
+                    "delete": "हटाएं"
+                },
+                "works": {
+                    "empty": "इस आइडिया से कोई Work जुड़ा नहीं है।"
+                },
+                "agents": {
+                    "empty": "इस आइडिया से कोई एजेंट जुड़ा नहीं है।"
+                },
+                "meta": {
+                    "source": "स्रोत",
+                    "slug": "स्लग",
+                    "fields": "फ़ील्ड",
+                    "categories": "सुझाई गई श्रेणियां"
+                },
+                "deleteDialog": {
+                    "title": "इस आइडिया को हटाएं?",
+                    "body": "{title} स्थायी रूप से हटा दिया जाएगा। इसे पूर्ववत नहीं किया जा सकता।",
+                    "confirm": "आइडिया हटाएं",
+                    "cancel": "रद्द करें",
+                    "deleting": "हटाया जा रहा है…",
+                    "error": "आइडिया हटाने में विफल",
+                    "blocked": {
+                        "linked-works": "हटाया नहीं जा सकता: यह आइडिया {count} Work से जुड़ा है। पहले उन्हें हटाएं या अलग करें।",
+                        "idea-agents": "हटाया नहीं जा सकता: {count} एजेंट इस आइडिया से जुड़े हैं। पहले उन्हें हटाएं या स्कोप बदलें।",
+                        "build-in-flight": "बिल्ड चलते समय नहीं हटा सकते। इसके पूरा होने की प्रतीक्षा करें।",
+                        "unknown": "अभी इस आइडिया को नहीं हटाया जा सकता।"
+                    }
+                },
+                "toasts": {
+                    "built": "इस आइडिया से Work बनाया गया",
+                    "buildFailed": "बिल्ड विफल रहा",
+                    "buildQueued": "बिल्ड कतार में",
+                    "retryQueued": "पुनः प्रयास कतार में",
+                    "rebuildQueued": "पुनर्निर्माण कतार में",
+                    "deleted": "आइडिया हटाया गया",
+                    "actionError": "कार्रवाई पूरी नहीं हो सकी। कृपया पुनः प्रयास करें।"
                 }
             }
         },

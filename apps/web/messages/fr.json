@@ -1096,6 +1096,33 @@
                 "title": "Aucune Tâche pour l'instant.",
                 "subtitle": "Les Tâches seront disponibles dans une phase ultérieure du déploiement Agents/Skills/Tasks. La page est réservée pour que la route de navigation de la barre latérale soit résolue."
             },
+            "scopedSection": {
+                "addExisting": "Ajouter une existante",
+                "newTask": "Nouvelle Tâche",
+                "assignTitle": "Ajouter une Tâche existante",
+                "assignSubtitle": "Choisissez une Tâche de votre backlog au lieu d'en créer une autre.",
+                "assignSearchPlaceholder": "Rechercher des Tâches…",
+                "assignSearchLabel": "Rechercher des Tâches",
+                "assignLoading": "Chargement des Tâches…",
+                "assignLoadFailed": "Impossible de charger les Tâches",
+                "assignNoneAvailable": "Aucune autre Tâche à ajouter.",
+                "assignNoMatches": "Aucune Tâche ne correspond à cette recherche.",
+                "assignedToast": "{title} ajoutée",
+                "assignFailed": "Impossible d'ajouter la Tâche",
+                "assignCancel": "Annuler",
+                "movesLabel": "déplacée",
+                "movesHint": "Classée ailleurs — l'ajouter ici la déplacera.",
+                "removedToast": "{title} retirée de cette liste",
+                "removeFailed": "Impossible de retirer la Tâche",
+                "rowMenuColumn": "Actions",
+                "rowMenuLabel": "Actions pour {title}",
+                "removeMenuItem": "Retirer de cette liste",
+                "confirmTitle": "Retirer cette Tâche ?",
+                "confirmBody": "{title} sera retirée de cette liste. La Tâche elle-même est conservée et peut être rajoutée plus tard.",
+                "confirmCancel": "Annuler",
+                "confirmSubmit": "Retirer",
+                "confirmPending": "Retrait…"
+            },
             "list": {
                 "newTask": "+ Nouvelle Tâche",
                 "noDescription": "Pas encore de description",
@@ -1753,11 +1780,85 @@
                 "error": "Impossible de créer l'Idea. Veuillez réessayer."
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "Works liés",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "Créé",
+                    "linked": "Lié",
+                    "rebuilt": "Recréé",
+                    "matched": "Correspondance"
+                }
+            },
+            "detail": {
+                "live": "En direct",
+                "fromMission": "Issue d'une Mission",
+                "sections": {
+                    "description": "Idée",
+                    "build": "État de la construction",
+                    "agents": "Agents",
+                    "details": "Détails"
+                },
+                "stages": {
+                    "drafted": "Rédigée",
+                    "queued": "En file d'attente",
+                    "building": "Construction",
+                    "built": "Construite",
+                    "failed": "Échec de la construction",
+                    "builtDirect": "Construite"
+                },
+                "stageHints": {
+                    "drafted": "L'Idée existe et est prête à être construite.",
+                    "queued": "En attente d'un constructeur.",
+                    "building": "L'Agent Work génère le Work.",
+                    "built": "Un Work a été produit à partir de cette Idée.",
+                    "failed": "La construction s'est arrêtée. Réessayez.",
+                    "builtDirect": "Créé dans le générateur de Works — la file d'attente de build a été ignorée."
+                },
+                "built": {
+                    "badge": "Construite ({count})",
+                    "none": "Pas encore construite"
+                },
+                "actions": {
+                    "build": "Construire",
+                    "retry": "Réessayer",
+                    "rebuild": "Reconstruire",
+                    "rebuildHint": "Crée un nouveau Work. L'existant est conservé.",
+                    "newAgent": "Nouvel Agent",
+                    "delete": "Supprimer"
+                },
+                "works": {
+                    "empty": "Aucun Work lié à cette Idée pour le moment."
+                },
+                "agents": {
+                    "empty": "Aucun Agent rattaché à cette Idée."
+                },
+                "meta": {
+                    "source": "Source",
+                    "slug": "Slug",
+                    "fields": "Champs",
+                    "categories": "Catégories suggérées"
+                },
+                "deleteDialog": {
+                    "title": "Supprimer cette Idée ?",
+                    "body": "{title} sera définitivement supprimée. Cette action est irréversible.",
+                    "confirm": "Supprimer l'Idée",
+                    "cancel": "Annuler",
+                    "deleting": "Suppression…",
+                    "error": "Échec de la suppression de l'Idée",
+                    "blocked": {
+                        "linked-works": "Suppression impossible : cette Idée est liée à {count} Work(s). Supprimez-les ou dissociez-les d'abord.",
+                        "idea-agents": "Suppression impossible : {count} Agent(s) sont rattachés à cette Idée. Supprimez-les ou changez leur portée.",
+                        "build-in-flight": "Suppression impossible pendant une construction. Attendez la fin.",
+                        "unknown": "Impossible de supprimer cette Idée pour le moment."
+                    }
+                },
+                "toasts": {
+                    "built": "Work construit à partir de cette Idée",
+                    "buildFailed": "La construction a échoué",
+                    "buildQueued": "Construction mise en file",
+                    "retryQueued": "Nouvelle tentative mise en file",
+                    "rebuildQueued": "Reconstruction mise en file",
+                    "deleted": "Idée supprimée",
+                    "actionError": "Action impossible. Veuillez réessayer."
                 }
             }
         },

@@ -1065,6 +1065,33 @@
                 "title": "Brak Zadań.",
                 "subtitle": "Zadania będą dostępne w późniejszej fazie wdrożenia Agentów/Umiejętności/Zadań. Strona jest zarezerwowana, aby trasa nawigacji paska bocznego była dostępna."
             },
+            "scopedSection": {
+                "addExisting": "Dodaj istniejące",
+                "newTask": "Nowe Zadanie",
+                "assignTitle": "Dodaj istniejące Zadanie",
+                "assignSubtitle": "Wybierz Zadanie ze swojego backlogu zamiast tworzyć nowe.",
+                "assignSearchPlaceholder": "Szukaj Zadań…",
+                "assignSearchLabel": "Szukaj Zadań",
+                "assignLoading": "Ładowanie Zadań…",
+                "assignLoadFailed": "Nie udało się wczytać Zadań",
+                "assignNoneAvailable": "Brak innych Zadań do dodania.",
+                "assignNoMatches": "Żadne Zadanie nie pasuje do tego wyszukiwania.",
+                "assignedToast": "Dodano Zadanie „{title}”",
+                "assignFailed": "Nie udało się dodać Zadania",
+                "assignCancel": "Anuluj",
+                "movesLabel": "zostanie przeniesione",
+                "movesHint": "Jest przypisane gdzie indziej — dodanie tutaj je przeniesie.",
+                "removedToast": "Usunięto Zadanie „{title}” z tej listy",
+                "removeFailed": "Nie udało się usunąć Zadania z tej listy",
+                "rowMenuColumn": "Akcje",
+                "rowMenuLabel": "Akcje dla {title}",
+                "removeMenuItem": "Usuń z tej listy",
+                "confirmTitle": "Usunąć to Zadanie?",
+                "confirmBody": "Zadanie „{title}” zostanie usunięte z tej listy. Samo Zadanie zostaje zachowane i można je dodać ponownie później.",
+                "confirmCancel": "Anuluj",
+                "confirmSubmit": "Usuń",
+                "confirmPending": "Usuwanie…"
+            },
             "list": {
                 "newTask": "+ Nowe Zadanie",
                 "noDescription": "Brak opisu",
@@ -1722,11 +1749,85 @@
                 "error": "Nie udało się utworzyć Idea. Spróbuj ponownie."
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "Powiązane Works",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "Utworzony",
+                    "linked": "Powiązany",
+                    "rebuilt": "Odtworzony",
+                    "matched": "Dopasowany"
+                }
+            },
+            "detail": {
+                "live": "Na żywo",
+                "fromMission": "Z Misji",
+                "sections": {
+                    "description": "Pomysł",
+                    "build": "Status budowy",
+                    "agents": "Agenci",
+                    "details": "Szczegóły"
+                },
+                "stages": {
+                    "drafted": "Utworzony",
+                    "queued": "W kolejce",
+                    "building": "Budowanie",
+                    "built": "Zbudowany",
+                    "failed": "Budowa nieudana",
+                    "builtDirect": "Zbudowany"
+                },
+                "stageHints": {
+                    "drafted": "Pomysł istnieje i jest gotowy do budowy.",
+                    "queued": "Czeka na wykonawcę.",
+                    "building": "Work Agent generuje Work.",
+                    "built": "Z tego Pomysłu powstał Work.",
+                    "failed": "Budowa została przerwana. Spróbuj ponownie.",
+                    "builtDirect": "Utworzono w kreatorze Works — pominięto kolejkę kompilacji."
+                },
+                "built": {
+                    "badge": "Zbudowany ({count})",
+                    "none": "Jeszcze nie zbudowany"
+                },
+                "actions": {
+                    "build": "Zbuduj",
+                    "retry": "Ponów",
+                    "rebuild": "Zbuduj ponownie",
+                    "rebuildHint": "Tworzy nowy Work. Istniejący zostaje zachowany.",
+                    "newAgent": "Nowy Agent",
+                    "delete": "Usuń"
+                },
+                "works": {
+                    "empty": "Brak Works powiązanych z tym Pomysłem."
+                },
+                "agents": {
+                    "empty": "Brak Agentów przypisanych do tego Pomysłu."
+                },
+                "meta": {
+                    "source": "Źródło",
+                    "slug": "Slug",
+                    "fields": "Pola",
+                    "categories": "Sugerowane kategorie"
+                },
+                "deleteDialog": {
+                    "title": "Usunąć ten Pomysł?",
+                    "body": "{title} zostanie trwale usunięty. Tej operacji nie można cofnąć.",
+                    "confirm": "Usuń Pomysł",
+                    "cancel": "Anuluj",
+                    "deleting": "Usuwanie…",
+                    "error": "Nie udało się usunąć Pomysłu",
+                    "blocked": {
+                        "linked-works": "Nie można usunąć: ten Pomysł jest powiązany z {count} Work(s). Najpierw usuń lub odłącz je.",
+                        "idea-agents": "Nie można usunąć: {count} Agent(ów) jest przypisanych do tego Pomysłu. Usuń ich lub zmień zakres.",
+                        "build-in-flight": "Nie można usunąć podczas budowy. Poczekaj na jej zakończenie.",
+                        "unknown": "Nie można teraz usunąć tego Pomysłu."
+                    }
+                },
+                "toasts": {
+                    "built": "Work zbudowany z tego Pomysłu",
+                    "buildFailed": "Budowa nie powiodła się",
+                    "buildQueued": "Budowa w kolejce",
+                    "retryQueued": "Ponowna próba w kolejce",
+                    "rebuildQueued": "Ponowna budowa w kolejce",
+                    "deleted": "Pomysł usunięty",
+                    "actionError": "Nie udało się wykonać akcji. Spróbuj ponownie."
                 }
             }
         },

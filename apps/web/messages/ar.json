@@ -1096,6 +1096,33 @@
                 "title": "لا توجد مهام بعد.",
                 "subtitle": "سيتم شحن المهام في مرحلة لاحقة من طرح الوكلاء/المهارات/المهام. تم حجز الصفحة بحيث يتم حل مسار التنقل في الشريط الجانبي."
             },
+            "scopedSection": {
+                "addExisting": "إضافة مهمة موجودة",
+                "newTask": "مهمة جديدة",
+                "assignTitle": "إضافة مهمة موجودة",
+                "assignSubtitle": "اختر مهمة من قائمة أعمالك المتراكمة بدلاً من إنشاء مهمة جديدة.",
+                "assignSearchPlaceholder": "البحث في المهام…",
+                "assignSearchLabel": "البحث في المهام",
+                "assignLoading": "جارٍ تحميل المهام…",
+                "assignLoadFailed": "تعذّر تحميل المهام",
+                "assignNoneAvailable": "لا توجد مهام أخرى لإضافتها.",
+                "assignNoMatches": "لا توجد مهام تطابق هذا البحث.",
+                "assignedToast": "تمت إضافة {title}",
+                "assignFailed": "تعذّر إضافة المهمة",
+                "assignCancel": "إلغاء",
+                "movesLabel": "يتم نقلها",
+                "movesHint": "مسجّلة في مكان آخر — إضافتها هنا ستنقلها.",
+                "removedToast": "تمت إزالة {title} من هذه القائمة",
+                "removeFailed": "تعذّر إزالة المهمة",
+                "rowMenuColumn": "الإجراءات",
+                "rowMenuLabel": "إجراءات {title}",
+                "removeMenuItem": "إزالة من هذه القائمة",
+                "confirmTitle": "إزالة هذه المهمة؟",
+                "confirmBody": "ستتم إزالة {title} من هذه القائمة. تبقى المهمة نفسها محفوظة ويمكن إضافتها لاحقًا.",
+                "confirmCancel": "إلغاء",
+                "confirmSubmit": "إزالة",
+                "confirmPending": "جارٍ الإزالة…"
+            },
             "list": {
                 "newTask": "+ مهمة جديدة",
                 "noDescription": "لا يوجد وصف بعد",
@@ -1753,11 +1780,85 @@
                 "error": "تعذّر إنشاء الـ Idea. يُرجى المحاولة مرة أخرى."
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "الـ Works المرتبطة",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "تم البناء",
+                    "linked": "مرتبط",
+                    "rebuilt": "أعيد البناء",
+                    "matched": "مطابق"
+                }
+            },
+            "detail": {
+                "live": "مباشر",
+                "fromMission": "من مهمة",
+                "sections": {
+                    "description": "الفكرة",
+                    "build": "حالة البناء",
+                    "agents": "الوكلاء",
+                    "details": "التفاصيل"
+                },
+                "stages": {
+                    "drafted": "مسودة",
+                    "queued": "في قائمة الانتظار",
+                    "building": "قيد البناء",
+                    "built": "تم البناء",
+                    "failed": "فشل البناء",
+                    "builtDirect": "تم البناء"
+                },
+                "stageHints": {
+                    "drafted": "الفكرة موجودة وجاهزة للبناء.",
+                    "queued": "في انتظار المنفّذ.",
+                    "building": "وكيل Work يقوم بإنشاء الـ Work.",
+                    "built": "تم إنتاج Work من هذه الفكرة.",
+                    "failed": "توقف البناء. أعد المحاولة.",
+                    "builtDirect": "أُنشئ في منشئ الأعمال — تخطّى قائمة انتظار البناء."
+                },
+                "built": {
+                    "badge": "تم البناء ({count})",
+                    "none": "لم يتم البناء بعد"
+                },
+                "actions": {
+                    "build": "بناء",
+                    "retry": "إعادة المحاولة",
+                    "rebuild": "إعادة البناء",
+                    "rebuildHint": "ينشئ Work جديدًا. يتم الاحتفاظ بالحالي.",
+                    "newAgent": "وكيل جديد",
+                    "delete": "حذف"
+                },
+                "works": {
+                    "empty": "لا توجد Works مرتبطة بهذه الفكرة بعد."
+                },
+                "agents": {
+                    "empty": "لا يوجد وكلاء مرتبطون بهذه الفكرة."
+                },
+                "meta": {
+                    "source": "المصدر",
+                    "slug": "المعرف",
+                    "fields": "الحقول",
+                    "categories": "الفئات المقترحة"
+                },
+                "deleteDialog": {
+                    "title": "حذف هذه الفكرة؟",
+                    "body": "سيتم حذف {title} نهائيًا. لا يمكن التراجع عن ذلك.",
+                    "confirm": "حذف الفكرة",
+                    "cancel": "إلغاء",
+                    "deleting": "جارٍ الحذف…",
+                    "error": "تعذّر حذف الفكرة",
+                    "blocked": {
+                        "linked-works": "تعذّر الحذف: هذه الفكرة مرتبطة بـ {count} من الـ Works. احذفها أو افصلها أولًا.",
+                        "idea-agents": "تعذّر الحذف: {count} من الوكلاء مرتبطون بهذه الفكرة. احذفهم أو غيّر نطاقهم.",
+                        "build-in-flight": "لا يمكن الحذف أثناء البناء. انتظر حتى ينتهي.",
+                        "unknown": "لا يمكن حذف هذه الفكرة الآن."
+                    }
+                },
+                "toasts": {
+                    "built": "تم بناء Work من هذه الفكرة",
+                    "buildFailed": "فشل البناء",
+                    "buildQueued": "تمت جدولة البناء",
+                    "retryQueued": "تمت جدولة إعادة المحاولة",
+                    "rebuildQueued": "تمت جدولة إعادة البناء",
+                    "deleted": "تم حذف الفكرة",
+                    "actionError": "تعذّر إتمام الإجراء. حاول مرة أخرى."
                 }
             }
         },

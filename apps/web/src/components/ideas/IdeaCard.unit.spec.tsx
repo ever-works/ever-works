@@ -81,12 +81,11 @@ describe('IdeaCard (Phase 5 PR M)', () => {
     });
 
     it('hides the categories row when there are no suggested categories', () => {
-        const { container } = render(
-            <IdeaCard proposal={{ ...minimalProposal, suggestedCategories: [] }} />,
-        );
-        // Pills wrapper is the only `.flex-wrap` element above the desc; it
-        // shouldn't exist in this branch. Assert via .gap-1.5 .flex-wrap selector.
-        expect(container.querySelector('.flex.flex-wrap.gap-1\\.5')).toBeNull();
+        render(<IdeaCard proposal={{ ...minimalProposal, suggestedCategories: [] }} />);
+        // Targets the pills wrapper by test id rather than by its utility
+        // classes: the badge row above it is now also a `flex flex-wrap
+        // gap-1.5` element, so the old class selector matched the wrong node.
+        expect(screen.queryByTestId('idea-card-categories')).toBeNull();
     });
 
     it('hides the plugin row when recommendedPlugins is empty', () => {
@@ -161,6 +160,104 @@ describe('IdeaCard (Phase 5 PR M)', () => {
                 expect(routerPushMock).toHaveBeenCalledWith('/works/new?proposal=prop-1');
             },
         );
+    });
+
+    describe('built tracking (idea_works provenance)', () => {
+        // A Work built through `/works/new?proposal=…` records an
+        // `idea_works` row but only stamps `acceptedWorkId` when the Idea's
+        // status can legally reach ACCEPTED. Reading built-ness off
+        // `acceptedWorkId` alone therefore left failed / queued / building
+        // Ideas stuck on "Build" forever even though a Work existed.
+        it('shows View Work from linkedWorksCount when acceptedWorkId was never stamped', () => {
+            routerPushMock.mockClear();
+            render(
+                <IdeaCard
+                    proposal={{
+                        ...minimalProposal,
+                        status: 'failed',
+                        acceptedWorkId: null,
+                        linkedWorksCount: 1,
+                        latestLinkedWorkId: 'work-9',
+                    }}
+                />,
+            );
+
+            expect(screen.getByText('actions.viewWork')).toBeTruthy();
+            expect(screen.getByTestId('idea-card-built-badge')).toBeTruthy();
+            fireEvent.click(screen.getByText('actions.viewWork'));
+            expect(routerPushMock).toHaveBeenCalledWith('/works/work-9');
+        });
+
+        it('shows View Work for a Work matched by title + description', () => {
+            // Nothing links a Work the user built outside the Idea flow, so
+            // provenance is empty; the page matched it by content instead.
+            routerPushMock.mockClear();
+            render(<IdeaCard proposal={minimalProposal} matchedWorkId="work-5" />);
+
+            expect(screen.getByText('actions.viewWork')).toBeTruthy();
+            expect(screen.getByTestId('idea-card-built-badge')).toBeTruthy();
+            fireEvent.click(screen.getByText('actions.viewWork'));
+            expect(routerPushMock).toHaveBeenCalledWith('/works/work-5');
+        });
+
+        it('prefers the provenance link over a content match for the View Work target', () => {
+            routerPushMock.mockClear();
+            render(
+                <IdeaCard
+                    proposal={{
+                        ...minimalProposal,
+                        status: 'accepted',
+                        acceptedWorkId: 'work-1',
+                    }}
+                    matchedWorkId="work-5"
+                />,
+            );
+
+            fireEvent.click(screen.getByText('actions.viewWork'));
+            expect(routerPushMock).toHaveBeenCalledWith('/works/work-1');
+        });
+
+        it('keeps the Build CTA and no badge when the Idea produced nothing', () => {
+            render(<IdeaCard proposal={{ ...minimalProposal, linkedWorksCount: 0 }} />);
+
+            expect(screen.getByText('actions.accept')).toBeTruthy();
+            expect(screen.queryByTestId('idea-card-built-badge')).toBeNull();
+        });
+
+        it('suppresses the Built badge on an accepted Idea (the status already says Done)', () => {
+            render(
+                <IdeaCard
+                    proposal={{
+                        ...minimalProposal,
+                        status: 'accepted',
+                        acceptedWorkId: 'work-1',
+                        linkedWorksCount: 1,
+                        latestLinkedWorkId: 'work-1',
+                    }}
+                />,
+            );
+
+            expect(screen.getByText('actions.viewWork')).toBeTruthy();
+            expect(screen.queryByTestId('idea-card-built-badge')).toBeNull();
+        });
+
+        it('prefers acceptedWorkId over the latest link as the View Work target', () => {
+            routerPushMock.mockClear();
+            render(
+                <IdeaCard
+                    proposal={{
+                        ...minimalProposal,
+                        status: 'accepted',
+                        acceptedWorkId: 'work-primary',
+                        linkedWorksCount: 2,
+                        latestLinkedWorkId: 'work-other',
+                    }}
+                />,
+            );
+
+            fireEvent.click(screen.getByText('actions.viewWork'));
+            expect(routerPushMock).toHaveBeenCalledWith('/works/work-primary');
+        });
     });
 
     it('calls dismissProposalAction + onDismissed when the X is clicked', async () => {
@@ -301,7 +398,7 @@ describe('IdeaCard (Phase 5 PR M)', () => {
               href="/ideas/prop-1"
             />
             <div
-              class="mb-3 pr-7"
+              class="mb-3 pr-7 flex flex-wrap items-center gap-1.5"
             >
               <span
                 class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset capitalize bg-slate-500/10 text-slate-600 dark:text-slate-300 ring-slate-500/20"
@@ -325,6 +422,7 @@ describe('IdeaCard (Phase 5 PR M)', () => {
             </p>
             <div
               class="flex flex-wrap gap-1.5 mb-3"
+              data-testid="idea-card-categories"
             >
               <span
                 class="inline-flex items-center rounded-full border border-border/60 dark:border-white/10 bg-surface-secondary/60 dark:bg-white/5 px-2.5 py-0.5 text-[11px] font-medium text-text-secondary dark:text-gray-300"

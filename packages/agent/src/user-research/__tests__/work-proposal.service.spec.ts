@@ -275,18 +275,29 @@ describe('WorkProposalService.acceptInternal — Idea↔Work provenance (review 
         expect(works.update).not.toHaveBeenCalled();
     });
 
-    it('records nothing when markAccepted refuses the status transition', async () => {
+    it('STILL records the link when markAccepted refuses the status transition', async () => {
+        // Regression: this used to bail before recordLink, which silently
+        // lost provenance for every Idea that wasn't in `fromStatuses`.
+        // The Ideas list routes queued / building / failed / dismissed
+        // Ideas to `/works/new?proposal=…` too, so those builds vanished
+        // from the Idea and it kept reading "not built" forever. The link
+        // — not the status — is what "this Idea produced a Work" means.
         const { service, repo, ideaWorks, works } = makeService();
         repo.markAccepted.mockResolvedValueOnce(false);
 
         const ok = await service.acceptInternal('u1', 'p1', 'w1');
 
-        expect(ok).toBe(false);
-        expect(ideaWorks.recordLink).not.toHaveBeenCalled();
-        expect(works.update).not.toHaveBeenCalled();
+        expect(ok).toBe(true);
+        expect(ideaWorks.recordLink).toHaveBeenCalledWith({
+            ideaId: 'p1',
+            workId: 'w1',
+            userId: 'u1',
+            kind: 'linked',
+        });
+        expect(works.update).toHaveBeenCalledWith('w1', { acceptedFromIdeaId: 'p1' });
     });
 
-    it('still resolves true and logs a warning when provenance recording fails (best-effort contract)', async () => {
+    it('reports failure and logs when the link write itself fails', async () => {
         const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
         try {
             const { service, ideaWorks, works } = makeService();
@@ -294,12 +305,35 @@ describe('WorkProposalService.acceptInternal — Idea↔Work provenance (review 
 
             const ok = await service.acceptInternal('u1', 'p1', 'w1');
 
-            // The primary transition (markAccepted) already committed —
-            // a provenance failure must not fail the accept.
-            expect(ok).toBe(true);
+            // The link is the authoritative write. Losing it means the Idea
+            // has no record of the Work, so the caller must hear about it —
+            // its retry then gets a real second chance (the insert is
+            // `orIgnore`, so retrying costs nothing).
+            expect(ok).toBe(false);
             expect(works.update).not.toHaveBeenCalled();
             expect(warnSpy).toHaveBeenCalledWith(
                 expect.stringContaining('Failed to record Idea↔Work provenance'),
+            );
+        } finally {
+            warnSpy.mockRestore();
+        }
+    });
+
+    it('keeps the accept successful when only the back-pointer stamp fails', async () => {
+        const warnSpy = jest.spyOn(Logger.prototype, 'warn').mockImplementation(() => undefined);
+        try {
+            const { service, ideaWorks, works } = makeService();
+            works.update.mockRejectedValueOnce(new Error('deadlock detected'));
+
+            const ok = await service.acceptInternal('u1', 'p1', 'w1');
+
+            // `works.acceptedFromIdeaId` is denormalized convenience; the
+            // link already committed, so reporting failure would push the
+            // caller into retrying a write that succeeded.
+            expect(ok).toBe(true);
+            expect(ideaWorks.recordLink).toHaveBeenCalled();
+            expect(warnSpy).toHaveBeenCalledWith(
+                expect.stringContaining('failed to stamp works.acceptedFromIdeaId'),
             );
         } finally {
             warnSpy.mockRestore();

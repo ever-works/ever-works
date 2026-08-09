@@ -308,4 +308,62 @@ describe('AgentRunService — cooperative mid-run abort', () => {
             expect.objectContaining({ abortSignal: controller.signal }),
         );
     });
+
+    /**
+     * A run dispatched from the Trigger.dev worker arrives over the internal
+     * RPC proxy, and SuperJSON has no transformer for `AbortSignal` — it
+     * encodes to `{}`. The worker no longer sends one, but it deploys on its
+     * own release workflow, so an OLDER worker keeps sending `{}` to a NEWER
+     * API for the whole skew window. These pin the behaviour that makes that
+     * window safe.
+     */
+    describe('a non-AbortSignal `signal` (SuperJSON-flattened over the RPC hop)', () => {
+        const rpcFlattenedSignal = {} as unknown as AbortSignal;
+
+        it('is NOT threaded into the model call — a truthy non-signal throws inside the AI SDK', async () => {
+            // `{}` is truthy, so downstream `if (signal) signal.addEventListener(...)`
+            // would blow up. `undefined` degrades correctly everywhere.
+            ai.dispatch.mockResolvedValue({
+                text: 'done',
+                toolCalls: [],
+                finishReason: 'stop',
+                usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+                model: 'gpt-4o-mini',
+            } as AgentAiDispatchResult);
+
+            await makeSvc().execute({ ...baseContext, signal: rpcFlattenedSignal });
+
+            expect(ai.dispatch).toHaveBeenCalledWith(
+                expect.objectContaining({ abortSignal: undefined }),
+            );
+        });
+
+        it('does not stop the run — an inert object must never read as "aborted"', async () => {
+            ai.dispatch.mockResolvedValue({
+                text: 'done',
+                toolCalls: [],
+                finishReason: 'stop',
+                usage: { promptTokens: 1, completionTokens: 1, totalTokens: 2 },
+                model: 'gpt-4o-mini',
+            } as AgentAiDispatchResult);
+
+            const result = await makeSvc().execute({
+                ...baseContext,
+                signal: rpcFlattenedSignal,
+            });
+
+            expect(result.status).toBe('dispatched');
+        });
+
+        it('falls back to the DB status poll, which is the path that works across the hop', async () => {
+            // With no usable signal the readStatus reader is the ONLY way this
+            // run can learn it was cancelled.
+            runs.findById.mockResolvedValue({ id: 'r1', status: 'cancelled' });
+
+            await makeSvc().execute({ ...baseContext, signal: rpcFlattenedSignal });
+
+            expect(runs.findById).toHaveBeenCalled();
+            expect(ai.dispatch).not.toHaveBeenCalled();
+        });
+    });
 });
