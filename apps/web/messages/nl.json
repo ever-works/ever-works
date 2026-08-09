@@ -1709,11 +1709,85 @@
                 "error": "Kan de Idea niet aanmaken. Probeer het opnieuw."
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "Gekoppelde Works",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "Gebouwd",
+                    "linked": "Gekoppeld",
+                    "rebuilt": "Opnieuw gebouwd",
+                    "matched": "Overeenkomst"
+                }
+            },
+            "detail": {
+                "live": "Live",
+                "fromMission": "Uit een Missie",
+                "sections": {
+                    "description": "Idee",
+                    "build": "Buildstatus",
+                    "agents": "Agents",
+                    "details": "Details"
+                },
+                "stages": {
+                    "drafted": "Opgesteld",
+                    "queued": "In wachtrij",
+                    "building": "Bouwen",
+                    "built": "Gebouwd",
+                    "failed": "Build mislukt",
+                    "builtDirect": "Gebouwd"
+                },
+                "stageHints": {
+                    "drafted": "Het Idee bestaat en is klaar om te bouwen.",
+                    "queued": "Wacht op een builder.",
+                    "building": "De Work Agent genereert het Work.",
+                    "built": "Er is een Work gemaakt van dit Idee.",
+                    "failed": "De build is gestopt. Probeer opnieuw.",
+                    "builtDirect": "Gemaakt in de Work-builder — de buildwachtrij is overgeslagen."
+                },
+                "built": {
+                    "badge": "Gebouwd ({count})",
+                    "none": "Nog niet gebouwd"
+                },
+                "actions": {
+                    "build": "Bouwen",
+                    "retry": "Opnieuw",
+                    "rebuild": "Opnieuw bouwen",
+                    "rebuildHint": "Maakt een nieuw Work. Het bestaande blijft behouden.",
+                    "newAgent": "Nieuwe Agent",
+                    "delete": "Verwijderen"
+                },
+                "works": {
+                    "empty": "Nog geen Works gekoppeld aan dit Idee."
+                },
+                "agents": {
+                    "empty": "Geen Agents gekoppeld aan dit Idee."
+                },
+                "meta": {
+                    "source": "Bron",
+                    "slug": "Slug",
+                    "fields": "Velden",
+                    "categories": "Voorgestelde categorieën"
+                },
+                "deleteDialog": {
+                    "title": "Dit Idee verwijderen?",
+                    "body": "{title} wordt permanent verwijderd. Dit kan niet ongedaan worden gemaakt.",
+                    "confirm": "Idee verwijderen",
+                    "cancel": "Annuleren",
+                    "deleting": "Verwijderen…",
+                    "error": "Idee kon niet worden verwijderd",
+                    "blocked": {
+                        "linked-works": "Verwijderen niet mogelijk: dit Idee is gekoppeld aan {count} Work(s). Verwijder of ontkoppel ze eerst.",
+                        "idea-agents": "Verwijderen niet mogelijk: {count} Agent(s) horen bij dit Idee. Verwijder ze of wijzig hun scope.",
+                        "build-in-flight": "Verwijderen kan niet tijdens een build. Wacht tot die klaar is.",
+                        "unknown": "Dit Idee kan nu niet worden verwijderd."
+                    }
+                },
+                "toasts": {
+                    "built": "Work gebouwd uit dit Idee",
+                    "buildFailed": "De build is mislukt",
+                    "buildQueued": "Build in wachtrij",
+                    "retryQueued": "Nieuwe poging in wachtrij",
+                    "rebuildQueued": "Herbouw in wachtrij",
+                    "deleted": "Idee verwijderd",
+                    "actionError": "Actie mislukt. Probeer het opnieuw."
                 }
             }
         },

@@ -1709,11 +1709,85 @@
                 "error": "Não foi possível criar a Idea. Tente novamente."
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "Works vinculados",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "Criado",
+                    "linked": "Vinculado",
+                    "rebuilt": "Recriado",
+                    "matched": "Correspondência"
+                }
+            },
+            "detail": {
+                "live": "Ao vivo",
+                "fromMission": "De uma Missão",
+                "sections": {
+                    "description": "Ideia",
+                    "build": "Estado da construção",
+                    "agents": "Agentes",
+                    "details": "Detalhes"
+                },
+                "stages": {
+                    "drafted": "Redigida",
+                    "queued": "Na fila",
+                    "building": "A construir",
+                    "built": "Construída",
+                    "failed": "Falha na construção",
+                    "builtDirect": "Construída"
+                },
+                "stageHints": {
+                    "drafted": "A Ideia existe e está pronta para ser construída.",
+                    "queued": "A aguardar um construtor.",
+                    "building": "O Agente Work está a gerar o Work.",
+                    "built": "Um Work foi produzido a partir desta Ideia.",
+                    "failed": "A construção parou. Tente novamente.",
+                    "builtDirect": "Criado no construtor de Works — ignorou a fila de compilação."
+                },
+                "built": {
+                    "badge": "Construída ({count})",
+                    "none": "Ainda não construída"
+                },
+                "actions": {
+                    "build": "Construir",
+                    "retry": "Tentar novamente",
+                    "rebuild": "Reconstruir",
+                    "rebuildHint": "Cria um novo Work. O existente é mantido.",
+                    "newAgent": "Novo Agente",
+                    "delete": "Eliminar"
+                },
+                "works": {
+                    "empty": "Ainda não há Works ligados a esta Ideia."
+                },
+                "agents": {
+                    "empty": "Sem Agentes associados a esta Ideia."
+                },
+                "meta": {
+                    "source": "Origem",
+                    "slug": "Slug",
+                    "fields": "Campos",
+                    "categories": "Categorias sugeridas"
+                },
+                "deleteDialog": {
+                    "title": "Eliminar esta Ideia?",
+                    "body": "{title} será eliminada permanentemente. Esta ação não pode ser desfeita.",
+                    "confirm": "Eliminar Ideia",
+                    "cancel": "Cancelar",
+                    "deleting": "A eliminar…",
+                    "error": "Não foi possível eliminar a Ideia",
+                    "blocked": {
+                        "linked-works": "Não é possível eliminar: esta Ideia está ligada a {count} Work(s). Elimine-os ou desassocie-os primeiro.",
+                        "idea-agents": "Não é possível eliminar: {count} Agente(s) estão associados a esta Ideia. Elimine-os ou altere o âmbito.",
+                        "build-in-flight": "Não é possível eliminar durante uma construção. Aguarde que termine.",
+                        "unknown": "Não é possível eliminar esta Ideia neste momento."
+                    }
+                },
+                "toasts": {
+                    "built": "Work construído a partir desta Ideia",
+                    "buildFailed": "A construção falhou",
+                    "buildQueued": "Construção na fila",
+                    "retryQueued": "Nova tentativa na fila",
+                    "rebuildQueued": "Reconstrução na fila",
+                    "deleted": "Ideia eliminada",
+                    "actionError": "Não foi possível concluir a ação. Tente novamente."
                 }
             }
         },

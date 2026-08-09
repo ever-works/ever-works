@@ -155,6 +155,7 @@ export enum ActivityActionType {
     IDEA_ACCEPTED = 'idea_accepted',
     IDEA_FAILED = 'idea_failed',
     IDEA_REBUILD_STARTED = 'idea_rebuild_started',
+    IDEA_DELETED = 'idea_deleted',
     AGENT_CREATED = 'agent_created',
     AGENT_PAUSED = 'agent_paused',
     AGENT_RESUMED = 'agent_resumed',

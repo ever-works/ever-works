@@ -1740,11 +1740,85 @@
                 "error": "לא ניתן ליצור את ה-Idea. נסה שוב."
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "Works מקושרים",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "נבנה",
+                    "linked": "מקושר",
+                    "rebuilt": "נבנה מחדש",
+                    "matched": "התאמה"
+                }
+            },
+            "detail": {
+                "live": "חי",
+                "fromMission": "ממשימה",
+                "sections": {
+                    "description": "רעיון",
+                    "build": "סטטוס בנייה",
+                    "agents": "סוכנים",
+                    "details": "פרטים"
+                },
+                "stages": {
+                    "drafted": "נוסח",
+                    "queued": "בתור",
+                    "building": "בבנייה",
+                    "built": "נבנה",
+                    "failed": "הבנייה נכשלה",
+                    "builtDirect": "נבנה"
+                },
+                "stageHints": {
+                    "drafted": "הרעיון קיים ומוכן לבנייה.",
+                    "queued": "ממתין לבנאי.",
+                    "building": "סוכן ה-Work מייצר את ה-Work.",
+                    "built": "נוצר Work מהרעיון הזה.",
+                    "failed": "הבנייה נעצרה. נסה שוב.",
+                    "builtDirect": "נוצר בבונה ה-Works — דילג על תור הבנייה."
+                },
+                "built": {
+                    "badge": "נבנה ({count})",
+                    "none": "עדיין לא נבנה"
+                },
+                "actions": {
+                    "build": "בנה",
+                    "retry": "נסה שוב",
+                    "rebuild": "בנה מחדש",
+                    "rebuildHint": "יוצר Work חדש. הקיים נשמר.",
+                    "newAgent": "סוכן חדש",
+                    "delete": "מחק"
+                },
+                "works": {
+                    "empty": "אין Works מקושרים לרעיון הזה."
+                },
+                "agents": {
+                    "empty": "אין סוכנים המשויכים לרעיון הזה."
+                },
+                "meta": {
+                    "source": "מקור",
+                    "slug": "Slug",
+                    "fields": "שדות",
+                    "categories": "קטגוריות מוצעות"
+                },
+                "deleteDialog": {
+                    "title": "למחוק את הרעיון הזה?",
+                    "body": "{title} יימחק לצמיתות. לא ניתן לבטל פעולה זו.",
+                    "confirm": "מחק רעיון",
+                    "cancel": "ביטול",
+                    "deleting": "מוחק…",
+                    "error": "מחיקת הרעיון נכשלה",
+                    "blocked": {
+                        "linked-works": "לא ניתן למחוק: הרעיון מקושר ל-{count} Works. מחק או נתק אותם קודם.",
+                        "idea-agents": "לא ניתן למחוק: {count} סוכנים משויכים לרעיון. מחק אותם או שנה את ההיקף.",
+                        "build-in-flight": "לא ניתן למחוק בזמן בנייה. המתן לסיום.",
+                        "unknown": "לא ניתן למחוק את הרעיון כרגע."
+                    }
+                },
+                "toasts": {
+                    "built": "נבנה Work מהרעיון הזה",
+                    "buildFailed": "הבנייה נכשלה",
+                    "buildQueued": "הבנייה נכנסה לתור",
+                    "retryQueued": "הניסיון החוזר נכנס לתור",
+                    "rebuildQueued": "הבנייה מחדש נכנסה לתור",
+                    "deleted": "הרעיון נמחק",
+                    "actionError": "הפעולה נכשלה. נסה שוב."
                 }
             }
         },

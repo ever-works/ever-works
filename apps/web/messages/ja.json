@@ -1709,11 +1709,85 @@
                 "error": "Idea を作成できませんでした。もう一度お試しください。"
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "関連する Works",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "構築済み",
+                    "linked": "リンク済み",
+                    "rebuilt": "再構築済み",
+                    "matched": "一致"
+                }
+            },
+            "detail": {
+                "live": "ライブ",
+                "fromMission": "ミッション由来",
+                "sections": {
+                    "description": "アイデア",
+                    "build": "ビルド状況",
+                    "agents": "エージェント",
+                    "details": "詳細"
+                },
+                "stages": {
+                    "drafted": "作成済み",
+                    "queued": "待機中",
+                    "building": "ビルド中",
+                    "built": "ビルド完了",
+                    "failed": "ビルド失敗",
+                    "builtDirect": "ビルド完了"
+                },
+                "stageHints": {
+                    "drafted": "アイデアは作成済みで、ビルドの準備ができています。",
+                    "queued": "ビルダーの空きを待っています。",
+                    "building": "Work エージェントが Work を生成しています。",
+                    "built": "このアイデアから Work が作成されました。",
+                    "failed": "ビルドが停止しました。再試行してください。",
+                    "builtDirect": "Work ビルダーで作成されました — ビルドキューをスキップしました。"
+                },
+                "built": {
+                    "badge": "ビルド済み ({count})",
+                    "none": "未ビルド"
+                },
+                "actions": {
+                    "build": "ビルド",
+                    "retry": "再試行",
+                    "rebuild": "再ビルド",
+                    "rebuildHint": "新しい Work を作成します。既存のものは保持されます。",
+                    "newAgent": "新規エージェント",
+                    "delete": "削除"
+                },
+                "works": {
+                    "empty": "このアイデアに紐づく Work はまだありません。"
+                },
+                "agents": {
+                    "empty": "このアイデアに紐づくエージェントはありません。"
+                },
+                "meta": {
+                    "source": "ソース",
+                    "slug": "スラッグ",
+                    "fields": "フィールド",
+                    "categories": "推奨カテゴリ"
+                },
+                "deleteDialog": {
+                    "title": "このアイデアを削除しますか？",
+                    "body": "{title} は完全に削除されます。この操作は取り消せません。",
+                    "confirm": "アイデアを削除",
+                    "cancel": "キャンセル",
+                    "deleting": "削除中…",
+                    "error": "アイデアを削除できませんでした",
+                    "blocked": {
+                        "linked-works": "削除できません: このアイデアは {count} 件の Work にリンクしています。先に削除またはリンク解除してください。",
+                        "idea-agents": "削除できません: {count} 件のエージェントがこのアイデアに紐づいています。先に削除またはスコープを変更してください。",
+                        "build-in-flight": "ビルド実行中は削除できません。完了までお待ちください。",
+                        "unknown": "現在このアイデアは削除できません。"
+                    }
+                },
+                "toasts": {
+                    "built": "このアイデアから Work をビルドしました",
+                    "buildFailed": "ビルドに失敗しました",
+                    "buildQueued": "ビルドをキューに追加しました",
+                    "retryQueued": "再試行をキューに追加しました",
+                    "rebuildQueued": "再ビルドをキューに追加しました",
+                    "deleted": "アイデアを削除しました",
+                    "actionError": "操作を完了できませんでした。もう一度お試しください。"
                 }
             }
         },

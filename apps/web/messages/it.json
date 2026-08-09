@@ -1709,11 +1709,85 @@
                 "error": "Impossibile creare la Idea. Riprova."
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "Works collegati",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "Creato",
+                    "linked": "Collegato",
+                    "rebuilt": "Ricreato",
+                    "matched": "Corrispondenza"
+                }
+            },
+            "detail": {
+                "live": "Live",
+                "fromMission": "Da una Missione",
+                "sections": {
+                    "description": "Idea",
+                    "build": "Stato della build",
+                    "agents": "Agenti",
+                    "details": "Dettagli"
+                },
+                "stages": {
+                    "drafted": "Bozza",
+                    "queued": "In coda",
+                    "building": "In costruzione",
+                    "built": "Costruita",
+                    "failed": "Build fallita",
+                    "builtDirect": "Costruita"
+                },
+                "stageHints": {
+                    "drafted": "L'Idea esiste ed è pronta per essere costruita.",
+                    "queued": "In attesa di un builder.",
+                    "building": "Il Work Agent sta generando il Work.",
+                    "built": "Da questa Idea è stato prodotto un Work.",
+                    "failed": "La build si è fermata. Riprova.",
+                    "builtDirect": "Creato nel generatore di Works: ha saltato la coda di build."
+                },
+                "built": {
+                    "badge": "Costruita ({count})",
+                    "none": "Non ancora costruita"
+                },
+                "actions": {
+                    "build": "Costruisci",
+                    "retry": "Riprova",
+                    "rebuild": "Ricostruisci",
+                    "rebuildHint": "Crea un nuovo Work. Quello esistente viene conservato.",
+                    "newAgent": "Nuovo Agente",
+                    "delete": "Elimina"
+                },
+                "works": {
+                    "empty": "Nessun Work collegato a questa Idea."
+                },
+                "agents": {
+                    "empty": "Nessun Agente associato a questa Idea."
+                },
+                "meta": {
+                    "source": "Origine",
+                    "slug": "Slug",
+                    "fields": "Campi",
+                    "categories": "Categorie suggerite"
+                },
+                "deleteDialog": {
+                    "title": "Eliminare questa Idea?",
+                    "body": "{title} sarà eliminata definitivamente. Operazione irreversibile.",
+                    "confirm": "Elimina Idea",
+                    "cancel": "Annulla",
+                    "deleting": "Eliminazione…",
+                    "error": "Impossibile eliminare l'Idea",
+                    "blocked": {
+                        "linked-works": "Impossibile eliminare: questa Idea è collegata a {count} Work. Eliminali o scollegali prima.",
+                        "idea-agents": "Impossibile eliminare: {count} Agente/i sono associati a questa Idea. Eliminali o cambia ambito.",
+                        "build-in-flight": "Impossibile eliminare durante una build. Attendi il completamento.",
+                        "unknown": "Impossibile eliminare questa Idea al momento."
+                    }
+                },
+                "toasts": {
+                    "built": "Work costruito da questa Idea",
+                    "buildFailed": "La build è fallita",
+                    "buildQueued": "Build in coda",
+                    "retryQueued": "Nuovo tentativo in coda",
+                    "rebuildQueued": "Ricostruzione in coda",
+                    "deleted": "Idea eliminata",
+                    "actionError": "Azione non riuscita. Riprova."
                 }
             }
         },

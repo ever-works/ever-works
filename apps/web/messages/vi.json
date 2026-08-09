@@ -1709,11 +1709,85 @@
                 "error": "Không thể tạo Idea. Vui lòng thử lại."
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "Works đã liên kết",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "Đã tạo",
+                    "linked": "Đã liên kết",
+                    "rebuilt": "Đã tạo lại",
+                    "matched": "Khớp"
+                }
+            },
+            "detail": {
+                "live": "Trực tiếp",
+                "fromMission": "Từ một Nhiệm vụ",
+                "sections": {
+                    "description": "Ý tưởng",
+                    "build": "Trạng thái dựng",
+                    "agents": "Tác nhân",
+                    "details": "Chi tiết"
+                },
+                "stages": {
+                    "drafted": "Đã soạn",
+                    "queued": "Trong hàng đợi",
+                    "building": "Đang dựng",
+                    "built": "Đã dựng",
+                    "failed": "Dựng thất bại",
+                    "builtDirect": "Đã dựng"
+                },
+                "stageHints": {
+                    "drafted": "Ý tưởng đã có và sẵn sàng để dựng.",
+                    "queued": "Đang chờ trình dựng.",
+                    "building": "Work Agent đang tạo Work.",
+                    "built": "Một Work đã được tạo từ Ý tưởng này.",
+                    "failed": "Quá trình dựng đã dừng. Hãy thử lại.",
+                    "builtDirect": "Được tạo trong trình tạo Work — đã bỏ qua hàng đợi build."
+                },
+                "built": {
+                    "badge": "Đã dựng ({count})",
+                    "none": "Chưa dựng"
+                },
+                "actions": {
+                    "build": "Dựng",
+                    "retry": "Thử lại",
+                    "rebuild": "Dựng lại",
+                    "rebuildHint": "Tạo Work mới. Work hiện có vẫn được giữ.",
+                    "newAgent": "Tác nhân mới",
+                    "delete": "Xóa"
+                },
+                "works": {
+                    "empty": "Chưa có Work nào liên kết với Ý tưởng này."
+                },
+                "agents": {
+                    "empty": "Không có Tác nhân nào gắn với Ý tưởng này."
+                },
+                "meta": {
+                    "source": "Nguồn",
+                    "slug": "Slug",
+                    "fields": "Trường",
+                    "categories": "Danh mục gợi ý"
+                },
+                "deleteDialog": {
+                    "title": "Xóa Ý tưởng này?",
+                    "body": "{title} sẽ bị xóa vĩnh viễn. Không thể hoàn tác.",
+                    "confirm": "Xóa Ý tưởng",
+                    "cancel": "Hủy",
+                    "deleting": "Đang xóa…",
+                    "error": "Không xóa được Ý tưởng",
+                    "blocked": {
+                        "linked-works": "Không thể xóa: Ý tưởng này liên kết với {count} Work. Hãy xóa hoặc hủy liên kết trước.",
+                        "idea-agents": "Không thể xóa: {count} Tác nhân đang gắn với Ý tưởng này. Hãy xóa hoặc đổi phạm vi trước.",
+                        "build-in-flight": "Không thể xóa khi đang dựng. Hãy đợi hoàn tất.",
+                        "unknown": "Hiện không thể xóa Ý tưởng này."
+                    }
+                },
+                "toasts": {
+                    "built": "Đã dựng Work từ Ý tưởng này",
+                    "buildFailed": "Dựng thất bại",
+                    "buildQueued": "Đã đưa vào hàng đợi dựng",
+                    "retryQueued": "Đã đưa vào hàng đợi thử lại",
+                    "rebuildQueued": "Đã đưa vào hàng đợi dựng lại",
+                    "deleted": "Đã xóa Ý tưởng",
+                    "actionError": "Không thực hiện được. Vui lòng thử lại."
                 }
             }
         },

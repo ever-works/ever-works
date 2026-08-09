@@ -1740,11 +1740,85 @@
                 "error": "Die Idea konnte nicht erstellt werden. Bitte versuche es erneut."
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "Verknüpfte Works",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "Erstellt",
+                    "linked": "Verknüpft",
+                    "rebuilt": "Neu erstellt",
+                    "matched": "Zugeordnet"
+                }
+            },
+            "detail": {
+                "live": "Live",
+                "fromMission": "Aus einer Mission",
+                "sections": {
+                    "description": "Idee",
+                    "build": "Build-Status",
+                    "agents": "Agenten",
+                    "details": "Details"
+                },
+                "stages": {
+                    "drafted": "Entworfen",
+                    "queued": "In Warteschlange",
+                    "building": "Wird gebaut",
+                    "built": "Gebaut",
+                    "failed": "Build fehlgeschlagen",
+                    "builtDirect": "Gebaut"
+                },
+                "stageHints": {
+                    "drafted": "Die Idee existiert und ist bereit zum Bauen.",
+                    "queued": "Wartet auf einen Builder.",
+                    "building": "Der Work-Agent generiert das Work.",
+                    "built": "Aus dieser Idee wurde ein Work erzeugt.",
+                    "failed": "Der Build wurde gestoppt. Erneut versuchen.",
+                    "builtDirect": "Im Work-Builder erstellt – die Build-Warteschlange wurde übersprungen."
+                },
+                "built": {
+                    "badge": "Gebaut ({count})",
+                    "none": "Noch nicht gebaut"
+                },
+                "actions": {
+                    "build": "Bauen",
+                    "retry": "Wiederholen",
+                    "rebuild": "Neu bauen",
+                    "rebuildHint": "Erstellt ein neues Work. Das bestehende bleibt erhalten.",
+                    "newAgent": "Neuer Agent",
+                    "delete": "Löschen"
+                },
+                "works": {
+                    "empty": "Noch keine Works mit dieser Idee verknüpft."
+                },
+                "agents": {
+                    "empty": "Keine Agenten dieser Idee zugeordnet."
+                },
+                "meta": {
+                    "source": "Quelle",
+                    "slug": "Slug",
+                    "fields": "Felder",
+                    "categories": "Vorgeschlagene Kategorien"
+                },
+                "deleteDialog": {
+                    "title": "Diese Idee löschen?",
+                    "body": "{title} wird dauerhaft gelöscht. Das kann nicht rückgängig gemacht werden.",
+                    "confirm": "Idee löschen",
+                    "cancel": "Abbrechen",
+                    "deleting": "Wird gelöscht…",
+                    "error": "Idee konnte nicht gelöscht werden",
+                    "blocked": {
+                        "linked-works": "Löschen nicht möglich: Diese Idee ist mit {count} Work(s) verknüpft. Zuerst löschen oder trennen.",
+                        "idea-agents": "Löschen nicht möglich: {count} Agent(en) sind dieser Idee zugeordnet. Zuerst löschen oder umhängen.",
+                        "build-in-flight": "Löschen während eines laufenden Builds nicht möglich. Bitte warten.",
+                        "unknown": "Diese Idee kann derzeit nicht gelöscht werden."
+                    }
+                },
+                "toasts": {
+                    "built": "Work aus dieser Idee gebaut",
+                    "buildFailed": "Der Build ist fehlgeschlagen",
+                    "buildQueued": "Build eingereiht",
+                    "retryQueued": "Wiederholung eingereiht",
+                    "rebuildQueued": "Neubau eingereiht",
+                    "deleted": "Idee gelöscht",
+                    "actionError": "Aktion fehlgeschlagen. Bitte erneut versuchen."
                 }
             }
         },

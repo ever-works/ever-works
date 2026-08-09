@@ -1709,11 +1709,85 @@
                 "error": "Idea oluşturulamadı. Lütfen tekrar deneyin."
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "Bağlı Works",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "Oluşturuldu",
+                    "linked": "Bağlandı",
+                    "rebuilt": "Yeniden oluşturuldu",
+                    "matched": "Eşleşen"
+                }
+            },
+            "detail": {
+                "live": "Canlı",
+                "fromMission": "Bir Görevden",
+                "sections": {
+                    "description": "Fikir",
+                    "build": "Yapım durumu",
+                    "agents": "Ajanlar",
+                    "details": "Ayrıntılar"
+                },
+                "stages": {
+                    "drafted": "Taslak",
+                    "queued": "Sırada",
+                    "building": "Yapılıyor",
+                    "built": "Yapıldı",
+                    "failed": "Yapım başarısız",
+                    "builtDirect": "Yapıldı"
+                },
+                "stageHints": {
+                    "drafted": "Fikir mevcut ve yapılmaya hazır.",
+                    "queued": "Bir yapıcı bekleniyor.",
+                    "building": "Work Agent, Work üretiyor.",
+                    "built": "Bu Fikirden bir Work üretildi.",
+                    "failed": "Yapım durdu. Tekrar deneyin.",
+                    "builtDirect": "Work oluşturucusunda oluşturuldu — derleme kuyruğu atlandı."
+                },
+                "built": {
+                    "badge": "Yapıldı ({count})",
+                    "none": "Henüz yapılmadı"
+                },
+                "actions": {
+                    "build": "Yap",
+                    "retry": "Yeniden dene",
+                    "rebuild": "Yeniden yap",
+                    "rebuildHint": "Yeni bir Work oluşturur. Mevcut olan korunur.",
+                    "newAgent": "Yeni Ajan",
+                    "delete": "Sil"
+                },
+                "works": {
+                    "empty": "Bu Fikre bağlı Work yok."
+                },
+                "agents": {
+                    "empty": "Bu Fikre atanmış Ajan yok."
+                },
+                "meta": {
+                    "source": "Kaynak",
+                    "slug": "Slug",
+                    "fields": "Alanlar",
+                    "categories": "Önerilen kategoriler"
+                },
+                "deleteDialog": {
+                    "title": "Bu Fikir silinsin mi?",
+                    "body": "{title} kalıcı olarak silinecek. Bu işlem geri alınamaz.",
+                    "confirm": "Fikri sil",
+                    "cancel": "İptal",
+                    "deleting": "Siliniyor…",
+                    "error": "Fikir silinemedi",
+                    "blocked": {
+                        "linked-works": "Silinemiyor: bu Fikir {count} Work ile bağlantılı. Önce onları silin veya bağlantıyı kaldırın.",
+                        "idea-agents": "Silinemiyor: {count} Ajan bu Fikre atanmış. Önce onları silin veya kapsamını değiştirin.",
+                        "build-in-flight": "Yapım sürerken silinemez. Bitmesini bekleyin.",
+                        "unknown": "Bu Fikir şu anda silinemiyor."
+                    }
+                },
+                "toasts": {
+                    "built": "Bu Fikirden Work üretildi",
+                    "buildFailed": "Yapım başarısız oldu",
+                    "buildQueued": "Yapım sıraya alındı",
+                    "retryQueued": "Yeniden deneme sıraya alındı",
+                    "rebuildQueued": "Yeniden yapım sıraya alındı",
+                    "deleted": "Fikir silindi",
+                    "actionError": "İşlem tamamlanamadı. Lütfen tekrar deneyin."
                 }
             }
         },
