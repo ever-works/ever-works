@@ -26,14 +26,25 @@ describe('taxonomy-watcher', () => {
 			const item = JSON.stringify({ name: 'Tool', category: 'Cloud Services', tags: ['cloud'] });
 			await writeFile(join(workspacePath, 'tool.json'), item, 'utf-8');
 
-			// Wait for debounce (50ms) + file read + processing
-			await sleep(300);
-
-			// Check that _meta/categories.json was created
+			// Poll for the file the watcher is supposed to write, rather than
+			// sleeping a guessed 300ms and reading once.
+			//
+			// The old `sleep(300)` was a bet that debounce + fs event + read +
+			// write always fits in 300ms. On a loaded runner it does not: the
+			// read then hits an absent (or half-written) file and the test fails
+			// with ENOENT rather than a real assertion. That is what happened on
+			// the develop -> stage cascade (#2008), where this test burned all
+			// its retries. Retrying a too-short sleep just re-rolls the same
+			// dice; waiting for the actual condition removes the bet, and
+			// returns as soon as the watcher is done.
 			const { readFile: rf } = await import('node:fs/promises');
-			const catContent = await rf(join(workspacePath, '_meta', 'categories.json'), 'utf-8');
-			const categories = JSON.parse(catContent);
-			expect(categories).toEqual([{ id: 'cloud-services', name: 'Cloud Services' }]);
+			await vi.waitFor(
+				async () => {
+					const catContent = await rf(join(workspacePath, '_meta', 'categories.json'), 'utf-8');
+					expect(JSON.parse(catContent)).toEqual([{ id: 'cloud-services', name: 'Cloud Services' }]);
+				},
+				{ timeout: 5_000, interval: 25 }
+			);
 		} finally {
 			watcher.stop();
 		}
