@@ -10,7 +10,7 @@ import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
 import type { WorkProposal } from '@/lib/api/work-proposals';
 import { dismissProposalAction } from '@/app/actions/dashboard/work-proposals';
-import { STATUS_STYLES } from './idea-status';
+import { BUILT_BADGE_STYLE, STATUS_STYLES, deriveIdeaBadge } from './idea-status';
 import { deriveIdeaBuiltState } from './idea-built';
 
 /**
@@ -100,6 +100,7 @@ export function IdeaCard({ proposal, onDismissed, matchedWorkId = null }: IdeaCa
     const topCategories = proposal.suggestedCategories.slice(0, 4);
     const topPlugins = proposal.recommendedPlugins.slice(0, 3);
     const statusStyle = STATUS_STYLES[proposal.status] ?? STATUS_STYLES.pending;
+    const badge = deriveIdeaBadge(proposal.status, { isBuilt, workCount });
 
     return (
         <div
@@ -134,35 +135,36 @@ export function IdeaCard({ proposal, onDismissed, matchedWorkId = null }: IdeaCa
                 className="absolute inset-0 z-0 rounded-lg focus:outline-none focus-visible:ring-2 focus-visible:ring-primary/50"
             />
 
-            {/* Status badge — meaningful now that the home preview surfaces
-                Ideas of every status (pending / building / accepted / …). */}
+            {/* Exactly ONE status pill (see `deriveIdeaBadge`). A Work
+                that exists outranks the Idea's own lifecycle status, so a
+                built Idea reads "Built (1)" rather than "Dismissed" — or,
+                worse, both at once, which is what this used to render. A
+                live build is the sole exception and keeps its status. */}
             <div className="mb-3 pr-7 flex flex-wrap items-center gap-1.5">
-                <span
-                    className={cn(
-                        'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset capitalize',
-                        statusStyle.badge,
-                    )}
-                >
-                    <span
-                        aria-hidden="true"
-                        className={cn('h-1.5 w-1.5 rounded-full', statusStyle.dot)}
-                    />
-                    {tPage(`filters.${proposal.status}`)}
-                </span>
-
-                {/* Built marker. Only rendered when the status doesn't
-                    already say so — an `accepted` Idea reads "Done" in the
-                    badge above, so a second green pill would be noise. It
-                    earns its place on a queued / building / failed Idea
-                    that HAS produced a Work, which the status alone can
-                    never convey. */}
-                {isBuilt && proposal.status !== 'accepted' && (
+                {badge.kind === 'built' ? (
                     <span
                         data-testid="idea-card-built-badge"
-                        className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-[11px] font-medium text-success ring-1 ring-inset ring-success/20"
+                        className={cn(
+                            'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset',
+                            BUILT_BADGE_STYLE,
+                        )}
                     >
                         <CheckCircle2 className="h-3 w-3" aria-hidden="true" />
-                        {tPage('detail.built.badge', { count: workCount })}
+                        {tPage('detail.built.badge', { count: badge.count })}
+                    </span>
+                ) : (
+                    <span
+                        data-testid="idea-card-status-badge"
+                        className={cn(
+                            'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset capitalize',
+                            statusStyle.badge,
+                        )}
+                    >
+                        <span
+                            aria-hidden="true"
+                            className={cn('h-1.5 w-1.5 rounded-full', statusStyle.dot)}
+                        />
+                        {tPage(`filters.${badge.status}`)}
                     </span>
                 )}
             </div>
