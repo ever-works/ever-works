@@ -1818,7 +1818,8 @@
                         "idea-agents": "Không thể xóa: {count} Tác nhân đang gắn với Ý tưởng này. Hãy xóa hoặc đổi phạm vi trước.",
                         "build-in-flight": "Không thể xóa khi đang dựng. Hãy đợi hoàn tất.",
                         "unknown": "Hiện không thể xóa Ý tưởng này."
-                    }
+                    },
+                    "unlinksWorks": "Ý tưởng này liên kết với {count} Work. Chúng sẽ được giữ lại — chỉ liên kết bị xóa."
                 },
                 "toasts": {
                     "built": "Đã dựng Work từ Ý tưởng này",

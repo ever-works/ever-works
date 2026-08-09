@@ -1818,7 +1818,8 @@
                         "idea-agents": "Não é possível eliminar: {count} Agente(s) estão associados a esta Ideia. Elimine-os ou altere o âmbito.",
                         "build-in-flight": "Não é possível eliminar durante uma construção. Aguarde que termine.",
                         "unknown": "Não é possível eliminar esta Ideia neste momento."
-                    }
+                    },
+                    "unlinksWorks": "Esta Ideia está vinculada a {count} Work(s). Eles serão mantidos — apenas o vínculo é removido."
                 },
                 "toasts": {
                     "built": "Work construído a partir desta Ideia",

@@ -1849,7 +1849,8 @@
                         "idea-agents": "Suppression impossible : {count} Agent(s) sont rattachés à cette Idée. Supprimez-les ou changez leur portée.",
                         "build-in-flight": "Suppression impossible pendant une construction. Attendez la fin.",
                         "unknown": "Impossible de supprimer cette Idée pour le moment."
-                    }
+                    },
+                    "unlinksWorks": "Cette Idée est liée à {count} Work(s). Ils seront conservés — seul le lien est supprimé."
                 },
                 "toasts": {
                     "built": "Work construit à partir de cette Idée",

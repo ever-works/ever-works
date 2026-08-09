@@ -1818,7 +1818,8 @@
                         "idea-agents": "Nie można usunąć: {count} Agent(ów) jest przypisanych do tego Pomysłu. Usuń ich lub zmień zakres.",
                         "build-in-flight": "Nie można usunąć podczas budowy. Poczekaj na jej zakończenie.",
                         "unknown": "Nie można teraz usunąć tego Pomysłu."
-                    }
+                    },
+                    "unlinksWorks": "Ten Pomysł jest powiązany z {count} Works. Zostaną zachowane — usuwane jest tylko powiązanie."
                 },
                 "toasts": {
                     "built": "Work zbudowany z tego Pomysłu",

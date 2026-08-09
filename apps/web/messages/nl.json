@@ -1818,7 +1818,8 @@
                         "idea-agents": "Verwijderen niet mogelijk: {count} Agent(s) horen bij dit Idee. Verwijder ze of wijzig hun scope.",
                         "build-in-flight": "Verwijderen kan niet tijdens een build. Wacht tot die klaar is.",
                         "unknown": "Dit Idee kan nu niet worden verwijderd."
-                    }
+                    },
+                    "unlinksWorks": "Dit Idee is gekoppeld aan {count} Work(s). Die blijven behouden — alleen de koppeling wordt verwijderd."
                 },
                 "toasts": {
                     "built": "Work gebouwd uit dit Idee",
