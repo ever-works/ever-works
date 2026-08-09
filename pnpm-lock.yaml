@@ -271,8 +271,8 @@ importers:
         specifier: ^1.13.3
         version: 1.13.3
       terms-acceptance:
-        specifier: ^0.1.0
-        version: 0.1.0(react@19.2.5)
+        specifier: ^0.1.1
+        version: 0.1.1(react@19.2.5)
       typeorm:
         specifier: ^0.3.31
         version: 0.3.31(better-sqlite3@12.6.2)(ioredis@5.10.1)(mysql2@3.17.1)(pg@8.18.0)(sql.js@1.14.0)(ts-node@10.9.2(@swc/core@1.15.33(@swc/helpers@0.5.21))(@types/node@22.19.11)(typescript@5.9.3))
@@ -21239,8 +21239,8 @@ packages:
     resolution: {integrity: sha512-wK0Ri4fOGjv/XPy8SBHZChl8CM7uMc5VML7SqiQ0zG7+J5Vr+RMQDoHa2CNT6KHUnTGIXH34UDMkPzAUyapBZg==}
     engines: {node: '>=8'}
 
-  terms-acceptance@0.1.0:
-    resolution: {integrity: sha512-UAf6OzWTjX76LVlTMPrzZffDw9GHvoSpbX95nzWUgkiIxeaOFDsdjGt9Cb2DxI40oRmshYWhBmdAi20wlhjP7w==}
+  terms-acceptance@0.1.1:
+    resolution: {integrity: sha512-8UxI4PlBqlSi/YwP9+MQkcQ2e8j97sBQDA4JMP7CgpdO7NwjfvrxvdL1JhZCwpI5beErScFYuQVXQJWPKOkyqg==}
     engines: {node: '>=20'}
     peerDependencies:
       react: ^18.2.0 || ^19.0.0
@@ -30866,7 +30866,7 @@ snapshots:
   '@react-email/render@1.1.2(react-dom@19.2.5(react@19.2.5))(react@19.2.5)':
     dependencies:
       html-to-text: 9.0.5
-      prettier: 3.9.5
+      prettier: 3.9.6
       react: 19.2.5
       react-dom: 19.2.5(react@19.2.5)
       react-promise-suspense: 0.3.4
@@ -31200,7 +31200,7 @@ snapshots:
       '@sentry/node-core': 10.38.0(@opentelemetry/api@1.9.0)(@opentelemetry/context-async-hooks@2.5.1(@opentelemetry/api@1.9.0))(@opentelemetry/core@2.8.0(@opentelemetry/api@1.9.0))(@opentelemetry/instrumentation@0.211.0(@opentelemetry/api@1.9.0))(@opentelemetry/resources@2.8.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.5.1(@opentelemetry/api@1.9.0))(@opentelemetry/semantic-conventions@1.41.1)
       '@sentry/opentelemetry': 10.38.0(@opentelemetry/api@1.9.0)(@opentelemetry/context-async-hooks@2.5.1(@opentelemetry/api@1.9.0))(@opentelemetry/core@2.8.0(@opentelemetry/api@1.9.0))(@opentelemetry/sdk-trace-base@2.5.1(@opentelemetry/api@1.9.0))(@opentelemetry/semantic-conventions@1.41.1)
       import-in-the-middle: 2.0.6
-      minimatch: 10.2.5
+      minimatch: 10.2.6
     transitivePeerDependencies:
       - supports-color
 
@@ -40331,7 +40331,7 @@ snapshots:
       mjml-parser-xml: 5.0.0-beta.2
       mjml-validator: 5.0.0-beta.2
       postcss: 8.5.20
-      prettier: 3.9.5
+      prettier: 3.9.6
     transitivePeerDependencies:
       - purgecss
       - relateurl
@@ -44949,7 +44949,7 @@ snapshots:
 
   term-size@2.2.1: {}
 
-  terms-acceptance@0.1.0(react@19.2.5):
+  terms-acceptance@0.1.1(react@19.2.5):
     optionalDependencies:
       react: 19.2.5
 
