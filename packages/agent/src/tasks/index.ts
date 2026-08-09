@@ -25,6 +25,8 @@ export * from './kb-backfill-skeleton.types';
 export * from './kb-backfill-skeleton-dispatcher';
 export * from './kb-embed-document.types';
 export * from './kb-embed-document-dispatcher';
+export * from './workflow-run.types';
+export * from './workflow-run-dispatcher';
 export * from './kb-org-overlay-fanout.types';
 export * from './kb-org-overlay-fanout-dispatcher';
 export * from './kb-normalize-media.types';

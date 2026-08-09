@@ -13,3 +13,6 @@ export * from './dispatchers/agent-task-dispatchers';
 // IdeaBuildExecutorDispatchModule binds this to the
 // IDEA_BUILD_EXECUTE_DISPATCHER token.
 export * from './dispatchers/idea-build-execute.dispatcher';
+// Judgment layer G5 — workflow graph run dispatch adapter. API-side
+// WorkflowsModule binds this to the WORKFLOW_RUN_DISPATCHER token.
+export * from './dispatchers/workflow-run.dispatcher';

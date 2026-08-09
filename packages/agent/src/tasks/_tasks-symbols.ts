@@ -77,6 +77,9 @@ export const TASKS_BARREL_RUNTIME_SYMBOLS: ReadonlyArray<string> = [
     // resolver and P4 worker host layer it in independently.
     'TenantCredentialCache',
     'WEBHOOK_DELIVERY_DISPATCHER',
+    // Judgment layer G5 — enqueues a saved workflow graph's run. The walk
+    // can take ~40 minutes, so it can never happen in an API request.
+    'WORKFLOW_RUN_DISPATCHER',
     'WORK_GENERATION_DISPATCHER',
     'WORK_GENERATION_MODE',
     'WORK_IMPORT_DISPATCHER',

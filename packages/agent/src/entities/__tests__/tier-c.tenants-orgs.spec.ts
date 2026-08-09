@@ -28,6 +28,7 @@ import { WorkKnowledgeTag } from '../work-knowledge-tag.entity';
 import { WorkKnowledgeUpload } from '../work-knowledge-upload.entity';
 import { WorkMember } from '../work-member.entity';
 import { Workflow } from '../workflow.entity';
+import { WorkflowRun } from '../workflow-run.entity';
 
 /**
  * EW-657 (Tenants & Organizations Phase 5a) — Tier C scope-column
@@ -84,6 +85,7 @@ describe('Tier C entities — Phase 5a scope columns', () => {
         { name: 'PluginUsageEvent', target: PluginUsageEvent },
         { name: 'ActivityLog', target: ActivityLog },
         { name: 'Workflow', target: Workflow },
+        { name: 'WorkflowRun', target: WorkflowRun },
     ];
 
     for (const { name, target } of tierC) {
