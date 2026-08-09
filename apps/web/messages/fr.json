@@ -954,6 +954,13 @@
                 "openInWizard": "Ouvrir dans l'assistant"
             },
             "settings": {
+                "identity": {
+                    "pause": "Mettre en pause",
+                    "resume": "Reprendre",
+                    "activate": "Activer",
+                    "archive": "Archiver",
+                    "delete": "Supprimer"
+                },
                 "orgCard": {
                     "title": "Organisation",
                     "teamLabel": "Équipe",
@@ -1024,7 +1031,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "Archivés"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1047,6 +1055,38 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "Agents archivés",
+                "subtitle": "Les agents que vous avez archivés. Ils ne s'exécutent pas et n'apparaissent pas dans le catalogue. Restaurez-en un pour le récupérer en pause, ou supprimez-le définitivement.",
+                "empty": {
+                    "title": "Aucun agent archivé",
+                    "subtitle": "Archiver un agent depuis sa page de paramètres le déplace ici."
+                },
+                "delete": "Supprimer définitivement",
+                "deleteAria": "Supprimer {name} définitivement",
+                "unarchive": "Restaurer",
+                "menuAria": "Actions pour {name}",
+                "unarchiveSuccess": "{name} restauré",
+                "unarchiveError": "Impossible de restaurer l'agent"
+            },
+            "archiveDialog": {
+                "title": "Archiver {name} ?",
+                "description": "L'agent cesse de s'exécuter et disparaît du catalogue. Ses exécutions, budgets et appartenances sont conservés.",
+                "hint": "Vous pouvez le restaurer depuis l'onglet Archivés à tout moment : il revient en pause.",
+                "cancel": "Annuler",
+                "confirm": "Archiver l'agent",
+                "success": "{name} archivé",
+                "error": "Impossible d'archiver l'agent"
+            },
+            "deleteDialog": {
+                "title": "Supprimer {name} ?",
+                "description": "Cette action supprime définitivement l'agent ainsi que ses budgets, ses appartenances et son historique d'exécutions.",
+                "hint": "Cette action est irréversible. Archivez plutôt cet agent si vous souhaitez seulement le masquer du catalogue.",
+                "cancel": "Annuler",
+                "confirm": "Supprimer définitivement",
+                "success": "{name} supprimé",
+                "error": "Impossible de supprimer l'agent"
             }
         },
         "tasksPage": {

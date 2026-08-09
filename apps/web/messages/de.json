@@ -954,6 +954,13 @@
                 "openInWizard": "Assistent öffnen"
             },
             "settings": {
+                "identity": {
+                    "pause": "Pausieren",
+                    "resume": "Fortsetzen",
+                    "activate": "Aktivieren",
+                    "archive": "Archivieren",
+                    "delete": "Löschen"
+                },
                 "orgCard": {
                     "title": "Organisation",
                     "teamLabel": "Team",
@@ -1024,7 +1031,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "Archiviert"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1047,6 +1055,38 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "Archivierte Agenten",
+                "subtitle": "Von Ihnen archivierte Agenten. Sie laufen nicht und erscheinen nicht im Katalog. Stellen Sie einen Agenten wieder her – er kehrt pausiert zurück – oder löschen Sie ihn endgültig.",
+                "empty": {
+                    "title": "Keine archivierten Agenten",
+                    "subtitle": "Wenn Sie einen Agenten auf seiner Einstellungsseite archivieren, erscheint er hier."
+                },
+                "delete": "Endgültig löschen",
+                "deleteAria": "{name} endgültig löschen",
+                "unarchive": "Wiederherstellen",
+                "menuAria": "Aktionen für {name}",
+                "unarchiveSuccess": "{name} wiederhergestellt",
+                "unarchiveError": "Agent konnte nicht wiederhergestellt werden"
+            },
+            "archiveDialog": {
+                "title": "{name} archivieren?",
+                "description": "Der Agent läuft nicht mehr und verschwindet aus dem Katalog. Ausführungen, Budgets und Mitgliedschaften bleiben erhalten.",
+                "hint": "Sie können ihn jederzeit im Tab „Archiviert“ wiederherstellen – er kehrt pausiert zurück.",
+                "cancel": "Abbrechen",
+                "confirm": "Agent archivieren",
+                "success": "{name} archiviert",
+                "error": "Agent konnte nicht archiviert werden"
+            },
+            "deleteDialog": {
+                "title": "{name} löschen?",
+                "description": "Damit werden der Agent sowie seine Budgets, Mitgliedschaften und sein Ausführungsverlauf endgültig gelöscht.",
+                "hint": "Das lässt sich nicht rückgängig machen. Archivieren Sie den Agenten, wenn Sie ihn nur aus dem Katalog ausblenden möchten.",
+                "cancel": "Abbrechen",
+                "confirm": "Endgültig löschen",
+                "success": "{name} gelöscht",
+                "error": "Agent konnte nicht gelöscht werden"
             }
         },
         "tasksPage": {

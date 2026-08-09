@@ -906,6 +906,13 @@
                 "nextDisabledReason": "Pick a parent or choose Workspace scope to continue."
             },
             "settings": {
+                "identity": {
+                    "pause": "หยุดชั่วคราว",
+                    "resume": "ดำเนินการต่อ",
+                    "activate": "เปิดใช้งาน",
+                    "archive": "เก็บถาวร",
+                    "delete": "ลบ"
+                },
                 "orgCard": {
                     "title": "องค์กร",
                     "teamLabel": "ทีม",
@@ -993,7 +1000,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "เก็บถาวรแล้ว"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1016,6 +1024,38 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "เอเจนต์ที่เก็บถาวร",
+                "subtitle": "เอเจนต์ที่คุณเก็บถาวรไว้ จะไม่ทำงานและไม่แสดงในแค็ตตาล็อก กู้คืนเพื่อให้กลับมาในสถานะหยุดชั่วคราว หรือลบอย่างถาวร",
+                "empty": {
+                    "title": "ไม่มีเอเจนต์ที่เก็บถาวร",
+                    "subtitle": "การเก็บถาวรเอเจนต์จากหน้าการตั้งค่าจะย้ายเอเจนต์มาที่นี่"
+                },
+                "delete": "ลบถาวร",
+                "deleteAria": "ลบ {name} อย่างถาวร",
+                "unarchive": "กู้คืน",
+                "menuAria": "การดำเนินการสำหรับ {name}",
+                "unarchiveSuccess": "กู้คืน {name} แล้ว",
+                "unarchiveError": "ไม่สามารถกู้คืนเอเจนต์ได้"
+            },
+            "archiveDialog": {
+                "title": "เก็บถาวร {name} หรือไม่?",
+                "description": "เอเจนต์จะหยุดทำงานและหายไปจากแค็ตตาล็อก ประวัติการทำงาน งบประมาณ และการเป็นสมาชิกยังคงอยู่",
+                "hint": "คุณกู้คืนได้จากแท็บที่เก็บถาวรเมื่อใดก็ได้ — เอเจนต์จะกลับมาในสถานะหยุดชั่วคราว",
+                "cancel": "ยกเลิก",
+                "confirm": "เก็บถาวรเอเจนต์",
+                "success": "เก็บถาวร {name} แล้ว",
+                "error": "ไม่สามารถเก็บถาวรเอเจนต์ได้"
+            },
+            "deleteDialog": {
+                "title": "ลบ {name} หรือไม่?",
+                "description": "การดำเนินการนี้จะลบเอเจนต์พร้อมงบประมาณ การเป็นสมาชิก และประวัติการทำงานอย่างถาวร",
+                "hint": "ไม่สามารถเลิกทำได้ หากต้องการเพียงซ่อนจากแค็ตตาล็อก ให้เก็บถาวรเอเจนต์แทน",
+                "cancel": "ยกเลิก",
+                "confirm": "ลบถาวร",
+                "success": "ลบ {name} แล้ว",
+                "error": "ไม่สามารถลบเอเจนต์ได้"
             }
         },
         "tasksPage": {

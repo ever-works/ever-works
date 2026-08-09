@@ -113,7 +113,8 @@ describe('activity-log.types', () => {
             // +3 git_pushed / git_committed / git_merged (git activity
             //    ingestion, audit item j) -> 121.
             // +1 idea_deleted (Idea delete, #1997) -> 122.
-            expect(literals).toHaveLength(122);
+            // +1 agent_unarchived (Agent archive/restore, #1994) -> 123.
+            expect(literals).toHaveLength(123);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

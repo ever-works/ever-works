@@ -113,6 +113,7 @@ const AGENT_LIFECYCLE_EVENT_TYPES: ActivityActionType[] = [
     ActivityActionType.AGENT_PAUSED,
     ActivityActionType.AGENT_RESUMED,
     ActivityActionType.AGENT_ARCHIVED,
+    ActivityActionType.AGENT_UNARCHIVED,
     ActivityActionType.AGENT_EXPORTED,
     ActivityActionType.AGENT_IMPORTED,
     ActivityActionType.AGENT_BUDGET_EXCEEDED,
@@ -571,6 +572,27 @@ export class AgentsController {
             userId: auth.userId,
             agentId: id,
             actionType: ActivityActionType.AGENT_RESUMED,
+            details: { status: dto.status },
+        });
+        return dto;
+    }
+
+    @Post(':id/unarchive')
+    @ApiOperation({
+        summary:
+            'Restore an archived Agent (ARCHIVED → PAUSED). Lands on PAUSED, not ACTIVE, so a cron-cadence Agent does not resume firing heartbeats on restore.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async unarchive(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<AgentDto> {
+        const dto = await this.service.unarchive(auth.userId, id);
+        void this.tryLog({
+            userId: auth.userId,
+            agentId: id,
+            actionType: ActivityActionType.AGENT_UNARCHIVED,
             details: { status: dto.status },
         });
         return dto;

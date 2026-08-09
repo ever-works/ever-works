@@ -906,6 +906,13 @@
                 "nextDisabledReason": "Pick a parent or choose Workspace scope to continue."
             },
             "settings": {
+                "identity": {
+                    "pause": "Jeda",
+                    "resume": "Lanjutkan",
+                    "activate": "Aktifkan",
+                    "archive": "Arsipkan",
+                    "delete": "Hapus"
+                },
                 "orgCard": {
                     "title": "Organisasi",
                     "teamLabel": "Tim",
@@ -993,7 +1000,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "Diarsipkan"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1016,6 +1024,38 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "Agen yang diarsipkan",
+                "subtitle": "Agen yang Anda arsipkan. Mereka tidak berjalan dan tidak muncul di katalog. Pulihkan agen untuk mengembalikannya dalam status dijeda, atau hapus secara permanen.",
+                "empty": {
+                    "title": "Belum ada agen yang diarsipkan",
+                    "subtitle": "Mengarsipkan agen dari halaman pengaturannya akan memindahkannya ke sini."
+                },
+                "delete": "Hapus permanen",
+                "deleteAria": "Hapus {name} secara permanen",
+                "unarchive": "Pulihkan",
+                "menuAria": "Tindakan untuk {name}",
+                "unarchiveSuccess": "{name} dipulihkan",
+                "unarchiveError": "Tidak dapat memulihkan agen"
+            },
+            "archiveDialog": {
+                "title": "Arsipkan {name}?",
+                "description": "Agen berhenti berjalan dan tidak lagi muncul di katalog. Riwayat proses, anggaran, dan keanggotaannya tetap disimpan.",
+                "hint": "Anda dapat memulihkannya dari tab Diarsipkan kapan saja — agen kembali dalam status dijeda.",
+                "cancel": "Batal",
+                "confirm": "Arsipkan agen",
+                "success": "{name} diarsipkan",
+                "error": "Tidak dapat mengarsipkan agen"
+            },
+            "deleteDialog": {
+                "title": "Hapus {name}?",
+                "description": "Tindakan ini menghapus agen beserta anggaran, keanggotaan, dan riwayat prosesnya secara permanen.",
+                "hint": "Tindakan ini tidak dapat dibatalkan. Arsipkan agen jika Anda hanya ingin menyembunyikannya dari katalog.",
+                "cancel": "Batal",
+                "confirm": "Hapus permanen",
+                "success": "{name} dihapus",
+                "error": "Tidak dapat menghapus agen"
             }
         },
         "tasksPage": {

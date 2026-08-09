@@ -906,6 +906,13 @@
                 "nextDisabledReason": "Pick a parent or choose Workspace scope to continue."
             },
             "settings": {
+                "identity": {
+                    "pause": "Призупинити",
+                    "resume": "Відновити",
+                    "activate": "Активувати",
+                    "archive": "Архівувати",
+                    "delete": "Видалити"
+                },
                 "orgCard": {
                     "title": "Організація",
                     "teamLabel": "Команда",
@@ -993,7 +1000,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "Архів"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1016,6 +1024,38 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "Архівні агенти",
+                "subtitle": "Агенти, які ви заархівували. Вони не виконуються та не показуються в каталозі. Відновіть агента, щоб повернути його на паузі, або видаліть назавжди.",
+                "empty": {
+                    "title": "Архівних агентів немає",
+                    "subtitle": "Архівування агента на сторінці його налаштувань переносить його сюди."
+                },
+                "delete": "Видалити назавжди",
+                "deleteAria": "Видалити {name} назавжди",
+                "unarchive": "Відновити",
+                "menuAria": "Дії для {name}",
+                "unarchiveSuccess": "{name} відновлено",
+                "unarchiveError": "Не вдалося відновити агента"
+            },
+            "archiveDialog": {
+                "title": "Архівувати {name}?",
+                "description": "Агент перестане запускатися та зникне з каталогу. Його запуски, бюджети та членства збережуться.",
+                "hint": "Ви можете відновити його на вкладці «Архів» будь-коли — він повернеться призупиненим.",
+                "cancel": "Скасувати",
+                "confirm": "Архівувати агента",
+                "success": "{name} заархівовано",
+                "error": "Не вдалося заархівувати агента"
+            },
+            "deleteDialog": {
+                "title": "Видалити {name}?",
+                "description": "Це остаточно видалить агента разом із його бюджетами, членством та історією запусків.",
+                "hint": "Цю дію не можна скасувати. Заархівуйте агента, якщо хочете лише сховати його з каталогу.",
+                "cancel": "Скасувати",
+                "confirm": "Видалити назавжди",
+                "success": "{name} видалено",
+                "error": "Не вдалося видалити агента"
             }
         },
         "tasksPage": {

@@ -160,6 +160,7 @@ export enum ActivityActionType {
     AGENT_PAUSED = 'agent_paused',
     AGENT_RESUMED = 'agent_resumed',
     AGENT_ARCHIVED = 'agent_archived',
+    AGENT_UNARCHIVED = 'agent_unarchived',
     AGENT_DELETED = 'agent_deleted',
     AGENT_HEARTBEAT_STARTED = 'agent_heartbeat_started',
     AGENT_HEARTBEAT_COMPLETED = 'agent_heartbeat_completed',

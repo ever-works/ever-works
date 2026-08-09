@@ -129,6 +129,7 @@ export const ROUTES = {
     // Agents (Agents/Skills/Tasks PR #1017 — Phase 5)
     DASHBOARD_AGENTS: '/agents',
     DASHBOARD_AGENT_SESSIONS: '/agents/sessions',
+    DASHBOARD_AGENTS_ARCHIVED: '/agents/archived',
     DASHBOARD_AGENT_NEW: '/agents/new',
     DASHBOARD_AGENT: (id: string) => `/agents/${id}`,
     DASHBOARD_AGENT_DASHBOARD: (id: string) => `/agents/${id}`,

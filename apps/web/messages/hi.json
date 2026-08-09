@@ -906,6 +906,13 @@
                 "nextDisabledReason": "Pick a parent or choose Workspace scope to continue."
             },
             "settings": {
+                "identity": {
+                    "pause": "रोकें",
+                    "resume": "फिर शुरू करें",
+                    "activate": "सक्रिय करें",
+                    "archive": "संग्रहीत करें",
+                    "delete": "हटाएँ"
+                },
                 "orgCard": {
                     "title": "संगठन",
                     "teamLabel": "टीम",
@@ -993,7 +1000,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "संग्रहीत"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1016,6 +1024,38 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "संग्रहीत एजेंट",
+                "subtitle": "वे एजेंट जिन्हें आपने संग्रहीत किया है। वे चलते नहीं हैं और कैटलॉग में नहीं दिखते। किसी को पुनर्स्थापित करें ताकि वह रुकी हुई स्थिति में वापस आ जाए, या उसे स्थायी रूप से हटा दें।",
+                "empty": {
+                    "title": "कोई संग्रहीत एजेंट नहीं",
+                    "subtitle": "किसी एजेंट को उसके सेटिंग पेज से संग्रहीत करने पर वह यहाँ आ जाता है।"
+                },
+                "delete": "स्थायी रूप से हटाएँ",
+                "deleteAria": "{name} को स्थायी रूप से हटाएँ",
+                "unarchive": "पुनर्स्थापित करें",
+                "menuAria": "{name} के लिए क्रियाएँ",
+                "unarchiveSuccess": "{name} पुनर्स्थापित किया गया",
+                "unarchiveError": "एजेंट को पुनर्स्थापित नहीं किया जा सका"
+            },
+            "archiveDialog": {
+                "title": "{name} को संग्रहीत करें?",
+                "description": "एजेंट चलना बंद कर देगा और कैटलॉग से हट जाएगा। इसके रन, बजट और सदस्यताएँ सुरक्षित रहती हैं।",
+                "hint": "आप इसे संग्रहीत टैब से कभी भी पुनर्स्थापित कर सकते हैं — यह रुकी हुई स्थिति में वापस आता है।",
+                "cancel": "रद्द करें",
+                "confirm": "एजेंट संग्रहीत करें",
+                "success": "{name} संग्रहीत किया गया",
+                "error": "एजेंट को संग्रहीत नहीं किया जा सका"
+            },
+            "deleteDialog": {
+                "title": "{name} को हटाएँ?",
+                "description": "इससे एजेंट और उसके बजट, सदस्यताएँ तथा रन इतिहास स्थायी रूप से हट जाएँगे।",
+                "hint": "इसे पूर्ववत नहीं किया जा सकता। यदि आप इसे केवल कैटलॉग से छिपाना चाहते हैं तो एजेंट को संग्रहीत करें।",
+                "cancel": "रद्द करें",
+                "confirm": "स्थायी रूप से हटाएँ",
+                "success": "{name} हटा दिया गया",
+                "error": "एजेंट को हटाया नहीं जा सका"
             }
         },
         "tasksPage": {

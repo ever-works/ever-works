@@ -906,6 +906,13 @@
                 "nextDisabledReason": "Pick a parent or choose Workspace scope to continue."
             },
             "settings": {
+                "identity": {
+                    "pause": "暂停",
+                    "resume": "恢复",
+                    "activate": "激活",
+                    "archive": "归档",
+                    "delete": "删除"
+                },
                 "orgCard": {
                     "title": "组织",
                     "teamLabel": "团队",
@@ -993,7 +1000,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "会话",
+                "archived": "已归档"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1016,6 +1024,38 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "已归档的代理",
+                "subtitle": "你归档的代理。它们不会运行，也不会出现在目录中。恢复后将以暂停状态返回，或者永久删除。",
+                "empty": {
+                    "title": "没有已归档的代理",
+                    "subtitle": "在设置页面归档代理后，它会出现在这里。"
+                },
+                "delete": "永久删除",
+                "deleteAria": "永久删除 {name}",
+                "unarchive": "恢复",
+                "menuAria": "{name} 的操作",
+                "unarchiveSuccess": "已恢复 {name}",
+                "unarchiveError": "无法恢复该代理"
+            },
+            "archiveDialog": {
+                "title": "归档 {name}？",
+                "description": "该代理将停止运行并从目录中移除。其运行记录、预算和团队成员关系都会保留。",
+                "hint": "你可以随时在“已归档”标签页中恢复它——恢复后处于暂停状态。",
+                "cancel": "取消",
+                "confirm": "归档代理",
+                "success": "已归档 {name}",
+                "error": "无法归档代理"
+            },
+            "deleteDialog": {
+                "title": "确定删除 {name}？",
+                "description": "此操作将永久删除该代理及其预算、成员关系和运行记录。",
+                "hint": "此操作无法撤销。如果只想在目录中隐藏它，请改为归档。",
+                "cancel": "取消",
+                "confirm": "永久删除",
+                "success": "已删除 {name}",
+                "error": "无法删除该代理"
             }
         },
         "tasksPage": {

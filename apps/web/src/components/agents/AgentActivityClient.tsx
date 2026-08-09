@@ -143,6 +143,10 @@ const EVENT_PRESENTATION: Record<string, { label: string; className: string }> =
         label: 'archived',
         className: 'bg-gray-50 text-gray-700 dark:bg-gray-900/20 dark:text-gray-300',
     },
+    agent_unarchived: {
+        label: 'unarchived',
+        className: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300',
+    },
     agent_exported: {
         label: 'exported',
         className: 'bg-indigo-50 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300',

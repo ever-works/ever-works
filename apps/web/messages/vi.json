@@ -906,6 +906,13 @@
                 "nextDisabledReason": "Pick a parent or choose Workspace scope to continue."
             },
             "settings": {
+                "identity": {
+                    "pause": "Tạm dừng",
+                    "resume": "Tiếp tục",
+                    "activate": "Kích hoạt",
+                    "archive": "Lưu trữ",
+                    "delete": "Xóa"
+                },
                 "orgCard": {
                     "title": "Tổ chức",
                     "teamLabel": "Nhóm",
@@ -993,7 +1000,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "Đã lưu trữ"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1016,6 +1024,38 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "Agent đã lưu trữ",
+                "subtitle": "Các Agent bạn đã lưu trữ. Chúng không chạy và không xuất hiện trong danh mục. Khôi phục để đưa Agent trở lại ở trạng thái tạm dừng, hoặc xóa vĩnh viễn.",
+                "empty": {
+                    "title": "Chưa có Agent nào được lưu trữ",
+                    "subtitle": "Lưu trữ một Agent từ trang cài đặt của nó sẽ chuyển nó tới đây."
+                },
+                "delete": "Xóa vĩnh viễn",
+                "deleteAria": "Xóa vĩnh viễn {name}",
+                "unarchive": "Khôi phục",
+                "menuAria": "Hành động cho {name}",
+                "unarchiveSuccess": "Đã khôi phục {name}",
+                "unarchiveError": "Không thể khôi phục Agent"
+            },
+            "archiveDialog": {
+                "title": "Lưu trữ {name}?",
+                "description": "Agent sẽ ngừng chạy và không còn xuất hiện trong danh mục. Lịch sử chạy, ngân sách và thành viên nhóm vẫn được giữ lại.",
+                "hint": "Bạn có thể khôi phục từ tab Đã lưu trữ bất cứ lúc nào — Agent quay lại ở trạng thái tạm dừng.",
+                "cancel": "Hủy",
+                "confirm": "Lưu trữ Agent",
+                "success": "Đã lưu trữ {name}",
+                "error": "Không thể lưu trữ Agent"
+            },
+            "deleteDialog": {
+                "title": "Xóa {name}?",
+                "description": "Thao tác này sẽ xóa vĩnh viễn Agent cùng ngân sách, tư cách thành viên và lịch sử chạy của nó.",
+                "hint": "Không thể hoàn tác. Hãy lưu trữ Agent nếu bạn chỉ muốn ẩn nó khỏi danh mục.",
+                "cancel": "Hủy",
+                "confirm": "Xóa vĩnh viễn",
+                "success": "Đã xóa {name}",
+                "error": "Không thể xóa Agent"
             }
         },
         "tasksPage": {
