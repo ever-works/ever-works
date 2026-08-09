@@ -362,18 +362,53 @@ describe('IdeaDetailClient', () => {
     });
 
     it('names the blocker in the dialog when the API refuses the delete', async () => {
-        deleteIdeaMock.mockResolvedValue({ deleted: false, reason: 'linked-works', count: 2 });
-        render(<IdeaDetailClient idea={baseIdea} initialLinks={[builtLink]} />);
+        // `idea-agents` rather than `linked-works`: linked Works no longer
+        // block the delete, so that reason is no longer produced.
+        deleteIdeaMock.mockResolvedValue({ deleted: false, reason: 'idea-agents', count: 3 });
+        render(<IdeaDetailClient idea={baseIdea} />);
 
         fireEvent.click(screen.getByTestId('idea-delete-button'));
         fireEvent.click(screen.getByTestId('idea-delete-confirm'));
 
         await waitFor(() =>
             expect(screen.getByTestId('idea-delete-error')).toHaveTextContent(
-                'deleteDialog.blocked.linked-works',
+                'deleteDialog.blocked.idea-agents',
             ),
         );
         // A refused delete must NOT navigate away.
         expect(routerPushMock).not.toHaveBeenCalled();
+    });
+
+    describe('deleting an Idea that has linked Works', () => {
+        it('warns that the links go but the Works are kept', () => {
+            render(<IdeaDetailClient idea={baseIdea} initialLinks={[builtLink]} />);
+
+            fireEvent.click(screen.getByTestId('idea-delete-button'));
+
+            expect(screen.getByTestId('idea-delete-unlinks-works')).toHaveTextContent(
+                'deleteDialog.unlinksWorks',
+            );
+        });
+
+        it('omits the warning when only a content match points at a Work', () => {
+            // A matched Work has no `idea_works` row, so a delete takes
+            // nothing away from it — warning about it would be a lie.
+            render(<IdeaDetailClient idea={baseIdea} matchedWork={matchedWork} />);
+
+            fireEvent.click(screen.getByTestId('idea-delete-button'));
+
+            expect(screen.queryByTestId('idea-delete-unlinks-works')).not.toBeInTheDocument();
+        });
+
+        it('goes through, rather than being refused as it used to be', async () => {
+            deleteIdeaMock.mockResolvedValue({ deleted: true });
+            render(<IdeaDetailClient idea={baseIdea} initialLinks={[builtLink]} />);
+
+            fireEvent.click(screen.getByTestId('idea-delete-button'));
+            fireEvent.click(screen.getByTestId('idea-delete-confirm'));
+
+            await waitFor(() => expect(deleteIdeaMock).toHaveBeenCalledWith('idea-1'));
+            await waitFor(() => expect(routerPushMock).toHaveBeenCalledWith('/ideas'));
+        });
     });
 });

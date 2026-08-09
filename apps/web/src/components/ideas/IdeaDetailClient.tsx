@@ -1038,6 +1038,21 @@ export function IdeaDetailClient({
                         </DialogDescription>
                     </DialogHeader>
 
+                    {/* Linked Works no longer block the delete, so say what
+                        the delete costs before it happens: the `idea_works`
+                        rows cascade away, but the Works themselves are kept
+                        (`works.acceptedFromIdeaId` is ON DELETE SET NULL).
+                        Counted off `links`, not `linkedWorkRows` — a
+                        content-matched Work has no row to lose. */}
+                    {links.length > 0 && (
+                        <p
+                            data-testid="idea-delete-unlinks-works"
+                            className="mt-4 rounded-md border border-border/60 dark:border-border-dark/60 bg-surface-secondary/60 dark:bg-surface-secondary-dark/60 p-2.5 text-xs text-text-secondary dark:text-text-secondary-dark"
+                        >
+                            {tDetail('deleteDialog.unlinksWorks', { count: links.length })}
+                        </p>
+                    )}
+
                     {deleteError && (
                         <p
                             role="alert"
