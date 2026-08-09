@@ -154,7 +154,7 @@ appends, locale key appends) are expected and fine.
       without explicit authorization; no client-generated credential forwarding
       cross-origin at all — with tests), run-end disconnect.
 - [ ] **T26**. `McpToolSource` injected into `AgentToolService.
-  resolveAllowedTools` as a new optional source (domain-tool-source
+resolveAllowedTools` as a new optional source (domain-tool-source
       pattern); `mcp__<server>__<tool>` naming; name/description sanitization;
       builtin-collision drop + WARN; run-log WARNs for skipped servers.
       Update module pin specs.
