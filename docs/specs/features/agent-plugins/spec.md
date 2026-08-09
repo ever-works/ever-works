@@ -142,13 +142,17 @@ a marketplace UI beyond the sources/install surface described here.
   additive stub enhancement that closes the gap to the Agent Skills spec's level-1
   disclosure. Existing behavior is unchanged either way.)
 - **US-6 (sidecars)**: Skills that ship `scripts/`, `references/`, or `assets/` keep
-  those files. They are stored with the installed package and **materialized into the
-  CLI-runner workspace** (the claude-code plugin's staging step) so
-  `scripts/extract.py`-style references in skill bodies actually resolve there. Runs
-  without a file workspace get the body only, plus a note that sidecar files are
-  attached to the skill (progressive disclosure level 3). Materialization into
-  Wave-2 **Task workspaces is explicitly deferred** — the provisioned `workspaceCwd`
-  has no execution consumer today (plan §4.5); we do not promise it in v1.
+  those files. They are stored with the installed package; `references/` and
+  `assets/` (non-executable) are **materialized into the CLI-runner workspace**
+  (the claude-code plugin's staging step) so relative references in skill bodies
+  resolve there. **`scripts/` are treated as code, not data**: the CLI runner
+  executes without a sandbox, so scripts materialize ONLY for packages that pass
+  the same execution gate as stdio MCP servers (US-9) — default off, never on
+  v1 SaaS. Runs without a file workspace get the body only, plus a note that
+  sidecar files are attached (progressive disclosure level 3). Materialization
+  into Wave-2 **Task workspaces is explicitly deferred** — the provisioned
+  `workspaceCwd` has no execution consumer today (plan §4.5); we do not promise
+  it in v1.
 
 ### 2.3 Using package MCP servers
 

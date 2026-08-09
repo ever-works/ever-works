@@ -82,9 +82,11 @@ _server_, `apps/mcp`), and an export serializer.
    default**, operator-enabled on self-hosted/desktop; on the managed SaaS,
    stdio stays disabled in v1 — enabling it there requires a sandboxed
    execution route this feature does not build (explicit follow-up decision).
-   Skill sidecar `scripts/` are never executed by the platform itself; they
-   are materialized into CLI-runner workspaces where the run's own execution
-   policy governs them.
+   Skill sidecar `scripts/` are never executed by the platform itself — but a
+   CLI-runner workspace IS an execution surface (the runner spawns without a
+   sandbox), so `scripts/` materialization is gated by the same execution gate
+   as stdio, while non-executable `references/`/`assets/` materialize under
+   standard content validation only.
 
 5. **`works.ever` is our extension namespace** (reverse-domain of `ever.works`),
    for Ever Works-specific data in exported manifests (`extensions["works.ever"]`)

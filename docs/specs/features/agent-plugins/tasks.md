@@ -141,7 +141,11 @@ appends, locale key appends) are expected and fine.
       `secretSettings`/`credentialsSecretRef`, per plan §2.5) + migration +
       inventory append. Account-transfer whitelist entries for bindings (same
       4-place set as T10) — masked secrets, `credentialsSecretRef` pointers
-      deliberately omitted.
+      deliberately omitted — implementing the ordered package-reference import
+      contract (plan §2.5): resolve/remap destination `packageId` FIRST; absent
+      package → pending-reference row + bindings imported `enabled: false`;
+      disallowed source → skip-and-report; never auto-fetch content on import;
+      never fail the whole import.
 - [ ] **T25**. `packages/agent/src/mcp/`: `McpClientService`
       (streamable-http + sse via `@modelcontextprotocol/sdk` — new dep of
       `packages/agent`), per-server failure isolation, connect-time credential
@@ -150,7 +154,7 @@ appends, locale key appends) are expected and fine.
       without explicit authorization; no client-generated credential forwarding
       cross-origin at all — with tests), run-end disconnect.
 - [ ] **T26**. `McpToolSource` injected into `AgentToolService.
-    resolveAllowedTools` as a new optional source (domain-tool-source
+  resolveAllowedTools` as a new optional source (domain-tool-source
       pattern); `mcp__<server>__<tool>` naming; name/description sanitization;
       builtin-collision drop + WARN; run-log WARNs for skipped servers.
       Update module pin specs.
@@ -200,8 +204,13 @@ appends, locale key appends) are expected and fine.
       for oversized/rejected files.
 - [ ] **T34**. Materialization into claude-code workspace staging
       (`claude-code.plugin.ts:542-558` seam): `.claude/skills/<name>/…` +
-      `.mcp.json` next to `seedMetadata` writes. Explicitly does NOT touch the
-      Wave-2 Task-workspace path (`workspaceCwd` has no consumer — see plan §4.5).
+      `.mcp.json` next to `seedMetadata` writes — with the **execution-gate
+      split** (plan §4.5/§5, Greptile P1 on PR #2000): `references/`+`assets/`
+      only by default (executable bits stripped); `scripts/` only for packages
+      passing the stdio-grade triple gate; `.mcp.json` only for bind-enabled
+      servers. Tests assert a non-gated package's scripts NEVER reach the
+      workspace. Explicitly does NOT touch the Wave-2 Task-workspace path
+      (`workspaceCwd` has no consumer — see plan §4.5).
 - [ ] **T35**. Export API + CLI + UI: scope-selected skills → conformant
       package (zip); round-trip gate (AP-22/23); slug guard enforcing the FULL
       spec name rule (≤64, no `--`, no leading/trailing hyphen — the DTO
