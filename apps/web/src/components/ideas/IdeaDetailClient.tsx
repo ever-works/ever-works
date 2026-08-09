@@ -73,15 +73,24 @@ const POLL_MAX_MS = 10 * 60_000;
 const IN_PROGRESS: ReadonlySet<WorkProposalStatus> = new Set(['queued', 'building']);
 
 /**
- * Badge tints for the Idea→Work link kinds (PR-1, `idea_works`).
+ * Badge tints for the Idea→Work link kinds (PR-1, `idea_works`), plus
+ * `matched` — not a stored kind but a Work recognised by content
+ * (`idea-work-match.ts`).
+ *
  * Mirrors the `STATUS_STYLES` palette so kinds read like statuses:
  * success-green for a Work the platform built, sky for a manually
- * linked Work, amber for a rebuild.
+ * linked Work, amber for a rebuild. `matched` stays deliberately
+ * colourless: it is inferred rather than recorded, and must not look
+ * like provenance the server actually stored.
  */
-const KIND_BADGE: Record<IdeaWorkLink['kind'], string> = {
+type WorkLinkKind = IdeaWorkLink['kind'] | 'matched';
+
+const KIND_BADGE: Record<WorkLinkKind, string> = {
     built: 'bg-success/10 text-success ring-success/20',
     linked: 'bg-sky-500/10 text-sky-600 dark:text-sky-300 ring-sky-500/20',
     rebuilt: 'bg-amber-500/10 text-amber-600 dark:text-amber-300 ring-amber-500/20',
+    matched:
+        'bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark ring-border dark:ring-border-dark',
 };
 
 // ─── Shared surface classes ───────────────────────────────────────────────
@@ -242,6 +251,32 @@ function buildTimeline(input: {
     ];
 }
 
+/**
+ * The content-matched Work, reduced to what the page renders. Only these
+ * fields cross the server→client boundary — the full `Work` payload is
+ * large and nothing here needs the rest of it.
+ */
+export interface MatchedWork {
+    id: string;
+    name: string;
+    /** ISO timestamp, shown beside the row. Absent ⇒ no date rendered. */
+    createdAt?: string | null;
+}
+
+/**
+ * A Linked Works row, from either source: an `idea_works` provenance row
+ * or the content match. Normalizing them lets one list render both, so a
+ * matched Work is listed exactly like a linked one — with its own badge
+ * marking it as inferred rather than recorded.
+ */
+interface LinkedWorkRow {
+    key: string;
+    workId: string;
+    label: string;
+    kind: WorkLinkKind;
+    createdAt: string | null;
+}
+
 interface IdeaDetailClientProps {
     idea: WorkProposal;
     /**
@@ -258,8 +293,12 @@ interface IdeaDetailClientProps {
      * (`idea-work-match.ts`). The fallback answer to "was this built?"
      * for a Work created outside the Idea flow, which leaves no
      * provenance link behind. `null` ⇒ no match.
+     *
+     * Carries the display fields rather than a bare id because the match
+     * is also rendered as a Linked Works row — a Work the Idea produced
+     * must be listed there, not just linked from the build tracker.
      */
-    matchedWorkId?: string | null;
+    matchedWork?: MatchedWork | null;
     /** Idea-scoped Agents (`GET /agents?ideaId=`). */
     agents?: Agent[];
     /** Uploads attached to this Idea (`GET :id/attachments`). */
@@ -282,7 +321,7 @@ interface IdeaDetailClientProps {
 export function IdeaDetailClient({
     idea: initialIdea,
     initialLinks = [],
-    matchedWorkId = null,
+    matchedWork = null,
     agents = [],
     attachments = [],
     missionTitle = null,
@@ -378,8 +417,29 @@ export function IdeaDetailClient({
         isBuilt,
         workCount,
         workId: primaryWorkId,
-    } = deriveIdeaBuiltState(idea, links, matchedWorkId);
+    } = deriveIdeaBuiltState(idea, links, matchedWork?.id ?? null);
     const hasFailed = idea.status === 'failed';
+
+    // Linked Works rows: provenance first, then the content match — but
+    // only when no link already points at that Work, so a Work that has
+    // both a row and a matching name is listed once, under its real
+    // provenance kind. Cheap enough to derive on every render.
+    const linkedWorkRows: LinkedWorkRow[] = links.map((link) => ({
+        key: link.id,
+        workId: link.workId,
+        label: link.workName ?? link.workId.slice(0, 8),
+        kind: link.kind,
+        createdAt: link.createdAt,
+    }));
+    if (matchedWork && !linkedWorkRows.some((row) => row.workId === matchedWork.id)) {
+        linkedWorkRows.push({
+            key: `matched-${matchedWork.id}`,
+            workId: matchedWork.id,
+            label: matchedWork.name,
+            kind: 'matched',
+            createdAt: matchedWork.createdAt ?? null,
+        });
+    }
 
     // A pipeline run stamps `built` / `rebuilt`; the Work builder form
     // stamps `linked`. The tracker needs the difference so it doesn't
@@ -698,43 +758,46 @@ export function IdeaDetailClient({
                     </section>
 
                     {/* ── Linked Works ─────────────────────────────────── */}
-                    <section className={sectionCard}>
+                    <section className={sectionCard} data-testid="idea-linked-works">
                         <SectionHeader
                             icon={Boxes}
                             title={tPage('linkedWorks.title')}
-                            count={links.length}
+                            count={linkedWorkRows.length}
                         />
-                        {links.length === 0 ? (
+                        {linkedWorkRows.length === 0 ? (
                             <p className={emptyText}>{tDetail('works.empty')}</p>
                         ) : (
                             <ul className="space-y-2">
-                                {links.map((link) => (
-                                    <li key={link.id}>
+                                {linkedWorkRows.map((row) => (
+                                    <li key={row.key}>
                                         <Link
-                                            href={ROUTES.DASHBOARD_WORK(link.workId)}
+                                            href={ROUTES.DASHBOARD_WORK(row.workId)}
+                                            data-testid="idea-linked-work-row"
                                             className="group flex items-center gap-3 rounded-lg border border-border/60 dark:border-border-dark/60 bg-surface/30 dark:bg-surface-dark/30 px-3 py-2.5 hover:border-border dark:hover:border-border-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
                                         >
                                             <span className="min-w-0 flex-1 truncate text-sm font-medium text-text dark:text-text-dark group-hover:text-primary transition-colors">
-                                                {link.workName ?? link.workId.slice(0, 8)}
+                                                {row.label}
                                             </span>
                                             <span
                                                 className={cn(
                                                     'shrink-0 inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ring-1 ring-inset',
-                                                    KIND_BADGE[link.kind],
+                                                    KIND_BADGE[row.kind],
                                                 )}
                                             >
-                                                {tPage(`linkedWorks.kind.${link.kind}`)}
+                                                {tPage(`linkedWorks.kind.${row.kind}`)}
                                             </span>
-                                            <span className="shrink-0 text-xs text-text-muted dark:text-text-muted-dark">
-                                                {new Date(link.createdAt).toLocaleDateString(
-                                                    locale,
-                                                    {
-                                                        year: 'numeric',
-                                                        month: 'short',
-                                                        day: 'numeric',
-                                                    },
-                                                )}
-                                            </span>
+                                            {row.createdAt && (
+                                                <span className="shrink-0 text-xs text-text-muted dark:text-text-muted-dark">
+                                                    {new Date(row.createdAt).toLocaleDateString(
+                                                        locale,
+                                                        {
+                                                            year: 'numeric',
+                                                            month: 'short',
+                                                            day: 'numeric',
+                                                        },
+                                                    )}
+                                                </span>
+                                            )}
                                             <ArrowRight className="w-3.5 h-3.5 shrink-0 text-text-muted" />
                                         </Link>
                                     </li>

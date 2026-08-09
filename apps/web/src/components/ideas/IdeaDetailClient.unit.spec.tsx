@@ -72,6 +72,16 @@ const baseIdea: WorkProposal = {
     generatedAt: '2026-01-01T00:00:00.000Z',
 };
 
+/**
+ * The Work the page matched to this Idea by content — same subject as
+ * `baseIdea`, but with no `idea_works` row tying them together.
+ */
+const matchedWork = {
+    id: 'work-5',
+    name: 'Top AI coding assistants',
+    createdAt: '2026-01-03T00:00:00.000Z',
+};
+
 const builtLink: IdeaWorkLink = {
     id: 'link-1',
     ideaId: 'idea-1',
@@ -146,12 +156,25 @@ describe('IdeaDetailClient', () => {
 
     it('counts a Work matched by title + description as built', () => {
         // A Work built outside the Idea flow leaves no provenance link.
-        // The page matches it on content and hands the id down.
-        render(<IdeaDetailClient idea={baseIdea} matchedWorkId="work-5" />);
+        // The page matches it on content and hands it down.
+        render(<IdeaDetailClient idea={baseIdea} matchedWork={matchedWork} />);
 
         expect(screen.getByTestId('idea-built-badge')).toHaveTextContent('built.badge');
         expect(screen.queryByTestId('idea-build-button')).not.toBeInTheDocument();
         expect(screen.getByTestId('idea-built-work-link')).toHaveAttribute('href', '/works/work-5');
+    });
+
+    it('lists the matched Work under Linked Works', () => {
+        // Provenance has nothing to list, but the Work exists — leaving the
+        // section empty next to a "Built" badge read as a contradiction.
+        render(<IdeaDetailClient idea={baseIdea} matchedWork={matchedWork} />);
+
+        const rows = screen.getAllByTestId('idea-linked-work-row');
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toHaveAttribute('href', '/works/work-5');
+        expect(rows[0]).toHaveTextContent('Top AI coding assistants');
+        // Inferred, not recorded — it carries its own kind badge.
+        expect(rows[0]).toHaveTextContent('linkedWorks.kind.matched');
     });
 
     it('prefers the provenance link over a content match', () => {
@@ -159,11 +182,28 @@ describe('IdeaDetailClient', () => {
             <IdeaDetailClient
                 idea={{ ...baseIdea, status: 'accepted', acceptedWorkId: 'work-1' }}
                 initialLinks={[builtLink]}
-                matchedWorkId="work-5"
+                matchedWork={matchedWork}
             />,
         );
 
         expect(screen.getByTestId('idea-built-work-link')).toHaveAttribute('href', '/works/work-1');
+    });
+
+    it('lists a Work once when provenance and the content match agree', () => {
+        // Same Work from both sources: the recorded kind wins and the row
+        // is not duplicated.
+        render(
+            <IdeaDetailClient
+                idea={{ ...baseIdea, status: 'accepted', acceptedWorkId: 'work-1' }}
+                initialLinks={[builtLink]}
+                matchedWork={{ ...matchedWork, id: 'work-1' }}
+            />,
+        );
+
+        const rows = screen.getAllByTestId('idea-linked-work-row');
+        expect(rows).toHaveLength(1);
+        expect(rows[0]).toHaveTextContent('linkedWorks.kind.built');
+        expect(rows[0]).not.toHaveTextContent('linkedWorks.kind.matched');
     });
 
     it('falls back to the rollup count when the link list is unavailable', () => {

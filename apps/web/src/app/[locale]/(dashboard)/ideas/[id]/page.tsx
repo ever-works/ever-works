@@ -107,11 +107,20 @@ export default async function IdeaDetailPage({ params }: { params: Params }) {
         idea.missionId ? missionsAPI.get(idea.missionId).catch(() => null) : Promise.resolve(null),
     ]);
 
+    // Reduced to the three fields the client renders — a full `Work` is a
+    // large payload to serialize across the boundary for a fallback badge
+    // and one list row.
+    const matched = findMatchingWork(idea, workCandidates);
+
     return (
         <IdeaDetailClient
             idea={idea}
             initialLinks={ideaWorks.links}
-            matchedWorkId={findMatchingWork(idea, workCandidates)?.id ?? null}
+            matchedWork={
+                matched
+                    ? { id: matched.id, name: matched.name, createdAt: matched.createdAt }
+                    : null
+            }
             agents={agents}
             attachments={attachments}
             missionTitle={mission?.title ?? null}
