@@ -33,8 +33,9 @@ manifests are mutually incompatible by construction:
   minimum.
 - Our validator fatally rejects non-semver `version`; spec §4.4 forbids a client
   from rejecting exactly that.
-- Our manifest requires `id`/`category`/`capabilities`; none is a legal top-level
-  key in the spec manifest.
+- Our manifest requires `id`/`name`/`version`/`category`
+  (`plugin-manifest-validator.service.ts:45-48`); `id` and `category` are not
+  legal top-level keys in the spec manifest at all.
 
 Meanwhile, the *destination* side of skills is already built: the
 `skills-provider` capability seam (`SkillsFacadeService` fan-out, first-wins slug
@@ -52,13 +53,17 @@ are a spec-conformant package reader, an MCP *client* (we only ship an MCP
    the closed spec schemas (plugin.json, mcp.json, Agent Skills frontmatter),
    discovery, path containment, and `${PLUGIN_ROOT}`/`${PLUGIN_DATA}` expansion.
 
-2. **One native plugin bridges the two worlds.** A new first-party plugin
-   (`packages/plugins/agent-plugins`) discovers installed spec packages and
-   exposes (a) their skills through the existing `skills-provider` capability —
-   so catalog/install/bindings/injection are reused unchanged — and (b) their
-   MCP server configs through a new `mcp-provider` capability consumed by a new
-   MCP client service in `packages/agent` (official `@modelcontextprotocol/sdk`,
-   per NN #22).
+2. **Platform bridge services connect the two worlds.** A new module in
+   `packages/agent/src/agent-plugins/` exposes (a) package skills through an
+   additive, optional second source in `SkillsFacadeService` — merged last, so
+   catalog/install/bindings/injection are reused unchanged and existing entries
+   can never be displaced — and (b) MCP server configs through a
+   `McpServerConfigService` consumed by a new MCP client service in
+   `packages/agent` (official `@modelcontextprotocol/sdk`, per NN #22). This is
+   deliberately NOT a native plugin: plugins are instantiated bare with no
+   repository access, and the package registry is tenant-scoped DB state a
+   plugin could neither query nor scope (and the `skills-provider` seam is
+   scope-blind).
 
 3. **Sources: local directory, git, npm — data-only acquisition.** Local dirs
    are registered in place. Git sources are fetched ref-pinned. npm sources are
@@ -74,10 +79,11 @@ are a spec-conformant package reader, an MCP *client* (we only ship an MCP
    enabled where outbound policy allows, with Ever Works-managed credentials
    injected as client-generated headers (never stored in packages — spec §6.2.1
    forbids it). `stdio` MCP servers execute a subprocess: **disabled by
-   default**, operator-enabled on self-hosted/desktop, and on managed SaaS only
-   via the sandboxed workspace execution family (same trust class as CLI runner
-   plugins). Skill sidecar `scripts/` are never executed by the platform itself;
-   they are materialized into run workspaces where the run's own execution
+   default**, operator-enabled on self-hosted/desktop; on the managed SaaS,
+   stdio stays disabled in v1 — enabling it there requires a sandboxed
+   execution route this feature does not build (explicit follow-up decision).
+   Skill sidecar `scripts/` are never executed by the platform itself; they
+   are materialized into CLI-runner workspaces where the run's own execution
    policy governs them.
 
 5. **`works.ever` is our extension namespace** (reverse-domain of `ever.works`),

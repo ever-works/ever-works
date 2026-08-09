@@ -24,7 +24,7 @@ flowchart TD
     end
     subgraph NewCode["New code"]
         CoreLib["packages/agent-plugins\n(conformance library — pure)"]
-        Bridge["packages/plugins/agent-plugins\n(native plugin: skills-provider + mcp-provider)"]
+        Bridge["AgentPluginCatalogService +\nMcpServerConfigService\n(packages/agent/src/agent-plugins/)"]
         InstallSvc["AgentPluginPackageService\n(packages/agent/src/agent-plugins/)"]
         McpClient["McpClientService + McpToolSource\n(packages/agent/src/mcp/)"]
         Exporter["Package exporter\n(skills → plugin.json + skills/)"]
@@ -46,7 +46,7 @@ flowchart TD
     InstallSvc --> PkgRow
     Bridge --> CoreLib
     Bridge --> PkgRow
-    Bridge -- "SkillCatalogEntry[]" --> Facade
+    Bridge -- "SkillCatalogEntry[] (additive optional\nsource, LAST in dedupe order)" --> Facade
     Facade --> Install
     Bridge -- "validated server configs" --> McpClient
     BindRow --> McpClient
@@ -78,13 +78,13 @@ v1.0.0). Contents:
 
 | Module | Responsibility |
 |---|---|
-| `src/manifest.ts` | Closed `plugin.json` parse + validate with the spec's exact severity split (AP-4): returns `{ manifest, warnings[] }` or a typed fatal error. Vendored canonical JSON Schemas under `src/schemas/1.0.0/` (imported via `resolveJsonModule` so they ship in `dist/` — do NOT place at package root: both packaging scripts copy `dist/` only, `scripts/prepare-docker-plugins.js:39-62`, `packages/tasks/scripts/prepare-plugins.js:16-25`) |
+| `src/manifest.ts` | Closed `plugin.json` parse + validate with the spec's exact severity split (AP-4): returns `{ manifest, warnings[] }` or a typed fatal error. Vendored canonical JSON Schemas under `src/schemas/1.0.0/` (imported via `resolveJsonModule` so they ship in `dist/` — do NOT place at package root: both packaging scripts copy `dist/` only, `scripts/prepare-docker-plugins.js:39-62`, `packages/tasks/scripts/prepare-plugins.js:50-67`) |
 | `src/skills.ts` | `skills/` discovery (immediate children only, `SKILL.md` regular-file check) + Agent Skills frontmatter validation (name/dir match, charset, description length, `allowed-tools` **space-separated-string → string[]** tokenizer). Skip-one semantics (AP-9) |
 | `src/mcp.ts` | Closed `mcp.json` parse; per-server closed-union validation (stdio / streamable-http / sse); URL rules (https-unless-loopback, no userinfo/fragment); header case-insensitive dup detection; reserved-env-key rejection |
 | `src/paths.ts` | Containment: `resolveWithinRoot(root, rel)` with `realpath` symlink resolution (AP-10). Modeled on `confinePluginEntry` (`plugin-loader.service.ts:832-860`) but exported + covering non-js files |
 | `src/expand.ts` | `${PLUGIN_ROOT}`/`${PLUGIN_DATA}` single-pass non-recursive expansion for args elements / env values / cwd only (AP-17) |
 | `src/serialize.ts` | Export side: `plugin.json` emitter, SKILL.md emitter (frontmatter YAML via `gray-matter` — new dep **of this package**; today only `packages/plugins/everworks-skills/package.json:35` has it, and `matter.stringify` has zero uses repo-wide), slug→spec-name guard (≤64, no `--`) |
-| `fixtures/` | Conformance corpus: valid + malformed packages for every AP requirement. **Add `docs/…/agent-plugins` fixtures dir to `.prettierignore`** — root `format:check` glob is `**/*.{ts,tsx,jsx,json,css,md}` (root `package.json:45`) and would rewrite deliberately-malformed fixtures |
+| `fixtures/` | Conformance corpus: valid + malformed packages for every AP requirement. **Add `packages/agent-plugins/fixtures/` to `.prettierignore`** — the root glob `**/*.{ts,tsx,jsx,json,css,md}` (root `package.json:45`) makes `format:check` FAIL on deliberately-malformed fixtures and `pnpm format` would rewrite them |
 
 Validation engine: Ajv 8 (own declared dep — pnpm strict node_modules means we
 cannot lean on `packages/agent`'s copy) for the two JSON schemas, plus hand-rolled
@@ -92,26 +92,45 @@ checks for everything schemas can't express (severity split, dir-name match,
 containment). `skills-ref` (Python) optionally runs in CI as an oracle — non-blocking
 job.
 
-### 2.2 `packages/plugins/agent-plugins` — the bridge plugin (new, native)
+### 2.2 Platform bridge services (new, in `packages/agent/src/agent-plugins/`)
 
-Normal native plugin: `everworks.plugin` id `agent-plugins`, name "Agent Plugins
-(Standard)", category `integration`, capabilities `["skills-provider",
-"mcp-provider"]`. **No `autoEnable`, no `defaultForCapabilities`** — ships inert;
-first-wins slug dedupe in the facade (`skills.facade.ts:88-92`) plus
-`defaultForCapabilities`-first ordering means it can never displace
-`everworks-skills` entries.
+**Why not a native plugin** (design decision, forced by verified constraints):
+native plugins are instantiated bare — `plugin-loader.service.ts:364`
+`return new PluginClass();` — receiving only `PluginContext` (logger/cache/http/
+settings; NO repository access, by trust design), so a plugin cannot query the
+Tier A `agent_plugin_packages` table; and `ISkillsProviderPlugin.listEntries` is
+scope-blind (`skills-provider.interface.ts:36-42` — limit/offset/tags/search
+only), so tenant-scoped catalogs cannot flow through that seam without
+cross-tenant leakage. Platform services have neither problem — and they can call
+the existing gates (`assertBody`-family checks, `packages/agent/src/utils/
+secret-scan.ts`) directly, which a standalone plugin package cannot import.
 
-- `ISkillsProviderPlugin` impl: `listEntries`/`getEntry` read registered packages
-  (via the package service) → `SkillCatalogEntry[]`. `version` (required by
-  `skills-provider.interface.ts:31`) = package `version` when present, else
-  content-hash-derived (AP-21). Implements `checkForUpdates` — and this feature
-  **adds the missing caller** (facade + UI badge; today it has zero non-test
-  callers).
-- New `IMcpProviderPlugin` (additive interface in
-  `packages/plugin/src/contracts/capabilities/mcp-provider.interface.ts` +
-  capability string `mcp-provider`; the capability list is free-form strings, no
-  category change needed): `listServers(scope)` → validated server configs +
-  provenance (packageId, serverName).
+- **`AgentPluginCatalogService`**: reads registered package rows (scoped through
+  the caller's request scope) + package files via the conformance library →
+  `SkillCatalogEntry[]` with provenance. Wired into `SkillsFacadeService.
+  listEntries` as an **additive, `@Optional()`-injected second source**, merged
+  LAST so the existing first-wins slug dedupe (`skills.facade.ts:88-92`) and the
+  `defaultForCapabilities`-first plugin ordering (`base.facade.ts:284-289`)
+  guarantee package entries can never displace `everworks-skills` entries.
+  Existing facade behavior with the feature flag off (or no packages installed)
+  is bit-identical. Entry `version` (required by
+  `skills-provider.interface.ts:31`) = package `version` when parseable, else
+  content-hash-derived (AP-21). `SkillCatalogEntry` gains **optional** readonly
+  provenance fields (`packageName?`, `packageVersion?`, `sourceKind?`) —
+  additive interface change only — so US-5's source labels have a data carrier.
+  Pre-flight findings (64KB cap, secret scan, injection tokens) computed here by
+  calling the same util functions the install path enforces.
+- **`McpServerConfigService`**: resolves a run's bound MCP servers
+  (`agent_mcp_server_bindings` rows → package `mcp.json` configs via the
+  conformance library) with per-server validation findings. Consumed only by
+  `McpClientService` (§2.4). No new plugin capability string, no
+  `PLUGIN_CAPABILITIES`/`facade-capabilities.ts` append — the closed typed
+  capability map (`packages/plugin/src/contracts/facade-capabilities.ts:101-106`)
+  stays untouched.
+- **Update checks**: the catalog service implements the update-available
+  computation for git/npm packages and the facade surfaces it — this also adds
+  the missing caller for the existing `checkForUpdates` provider seam (zero
+  non-test callers today) so `everworks-skills` catalog updates surface too.
 
 ### 2.3 `packages/agent/src/agent-plugins/` — package lifecycle (new module in agent)
 
@@ -179,8 +198,12 @@ strict).
   order). `command` containment via the conformance library. Gate: see §5.
 - **streamable-http/sse**: SSRF policy layered on the EW-711 work — deny
   cluster-internal/link-local/metadata targets by default (the spec's URL rules
-  alone permit `http://ever-works-api:3100`-shaped loopback-adjacent targets;
-  our egress policy must not).
+  reject plain-http non-loopback targets, but an `https://ever-works-api.internal`
+  -shaped cluster target passes them; our egress policy must deny it). Redirect
+  handling per AP-15 is **runtime client behavior**: never forward
+  package-configured headers cross-origin without explicit user authorization,
+  and never forward client-generated credential headers cross-origin at all —
+  implemented and tested in T25, not just statically validated.
 - Credentials: per-binding encrypted `secretSettings` (AES-256-GCM
   `PluginSecretEncService` pattern — note the key is
   **`PLUGIN_SECRET_ENCRYPTION_KEY`**, not `PLATFORM_ENCRYPTION_KEY`:
@@ -191,7 +214,7 @@ strict).
   (stdio) at connect time; masked on read (partialReveal,
   `plugin-operations.service.ts:1776-1799`).
 
-### 2.5 Entities (new; Tier per tenants-and-organizations spec §126-142)
+### 2.5 Entities (new; Tier per tenants-and-organizations spec §126-143)
 
 Register every one in **`packages/agent/src/database/_entities-inventory.ts`**
 (the ENTITIES array moved there; `database.config.ts:52` imports it) + migration
@@ -200,10 +223,10 @@ in the SAME PR (`apps/api/src/migrations/`, latest is
 
 | Entity | Tier | Shape (template) |
 |---|---|---|
-| `agent_plugin_packages` | **A** (`tenantId`+`organizationId` nullable uuid, no `@ManyToOne`, **no XOR CHECK** — known migration-abort bug class) | Mirrors `PluginEntity`'s EW-693 columns (`plugin.entity.ts:132-174`): `name` (spec name), `version` nullable, `manifest` json, `source: 'local'\|'git'\|'npm'`, `sourceRef` (dir path / git url#ref / npm spec), `integrity` nullable, `installPath`, `dataPath`, `installState`, `installError`, `contentHash`, per-component findings json (skipped skills, disabled MCP reasons) |
+| `agent_plugin_packages` | **A** (`tenantId`+`organizationId` nullable uuid, no `@ManyToOne`, **no XOR CHECK** — known migration-abort bug class) | Mirrors `PluginEntity`'s EW-693 columns (`plugin.entity.ts:132-174`): `name` (spec name), `version` nullable, `manifest` json, `source: 'local'\|'git'\|'npm'`, `sourceRef` (dir path / git url#ref / npm spec), `integrity` nullable, `installPath`, `dataPath`, `installState`, `installError`, `contentHash`, per-component findings json (skipped skills, disabled MCP reasons), `dataManifest` json (PLUGIN_DATA object-storage key manifest — see §3 SaaS persistence) |
 | `agent_plugin_package_allowlist` | D (global, like `plugin_allowlist`) | `packageName`, `versionRange`, `integrity?`, `source: 'npm'\|'git'`, `enabled` |
-| `agent_mcp_server_bindings` | **C** (denorm pair) | `skill_bindings` template (`skill-binding.entity.ts`): `packageId` FK CASCADE, `serverName`, `targetType ∈ 'agent'\|'work'\|'tenant'`, `targetId` nullable-for-tenant, `userId`, `enabled`, `settings`/`secretSettings` json, `credentialsSecretRef` varchar(128) nullable, unique `(packageId, serverName, targetType, targetId)` |
-| `skill_files` (Phase 5) | C | Sidecar store: `skillId` FK, `relPath`, `sha256`, `size`, `mime`, bytes via `IStoragePlugin` at `agent-plugins/<sha256>` — the `user_uploads` shape (`uploads.service.ts`: magic-byte sniff, sha256 naming, size caps; `assertNoSecrets` on text files only; NO injection-token gate on scripts — that gate is for prompt-bound bodies only, `skills.service.ts:394-405`) |
+| `agent_mcp_server_bindings` | **C** (denorm pair) | `skill_bindings` template (`skill-binding.entity.ts` provides: subject FK CASCADE, `targetType` (5-valued there; restricted here to `'agent'\|'work'\|'tenant'`), `targetId` nullable-for-tenant, `userId`, unique index) **PLUS net-new columns**: `serverName`, `enabled`, `settings`/`secretSettings` json, `credentialsSecretRef` varchar(128) nullable; unique `(packageId, serverName, targetType, targetId)`. v1 API creates agent-scoped bindings only; the column shape supports work/tenant targets later |
+| `skill_files` (Phase 5) | C | Sidecar store: `skillId` FK, `relPath`, `sha256`, `size`, `mime`, bytes via `IStoragePlugin` at `agent-plugins/<sha256>` — copy the `user_uploads` validation shape (`uploads.service.ts`: magic-byte sniff, sha256 naming, size caps). NOTE: the uploads stack does NOT secret-scan — wire `assertNoSecrets` (`packages/agent/src/utils/secret-scan.ts`) as a NEW check on text-like files only; NO injection-token gate on scripts (that gate is for prompt-bound bodies only, `skills.service.ts:394-405`) |
 
 **Scope model**: package install rows are per-tenant/org (Tier A — the platform's
 `Skill` already is; do NOT copy the unscoped code-plugin tables). Enablement
@@ -241,7 +264,8 @@ pointers deliberately omitted (deployment-local meaning).
   `agent-tool.service.ts:317-319`) via a new entry in the
   `AGENT_DOMAIN_TOOL_SOURCES` bundle.
 - Module-shape pin specs updated in the same PR as any provider add
-  (`apps/api/src/agents/agents.module.spec.ts:158,205`,
+  (`apps/api/src/agents/agents.module.spec.ts:178-201` (the
+  `AGENT_DOMAIN_TOOL_SOURCES` inject-array pin) and `:205`,
   `apps/api/src/trigger/trigger-internal.module.spec.ts`).
 - OpenAPI: run `generate:openapi` full-app bootstrap as the DI gate
   (`apps/api/package.json:19`); no committed openapi.json exists (verified) —
@@ -257,7 +281,7 @@ pointers deliberately omitted (deployment-local meaning).
 |---|---|
 | Packages dir | `AGENT_PLUGINS_DIR`, **optional-with-default** `/app/agent-plugins` (constants.ts `installDir()` :389 pattern — avoids the required-env crash-loop class). NEVER at `/app/plugins` (prohibition comment, `k8s-manifest.prod.yaml:396-413`) |
 | PLUGIN_DATA root | `AGENT_PLUGINS_DATA_DIR`, default `/app/agent-plugins-data`; per-package dir keyed **per (tenant, package)** — a shared stdio server must never mix tenant data |
-| SaaS persistence | Per-replica local dirs + **DB/object-storage write-through**: package bytes re-materialized on boot (warmupFromDb precedent); PLUGIN_DATA synced through the boot-selected `IStoragePlugin` (`storage.interface.ts` putObject/getObject; no list op → keep a DB-side key manifest). RWO PVC does not fit the 2-replica API; emptyDir alone violates the spec's persistence MUST |
+| SaaS persistence | Per-replica local dirs + **DB/object-storage write-through**: package bytes re-materialized on boot (warmupFromDb precedent); PLUGIN_DATA synced through the boot-selected `IStoragePlugin` (`storage.interface.ts` putObject/getObject; no list op → the key manifest is a declared **`dataManifest` json column on `agent_plugin_packages`** — not a separate table, no extra migration). RWO PVC does not fit the 2-replica API; emptyDir alone violates the spec's persistence MUST |
 | Self-host/desktop | Plain disk dirs; desktop bundle staging extended in `apps/desktop/scripts/prepare-bundle.js` (:147-149 copies `plugins/` — add `agent-plugins/`) |
 | Env wiring | The 2026-06-12 checklist: k8s manifests (dev/stage/prod) + deploy workflow env blocks + `.env.example` + compose env files + e2e.yml if boot-required (they are NOT — defaults). ArgoCD-managed live env source is outside this repo — flag to operator explicitly |
 | Feature flag | `FEATURE_AGENT_PLUGINS` default **false** (`FEATURE_DYNAMIC_PLUGINS` precedent, constants.ts:316-325) |
@@ -267,7 +291,7 @@ pointers deliberately omitted (deployment-local meaning).
 
 ## 4. Skills flow details
 
-1. **Ingest** (bridge plugin → facade): conformance lib parses; `allowed-tools`
+1. **Ingest** (catalog service → facade): conformance lib parses; `allowed-tools`
    tokenized to `allowedTools: string[]` **at ingest only** (never a global
    normalizer/backfill — `filterSkillsByToolGrants`
    (`packages/agent/src/policy/skill-activation.ts:59-97`) *suppresses* skills
@@ -278,7 +302,7 @@ pointers deliberately omitted (deployment-local meaning).
    (`skills.service.ts:186`) — the 64KB body cap + secret scan + injection-token
    gate (:394-405) apply unchanged. Oversized/gated bodies are surfaced as
    per-skill findings at package validation time (pre-flight the checks in the
-   bridge's `listEntries` so the catalog card can warn *before* install fails).
+   catalog service's `listEntries` so the card can warn *before* install fails).
 3. **Slug collision**: spec skill names are `[a-z0-9-]` ≤64 — a strict subset of
    the slug DTO `/^[a-z0-9-]{1,80}$/` (`skill.dto.ts:176`). Facade dedupe is
    first-wins with `defaultForCapabilities` providers sorted first — package
@@ -300,9 +324,10 @@ pointers deliberately omitted (deployment-local meaning).
    do not promise it.
 6. **e2e trap**: `apps/web/e2e/flow-skills-catalog-pagination.spec.ts` pins 10
    catalog slugs in the first page (:46-57, :522-523), asserts total ≤200
-   (:549-551) and disjoint tag math (:633). The bridge plugin ships
-   **disabled-by-default** so CI catalogs are unchanged; the task enabling it
-   anywhere in e2e must revisit that spec explicitly.
+   (:549-551) and disjoint tag math (:633). The platform catalog source is
+   feature-flag-off by default and empty without installed packages, so CI
+   catalogs are unchanged; any task enabling it in e2e must revisit that spec
+   explicitly.
 
 ---
 

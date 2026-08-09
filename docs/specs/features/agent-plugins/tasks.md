@@ -68,10 +68,14 @@ appends, locale key appends) are expected and fine.
 
 ## Phase 1 — Package registry + local-dir source + skills read-side (PR-2, PR-3)
 
-- [ ] **T10**. Entities `agent_plugin_packages` (Tier A) +
+- [ ] **T10**. Entities `agent_plugin_packages` (Tier A, incl. `dataManifest`) +
       `agent_plugin_package_allowlist` (Tier D) per plan §2.5; append to
       `_entities-inventory.ts`; migration `CreateAgentPluginPackages`.
-      **Read the generated SQL** before commit (NN #16).
+      **Read the generated SQL** before commit (NN #16). Account-transfer
+      whitelist entries for packages land HERE, same PR (types.ts + export
+      literal + both import paths + SyncPushOptions) — reference-only export
+      (name+version+source), never package content; deferring this to Phase 3
+      would reopen the silent-no-round-trip bug class.
 - [ ] **T11**. `packages/agent/src/agent-plugins/` module:
       `AgentPluginPackageService` (register/validate/list/remove; findings
       persisted per package), local-dir acquirer (`AGENT_PLUGINS_DIR` scan,
@@ -79,20 +83,29 @@ appends, locale key appends) are expected and fine.
       in `packages/agent/package.json` export map.
 - [ ] **T12**. Feature flag `FEATURE_AGENT_PLUGINS` default false in
       `apps/api/src/config/constants.ts` + `.env.example` + compose env files.
-- [ ] **T13**. Bridge plugin `packages/plugins/agent-plugins` with
-      `skills-provider` impl (listEntries/getEntry from registered packages;
-      version synthesis per AP-21; pre-flight 64KB/secret/injection findings).
-      No autoEnable, no defaultForCapabilities.
+- [ ] **T13**. `AgentPluginCatalogService` (plan §2.2) in
+      `packages/agent/src/agent-plugins/`: entries from registered package rows
+      + conformance lib; version synthesis per AP-21; pre-flight findings by
+      calling the existing gates directly (`MAX_BODY_BYTES`/`assertNoSecrets`/
+      `assertNoInjectionTokens` — reachable because this is platform code, not
+      a plugin). Wire into `SkillsFacadeService.listEntries` as an
+      `@Optional()`-injected additive source merged LAST (existing behavior
+      bit-identical when absent/flag-off). Add optional provenance fields
+      (`packageName?`/`packageVersion?`/`sourceKind?`) to `SkillCatalogEntry`
+      (additive interface change). Barrel-export the new module in
+      `packages/agent/package.json` export map.
 - [ ] **T14**. API controller `apps/api/src/agent-plugins/` (list/install
       local/uninstall/findings), throttled 5/min, admin allowlist CRUD parallel
       to `admin/plugins/allowlist`. DTO validation + validation-authz-matrix
       e2e specs for every new route.
 - [ ] **T15**. CLI verbs (`agent-plugins list/install/status/uninstall`)
       following `dynamic.command.ts` pattern.
-- [ ] **T16**. Integration test: fixture package on disk → register → catalog
+- [ ] **T16**. Integration test (Jest, in `packages/agent` — the facade +
+      services live there; conformance-lib unit tests stay Vitest in
+      `packages/agent-plugins`): fixture package on disk → register → catalog
       entries appear via `SkillsFacadeService` → `installFromCatalog` →
       identical `Skill` rows; assert existing catalog e2e pins unaffected
-      (bridge disabled by default; `flow-skills-catalog-pagination.spec.ts`
+      (flag off by default; `flow-skills-catalog-pagination.spec.ts`
       untouched).
 
 ## Phase 2 — git + npm sources + updates (PR-4)
@@ -105,9 +118,11 @@ appends, locale key appends) are expected and fine.
       mapping parity with the code-plugin installer.
 - [ ] **T19**. Boot re-materialization (warmupFromDb pattern) for git/npm
       packages; startupProbe budget check.
-- [ ] **T20**. Wire `checkForUpdates` end-to-end (facade → bridge provider →
-      "update available" badge + explicit re-sync action) — this adds the
-      missing caller for the existing seam too.
+- [ ] **T20**. Update-available end-to-end: catalog service computes updates for
+      git/npm packages; facade surfaces a badge + explicit re-sync action; the
+      same facade wiring finally calls the existing provider `checkForUpdates`
+      seam (zero non-test callers today) so `everworks-skills` updates surface
+      too.
 - [ ] **T21**. Web UI: Sources + Packages pages under settings; install flow
       with per-component findings display; i18n keys in ALL
       `apps/web/messages/*.json`; PostHog events.
@@ -117,28 +132,38 @@ appends, locale key appends) are expected and fine.
 
 ## Phase 3 — MCP client: remote transports + bindings (PR-5, PR-6)
 
-- [ ] **T23**. `IMcpProviderPlugin` capability interface (additive, in
-      `packages/plugin/src/contracts/capabilities/`) + bridge impl returning
-      validated server configs with provenance.
-- [ ] **T24**. Entity `agent_mcp_server_bindings` (Tier C, skill_bindings
-      template incl. `secretSettings` + `credentialsSecretRef`) + migration +
-      inventory append. Account-transfer whitelist entries (types + export
-      literal + both import paths + SyncPushOptions) for packages + bindings —
-      reference-only export, masked secrets, refs omitted.
+- [ ] **T23**. `McpServerConfigService` (plan §2.2) in
+      `packages/agent/src/agent-plugins/`: resolves bound servers → validated
+      configs + provenance via the conformance lib. No plugin capability, no
+      `facade-capabilities.ts` append. Barrel-export from
+      `packages/agent/package.json` export map (TS2305 bug class).
+- [ ] **T24**. Entity `agent_mcp_server_bindings` (Tier C — skill_bindings
+      template PLUS net-new columns `serverName`/`enabled`/`settings`/
+      `secretSettings`/`credentialsSecretRef`, per plan §2.5) + migration +
+      inventory append. Account-transfer whitelist entries for bindings (same
+      4-place set as T10) — masked secrets, `credentialsSecretRef` pointers
+      deliberately omitted.
 - [ ] **T25**. `packages/agent/src/mcp/`: `McpClientService`
       (streamable-http + sse via `@modelcontextprotocol/sdk` — new dep of
       `packages/agent`), per-server failure isolation, connect-time credential
       injection (client-generated headers; masked reads), SSRF egress policy,
-      run-end disconnect.
+      **redirect policy per AP-15** (no package-header cross-origin forwarding
+      without explicit authorization; no client-generated credential forwarding
+      cross-origin at all — with tests), run-end disconnect.
 - [ ] **T26**. `McpToolSource` injected into `AgentToolService.
       resolveAllowedTools` as a new optional source (domain-tool-source
       pattern); `mcp__<server>__<tool>` naming; name/description sanitization;
       builtin-collision drop + WARN; run-log WARNs for skipped servers.
       Update module pin specs.
 - [ ] **T27**. Bindings API (`/api/agents/:id/mcp-servers` CRUD + standalone
-      delete) + **MCP Servers tab** on `/agents/[id]` + i18n + domain chat
-      tools for both new entities (agent-tool.service DoD) + e2e specs
-      (binding CRUD, authz matrix, cross-tenant isolation).
+      delete; agent-scoped targets only in v1) + **MCP Servers tab** on
+      `/agents/[id]` + i18n + e2e specs (binding CRUD, authz matrix,
+      cross-tenant isolation). Domain chat tools per the in-code DoD
+      (`agent-tool.service.ts:317-319`, "every new entity"): packages +
+      bindings get tool sources here; `agent_plugin_package_allowlist` is
+      exempt (admin-only surface, like `plugin_allowlist` which has no chat
+      tools) and `skill_files` is exempt (child rows surfaced through existing
+      skill tools) — exemptions stated so the DoD check is explicit.
 - [ ] **T28**. Decision + implementation: MCP tool invocations →
       `PluginUsageEvent` usage accounting (recommended: on).
 
@@ -153,8 +178,15 @@ appends, locale key appends) are expected and fine.
       token command resolution (bare vs `./`-relative) with containment; cwd
       rules per AP-13; process supervision + teardown at run end.
 - [ ] **T31**. Triple gate: feature flag + `AGENT_PLUGINS_STDIO` deployment
-      setting (default off in cloud) + per-binding explicit enable; disabled
-      stdio surfaces as "present, disabled by policy" (AP-19).
+      setting (default off; v1 SaaS keeps it off — no sandbox route is built in
+      this feature) + per-binding explicit enable; disabled stdio surfaces as
+      "present, disabled by policy" (AP-19).
+- [ ] **T31b**. Phase-4 env wiring repeat of the 2026-06-12 checklist for
+      `AGENT_PLUGINS_DATA_DIR` + `AGENT_PLUGINS_STDIO`: k8s manifests
+      (dev/stage/prod) + deploy workflow env blocks + `.env.example` + compose
+      files + explicit operator note for the ArgoCD-managed live env (outside
+      this repo). Defaults keep boot non-fatal; the wiring is still required
+      for the values to be settable.
 - [ ] **T32**. Full-spec conformance run: fixture packages exercising every
       §10.1 checklist row against the live loader; publish the checklist result
       as a doc page.
@@ -163,14 +195,18 @@ appends, locale key appends) are expected and fine.
 
 - [ ] **T33**. `skill_files` entity + migration + storage via `IStoragePlugin`
       (uploads-stack validation: sha256 naming, MIME sniff, per-file + per-skill
-      size caps, `assertNoSecrets` on text only). Bridge ingests sidecars;
-      findings for oversized/rejected files.
+      size caps). NOTE: uploads stack does NOT secret-scan — wire
+      `assertNoSecrets` (`packages/agent/src/utils/secret-scan.ts`) as a NEW
+      check on text-like files only. Package service ingests sidecars; findings
+      for oversized/rejected files.
 - [ ] **T34**. Materialization into claude-code workspace staging
       (`claude-code.plugin.ts:542-558` seam): `.claude/skills/<name>/…` +
       `.mcp.json` next to `seedMetadata` writes. Explicitly does NOT touch the
       Wave-2 Task-workspace path (`workspaceCwd` has no consumer — see plan §4.5).
 - [ ] **T35**. Export API + CLI + UI: scope-selected skills → conformant
-      package (zip); round-trip gate (AP-22/23); slug guard with rename prompt.
+      package (zip); round-trip gate (AP-22/23); slug guard enforcing the FULL
+      spec name rule (≤64, no `--`, no leading/trailing hyphen — the DTO
+      accepts all three) with rename prompt.
 - [ ] **T36**. `ever-works-mcp` package descriptor export (streamable-http
       `https://mcp.ever.works/mcp`, credential-free; docs updated by addition —
       pointer from `docs/features/mcp-server.md`, no removal).
@@ -187,8 +223,13 @@ appends, locale key appends) are expected and fine.
 - [ ] **T40**. Security review pass (stdio gate, SSRF policy, containment
       fuzzing over fixture escapes); Sentry tags; rate-limit re-check.
 - [ ] **T41**. Conformance statement doc: map every §10.1 row + AP-1…AP-23 to
-      test evidence; announce "Agent Plugins v1.0.0 compatible (client, skills
-      + MCP; producer, skills)".
+      test evidence; announce "Agent Plugins v1.0.0 compatible (client: skills
+      + MCP; producer: skills packages, plus the Ever Works MCP-server package
+      descriptor)" — the single canonical claim wording, used verbatim in spec
+      §1.3, the ADR, and marketing. MUST document client-side policy refusals
+      explicitly (64KB body cap, secret/injection gates, stdio-off deployments,
+      SSRF egress denies): spec-valid packages a deployment may decline to load,
+      stated as policy, not as conformance gaps.
 
 ---
 

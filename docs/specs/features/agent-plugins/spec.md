@@ -65,9 +65,13 @@ These are different species and MUST stay separate:
 | Validated by | `PluginManifestValidator` (unchanged) | New closed-schema validator (parallel, per spec §4) |
 | Trust | First-party / ADR-016 allowlist; code runs in-process | Data is safe to parse; **only** stdio MCP servers execute anything, behind an explicit gate (§4.4) |
 
-The bridge between the two worlds is **one new native plugin**
-(`packages/plugins/agent-plugins`) that discovers installed spec packages and feeds
-their contents into existing platform seams (skills catalog) and one new seam (MCP).
+The bridge between the two worlds is a **new platform module**
+(`packages/agent/src/agent-plugins/`) whose services read installed spec packages
+and feed their contents into existing platform seams (an additive second source in
+the skills catalog facade) and one new seam (MCP). It is deliberately NOT a native
+plugin: native plugins are instantiated bare (`plugin-loader.service.ts:364`
+`new PluginClass()`) with no repository access, and the package registry is
+tenant-scoped DB state — a plugin could neither query it nor scope it.
 
 The existing validator MUST NOT be reused for spec manifests and MUST NOT be relaxed:
 the two schemas disagree by design (spec `name` allows dots and 1-char names and
@@ -139,10 +143,12 @@ a marketplace UI beyond the sources/install surface described here.
   disclosure. Existing behavior is unchanged either way.)
 - **US-6 (sidecars)**: Skills that ship `scripts/`, `references/`, or `assets/` keep
   those files. They are stored with the installed package and **materialized into the
-  agent's workspace** when a run's environment supports file access (CLI runners /
-  task workspaces), so `scripts/extract.py`-style references in skill bodies actually
-  resolve. Runs without a workspace get the body only, plus a note that sidecar files
-  are attached to the skill (progressive disclosure level 3).
+  CLI-runner workspace** (the claude-code plugin's staging step) so
+  `scripts/extract.py`-style references in skill bodies actually resolve there. Runs
+  without a file workspace get the body only, plus a note that sidecar files are
+  attached to the skill (progressive disclosure level 3). Materialization into
+  Wave-2 **Task workspaces is explicitly deferred** — the provisioned `workspaceCwd`
+  has no execution consumer today (plan §4.5); we do not promise it in v1.
 
 ### 2.3 Using package MCP servers
 
@@ -157,10 +163,11 @@ a marketplace UI beyond the sources/install surface described here.
   *client-generated* headers/env — which the spec explicitly permits and gives
   precedence over package-configured values.
 - **US-9 (stdio gate)**: `stdio` servers execute a subprocess. This is OFF by default
-  and gated per ADR-018: enabled by operator setting on self-hosted/desktop; on the
-  managed SaaS it requires the sandbox/workspace execution path (same trust family as
-  CLI runner plugins). `streamable-http`/`sse` servers are network clients and are
-  enabled wherever outbound network policy allows.
+  and gated per ADR-018: enabled by operator setting on self-hosted/desktop. On the
+  managed SaaS, stdio stays **disabled in v1** — enabling it there requires a
+  sandboxed execution route that this feature does not build (an explicit follow-up
+  decision, not a v1 deliverable). `streamable-http`/`sse` servers are network
+  clients and are enabled wherever outbound network policy allows.
 
 ### 2.4 Exporting
 
@@ -171,10 +178,12 @@ a marketplace UI beyond the sources/install surface described here.
   export → import into a fresh Ever Works → identical skill rows (modulo ids/scopes).
 - **US-11**: `GET /api/agent-plugins/export/ever-works-mcp` (or CLI) emits the
   canonical package describing our own MCP server as a `streamable-http` entry —
-  **without credentials** (auth is documented as client-generated headers), fixing the
-  spec-illegal `env: {EVER_WORKS_API_KEY}` example currently in
-  `docs/features/mcp-server.md` *by addition* (the new package is the conformant path;
-  the existing doc gains a pointer, nothing is removed).
+  **without credentials** (auth is documented as client-generated headers). The
+  `env: {EVER_WORKS_API_KEY: "ew_live_…"}` example currently in
+  `docs/features/mcp-server.md` would violate the spec's producer rule (plugins
+  MUST NOT embed credentials in `env`/`headers`) if shipped in a package; the new
+  package is the conformant path and the existing doc gains a pointer *by
+  addition* — nothing is removed.
 
 ### 2.5 Where this runs
 
@@ -191,12 +200,12 @@ configuration, not code paths.
 |---|---|
 | Plugin (package) | New `agent_plugin_packages` row + files under the managed packages dir (or a registered local source dir) |
 | `plugin.json` manifest | Parsed by the new conformance library; stored on the package row (`manifest` json column) |
-| Skill (`skills/<name>/SKILL.md`) | `SkillCatalogEntry` via the `skills-provider` capability → existing `Skill` row on install (frontmatter preserved verbatim in the open `frontmatter` json column, body in `instructionsMd`) |
-| Skill sidecar files (`scripts/`, `references/`, `assets/`) | Stored with the package; materialized into run workspaces (plan §Workspace) |
-| MCP server (`mcp.json` entry) | New `mcp-provider` capability output → bindable via new `agent_mcp_server_bindings`; connected at run time by the new MCP client service in `packages/agent` |
+| Skill (`skills/<name>/SKILL.md`) | `SkillCatalogEntry` via the catalog facade's additive platform source (plan §2.2) → existing `Skill` row on install (frontmatter preserved verbatim in the open `frontmatter` json column, body in `instructionsMd`) |
+| Skill sidecar files (`scripts/`, `references/`, `assets/`) | Stored with the package; materialized into CLI-runner workspaces (plan §4.5) |
+| MCP server (`mcp.json` entry) | New `McpServerConfigService` output → bindable via new `agent_mcp_server_bindings`; connected at run time by the new MCP client service in `packages/agent` |
 | `extensions["works.ever"]` | Ever Works' reverse-domain namespace (our domain `ever.works` reversed). Carries EW-specific package/skill metadata on export; ignored-if-absent on import |
 | `works.ever/` extension directory | Reserved for future EW-specific package files; v1 writes none, reads none (spec-legal) |
-| `PLUGIN_ROOT` / `PLUGIN_DATA` | Absolute package dir / new per-package persistent data dir (plan §Data dirs) |
+| `PLUGIN_ROOT` / `PLUGIN_DATA` | Absolute package dir / new per-package persistent data dir (plan §3) |
 
 **Namespace decision**: the reverse-domain namespace is **`works.ever`** (from
 `ever.works`). All Ever Works-specific manifest data lives under
@@ -215,7 +224,10 @@ suite (tasks.md). References are to Agent Plugins v1.0.0 sections.
 - **AP-1**: Load `plugin.json` from the package root; it MUST be a JSON object.
 - **AP-2**: Permitted top-level fields only: `$schema`, `name`, `version`,
   `description`, `author`, `homepage`, `repository`, `license`, `keywords`,
-  `extensions`. Required: `$schema` (exact canonical id) and `name`.
+  `extensions`. Required: `$schema` (exact canonical id) and `name`. `author`, when
+  present, is a **closed** object of only optional string fields `name`/`email`/
+  `url` — an unknown `author` subfield is a schema violation (top-level unknown-key
+  leniency does NOT apply inside `author`) and is therefore fatal per AP-4.
 - **AP-3**: `name` MUST match `^(?!.*(?:--|\.\.))[a-z0-9](?:[a-z0-9.-]*[a-z0-9])?$`
   and be 1–64 chars.
 - **AP-4**: Severity split, exactly: unknown top-level field → **report + ignore,
@@ -236,15 +248,18 @@ suite (tasks.md). References are to Agent Plugins v1.0.0 sections.
 - **AP-8**: Each `SKILL.md` is validated against the Agent Skills spec: frontmatter
   `name` (required; 1–64; `[a-z0-9-]`; no leading/trailing `-`; no `--`; MUST equal
   the parent directory name) and `description` (required; 1–1024; non-empty);
-  optional `license`, `compatibility` (≤500), `metadata` (string→string map),
-  `allowed-tools` (space-separated string). Unknown frontmatter keys are preserved,
-  not rejected.
+  optional `license`, `compatibility` (1–500 chars when present), `metadata`
+  (string→string map), `allowed-tools` (space-separated string). Unknown
+  frontmatter keys are preserved, not rejected.
 - **AP-9**: A non-conforming skill is **skipped alone** (reported); other skills and
   component types continue loading.
 - **AP-10**: All resolved paths MUST stay inside the package root (symlinks allowed
-  only if the target stays inside). Escapes: invalid root/manifest path → reject
-  package; escaped `SKILL.md` → skip that skill; escaped MCP `command`/`cwd` → that
-  server invalid; any other escaped path → access denied to that path.
+  only if the target stays inside). Failure boundaries, all five: invalid
+  root/manifest path → reject package; escaped **fixed component location** (the
+  `skills/` dir or `mcp.json` itself resolving outside the root) → that component
+  type invalid, others continue; escaped `SKILL.md` → skip that skill; escaped MCP
+  `command`/`cwd` → that server invalid; any other escaped path → access denied to
+  that path.
 
 ### 4.3 MCP configuration (spec §6.2)
 
@@ -267,10 +282,14 @@ suite (tasks.md). References are to Agent Plugins v1.0.0 sections.
   initial connection uses the declared transport; no fallback. A server that fails to
   start/connect/handshake is reported and does not affect other servers/components.
 - **AP-15**: Package-configured `headers`/`env` are treated as visible, non-secret
-  data. Ever Works-managed credentials are injected as client-generated values, which
-  take precedence over same-name package values (case-insensitive for headers). We
-  never forward package headers cross-origin on redirect without explicit user
-  authorization.
+  data (the spec's producer rule: plugins MUST NOT embed credentials in them).
+  Ever Works-managed credentials are injected as client-generated values, which
+  take precedence over same-name package values (case-insensitive for headers).
+  Redirect rule: we never forward package-configured headers cross-origin on
+  redirect without explicit user authorization (spec MUST), and — our stricter
+  house rule — we never forward **client-generated credential headers**
+  cross-origin at all. This is runtime client behavior and MUST have its own
+  implementation + test task, not just static validation.
 
 ### 4.4 Subprocess environment (spec §8) — stdio only
 
@@ -286,8 +305,10 @@ suite (tasks.md). References are to Agent Plugins v1.0.0 sections.
   restrictive allowlist approach of the CLI-runner plugins); package `env` overlays
   it; `PLUGIN_ROOT`/`PLUGIN_DATA` are set last and win.
 - **AP-19**: `stdio` execution is gated (US-9). When the gate is off, `stdio` entries
-  are surfaced as "present but disabled by policy" — which the spec treats the same
-  as an unsupported transport: skip, report, continue.
+  are surfaced as "present but disabled by policy" and handled as skip + report +
+  continue — **our interpretation**, consistent with the spec's failure-isolation
+  rules for unsupported transports (§6.2.2); the spec itself does not define a
+  policy-disabled state.
 
 ### 4.5 Versioning & updates (spec §9)
 
@@ -305,9 +326,11 @@ suite (tasks.md). References are to Agent Plugins v1.0.0 sections.
 
 - **AP-22**: Exported packages MUST validate against our own importer at maximum
   strictness (round-trip law, US-10) and against the published JSON Schemas.
-- **AP-23**: Export maps: skill `slug` → directory name + frontmatter `name` (slugs
-  longer than 64 chars or containing `--` are rejected with a rename prompt — spec
-  names are stricter than our slug DTO); `frontmatter` json → YAML frontmatter
+- **AP-23**: Export maps: skill `slug` → directory name + frontmatter `name`,
+  enforcing the FULL Agent Skills name rule: ≤64 chars, no `--`, **and no leading
+  or trailing hyphen** (our slug DTO accepts all three — e.g. `-foo`/`foo-` are
+  valid EW slugs but invalid spec names; rejected with a rename prompt);
+  `frontmatter` json → YAML frontmatter
   (preserving unknown keys; `allowedTools: string[]` serialized back to the
   spec's space-separated `allowed-tools` string); `instructionsMd` → body;
   stored sidecars → files. EW-specific metadata (owner scope, catalog provenance)
@@ -325,7 +348,9 @@ Verifiable by `git diff` on the implementing PRs — these surfaces are untouche
   `plugins.constants.ts` `DEFAULT_PLUGIN_PATHS`.
 - `packages/plugin/src/contracts/plugin-manifest.types.ts` — `PluginManifest` stays
   the native manifest; `package.json` `everworks.plugin` stays authoritative for
-  native plugins. (The contracts package gains **new** capability interfaces only.)
+  native plugins. (The contracts package gains only **additive optional fields** —
+  e.g. optional provenance fields on `SkillCatalogEntry` for source labeling —
+  never changed or removed members.)
 - All existing plugins including `packages/plugins/everworks-skills` (keeps
   `defaultForCapabilities`, its GitHub catalog source, and its builtin fallback).
 - `Skill` / `SkillBinding` entities and every existing column; existing skills API
@@ -350,10 +375,12 @@ new UI tabs/pages, new env vars, new capability interface — enumerated in plan
    governed by deployment mode + operator policy.
 3. **Strictly additive** — nothing existing is dropped or changed in behavior.
 4. **Terminology**: Agent Plugins v1.0.0 has exactly two component types. "Agents"
-   (e.g. Claude Code's `agents/` subagent dirs) are NOT a spec component type; such
-   client-specific dirs are extension directories we ignore per AP-6. If a future
-   spec version adds component types, AP-20's version registry is the extension
-   point.
+   (e.g. Claude Code's `agents/` subagent dirs) are NOT a spec component type. A
+   directory like `agents/` is simply an unrecognized directory we ignore (only
+   reverse-domain-named dirs like `com.example.client/` are formal *extension
+   directories*; manifest `extensions` namespaces are governed by AP-6 — all three
+   are ignored when unimplemented). If a future spec version adds component types,
+   AP-20's version registry is the extension point.
 
 ## 7. Open questions
 
