@@ -995,11 +995,11 @@ export class WorkProposalService {
      * Refuses (409 + a machine-readable `reason`) when:
      *   - a build is in flight (QUEUED / BUILDING) — the Goal-completion
      *     handler would later try to accept an Idea that's gone;
-     *   - the Idea has `idea_works` provenance links — those rows DO
-     *     cascade, but deleting silently destroys the record of which
-     *     Idea a live Work came from. Deleting the Works (or unlinking)
-     *     is an explicit user decision, not a side effect of this call;
      *   - Idea-scoped Agents still exist (`agents.scope = 'idea'`).
+     *
+     * Linked Works do NOT block the delete — see the note in the body.
+     * Both remaining guards are recoverable by the user without leaving
+     * the page: wait for the build, or re-scope the Agents.
      *
      * The web UI reads `reason` to tell the user exactly what blocks
      * the delete instead of showing a generic failure.
@@ -1021,14 +1021,26 @@ export class WorkProposalService {
             });
         }
 
-        const linkedWorks = await this.ideaWorks.countForIdea(proposalId, userId);
-        if (linkedWorks > 0) {
-            throw new ConflictException({
-                reason: 'linked-works' satisfies IdeaDeleteBlockedReason,
-                count: linkedWorks,
-                message: `This Idea is linked to ${linkedWorks} Work(s). Unlink or delete them first.`,
-            });
-        }
+        // Linked Works no longer block the delete.
+        //
+        // The guard that used to live here refused any Idea with
+        // `idea_works` rows and told the user to "unlink or delete them
+        // first" — but there is no unlink endpoint, so the only way out
+        // was deleting the Work itself. That made every Idea that had
+        // ever produced a Work permanently undeletable, which is the
+        // opposite of what the guard was protecting.
+        //
+        // Dropping it is safe because both foreign keys already say what
+        // should happen:
+        //   - `idea_works.ideaId` is ON DELETE CASCADE, so the provenance
+        //     rows go with the Idea;
+        //   - `works.acceptedFromIdeaId` is ON DELETE SET NULL, so the
+        //     built Work SURVIVES and merely loses its back-pointer.
+        //
+        // What is genuinely lost is the record of which Idea a Work came
+        // from. That is a real cost, but it is the user's call to make —
+        // and the confirm dialog now names the Works that will be
+        // unlinked before they make it.
 
         const ideaAgents = await this.countIdeaAgents(userId, proposalId);
         if (ideaAgents > 0) {
