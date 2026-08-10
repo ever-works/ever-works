@@ -8,17 +8,17 @@ import {
     CalendarClock,
     CheckCircle2,
     ChevronLeft,
-    Copy,
     GitFork,
     Lightbulb,
     Pause,
     Play,
+    PlayCircle,
     Radio,
     Settings as SettingsIcon,
     Shield,
     Target,
     Trash2,
-    Zap,
+    TriangleAlertIcon,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
@@ -42,6 +42,7 @@ import {
 import type {
     Mission,
     MissionAttachmentRow,
+    MissionGoalLinkDto,
     MissionOutcome,
     MissionWorkRelationDto,
     OwnerBudgetSummary,
@@ -49,15 +50,19 @@ import type {
 import type { WorkProposal } from '@/lib/api/work-proposals';
 import { IdeaCard } from '@/components/ideas';
 import { MissionAttachedWorksPanel, type AttachableWorkOption } from './MissionAttachedWorksPanel';
+import { MissionGoalsPanel, type AttachableGoalOption } from './MissionGoalsPanel';
 import { BudgetSummaryCard } from '@/components/budgets';
 import { EntityAttachmentsSection } from '@/components/common/EntityAttachmentsSection';
 import {
     Dialog,
+    DialogClose,
     DialogContent,
+    DialogDescription,
     DialogFooter,
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
 import { ShowDateTime } from '@/components/ui/show-datetime';
@@ -73,6 +78,10 @@ export interface MissionDetailClientProps {
     workRelations?: MissionWorkRelationDto[];
     /** PR-2 — the caller's Works, feeding the "Attach Work" select. */
     attachableWorks?: ReadonlyArray<AttachableWorkOption>;
+    /** Goals & Metrics PR-8 — `mission_goals` edges for the "Goals" panel. */
+    goalLinks?: ReadonlyArray<MissionGoalLinkDto>;
+    /** Goals & Metrics PR-8 — the caller's Goals, feeding the "Attach Goal" select. */
+    attachableGoals?: ReadonlyArray<AttachableGoalOption>;
 }
 
 const RUNNABLE_STATUSES = new Set(['active', 'paused']);
@@ -112,18 +121,30 @@ const btnDanger =
 
 // ─── Section header helper ────────────────────────────────────────────────
 
+/**
+ * Neutral icon-tile styling shared by every section header on this page.
+ *
+ * Sections used to each carry their own accent (amber Ideas, violet Live
+ * runs, emerald Goals, primary Works, …), which made a page of ten cards
+ * read as ten unrelated widgets and spent the palette's semantic colors —
+ * success, warning, info — on decoration rather than on state. Those
+ * colors now appear only where they mean something: the status and
+ * outcome pills. The tile is design-system surface + border, the glyph
+ * secondary text.
+ */
+const SECTION_ICON_TILE =
+    'bg-surface-secondary dark:bg-surface-secondary-dark border-border/60 dark:border-border-dark/60';
+
+const SECTION_ICON_GLYPH = 'text-text-secondary dark:text-text-secondary-dark';
+
 function SectionHeader({
     icon: Icon,
     title,
     count,
-    iconClass,
-    tileClass,
 }: {
     icon: React.ComponentType<{ className?: string }>;
     title: string;
     count?: number;
-    iconClass: string;
-    tileClass: string;
 }) {
     return (
         <div className="flex items-center justify-between gap-3 mb-4">
@@ -131,10 +152,10 @@ function SectionHeader({
                 <div
                     className={cn(
                         'w-7 h-7 rounded-md flex items-center justify-center shrink-0 border',
-                        tileClass,
+                        SECTION_ICON_TILE,
                     )}
                 >
-                    <Icon className={cn('w-3.5 h-3.5', iconClass)} />
+                    <Icon className={cn('w-3.5 h-3.5', SECTION_ICON_GLYPH)} />
                 </div>
                 <h2 className="text-sm font-semibold text-text dark:text-text-dark">{title}</h2>
             </div>
@@ -161,6 +182,8 @@ export function MissionDetailClient({
     attachments = [],
     workRelations = [],
     attachableWorks = [],
+    goalLinks = [],
+    attachableGoals = [],
 }: MissionDetailClientProps) {
     const t = useTranslations('dashboard.missionDetail');
     const router = useRouter();
@@ -174,6 +197,9 @@ export function MissionDetailClient({
 
     const [cloneOpen, setCloneOpen] = useState(false);
     const [cloneTitleDraft, setCloneTitleDraft] = useState('');
+
+    const [deleteOpen, setDeleteOpen] = useState(false);
+    const [deleteError, setDeleteError] = useState<string | null>(null);
 
     // PR-3 — Complete dialog: outcome verdict select ('' = no verdict).
     const [completeOpen, setCompleteOpen] = useState(false);
@@ -314,15 +340,26 @@ export function MissionDetailClient({
         });
     };
 
+    const openDelete = () => {
+        setDeleteError(null);
+        setDeleteOpen(true);
+    };
+
+    const closeDelete = () => {
+        if (pendingDelete) return;
+        setDeleteOpen(false);
+        setDeleteError(null);
+    };
+
     const handleDelete = () => {
-        if (!window.confirm(t('confirm.delete'))) return;
+        setDeleteError(null);
         startDelete(async () => {
             try {
                 await deleteMissionAction(mission.id);
                 toast.success(t('toasts.deleted'));
                 router.push(ROUTES.DASHBOARD_MISSIONS);
             } catch (err) {
-                toast.error(err instanceof Error ? err.message : t('toasts.deleteError'));
+                setDeleteError(err instanceof Error ? err.message : t('deleteDialog.error'));
             }
         });
     };
@@ -337,86 +374,50 @@ export function MissionDetailClient({
         <div className="w-full p-6 max-w-screen-2xl mx-auto space-y-6">
             {/* ── Header ───────────────────────────────────────────────────── */}
             <div>
-                <Link
-                    href={ROUTES.DASHBOARD_MISSIONS}
-                    className="inline-flex items-center gap-1 text-xs text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark transition-colors"
-                >
-                    <ChevronLeft className="w-3.5 h-3.5" />
-                    {t('backToMissions')}
-                </Link>
+                {/* Top bar — every action on the page lives here, on the
+                    breadcrumb line, as a single non-wrapping row: Run now,
+                    Clone, the lifecycle verbs, then Delete behind a divider so
+                    the destructive intent never reads as part of the same
+                    group. Icons match how the rest of the app already draws
+                    these verbs: `PlayCircle` is the "Run now" glyph in
+                    WorkScheduleCard and TaskRunControls, and `GitFork` is the
+                    clone glyph on the "Cloned" badge below and on MissionCard. */}
+                <div className="flex items-center justify-between gap-3">
+                    <Link
+                        href={ROUTES.DASHBOARD_MISSIONS}
+                        className="inline-flex min-w-0 items-center gap-1 text-xs text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark transition-colors"
+                    >
+                        <ChevronLeft className="w-3.5 h-3.5 shrink-0" />
+                        <span className="truncate">{t('backToMissions')}</span>
+                    </Link>
 
-                <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
-                    {/* Icon + title + badges + description */}
-                    <div className="flex items-start gap-3 min-w-0 flex-1">
-                        <div className="shrink-0 w-10 h-10 rounded-xl bg-warning/10 border border-warning/20 flex items-center justify-center">
-                            <Target className="w-5 h-5 text-warning" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                            <h1 className="text-2xl font-semibold text-text dark:text-text-dark leading-tight">
-                                {mission.title}
-                            </h1>
-                            <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                                <StatusPill status={mission.status} />
-                                {mission.outcome && (
-                                    <span
-                                        title={t('outcomeTooltip')}
-                                        className={cn(
-                                            'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium',
-                                            OUTCOME_STYLES[mission.outcome],
-                                        )}
-                                    >
-                                        <CheckCircle2 className="w-3 h-3" />
-                                        {t(`outcomes.${mission.outcome}`)}
-                                    </span>
-                                )}
-                                {mission.completedAt && (
-                                    <span className="inline-flex items-center gap-1 rounded-full border border-border dark:border-border-dark bg-surface dark:bg-surface-dark px-2 py-0.5 text-[11px] font-medium text-text-muted dark:text-text-muted-dark">
-                                        {t('completedAtLabel')}{' '}
-                                        <ShowDateTime value={mission.completedAt} />
-                                    </span>
-                                )}
-                                <span
-                                    className={cn(
-                                        'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium',
-                                        isScheduled
-                                            ? 'border-info/30 bg-info/8 dark:bg-info/12 text-info'
-                                            : 'border-border dark:border-border-dark bg-surface dark:bg-surface-dark text-text-muted dark:text-text-muted-dark',
-                                    )}
-                                >
-                                    {isScheduled && <CalendarClock className="w-3 h-3" />}
-                                    {t(isScheduled ? 'badges.scheduled' : 'badges.oneShot')}
-                                </span>
-                                {mission.sourceMissionId && (
-                                    <span
-                                        title={t('badges.clonedTooltip')}
-                                        className="inline-flex items-center gap-1 rounded-full border border-border dark:border-border-dark bg-surface dark:bg-surface-dark px-2 py-0.5 text-[11px] font-medium text-text-muted dark:text-text-muted-dark"
-                                    >
-                                        <GitFork className="w-3 h-3" />
-                                        {t('badges.cloned')}
-                                    </span>
-                                )}
-                            </div>
-                            {mission.description && (
-                                <p className="mt-2.5 text-sm text-text-secondary dark:text-text-secondary-dark max-w-3xl leading-relaxed">
-                                    {mission.description}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-
-                    {/* Action buttons */}
-                    <div className="flex flex-wrap items-center gap-2 shrink-0">
+                    {/* No wrapping here: the buttons hold one line and the
+                        back link truncates instead — it is the one element on
+                        this row that can lose characters without losing
+                        meaning. Below the widest breakpoints the row scrolls
+                        sideways rather than breaking onto a second line, and
+                        the vertical padding keeps focus rings unclipped. */}
+                    <div className="flex min-w-0 items-center gap-2 overflow-x-auto py-0.5">
                         {canRunNow && (
                             <button
                                 type="button"
                                 onClick={runNow}
                                 disabled={pendingRunNow}
-                                className={btn}
+                                className={cn(btn, 'shrink-0')}
                             >
-                                <Zap className="w-3.5 h-3.5" />
+                                <PlayCircle className="w-3.5 h-3.5" />
                                 {t('actions.runNow')}
                             </button>
                         )}
+                        <button
+                            type="button"
+                            onClick={() => setCloneOpen(true)}
+                            disabled={pendingClone}
+                            className={cn(btn, 'shrink-0')}
+                        >
+                            <GitFork className="w-3.5 h-3.5" />
+                            {t('actions.clone')}
+                        </button>
                         {canPause && (
                             <button
                                 type="button"
@@ -424,7 +425,7 @@ export function MissionDetailClient({
                                     transition('pause', () => pauseMissionAction(mission.id))
                                 }
                                 disabled={pendingLifecycle}
-                                className={btn}
+                                className={cn(btn, 'shrink-0')}
                             >
                                 <Pause className="w-3.5 h-3.5" />
                                 {t('actions.pause')}
@@ -437,7 +438,7 @@ export function MissionDetailClient({
                                     transition('resume', () => resumeMissionAction(mission.id))
                                 }
                                 disabled={pendingLifecycle}
-                                className={btn}
+                                className={cn(btn, 'shrink-0')}
                             >
                                 <Play className="w-3.5 h-3.5" />
                                 {t('actions.resume')}
@@ -448,265 +449,329 @@ export function MissionDetailClient({
                                 type="button"
                                 onClick={() => setCompleteOpen(true)}
                                 disabled={pendingLifecycle}
-                                className={btn}
+                                className={cn(btn, 'shrink-0')}
                             >
                                 <CheckCircle2 className="w-3.5 h-3.5" />
                                 {t('actions.complete')}
                             </button>
                         )}
+                        <span
+                            aria-hidden
+                            className="h-5 w-px shrink-0 bg-border dark:bg-border-dark"
+                        />
                         <button
                             type="button"
-                            onClick={() => setCloneOpen(true)}
-                            disabled={pendingClone}
-                            className={btn}
-                        >
-                            <Copy className="w-3.5 h-3.5" />
-                            {t('actions.clone')}
-                        </button>
-                        <button
-                            type="button"
-                            onClick={handleDelete}
+                            data-testid="mission-delete-button"
+                            onClick={openDelete}
                             disabled={pendingDelete}
-                            className={btnDanger}
+                            className={cn(btnDanger, 'shrink-0')}
                         >
                             <Trash2 className="w-3.5 h-3.5" />
                             {t('actions.delete')}
                         </button>
                     </div>
                 </div>
-            </div>
 
-            {/* ── Settings ─────────────────────────────────────────────────── */}
-            <section className={sectionCard}>
-                <SectionHeader
-                    icon={SettingsIcon}
-                    title={t('sections.settings')}
-                    tileClass="bg-surface-secondary dark:bg-surface-secondary-dark border-border/60 dark:border-border-dark/60"
-                    iconClass="text-text-secondary dark:text-text-secondary-dark"
-                />
-                <div className="space-y-4">
-                    {/* Toggles — flex row above the inputs */}
-                    <div className="flex items-center gap-2.5 flex-wrap">
-                        <Checkbox
-                            label={t('fields.autoBuildWorks')}
-                            checked={autoBuildDraft}
-                            onChange={(e) => setAutoBuildDraft(e.target.checked)}
-                        />
-                        <Checkbox
-                            label={t('fields.capInherit')}
-                            checked={capInherit}
-                            onChange={(e) => setCapInherit(e.target.checked)}
-                        />
+                {/* Icon + title + badges + description — the actions that used
+                    to share this row now all live in the top bar above. */}
+                <div className="mt-3 flex items-start gap-3 min-w-0">
+                    {/* The one accented tile left on the page, and it uses
+                            the `concept-missions` token every other Mission
+                            surface uses (MissionCard, MissionsList,
+                            NewMissionForm, PageHeader) — this page was the
+                            only one painting the entity icon `warning`. */}
+                    <div className="shrink-0 w-10 h-10 rounded-xl bg-concept-missions/10 border border-concept-missions/20 flex items-center justify-center">
+                        <Target className="w-5 h-5 text-concept-missions" />
                     </div>
-
-                    {/* Inputs below */}
-                    <div className="grid gap-4 @xl/main:grid-cols-1">
-                        {isScheduled && (
-                            <label className="space-y-1.5">
-                                <span className="text-xs text-text-muted dark:text-text-muted-dark">
-                                    {t('fields.schedule')}
-                                </span>
-                                <Textarea
-                                    value={scheduleDraft}
-                                    onChange={(e) => setScheduleDraft(e.target.value)}
-                                    rows={1}
-                                    placeholder="0 9 * * MON"
-                                    className="font-mono text-xs"
-                                />
-                            </label>
-                        )}
-                        {!capInherit && (
-                            <Input
-                                type="number"
-                                label={t('fields.outstandingCap')}
-                                value={capValue}
-                                min={-1}
-                                max={1000}
-                                onChange={(e) => setCapValue(Number(e.target.value))}
-                            />
-                        )}
-                    </div>
-                </div>
-                <div className="mt-5 pt-4 border-t border-border/60 dark:border-border-dark/60">
-                    <button onClick={saveSettings} disabled={pendingSettings} className={btn}>
-                        {t('actions.saveSettings')}
-                    </button>
-                </div>
-            </section>
-
-            {/* ── Guardrails ───────────────────────────────────────────────── */}
-            <section className={sectionCard}>
-                <SectionHeader
-                    icon={Shield}
-                    title={t('sections.guardrails')}
-                    tileClass="bg-warning/10 border-warning/20"
-                    iconClass="text-warning"
-                />
-                <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                    {mission.guardrailsOverride &&
-                    Object.keys(mission.guardrailsOverride).length > 0
-                        ? t('guardrails.activeOverride')
-                        : t('guardrails.inheriting')}
-                </p>
-            </section>
-
-            {/* ── Activity + Spend ─────────────────────────────────────────── */}
-            <div className="grid gap-5 @3xl/main:grid-cols-2">
-                <section className={sectionCard}>
-                    <SectionHeader
-                        icon={Activity}
-                        title={t('sections.activity')}
-                        tileClass="bg-info/10 border-info/20"
-                        iconClass="text-info"
-                    />
-                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                        {t('activity.empty')}
-                    </p>
-                </section>
-
-                <section className={sectionCard}>
-                    <SectionHeader
-                        icon={BarChart3}
-                        title={t('sections.spend')}
-                        tileClass="bg-success/10 border-success/20"
-                        iconClass="text-success"
-                    />
-                    {budget ? (
-                        <BudgetSummaryCard summary={budget} />
-                    ) : (
-                        <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                            {t('spend.empty')}
-                        </p>
-                    )}
-                </section>
-            </div>
-
-            {/* ── Live runs ────────────────────────────────────────────────── */}
-            <section className={sectionCard}>
-                <SectionHeader
-                    icon={Radio}
-                    title={t('sections.liveRuns')}
-                    tileClass="bg-violet-500/10 border-violet-500/20"
-                    iconClass="text-violet-600 dark:text-violet-400"
-                />
-                <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                    {t('liveRuns.empty')}
-                </p>
-            </section>
-
-            {/* ── Ideas ────────────────────────────────────────────────────── */}
-            <section className={sectionCard}>
-                <SectionHeader
-                    icon={Lightbulb}
-                    title={t('sections.ideas')}
-                    count={ideas.length}
-                    tileClass="bg-amber-500/10 border-amber-500/20"
-                    iconClass="text-amber-600 dark:text-amber-400"
-                />
-                {ideas.length === 0 ? (
-                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                        {t('ideas.empty')}
-                    </p>
-                ) : (
-                    <div className="grid grid-cols-1 @lg/main:grid-cols-2 @3xl/main:grid-cols-3 gap-4">
-                        {ideas.map((i) => (
-                            <IdeaCard key={i.id} proposal={i} />
-                        ))}
-                    </div>
-                )}
-            </section>
-
-            {/* ── Related Works ────────────────────────────────────────────── */}
-            <section className={sectionCard}>
-                <SectionHeader
-                    icon={GitFork}
-                    title={t('sections.relatedWorks')}
-                    count={acceptedWorkLinks.length}
-                    tileClass="bg-primary/10 border-primary/20"
-                    iconClass="text-primary"
-                />
-                {acceptedWorkLinks.length === 0 ? (
-                    <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                        {t('works.empty')}
-                    </p>
-                ) : (
-                    <ul className="space-y-2">
-                        {acceptedWorkLinks.map((w) => (
-                            <li key={w.workId}>
-                                <Link
-                                    href={ROUTES.DASHBOARD_WORK(w.workId)}
-                                    className="flex items-center gap-3 p-3 rounded-lg border border-border/60 dark:border-border-dark/60 hover:border-border dark:hover:border-border-dark bg-surface/30 dark:bg-surface-dark/30 hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors group"
+                    <div className="min-w-0 flex-1">
+                        <h1 className="text-2xl font-semibold text-text dark:text-text-dark leading-tight">
+                            {mission.title}
+                        </h1>
+                        <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                            <StatusPill status={mission.status} />
+                            {mission.outcome && (
+                                <span
+                                    title={t('outcomeTooltip')}
+                                    className={cn(
+                                        'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium',
+                                        OUTCOME_STYLES[mission.outcome],
+                                    )}
                                 >
-                                    <span className="text-sm font-medium text-text dark:text-text-dark group-hover:text-primary transition-colors truncate flex-1">
-                                        {w.ideaTitle}
-                                    </span>
-                                    <ArrowRight className="w-3.5 h-3.5 text-text-muted shrink-0" />
-                                </Link>
-                            </li>
-                        ))}
-                    </ul>
-                )}
-            </section>
-
-            {/* ── Attached Works (explicit mission_works edges, PR-2) ──────── */}
-            <MissionAttachedWorksPanel
-                missionId={mission.id}
-                initialRelations={workRelations}
-                attachableWorks={attachableWorks}
-            />
-
-            {/* ── Inherited Works (cloned missions only) ───────────────────── */}
-            {mission.sourceMissionId && (
-                <section className={sectionCard}>
-                    <SectionHeader
-                        icon={GitFork}
-                        title={t('sections.inheritedWorks')}
-                        count={inheritedWorkLinks.length}
-                        tileClass="bg-surface-secondary dark:bg-surface-secondary-dark border-border/60 dark:border-border-dark/60"
-                        iconClass="text-text-secondary dark:text-text-secondary-dark"
-                    />
-                    {sourceMission && (
-                        <p className="text-xs text-text-muted dark:text-text-muted-dark -mt-2 mb-4">
-                            {t('inherited.fromSource')}{' '}
-                            <Link
-                                href={ROUTES.DASHBOARD_MISSION(sourceMission.id)}
-                                className="text-primary hover:underline"
+                                    <CheckCircle2 className="w-3 h-3" />
+                                    {t(`outcomes.${mission.outcome}`)}
+                                </span>
+                            )}
+                            {mission.completedAt && (
+                                <span className="inline-flex items-center gap-1 rounded-full border border-border dark:border-border-dark bg-surface dark:bg-surface-dark px-2 py-0.5 text-[11px] font-medium text-text-muted dark:text-text-muted-dark">
+                                    {t('completedAtLabel')}{' '}
+                                    <ShowDateTime value={mission.completedAt} />
+                                </span>
+                            )}
+                            <span
+                                className={cn(
+                                    'inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-medium',
+                                    isScheduled
+                                        ? 'border-info/30 bg-info/8 dark:bg-info/12 text-info'
+                                        : 'border-border dark:border-border-dark bg-surface dark:bg-surface-dark text-text-muted dark:text-text-muted-dark',
+                                )}
                             >
-                                {sourceMission.title}
-                            </Link>
-                        </p>
-                    )}
-                    {inheritedWorkLinks.length === 0 ? (
-                        <p className="text-xs text-text-muted dark:text-text-muted-dark">
-                            {t('inherited.empty')}
-                        </p>
-                    ) : (
-                        <ul className="space-y-2">
-                            {inheritedWorkLinks.map((w) => (
-                                <li key={w.workId}>
-                                    <Link
-                                        href={ROUTES.DASHBOARD_WORK(w.workId)}
-                                        className="flex items-center gap-3 p-3 rounded-lg border border-border/60 dark:border-border-dark/60 hover:border-border dark:hover:border-border-dark bg-surface/30 dark:bg-surface-dark/30 hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors group"
-                                    >
-                                        <span className="text-sm font-medium text-text dark:text-text-dark group-hover:text-primary transition-colors truncate flex-1">
-                                            {w.ideaTitle}
-                                        </span>
-                                        <ArrowRight className="w-3.5 h-3.5 text-text-muted shrink-0" />
-                                    </Link>
-                                </li>
-                            ))}
-                        </ul>
-                    )}
-                </section>
-            )}
+                                {isScheduled && <CalendarClock className="w-3 h-3" />}
+                                {t(isScheduled ? 'badges.scheduled' : 'badges.oneShot')}
+                            </span>
+                            {mission.sourceMissionId && (
+                                <span
+                                    title={t('badges.clonedTooltip')}
+                                    className="inline-flex items-center gap-1 rounded-full border border-border dark:border-border-dark bg-surface dark:bg-surface-dark px-2 py-0.5 text-[11px] font-medium text-text-muted dark:text-text-muted-dark"
+                                >
+                                    <GitFork className="w-3 h-3" />
+                                    {t('badges.cloned')}
+                                </span>
+                            )}
+                        </div>
+                        {mission.description && (
+                            <p className="mt-2.5 text-sm text-text-secondary dark:text-text-secondary-dark max-w-3xl leading-relaxed">
+                                {mission.description}
+                            </p>
+                        )}
+                    </div>
+                </div>
+            </div>
 
-            {/* ── Attachments ──────────────────────────────────────────────── */}
-            <EntityAttachmentsSection
-                initial={attachments}
-                onAttach={(uploadId) => attachUploadToMissionAction(mission.id, uploadId)}
-                onDetach={(attachmentId) => detachMissionAttachmentAction(mission.id, attachmentId)}
-                testId="mission-attachments"
-            />
+            {/* ── Body ─────────────────────────────────────────────────────
+                Two tracks on wide viewports: the left column carries what the
+                Mission *is about* (Goals → Ideas → Works → Attachments), the
+                right rail carries what it *costs and runs on* plus its
+                configuration. Below @5xl the grid collapses to one column and
+                the DOM order still reads content-first, config-last. */}
+            <div className="grid items-start gap-5 @5xl/main:grid-cols-12">
+                {/* ── Content column ───────────────────────────────────── */}
+                <div className="min-w-0 space-y-5 @5xl/main:col-span-8">
+                    {/* ── Goals (mission_goals edges, Goals & Metrics PR-8) ─ */}
+                    <MissionGoalsPanel
+                        missionId={mission.id}
+                        initialLinks={goalLinks}
+                        attachableGoals={attachableGoals}
+                    />
+
+                    {/* ── Attached Works (explicit mission_works edges, PR-2)
+                        Sits directly under Goals: both are the human's
+                        explicit "this Mission is wired to that" edges, and
+                        both carry an attach control — keeping them adjacent
+                        means one place to wire a Mission up, instead of
+                        splitting the two attach affordances across the page. */}
+                    <MissionAttachedWorksPanel
+                        missionId={mission.id}
+                        initialRelations={workRelations}
+                        attachableWorks={attachableWorks}
+                    />
+
+                    {/* ── Ideas ────────────────────────────────────────── */}
+                    <section className={sectionCard}>
+                        <SectionHeader
+                            icon={Lightbulb}
+                            title={t('sections.ideas')}
+                            count={ideas.length}
+                        />
+                        {ideas.length === 0 ? (
+                            <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                                {t('ideas.empty')}
+                            </p>
+                        ) : (
+                            // Breakpoints are one step wider than the old
+                            // full-bleed grid: the cards now live in a 8/12
+                            // column, so the same @lg/@3xl steps would have
+                            // packed 3 cards into ~2 cards' worth of width.
+                            <div className="grid grid-cols-1 gap-4 @3xl/main:grid-cols-2 @6xl/main:grid-cols-3">
+                                {ideas.map((i) => (
+                                    <IdeaCard key={i.id} proposal={i} />
+                                ))}
+                            </div>
+                        )}
+                    </section>
+
+                    {/* ── Related Works ────────────────────────────────── */}
+                    <section className={sectionCard}>
+                        <SectionHeader
+                            icon={GitFork}
+                            title={t('sections.relatedWorks')}
+                            count={acceptedWorkLinks.length}
+                        />
+                        {acceptedWorkLinks.length === 0 ? (
+                            <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                                {t('works.empty')}
+                            </p>
+                        ) : (
+                            <ul className="space-y-2">
+                                {acceptedWorkLinks.map((w) => (
+                                    <li key={w.workId}>
+                                        <Link
+                                            href={ROUTES.DASHBOARD_WORK(w.workId)}
+                                            className="flex items-center gap-3 p-3 rounded-lg border border-border/60 dark:border-border-dark/60 hover:border-border dark:hover:border-border-dark bg-surface/30 dark:bg-surface-dark/30 hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors group"
+                                        >
+                                            <span className="text-sm font-medium text-text dark:text-text-dark group-hover:text-primary transition-colors truncate flex-1">
+                                                {w.ideaTitle}
+                                            </span>
+                                            <ArrowRight className="w-3.5 h-3.5 text-text-muted shrink-0" />
+                                        </Link>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </section>
+
+                    {/* ── Inherited Works (cloned missions only) ───────── */}
+                    {mission.sourceMissionId && (
+                        <section className={sectionCard}>
+                            <SectionHeader
+                                icon={GitFork}
+                                title={t('sections.inheritedWorks')}
+                                count={inheritedWorkLinks.length}
+                            />
+                            {sourceMission && (
+                                <p className="text-xs text-text-muted dark:text-text-muted-dark -mt-2 mb-4">
+                                    {t('inherited.fromSource')}{' '}
+                                    <Link
+                                        href={ROUTES.DASHBOARD_MISSION(sourceMission.id)}
+                                        className="text-primary hover:underline"
+                                    >
+                                        {sourceMission.title}
+                                    </Link>
+                                </p>
+                            )}
+                            {inheritedWorkLinks.length === 0 ? (
+                                <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                                    {t('inherited.empty')}
+                                </p>
+                            ) : (
+                                <ul className="space-y-2">
+                                    {inheritedWorkLinks.map((w) => (
+                                        <li key={w.workId}>
+                                            <Link
+                                                href={ROUTES.DASHBOARD_WORK(w.workId)}
+                                                className="flex items-center gap-3 p-3 rounded-lg border border-border/60 dark:border-border-dark/60 hover:border-border dark:hover:border-border-dark bg-surface/30 dark:bg-surface-dark/30 hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors group"
+                                            >
+                                                <span className="text-sm font-medium text-text dark:text-text-dark group-hover:text-primary transition-colors truncate flex-1">
+                                                    {w.ideaTitle}
+                                                </span>
+                                                <ArrowRight className="w-3.5 h-3.5 text-text-muted shrink-0" />
+                                            </Link>
+                                        </li>
+                                    ))}
+                                </ul>
+                            )}
+                        </section>
+                    )}
+
+                    {/* ── Attachments ──────────────────────────────────── */}
+                    <EntityAttachmentsSection
+                        initial={attachments}
+                        onAttach={(uploadId) => attachUploadToMissionAction(mission.id, uploadId)}
+                        onDetach={(attachmentId) =>
+                            detachMissionAttachmentAction(mission.id, attachmentId)
+                        }
+                        testId="mission-attachments"
+                    />
+                </div>
+
+                {/* ── Context rail ─────────────────────────────────────── */}
+                <aside className="min-w-0 space-y-5 @5xl/main:col-span-4">
+                    {/* ── Spend ────────────────────────────────────────── */}
+                    <section className={sectionCard}>
+                        <SectionHeader icon={BarChart3} title={t('sections.spend')} />
+                        {budget ? (
+                            <BudgetSummaryCard summary={budget} />
+                        ) : (
+                            <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                                {t('spend.empty')}
+                            </p>
+                        )}
+                    </section>
+
+                    {/* ── Live runs ────────────────────────────────────── */}
+                    <section className={sectionCard}>
+                        <SectionHeader icon={Radio} title={t('sections.liveRuns')} />
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                            {t('liveRuns.empty')}
+                        </p>
+                    </section>
+
+                    {/* ── Activity ─────────────────────────────────────── */}
+                    <section className={sectionCard}>
+                        <SectionHeader icon={Activity} title={t('sections.activity')} />
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                            {t('activity.empty')}
+                        </p>
+                    </section>
+
+                    {/* ── Guardrails ───────────────────────────────────── */}
+                    <section className={sectionCard}>
+                        <SectionHeader icon={Shield} title={t('sections.guardrails')} />
+                        <p className="text-xs text-text-muted dark:text-text-muted-dark">
+                            {mission.guardrailsOverride &&
+                            Object.keys(mission.guardrailsOverride).length > 0
+                                ? t('guardrails.activeOverride')
+                                : t('guardrails.inheriting')}
+                        </p>
+                    </section>
+
+                    {/* ── Settings ─────────────────────────────────────── */}
+                    <section className={sectionCard}>
+                        <SectionHeader icon={SettingsIcon} title={t('sections.settings')} />
+                        <div className="space-y-4">
+                            {/* Toggles — flex row above the inputs */}
+                            <div className="flex items-center gap-2.5 flex-wrap">
+                                <Checkbox
+                                    label={t('fields.autoBuildWorks')}
+                                    checked={autoBuildDraft}
+                                    onChange={(e) => setAutoBuildDraft(e.target.checked)}
+                                />
+                                <Checkbox
+                                    label={t('fields.capInherit')}
+                                    checked={capInherit}
+                                    onChange={(e) => setCapInherit(e.target.checked)}
+                                />
+                            </div>
+
+                            {/* Inputs below */}
+                            <div className="grid gap-4">
+                                {isScheduled && (
+                                    <label className="space-y-1.5">
+                                        <span className="text-xs text-text-muted dark:text-text-muted-dark">
+                                            {t('fields.schedule')}
+                                        </span>
+                                        <Textarea
+                                            value={scheduleDraft}
+                                            onChange={(e) => setScheduleDraft(e.target.value)}
+                                            rows={1}
+                                            placeholder="0 9 * * MON"
+                                            className="font-mono text-xs"
+                                        />
+                                    </label>
+                                )}
+                                {!capInherit && (
+                                    <Input
+                                        type="number"
+                                        label={t('fields.outstandingCap')}
+                                        value={capValue}
+                                        min={-1}
+                                        max={1000}
+                                        onChange={(e) => setCapValue(Number(e.target.value))}
+                                    />
+                                )}
+                            </div>
+                        </div>
+                        <div className="mt-5 pt-4 border-t border-border/60 dark:border-border-dark/60">
+                            <button
+                                onClick={saveSettings}
+                                disabled={pendingSettings}
+                                className={btn}
+                            >
+                                {t('actions.saveSettings')}
+                            </button>
+                        </div>
+                    </section>
+                </aside>
+            </div>
 
             {/* ── Clone modal ──────────────────────────────────────────────── */}
             <Dialog open={cloneOpen} onOpenChange={setCloneOpen}>
@@ -743,9 +808,65 @@ export function MissionDetailClient({
                             disabled={pendingClone}
                             className={btn}
                         >
-                            <Copy className="w-3.5 h-3.5" />
+                            <GitFork className="w-3.5 h-3.5" />
                             {t('clone.confirm')}
                         </button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
+            {/* ── Delete modal (mirrors the Task detail delete dialog) ─────── */}
+            <Dialog
+                open={deleteOpen}
+                onOpenChange={(next) => (next ? setDeleteOpen(true) : closeDelete())}
+            >
+                <DialogContent className="max-w-md">
+                    <DialogClose onClose={closeDelete} />
+                    <DialogHeader className="mb-0">
+                        <div className="flex items-center gap-3 mb-1">
+                            <span className="flex items-center justify-center size-9 rounded-full bg-red-100 dark:bg-red-950/50 shrink-0">
+                                <TriangleAlertIcon className="size-4 text-red-600 dark:text-red-400" />
+                            </span>
+                            <DialogTitle className="text-base font-semibold text-text dark:text-text-dark">
+                                {t('deleteDialog.title')}
+                            </DialogTitle>
+                        </div>
+                        <DialogDescription>
+                            {t('deleteDialog.body', { title: mission.title })}
+                        </DialogDescription>
+                    </DialogHeader>
+
+                    {deleteError && (
+                        <p
+                            role="alert"
+                            data-testid="mission-delete-error"
+                            className="mt-4 text-xs text-danger"
+                        >
+                            {deleteError}
+                        </p>
+                    )}
+
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            data-testid="mission-delete-cancel"
+                            disabled={pendingDelete}
+                            onClick={closeDelete}
+                        >
+                            {t('deleteDialog.cancel')}
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="danger"
+                            size="sm"
+                            data-testid="mission-delete-confirm"
+                            loading={pendingDelete}
+                            onClick={handleDelete}
+                        >
+                            {pendingDelete ? t('deleteDialog.deleting') : t('deleteDialog.confirm')}
+                        </Button>
                     </DialogFooter>
                 </DialogContent>
             </Dialog>

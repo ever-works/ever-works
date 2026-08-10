@@ -3,14 +3,78 @@ import superjson from 'superjson';
 import { config } from '@ever-works/agent/config';
 import { WorkContextResponse } from '@ever-works/agent/tasks';
 
+/**
+ * Remote calls that are safe to re-issue after a transport failure.
+ *
+ * **The list is an ALLOW-list and the default is "do not retry."** Omitting a
+ * method costs at most one lost retry; adding the wrong one silently doubles a
+ * side effect in production, so the polarity is deliberate — when in doubt,
+ * leave a method out.
+ *
+ * Why this exists: a transport failure tells the caller nothing about whether
+ * the server ran the work. A client-side deadline does not cancel the API pod,
+ * and neither does an nginx 504 or a Cloudflare 524 — the request keeps
+ * executing on the other side while the worker gives up on it. Re-issuing the
+ * call therefore starts a SECOND execution of work that is very likely already
+ * running or already committed. For a pure read that is harmless; for
+ * `AgentRunService.execute` it is a second billed agent loop with real tool
+ * side effects, which is exactly the case this list exists to prevent.
+ *
+ * Retries are not the last line of defence: a call that is refused a retry
+ * here surfaces as a task failure, and Trigger.dev retries the whole task —
+ * where `dedupKey` and the `markStarted` CAS make re-execution safe. That is
+ * the right layer for a retry, because it is the layer that has deduplication.
+ *
+ * A method qualifies only if calling it twice is indistinguishable from
+ * calling it once, and that property is STRUCTURAL (a CAS, a dedup key, or an
+ * absolute-value SET) rather than incidental. Entries are grouped by which of
+ * those two reasons applies. Note `AgentRunRepository.addTokens` is
+ * deliberately absent while its sibling `updateTelemetry` is present: the
+ * former accumulates, the latter overwrites.
+ */
+const RETRY_SAFE_REMOTE_METHODS: ReadonlySet<string> = new Set<string>([
+    // ── Pure reads — no writes at all. ──────────────────────────────
+    'AgentRepository.findById',
+    'AgentRepository.findByIdAndUser',
+    'AgentRunRepository.findById',
+    'AgentRunRepository.findInFlightForAgent',
+    'AgentRunRepository.findInFlightForTaskAgent',
+    'AgentRunService.checkBudget',
+    'TasksService.getOne',
+    'WorkRepository.findById',
+
+    // ── Writers whose idempotency is structural. ────────────────────
+    // CAS on a non-terminal status: a second call matches zero rows.
+    'AgentRunRepository.markCompleted',
+    'AgentRunRepository.markFailed',
+    'AgentRunRepository.markStarted',
+    // Absolute-value SET of an explicit field whitelist; nothing accumulates.
+    'AgentRunRepository.updateGateResults',
+    'AgentRunRepository.updateTelemetry',
+    'AgentRepository.releaseAfterRun',
+    // Pointer-CAS of the same (latestRunId, latestRunStatus) pair.
+    'TaskRunDenormService.recordQueued',
+    'TaskRunDenormService.recordStarted',
+    'TaskRunDenormService.recordTerminal',
+    // Dedup key with a pre-read plus a UNIQUE-violation re-read.
+    'AgentEscalationService.record',
+    // Per-user `daily:<userId>:<date>` idempotency key checked before the write.
+    'CreditLedgerService.dispatchDailyGrants',
+    // Explicit already-marked guard / absolute SET recomputed from the anchor.
+    'WorkScheduleService.markRunCompleted',
+    'WorkScheduleService.markRunFailed',
+]);
+
 @Injectable()
 export class TriggerInternalApiClient {
     private readonly baseUrl: string;
     private readonly secret: string;
+    private readonly requestTimeoutMs: number;
 
     constructor() {
         this.baseUrl = config.trigger.getInternalBaseUrl() || '';
         this.secret = config.trigger.getInternalSecret() || '';
+        this.requestTimeoutMs = config.trigger.getInternalRequestTimeoutMs();
 
         if (!this.baseUrl) {
             throw new Error('TRIGGER_INTERNAL_API_URL is not configured');
@@ -82,6 +146,8 @@ export class TriggerInternalApiClient {
         return this.request<WorkContextResponse>({
             method: 'GET',
             path: `/works/${workId}/context?${searchParams.toString()}`,
+            // A read. Re-issuing it can only cost a duplicate query.
+            retryable: true,
         });
     }
 
@@ -98,6 +164,10 @@ export class TriggerInternalApiClient {
             method: 'POST',
             path: '/remote/call',
             body: { name, method, args },
+            // Default-deny. Only a method explicitly declared re-issuable may
+            // be retried — see `RETRY_SAFE_REMOTE_METHODS` for why an
+            // unlisted method must fail through to the task-level retry.
+            retryable: RETRY_SAFE_REMOTE_METHODS.has(`${name}.${method}`),
         });
 
         return response.result ? superjson.deserialize(response.result as any) : undefined;
@@ -107,13 +177,20 @@ export class TriggerInternalApiClient {
         method,
         path,
         body,
+        retryable,
     }: {
         method: string;
         path: string;
         body?: unknown;
+        /**
+         * Whether re-issuing this exact request is safe. `false` collapses the
+         * loop to a single attempt — a transport failure then propagates to
+         * the caller instead of being silently re-executed.
+         */
+        retryable: boolean;
     }): Promise<T> {
         const url = this.composeUrl(path);
-        const maxRetries = 3;
+        const maxRetries = retryable ? 3 : 0;
         const baseDelayMs = 500;
 
         let lastError: Error | undefined;
@@ -124,50 +201,84 @@ export class TriggerInternalApiClient {
                 await new Promise((resolve) => setTimeout(resolve, delay));
             }
 
-            let response: Response;
+            // One deadline per attempt, covering the response body as well as
+            // the headers — a stalled body read hangs the worker just as
+            // effectively as a stalled connect. `AbortController` +
+            // `setTimeout` rather than `AbortSignal.timeout()`: the former is
+            // driven by the suite's fake timers, the latter is not.
+            const controller = new AbortController();
+            const timer = setTimeout(() => controller.abort(), this.requestTimeoutMs);
+            timer.unref?.();
 
             try {
-                response = await fetch(url, {
-                    method,
-                    headers: {
-                        'content-type': 'application/json',
-                        'x-trigger-secret': this.secret,
-                    },
-                    body: body ? JSON.stringify(body) : undefined,
-                });
-            } catch (networkError) {
-                lastError =
-                    networkError instanceof Error ? networkError : new Error(String(networkError));
+                let response: Response;
 
-                if (attempt < maxRetries) {
-                    continue;
+                try {
+                    response = await fetch(url, {
+                        method,
+                        headers: {
+                            'content-type': 'application/json',
+                            'x-trigger-secret': this.secret,
+                        },
+                        body: body ? JSON.stringify(body) : undefined,
+                        signal: controller.signal,
+                    });
+                } catch (networkError) {
+                    lastError = this.describeTransportFailure(networkError, controller.signal);
+
+                    if (attempt < maxRetries) {
+                        continue;
+                    }
+
+                    throw lastError;
                 }
 
-                throw lastError;
-            }
+                if (response.ok) {
+                    if (response.status === 204) {
+                        return undefined as T;
+                    }
 
-            if (response.ok) {
-                if (response.status === 204) {
-                    return undefined as T;
+                    const text = await response.text();
+
+                    return text ? (JSON.parse(text) as T) : (undefined as T);
                 }
 
                 const text = await response.text();
+                lastError = new Error(
+                    `Trigger internal API request failed (${response.status}): ${text}`,
+                );
 
-                return text ? (JSON.parse(text) as T) : (undefined as T);
-            }
-
-            const text = await response.text();
-            lastError = new Error(
-                `Trigger internal API request failed (${response.status}): ${text}`,
-            );
-
-            // Only retry on 5xx server errors
-            if (response.status < 500 || attempt >= maxRetries) {
-                throw lastError;
+                // Only retry on 5xx server errors. Note this branch is what
+                // makes a proxy timeout retryable at all: nginx answers 504 and
+                // Cloudflare answers 524, both of which are >= 500 even though
+                // the work they timed out on is still running server-side. That
+                // is why `retryable` has to gate the loop rather than the
+                // status code alone.
+                if (response.status < 500 || attempt >= maxRetries) {
+                    throw lastError;
+                }
+            } finally {
+                clearTimeout(timer);
             }
         }
 
         throw lastError ?? new Error('Trigger internal API request failed after retries');
+    }
+
+    /**
+     * Turn a rejected `fetch` into the error the caller should see. An abort
+     * raised by our own deadline is reported as a timeout naming the budget,
+     * so an operator reading worker logs can tell "we gave up" apart from
+     * "the network refused us". Everything else is passed through unchanged.
+     */
+    private describeTransportFailure(cause: unknown, signal: AbortSignal): Error {
+        if (signal.aborted) {
+            return new Error(
+                `Trigger internal API request timed out after ${this.requestTimeoutMs}ms`,
+            );
+        }
+
+        return cause instanceof Error ? cause : new Error(String(cause));
     }
 
     private composeUrl(path: string): string {

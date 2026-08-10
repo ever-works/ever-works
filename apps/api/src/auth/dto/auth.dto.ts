@@ -1,13 +1,55 @@
 import {
+    ArrayNotEmpty,
+    IsArray,
     IsEmail,
     IsNotEmpty,
     IsString,
+    MaxLength,
     MinLength,
     Matches,
     IsOptional,
     IsUUID,
+    ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+/**
+ * One legal document the signup form says it displayed next to the terms
+ * checkbox.
+ *
+ * These values arrive from a browser, so they are a *claim*, not evidence. The
+ * checks here only reject obvious rubbish; what makes a claim true is
+ * `TermsAcceptanceService`, which re-checks every field against the published
+ * `@ever-co/legal` corpus before a row is written. A digest the corpus never
+ * published is refused — recording it would produce evidence pointing at
+ * nothing.
+ */
+export class TermsAcceptanceClaimDto {
+    @ApiProperty({ description: 'Stable document id', example: 'tos:ever-works' })
+    @IsNotEmpty()
+    @IsString()
+    @MaxLength(255)
+    documentId: string;
+
+    @ApiProperty({ description: 'Published document version', example: '1.0.0' })
+    @IsNotEmpty()
+    @IsString()
+    @MaxLength(64)
+    version: string;
+
+    @ApiProperty({ description: 'Lowercase hex sha256 of the document source' })
+    @Matches(/^[0-9a-f]{64}$/, {
+        message: 'sha256 must be a 64-character lowercase hex digest',
+    })
+    sha256: string;
+
+    @ApiProperty({ description: 'BCP-47 locale of the text that was shown', example: 'en' })
+    @IsNotEmpty()
+    @IsString()
+    @MaxLength(35)
+    locale: string;
+}
 
 export class RegisterDto {
     @ApiProperty({ description: 'Username for the new account', example: 'johndoe', minLength: 3 })
@@ -46,6 +88,28 @@ export class RegisterDto {
     @IsString()
     @IsOptional()
     emailVerificationCallbackUrl?: string;
+
+    /**
+     * The legal documents the user ticked the box for, exactly as the form
+     * displayed them.
+     *
+     * This is the field the signup checkbox was missing. It was uncontrolled
+     * (`<input id="terms" type="checkbox" required>`), never entered `formData`,
+     * and never reached the API: HTML5 `required` blocked the submit and nothing
+     * was recorded.
+     *
+     * Optional at the DTO layer so machine-driven registration paths that never
+     * showed a checkbox are not forced to invent one; the interactive signup
+     * form always sends it, and `AuthController.register` rejects a claim the
+     * corpus never published.
+     */
+    @ApiPropertyOptional({ type: () => [TermsAcceptanceClaimDto] })
+    @IsOptional()
+    @IsArray()
+    @ArrayNotEmpty({ message: 'Terms acceptance, when supplied, must list at least one document' })
+    @ValidateNested({ each: true })
+    @Type(() => TermsAcceptanceClaimDto)
+    terms?: TermsAcceptanceClaimDto[];
 }
 
 export class LoginDto {

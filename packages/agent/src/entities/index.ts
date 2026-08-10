@@ -26,6 +26,7 @@ export * from './conversation-message.entity';
 export * from './auth-account.entity';
 export * from './auth-session.entity';
 export * from './auth-verification.entity';
+export * from './terms-acceptance.entity';
 export * from './github-app-installation.entity';
 export * from './github-app-installation-repository.entity';
 export * from './github-app-user-link.entity';
@@ -148,3 +149,6 @@ export * from './fleet-job.entity';
 // Tool-grant matrix (audit item G4) — per-scope tool allow/deny rows.
 export * from './tool-grant.entity';
 export * from './workflow.entity';
+// One execution of a saved graph — what makes running a workflow leave a
+// trace instead of vanishing into a chat tool's return value.
+export * from './workflow-run.entity';

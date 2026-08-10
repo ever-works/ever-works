@@ -6,7 +6,9 @@ import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
 import type { Task, TaskStatus, TaskPriority } from '@/lib/api/tasks';
+import type { TaskScopeRef } from '@/lib/api/tasks.shared';
 import { TasksKanbanView } from './TasksKanbanView';
+import { TaskScopeRowMenu } from './TaskScopeRowMenu';
 import { LayoutGrid, Table2, Kanban } from 'lucide-react';
 
 const STATUS_TONES: Record<TaskStatus, string> = {
@@ -59,9 +61,17 @@ const STATUS_FILTERS: { key: TaskStatus | 'all'; label: string }[] = [
 export function TasksList({
     tasks,
     enableStatusFilter = true,
+    scope,
 }: {
     tasks: Task[];
     enableStatusFilter?: boolean;
+    /**
+     * Set only when this list IS a scope's tab. Turns on the per-row
+     * "remove from this scope" action; omitted on the global /tasks page,
+     * where a Task belongs to no list in particular and there would be
+     * nothing to remove it from.
+     */
+    scope?: TaskScopeRef;
 }) {
     const t = useTranslations('dashboard.tasksPage');
     const [view, setView] = useState<ViewKey>('cards');
@@ -162,19 +172,19 @@ export function TasksList({
             ) : view === 'cards' ? (
                 <div className="grid grid-cols-1 @lg/main:grid-cols-2 @3xl/main:grid-cols-3 gap-4">
                     {filtered.map((t) => (
-                        <TaskCard key={t.id} task={t} />
+                        <TaskCard key={t.id} task={t} scope={scope} />
                     ))}
                 </div>
             ) : (
-                <TaskTable tasks={filtered} />
+                <TaskTable tasks={filtered} scope={scope} />
             )}
         </div>
     );
 }
 
-function TaskCard({ task }: { task: Task }) {
+function TaskCard({ task, scope }: { task: Task; scope?: TaskScopeRef }) {
     const t = useTranslations('dashboard.tasksPage');
-    return (
+    const card = (
         <Link
             href={ROUTES.DASHBOARD_TASK(task.id)}
             className="block rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 hover:border-border transition-colors"
@@ -216,9 +226,29 @@ function TaskCard({ task }: { task: Task }) {
             </div>
         </Link>
     );
+
+    if (!scope) return card;
+
+    // The overflow menu is a SIBLING of the card link, never a child:
+    // a <button> nested inside an <a> is invalid HTML and opening the
+    // menu would navigate too. Bottom-right because the top-right corner
+    // is already the priority badge.
+    return (
+        <div className="relative">
+            {card}
+            <TaskScopeRowMenu
+                taskId={task.id}
+                taskTitle={task.title}
+                scopeKey={scope.key}
+                scopeId={scope.id}
+                className="absolute bottom-3 right-3"
+            />
+        </div>
+    );
 }
 
-function TaskTable({ tasks }: { tasks: Task[] }) {
+function TaskTable({ tasks, scope }: { tasks: Task[]; scope?: TaskScopeRef }) {
+    const t = useTranslations('dashboard.tasksPage.scopedSection');
     return (
         <div className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark overflow-hidden">
             <table className="w-full text-sm">
@@ -229,6 +259,11 @@ function TaskTable({ tasks }: { tasks: Task[] }) {
                         <th className="text-left px-4 py-2.5 font-medium">Status</th>
                         <th className="text-left px-4 py-2.5 font-medium">Priority</th>
                         <th className="text-left px-4 py-2.5 font-medium">Updated</th>
+                        {scope && (
+                            <th className="px-4 py-2.5 font-medium w-10">
+                                <span className="sr-only">{t('rowMenuColumn')}</span>
+                            </th>
+                        )}
                     </tr>
                 </thead>
                 <tbody className="divide-y divide-border/60 dark:divide-border-dark/60">
@@ -274,6 +309,16 @@ function TaskTable({ tasks }: { tasks: Task[] }) {
                             <td className="px-4 py-2.5 text-xs text-text-muted">
                                 {new Date(t.updatedAt).toLocaleDateString()}
                             </td>
+                            {scope && (
+                                <td className="px-4 py-2.5">
+                                    <TaskScopeRowMenu
+                                        taskId={t.id}
+                                        taskTitle={t.title}
+                                        scopeKey={scope.key}
+                                        scopeId={scope.id}
+                                    />
+                                </td>
+                            )}
                         </tr>
                     ))}
                 </tbody>

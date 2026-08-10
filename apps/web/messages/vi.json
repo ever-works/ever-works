@@ -217,7 +217,8 @@
             "errors": {
                 "passwordsDoNotMatch": "Mật khẩu không khớp",
                 "passwordTooShort": "Mật khẩu phải có ít nhất 8 ký tự",
-                "generic": "Đã xảy ra lỗi. Vui lòng thử lại."
+                "generic": "Đã xảy ra lỗi. Vui lòng thử lại.",
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
             }
         }
     },
@@ -905,6 +906,13 @@
                 "nextDisabledReason": "Pick a parent or choose Workspace scope to continue."
             },
             "settings": {
+                "identity": {
+                    "pause": "Tạm dừng",
+                    "resume": "Tiếp tục",
+                    "activate": "Kích hoạt",
+                    "archive": "Lưu trữ",
+                    "delete": "Xóa"
+                },
                 "orgCard": {
                     "title": "Tổ chức",
                     "teamLabel": "Nhóm",
@@ -992,7 +1000,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "Đã lưu trữ"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1015,6 +1024,38 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "Agent đã lưu trữ",
+                "subtitle": "Các Agent bạn đã lưu trữ. Chúng không chạy và không xuất hiện trong danh mục. Khôi phục để đưa Agent trở lại ở trạng thái tạm dừng, hoặc xóa vĩnh viễn.",
+                "empty": {
+                    "title": "Chưa có Agent nào được lưu trữ",
+                    "subtitle": "Lưu trữ một Agent từ trang cài đặt của nó sẽ chuyển nó tới đây."
+                },
+                "delete": "Xóa vĩnh viễn",
+                "deleteAria": "Xóa vĩnh viễn {name}",
+                "unarchive": "Khôi phục",
+                "menuAria": "Hành động cho {name}",
+                "unarchiveSuccess": "Đã khôi phục {name}",
+                "unarchiveError": "Không thể khôi phục Agent"
+            },
+            "archiveDialog": {
+                "title": "Lưu trữ {name}?",
+                "description": "Agent sẽ ngừng chạy và không còn xuất hiện trong danh mục. Lịch sử chạy, ngân sách và thành viên nhóm vẫn được giữ lại.",
+                "hint": "Bạn có thể khôi phục từ tab Đã lưu trữ bất cứ lúc nào — Agent quay lại ở trạng thái tạm dừng.",
+                "cancel": "Hủy",
+                "confirm": "Lưu trữ Agent",
+                "success": "Đã lưu trữ {name}",
+                "error": "Không thể lưu trữ Agent"
+            },
+            "deleteDialog": {
+                "title": "Xóa {name}?",
+                "description": "Thao tác này sẽ xóa vĩnh viễn Agent cùng ngân sách, tư cách thành viên và lịch sử chạy của nó.",
+                "hint": "Không thể hoàn tác. Hãy lưu trữ Agent nếu bạn chỉ muốn ẩn nó khỏi danh mục.",
+                "cancel": "Hủy",
+                "confirm": "Xóa vĩnh viễn",
+                "success": "Đã xóa {name}",
+                "error": "Không thể xóa Agent"
             }
         },
         "tasksPage": {
@@ -1023,6 +1064,33 @@
             "empty": {
                 "title": "Chưa có Task nào.",
                 "subtitle": "Tasks sẽ được phát hành trong giai đoạn sau của việc triển khai Agents/Skills/Tasks. Trang này được giữ lại để định tuyến điều hướng thanh bên được giải quyết."
+            },
+            "scopedSection": {
+                "addExisting": "Thêm Task có sẵn",
+                "newTask": "Task mới",
+                "assignTitle": "Thêm một Task có sẵn",
+                "assignSubtitle": "Chọn một Task từ backlog của bạn thay vì tạo thêm Task mới.",
+                "assignSearchPlaceholder": "Tìm Task…",
+                "assignSearchLabel": "Tìm Task",
+                "assignLoading": "Đang tải Task…",
+                "assignLoadFailed": "Không thể tải Task",
+                "assignNoneAvailable": "Không còn Task nào khác để thêm.",
+                "assignNoMatches": "Không có Task nào khớp với tìm kiếm đó.",
+                "assignedToast": "Đã thêm {title}",
+                "assignFailed": "Không thể thêm Task",
+                "assignCancel": "Hủy",
+                "movesLabel": "sẽ chuyển",
+                "movesHint": "Đang thuộc nơi khác — thêm vào đây sẽ chuyển nó.",
+                "removedToast": "Đã gỡ {title} khỏi danh sách này",
+                "removeFailed": "Không thể gỡ Task",
+                "rowMenuColumn": "Hành động",
+                "rowMenuLabel": "Hành động cho {title}",
+                "removeMenuItem": "Gỡ khỏi danh sách này",
+                "confirmTitle": "Gỡ Task này?",
+                "confirmBody": "{title} sẽ được gỡ khỏi danh sách này. Bản thân Task vẫn được giữ lại và có thể thêm lại sau.",
+                "confirmCancel": "Hủy",
+                "confirmSubmit": "Gỡ",
+                "confirmPending": "Đang gỡ…"
             },
             "list": {
                 "newTask": "+ Task mới",
@@ -1446,7 +1514,14 @@
                 "relationLabel": "Relation",
                 "attach": "Attach",
                 "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "detachDialog": {
+                    "title": "Gỡ Công việc này?",
+                    "body": "{title} sẽ được gỡ khỏi Nhiệm vụ này. Bản thân Công việc không bao giờ bị thay đổi — thao tác này chỉ xóa liên kết.",
+                    "confirm": "Gỡ Công việc",
+                    "cancel": "Hủy",
+                    "detaching": "Đang gỡ…",
+                    "error": "Không thể gỡ Công việc"
+                },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
                     "created": "Created",
@@ -1495,8 +1570,13 @@
                 "runNow": "Run now",
                 "clone": "Clone"
             },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            "deleteDialog": {
+                "title": "Xóa Nhiệm vụ này?",
+                "body": "{title} sẽ bị xóa vĩnh viễn. Các Ý tưởng và Công việc con vẫn được giữ lại, nhưng liên kết ngược của chúng tới Nhiệm vụ này sẽ bị mất. Không thể hoàn tác thao tác này.",
+                "confirm": "Xóa Nhiệm vụ",
+                "cancel": "Hủy",
+                "deleting": "Đang xóa…",
+                "error": "Không thể xóa Nhiệm vụ"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1567,6 +1647,36 @@
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)"
+                }
+            },
+            "goals": {
+                "title": "Mục tiêu",
+                "empty": "Chưa có Mục tiêu nào được đính kèm vào Nhiệm vụ này. Hãy đính kèm một Mục tiêu bên dưới để xác định thế nào là thành công.",
+                "attachTitle": "Đính kèm Mục tiêu",
+                "goalLabel": "Mục tiêu",
+                "goalPlaceholder": "Chọn một Mục tiêu",
+                "primaryLabel": "Đặt làm chính",
+                "primaryBadge": "Chính",
+                "primaryTooltip": "Mục tiêu chính của Nhiệm vụ này - mỗi lần chỉ có một Mục tiêu được đặt làm chính.",
+                "attach": "Đính kèm",
+                "detach": "Gỡ",
+                "detachDialog": {
+                    "title": "Gỡ Mục tiêu này?",
+                    "body": "{title} sẽ được gỡ khỏi Nhiệm vụ này. Bản thân Mục tiêu không bị xóa — nó vẫn nằm trên trang Mục tiêu và trong mọi Nhiệm vụ khác mà nó được đính kèm.",
+                    "confirm": "Gỡ Mục tiêu",
+                    "cancel": "Hủy",
+                    "detaching": "Đang gỡ…",
+                    "error": "Không thể gỡ Mục tiêu"
+                },
+                "alreadyLinkedOption": "{title} (đã đính kèm)",
+                "noGoalsToAttach": "Bạn chưa có Mục tiêu nào. Hãy tạo một Mục tiêu trên trang Mục tiêu, rồi đính kèm tại đây.",
+                "pickerTruncated": "Đang hiển thị 100 Mục tiêu gần đây nhất của bạn - mở trang Mục tiêu để xem danh sách đầy đủ.",
+                "invariantNote": "Việc đính kèm Mục tiêu không bao giờ thay đổi trạng thái của Nhiệm vụ này - hoàn thành một Nhiệm vụ vẫn là một thao tác rõ ràng.",
+                "toasts": {
+                    "attached": "Đã đính kèm Mục tiêu",
+                    "attachError": "Không thể đính kèm Mục tiêu",
+                    "detached": "Đã gỡ Mục tiêu",
+                    "detachError": "Không thể gỡ Mục tiêu"
                 }
             }
         },
@@ -1639,11 +1749,85 @@
                 "error": "Không thể tạo Idea. Vui lòng thử lại."
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "Works đã liên kết",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "Đã tạo",
+                    "linked": "Đã liên kết",
+                    "rebuilt": "Đã tạo lại",
+                    "matched": "Khớp"
+                }
+            },
+            "detail": {
+                "live": "Trực tiếp",
+                "fromMission": "Từ một Nhiệm vụ",
+                "sections": {
+                    "description": "Ý tưởng",
+                    "build": "Trạng thái dựng",
+                    "agents": "Tác nhân",
+                    "details": "Chi tiết"
+                },
+                "stages": {
+                    "drafted": "Đã soạn",
+                    "queued": "Trong hàng đợi",
+                    "building": "Đang dựng",
+                    "built": "Đã dựng",
+                    "failed": "Dựng thất bại",
+                    "builtDirect": "Đã dựng"
+                },
+                "stageHints": {
+                    "drafted": "Ý tưởng đã có và sẵn sàng để dựng.",
+                    "queued": "Đang chờ trình dựng.",
+                    "building": "Work Agent đang tạo Work.",
+                    "built": "Một Work đã được tạo từ Ý tưởng này.",
+                    "failed": "Quá trình dựng đã dừng. Hãy thử lại.",
+                    "builtDirect": "Được tạo trong trình tạo Work — đã bỏ qua hàng đợi build."
+                },
+                "built": {
+                    "badge": "Đã dựng ({count})",
+                    "none": "Chưa dựng"
+                },
+                "actions": {
+                    "build": "Dựng",
+                    "retry": "Thử lại",
+                    "rebuild": "Dựng lại",
+                    "rebuildHint": "Tạo Work mới. Work hiện có vẫn được giữ.",
+                    "newAgent": "Tác nhân mới",
+                    "delete": "Xóa"
+                },
+                "works": {
+                    "empty": "Chưa có Work nào liên kết với Ý tưởng này."
+                },
+                "agents": {
+                    "empty": "Không có Tác nhân nào gắn với Ý tưởng này."
+                },
+                "meta": {
+                    "source": "Nguồn",
+                    "slug": "Slug",
+                    "fields": "Trường",
+                    "categories": "Danh mục gợi ý"
+                },
+                "deleteDialog": {
+                    "title": "Xóa Ý tưởng này?",
+                    "body": "{title} sẽ bị xóa vĩnh viễn. Không thể hoàn tác.",
+                    "confirm": "Xóa Ý tưởng",
+                    "cancel": "Hủy",
+                    "deleting": "Đang xóa…",
+                    "error": "Không xóa được Ý tưởng",
+                    "blocked": {
+                        "linked-works": "Không thể xóa: Ý tưởng này liên kết với {count} Work. Hãy xóa hoặc hủy liên kết trước.",
+                        "idea-agents": "Không thể xóa: {count} Tác nhân đang gắn với Ý tưởng này. Hãy xóa hoặc đổi phạm vi trước.",
+                        "build-in-flight": "Không thể xóa khi đang dựng. Hãy đợi hoàn tất.",
+                        "unknown": "Hiện không thể xóa Ý tưởng này."
+                    }
+                },
+                "toasts": {
+                    "built": "Đã dựng Work từ Ý tưởng này",
+                    "buildFailed": "Dựng thất bại",
+                    "buildQueued": "Đã đưa vào hàng đợi dựng",
+                    "retryQueued": "Đã đưa vào hàng đợi thử lại",
+                    "rebuildQueued": "Đã đưa vào hàng đợi dựng lại",
+                    "deleted": "Đã xóa Ý tưởng",
+                    "actionError": "Không thực hiện được. Vui lòng thử lại."
                 }
             }
         },
@@ -2876,7 +3060,23 @@
                 "activatedToast": "Đã kích hoạt Agent",
                 "statusUpdateFailed": "Không thể cập nhật trạng thái",
                 "newAgent": "Agent mới",
-                "moreAgents": "+{count} khác"
+                "moreAgents": "+{count} khác",
+                "assignExisting": "Gán Agent có sẵn",
+                "assignTitle": "Gán một Agent cho Công việc này",
+                "assignSubtitle": "Đưa một Agent bạn đã có vào Công việc này thay vì tạo thêm một Agent mới.",
+                "assignSearchPlaceholder": "Tìm Agent…",
+                "assignLoading": "Đang tải Agent…",
+                "assignNoneAvailable": "Không còn Agent nào khác để gán.",
+                "assignNoMatches": "Không có Agent nào khớp với tìm kiếm đó.",
+                "assignLoadFailed": "Không thể tải Agent",
+                "assignedToast": "Đã gán {name} cho Công việc này",
+                "assignFailed": "Không thể gán Agent",
+                "assignCancel": "Hủy",
+                "assignedLabel": "Đã gán",
+                "assignedHint": "Được gán cho Công việc này — không được tạo ở đây",
+                "unassign": "Gỡ khỏi Công việc này",
+                "unassignedToast": "Đã gỡ {name} khỏi Công việc này",
+                "unassignFailed": "Không thể gỡ Agent"
             },
             "failedToGenerateItems": "Không thể tạo các mục. Vui lòng thử lại.",
             "generationCompleted": "Tạo hoàn tất thành công",
@@ -7118,6 +7318,9 @@
             },
             "token": {
                 "required": "Token cannot be empty"
+            },
+            "terms": {
+                "required": "You must accept the Terms of Service and Privacy Policy to create an account."
             }
         }
     },

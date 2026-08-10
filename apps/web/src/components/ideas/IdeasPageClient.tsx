@@ -72,6 +72,14 @@ const IDEA_PLACEHOLDERS: ReadonlyArray<string> = [
 interface IdeasPageClientProps {
     initialIdeas: WorkProposal[];
     loadError?: string | null;
+    /**
+     * `{ [ideaId]: workId }` for Ideas whose title + description match an
+     * existing Work's name + description. Resolved server-side by the page
+     * so a Work built outside the Idea flow — which leaves no provenance
+     * link — still marks its Idea as built. Ideas without a match are
+     * absent from the map.
+     */
+    matchedWorkIds?: Record<string, string>;
     filters?: {
         status?: IdeasStatusFilter;
         search?: string;
@@ -88,6 +96,7 @@ interface IdeasPageClientProps {
 export function IdeasPageClient({
     initialIdeas,
     loadError = null,
+    matchedWorkIds = {},
     filters,
     pagination,
 }: IdeasPageClientProps) {
@@ -329,7 +338,12 @@ export function IdeasPageClient({
                                 new Date(a.generatedAt).getTime(),
                         )
                         .map((idea) => (
-                            <IdeaCard key={idea.id} proposal={idea} onDismissed={handleDismissed} />
+                            <IdeaCard
+                                key={idea.id}
+                                proposal={idea}
+                                onDismissed={handleDismissed}
+                                matchedWorkId={matchedWorkIds[idea.id] ?? null}
+                            />
                         ))}
                 </div>
             ) : null}

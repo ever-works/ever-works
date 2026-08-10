@@ -217,7 +217,8 @@
             "errors": {
                 "passwordsDoNotMatch": "Паролите не съвпадат",
                 "passwordTooShort": "Паролата трябва да е поне 8 символа",
-                "generic": "Грешка. Моля, опитайте отново."
+                "generic": "Грешка. Моля, опитайте отново.",
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
             }
         }
     },
@@ -953,6 +954,13 @@
                 "openInWizard": "Отвори в помощник"
             },
             "settings": {
+                "identity": {
+                    "pause": "Пауза",
+                    "resume": "Възобнови",
+                    "activate": "Активирай",
+                    "archive": "Архивирай",
+                    "delete": "Изтрий"
+                },
                 "orgCard": {
                     "title": "Организация",
                     "teamLabel": "Екип",
@@ -1023,7 +1031,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "Архивирани"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1046,6 +1055,38 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "Архивирани агенти",
+                "subtitle": "Агенти, които сте архивирали. Те не се изпълняват и не се показват в каталога. Възстановете агент, за да се върне на пауза, или го изтрийте завинаги.",
+                "empty": {
+                    "title": "Няма архивирани агенти",
+                    "subtitle": "Архивирането на агент от страницата с неговите настройки го премества тук."
+                },
+                "delete": "Изтрий завинаги",
+                "deleteAria": "Изтрий {name} завинаги",
+                "unarchive": "Възстанови",
+                "menuAria": "Действия за {name}",
+                "unarchiveSuccess": "{name} е възстановен",
+                "unarchiveError": "Агентът не можа да бъде възстановен"
+            },
+            "archiveDialog": {
+                "title": "Да се архивира ли {name}?",
+                "description": "Агентът спира да работи и изчезва от каталога. Изпълненията, бюджетите и членствата му се запазват.",
+                "hint": "Можете да го възстановите от раздела „Архивирани“ по всяко време — той се връща на пауза.",
+                "cancel": "Отказ",
+                "confirm": "Архивирай агента",
+                "success": "{name} е архивиран",
+                "error": "Агентът не можа да бъде архивиран"
+            },
+            "deleteDialog": {
+                "title": "Да се изтрие ли {name}?",
+                "description": "Това изтрива завинаги агента, както и бюджетите, членствата и историята на изпълненията му.",
+                "hint": "Действието е необратимо. Архивирайте агента, ако само искате да го скриете от каталога.",
+                "cancel": "Отказ",
+                "confirm": "Изтрий завинаги",
+                "success": "{name} е изтрит",
+                "error": "Агентът не можа да бъде изтрит"
             }
         },
         "tasksPage": {
@@ -1054,6 +1095,33 @@
             "empty": {
                 "title": "Все още няма Задачи.",
                 "subtitle": "Задачите ще бъдат добавени в по-късна фаза от rollout-а на Агенти/Умения/Задачи. Страницата е запазена, за маршрутът от навигацията в страничната лента да работи."
+            },
+            "scopedSection": {
+                "addExisting": "Добавяне на съществуваща",
+                "newTask": "Нова Задача",
+                "assignTitle": "Добавяне на съществуваща Задача",
+                "assignSubtitle": "Изберете Задача от списъка си, вместо да създавате нова.",
+                "assignSearchPlaceholder": "Търсене на Задачи…",
+                "assignSearchLabel": "Търсене на Задачи",
+                "assignLoading": "Зареждане на Задачи…",
+                "assignLoadFailed": "Задачите не можаха да се заредят",
+                "assignNoneAvailable": "Няма други Задачи за добавяне.",
+                "assignNoMatches": "Няма Задачи, съответстващи на това търсене.",
+                "assignedToast": "{title} е добавена",
+                "assignFailed": "Задачата не можа да бъде добавена",
+                "assignCancel": "Отказ",
+                "movesLabel": "се премества",
+                "movesHint": "Намира се другаде — добавянето тук ще я премести.",
+                "removedToast": "{title} е премахната от този списък",
+                "removeFailed": "Задачата не можа да бъде премахната",
+                "rowMenuColumn": "Действия",
+                "rowMenuLabel": "Действия за {title}",
+                "removeMenuItem": "Премахване от този списък",
+                "confirmTitle": "Премахване на тази Задача?",
+                "confirmBody": "{title} ще бъде премахната от този списък. Самата Задача се запазва и може да бъде добавена отново по-късно.",
+                "confirmCancel": "Отказ",
+                "confirmSubmit": "Премахване",
+                "confirmPending": "Премахване…"
             },
             "list": {
                 "newTask": "+ Нова Задача",
@@ -1477,7 +1545,14 @@
                 "relationLabel": "Relation",
                 "attach": "Attach",
                 "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "detachDialog": {
+                    "title": "Да се отдели ли тази Работа?",
+                    "body": "{title} ще бъде премахната от тази Мисия. Самата Работа остава непроменена — това само премахва връзката.",
+                    "confirm": "Отделяне на Работата",
+                    "cancel": "Отказ",
+                    "detaching": "Отделяне…",
+                    "error": "Неуспешно отделяне на Работата"
+                },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
                     "created": "Created",
@@ -1526,8 +1601,13 @@
                 "runNow": "Run now",
                 "clone": "Clone"
             },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            "deleteDialog": {
+                "title": "Да се изтрие ли тази Мисия?",
+                "body": "{title} ще бъде изтрита завинаги. Дъщерните Идеи и Работи се запазват, но обратната им връзка към тази Мисия се губи. Това действие е необратимо.",
+                "confirm": "Изтриване на Мисията",
+                "cancel": "Отказ",
+                "deleting": "Изтриване…",
+                "error": "Неуспешно изтриване на Мисията"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1598,6 +1678,36 @@
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)"
+                }
+            },
+            "goals": {
+                "title": "Цели",
+                "empty": "Към тази Мисия още няма прикачени Цели. Прикачете една по-долу, за да проследявате какво означава успех.",
+                "attachTitle": "Прикачване на Цел",
+                "goalLabel": "Цел",
+                "goalPlaceholder": "Изберете Цел",
+                "primaryLabel": "Задаване като основна",
+                "primaryBadge": "Основна",
+                "primaryTooltip": "Основната Цел за тази Мисия - само една Цел може да бъде основна в даден момент.",
+                "attach": "Прикачване",
+                "detach": "Отделяне",
+                "detachDialog": {
+                    "title": "Да се отдели ли тази Цел?",
+                    "body": "{title} ще бъде премахната от тази Мисия. Самата Цел не се изтрива — тя остава на страницата с Цели и във всяка друга Мисия, към която е прикачена.",
+                    "confirm": "Отделяне на Целта",
+                    "cancel": "Отказ",
+                    "detaching": "Отделяне…",
+                    "error": "Неуспешно отделяне на Целта"
+                },
+                "alreadyLinkedOption": "{title} (вече прикачена)",
+                "noGoalsToAttach": "Все още нямате Цели. Създайте една на страницата с Цели и след това я прикачете тук.",
+                "pickerTruncated": "Показват се последните ви 100 Цели - отворете страницата с Цели за пълния списък.",
+                "invariantNote": "Прикачването на Цел никога не променя статуса на тази Мисия - завършването на Мисия остава изрично действие.",
+                "toasts": {
+                    "attached": "Целта е прикачена",
+                    "attachError": "Целта не можа да бъде прикачена",
+                    "detached": "Целта е отделена",
+                    "detachError": "Целта не можа да бъде отделена"
                 }
             }
         },
@@ -1670,11 +1780,85 @@
                 "error": "Idea не може да бъде създадена. Моля, опитайте отново."
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "Свързани Works",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "Създаден",
+                    "linked": "Свързан",
+                    "rebuilt": "Пресъздаден",
+                    "matched": "Съвпадение"
+                }
+            },
+            "detail": {
+                "live": "На живо",
+                "fromMission": "От Мисия",
+                "sections": {
+                    "description": "Идея",
+                    "build": "Статус на изграждане",
+                    "agents": "Агенти",
+                    "details": "Детайли"
+                },
+                "stages": {
+                    "drafted": "Създадена",
+                    "queued": "В опашка",
+                    "building": "Изгражда се",
+                    "built": "Изградена",
+                    "failed": "Неуспешно изграждане",
+                    "builtDirect": "Изградена"
+                },
+                "stageHints": {
+                    "drafted": "Идеята съществува и е готова за изграждане.",
+                    "queued": "Изчаква изпълнител.",
+                    "building": "Work агентът генерира Work.",
+                    "built": "От тази Идея е създаден Work.",
+                    "failed": "Изграждането спря. Опитайте отново.",
+                    "builtDirect": "Създадено в конструктора на Works — пропусна опашката за изграждане."
+                },
+                "built": {
+                    "badge": "Изградена ({count})",
+                    "none": "Още не е изградена"
+                },
+                "actions": {
+                    "build": "Изгради",
+                    "retry": "Опитай отново",
+                    "rebuild": "Изгради наново",
+                    "rebuildHint": "Създава нов Work. Съществуващият се запазва.",
+                    "newAgent": "Нов агент",
+                    "delete": "Изтрий"
+                },
+                "works": {
+                    "empty": "Все още няма Works, свързани с тази Идея."
+                },
+                "agents": {
+                    "empty": "Няма агенти, свързани с тази Идея."
+                },
+                "meta": {
+                    "source": "Източник",
+                    "slug": "Slug",
+                    "fields": "Полета",
+                    "categories": "Предложени категории"
+                },
+                "deleteDialog": {
+                    "title": "Изтриване на тази Идея?",
+                    "body": "{title} ще бъде изтрита завинаги. Действието е необратимо.",
+                    "confirm": "Изтрий Идеята",
+                    "cancel": "Отказ",
+                    "deleting": "Изтриване…",
+                    "error": "Идеята не можа да бъде изтрита",
+                    "blocked": {
+                        "linked-works": "Не може да се изтрие: тази Идея е свързана с {count} Work. Първо ги изтрийте или разкачете.",
+                        "idea-agents": "Не може да се изтрие: {count} агент(и) са свързани с тази Идея. Изтрийте ги или сменете обхвата.",
+                        "build-in-flight": "Не може да се изтрие по време на изграждане. Изчакайте да приключи.",
+                        "unknown": "В момента тази Идея не може да бъде изтрита."
+                    }
+                },
+                "toasts": {
+                    "built": "Изграден е Work от тази Идея",
+                    "buildFailed": "Изграждането е неуспешно",
+                    "buildQueued": "Изграждането е в опашка",
+                    "retryQueued": "Повторният опит е в опашка",
+                    "rebuildQueued": "Повторното изграждане е в опашка",
+                    "deleted": "Идеята е изтрита",
+                    "actionError": "Действието не бе изпълнено. Опитайте отново."
                 }
             }
         },
@@ -2944,7 +3128,23 @@
                 "activatedToast": "Агентът е активиран",
                 "statusUpdateFailed": "Статусът не можа да бъде обновен",
                 "newAgent": "Нов Агент",
-                "moreAgents": "+{count} още"
+                "moreAgents": "+{count} още",
+                "assignExisting": "Присвои съществуващ",
+                "assignTitle": "Присвояване на Агент към тази Работа",
+                "assignSubtitle": "Добавете към тази Работа Агент, който вече имате, вместо да създавате нов.",
+                "assignSearchPlaceholder": "Търсене на Агенти…",
+                "assignLoading": "Зареждане на Агенти…",
+                "assignNoneAvailable": "Няма други Агенти за присвояване.",
+                "assignNoMatches": "Няма Агенти, отговарящи на това търсене.",
+                "assignLoadFailed": "Агентите не можаха да бъдат заредени",
+                "assignedToast": "{name} е присвоен към тази Работа",
+                "assignFailed": "Агентът не можа да бъде присвоен",
+                "assignCancel": "Отказ",
+                "assignedLabel": "Присвоен",
+                "assignedHint": "Присвоен към тази Работа — не е създаден тук",
+                "unassign": "Премахване от тази Работа",
+                "unassignedToast": "{name} е премахнат от тази Работа",
+                "unassignFailed": "Агентът не можа да бъде премахнат"
             },
             "failedToGenerateItems": "Неуспешно генериране на елементи. Моля, опитайте отново.",
             "generationCompleted": "Генерирането завърши успешно",
@@ -7117,6 +7317,9 @@
             },
             "token": {
                 "required": "Token cannot be empty"
+            },
+            "terms": {
+                "required": "You must accept the Terms of Service and Privacy Policy to create an account."
             }
         }
     },

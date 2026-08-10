@@ -1,7 +1,16 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { FindOptionsWhere, In, IsNull, LessThanOrEqual, Not, Repository } from 'typeorm';
-import { Agent, AgentScope, AgentStatus } from '../../entities/agent.entity';
+import {
+    EntityManager,
+    FindOptionsWhere,
+    In,
+    IsNull,
+    LessThanOrEqual,
+    Not,
+    Repository,
+} from 'typeorm';
+import { Agent, AgentScope, AgentStatus, type AgentTarget } from '../../entities/agent.entity';
+import { AgentMembership } from '../../entities/agent-membership.entity';
 import { sanitizeLikePattern } from '../utils';
 
 /**
@@ -15,6 +24,14 @@ export interface ListAgentsFilter {
     missionId?: string;
     ideaId?: string;
     workId?: string;
+    /**
+     * "Which Agents REACH this Work?" — Agents whose
+     * `targets` include this Work, resolved through the indexed
+     * `agent_memberships` join rather than a JSON scan. Distinct from
+     * `workId`, which matches Agents PINNED to the Work by scope; the
+     * Work header's Agents dropdown unions the two.
+     */
+    assignedWorkId?: string;
     search?: string;
     limit?: number;
     offset?: number;
@@ -72,10 +89,22 @@ export class AgentRepository {
         userId: string,
         filter: ListAgentsFilter = {},
     ): Promise<{ rows: Agent[]; total: number }> {
+        // Archived Agents are hidden from every catalog surface by
+        // default — EXCEPT when the caller explicitly asks for them
+        // (`?status=archived`), which is what the `/agents/archived`
+        // tab does. Without this carve-out the two predicates
+        // contradict each other and the archived view is always empty.
+        const wantsArchived = Array.isArray(filter.status)
+            ? filter.status.includes(AgentStatus.ARCHIVED)
+            : filter.status === AgentStatus.ARCHIVED;
+
         const qb = this.repository
             .createQueryBuilder('agent')
-            .where('agent.userId = :userId', { userId })
-            .andWhere('agent.status != :archived', { archived: AgentStatus.ARCHIVED });
+            .where('agent.userId = :userId', { userId });
+
+        if (!wantsArchived) {
+            qb.andWhere('agent.status != :archived', { archived: AgentStatus.ARCHIVED });
+        }
 
         if (filter.scope) {
             qb.andWhere('agent.scope = :scope', { scope: filter.scope });
@@ -95,6 +124,25 @@ export class AgentRepository {
         }
         if (filter.workId) {
             qb.andWhere('agent.workId = :workId', { workId: filter.workId });
+        }
+        if (filter.assignedWorkId) {
+            // EXISTS over the membership join (idx_agent_memberships_target)
+            // — built through the query builder so the column identifiers
+            // come from entity metadata instead of hand-quoted SQL.
+            qb.andWhere((sub) => {
+                const sql = sub
+                    .subQuery()
+                    .select('1')
+                    .from(AgentMembership, 'membership')
+                    .where('membership.agentId = agent.id')
+                    .andWhere('membership.targetType = :assignedTargetType')
+                    .andWhere('membership.targetId = :assignedWorkId')
+                    .getQuery();
+                return `EXISTS ${sql}`;
+            }).setParameters({
+                assignedTargetType: 'work',
+                assignedWorkId: filter.assignedWorkId,
+            });
         }
         if (filter.search) {
             // Security: escape LIKE wildcards (%/_/\) in the user-supplied
@@ -331,6 +379,63 @@ export class AgentRepository {
             .where('id = :id', { id: agentId })
             .andWhere('status IN (:...from)', { from: fromList })
             .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
+     * Run `fn` inside a single DB transaction, handing it the tx-scoped
+     * `EntityManager` to pass down to the repository calls that must
+     * commit or roll back together.
+     *
+     * Exposed here (rather than injecting a DataSource into the service)
+     * because `DatabaseModule` deliberately exports repository wrappers
+     * only — see `database.module.spec.ts`. The one caller today is
+     * `AgentsService.addTarget/removeTarget`, which has to land
+     * `agents.targets` and its `agent_memberships` row atomically.
+     */
+    async withTransaction<T>(fn: (manager: EntityManager) => Promise<T>): Promise<T> {
+        return this.repository.manager.transaction(fn);
+    }
+
+    /**
+     * CAS-swap the whole `targets` array — succeeds only if the row still
+     * holds `expected` at write time. Same guard `transitionStatus` and
+     * `tryClaimForRun` put on the status column, applied to the column
+     * two concurrent assign/unassign calls read-modify-write: without it
+     * the later commit silently drops the earlier one's target, while its
+     * `agent_memberships` row (what the `assignedWorkId` filter reads)
+     * stays behind and disagrees with `Agent.targets`.
+     *
+     * `targets` is a `simple-json` column, so TypeORM stores it as the
+     * `JSON.stringify` of the array — or SQL NULL when the value is null,
+     * which no `=` comparison matches, hence the explicit `IS NULL` arm.
+     * Comparing against `JSON.stringify(expected)` therefore compares
+     * against exactly what the write we read from put in the row.
+     *
+     * Pass `manager` to enlist the write in an open transaction — the
+     * membership row that mirrors this array has to commit with it.
+     */
+    async casUpdateTargets(
+        agentId: string,
+        expected: AgentTarget[] | null | undefined,
+        next: AgentTarget[] | null,
+        manager?: EntityManager,
+    ): Promise<boolean> {
+        const qb = (manager?.getRepository(Agent) ?? this.repository)
+            .createQueryBuilder()
+            .update(Agent)
+            .set({ targets: next, updatedAt: new Date() })
+            .where('id = :id', { id: agentId });
+
+        if (expected === null || expected === undefined) {
+            qb.andWhere('targets IS NULL');
+        } else {
+            qb.andWhere('targets = :expectedTargets', {
+                expectedTargets: JSON.stringify(expected),
+            });
+        }
+
+        const result = await qb.execute();
         return (result.affected ?? 0) > 0;
     }
 

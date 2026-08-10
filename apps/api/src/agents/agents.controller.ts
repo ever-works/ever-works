@@ -63,6 +63,7 @@ import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import {
     AddAgentAttachmentDto,
+    AgentTargetBodyDto,
     AssignTaskToAgentDto,
     CreateAgentDto,
     CreateAgentFromTemplateDto,
@@ -85,6 +86,8 @@ import {
  *   DELETE /api/agents/:id          archive (soft-delete) — operator can pass ?hard=true to delete
  *   POST   /api/agents/:id/pause    ACTIVE → PAUSED
  *   POST   /api/agents/:id/resume   PAUSED/ERROR → ACTIVE
+ *   POST   /api/agents/:id/targets  assign an Agent to a Mission/Idea/Work
+ *   DELETE /api/agents/:id/targets/:targetType/:targetId   unassign it
  *
  * Runtime endpoints (`/run-now`, `/dry-run`, `/export`, `/import`,
  * `/files/:name`, `/runs`, `/skills`, `/budget`) land in later phases.
@@ -110,6 +113,7 @@ const AGENT_LIFECYCLE_EVENT_TYPES: ActivityActionType[] = [
     ActivityActionType.AGENT_PAUSED,
     ActivityActionType.AGENT_RESUMED,
     ActivityActionType.AGENT_ARCHIVED,
+    ActivityActionType.AGENT_UNARCHIVED,
     ActivityActionType.AGENT_EXPORTED,
     ActivityActionType.AGENT_IMPORTED,
     ActivityActionType.AGENT_BUDGET_EXCEEDED,
@@ -213,6 +217,7 @@ export class AgentsController {
             missionId: query.missionId,
             ideaId: query.ideaId,
             workId: query.workId,
+            assignedWorkId: query.assignedWorkId,
             search: query.search,
             limit,
             offset,
@@ -462,6 +467,43 @@ export class AgentsController {
         });
     }
 
+    /**
+     * Assign an existing Agent to a Mission / Idea / Work
+     * — the write behind the Work header's "Assign existing Agent"
+     * picker. Idempotent: re-assigning an Agent that already reaches the
+     * target returns it unchanged rather than 409-ing.
+     */
+    @Post(':id/targets')
+    @ApiOperation({ summary: 'Assign an existing Agent to a Mission / Idea / Work' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async addTarget(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: AgentTargetBodyDto,
+    ): Promise<AgentDto> {
+        return this.service.addTarget(auth.userId, id, { type: body.type, id: body.id });
+    }
+
+    /** Inverse of `addTarget` — also idempotent. */
+    @Delete(':id/targets/:targetType/:targetId')
+    @ApiOperation({ summary: 'Unassign an Agent from a Mission / Idea / Work' })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async removeTarget(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Param('targetType') targetType: string,
+        @Param('targetId', ParseUUIDPipe) targetId: string,
+    ): Promise<AgentDto> {
+        if (targetType !== 'mission' && targetType !== 'idea' && targetType !== 'work') {
+            throw new BadRequestException(
+                `Unsupported target type "${targetType}" — expected mission, idea or work.`,
+            );
+        }
+        return this.service.removeTarget(auth.userId, id, { type: targetType, id: targetId });
+    }
+
     @Put(':id/guardrails')
     @ApiOperation({
         summary:
@@ -530,6 +572,27 @@ export class AgentsController {
             userId: auth.userId,
             agentId: id,
             actionType: ActivityActionType.AGENT_RESUMED,
+            details: { status: dto.status },
+        });
+        return dto;
+    }
+
+    @Post(':id/unarchive')
+    @ApiOperation({
+        summary:
+            'Restore an archived Agent (ARCHIVED → PAUSED). Lands on PAUSED, not ACTIVE, so a cron-cadence Agent does not resume firing heartbeats on restore.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async unarchive(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<AgentDto> {
+        const dto = await this.service.unarchive(auth.userId, id);
+        void this.tryLog({
+            userId: auth.userId,
+            agentId: id,
+            actionType: ActivityActionType.AGENT_UNARCHIVED,
             details: { status: dto.status },
         });
         return dto;

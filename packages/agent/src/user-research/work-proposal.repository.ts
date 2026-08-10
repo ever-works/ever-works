@@ -108,6 +108,19 @@ export class WorkProposalRepository {
         return this.repository.findOne({ where: { id, userId } });
     }
 
+    /**
+     * Hard-delete an Idea the caller owns. Scoped by `userId` so an
+     * id belonging to somebody else simply matches no row (returns
+     * `false` → the caller surfaces a 404, which is existence-leak
+     * safe). `idea_works` rows cascade at the DB level
+     * (`@ManyToOne(() => WorkProposal, { onDelete: 'CASCADE' })`);
+     * the deletion GUARDS live in `WorkProposalService.delete`.
+     */
+    async deleteForUser(id: string, userId: string): Promise<boolean> {
+        const res = await this.repository.delete({ id, userId });
+        return (res.affected ?? 0) > 0;
+    }
+
     async markDismissed(id: string, userId: string): Promise<boolean> {
         const res = await this.repository.update(
             { id, userId, status: WorkProposalStatus.PENDING },

@@ -11,7 +11,7 @@ import { cn } from '@/lib/utils/cn';
  * projection of `agent_runs`, exactly as the Tasks kanban is a view
  * over Task). Same visual language as the per-agent `AgentDetailTabs`.
  */
-export function AgentsPageTabs({ active }: { active: 'agents' | 'sessions' }) {
+export function AgentsPageTabs({ active }: { active: 'agents' | 'sessions' | 'archived' }) {
     const t = useTranslations('dashboard.agentsPage.pageTabs');
 
     const tabs = [
@@ -20,6 +20,14 @@ export function AgentsPageTabs({ active }: { active: 'agents' | 'sessions' }) {
             key: 'sessions' as const,
             href: ROUTES.DASHBOARD_AGENT_SESSIONS,
             label: t('sessions'),
+        },
+        // The catalog hides archived Agents, so without a tab of their
+        // own they are unreachable in the UI — and permanent deletion
+        // (the only transition left to them) with it.
+        {
+            key: 'archived' as const,
+            href: ROUTES.DASHBOARD_AGENTS_ARCHIVED,
+            label: t('archived'),
         },
     ];
 

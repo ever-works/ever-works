@@ -217,7 +217,8 @@
             "errors": {
                 "passwordsDoNotMatch": "पासवर्ड मेल नहीं खाते",
                 "passwordTooShort": "पासवर्ड कम से कम 8 अक्षरों का होना चाहिए",
-                "generic": "एक त्रुटि हुई। कृपया पुनः प्रयास करें।"
+                "generic": "एक त्रुटि हुई। कृपया पुनः प्रयास करें।",
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
             }
         }
     },
@@ -905,6 +906,13 @@
                 "nextDisabledReason": "Pick a parent or choose Workspace scope to continue."
             },
             "settings": {
+                "identity": {
+                    "pause": "रोकें",
+                    "resume": "फिर शुरू करें",
+                    "activate": "सक्रिय करें",
+                    "archive": "संग्रहीत करें",
+                    "delete": "हटाएँ"
+                },
                 "orgCard": {
                     "title": "संगठन",
                     "teamLabel": "टीम",
@@ -992,7 +1000,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "संग्रहीत"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1015,6 +1024,38 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "संग्रहीत एजेंट",
+                "subtitle": "वे एजेंट जिन्हें आपने संग्रहीत किया है। वे चलते नहीं हैं और कैटलॉग में नहीं दिखते। किसी को पुनर्स्थापित करें ताकि वह रुकी हुई स्थिति में वापस आ जाए, या उसे स्थायी रूप से हटा दें।",
+                "empty": {
+                    "title": "कोई संग्रहीत एजेंट नहीं",
+                    "subtitle": "किसी एजेंट को उसके सेटिंग पेज से संग्रहीत करने पर वह यहाँ आ जाता है।"
+                },
+                "delete": "स्थायी रूप से हटाएँ",
+                "deleteAria": "{name} को स्थायी रूप से हटाएँ",
+                "unarchive": "पुनर्स्थापित करें",
+                "menuAria": "{name} के लिए क्रियाएँ",
+                "unarchiveSuccess": "{name} पुनर्स्थापित किया गया",
+                "unarchiveError": "एजेंट को पुनर्स्थापित नहीं किया जा सका"
+            },
+            "archiveDialog": {
+                "title": "{name} को संग्रहीत करें?",
+                "description": "एजेंट चलना बंद कर देगा और कैटलॉग से हट जाएगा। इसके रन, बजट और सदस्यताएँ सुरक्षित रहती हैं।",
+                "hint": "आप इसे संग्रहीत टैब से कभी भी पुनर्स्थापित कर सकते हैं — यह रुकी हुई स्थिति में वापस आता है।",
+                "cancel": "रद्द करें",
+                "confirm": "एजेंट संग्रहीत करें",
+                "success": "{name} संग्रहीत किया गया",
+                "error": "एजेंट को संग्रहीत नहीं किया जा सका"
+            },
+            "deleteDialog": {
+                "title": "{name} को हटाएँ?",
+                "description": "इससे एजेंट और उसके बजट, सदस्यताएँ तथा रन इतिहास स्थायी रूप से हट जाएँगे।",
+                "hint": "इसे पूर्ववत नहीं किया जा सकता। यदि आप इसे केवल कैटलॉग से छिपाना चाहते हैं तो एजेंट को संग्रहीत करें।",
+                "cancel": "रद्द करें",
+                "confirm": "स्थायी रूप से हटाएँ",
+                "success": "{name} हटा दिया गया",
+                "error": "एजेंट को हटाया नहीं जा सका"
             }
         },
         "tasksPage": {
@@ -1023,6 +1064,33 @@
             "empty": {
                 "title": "अभी तक कोई कार्य नहीं।",
                 "subtitle": "कार्य एजेंट/कौशल/कार्य रोलआउट के बाद के चरण में आएंगे। पृष्ठ साइडबार नेविगेशन रूट को हल करने के लिए आरक्षित है।"
+            },
+            "scopedSection": {
+                "addExisting": "मौजूदा जोड़ें",
+                "newTask": "नया कार्य",
+                "assignTitle": "मौजूदा कार्य जोड़ें",
+                "assignSubtitle": "नया बनाने के बजाय अपने बैकलॉग से कोई कार्य चुनें।",
+                "assignSearchPlaceholder": "कार्य खोजें…",
+                "assignSearchLabel": "कार्य खोजें",
+                "assignLoading": "कार्य लोड हो रहे हैं…",
+                "assignLoadFailed": "कार्य लोड नहीं हो सके",
+                "assignNoneAvailable": "जोड़ने के लिए कोई और कार्य नहीं है।",
+                "assignNoMatches": "इस खोज से कोई कार्य मेल नहीं खाता।",
+                "assignedToast": "{title} जोड़ा गया",
+                "assignFailed": "कार्य नहीं जोड़ा जा सका",
+                "assignCancel": "रद्द करें",
+                "movesLabel": "स्थानांतरित",
+                "movesHint": "यह कहीं और दर्ज है — इसे यहाँ जोड़ने पर यह स्थानांतरित हो जाएगा।",
+                "removedToast": "{title} को इस सूची से हटा दिया गया",
+                "removeFailed": "कार्य नहीं हटाया जा सका",
+                "rowMenuColumn": "क्रियाएँ",
+                "rowMenuLabel": "{title} के लिए क्रियाएँ",
+                "removeMenuItem": "इस सूची से हटाएँ",
+                "confirmTitle": "क्या यह कार्य हटाना है?",
+                "confirmBody": "{title} को इस सूची से हटा दिया जाएगा। कार्य स्वयं सुरक्षित रहता है और बाद में दोबारा जोड़ा जा सकता है।",
+                "confirmCancel": "रद्द करें",
+                "confirmSubmit": "हटाएँ",
+                "confirmPending": "हटाया जा रहा है…"
             },
             "list": {
                 "newTask": "+ नया कार्य",
@@ -1446,7 +1514,14 @@
                 "relationLabel": "Relation",
                 "attach": "Attach",
                 "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "detachDialog": {
+                    "title": "इस कार्य को अलग करें?",
+                    "body": "{title} को इस मिशन से हटा दिया जाएगा। कार्य स्वयं कभी नहीं बदला जाता — इससे केवल संदर्भ हटता है।",
+                    "confirm": "कार्य अलग करें",
+                    "cancel": "रद्द करें",
+                    "detaching": "अलग किया जा रहा है…",
+                    "error": "कार्य अलग नहीं किया जा सका"
+                },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
                     "created": "Created",
@@ -1495,8 +1570,13 @@
                 "runNow": "Run now",
                 "clone": "Clone"
             },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            "deleteDialog": {
+                "title": "इस मिशन को हटाएँ?",
+                "body": "{title} को स्थायी रूप से हटा दिया जाएगा। चाइल्ड विचार और कार्य सुरक्षित रहते हैं, लेकिन इस मिशन से उनका बैक-लिंक टूट जाता है। इसे पूर्ववत नहीं किया जा सकता।",
+                "confirm": "मिशन हटाएँ",
+                "cancel": "रद्द करें",
+                "deleting": "हटाया जा रहा है…",
+                "error": "मिशन हटाया नहीं जा सका"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1567,6 +1647,36 @@
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)"
+                }
+            },
+            "goals": {
+                "title": "लक्ष्य",
+                "empty": "इस मिशन से अभी तक कोई लक्ष्य नहीं जुड़ा है। सफलता का अर्थ ट्रैक करने के लिए नीचे एक लक्ष्य जोड़ें।",
+                "attachTitle": "एक लक्ष्य जोड़ें",
+                "goalLabel": "लक्ष्य",
+                "goalPlaceholder": "एक लक्ष्य चुनें",
+                "primaryLabel": "प्राथमिक के रूप में सेट करें",
+                "primaryBadge": "प्राथमिक",
+                "primaryTooltip": "इस मिशन का प्राथमिक लक्ष्य - एक समय में केवल एक ही लक्ष्य प्राथमिक हो सकता है।",
+                "attach": "जोड़ें",
+                "detach": "अलग करें",
+                "detachDialog": {
+                    "title": "इस लक्ष्य को अलग करें?",
+                    "body": "{title} को इस मिशन से हटा दिया जाएगा। लक्ष्य स्वयं हटाया नहीं जाता — यह लक्ष्य पृष्ठ पर और किसी भी अन्य मिशन में बना रहता है जिससे यह जुड़ा है।",
+                    "confirm": "लक्ष्य अलग करें",
+                    "cancel": "रद्द करें",
+                    "detaching": "अलग किया जा रहा है…",
+                    "error": "लक्ष्य अलग नहीं किया जा सका"
+                },
+                "alreadyLinkedOption": "{title} (पहले से जुड़ा हुआ)",
+                "noGoalsToAttach": "आपके पास अभी तक कोई लक्ष्य नहीं है। लक्ष्य पृष्ठ पर एक बनाएँ, फिर उसे यहाँ जोड़ें।",
+                "pickerTruncated": "आपके 100 सबसे नए लक्ष्य दिखाए जा रहे हैं - पूरी सूची के लिए लक्ष्य पृष्ठ खोलें।",
+                "invariantNote": "लक्ष्य जोड़ने से इस मिशन की स्थिति कभी नहीं बदलती - मिशन पूरा करना एक स्पष्ट क्रिया बनी रहती है।",
+                "toasts": {
+                    "attached": "लक्ष्य जोड़ा गया",
+                    "attachError": "लक्ष्य जोड़ा नहीं जा सका",
+                    "detached": "लक्ष्य अलग किया गया",
+                    "detachError": "लक्ष्य अलग नहीं किया जा सका"
                 }
             }
         },
@@ -1639,11 +1749,85 @@
                 "error": "Idea नहीं बनाया जा सका। कृपया पुनः प्रयास करें।"
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "लिंक किए गए Works",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "बनाया गया",
+                    "linked": "लिंक किया गया",
+                    "rebuilt": "पुनः बनाया गया",
+                    "matched": "मिलान"
+                }
+            },
+            "detail": {
+                "live": "लाइव",
+                "fromMission": "एक मिशन से",
+                "sections": {
+                    "description": "आइडिया",
+                    "build": "बिल्ड स्थिति",
+                    "agents": "एजेंट",
+                    "details": "विवरण"
+                },
+                "stages": {
+                    "drafted": "तैयार",
+                    "queued": "कतार में",
+                    "building": "बन रहा है",
+                    "built": "बन गया",
+                    "failed": "बिल्ड विफल",
+                    "builtDirect": "बन गया"
+                },
+                "stageHints": {
+                    "drafted": "आइडिया मौजूद है और बनाने के लिए तैयार है।",
+                    "queued": "बिल्डर की प्रतीक्षा में।",
+                    "building": "Work एजेंट Work बना रहा है।",
+                    "built": "इस आइडिया से एक Work बनाया गया।",
+                    "failed": "बिल्ड रुक गया। पुनः प्रयास करें।",
+                    "builtDirect": "Work बिल्डर में बनाया गया — यह बिल्ड कतार को छोड़ गया।"
+                },
+                "built": {
+                    "badge": "बना ({count})",
+                    "none": "अभी तक नहीं बना"
+                },
+                "actions": {
+                    "build": "बनाएं",
+                    "retry": "पुनः प्रयास",
+                    "rebuild": "फिर से बनाएं",
+                    "rebuildHint": "नया Work बनाता है। मौजूदा सुरक्षित रहता है।",
+                    "newAgent": "नया एजेंट",
+                    "delete": "हटाएं"
+                },
+                "works": {
+                    "empty": "इस आइडिया से कोई Work जुड़ा नहीं है।"
+                },
+                "agents": {
+                    "empty": "इस आइडिया से कोई एजेंट जुड़ा नहीं है।"
+                },
+                "meta": {
+                    "source": "स्रोत",
+                    "slug": "स्लग",
+                    "fields": "फ़ील्ड",
+                    "categories": "सुझाई गई श्रेणियां"
+                },
+                "deleteDialog": {
+                    "title": "इस आइडिया को हटाएं?",
+                    "body": "{title} स्थायी रूप से हटा दिया जाएगा। इसे पूर्ववत नहीं किया जा सकता।",
+                    "confirm": "आइडिया हटाएं",
+                    "cancel": "रद्द करें",
+                    "deleting": "हटाया जा रहा है…",
+                    "error": "आइडिया हटाने में विफल",
+                    "blocked": {
+                        "linked-works": "हटाया नहीं जा सकता: यह आइडिया {count} Work से जुड़ा है। पहले उन्हें हटाएं या अलग करें।",
+                        "idea-agents": "हटाया नहीं जा सकता: {count} एजेंट इस आइडिया से जुड़े हैं। पहले उन्हें हटाएं या स्कोप बदलें।",
+                        "build-in-flight": "बिल्ड चलते समय नहीं हटा सकते। इसके पूरा होने की प्रतीक्षा करें।",
+                        "unknown": "अभी इस आइडिया को नहीं हटाया जा सकता।"
+                    }
+                },
+                "toasts": {
+                    "built": "इस आइडिया से Work बनाया गया",
+                    "buildFailed": "बिल्ड विफल रहा",
+                    "buildQueued": "बिल्ड कतार में",
+                    "retryQueued": "पुनः प्रयास कतार में",
+                    "rebuildQueued": "पुनर्निर्माण कतार में",
+                    "deleted": "आइडिया हटाया गया",
+                    "actionError": "कार्रवाई पूरी नहीं हो सकी। कृपया पुनः प्रयास करें।"
                 }
             }
         },
@@ -2876,7 +3060,23 @@
                 "activatedToast": "एजेंट सक्रिय किया गया",
                 "statusUpdateFailed": "स्थिति अपडेट नहीं हो सकी",
                 "newAgent": "नया एजेंट",
-                "moreAgents": "+{count} और"
+                "moreAgents": "+{count} और",
+                "assignExisting": "मौजूदा असाइन करें",
+                "assignTitle": "इस काम को एक एजेंट असाइन करें",
+                "assignSubtitle": "नया बनाने के बजाय अपने पास पहले से मौजूद एजेंट को इस काम पर लगाएं।",
+                "assignSearchPlaceholder": "एजेंट खोजें…",
+                "assignLoading": "एजेंट लोड हो रहे हैं…",
+                "assignNoneAvailable": "असाइन करने के लिए कोई और एजेंट नहीं है।",
+                "assignNoMatches": "इस खोज से कोई एजेंट मेल नहीं खाता।",
+                "assignLoadFailed": "एजेंट लोड नहीं हो सके",
+                "assignedToast": "{name} इस काम को असाइन किया गया",
+                "assignFailed": "एजेंट असाइन नहीं हो सका",
+                "assignCancel": "रद्द करें",
+                "assignedLabel": "असाइन किया गया",
+                "assignedHint": "इस काम को असाइन किया गया — यहाँ नहीं बनाया गया",
+                "unassign": "इस काम से हटाएं",
+                "unassignedToast": "{name} इस काम से हटाया गया",
+                "unassignFailed": "एजेंट हटाया नहीं जा सका"
             },
             "failedToGenerateItems": "आइटम उत्पन्न करने में विफल। कृपया पुनः प्रयास करें।",
             "generationCompleted": "उत्पत्ति सफलतापूर्वक पूर्ण हुई",
@@ -7118,6 +7318,9 @@
             },
             "token": {
                 "required": "Token cannot be empty"
+            },
+            "terms": {
+                "required": "You must accept the Terms of Service and Privacy Policy to create an account."
             }
         }
     },

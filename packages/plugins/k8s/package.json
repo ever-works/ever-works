@@ -31,14 +31,13 @@
 	},
 	"dependencies": {
 		"@kubernetes/client-node": "^1.4.0",
-		"js-yaml": "^4.1.0"
+		"js-yaml": "^5.2.3"
 	},
 	"peerDependencies": {
 		"@ever-works/plugin": "workspace:*"
 	},
 	"devDependencies": {
 		"@ever-works/plugin": "workspace:*",
-		"@types/js-yaml": "^4.0.9",
 		"@types/node": "^22.0.0",
 		"tsup": "^8.4.0",
 		"typescript": "^5.7.3",

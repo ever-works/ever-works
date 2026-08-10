@@ -1,6 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { IdeaWork, type IdeaWorkKind } from '../../entities/idea-work.entity';
 
 /**
@@ -89,5 +89,41 @@ export class IdeaWorkRepository {
 
     async countForIdea(ideaId: string, userId: string): Promise<number> {
         return this.repository.count({ where: { ideaId, userId } });
+    }
+
+    /**
+     * Provenance summary for MANY Ideas in one query — what the Ideas
+     * list needs to render "built / not built" per card without an
+     * N+1. Ideas with no links are simply absent from the map; callers
+     * treat a miss as `{ count: 0, latestWorkId: null }`.
+     *
+     * Folded in JS rather than via `DISTINCT ON` / a window function so
+     * it stays dialect-agnostic. The row volume is bounded by the list
+     * page size (≤101 Ideas) times a handful of links each.
+     */
+    async summarizeForIdeas(
+        ideaIds: string[],
+        userId: string,
+    ): Promise<Map<string, { count: number; latestWorkId: string }>> {
+        const summary = new Map<string, { count: number; latestWorkId: string }>();
+        if (ideaIds.length === 0) return summary;
+
+        const rows = await this.repository.find({
+            where: { ideaId: In(ideaIds), userId },
+            select: { ideaId: true, workId: true, createdAt: true },
+            order: { createdAt: 'DESC' },
+        });
+
+        // Rows arrive newest-first, so the FIRST row seen per Idea is the
+        // most recent link — later rows only bump the count.
+        for (const row of rows) {
+            const existing = summary.get(row.ideaId);
+            if (existing) {
+                existing.count += 1;
+            } else {
+                summary.set(row.ideaId, { count: 1, latestWorkId: row.workId });
+            }
+        }
+        return summary;
     }
 }

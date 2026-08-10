@@ -13,6 +13,8 @@ export type {
     AuthResponse,
     OAuthUrlResponse,
     TokenValidationResponse,
+    TermsAcceptanceClaim,
+    TermsAcceptanceDocument,
 } from './auth';
 
 export type {

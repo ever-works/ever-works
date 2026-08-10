@@ -217,7 +217,8 @@
             "errors": {
                 "passwordsDoNotMatch": "Wachtwoorden komen niet overeen",
                 "passwordTooShort": "Wachtwoord moet minimaal 8 tekens bevatten",
-                "generic": "Er is een fout opgetreden. Probeer het opnieuw."
+                "generic": "Er is een fout opgetreden. Probeer het opnieuw.",
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
             }
         }
     },
@@ -905,6 +906,13 @@
                 "nextDisabledReason": "Pick a parent or choose Workspace scope to continue."
             },
             "settings": {
+                "identity": {
+                    "pause": "Pauzeren",
+                    "resume": "Hervatten",
+                    "activate": "Activeren",
+                    "archive": "Archiveren",
+                    "delete": "Verwijderen"
+                },
                 "orgCard": {
                     "title": "Organisatie",
                     "teamLabel": "Team",
@@ -992,7 +1000,8 @@
             },
             "pageTabs": {
                 "agents": "Agents",
-                "sessions": "Sessions"
+                "sessions": "Sessions",
+                "archived": "Gearchiveerd"
             },
             "sessions": {
                 "title": "Sessions",
@@ -1015,6 +1024,38 @@
                 "noWork": "No Work",
                 "emptyTitle": "No sessions yet",
                 "emptyBody": "Runs appear here as soon as an agent starts working. Queued sessions are waiting for a free concurrency slot, running sessions are actively working, and sessions awaiting input need a reply before they continue."
+            },
+            "archived": {
+                "title": "Gearchiveerde Agenten",
+                "subtitle": "Agenten die je hebt gearchiveerd. Ze draaien niet en staan niet in de catalogus. Herstel een agent om hem gepauzeerd terug te halen, of verwijder hem definitief.",
+                "empty": {
+                    "title": "Geen gearchiveerde Agenten",
+                    "subtitle": "Een agent archiveren op zijn instellingenpagina verplaatst hem hierheen."
+                },
+                "delete": "Definitief verwijderen",
+                "deleteAria": "{name} definitief verwijderen",
+                "unarchive": "Herstellen",
+                "menuAria": "Acties voor {name}",
+                "unarchiveSuccess": "{name} hersteld",
+                "unarchiveError": "Kan de agent niet herstellen"
+            },
+            "archiveDialog": {
+                "title": "{name} archiveren?",
+                "description": "De agent stopt met draaien en verdwijnt uit de catalogus. Runs, budgetten en lidmaatschappen blijven bewaard.",
+                "hint": "Je kunt hem op elk moment herstellen via het tabblad Gearchiveerd — hij komt gepauzeerd terug.",
+                "cancel": "Annuleren",
+                "confirm": "Agent archiveren",
+                "success": "{name} gearchiveerd",
+                "error": "Kon de agent niet archiveren"
+            },
+            "deleteDialog": {
+                "title": "{name} verwijderen?",
+                "description": "Hiermee worden de agent en zijn budgetten, lidmaatschappen en uitvoeringsgeschiedenis definitief verwijderd.",
+                "hint": "Dit kan niet ongedaan worden gemaakt. Archiveer de agent als je hem alleen uit de catalogus wilt verbergen.",
+                "cancel": "Annuleren",
+                "confirm": "Definitief verwijderen",
+                "success": "{name} verwijderd",
+                "error": "Kan de agent niet verwijderen"
             }
         },
         "tasksPage": {
@@ -1023,6 +1064,33 @@
             "empty": {
                 "title": "Nog geen Taken.",
                 "subtitle": "Taken komen in een latere fase van de Agents/Skills/Tasks uitrol. De pagina is gereserveerd zodat de zijbalk navigatie route werkt."
+            },
+            "scopedSection": {
+                "addExisting": "Bestaande Taak toevoegen",
+                "newTask": "Nieuwe Taak",
+                "assignTitle": "Een bestaande Taak toevoegen",
+                "assignSubtitle": "Kies een Taak uit je backlog in plaats van een nieuwe te maken.",
+                "assignSearchPlaceholder": "Taken zoeken…",
+                "assignSearchLabel": "Taken zoeken",
+                "assignLoading": "Taken laden…",
+                "assignLoadFailed": "Kon Taken niet laden",
+                "assignNoneAvailable": "Geen andere Taken meer om toe te voegen.",
+                "assignNoMatches": "Geen Taken komen overeen met die zoekopdracht.",
+                "assignedToast": "{title} toegevoegd",
+                "assignFailed": "Kon Taak niet toevoegen",
+                "assignCancel": "Annuleren",
+                "movesLabel": "wordt verplaatst",
+                "movesHint": "Staat ergens anders — hier toevoegen verplaatst hem.",
+                "removedToast": "{title} verwijderd uit deze lijst",
+                "removeFailed": "Kon Taak niet verwijderen",
+                "rowMenuColumn": "Acties",
+                "rowMenuLabel": "Acties voor {title}",
+                "removeMenuItem": "Uit deze lijst verwijderen",
+                "confirmTitle": "Deze Taak uit deze lijst verwijderen?",
+                "confirmBody": "{title} wordt uit deze lijst verwijderd. De Taak zelf blijft bestaan en kan later opnieuw worden toegevoegd.",
+                "confirmCancel": "Annuleren",
+                "confirmSubmit": "Verwijderen",
+                "confirmPending": "Verwijderen…"
             },
             "list": {
                 "newTask": "+ Nieuwe Taak",
@@ -1446,7 +1514,14 @@
                 "relationLabel": "Relation",
                 "attach": "Attach",
                 "detach": "Detach",
-                "confirmDetach": "Detach this Work from the Mission? The Work itself is never touched — this only removes the reference.",
+                "detachDialog": {
+                    "title": "Dit Werk loskoppelen?",
+                    "body": "{title} wordt verwijderd uit deze Missie. Het Werk zelf wordt nooit aangepast — dit verwijdert alleen de verwijzing.",
+                    "confirm": "Werk loskoppelen",
+                    "cancel": "Annuleren",
+                    "detaching": "Loskoppelen…",
+                    "error": "Loskoppelen van Werk mislukt"
+                },
                 "noWorksToAttach": "You have no Works to attach yet.",
                 "relations": {
                     "created": "Created",
@@ -1495,8 +1570,13 @@
                 "runNow": "Run now",
                 "clone": "Clone"
             },
-            "confirm": {
-                "delete": "Delete this Mission? Child Ideas + Works are preserved; the back-link is broken."
+            "deleteDialog": {
+                "title": "Deze Missie verwijderen?",
+                "body": "{title} wordt permanent verwijderd. Onderliggende Ideeën en Werken blijven behouden, maar hun koppeling terug naar deze Missie gaat verloren. Dit kan niet ongedaan worden gemaakt.",
+                "confirm": "Missie verwijderen",
+                "cancel": "Annuleren",
+                "deleting": "Verwijderen…",
+                "error": "Verwijderen van Missie mislukt"
             },
             "guardrails": {
                 "activeOverride": "Custom guardrail overrides are active on this Mission.",
@@ -1567,6 +1647,36 @@
                     "no-ideas": "Tick ran but generated no Ideas",
                     "failed": "Run now failed",
                     "cron-no-match": "Tick ran (cron skipped)"
+                }
+            },
+            "goals": {
+                "title": "Doelen",
+                "empty": "Er zijn nog geen Doelen gekoppeld aan deze Missie. Koppel er hieronder een om vast te leggen wat succes betekent.",
+                "attachTitle": "Een Doel koppelen",
+                "goalLabel": "Doel",
+                "goalPlaceholder": "Selecteer een Doel",
+                "primaryLabel": "Instellen als primair",
+                "primaryBadge": "Primair",
+                "primaryTooltip": "Het primaire Doel voor deze Missie - er kan maar één Doel tegelijk primair zijn.",
+                "attach": "Koppelen",
+                "detach": "Loskoppelen",
+                "detachDialog": {
+                    "title": "Dit Doel loskoppelen?",
+                    "body": "{title} wordt verwijderd uit deze Missie. Het Doel zelf wordt niet verwijderd — het blijft staan op de pagina Doelen en bij elke andere Missie waaraan het gekoppeld is.",
+                    "confirm": "Doel loskoppelen",
+                    "cancel": "Annuleren",
+                    "detaching": "Loskoppelen…",
+                    "error": "Loskoppelen van Doel mislukt"
+                },
+                "alreadyLinkedOption": "{title} (al gekoppeld)",
+                "noGoalsToAttach": "Je hebt nog geen Doelen. Maak er een aan op de pagina Doelen en koppel het hier.",
+                "pickerTruncated": "Je 100 meest recente Doelen worden getoond - open de pagina Doelen voor de volledige lijst.",
+                "invariantNote": "Een Doel koppelen verandert nooit de status van deze Missie - een Missie voltooien blijft een expliciete actie.",
+                "toasts": {
+                    "attached": "Doel gekoppeld",
+                    "attachError": "Kan Doel niet koppelen",
+                    "detached": "Doel losgekoppeld",
+                    "detachError": "Kan Doel niet loskoppelen"
                 }
             }
         },
@@ -1639,11 +1749,85 @@
                 "error": "Kan de Idea niet aanmaken. Probeer het opnieuw."
             },
             "linkedWorks": {
-                "title": "Linked Works",
+                "title": "Gekoppelde Works",
                 "kind": {
-                    "built": "Built",
-                    "linked": "Linked",
-                    "rebuilt": "Rebuilt"
+                    "built": "Gebouwd",
+                    "linked": "Gekoppeld",
+                    "rebuilt": "Opnieuw gebouwd",
+                    "matched": "Overeenkomst"
+                }
+            },
+            "detail": {
+                "live": "Live",
+                "fromMission": "Uit een Missie",
+                "sections": {
+                    "description": "Idee",
+                    "build": "Buildstatus",
+                    "agents": "Agents",
+                    "details": "Details"
+                },
+                "stages": {
+                    "drafted": "Opgesteld",
+                    "queued": "In wachtrij",
+                    "building": "Bouwen",
+                    "built": "Gebouwd",
+                    "failed": "Build mislukt",
+                    "builtDirect": "Gebouwd"
+                },
+                "stageHints": {
+                    "drafted": "Het Idee bestaat en is klaar om te bouwen.",
+                    "queued": "Wacht op een builder.",
+                    "building": "De Work Agent genereert het Work.",
+                    "built": "Er is een Work gemaakt van dit Idee.",
+                    "failed": "De build is gestopt. Probeer opnieuw.",
+                    "builtDirect": "Gemaakt in de Work-builder — de buildwachtrij is overgeslagen."
+                },
+                "built": {
+                    "badge": "Gebouwd ({count})",
+                    "none": "Nog niet gebouwd"
+                },
+                "actions": {
+                    "build": "Bouwen",
+                    "retry": "Opnieuw",
+                    "rebuild": "Opnieuw bouwen",
+                    "rebuildHint": "Maakt een nieuw Work. Het bestaande blijft behouden.",
+                    "newAgent": "Nieuwe Agent",
+                    "delete": "Verwijderen"
+                },
+                "works": {
+                    "empty": "Nog geen Works gekoppeld aan dit Idee."
+                },
+                "agents": {
+                    "empty": "Geen Agents gekoppeld aan dit Idee."
+                },
+                "meta": {
+                    "source": "Bron",
+                    "slug": "Slug",
+                    "fields": "Velden",
+                    "categories": "Voorgestelde categorieën"
+                },
+                "deleteDialog": {
+                    "title": "Dit Idee verwijderen?",
+                    "body": "{title} wordt permanent verwijderd. Dit kan niet ongedaan worden gemaakt.",
+                    "confirm": "Idee verwijderen",
+                    "cancel": "Annuleren",
+                    "deleting": "Verwijderen…",
+                    "error": "Idee kon niet worden verwijderd",
+                    "blocked": {
+                        "linked-works": "Verwijderen niet mogelijk: dit Idee is gekoppeld aan {count} Work(s). Verwijder of ontkoppel ze eerst.",
+                        "idea-agents": "Verwijderen niet mogelijk: {count} Agent(s) horen bij dit Idee. Verwijder ze of wijzig hun scope.",
+                        "build-in-flight": "Verwijderen kan niet tijdens een build. Wacht tot die klaar is.",
+                        "unknown": "Dit Idee kan nu niet worden verwijderd."
+                    }
+                },
+                "toasts": {
+                    "built": "Work gebouwd uit dit Idee",
+                    "buildFailed": "De build is mislukt",
+                    "buildQueued": "Build in wachtrij",
+                    "retryQueued": "Nieuwe poging in wachtrij",
+                    "rebuildQueued": "Herbouw in wachtrij",
+                    "deleted": "Idee verwijderd",
+                    "actionError": "Actie mislukt. Probeer het opnieuw."
                 }
             }
         },
@@ -2876,7 +3060,23 @@
                 "activatedToast": "Agent geactiveerd",
                 "statusUpdateFailed": "Status kon niet worden bijgewerkt",
                 "newAgent": "Nieuwe Agent",
-                "moreAgents": "+{count} meer"
+                "moreAgents": "+{count} meer",
+                "assignExisting": "Bestaande toewijzen",
+                "assignTitle": "Een Agent aan deze Work toewijzen",
+                "assignSubtitle": "Zet een Agent die je al hebt op deze Work in plaats van een nieuwe te maken.",
+                "assignSearchPlaceholder": "Agenten zoeken…",
+                "assignLoading": "Agenten laden…",
+                "assignNoneAvailable": "Geen andere Agenten meer om toe te wijzen.",
+                "assignNoMatches": "Geen Agenten gevonden voor die zoekopdracht.",
+                "assignLoadFailed": "Kon Agenten niet laden",
+                "assignedToast": "{name} toegewezen aan deze Work",
+                "assignFailed": "Kon Agent niet toewijzen",
+                "assignCancel": "Annuleren",
+                "assignedLabel": "Toegewezen",
+                "assignedHint": "Toegewezen aan deze Work — hier niet aangemaakt",
+                "unassign": "Verwijderen van deze Work",
+                "unassignedToast": "{name} verwijderd van deze Work",
+                "unassignFailed": "Kon Agent niet verwijderen"
             },
             "failedToGenerateItems": "Kon items niet genereren. Probeer het opnieuw.",
             "generationCompleted": "Generatie succesvol voltooid",
@@ -7118,6 +7318,9 @@
             },
             "token": {
                 "required": "Token cannot be empty"
+            },
+            "terms": {
+                "required": "You must accept the Terms of Service and Privacy Policy to create an account."
             }
         }
     },

@@ -4,6 +4,7 @@ import { getTranslations } from 'next-intl/server';
 import { missionsAPI } from '@/lib/api/missions';
 import { workProposalsAPI } from '@/lib/api/work-proposals';
 import { workAPI } from '@/lib/api/work';
+import { goalsAPI } from '@/lib/api/goals';
 import { MissionDetailClient } from '@/components/missions';
 
 /**
@@ -56,6 +57,9 @@ export default async function MissionDetailPage({ params }: { params: Params }) 
     // Work" select. Defensive .catch on both: a flaky endpoint (or a
     // stale environment missing the migration) renders the empty
     // surface, never 500s the page.
+    // Goals & Metrics PR-8 — also fetch the Mission↔Goal edges for the
+    // "Goals" panel plus the caller's Goals for its "Attach Goal"
+    // select. Same defensive .catch posture as the panels above.
     const [
         ideas,
         sourceMission,
@@ -64,6 +68,8 @@ export default async function MissionDetailPage({ params }: { params: Params }) 
         attachments,
         workRelations,
         worksResponse,
+        goalLinks,
+        attachableGoals,
     ] = await Promise.all([
         workProposalsAPI
             .list(['pending', 'queued', 'building', 'failed', 'accepted', 'dismissed'], {
@@ -84,6 +90,8 @@ export default async function MissionDetailPage({ params }: { params: Params }) 
         missionsAPI.listAttachments(id).catch(() => []),
         missionsAPI.listWorks(id).catch(() => []),
         workAPI.getAll({ limit: 100 }).catch(() => null),
+        missionsAPI.listGoals(id).catch(() => []),
+        goalsAPI.list({ limit: 100 }).catch(() => []),
     ]);
 
     return (
@@ -98,6 +106,13 @@ export default async function MissionDetailPage({ params }: { params: Params }) 
             attachableWorks={(worksResponse?.works ?? []).map((w) => ({
                 id: w.id,
                 name: w.name,
+                kind: w.kind,
+            }))}
+            goalLinks={goalLinks}
+            attachableGoals={attachableGoals.map((g) => ({
+                id: g.id,
+                title: g.title,
+                status: g.status,
             }))}
         />
     );

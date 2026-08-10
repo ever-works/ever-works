@@ -22,10 +22,12 @@ interface WorkLayoutClientProps {
     children: React.ReactNode;
     oauthConnection: GitProviderConnectionInfo | null;
     config: WorkConfig | null;
-    /** Work-scoped Agents for the header dropdown. */
+    /** Agents on this Work (pinned by scope + assigned via targets). */
     agents?: Agent[];
-    /** Total Work-scoped Agents upstream — may exceed agents.length. */
+    /** Total Agents on this Work upstream — may exceed agents.length. */
     agentsTotal?: number;
+    /** Which of `agents` are ASSIGNED (detachable) rather than pinned. */
+    assignedAgentIds?: string[];
 }
 
 export function WorkLayoutClient({
@@ -34,6 +36,7 @@ export function WorkLayoutClient({
     config,
     agents = [],
     agentsTotal,
+    assignedAgentIds = [],
     children,
 }: WorkLayoutClientProps) {
     const router = useRouter();
@@ -167,7 +170,12 @@ export function WorkLayoutClient({
             onWorkChange={setSyncedWork}
         >
             <div className="w-full">
-                <WorkHeader work={syncedWork} agents={agents} agentsTotal={agentsTotal} />
+                <WorkHeader
+                    work={syncedWork}
+                    agents={agents}
+                    agentsTotal={agentsTotal}
+                    assignedAgentIds={assignedAgentIds}
+                />
                 <WorkTabs work={syncedWork} />
 
                 <div className="mt-6">{children}</div>

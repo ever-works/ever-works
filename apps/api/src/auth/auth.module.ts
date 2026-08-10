@@ -16,6 +16,8 @@ import { createAuthRuntimeInstance } from './providers/auth-runtime.instance';
 import { SocialAuthService } from './services/social-auth.service';
 import { OAuthStateService } from './services/oauth-state.service';
 import { AuthSessionGuard } from './guards/auth-session.guard';
+import { TermsAcceptanceService } from '../terms/terms-acceptance.service';
+import { TermsController } from '../terms/terms.controller';
 import { DataSource } from 'typeorm';
 import {
     DatabaseModule,
@@ -60,8 +62,12 @@ import { ActivityLogModule } from '@ever-works/agent/activity-log';
             inject: [DataSource],
             useFactory: (dataSource: DataSource) => createAuthRuntimeInstance(dataSource),
         },
+        // Lives here rather than in its own module because it depends on the
+        // AUTH_RUNTIME_INSTANCE token and AuthController depends on it in turn;
+        // a separate module would be a cycle for no gain.
+        TermsAcceptanceService,
     ],
-    controllers: [OAuthController, AuthController, ApiKeysController],
+    controllers: [OAuthController, AuthController, ApiKeysController, TermsController],
     exports: [
         AuthService,
         AnonymousAuthService,
@@ -73,6 +79,7 @@ import { ActivityLogModule } from '@ever-works/agent/activity-log';
         AUTH_PROVIDER,
         AUTH_RUNTIME_INSTANCE,
         AuthSyncService,
+        TermsAcceptanceService,
     ],
 })
 export class AuthModule {}

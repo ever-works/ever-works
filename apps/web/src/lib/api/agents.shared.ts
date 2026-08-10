@@ -156,3 +156,13 @@ export interface AgentPickerOption {
     slug: string;
     status: AgentStatus;
 }
+
+/**
+ * One row of the Work header's "Assign existing Agent" picker. Same
+ * projection as `AgentPickerOption` plus the Agent's role line, which is
+ * what actually tells an operator whether THIS Agent belongs on THIS
+ * Work ("Release manager" vs "SEO writer") — the name alone rarely does.
+ */
+export interface AgentAssignCandidate extends AgentPickerOption {
+    title: string | null;
+}
