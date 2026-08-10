@@ -47,8 +47,19 @@ vi.mock('@/app/actions/dashboard/work-proposals', () => ({
     detachIdeaAttachmentAction: vi.fn(),
 }));
 
+// Both the rail's unassign action and the assign dialog it mounts reach
+// for the `server-only` agents actions module.
+const unassignAgentMock = vi.fn();
+const listAssignableAgentsMock = vi.fn();
+vi.mock('@/app/actions/agents', () => ({
+    unassignAgentFromIdeaAction: (...a: unknown[]) => unassignAgentMock(...a),
+    assignAgentToIdeaAction: vi.fn(),
+    listAssignableIdeaAgentsAction: (...a: unknown[]) => listAssignableAgentsMock(...a),
+}));
+
 import { IdeaDetailClient } from './IdeaDetailClient';
 import type { IdeaWorkLink, WorkProposal } from '@/lib/api/work-proposals';
+import type { Agent } from '@/lib/api/agents';
 
 /**
  * `/ideas/[id]` detail — covers the two things the redesign added on
@@ -95,6 +106,7 @@ const builtLink: IdeaWorkLink = {
 describe('IdeaDetailClient', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        listAssignableAgentsMock.mockResolvedValue([]);
     });
 
     it('reads as not built, and offers Build, when no Work was produced', () => {
@@ -409,6 +421,88 @@ describe('IdeaDetailClient', () => {
 
             await waitFor(() => expect(deleteIdeaMock).toHaveBeenCalledWith('idea-1'));
             await waitFor(() => expect(routerPushMock).toHaveBeenCalledWith('/ideas'));
+        });
+    });
+
+    /**
+     * The Agents rail mirrors the Work header's dropdown: one merged list
+     * of Agents PINNED here by scope and Agents ASSIGNED here through
+     * their `targets`, with detach offered only on the latter.
+     */
+    describe('Agents rail', () => {
+        const pinnedAgent = {
+            id: 'agent-pinned',
+            name: 'Idea Scout',
+            slug: 'idea-scout',
+            title: null,
+            status: 'active',
+        } as unknown as Agent;
+
+        const assignedAgent = {
+            id: 'agent-assigned',
+            name: 'Release Manager',
+            slug: 'release-manager',
+            title: 'Ships',
+            status: 'active',
+        } as unknown as Agent;
+
+        it('opens the picker from the section header', async () => {
+            render(<IdeaDetailClient idea={baseIdea} />);
+
+            fireEvent.click(screen.getByTestId('idea-assign-agent-button'));
+
+            await waitFor(() =>
+                expect(listAssignableAgentsMock).toHaveBeenCalledWith('idea-1', ''),
+            );
+        });
+
+        it('offers detach on assigned Agents only — a pinned one is placed by its scope', () => {
+            render(
+                <IdeaDetailClient
+                    idea={baseIdea}
+                    agents={[pinnedAgent, assignedAgent]}
+                    assignedAgentIds={[assignedAgent.id]}
+                />,
+            );
+
+            expect(screen.getByText('Idea Scout')).toBeTruthy();
+            expect(screen.getByText('Release Manager')).toBeTruthy();
+            // One row is detachable, so exactly one unassign control exists.
+            expect(screen.getAllByLabelText('agents.unassign')).toHaveLength(1);
+        });
+
+        it('detaches the assigned Agent and refreshes', async () => {
+            unassignAgentMock.mockResolvedValue({ id: assignedAgent.id });
+            render(
+                <IdeaDetailClient
+                    idea={baseIdea}
+                    agents={[assignedAgent]}
+                    assignedAgentIds={[assignedAgent.id]}
+                />,
+            );
+
+            fireEvent.click(screen.getByLabelText('agents.unassign'));
+
+            await waitFor(() =>
+                expect(unassignAgentMock).toHaveBeenCalledWith('agent-assigned', 'idea-1'),
+            );
+            await waitFor(() => expect(routerRefreshMock).toHaveBeenCalled());
+            expect(toastSuccessMock).toHaveBeenCalledWith('agents.unassignedToast');
+        });
+
+        it('surfaces a failed detach', async () => {
+            unassignAgentMock.mockRejectedValue(new Error('still running'));
+            render(
+                <IdeaDetailClient
+                    idea={baseIdea}
+                    agents={[assignedAgent]}
+                    assignedAgentIds={[assignedAgent.id]}
+                />,
+            );
+
+            fireEvent.click(screen.getByLabelText('agents.unassign'));
+
+            await waitFor(() => expect(toastErrorMock).toHaveBeenCalledWith('still running'));
         });
     });
 });
