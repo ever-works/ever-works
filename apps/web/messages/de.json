@@ -1829,7 +1829,23 @@
                     "empty": "Noch keine Works mit dieser Idee verknüpft."
                 },
                 "agents": {
-                    "empty": "Keine Agenten dieser Idee zugeordnet."
+                    "empty": "Keine Agenten dieser Idee zugeordnet.",
+                    "assignExisting": "Vorhandenen zuweisen",
+                    "assignTitle": "Einen Agenten dieser Idee zuweisen",
+                    "assignSubtitle": "Weisen Sie dieser Idee einen Agenten zu, den Sie bereits haben, statt einen neuen zu erstellen.",
+                    "assignSearchPlaceholder": "Agenten suchen…",
+                    "assignLoading": "Agenten werden geladen…",
+                    "assignNoneAvailable": "Keine weiteren Agenten zum Zuweisen vorhanden.",
+                    "assignNoMatches": "Keine Agenten passen zu dieser Suche.",
+                    "assignLoadFailed": "Agenten konnten nicht geladen werden",
+                    "assignedToast": "{name} dieser Idee zugewiesen",
+                    "assignFailed": "Agent konnte nicht zugewiesen werden",
+                    "assignCancel": "Abbrechen",
+                    "assignedLabel": "Zugewiesen",
+                    "assignedHint": "Dieser Idee zugewiesen — nicht hier erstellt",
+                    "unassign": "Von dieser Idee entfernen",
+                    "unassignedToast": "{name} von dieser Idee entfernt",
+                    "unassignFailed": "Agent konnte nicht entfernt werden"
                 },
                 "meta": {
                     "source": "Quelle",

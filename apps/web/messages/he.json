@@ -1829,7 +1829,23 @@
                     "empty": "אין Works מקושרים לרעיון הזה."
                 },
                 "agents": {
-                    "empty": "אין סוכנים המשויכים לרעיון הזה."
+                    "empty": "אין סוכנים המשויכים לרעיון הזה.",
+                    "assignExisting": "שיוך סוכן קיים",
+                    "assignTitle": "שיוך סוכן לרעיון זה",
+                    "assignSubtitle": "שייכו לרעיון זה סוכן שכבר יש לכם במקום ליצור סוכן נוסף.",
+                    "assignSearchPlaceholder": "חיפוש סוכנים…",
+                    "assignLoading": "טוען סוכנים…",
+                    "assignNoneAvailable": "אין סוכנים נוספים לשיוך.",
+                    "assignNoMatches": "אין סוכנים התואמים לחיפוש זה.",
+                    "assignLoadFailed": "לא ניתן לטעון סוכנים",
+                    "assignedToast": "{name} שויך לרעיון זה",
+                    "assignFailed": "לא ניתן לשייך את הסוכן",
+                    "assignCancel": "ביטול",
+                    "assignedLabel": "משויך",
+                    "assignedHint": "משויך לרעיון זה — לא נוצר כאן",
+                    "unassign": "הסרה מרעיון זה",
+                    "unassignedToast": "{name} הוסר מרעיון זה",
+                    "unassignFailed": "לא ניתן להסיר את הסוכן"
                 },
                 "meta": {
                     "source": "מקור",

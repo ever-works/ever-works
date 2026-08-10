@@ -1798,7 +1798,23 @@
                     "empty": "이 아이디어에 연결된 Work가 없습니다."
                 },
                 "agents": {
-                    "empty": "이 아이디어에 연결된 에이전트가 없습니다."
+                    "empty": "이 아이디어에 연결된 에이전트가 없습니다.",
+                    "assignExisting": "기존 에이전트 할당",
+                    "assignTitle": "이 아이디어에 에이전트 할당",
+                    "assignSubtitle": "새로 만드는 대신 이미 있는 에이전트를 이 아이디어에 배치하세요.",
+                    "assignSearchPlaceholder": "에이전트 검색…",
+                    "assignLoading": "에이전트 불러오는 중…",
+                    "assignNoneAvailable": "할당할 다른 에이전트가 없습니다.",
+                    "assignNoMatches": "검색과 일치하는 에이전트가 없습니다.",
+                    "assignLoadFailed": "에이전트를 불러올 수 없습니다",
+                    "assignedToast": "{name}을(를) 이 아이디어에 할당했습니다",
+                    "assignFailed": "에이전트를 할당할 수 없습니다",
+                    "assignCancel": "취소",
+                    "assignedLabel": "할당됨",
+                    "assignedHint": "이 아이디어에 할당됨 — 여기서 만든 것이 아님",
+                    "unassign": "이 아이디어에서 제거",
+                    "unassignedToast": "{name}을(를) 이 아이디어에서 제거했습니다",
+                    "unassignFailed": "에이전트를 제거할 수 없습니다"
                 },
                 "meta": {
                     "source": "출처",

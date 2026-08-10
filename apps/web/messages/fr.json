@@ -1829,7 +1829,23 @@
                     "empty": "Aucun Work lié à cette Idée pour le moment."
                 },
                 "agents": {
-                    "empty": "Aucun Agent rattaché à cette Idée."
+                    "empty": "Aucun Agent rattaché à cette Idée.",
+                    "assignExisting": "Agent existant",
+                    "assignTitle": "Assigner un Agent à cette Idée",
+                    "assignSubtitle": "Placez sur cette Idée un Agent que vous avez déjà au lieu d'en créer un autre.",
+                    "assignSearchPlaceholder": "Rechercher des Agents…",
+                    "assignLoading": "Chargement des Agents…",
+                    "assignNoneAvailable": "Aucun autre Agent à assigner.",
+                    "assignNoMatches": "Aucun Agent ne correspond à cette recherche.",
+                    "assignLoadFailed": "Impossible de charger les Agents",
+                    "assignedToast": "{name} assigné à cette Idée",
+                    "assignFailed": "Impossible d'assigner l'Agent",
+                    "assignCancel": "Annuler",
+                    "assignedLabel": "Assigné",
+                    "assignedHint": "Assigné à cette Idée — non créé ici",
+                    "unassign": "Retirer de cette Idée",
+                    "unassignedToast": "{name} retiré de cette Idée",
+                    "unassignFailed": "Impossible de retirer l'Agent"
                 },
                 "meta": {
                     "source": "Source",

@@ -1798,7 +1798,23 @@
                     "empty": "还没有与该想法关联的 Work。"
                 },
                 "agents": {
-                    "empty": "该想法下没有智能体。"
+                    "empty": "该想法下没有智能体。",
+                    "assignExisting": "分配现有智能体",
+                    "assignTitle": "为该想法分配智能体",
+                    "assignSubtitle": "将你已有的智能体分配到该想法，而不是再创建一个。",
+                    "assignSearchPlaceholder": "搜索智能体…",
+                    "assignLoading": "正在加载智能体…",
+                    "assignNoneAvailable": "没有其他可分配的智能体。",
+                    "assignNoMatches": "没有与该搜索匹配的智能体。",
+                    "assignLoadFailed": "无法加载智能体",
+                    "assignedToast": "已将 {name} 分配到该想法",
+                    "assignFailed": "无法分配智能体",
+                    "assignCancel": "取消",
+                    "assignedLabel": "已分配",
+                    "assignedHint": "已分配到该想法 — 并非在此创建",
+                    "unassign": "从该想法中移除",
+                    "unassignedToast": "已将 {name} 从该想法中移除",
+                    "unassignFailed": "无法移除智能体"
                 },
                 "meta": {
                     "source": "来源",

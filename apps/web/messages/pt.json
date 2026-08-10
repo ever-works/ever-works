@@ -1798,7 +1798,23 @@
                     "empty": "Ainda não há Works ligados a esta Ideia."
                 },
                 "agents": {
-                    "empty": "Sem Agentes associados a esta Ideia."
+                    "empty": "Sem Agentes associados a esta Ideia.",
+                    "assignExisting": "Atribuir existente",
+                    "assignTitle": "Atribuir um Agente a esta Ideia",
+                    "assignSubtitle": "Coloque nesta Ideia um Agente que você já tem em vez de criar outro.",
+                    "assignSearchPlaceholder": "Buscar Agentes…",
+                    "assignLoading": "Carregando Agentes…",
+                    "assignNoneAvailable": "Não há outros Agentes para atribuir.",
+                    "assignNoMatches": "Nenhum Agente corresponde a essa busca.",
+                    "assignLoadFailed": "Não foi possível carregar os Agentes",
+                    "assignedToast": "{name} atribuído a esta Ideia",
+                    "assignFailed": "Não foi possível atribuir o Agente",
+                    "assignCancel": "Cancelar",
+                    "assignedLabel": "Atribuído",
+                    "assignedHint": "Atribuído a esta Ideia — não foi criado aqui",
+                    "unassign": "Remover desta Ideia",
+                    "unassignedToast": "{name} removido desta Ideia",
+                    "unassignFailed": "Não foi possível remover o Agente"
                 },
                 "meta": {
                     "source": "Origem",

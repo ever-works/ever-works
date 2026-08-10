@@ -1798,7 +1798,23 @@
                     "empty": "इस आइडिया से कोई Work जुड़ा नहीं है।"
                 },
                 "agents": {
-                    "empty": "इस आइडिया से कोई एजेंट जुड़ा नहीं है।"
+                    "empty": "इस आइडिया से कोई एजेंट जुड़ा नहीं है।",
+                    "assignExisting": "मौजूदा असाइन करें",
+                    "assignTitle": "इस आइडिया को एक एजेंट असाइन करें",
+                    "assignSubtitle": "नया बनाने के बजाय अपने पास पहले से मौजूद एजेंट को इस आइडिया पर लगाएं।",
+                    "assignSearchPlaceholder": "एजेंट खोजें…",
+                    "assignLoading": "एजेंट लोड हो रहे हैं…",
+                    "assignNoneAvailable": "असाइन करने के लिए कोई और एजेंट नहीं है।",
+                    "assignNoMatches": "इस खोज से कोई एजेंट मेल नहीं खाता।",
+                    "assignLoadFailed": "एजेंट लोड नहीं हो सके",
+                    "assignedToast": "{name} इस आइडिया को असाइन किया गया",
+                    "assignFailed": "एजेंट असाइन नहीं हो सका",
+                    "assignCancel": "रद्द करें",
+                    "assignedLabel": "असाइन किया गया",
+                    "assignedHint": "इस आइडिया को असाइन किया गया — यहाँ नहीं बनाया गया",
+                    "unassign": "इस आइडिया से हटाएं",
+                    "unassignedToast": "{name} इस आइडिया से हटाया गया",
+                    "unassignFailed": "एजेंट हटाया नहीं जा सका"
                 },
                 "meta": {
                     "source": "स्रोत",

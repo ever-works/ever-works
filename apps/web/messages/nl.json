@@ -1798,7 +1798,23 @@
                     "empty": "Nog geen Works gekoppeld aan dit Idee."
                 },
                 "agents": {
-                    "empty": "Geen Agents gekoppeld aan dit Idee."
+                    "empty": "Geen Agents gekoppeld aan dit Idee.",
+                    "assignExisting": "Bestaande toewijzen",
+                    "assignTitle": "Een Agent aan dit Idee toewijzen",
+                    "assignSubtitle": "Zet een Agent die je al hebt op dit Idee in plaats van een nieuwe te maken.",
+                    "assignSearchPlaceholder": "Agenten zoeken…",
+                    "assignLoading": "Agenten laden…",
+                    "assignNoneAvailable": "Geen andere Agenten meer om toe te wijzen.",
+                    "assignNoMatches": "Geen Agenten gevonden voor die zoekopdracht.",
+                    "assignLoadFailed": "Kon Agenten niet laden",
+                    "assignedToast": "{name} toegewezen aan dit Idee",
+                    "assignFailed": "Kon Agent niet toewijzen",
+                    "assignCancel": "Annuleren",
+                    "assignedLabel": "Toegewezen",
+                    "assignedHint": "Toegewezen aan dit Idee — hier niet aangemaakt",
+                    "unassign": "Verwijderen van dit Idee",
+                    "unassignedToast": "{name} verwijderd van dit Idee",
+                    "unassignFailed": "Kon Agent niet verwijderen"
                 },
                 "meta": {
                     "source": "Bron",

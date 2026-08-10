@@ -1881,7 +1881,23 @@
                     "empty": "No Works linked to this Idea yet."
                 },
                 "agents": {
-                    "empty": "No Agents scoped to this Idea."
+                    "empty": "No Agents on this Idea yet.",
+                    "assignExisting": "Assign existing",
+                    "assignTitle": "Assign an Agent to this Idea",
+                    "assignSubtitle": "Put an Agent you already have on this Idea instead of creating another one.",
+                    "assignSearchPlaceholder": "Search Agents…",
+                    "assignLoading": "Loading Agents…",
+                    "assignNoneAvailable": "No other Agents left to assign.",
+                    "assignNoMatches": "No Agents match that search.",
+                    "assignLoadFailed": "Could not load Agents",
+                    "assignedToast": "{name} assigned to this Idea",
+                    "assignFailed": "Could not assign Agent",
+                    "assignCancel": "Cancel",
+                    "assignedLabel": "Assigned",
+                    "assignedHint": "Assigned to this Idea — not created here",
+                    "unassign": "Remove from this Idea",
+                    "unassignedToast": "{name} removed from this Idea",
+                    "unassignFailed": "Could not remove Agent"
                 },
                 "meta": {
                     "source": "Source",

@@ -1798,7 +1798,23 @@
                     "empty": "Bu Fikre bağlı Work yok."
                 },
                 "agents": {
-                    "empty": "Bu Fikre atanmış Ajan yok."
+                    "empty": "Bu Fikre atanmış Ajan yok.",
+                    "assignExisting": "Mevcut olanı ata",
+                    "assignTitle": "Bu Fikre bir Ajan ata",
+                    "assignSubtitle": "Yenisini oluşturmak yerine hâlihazırda sahip olduğunuz bir Ajanı bu Fikre ekleyin.",
+                    "assignSearchPlaceholder": "Ajan ara…",
+                    "assignLoading": "Ajanlar yükleniyor…",
+                    "assignNoneAvailable": "Atanacak başka Ajan kalmadı.",
+                    "assignNoMatches": "Bu aramayla eşleşen Ajan yok.",
+                    "assignLoadFailed": "Ajanlar yüklenemedi",
+                    "assignedToast": "{name} bu Fikre atandı",
+                    "assignFailed": "Ajan atanamadı",
+                    "assignCancel": "İptal",
+                    "assignedLabel": "Atandı",
+                    "assignedHint": "Bu Fikre atandı — burada oluşturulmadı",
+                    "unassign": "Bu Fikirden kaldır",
+                    "unassignedToast": "{name} bu Fikirden kaldırıldı",
+                    "unassignFailed": "Ajan kaldırılamadı"
                 },
                 "meta": {
                     "source": "Kaynak",
