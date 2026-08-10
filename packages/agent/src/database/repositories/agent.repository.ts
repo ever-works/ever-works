@@ -32,6 +32,13 @@ export interface ListAgentsFilter {
      * Work header's Agents dropdown unions the two.
      */
     assignedWorkId?: string;
+    /**
+     * The Idea counterpart of `assignedWorkId` — Agents whose `targets`
+     * include this Idea, read through the same `agent_memberships` join.
+     * Distinct from `ideaId`, which matches Agents PINNED to the Idea by
+     * scope; the Idea detail rail unions the two.
+     */
+    assignedIdeaId?: string;
     search?: string;
     limit?: number;
     offset?: number;
@@ -142,6 +149,25 @@ export class AgentRepository {
             }).setParameters({
                 assignedTargetType: 'work',
                 assignedWorkId: filter.assignedWorkId,
+            });
+        }
+        if (filter.assignedIdeaId) {
+            // Same EXISTS shape as `assignedWorkId` above, with its own
+            // subquery alias and parameter names so the two can be combined
+            // in one call without colliding.
+            qb.andWhere((sub) => {
+                const sql = sub
+                    .subQuery()
+                    .select('1')
+                    .from(AgentMembership, 'ideaMembership')
+                    .where('ideaMembership.agentId = agent.id')
+                    .andWhere('ideaMembership.targetType = :assignedIdeaTargetType')
+                    .andWhere('ideaMembership.targetId = :assignedIdeaId')
+                    .getQuery();
+                return `EXISTS ${sql}`;
+            }).setParameters({
+                assignedIdeaTargetType: 'idea',
+                assignedIdeaId: filter.assignedIdeaId,
             });
         }
         if (filter.search) {
