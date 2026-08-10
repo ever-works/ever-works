@@ -67,6 +67,12 @@
 	},
 	"packageManager": "pnpm@10.33.3",
 	"pnpm": {
+		"auditConfig": {
+			"ignoreGhsas": [
+				"GHSA-w3rx-r6r6-pgpr",
+				"GHSA-5p2g-fcmc-qvqq"
+			]
+		},
 		"overrides": {
 			"protobufjs@<7.5.5": ">=7.5.5",
 			"protobufjs@>=8.0.0 <=8.4.0": ">=8.4.1",
