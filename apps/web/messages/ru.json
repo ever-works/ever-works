@@ -1810,8 +1810,6 @@
                     "assignedToast": "{name} назначен этой Идее",
                     "assignFailed": "Не удалось назначить агента",
                     "assignCancel": "Отмена",
-                    "assignedLabel": "Назначен",
-                    "assignedHint": "Назначен этой Идее — создан не здесь",
                     "unassign": "Убрать из этой Идеи",
                     "unassignedToast": "{name} убран из этой Идеи",
                     "unassignFailed": "Не удалось убрать агента"

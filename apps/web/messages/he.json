@@ -1841,8 +1841,6 @@
                     "assignedToast": "{name} שויך לרעיון זה",
                     "assignFailed": "לא ניתן לשייך את הסוכן",
                     "assignCancel": "ביטול",
-                    "assignedLabel": "משויך",
-                    "assignedHint": "משויך לרעיון זה — לא נוצר כאן",
                     "unassign": "הסרה מרעיון זה",
                     "unassignedToast": "{name} הוסר מרעיון זה",
                     "unassignFailed": "לא ניתן להסיר את הסוכן"

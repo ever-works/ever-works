@@ -1810,8 +1810,6 @@
                     "assignedToast": "{name} toegewezen aan dit Idee",
                     "assignFailed": "Kon Agent niet toewijzen",
                     "assignCancel": "Annuleren",
-                    "assignedLabel": "Toegewezen",
-                    "assignedHint": "Toegewezen aan dit Idee — hier niet aangemaakt",
                     "unassign": "Verwijderen van dit Idee",
                     "unassignedToast": "{name} verwijderd van dit Idee",
                     "unassignFailed": "Kon Agent niet verwijderen"

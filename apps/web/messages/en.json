@@ -1893,8 +1893,6 @@
                     "assignedToast": "{name} assigned to this Idea",
                     "assignFailed": "Could not assign Agent",
                     "assignCancel": "Cancel",
-                    "assignedLabel": "Assigned",
-                    "assignedHint": "Assigned to this Idea — not created here",
                     "unassign": "Remove from this Idea",
                     "unassignedToast": "{name} removed from this Idea",
                     "unassignFailed": "Could not remove Agent"

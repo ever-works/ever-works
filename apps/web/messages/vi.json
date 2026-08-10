@@ -1810,8 +1810,6 @@
                     "assignedToast": "Đã gán {name} cho Ý tưởng này",
                     "assignFailed": "Không thể gán Tác nhân",
                     "assignCancel": "Hủy",
-                    "assignedLabel": "Đã gán",
-                    "assignedHint": "Được gán cho Ý tưởng này — không được tạo ở đây",
                     "unassign": "Gỡ khỏi Ý tưởng này",
                     "unassignedToast": "Đã gỡ {name} khỏi Ý tưởng này",
                     "unassignFailed": "Không thể gỡ Tác nhân"

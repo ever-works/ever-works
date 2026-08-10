@@ -1810,8 +1810,6 @@
                     "assignedToast": "{name} इस आइडिया को असाइन किया गया",
                     "assignFailed": "एजेंट असाइन नहीं हो सका",
                     "assignCancel": "रद्द करें",
-                    "assignedLabel": "असाइन किया गया",
-                    "assignedHint": "इस आइडिया को असाइन किया गया — यहाँ नहीं बनाया गया",
                     "unassign": "इस आइडिया से हटाएं",
                     "unassignedToast": "{name} इस आइडिया से हटाया गया",
                     "unassignFailed": "एजेंट हटाया नहीं जा सका"

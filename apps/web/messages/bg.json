@@ -1841,8 +1841,6 @@
                     "assignedToast": "{name} е присвоен към тази Идея",
                     "assignFailed": "Агентът не можа да бъде присвоен",
                     "assignCancel": "Отказ",
-                    "assignedLabel": "Присвоен",
-                    "assignedHint": "Присвоен към тази Идея — не е създаден тук",
                     "unassign": "Премахване от тази Идея",
                     "unassignedToast": "{name} е премахнат от тази Идея",
                     "unassignFailed": "Агентът не можа да бъде премахнат"

@@ -1810,8 +1810,6 @@
                     "assignedToast": "{name} bu Fikre atandı",
                     "assignFailed": "Ajan atanamadı",
                     "assignCancel": "İptal",
-                    "assignedLabel": "Atandı",
-                    "assignedHint": "Bu Fikre atandı — burada oluşturulmadı",
                     "unassign": "Bu Fikirden kaldır",
                     "unassignedToast": "{name} bu Fikirden kaldırıldı",
                     "unassignFailed": "Ajan kaldırılamadı"

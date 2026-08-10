@@ -1810,8 +1810,6 @@
                     "assignedToast": "{name} atribuído a esta Ideia",
                     "assignFailed": "Não foi possível atribuir o Agente",
                     "assignCancel": "Cancelar",
-                    "assignedLabel": "Atribuído",
-                    "assignedHint": "Atribuído a esta Ideia — não foi criado aqui",
                     "unassign": "Remover desta Ideia",
                     "unassignedToast": "{name} removido desta Ideia",
                     "unassignFailed": "Não foi possível remover o Agente"

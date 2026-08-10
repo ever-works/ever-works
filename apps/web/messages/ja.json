@@ -1810,8 +1810,6 @@
                     "assignedToast": "{name} をこのアイデアに割り当てました",
                     "assignFailed": "エージェントを割り当てられませんでした",
                     "assignCancel": "キャンセル",
-                    "assignedLabel": "割り当て済み",
-                    "assignedHint": "このアイデアに割り当て済み — ここで作成されたものではありません",
                     "unassign": "このアイデアから外す",
                     "unassignedToast": "{name} をこのアイデアから外しました",
                     "unassignFailed": "エージェントを外せませんでした"

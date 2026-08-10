@@ -915,19 +915,8 @@ export function IdeaDetailClient({
                                                     isAssigned && 'pr-11',
                                                 )}
                                             >
-                                                <span className="min-w-0 flex-1">
-                                                    <span className="block truncate text-sm font-medium text-text dark:text-text-dark group-hover:text-primary transition-colors">
-                                                        {agent.name}
-                                                    </span>
-                                                    {isAssigned && (
-                                                        <span
-                                                            className="mt-0.5 inline-flex items-center gap-1 text-[10px] text-text-muted dark:text-text-muted-dark"
-                                                            title={tDetail('agents.assignedHint')}
-                                                        >
-                                                            <Link2 className="w-2.5 h-2.5" />
-                                                            {tDetail('agents.assignedLabel')}
-                                                        </span>
-                                                    )}
+                                                <span className="min-w-0 flex-1 truncate text-sm font-medium text-text dark:text-text-dark group-hover:text-primary transition-colors">
+                                                    {agent.name}
                                                 </span>
                                                 <span className="shrink-0 rounded-full border border-border dark:border-border-dark px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-text-muted dark:text-text-muted-dark">
                                                     {agent.status}

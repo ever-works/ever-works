@@ -1841,8 +1841,6 @@
                     "assignedToast": "تم تعيين {name} لهذه الفكرة",
                     "assignFailed": "تعذر تعيين الوكيل",
                     "assignCancel": "إلغاء",
-                    "assignedLabel": "معيّن",
-                    "assignedHint": "معيّن لهذه الفكرة — لم يُنشأ هنا",
                     "unassign": "إزالة من هذه الفكرة",
                     "unassignedToast": "تمت إزالة {name} من هذه الفكرة",
                     "unassignFailed": "تعذرت إزالة الوكيل"

@@ -1841,8 +1841,6 @@
                     "assignedToast": "{name} dieser Idee zugewiesen",
                     "assignFailed": "Agent konnte nicht zugewiesen werden",
                     "assignCancel": "Abbrechen",
-                    "assignedLabel": "Zugewiesen",
-                    "assignedHint": "Dieser Idee zugewiesen — nicht hier erstellt",
                     "unassign": "Von dieser Idee entfernen",
                     "unassignedToast": "{name} von dieser Idee entfernt",
                     "unassignFailed": "Agent konnte nicht entfernt werden"

@@ -1810,8 +1810,6 @@
                     "assignedToast": "{name}을(를) 이 아이디어에 할당했습니다",
                     "assignFailed": "에이전트를 할당할 수 없습니다",
                     "assignCancel": "취소",
-                    "assignedLabel": "할당됨",
-                    "assignedHint": "이 아이디어에 할당됨 — 여기서 만든 것이 아님",
                     "unassign": "이 아이디어에서 제거",
                     "unassignedToast": "{name}을(를) 이 아이디어에서 제거했습니다",
                     "unassignFailed": "에이전트를 제거할 수 없습니다"

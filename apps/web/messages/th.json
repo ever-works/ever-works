@@ -1810,8 +1810,6 @@
                     "assignedToast": "กำหนด {name} ให้ไอเดียนี้แล้ว",
                     "assignFailed": "ไม่สามารถกำหนดเอเจนต์ได้",
                     "assignCancel": "ยกเลิก",
-                    "assignedLabel": "กำหนดแล้ว",
-                    "assignedHint": "กำหนดให้ไอเดียนี้ — ไม่ได้สร้างที่นี่",
                     "unassign": "นำออกจากไอเดียนี้",
                     "unassignedToast": "นำ {name} ออกจากไอเดียนี้แล้ว",
                     "unassignFailed": "ไม่สามารถนำเอเจนต์ออกได้"

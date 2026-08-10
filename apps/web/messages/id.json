@@ -1810,8 +1810,6 @@
                     "assignedToast": "{name} ditetapkan ke Ide ini",
                     "assignFailed": "Tidak dapat menetapkan Agen",
                     "assignCancel": "Batal",
-                    "assignedLabel": "Ditetapkan",
-                    "assignedHint": "Ditetapkan ke Ide ini — bukan dibuat di sini",
                     "unassign": "Hapus dari Ide ini",
                     "unassignedToast": "{name} dihapus dari Ide ini",
                     "unassignFailed": "Tidak dapat menghapus Agen"

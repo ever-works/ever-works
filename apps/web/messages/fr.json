@@ -1841,8 +1841,6 @@
                     "assignedToast": "{name} assigné à cette Idée",
                     "assignFailed": "Impossible d'assigner l'Agent",
                     "assignCancel": "Annuler",
-                    "assignedLabel": "Assigné",
-                    "assignedHint": "Assigné à cette Idée — non créé ici",
                     "unassign": "Retirer de cette Idée",
                     "unassignedToast": "{name} retiré de cette Idée",
                     "unassignFailed": "Impossible de retirer l'Agent"

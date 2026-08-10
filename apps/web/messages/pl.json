@@ -1810,8 +1810,6 @@
                     "assignedToast": "{name} przypisany do tego Pomysłu",
                     "assignFailed": "Nie udało się przypisać Agenta",
                     "assignCancel": "Anuluj",
-                    "assignedLabel": "Przypisany",
-                    "assignedHint": "Przypisany do tego Pomysłu — nie utworzony tutaj",
                     "unassign": "Usuń z tego Pomysłu",
                     "unassignedToast": "{name} usunięty z tego Pomysłu",
                     "unassignFailed": "Nie udało się usunąć Agenta"

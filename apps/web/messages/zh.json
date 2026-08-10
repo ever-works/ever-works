@@ -1810,8 +1810,6 @@
                     "assignedToast": "已将 {name} 分配到该想法",
                     "assignFailed": "无法分配智能体",
                     "assignCancel": "取消",
-                    "assignedLabel": "已分配",
-                    "assignedHint": "已分配到该想法 — 并非在此创建",
                     "unassign": "从该想法中移除",
                     "unassignedToast": "已将 {name} 从该想法中移除",
                     "unassignFailed": "无法移除智能体"
