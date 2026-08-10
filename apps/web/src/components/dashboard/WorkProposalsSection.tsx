@@ -41,6 +41,9 @@ const POLL_MAX_MS = 10 * 60_000;
 /** Spec §3 + PR O - dashboard preview block caps at 3 IdeaCards.
  *  The full list lives at /ideas (PR N). */
 const PREVIEW_CARD_LIMIT = 3;
+/** Module-level so the `matchedWorkIds` default keeps a stable identity
+ *  across renders rather than allocating a fresh `{}` each time. */
+const EMPTY_MATCHES: Record<string, string> = {};
 
 interface WorkProposalsSectionProps {
     initialProposals: WorkProposal[];
@@ -70,6 +73,20 @@ interface WorkProposalsSectionProps {
      * everything here.
      */
     showAllStatuses?: boolean;
+    /**
+     * `{ [ideaId]: workId }` for Ideas whose title + description match an
+     * existing Work (`idea-work-match.ts`), resolved server-side by the
+     * page that renders this section — the same input `/ideas` feeds its
+     * cards.
+     *
+     * It is load-bearing, not cosmetic: the list endpoint sends no
+     * `idea_works` rollup, so without this an Idea can only read "Built"
+     * when `acceptedWorkId` is set — and that field is stamped only on a
+     * legal transition to ACCEPTED, never by the `/works/new?proposal=…`
+     * flow this card's own Build CTA uses. Omitting it is what made the
+     * home preview show fewer Built Ideas than `/ideas`.
+     */
+    matchedWorkIds?: Record<string, string>;
 }
 
 export function WorkProposalsSection({
@@ -80,6 +97,7 @@ export function WorkProposalsSection({
     autoStart = false,
     totalIdeas,
     showAllStatuses = false,
+    matchedWorkIds = EMPTY_MATCHES,
 }: WorkProposalsSectionProps) {
     const t = useTranslations('dashboard.proposals');
     const tPage = useTranslations('dashboard.ideasPage');
@@ -512,7 +530,12 @@ export function WorkProposalsSection({
             {previewCards.length > 0 && (
                 <div className="grid grid-cols-1 @lg/main:grid-cols-2 @3xl/main:grid-cols-3 gap-4">
                     {previewCards.map((p) => (
-                        <IdeaCard key={p.id} proposal={p} onDismissed={handleDismissed} />
+                        <IdeaCard
+                            key={p.id}
+                            proposal={p}
+                            onDismissed={handleDismissed}
+                            matchedWorkId={matchedWorkIds[p.id] ?? null}
+                        />
                     ))}
                 </div>
             )}
