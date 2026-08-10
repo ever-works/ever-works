@@ -446,6 +446,22 @@ describe('IdeaDetailClient', () => {
             status: 'active',
         } as unknown as Agent;
 
+        it('sits in the main column directly under Linked Works', () => {
+            render(<IdeaDetailClient idea={baseIdea} agents={[pinnedAgent]} />);
+
+            const linkedWorks = screen.getByTestId('idea-linked-works');
+            const agentsCard = screen.getByTestId('idea-agents');
+
+            // Same parent as Linked Works — i.e. the main column, not the
+            // read-mostly rail the Build tracker lives in.
+            expect(agentsCard.parentElement).toBe(linkedWorks.parentElement);
+            expect(screen.getByTestId('idea-build-tracker').parentElement).not.toBe(
+                agentsCard.parentElement,
+            );
+            // Directly under it: adjacent siblings, in that order.
+            expect(linkedWorks.nextElementSibling).toBe(agentsCard);
+        });
+
         it('opens the picker from the section header', async () => {
             render(<IdeaDetailClient idea={baseIdea} />);
 

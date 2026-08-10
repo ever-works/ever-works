@@ -320,9 +320,14 @@ interface IdeaDetailClientProps {
 
 /**
  * `/ideas/[id]` detail body — a two-column entity page matching the
- * Mission detail layout: actions on the breadcrumb line, the Idea's
- * own content in the main column, and a context rail carrying the
- * build tracker, Agents and metadata.
+ * Mission detail layout: actions on the breadcrumb line, the Idea's own
+ * content in the main column, and a context rail carrying the build
+ * tracker and metadata.
+ *
+ * Agents sit in the MAIN column, directly under Linked Works: both
+ * answer "what does this Idea have attached to it", and both carry
+ * actions (assign / detach), which the narrow rail — a read-mostly
+ * summary strip — is the wrong place for.
  *
  * It stays a client island because a `queued`/`building` Idea updates
  * in place: the tracker advances, the status badge animates, and the
@@ -872,6 +877,94 @@ export function IdeaDetailClient({
                         )}
                     </section>
 
+                    {/* ── Agents ───────────────────────────────────────── */}
+                    <section className={sectionCard} data-testid="idea-agents">
+                        <SectionHeader
+                            icon={Bot}
+                            title={tDetail('sections.agents')}
+                            count={agents.length}
+                            action={
+                                <button
+                                    type="button"
+                                    data-testid="idea-assign-agent-button"
+                                    onClick={() => setAssignOpen(true)}
+                                    className={cn(btn, 'shrink-0 px-2 py-1')}
+                                >
+                                    <Link2 className="w-3.5 h-3.5" />
+                                    {tDetail('agents.assignExisting')}
+                                </button>
+                            }
+                        />
+                        {agents.length === 0 ? (
+                            <p className={emptyText}>{tDetail('agents.empty')}</p>
+                        ) : (
+                            <ul className="space-y-2">
+                                {agents.map((agent) => {
+                                    const isAssigned = assignedIds.has(agent.id);
+                                    const isUnassigning = unassigningId === agent.id;
+                                    return (
+                                        // The unassign control is a SIBLING of the row
+                                        // Link, never a child: nesting a button inside an
+                                        // anchor is invalid markup and would make the
+                                        // click navigate as well as detach.
+                                        <li key={agent.id} className="group/agent relative">
+                                            <Link
+                                                href={ROUTES.DASHBOARD_AGENT(agent.id)}
+                                                className={cn(
+                                                    'group flex items-center gap-3 rounded-lg border border-border/60 dark:border-border-dark/60 bg-surface/30 dark:bg-surface-dark/30 px-3 py-2.5 hover:border-border dark:hover:border-border-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors',
+                                                    isAssigned && 'pr-11',
+                                                )}
+                                            >
+                                                <span className="min-w-0 flex-1">
+                                                    <span className="block truncate text-sm font-medium text-text dark:text-text-dark group-hover:text-primary transition-colors">
+                                                        {agent.name}
+                                                    </span>
+                                                    {isAssigned && (
+                                                        <span
+                                                            className="mt-0.5 inline-flex items-center gap-1 text-[10px] text-text-muted dark:text-text-muted-dark"
+                                                            title={tDetail('agents.assignedHint')}
+                                                        >
+                                                            <Link2 className="w-2.5 h-2.5" />
+                                                            {tDetail('agents.assignedLabel')}
+                                                        </span>
+                                                    )}
+                                                </span>
+                                                <span className="shrink-0 rounded-full border border-border dark:border-border-dark px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-text-muted dark:text-text-muted-dark">
+                                                    {agent.status}
+                                                </span>
+                                            </Link>
+                                            {/* Only ASSIGNED Agents can be taken off the
+                                                Idea here — a pinned Agent's placement is
+                                                its scope, changed on the Agent itself. */}
+                                            {isAssigned && (
+                                                <button
+                                                    type="button"
+                                                    aria-label={tDetail('agents.unassign')}
+                                                    title={tDetail('agents.unassign')}
+                                                    disabled={unassigningId !== null}
+                                                    onClick={() => unassignAgent(agent)}
+                                                    className={cn(
+                                                        'absolute right-2 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md border border-transparent text-text-muted dark:text-text-muted-dark transition-all',
+                                                        'opacity-0 group-hover/agent:opacity-100 focus-visible:opacity-100',
+                                                        'hover:border-border dark:hover:border-border-dark hover:text-danger hover:bg-surface-hover dark:hover:bg-surface-hover-dark',
+                                                        'disabled:cursor-not-allowed',
+                                                        isUnassigning && 'opacity-100',
+                                                    )}
+                                                >
+                                                    {isUnassigning ? (
+                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                    ) : (
+                                                        <Unlink className="w-3.5 h-3.5" />
+                                                    )}
+                                                </button>
+                                            )}
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        )}
+                    </section>
+
                     {/* ── Attachments ──────────────────────────────────── */}
                     <EntityAttachmentsSection
                         initial={attachments}
@@ -977,94 +1070,6 @@ export function IdeaDetailClient({
                                 <span className="min-w-0 truncate">{t('actions.viewWork')}</span>
                                 <ChevronRight className="w-3 h-3 shrink-0" />
                             </Link>
-                        )}
-                    </section>
-
-                    {/* ── Agents ───────────────────────────────────────── */}
-                    <section className={sectionCard}>
-                        <SectionHeader
-                            icon={Bot}
-                            title={tDetail('sections.agents')}
-                            count={agents.length}
-                            action={
-                                <button
-                                    type="button"
-                                    data-testid="idea-assign-agent-button"
-                                    onClick={() => setAssignOpen(true)}
-                                    className={cn(btn, 'shrink-0 px-2 py-1')}
-                                >
-                                    <Link2 className="w-3.5 h-3.5" />
-                                    {tDetail('agents.assignExisting')}
-                                </button>
-                            }
-                        />
-                        {agents.length === 0 ? (
-                            <p className={emptyText}>{tDetail('agents.empty')}</p>
-                        ) : (
-                            <ul className="space-y-2">
-                                {agents.map((agent) => {
-                                    const isAssigned = assignedIds.has(agent.id);
-                                    const isUnassigning = unassigningId === agent.id;
-                                    return (
-                                        // The unassign control is a SIBLING of the row
-                                        // Link, never a child: nesting a button inside an
-                                        // anchor is invalid markup and would make the
-                                        // click navigate as well as detach.
-                                        <li key={agent.id} className="group/agent relative">
-                                            <Link
-                                                href={ROUTES.DASHBOARD_AGENT(agent.id)}
-                                                className={cn(
-                                                    'group flex items-center gap-3 rounded-lg border border-border/60 dark:border-border-dark/60 bg-surface/30 dark:bg-surface-dark/30 px-3 py-2.5 hover:border-border dark:hover:border-border-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors',
-                                                    isAssigned && 'pr-11',
-                                                )}
-                                            >
-                                                <span className="min-w-0 flex-1">
-                                                    <span className="block truncate text-sm font-medium text-text dark:text-text-dark group-hover:text-primary transition-colors">
-                                                        {agent.name}
-                                                    </span>
-                                                    {isAssigned && (
-                                                        <span
-                                                            className="mt-0.5 inline-flex items-center gap-1 text-[10px] text-text-muted dark:text-text-muted-dark"
-                                                            title={tDetail('agents.assignedHint')}
-                                                        >
-                                                            <Link2 className="w-2.5 h-2.5" />
-                                                            {tDetail('agents.assignedLabel')}
-                                                        </span>
-                                                    )}
-                                                </span>
-                                                <span className="shrink-0 rounded-full border border-border dark:border-border-dark px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-text-muted dark:text-text-muted-dark">
-                                                    {agent.status}
-                                                </span>
-                                            </Link>
-                                            {/* Only ASSIGNED Agents can be taken off the
-                                                Idea here — a pinned Agent's placement is
-                                                its scope, changed on the Agent itself. */}
-                                            {isAssigned && (
-                                                <button
-                                                    type="button"
-                                                    aria-label={tDetail('agents.unassign')}
-                                                    title={tDetail('agents.unassign')}
-                                                    disabled={unassigningId !== null}
-                                                    onClick={() => unassignAgent(agent)}
-                                                    className={cn(
-                                                        'absolute right-2 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md border border-transparent text-text-muted dark:text-text-muted-dark transition-all',
-                                                        'opacity-0 group-hover/agent:opacity-100 focus-visible:opacity-100',
-                                                        'hover:border-border dark:hover:border-border-dark hover:text-danger hover:bg-surface-hover dark:hover:bg-surface-hover-dark',
-                                                        'disabled:cursor-not-allowed',
-                                                        isUnassigning && 'opacity-100',
-                                                    )}
-                                                >
-                                                    {isUnassigning ? (
-                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                                                    ) : (
-                                                        <Unlink className="w-3.5 h-3.5" />
-                                                    )}
-                                                </button>
-                                            )}
-                                        </li>
-                                    );
-                                })}
-                            </ul>
                         )}
                     </section>
 
