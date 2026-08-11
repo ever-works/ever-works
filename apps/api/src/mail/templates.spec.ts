@@ -42,7 +42,14 @@ describe('email templates resolver', () => {
             // expression correct in both trees and in the container.
             expect(TEMPLATES_DIR).toBe(path.resolve(__dirname, '..', 'templates'));
             expect(fs.existsSync(TEMPLATES_DIR)).toBe(true);
-            expect(TEMPLATES_DIR.startsWith(fs.realpathSync(process.cwd()))).toBe(false);
+
+            // The property that actually broke production: the old
+            // `path.resolve(process.cwd(), 'src/templates')` resolves to
+            // nothing from here, while TEMPLATES_DIR still resolves. Stated
+            // as "cwd-relative misses, module-relative hits" rather than a
+            // prefix comparison, which would be wrong on a runner whose
+            // temp dir happens to be an ancestor of the workspace.
+            expect(fs.existsSync(path.resolve(process.cwd(), 'src/templates'))).toBe(false);
         } finally {
             process.chdir(originalCwd);
             fs.rmSync(scratch, { recursive: true, force: true });
