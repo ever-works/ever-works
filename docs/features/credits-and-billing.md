@@ -44,19 +44,48 @@ The purchase, payment-method and auto-recharge surfaces are flag-gated behind `P
 
 ## The Usage & Credits page
 
-**Settings → Usage** shows the period totals and four spend breakdowns:
+**Settings → Usage & Credits** (`/settings/usage`) answers "where did the credits go?". **One reporting period drives the whole page** — the tiles and all four charts always describe the same window.
+
+### Choosing the period
+
+The controls at the top-right of the page offer three ways to set it:
+
+- **7d** and **30d** — rolling windows.
+- A **calendar month** picker (*Pick a month*), listing the last twelve months newest-first.
+- The page defaults to the **current calendar month**.
+
+A `?period=` query parameter is honoured server-side, so a link like `/settings/usage?period=2026-07` renders exactly the month it names. An unrecognised value falls back to the current month rather than blanking the page. Switching back to a period you already viewed is instant — each period's snapshot is cached client-side for the session.
+
+### Period totals
 
 | Tile            | Meaning                                            |
 | --------------- | -------------------------------------------------- |
-| Balance         | Live balance (not window-bound).                   |
-| Consumed        | Credits debited inside the window.                 |
-| Added           | Purchases + grants + daily-free inside the window. |
-| Spend           | Metered provider spend in cents for the window.    |
+| Credits balance | Live balance (not window-bound).                   |
+| Credits used    | Credits debited inside the window.                 |
+| Credits added   | Purchases + grants + daily-free inside the window. |
+| Month spend     | Metered provider spend in cents for the window.    |
 | Tasks completed | Count for the window.                              |
 | Works active    | Count for the window.                              |
 | Agent runs      | Count for the window.                              |
 
-Charts break the same window down **per day** (with a 7d / 30d toggle), **per model**, **per agent** and **per Work**. `period` accepts a calendar month (`YYYY-MM`, default the current month) or a rolling `7d` / `30d`.
+A line under the tiles names the period they describe, so a screenshot is never ambiguous about what it is showing.
+
+### The four breakdowns
+
+| Chart              | Breaks the window down by                      |
+| ------------------ | ---------------------------------------------- |
+| **Usage per day**  | Each day in the period.                        |
+| **Usage by model** | The AI models the spend went to.               |
+| **Usage by agent** | The Agents that spent it.                      |
+| **Usage by Work**  | The Works it was spent on.                     |
+
+Rows that cannot be attributed to a model, agent or Work are grouped under **Unattributed** rather than dropped, so the breakdowns still add up. A period with no activity says "No usage in this period." instead of drawing an empty chart, and if a panel fails to load the page says so rather than showing a misleading zero.
+
+### Export CSV
+
+**Export CSV** downloads every usage event in the currently selected period as a CSV file, via `GET /api/credits/usage/export?period=…`. The `period` sent is whatever the selector is set to, so the export and the charts always agree.
+
+`period` accepts a calendar month (`YYYY-MM`, default the current month) or a rolling `7d` / `30d` everywhere it appears — page, API and export alike.
 
 ## Plan entitlements
 
