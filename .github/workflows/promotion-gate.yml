@@ -1,0 +1,105 @@
+name: Promotion Gate
+
+# Refuses to let `stage` reach `main` while stage's own E2E result is unknown or
+# red — unless a human explicitly overrides, on the record.
+#
+# Why this exists. On 2026-08-09 the E2E suite DID catch a defect that made
+# registration impossible: `auth.spec.ts › Registration › should register a new
+# user` failed because the consent checkbox rendered `disabled`. That run
+# completed on `stage` at 23:29, BEFORE the stage → main promotion. The
+# promotion went ahead anyway, because the only thing consulted was
+# `lint-and-test` (the required check) plus health endpoints, and the release
+# shipped a broken signup to production.
+#
+# The gap was never coverage. The gate existed and nothing made anyone look at
+# it. This makes not-looking impossible.
+#
+# On the chronic-red problem. This suite carries pre-existing failures unrelated
+# to any given change, so a plain "must be all green" bar would block every
+# promotion and be routed around within a week — which is exactly how a signal
+# dies. So the gate is a FORCED DECISION, not a hard block: it fails with the
+# failing spec list in the log, and a maintainer who has read that list applies
+# the `override-e2e-gate` label to proceed. The override is deliberate,
+# attributable, and visible in the PR timeline.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened, labeled, unlabeled]
+
+permissions:
+  contents: read
+  pull-requests: read
+  actions: read
+
+jobs:
+  e2e-result:
+    name: stage E2E must be green (or explicitly overridden)
+    runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
+    timeout-minutes: 10
+    # Only gate promotions from stage. Hotfix branches targeting main directly
+    # are a different conversation and are not covered here.
+    if: github.event.pull_request.head.ref == 'stage'
+
+    steps:
+      - name: Evaluate the E2E result for the exact commit being promoted
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          REPO: ${{ github.repository }}
+          OVERRIDDEN: ${{ contains(github.event.pull_request.labels.*.name, 'override-e2e-gate') }}
+        run: |
+          set -uo pipefail
+
+          echo "Promoting commit: $HEAD_SHA"
+
+          RUN=$(gh api "repos/$REPO/actions/workflows/e2e.yml/runs?head_sha=$HEAD_SHA&per_page=1" \
+                  --jq '.workflow_runs[0] // empty' 2>/dev/null || echo "")
+
+          if [ -z "$RUN" ]; then
+            echo "::error::No E2E run found for $HEAD_SHA."
+            echo "The suite runs on push to stage. If it has not started yet, wait for it."
+            echo "Promoting a commit whose E2E result is unknown is what shipped the"
+            echo "2026-08-09 signup outage."
+            [ "$OVERRIDDEN" = "true" ] && { echo "::warning::override-e2e-gate label present — allowing."; exit 0; }
+            exit 1
+          fi
+
+          STATUS=$(echo "$RUN"     | jq -r '.status')
+          CONCLUSION=$(echo "$RUN" | jq -r '.conclusion // ""')
+          RUN_ID=$(echo "$RUN"     | jq -r '.id')
+          URL=$(echo "$RUN"        | jq -r '.html_url')
+
+          echo "E2E run $RUN_ID: $STATUS/$CONCLUSION"
+          echo "$URL"
+
+          if [ "$STATUS" != "completed" ]; then
+            echo "::error::E2E for $HEAD_SHA is still $STATUS. Wait for it to finish."
+            [ "$OVERRIDDEN" = "true" ] && { echo "::warning::override-e2e-gate label present — allowing."; exit 0; }
+            exit 1
+          fi
+
+          if [ "$CONCLUSION" = "success" ]; then
+            echo "E2E is green for the commit being promoted."
+            exit 0
+          fi
+
+          # Red. Surface WHICH specs failed so the override decision is informed
+          # rather than reflexive — a maintainer should be able to tell a
+          # pre-existing failure from a new one without opening 33 shard logs.
+          echo "::group::Failing specs in E2E run $RUN_ID"
+          gh api "repos/$REPO/actions/runs/$RUN_ID/jobs?per_page=100" \
+            --jq '.jobs[] | select(.conclusion=="failure") | .name' 2>/dev/null | sed 's/^/  shard: /' || true
+          echo "::endgroup::"
+
+          echo "::error::E2E concluded '$CONCLUSION' for $HEAD_SHA — see $URL"
+          echo ""
+          echo "This suite carries known pre-existing failures. If you have read the run"
+          echo "and the failures are unrelated to this promotion, apply the label"
+          echo "'override-e2e-gate' to proceed. That override is recorded on the PR."
+
+          if [ "$OVERRIDDEN" = "true" ]; then
+            echo "::warning::override-e2e-gate label present — promotion allowed despite a red E2E."
+            exit 0
+          fi
+          exit 1
