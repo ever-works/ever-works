@@ -118,7 +118,7 @@ const summaryUrl = (workId: string) => `${API_BASE}/api/works/${workId}/usage/su
 const trendUrl = (workId: string) => `${API_BASE}/api/works/${workId}/usage/trend`;
 const exportUrl = (workId: string) => `${API_BASE}/api/works/${workId}/usage/export`;
 const ACCOUNT_WIDE = `${API_BASE}/api/me/usage/account-wide`;
-const ADMIN_USAGE = `${API_BASE}/admin/usage`;
+const ADMIN_USAGE = `${API_BASE}/api/admin/usage`;
 
 function stamp(): string {
     return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`;
@@ -845,7 +845,7 @@ test.describe('flow: admin/usage guard — platform-admin gate precedes period v
         const anon = await request.get(ADMIN_USAGE);
         expect(anon.status()).toBe(401);
 
-        const wrongPrefix = await request.get(`${API_BASE}/api/admin/usage`, {
+        const wrongPrefix = await request.get(`${API_BASE}/admin/usage`, {
             headers: authedHeaders(u.access_token),
         });
         expect(wrongPrefix.status(), 'api/ prefix is NOT a route for admin usage').toBe(404);

@@ -107,7 +107,7 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  */
 
 const FAKE_UUID = '99999999-9999-4999-8999-999999999999';
-const ADMIN_USAGE = `${API_BASE}/admin/usage`;
+const ADMIN_USAGE = `${API_BASE}/api/admin/usage`;
 
 interface PerPluginRow {
     pluginId: string;
@@ -430,7 +430,7 @@ test.describe('Flow: admin cross-user usage aggregation — platform-admin guard
         //    route lives at /admin/usage with NO 'api/' prefix — the 'api/'-prefixed
         //    variant 404s. Pin both so a future prefix refactor is caught.
         expect((await request.get(ADMIN_USAGE)).status(), 'unauth admin usage → 401').toBe(401);
-        const wrongPrefix = await request.get(`${API_BASE}/api/admin/usage`, {
+        const wrongPrefix = await request.get(`${API_BASE}/admin/usage`, {
             headers: authedHeaders(normal.access_token),
         });
         expect(wrongPrefix.status(), '/api/admin/usage (wrong prefix) → 404').toBe(404);

@@ -13,10 +13,12 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  * SHAPES VERIFIED AGAINST THE LIVE API (http://127.0.0.1:3100) BEFORE WRITING:
  *
  *   ADMIN USAGE  (AdminUsageController @Controller('admin/usage'), IsPlatformAdminGuard)
- *     NOTE: mounted at bare 'admin/usage' — NO `api/` prefix (unlike every sibling).
- *       GET /api/admin/usage                       -> 404  (api/-prefixed path is NOT a route)
- *       GET /admin/usage              (no auth)     -> 401  { message:'Unauthorized', statusCode:401 }
- *       GET /admin/usage              (non-admin)   -> 403  { message:'Platform admin access required',
+ *     NOTE: mounted at 'api/admin/usage', like every sibling controller. It was
+ *     declared bare ('admin/usage') until PR #2012 corrected it — this app has no
+ *     setGlobalPrefix, so each controller carries the `api/` segment itself.
+ *       GET /admin/usage                           -> 404  (bare path is NOT a route)
+ *       GET /api/admin/usage          (no auth)     -> 401  { message:'Unauthorized', statusCode:401 }
+ *       GET /api/admin/usage          (non-admin)   -> 403  { message:'Platform admin access required',
  *                                                            error:'Forbidden', statusCode:403 }
  *     GUARD-BEFORE-PIPE ORDERING (verified): the IsPlatformAdminGuard runs BEFORE the
  *     @Query('period') validation. A non-admin hitting /admin/usage?period=garbage gets
@@ -107,15 +109,15 @@ test.describe('Flow: platform-admin usage gating matrix (isPlatformAdmin)', () =
     test('flow 1: the admin cross-user usage surface is a tightly-closed platform-admin route — the api/-prefixed path is not a route, unauth is 401, every authed non-admin is 403, and that 403 is stable across the full RBAC matrix', async ({
         request,
     }) => {
-        // ── 1. The `api/`-prefixed path does NOT exist. Sibling usage controllers all
-        //       carry `api/`, so a naive client guessing the path 404s — proving the
-        //       admin controller is mounted at the bare 'admin/usage'.
-        const apiPrefixed = await request.get(`${API_BASE}/api/admin/usage`);
-        expect(apiPrefixed.status(), 'api/admin/usage must NOT resolve').toBe(404);
+        // ── 1. The BARE path does NOT exist. Every sibling usage controller carries
+        //       `api/` and, since PR #2012, so does this one — so a client still
+        //       guessing the old bare path 404s.
+        const barePath = await request.get(`${API_BASE}/admin/usage`);
+        expect(barePath.status(), 'bare admin/usage must NOT resolve').toBe(404);
 
         // ── 2. The real route exists but requires authentication → 401 (the global
         //       AuthSessionGuard fires before the platform-admin guard for anon).
-        const unauth = await request.get(`${API_BASE}/admin/usage`);
+        const unauth = await request.get(`${API_BASE}/api/admin/usage`);
         expect(unauth.status(), 'admin usage requires auth').toBe(401);
         const unauthBody = await unauth.json();
         expect(unauthBody.statusCode).toBe(401);
@@ -126,7 +128,7 @@ test.describe('Flow: platform-admin usage gating matrix (isPlatformAdmin)', () =
         //       can elevate a normal account to the cross-user view.
         for (let i = 0; i < 3; i++) {
             const u = await registerUserViaAPI(request);
-            const res = await request.get(`${API_BASE}/admin/usage`, {
+            const res = await request.get(`${API_BASE}/api/admin/usage`, {
                 headers: authedHeaders(u.access_token),
             });
             expect(res.status(), `non-admin #${i} must be forbidden`).toBe(403);
@@ -147,7 +149,7 @@ test.describe('Flow: platform-admin usage gating matrix (isPlatformAdmin)', () =
         });
         expect(login.ok(), 'seeded user logs in').toBeTruthy();
         const { access_token } = await login.json();
-        const seededRes = await request.get(`${API_BASE}/admin/usage`, {
+        const seededRes = await request.get(`${API_BASE}/api/admin/usage`, {
             headers: authedHeaders(access_token),
         });
         expect(seededRes.status(), 'the seeded work-owner is still NOT a platform admin').toBe(403);
@@ -175,8 +177,8 @@ test.describe('Flow: platform-admin usage gating matrix (isPlatformAdmin)', () =
         for (const period of periodInputs) {
             const url =
                 period === undefined
-                    ? `${API_BASE}/admin/usage`
-                    : `${API_BASE}/admin/usage?period=${encodeURIComponent(period)}`;
+                    ? `${API_BASE}/api/admin/usage`
+                    : `${API_BASE}/api/admin/usage?period=${encodeURIComponent(period)}`;
             const res = await request.get(url, { headers });
             expect(
                 res.status(),
@@ -376,10 +378,10 @@ test.describe('Flow: cross-user usage isolation (admin-gated vs owner-scoped)', 
 
         // ── 4. The ONE surface that would aggregate Alice+Bob spend together is the
         //       admin route — and it is 403 for BOTH of them (neither is a platform admin).
-        const aliceAdmin = await request.get(`${API_BASE}/admin/usage`, {
+        const aliceAdmin = await request.get(`${API_BASE}/api/admin/usage`, {
             headers: authedHeaders(alice.token),
         });
-        const bobAdmin = await request.get(`${API_BASE}/admin/usage`, { headers: bobHeaders });
+        const bobAdmin = await request.get(`${API_BASE}/api/admin/usage`, { headers: bobHeaders });
         expect(aliceAdmin.status()).toBe(403);
         expect(bobAdmin.status()).toBe(403);
 
