@@ -1,6 +1,7 @@
 import { CanActivate, ExecutionContext, Inject, Injectable, UnauthorizedException } from '@nestjs/common';
 import { timingSafeEqual } from 'crypto';
 import { McpConfigService } from '../config/mcp-config.service.js';
+import { CallerContextService } from '../context/caller-context.service.js';
 
 /**
  * H-21 — MCP auth, dual mode.
@@ -25,7 +26,10 @@ import { McpConfigService } from '../config/mcp-config.service.js';
  */
 @Injectable()
 export class ApiKeyGuard implements CanActivate {
-	constructor(@Inject(McpConfigService) private readonly config: McpConfigService) {}
+	constructor(
+		@Inject(McpConfigService) private readonly config: McpConfigService,
+		@Inject(CallerContextService) private readonly callerContext: CallerContextService
+	) {}
 
 	canActivate(context: ExecutionContext): boolean {
 		const request = context.switchToHttp().getRequest<{
@@ -81,10 +85,23 @@ export class ApiKeyGuard implements CanActivate {
 			throw new UnauthorizedException('Missing Authorization Bearer header');
 		}
 
-		// 3. Stash the per-user JWT (if any) on the request so ApiClientService
-		// can forward it upstream. We do NOT verify the JWT here — that's the
-		// upstream API's job. The MCP server is a transport.
+		// 3. Publish the per-user JWT (if any) so ApiClientService can forward
+		// it upstream. We do NOT verify the JWT here — that's the upstream
+		// API's job. The MCP server is a transport.
+		//
+		// This runs only after every check above has passed, so an
+		// unauthenticated request never seeds an identity.
 		if (userJwtPresent) {
+			// The AsyncLocalStorage frame opened by CallerContextMiddleware is
+			// the load-bearing channel. The request stash below cannot be
+			// relied on: @rekog/mcp-nest binds its own adapter wrapper — not
+			// this Express request — to Nest's REQUEST token, so a value
+			// written here is invisible to a request-scoped consumer. That is
+			// the defect that made every data tool return 401. See
+			// CallerContextService for the full account.
+			this.callerContext.setCallerJwt(userJwtHeader);
+			// Kept for any consumer that does hold the real Express request
+			// (and so the stdio/None-transport shape is unchanged).
 			request.__callerJwt = userJwtHeader as string;
 		}
 

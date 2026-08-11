@@ -126,6 +126,16 @@ interface NewWorkClientProps {
      * everything enabled (fail-open).
      */
     disabledKinds?: string[];
+    /**
+     * True when this user's Work repositories are created in the managed
+     * Ever Works GitHub org (wizard storage choice `ever-works-git` + the
+     * platform feature enabled). Resolved server-side in `page.tsx`; a
+     * client component cannot read the API-side env flag behind it.
+     *
+     * When true no personal git provider needs connecting, so the sidebar
+     * shows where repos actually go instead of a "Not connected" prompt.
+     */
+    managedGitStorage?: boolean;
 }
 
 export default function NewWorkClient({
@@ -141,6 +151,7 @@ export default function NewWorkClient({
     initialPrompt,
     initialKind = null,
     disabledKinds = [],
+    managedGitStorage = false,
 }: NewWorkClientProps) {
     const [creationMode, setCreationMode] = useState<CreationMode | null>(
         proposal ? 'ai' : initialMode,
@@ -393,6 +404,7 @@ export default function NewWorkClient({
                                 providers={providers}
                                 selectedProviderId={selectedProviderId}
                                 onSelect={setSelectedProviderId}
+                                managedGitStorage={managedGitStorage}
                                 compact
                             />
                         </div>
@@ -452,6 +464,7 @@ export default function NewWorkClient({
                     <WorkAICreator
                         gitProvider={selectedProviderId || undefined}
                         gitConnected={gitConnected}
+                        managedGitStorage={managedGitStorage}
                         deployProvider={selectedDeployProviderId || undefined}
                         websiteTemplates={websiteTemplates}
                         workBlueprints={workBlueprints}

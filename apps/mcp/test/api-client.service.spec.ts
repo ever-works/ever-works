@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { ApiClientService } from '../src/api-client/api-client.service.js';
 import { ApiError } from '../src/api-client/api-error.js';
 import { McpConfigService } from '../src/config/mcp-config.service.js';
+import { CallerContextService } from '../src/context/caller-context.service.js';
 
 describe('ApiClientService', () => {
 	let service: ApiClientService;
@@ -15,7 +16,11 @@ describe('ApiClientService', () => {
 			transport: 'stdio'
 		} as McpConfigService;
 
-		service = new ApiClientService(config);
+		// No caller-context frame is open here, which is exactly the stdio
+		// transport's situation: no HTTP request, no per-user JWT, so the
+		// shared key remains the credential. `sends correct headers` below
+		// pins that fallback.
+		service = new ApiClientService(config, new CallerContextService());
 		fetchSpy = vi.fn();
 		globalThis.fetch = fetchSpy;
 	});

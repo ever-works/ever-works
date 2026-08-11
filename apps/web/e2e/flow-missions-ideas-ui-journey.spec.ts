@@ -38,15 +38,16 @@ import { clickAndExpectUrl } from './helpers/nav';
  *         outstandingIdeasCap,sourceMissionId,...}
  *   POST /api/me/missions/:id/pause -> 200 {status:'paused'}
  *   GET  /api/me/missions?status=active|paused              (works on sqlite)
- *   GET  /api/me/missions?search=<t>  (works on sqlite; ILIKE not used)
+ *   GET  /api/me/missions?search=<t>  (works on sqlite; portable LIKE)
  *   POST /api/me/work-proposals {description,title?} -> 201
  *        {id,title,description,slugSuggestion,status:'pending',
  *         source:'user-manual',missionId:null,...}
  *   PATCH /api/me/work-proposals/:id/dismiss -> 204
  *   GET  /api/me/work-proposals?statuses=dismissed          (works)
- *   GET  /api/me/work-proposals?search=<t> -> 500 on sqlite (ILIKE is
- *        Postgres-only) => /ideas?search= renders the "Could not load
- *        Ideas." alert. Asserted TOLERANTLY (idea OR alert).
+ *   GET  /api/me/work-proposals?search=<t> -> 200 on every driver (portable
+ *        `LOWER(col) LIKE :p ESCAPE '\'`) => /ideas?search= renders the
+ *        matching card. This used to be a Postgres-only ILIKE that 500'd on
+ *        sqlite and the assertion tolerated the "Could not load Ideas." alert.
  *   GET  /api/me/missions/<unknown-uuid> -> 404 (=> detail page notFound()).
  */
 
@@ -458,14 +459,14 @@ test.describe('Ideas catalog — /en/ideas UI', () => {
         await expect(card.getByText('Dismissed')).toBeVisible();
     });
 
-    test('the /ideas search filter is env-adaptive on sqlite (idea card OR load-error alert)', async ({
+    test('the /ideas search filter renders the matching card on every driver', async ({
         page,
         request,
     }) => {
-        // The work-proposal search path uses ILIKE, which sqlite (the local
-        // stack) does not implement -> the API 500s -> the page renders its
-        // "Could not load Ideas." alert instead of results. On Postgres the
-        // same URL returns the matching card. Assert either outcome.
+        // The work-proposal search path is portable now (`LOWER(col) LIKE :p
+        // ESCAPE '\'`), so sqlite executes it exactly as Postgres does. This
+        // assertion used to also accept the "Could not load Ideas." alert,
+        // which meant it could not fail while the endpoint was 500ing.
         const token = await seededToken(request);
         const marker = uniq('SearchMarker');
         await createIdea(request, token, `${marker} unique searchable idea body`);
@@ -477,10 +478,8 @@ test.describe('Ideas catalog — /en/ideas UI', () => {
         await expect(page.getByRole('heading', { name: 'Ideas' }).first()).toBeVisible({
             timeout: 30_000,
         });
-        const card = page.getByText(marker).first();
-        const loadError = page.getByText('Could not load Ideas.');
-        const emptyState = page.getByText('No Ideas match these filters.');
-        await expect(card.or(loadError).or(emptyState).first()).toBeVisible({ timeout: 30_000 });
+        await expect(page.getByText(marker).first()).toBeVisible({ timeout: 30_000 });
+        await expect(page.getByText('Could not load Ideas.')).toHaveCount(0);
     });
 
     test('clicking an idea card navigates to its detail page', async ({ page, request }) => {

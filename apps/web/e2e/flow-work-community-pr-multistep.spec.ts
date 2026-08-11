@@ -48,9 +48,10 @@ import { API_BASE, authedHeaders, registerUserViaAPI, createWorkViaAPI } from '.
  *    kind:'linked', createdAt, workName, workSlug}]}; link-less Idea → {links:[]}.
  *  PATCH /api/me/work-proposals/:id/dismiss         → 204; PENDING→DISMISSED.
  *  GET  /api/me/work-proposals?statuses=a&statuses=b→ 200 union of the partitions.
- *  GET  /api/me/work-proposals?search=<t>           → ENV-ADAPTIVE: 200 (real DB,
- *    case-insensitive title/description ILIKE) OR 500 {statusCode:500,
- *    message:"Internal server error"} on sqlite (ILIKE unsupported).
+ *  GET  /api/me/work-proposals?search=<t>           → 200, case-insensitive
+ *    title/description substring match on EVERY driver (portable
+ *    `LOWER(col) LIKE :p ESCAPE '\'`; it used to be a Postgres-only ILIKE that
+ *    500'd on sqlite, and this spec tolerated the 500).
  *  PUT  /api/works/:id {communityPrEnabled?, communityPrAutoClose?} → 200; bad type
  *    → 400 ["communityPrEnabled must be a boolean value"].
  *  POST /api/works/:id/process-community-prs         → 400 "…not enabled…" (disabled)
@@ -698,7 +699,7 @@ test.describe('Idea create → list → accept/reject partitioning ⟷ community
         expect((await readIdea(request, token, dismissedIdea.id)).acceptedWorkId).toBeNull();
     });
 
-    test('?search= is env-adaptive: 200 filters by a case-insensitive description substring (matching Idea present, non-matching excluded) OR 500 sqlite ILIKE', async ({
+    test('?search= returns 200 and filters by a case-insensitive description substring (matching Idea present, non-matching excluded)', async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
@@ -720,26 +721,25 @@ test.describe('Idea create → list → accept/reject partitioning ⟷ community
         const res = await request.get(`${proposalsUrl()}?search=${token36}`, {
             headers: authedHeaders(token),
         });
-        // sqlite has no ILIKE → the repo query throws → a raw 500. A real Postgres
-        // stack filters and returns 200. Both are the truthful contract.
-        expect([200, 500]).toContain(res.status());
-        if (res.status() === 500) {
-            const body = await res.json();
-            expect(body.statusCode).toBe(500);
-            expect(String(body.message)).toMatch(/internal server error/i);
-        } else {
-            const rows = (await res.json()) as IdeaRow[];
-            const ids = rows.map((p) => p.id);
-            expect(ids).toContain(marked.id);
-            expect(ids).not.toContain(unmarked.id);
+        // The predicate is portable (`LOWER(col) LIKE :p ESCAPE '\'`), so sqlite
+        // and Postgres both execute it. 200 is the only correct outcome — this
+        // assertion previously also accepted 500, which is why the sqlite
+        // breakage went unnoticed for as long as it existed.
+        expect(res.status()).toBe(200);
 
-            // Case-insensitivity: an UPPERCASE search still matches the same Idea.
-            const upper = await request.get(`${proposalsUrl()}?search=${token36.toUpperCase()}`, {
-                headers: authedHeaders(token),
-            });
-            expect(upper.status()).toBe(200);
-            expect(((await upper.json()) as IdeaRow[]).map((p) => p.id)).toContain(marked.id);
-        }
+        const rows = (await res.json()) as IdeaRow[];
+        const ids = rows.map((p) => p.id);
+        expect(ids).toContain(marked.id);
+        expect(ids).not.toContain(unmarked.id);
+
+        // Case-insensitivity: an UPPERCASE search still matches the same Idea.
+        // On Postgres a bare LIKE would miss here; on sqlite it would match by
+        // accident. Both drivers must agree.
+        const upper = await request.get(`${proposalsUrl()}?search=${token36.toUpperCase()}`, {
+            headers: authedHeaders(token),
+        });
+        expect(upper.status()).toBe(200);
+        expect(((await upper.json()) as IdeaRow[]).map((p) => p.id)).toContain(marked.id);
     });
 
     test('GET :id/works after accept binds the link display fields (workName / workSlug) to the accepted community-PR Work; a link-less pending Idea → []', async ({

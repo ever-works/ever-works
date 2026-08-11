@@ -83,6 +83,17 @@ export interface CreateWorkDto {
     organization: boolean;
     gitProvider?: string;
     deployProvider?: string;
+    /**
+     * Where the Work's repository lives: `ever-works-git` (the managed Ever
+     * Works GitHub org, provisioned by the platform's own PAT) or one of the
+     * personal choices (`user-github`, `user-gitlab`, `user-git`). Mirrors
+     * `CreateWorkDto.storageProvider` on the API.
+     *
+     * Omit to let the API seed it from the user's onboarding choice; send it
+     * explicitly when the caller has already resolved the choice, so both
+     * tiers key their behaviour off the same value.
+     */
+    storageProvider?: string;
     websiteTemplateId?: string;
     /** Work-kind chip value (website, landing-page, blog, directory,
      *  awesome-repo). Drives the kind-aware default website template;
