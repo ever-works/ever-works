@@ -64,6 +64,12 @@ type InitialWorkKind = 'website' | 'landing-page' | 'blog' | 'directory' | 'awes
 interface WorkAICreatorProps {
     gitProvider?: string;
     gitConnected?: boolean;
+    /**
+     * True when Work repositories go to the managed Ever Works GitHub org.
+     * Purely presentational here — the server action re-resolves the storage
+     * choice itself and never trusts a client-supplied value.
+     */
+    managedGitStorage?: boolean;
     deployProvider?: string;
     websiteTemplates: WebsiteTemplateOption[];
     /** Manifest Work blueprints (Works Templates catalog); may be empty. */
@@ -76,6 +82,7 @@ interface WorkAICreatorProps {
 export function WorkAICreator({
     gitProvider,
     gitConnected,
+    managedGitStorage = false,
     deployProvider,
     websiteTemplates,
     workBlueprints = [],
@@ -452,6 +459,7 @@ export function WorkAICreator({
             <RepositoryOwnerCard
                 gitProvider={gitProvider}
                 gitConnected={gitConnected}
+                managedGitStorage={managedGitStorage}
                 owner={owner}
                 onChange={(value, isOrganization) => {
                     setOwner(value);
