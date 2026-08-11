@@ -46,8 +46,29 @@ function isRelativeOrAllowedRedirectHost(redirectUrl: string): boolean {
     }
 }
 
+/**
+ * Does this rejection mean "the credentials were right, the address is not
+ * confirmed"? The API answers `403 { message: 'Email not verified' }`.
+ *
+ * Matched on the status AND the message so a future unrelated 403 on this
+ * route doesn't silently start telling people to check their inbox. The
+ * message check is tolerant of case and wording drift around the two words
+ * that carry the meaning.
+ */
+function isEmailNotVerifiedError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error ?? '');
+    const looksUnverified = /email.*not.*verif/i.test(message);
+    if (!looksUnverified) return false;
+
+    const statusCode = (error as { statusCode?: number } | null)?.statusCode;
+    return statusCode === undefined || statusCode === 403;
+}
+
 export async function login(identifier: string, password: string, redirectUrl: string | null) {
     const t = await getTranslations('validation.auth');
+    // `validation.auth` has no key for an unverified email; the message already
+    // exists (and is already translated into all 21 locales) under `auth.error`.
+    const tAuthError = await getTranslations('auth.error');
 
     // Validation schemas
     const loginSchema = z.object({
@@ -77,9 +98,17 @@ export async function login(identifier: string, password: string, redirectUrl: s
     } catch (error) {
         console.error(error);
 
+        // Only `suspended` was ever distinguished, so every other rejection —
+        // including the API's `403 Email not verified` — was reported as
+        // "Invalid email or password". That is not merely vague, it is wrong:
+        // the credentials ARE correct, and the message sends the user to
+        // "Forgot password?" to fix a problem a password reset cannot fix.
+        // Tell them what actually happened so the next step is the right one.
         let message = t('invalidCredentials');
         if (error instanceof Error && error.message.includes('suspended')) {
             message = t('account.suspended');
+        } else if (isEmailNotVerifiedError(error)) {
+            message = tAuthError('emailNotVerified');
         }
 
         return {
