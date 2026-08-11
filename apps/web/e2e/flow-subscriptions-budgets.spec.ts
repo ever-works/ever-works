@@ -57,11 +57,11 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *          "occurredAt,pluginId,capability,units,costCents,currency,modelId,requestId"
  *
  *   ADMIN USAGE  (AdminUsageController @Controller('admin/usage'), IsPlatformAdminGuard)
- *     NOTE: this controller is mounted at 'admin/usage' WITHOUT the `api/` prefix the
- *     others carry. Verified live:
- *       GET /api/admin/usage  -> 404  (the `api/`-prefixed path does NOT exist)
- *       GET /admin/usage (no auth)          -> 401
- *       GET /admin/usage (auth, non-admin)  -> 403  (route exists, platform-admin guard rejects)
+ *     NOTE: this controller is mounted at 'api/admin/usage' like the others. It was
+ *     bare until PR #2012 corrected it. Verified live:
+ *       GET /admin/usage  -> 404  (the bare path does NOT exist)
+ *       GET /api/admin/usage (no auth)          -> 401
+ *       GET /api/admin/usage (auth, non-admin)  -> 403  (route exists, platform-admin guard rejects)
  *
  *   AGENT / ACCOUNT-WIDE BUDGET CAP
  *     (WorkAgentController @Controller('api/me/work-agent') + AccountUsageController @Controller('api/me/usage'))
@@ -103,7 +103,7 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *     POST /plan call, and we assert it observably (plan code + cadence gating change).
  *   • There is no `/api/subscriptions/plans` catalogue endpoint in this build (404),
  *     so the available-tier set is asserted by exercising each enum value on POST /plan.
- *   • The admin-usage route is `/admin/usage` (NO `api/` prefix). A non-admin e2e user
+ *   • The admin-usage route is `/api/admin/usage` (bare `/admin/usage` 404s). A non-admin e2e user
  *     can never reach 200 here, so we pin the genuine closure contract (401 unauth /
  *     403 forbidden) rather than the admin payload.
  *   • Per-Work usage is never non-zero in CI (no plugin calls are billed), so usage
@@ -484,17 +484,17 @@ test.describe('Flow: Budgets + usage — per-Work cap CRUD reflected in usage su
     test('admin cross-user usage is gated: api-prefixed path 404, /admin/usage 401 unauth + 403 non-admin', async ({
         request,
     }) => {
-        // The `api/`-prefixed path does NOT exist — the controller is mounted at bare 'admin/usage'.
-        const apiPrefixed = await request.get(`${API_BASE}/api/admin/usage`);
-        expect(apiPrefixed.status(), 'api/admin/usage is not a route').toBe(404);
+        // The BARE path does NOT exist — the controller is mounted at 'api/admin/usage'.
+        const barePath = await request.get(`${API_BASE}/admin/usage`);
+        expect(barePath.status(), 'bare admin/usage is not a route').toBe(404);
 
         // The real route requires auth.
-        const unauth = await request.get(`${API_BASE}/admin/usage`);
+        const unauth = await request.get(`${API_BASE}/api/admin/usage`);
         expect(unauth.status(), 'admin usage requires auth').toBe(401);
 
         // An authenticated NON-admin user is forbidden (route exists, guard rejects).
         const u = await registerUserViaAPI(request);
-        const nonAdmin = await request.get(`${API_BASE}/admin/usage`, {
+        const nonAdmin = await request.get(`${API_BASE}/api/admin/usage`, {
             headers: authedHeaders(u.access_token),
         });
         expect(nonAdmin.status(), 'non-admin must not read cross-user spend').toBe(403);

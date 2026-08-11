@@ -294,14 +294,14 @@ test.describe('Flow: admin namespace — route enumeration & prefix asymmetry', 
 
         // admin/usage is BARE: the api-prefixed variant does NOT exist → 404 (even
         // for an authed user — the route never matched, so no 403).
-        const usageApiPrefixed = await request.get(`${API_BASE}/api/admin/usage`, { headers });
+        const usageApiPrefixed = await request.get(`${API_BASE}/admin/usage`, { headers });
         expect(
             usageApiPrefixed.status(),
             'api/admin/usage must NOT resolve (bare-only route)',
         ).toBe(404);
 
         // ...while the BARE admin/usage IS the real route → gated 403 for this non-admin.
-        const usageBare = await request.get(`${API_BASE}/admin/usage`, { headers });
+        const usageBare = await request.get(`${API_BASE}/api/admin/usage`, { headers });
         await expectPlatformAdmin403(usageBare, 'bare admin/usage (real route)');
 
         // The allowlist is the EXACT inverse: api-prefixed is real (403), bare is 404.
@@ -396,8 +396,8 @@ test.describe('Flow: admin gate — response hygiene & cross-method consistency'
             headers,
             data: { packageName: '@m/n', versionRange: '^2.0.0' },
         });
-        const usageBare = await request.get(`${API_BASE}/admin/usage`, { headers });
-        const usageWithPeriod = await request.get(`${API_BASE}/admin/usage?period=current`, {
+        const usageBare = await request.get(`${API_BASE}/api/admin/usage`, { headers });
+        const usageWithPeriod = await request.get(`${API_BASE}/api/admin/usage?period=current`, {
             headers,
         });
 
@@ -408,5 +408,70 @@ test.describe('Flow: admin gate — response hygiene & cross-method consistency'
         // the gate is period-independent (the usage spec pins the full period grid;
         // here we only confirm the same user is uniformly walled out of both routes).
         await expectPlatformAdmin403(usageWithPeriod, 'admin usage (period=current)');
+    });
+});
+
+/**
+ * PAGE-level gating for the admin allowlist surface.
+ *
+ * Everything above pins the REST controller. Nothing pinned the Next.js
+ * page that renders it, and that gap shipped a real defect:
+ * `/admin/plugins/allowlist` awaited `pluginAllowlistAPI.list()` with no
+ * error handling, so for every non-admin the API's 403 escaped the Server
+ * Component and the route answered **HTTP 500** with an empty content
+ * area. Observed live on app-dev.ever.works, digest 3193896329:
+ *
+ *     ApiResponseError: Platform admin access required
+ *       at h (.next/server/app/[locale]/(dashboard)/admin/plugins/allowlist/page.js)
+ *
+ * A 403 turning into a 500 is both a broken page and an enumeration
+ * signal — a crash is a louder "something is here" than a 404. Its two
+ * sibling admin pages (`/admin/usage`, the tenant runtime-allowlist) had
+ * always translated the rejection into `notFound()`; this one had not.
+ *
+ * The controller-level tests above CANNOT catch this: they assert the API
+ * returns 403, which it always did correctly. Only the rendered page shows
+ * the difference, and only the HTTP STATUS distinguishes 500 from 404 —
+ * both render "no admin table", so a content-only assertion would pass
+ * against the bug. Hence the explicit status assertion below.
+ */
+test.describe('Flow: admin allowlist PAGE gating (non-admin → not-found, never 500)', () => {
+    test('flow 9: the /admin/plugins/allowlist page answers 404 (not 500) for an authenticated non-admin, renders the not-found surface, and never leaks the allowlist table', async ({
+        page,
+        baseURL,
+    }) => {
+        const origin = baseURL ?? 'http://localhost:3000';
+
+        const response = await page.goto(`${origin}/admin/plugins/allowlist`, {
+            waitUntil: 'domcontentloaded',
+        });
+        await page.waitForLoadState('networkidle').catch(() => {});
+
+        // The regression itself. Before the fix this was 500.
+        expect(
+            response?.status(),
+            'a non-admin must get the ordinary not-found status, never a server error',
+        ).not.toBe(500);
+        expect(response?.status(), 'non-admin sees 404 for the admin allowlist page').toBe(404);
+
+        // The admin surface must not render any of its chrome.
+        await expect(
+            page.getByRole('heading', { name: /plugin allowlist/i }),
+            'allowlist title must not render for a non-admin',
+        ).toHaveCount(0);
+        await expect(
+            page
+                .getByRole('button', { name: /add|create/i })
+                .filter({ hasText: /allowlist|entry|package/i }),
+            'allowlist add-row form must not render for a non-admin',
+        ).toHaveCount(0);
+
+        // ...and the not-found surface must be what the user actually sees.
+        const notFound = page
+            .getByText(/page (could not be|not) found/i)
+            .or(page.getByText(/^404$/))
+            .or(page.getByRole('heading', { name: /not found/i }))
+            .first();
+        await expect(notFound, 'non-admin sees the not-found page').toBeVisible({ timeout: 20000 });
     });
 });

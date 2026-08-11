@@ -727,7 +727,7 @@ test.describe('Chain read-back → a keyless chain tracks 0 spend, and only the 
         const token = user.access_token;
 
         // A normal (non-platform-admin) owner cannot read the cross-user table.
-        const admin = await request.get(`${API_BASE}/admin/usage`, {
+        const admin = await request.get(`${API_BASE}/api/admin/usage`, {
             headers: authedHeaders(token),
         });
         expect(admin.status()).toBe(403);
@@ -736,12 +736,12 @@ test.describe('Chain read-back → a keyless chain tracks 0 spend, and only the 
         // The api-prefixed spelling is not a route at all.
         expect(
             (
-                await request.get(`${API_BASE}/api/admin/usage`, { headers: authedHeaders(token) })
+                await request.get(`${API_BASE}/admin/usage`, { headers: authedHeaders(token) })
             ).status(),
         ).toBe(404);
 
         // Anonymous → 401 on the admin surface.
-        expect((await request.get(`${API_BASE}/admin/usage`)).status()).toBe(401);
+        expect((await request.get(`${API_BASE}/api/admin/usage`)).status()).toBe(401);
 
         // The owner's own window is self-scoped to their user id.
         const acct = await getAccountWide(request, token);
