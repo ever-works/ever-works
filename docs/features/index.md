@@ -21,6 +21,10 @@ This section covers the individual capabilities that make that possible, beyond 
 | [Ideas](./ideas)                               | Proposed Works in the queue between "topic" and "finished website" — build, retry, dismiss, accept         |
 | [Creating a Work](./creating-a-work)           | The buildable unit — websites, blogs, directories, landing pages — created with AI, manually, or by import |
 | [Agents (AI Employees)](./agents)              | Named, persistent AI workers you create, scope, schedule, and budget — your standing team                  |
+| [Creating an Agent](./creating-an-agent)       | The `/agents/new` wizard — role templates, scope, and the job-runtime prerequisite for running one         |
+| [Creating a Skill](./creating-a-skill)         | Writing your own reusable guidance for Agents to consult, and choosing what it is scoped to                |
+| [Tasks](./tasks)                               | The unit of work Agents execute — priority, labels, Work scope, acceptance checks, and Task keys           |
+| [Goals](./goals)                               | Measurable targets with a metric source, attached to the Missions they judge                               |
 | [Agent Email & Inboxes](./agent-email)         | Inbound + outbound mailboxes per Agent / Mission / Idea / Work — your AI team's email                      |
 | [Knowledge Base & Memory](./knowledge-base)    | Per-Work, typed, Git-backed institutional context and long-term memory every run reads from                |
 | [Autonomous Operation](./autonomous-operation) | How the platform keeps working 24/7 — the half one-shot builders don't have                                |
@@ -71,4 +75,5 @@ This section covers the individual capabilities that make that possible, beyond 
 | [Custom Domains](./custom-domains)        | Assign your own domain name to a work's deployed website                                            |
 | [K8s Deployment](./k8s-deployment)        | Deploy a Work to a Kubernetes cluster                                                               |
 | [MCP Server](./mcp-server)                | Expose the Ever Works API as tools for AI assistants like Claude                                    |
+| [Connecting to MCP](./mcp-connecting)     | The hosted MCP endpoint, the `x-ever-works-jwt` header, and a first `initialize` / `tools/list`     |
 | [Data Management](./data-management)      | Export, import, and sync account data (works, items, plugins, secrets) with GitHub backup           |

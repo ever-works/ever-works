@@ -13,6 +13,10 @@ The Ever Works MCP (Model Context Protocol) server exposes the Ever Works API as
 Connect the MCP server to Claude Desktop, Claude Code, or any MCP-compatible client to manage your Ever Works works through AI-powered conversation instead of manual API calls.
 :::
 
+:::note Connecting to the hosted server
+This page is the operator's view — running the server, its environment variables, and the tools it derives from the API's OpenAPI spec. To connect a client to the **hosted** endpoint at `mcp.ever.works`, including the per-user JWT header it requires, see [Connecting to the MCP Server](./mcp-connecting.md).
+:::
+
 ## Prerequisites
 
 - A running Ever Works API instance

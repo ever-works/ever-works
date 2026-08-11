@@ -113,11 +113,16 @@ A **dry-run** mode (`POST /agents/:id/dry-run`) builds the prompt and estimates 
 4. Choose a scope — Tenant for a company-wide role, or a specific Mission/Idea/Work.
 5. Create it (starts in `draft`), then open the **Dashboard** tab and click **Start**, optionally setting a heartbeat cadence and budget.
 
+For the `/agents/new` wizard step by step — the role templates, the scope picker, and the background
+job runtime an Agent needs before it can actually run — see [Creating an Agent](./creating-an-agent.md).
+
 You can also drive everything from the in-app AI Chat or any MCP client — _"Create a CEO agent for my company mission and run it daily."_
 
 ## See also
 
+- [Creating an Agent](./creating-an-agent.md) — the `/agents/new` wizard, step by step.
 - [Missions](./missions.md) · [Ideas](./ideas.md) · [Creating a Work](./creating-a-work.md)
+- [Tasks](./tasks.md) · [Creating a Skill](./creating-a-skill.md) · [Goals](./goals.md)
 - [Agent Email & Inboxes](./agent-email.md)
 - [Knowledge Base](./knowledge-base.md)
 - [Autonomous Operation](./autonomous-operation.md)

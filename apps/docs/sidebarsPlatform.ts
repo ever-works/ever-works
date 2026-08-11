@@ -57,7 +57,15 @@ const sidebars: SidebarsConfig = {
 				'features/ideas',
 				'features/agents',
 				'features/agents-catalog',
+				// The "how do I actually make one" pages for the
+				// Agents / Skills / Tasks / Goals family. Each sits
+				// directly after the concept page it builds on, so the
+				// concept reads first and the walkthrough second.
+				'features/creating-an-agent',
 				'features/skills-catalog',
+				'features/creating-a-skill',
+				'features/tasks',
+				'features/goals',
 				'features/agent-email',
 				'features/mission-templates',
 				// 2026-07 feature program — how agent work is isolated,
@@ -100,6 +108,10 @@ const sidebars: SidebarsConfig = {
 				'features/work-templates',
 				'features/k8s-deployment',
 				'features/mcp-server',
+				// Client-side counterpart to the operator-facing
+				// mcp-server page: the hosted endpoint, the per-user
+				// JWT header, and a first handshake.
+				'features/mcp-connecting',
 				'features/data-management'
 			]
 		},
