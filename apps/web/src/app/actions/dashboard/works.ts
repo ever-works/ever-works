@@ -34,6 +34,11 @@ import {
 // Mirrors work-proposals.ts / work-schedule.ts.
 import { getAuthFromCookie } from '@/lib/auth';
 import { checkGitProviderConnection } from './oauth';
+import {
+    EVER_WORKS_GIT_STORAGE,
+    resolveManagedStorageStatus,
+    type ManagedStorageStatus,
+} from '@/lib/works/managed-storage';
 import { getTranslations } from 'next-intl/server';
 import { revalidatePath } from 'next/cache';
 import { ROUTES } from '@/lib/constants';
@@ -83,6 +88,11 @@ const getCreateWorkSchema = async () => {
         organization: z.boolean(),
         gitProvider: z.string().optional(),
         deployProvider: z.string().optional(),
+        // Storage provider (`ever-works-git` | `user-github` | …). zod strips
+        // unknown keys, so this MUST be declared or the field is silently
+        // dropped on its way to `CreateWorkDto` and the API is left to
+        // re-infer the choice from onboarding state.
+        storageProvider: z.string().optional(),
         websiteTemplateId: z.string().optional(),
         // Optional work-kind chip value — kept in the parsed output so it
         // reaches the API's CreateWorkDto (zod strips unknown keys).
@@ -146,6 +156,68 @@ const checkOrganization = (
     };
 };
 
+/**
+ * Outcome of the create-time git-provider gate. `ok: true` carries the
+ * connection info the owner/organization resolution needs (or `null` when no
+ * personal provider was involved at all).
+ *
+ * The reason codes exist so callers can keep their exact user-facing copy —
+ * "connect a git provider" vs "connect <provider>" — while the decision
+ * itself lives in one place.
+ */
+type CreateWorkGitGate =
+    | { readonly ok: true; readonly connectionInfo: GitProviderConnectionInfo | null }
+    | { readonly ok: false; readonly reason: 'missing-provider' }
+    | { readonly ok: false; readonly reason: 'not-connected'; readonly providerId: string };
+
+/**
+ * Decide whether creating a Work requires a *personal* connected git
+ * provider.
+ *
+ * It does NOT when the user's effective storage choice is the managed
+ * `ever-works-git` and the platform has that feature enabled: the API creates
+ * the repository in the `ever-works-cloud` org with the platform's own PAT
+ * (`WorkLifecycleService.createWork`'s `storageProvider === 'ever-works-git'`
+ * branch), so there is nothing for the user to connect. Blocking here made
+ * the single core action of the product impossible for every user who took
+ * the wizard's DEFAULT storage option — `POST /works` would have accepted the
+ * request.
+ *
+ * It DOES for every personal choice (`user-github`, …): those repositories
+ * are created with the user's own OAuth token, so an unconnected provider is
+ * a genuine, pre-flight-detectable failure. That path is unchanged.
+ */
+async function resolveCreateWorkGitGate(
+    providerId: string | undefined,
+    managedStorage: ManagedStorageStatus,
+): Promise<CreateWorkGitGate> {
+    if (managedStorage.managedGitActive) {
+        return { ok: true, connectionInfo: null };
+    }
+
+    if (!providerId) {
+        return { ok: false, reason: 'missing-provider' };
+    }
+
+    const connectionCheck = await checkGitProviderConnection(providerId);
+    if (!connectionCheck.connected) {
+        return { ok: false, reason: 'not-connected', providerId };
+    }
+
+    return { ok: true, connectionInfo: connectionCheck as GitProviderConnectionInfo };
+}
+
+/**
+ * The `storageProvider` value to send with `CreateWorkDto`. Sending it
+ * explicitly (rather than letting the API infer it from onboarding state)
+ * keeps the web's gate decision and the server's provisioning decision keyed
+ * off the SAME value — they can no longer disagree about which storage a
+ * given create used.
+ */
+function storageProviderForCreate(managedStorage: ManagedStorageStatus): string | undefined {
+    return managedStorage.managedGitActive ? EVER_WORKS_GIT_STORAGE : undefined;
+}
+
 export async function createWork(data: CreateWorkDto) {
     // Security: verify authentication at the server-action boundary.
     const user = await getAuthFromCookie();
@@ -168,33 +240,31 @@ export async function createWork(data: CreateWorkDto) {
         }
 
         const providerId = validation.data.gitProvider;
-        if (!providerId) {
+        const managedStorage = await resolveManagedStorageStatus();
+
+        const gate = await resolveCreateWorkGitGate(providerId, managedStorage);
+        if (!gate.ok) {
             return {
                 success: false,
-                error: t('oauthRequired', { provider: 'git provider' }),
+                error: t('oauthRequired', {
+                    provider: gate.reason === 'not-connected' ? gate.providerId : 'git provider',
+                }),
                 requiresGitProvider: true,
             };
         }
 
-        // Check git provider connection
-        const connectionCheck = await checkGitProviderConnection(providerId);
-        if (!connectionCheck.connected) {
-            return {
-                success: false,
-                error: t('oauthRequired', { provider: providerId }),
-                requiresGitProvider: true,
-            };
-        }
-
-        const { organization, owner } = checkOrganization(
-            connectionCheck as GitProviderConnectionInfo,
-            validation.data,
-        );
+        const { organization, owner } = checkOrganization(gate.connectionInfo, validation.data);
 
         validation.data.organization = organization;
         validation.data.owner = owner;
         validation.data.gitProvider = providerId;
         validation.data.deployProvider = data.deployProvider || undefined;
+        // An explicit caller-supplied choice wins; otherwise send the one we
+        // just resolved. Under managed storage the API replaces owner /
+        // organization with the platform org after it provisions the repo, so
+        // the two lines above only matter on the personal path.
+        validation.data.storageProvider =
+            data.storageProvider ?? storageProviderForCreate(managedStorage);
 
         // Security: do not log validated work-creation payload (contains git
         // provider id, owner/org, slug, name, description) to server stdout.
@@ -312,20 +382,15 @@ export async function createWorkWithAI(request: AIWorkOptions) {
         }
 
         const providerId = validation.data.gitProvider;
-        if (!providerId) {
-            return {
-                success: false,
-                error: t('oauthRequired', { provider: 'git provider' }),
-                requiresGitProvider: true,
-            };
-        }
+        const managedStorage = await resolveManagedStorageStatus();
 
-        // Check git provider connection
-        const connectionCheck = await checkGitProviderConnection(providerId);
-        if (!connectionCheck.connected) {
+        const gate = await resolveCreateWorkGitGate(providerId, managedStorage);
+        if (!gate.ok) {
             return {
                 success: false,
-                error: t('oauthRequired', { provider: providerId }),
+                error: t('oauthRequired', {
+                    provider: gate.reason === 'not-connected' ? gate.providerId : 'git provider',
+                }),
                 requiresGitProvider: true,
             };
         }
@@ -362,10 +427,7 @@ export async function createWorkWithAI(request: AIWorkOptions) {
         }
 
         // Determine organization settings
-        const { organization, owner } = checkOrganization(
-            connectionCheck as GitProviderConnectionInfo,
-            request,
-        );
+        const { organization, owner } = checkOrganization(gate.connectionInfo, request);
 
         const workData: CreateWorkDto = {
             name: validation.data.name,
@@ -375,6 +437,11 @@ export async function createWorkWithAI(request: AIWorkOptions) {
             owner,
             gitProvider: providerId,
             deployProvider: request.deployProvider || undefined,
+            // Explicit storage choice — see `storageProviderForCreate`. Under
+            // managed storage the API resolves `gitProvider` from this value
+            // (`gitProviderFromStorageChoice('ever-works-git')` → `github`),
+            // so an absent `providerId` above is fine.
+            storageProvider: storageProviderForCreate(managedStorage),
             websiteTemplateId: request.websiteTemplateId || undefined,
             // Persist the work-kind chip on the Work itself (not just the
             // generation prompt) so the kind-aware default website
