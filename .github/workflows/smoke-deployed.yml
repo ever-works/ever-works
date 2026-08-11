@@ -1,0 +1,146 @@
+name: Post-Deploy Smoke
+
+# Verifies a DEPLOYED environment, not a commit.
+#
+# `ci.yml` proves the code compiles and its unit tests pass. `e2e.yml` proves the
+# product behaves, against a local stack it builds itself. Neither can see the
+# thing that actually broke production on 2026-08-09: the deployed web app asked
+# the deployed API for `/api/terms/required` while the API served
+# `/terms/required`, so registration was impossible while every health check
+# reported ok and `/api/version` reported the right SHA.
+#
+# A local stack cannot reproduce that, because both halves are built from the
+# same config. Only a real deployment can.
+#
+# Rollout-aware on purpose: k8s replaces pods gradually, so immediately after a
+# deploy `/api/version` alternates between the old and new SHA depending on
+# which pod answers. Sampling once is a coin flip — this waits for the new SHA
+# to answer consistently before testing anything.
+
+on:
+  workflow_run:
+    workflows: ['k8s-build']
+    types: [completed]
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Which deployment to smoke'
+        required: true
+        default: stage
+        type: choice
+        options: [dev, stage, prod]
+
+concurrency:
+  group: smoke-${{ github.event.workflow_run.head_branch || inputs.environment }}
+  cancel-in-progress: true
+
+jobs:
+  smoke:
+    # Only for branches that map to an environment, and only when the deploy
+    # itself succeeded — smoking a failed deploy tests nothing.
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      (github.event.workflow_run.conclusion == 'success' &&
+       contains(fromJSON('["develop","stage","main"]'), github.event.workflow_run.head_branch))
+    runs-on: ${{ vars.RUNNER_LINUX_X64_4 || 'ubuntu-latest' }}
+    timeout-minutes: 30
+
+    steps:
+      - name: Resolve target environment
+        id: target
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            ENV_NAME="${{ inputs.environment }}"
+            EXPECTED_SHA=""
+          else
+            case "${{ github.event.workflow_run.head_branch }}" in
+              develop) ENV_NAME=dev ;;
+              stage)   ENV_NAME=stage ;;
+              main)    ENV_NAME=prod ;;
+              *)       echo "unmapped branch"; exit 1 ;;
+            esac
+            EXPECTED_SHA="${{ github.event.workflow_run.head_sha }}"
+          fi
+
+          case "$ENV_NAME" in
+            dev)   API=https://apidev.ever.works;   WEB=https://appdev.ever.works;   WRITES=true ;;
+            stage) API=https://apistage.ever.works; WEB=https://appstage.ever.works; WRITES=true ;;
+            # Production is not a test fixture. Read-only checks only — which is
+            # the half that caught the 2026-08-09 outage anyway.
+            prod)  API=https://api.ever.works;      WEB=https://app.ever.works;      WRITES=false ;;
+          esac
+
+          {
+            echo "env_name=$ENV_NAME"
+            echo "api=$API"
+            echo "web=$WEB"
+            echo "writes=$WRITES"
+            echo "expected_sha=$EXPECTED_SHA"
+          } >> "$GITHUB_OUTPUT"
+          echo "Smoking $ENV_NAME ($WEB) — writes=$WRITES expected_sha=${EXPECTED_SHA:-any}"
+
+      - name: Wait for the rollout to serve the new SHA consistently
+        if: steps.target.outputs.expected_sha != ''
+        run: |
+          set -uo pipefail
+          API="${{ steps.target.outputs.api }}"
+          WANT="${{ steps.target.outputs.expected_sha }}"
+          UA='Mozilla/5.0 (compatible; ever-works-smoke)'
+
+          # Up to ~15 min for pods to cycle. Requires 5 CONSECUTIVE samples on
+          # the new SHA: during a rolling update the old and new pods both
+          # answer, so a single match proves nothing.
+          for attempt in $(seq 1 90); do
+            streak=0
+            for i in 1 2 3 4 5; do
+              got=$(curl -s --max-time 15 -A "$UA" "$API/api/version" | jq -r '.gitSha // ""' || echo "")
+              if [ "$got" = "$WANT" ]; then streak=$((streak+1)); else streak=0; break; fi
+              sleep 2
+            done
+            if [ "$streak" -ge 5 ]; then
+              echo "rollout complete: $API serving ${WANT:0:8} on 5/5 samples"
+              exit 0
+            fi
+            echo "attempt $attempt: not yet consistent (last saw ${got:0:8}, want ${WANT:0:8})"
+            sleep 10
+          done
+
+          echo "::error::$API never settled on ${WANT:0:8} — the rollout did not complete"
+          exit 1
+
+      - uses: actions/checkout@v4
+
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+
+      - name: Setup Node.js 22.x
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright chromium
+        working-directory: apps/web
+        run: npx playwright install --with-deps chromium
+
+      - name: Run the smoke suite
+        working-directory: apps/web
+        env:
+          SMOKE_BASE_URL: ${{ steps.target.outputs.web }}
+          SMOKE_API_URL: ${{ steps.target.outputs.api }}
+          SMOKE_ALLOW_WRITES: ${{ steps.target.outputs.writes }}
+        run: npx playwright test -c playwright.smoke.config.ts --project=smoke
+
+      - name: Upload report on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: smoke-${{ steps.target.outputs.env_name }}-report
+          path: |
+            apps/web/test-results/
+            apps/web/playwright-report/
+          retention-days: 7
