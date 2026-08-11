@@ -1,6 +1,7 @@
 import 'server-only';
 
 import { serverFetch } from '@/lib/api/server-api';
+import { schedulesAPI, type ScheduleEntry } from '@/lib/api/schedules';
 import { ROUTES } from '@/lib/constants';
 import type { Agent } from '@/lib/api/agents';
 import type { Task } from '@/lib/api/tasks';
@@ -13,10 +14,13 @@ import type { AttentionItem, SoonRunItem } from '@/components/dashboard/dashboar
  * additive home changes: the Teams count tile, the Attention block,
  * and the Soon block.
  *
- * Every network path here is defensively caught: the Teams and Soon
- * backends land in sibling PRs (Teams #1647, Schedules front), so a
- * 404 must degrade to "omit the tile / render nothing", never a 500
- * bubbling up to the home page (spec §6 — graceful absence).
+ * Every network path here is defensively caught so a failing or absent
+ * backend degrades to "omit the tile / render nothing" rather than
+ * 500-ing the home page (spec §6 — graceful absence). Degrading is not
+ * the same as staying silent: each catch logs which call failed, because
+ * a swallowed error here is invisible by construction — the block it
+ * feeds renders nothing when it has no data, which looks identical to a
+ * healthy-but-quiet dashboard.
  */
 
 // The account-budgets settings anchor the Month Spend tile already
@@ -58,7 +62,8 @@ export async function getTeamsTotal(): Promise<number | undefined> {
     try {
         const res = await serverFetch<Array<{ id: string }>>('/organizations', { method: 'GET' });
         orgs = Array.isArray(res) ? res : [];
-    } catch {
+    } catch (error) {
+        console.error('[dashboard] Teams tile: GET /api/organizations failed', error);
         return undefined;
     }
 
@@ -92,25 +97,80 @@ export async function getTeamsTotal(): Promise<number | undefined> {
     return anyWired ? total : undefined;
 }
 
+// The Soon block previews the soonest few runs; `total` still counts every
+// upcoming run so SoonSection can render its "+N more" link (spec §4.4).
+const SOON_MAX = 3;
+
+/**
+ * `GET /api/schedules` projects seven scheduled sources, but `SoonRunItem`
+ * models exactly two kinds — Work schedules and Mission ticks (dashboard-blocks
+ * spec §2.2), and `SoonSection` only has badge copy for those two
+ * (`dashboard.soon.source.{work,mission}`). Rows from the other five sources
+ * are skipped rather than mislabelled as one of these; widening the block to
+ * cover them is a product change (a new badge string in all 21 locale files),
+ * not part of this fix.
+ */
+const SOON_SOURCE_KINDS: Partial<Record<ScheduleEntry['sourceType'], SoonRunItem['sourceKind']>> = {
+    work_schedule: 'work-schedule',
+    mission_tick: 'mission',
+};
+
 /**
  * Upcoming scheduled runs for the Soon block (spec §3.3, change 4).
  *
- * REUSES `GET /api/schedules` from the Schedules front, which does not
- * exist on this branch yet. Until it ships this resolves to an empty
- * set (404 → catch) and the Soon block renders nothing (spec §4.4).
+ * REUSES `GET /api/schedules` from the Schedules front, via the same typed
+ * client (`schedulesAPI`) the Schedules view itself uses.
+ *
+ * The dashboard-blocks spec sketched this call as
+ * `?status=active&sort=nextRunAt:asc&limit=3 → { items, total }`, but that was
+ * written before the Schedules front shipped and the endpoint it describes was
+ * never built. The real contract (schedules spec §4.1) is narrower and is the
+ * authority here:
+ *   - filters are `sourceType` / `entityKind` / `enabledOnly` only, policed by
+ *     `forbidNonWhitelisted` — the three sketched params were rejected with a
+ *     400, not ignored;
+ *   - the aggregation is deliberately un-paginated and returns a bare
+ *     `ScheduleView[]`, already sorted by `nextRunAt` ascending (nulls last).
+ * So `status=active` becomes the server-side `enabledOnly`, and the ordering
+ * and limiting happen here.
  */
 export async function getSoonRuns(): Promise<{ items: SoonRunItem[]; total: number }> {
+    let schedules: ScheduleEntry[];
     try {
-        const res = await serverFetch<{ items?: SoonRunItem[]; total?: number }>(
-            '/schedules?status=active&sort=nextRunAt:asc&limit=3',
-            { method: 'GET' },
-        );
-        const items = Array.isArray(res?.items) ? res.items : [];
-        const total = typeof res?.total === 'number' ? res.total : items.length;
-        return { items, total };
-    } catch {
+        const rows = await schedulesAPI.getAll({ enabledOnly: true });
+        schedules = Array.isArray(rows) ? rows : [];
+    } catch (error) {
+        // `serverFetch` logs the failing response body but not the endpoint, so
+        // before this line a 400 here was unattributable in the pod logs — and
+        // the Soon block renders nothing when empty, so nothing on the page
+        // gave the failure away either. Name the call.
+        console.error('[dashboard] Soon block: GET /api/schedules failed', error);
         return { items: [], total: 0 };
     }
+
+    const upcoming: SoonRunItem[] = [];
+    for (const schedule of schedules) {
+        const sourceKind = SOON_SOURCE_KINDS[schedule.sourceType];
+        // `nextRunAt` is nullable on the wire (not every source can derive one)
+        // while `SoonRunItem.nextRunAt` is not — a row with no computable next
+        // run is not an upcoming run.
+        if (!sourceKind || !schedule.nextRunAt) continue;
+        upcoming.push({
+            id: schedule.id,
+            sourceKind,
+            title: schedule.ownerName,
+            nextRunAt: schedule.nextRunAt,
+            href: schedule.ownerLink,
+        });
+    }
+
+    // The API already sorts by `nextRunAt` ascending. Sorting again makes
+    // "the soonest N" a property of this function instead of an unstated
+    // dependency on the server's ordering. ISO-8601 UTC strings sort
+    // lexicographically, which is how the API compares them too.
+    upcoming.sort((a, b) => a.nextRunAt.localeCompare(b.nextRunAt));
+
+    return { items: upcoming.slice(0, SOON_MAX), total: upcoming.length };
 }
 
 /**
