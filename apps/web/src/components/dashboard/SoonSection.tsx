@@ -12,10 +12,15 @@ import type { SoonRunItem } from './dashboard-signals.types';
  * Attention and above the Missions list.
  *
  * Data comes from the Schedules front's `GET /api/schedules`
- * aggregation (server-fetched in the page, reused here as a prop).
- * That endpoint does not exist on this branch yet, so `items` arrives
- * empty and the block self-suppresses (`null`) — no "no upcoming runs"
- * empty state on a healthy home page (spec §9 Q6).
+ * aggregation (server-fetched in the page via `getSoonRuns`, reused here
+ * as a prop). When the account genuinely has no upcoming Work-schedule or
+ * Mission run — or the fetch failed — `items` arrives empty and the block
+ * self-suppresses (`null`): no "no upcoming runs" empty state on a healthy
+ * home page (spec §9 Q6).
+ *
+ * That self-suppression is why a broken fetch upstream is invisible on the
+ * page; `getSoonRuns` logs the failure instead of relying on this block to
+ * show it.
  */
 
 const PREVIEW_LIMIT = 3;
