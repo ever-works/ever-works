@@ -14,9 +14,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
  */
 
 // Hoisted because vi.mock factory runs before regular module code.
-const { setOAuthStateCookieMock, getOAuthAuthUrlMock } = vi.hoisted(() => ({
+const { setOAuthStateCookieMock, getOAuthAuthUrlMock, loginMock } = vi.hoisted(() => ({
     setOAuthStateCookieMock: vi.fn(),
     getOAuthAuthUrlMock: vi.fn(),
+    loginMock: vi.fn(),
 }));
 
 vi.mock('@/lib/auth', () => ({
@@ -29,8 +30,7 @@ vi.mock('@/lib/auth', () => ({
 vi.mock('@/lib/api', () => ({
     authAPI: {
         getOAuthAuthUrl: getOAuthAuthUrlMock,
-        // satisfy the import — connectProvider only touches getOAuthAuthUrl
-        login: vi.fn(),
+        login: loginMock,
         register: vi.fn(),
         logout: vi.fn(),
     },
@@ -111,5 +111,77 @@ describe('connectProvider — C-03 state round-trip', () => {
         const urlState = new URL(result.url!).searchParams.get('state');
         expect(cookieValue).toBe(urlState);
         expect(cookieValue).toBe(minted);
+    });
+});
+
+/**
+ * `login` error mapping.
+ *
+ * The catch distinguished only `suspended`; every other rejection collapsed to
+ * `invalidCredentials`. So a user whose address is unconfirmed — whose email and
+ * password are CORRECT — was told "Invalid email or password" and pointed at
+ * "Forgot password?", which cannot fix an unverified address. Observed live on
+ * app.ever.works: the API answered `403 { message: 'Email not verified' }` while
+ * the form said the credentials were wrong.
+ *
+ * `getTranslations` is mocked to echo its key, so each branch is identifiable by
+ * the key it returns rather than by prose that may be re-worded.
+ */
+describe('login — which failure the user is told about', () => {
+    beforeEach(() => {
+        loginMock.mockReset();
+    });
+
+    afterEach(() => {
+        vi.resetModules();
+    });
+
+    /** The API's real rejection shape for an unconfirmed address. */
+    function emailNotVerifiedRejection() {
+        const err = new Error('Email not verified') as Error & { statusCode?: number };
+        err.statusCode = 403;
+        return err;
+    }
+
+    it('names the unverified email instead of blaming the credentials', async () => {
+        loginMock.mockRejectedValue(emailNotVerifiedRejection());
+
+        const { login } = await import('./auth');
+        const result = await login('someone@example.com', 'correct-horse', null);
+
+        expect(result).toEqual({ success: false, error: 'emailNotVerified' });
+    });
+
+    it('still blames the credentials when they are genuinely wrong', async () => {
+        // Control: the mapping must stay narrow. If this also returned
+        // `emailNotVerified`, the first test would pass for the wrong reason.
+        const err = new Error('Invalid credentials') as Error & { statusCode?: number };
+        err.statusCode = 401;
+        loginMock.mockRejectedValue(err);
+
+        const { login } = await import('./auth');
+        const result = await login('someone@example.com', 'wrong', null);
+
+        expect(result).toEqual({ success: false, error: 'invalidCredentials' });
+    });
+
+    it('still reports a suspended account', async () => {
+        loginMock.mockRejectedValue(new Error('This account has been suspended'));
+
+        const { login } = await import('./auth');
+        const result = await login('someone@example.com', 'correct-horse', null);
+
+        expect(result).toEqual({ success: false, error: 'account.suspended' });
+    });
+
+    it('does not mistake an unrelated 403 for an unverified email', async () => {
+        const err = new Error('Forbidden: region blocked') as Error & { statusCode?: number };
+        err.statusCode = 403;
+        loginMock.mockRejectedValue(err);
+
+        const { login } = await import('./auth');
+        const result = await login('someone@example.com', 'correct-horse', null);
+
+        expect(result).toEqual({ success: false, error: 'invalidCredentials' });
     });
 });
