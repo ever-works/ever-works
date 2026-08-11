@@ -8,6 +8,8 @@
  * mode label. It never reads or echoes the secret values themselves.
  */
 
+import { inspectTemplatesDir } from '../mail/templates';
+
 export interface ServiceStatus {
     /** Stable key used as the health-indicator name (snake_case). */
     key: string;
@@ -92,9 +94,17 @@ export function detectInformationalServices(): ServiceStatus[] {
             mode: stripeConfigured ? 'enabled' : 'disabled',
         },
         {
+            // `configured` reflects the env only; `mode` additionally reports
+            // whether the Handlebars templates were actually shipped in this
+            // image. Before this check, production reported
+            // `email: { configured: true, mode: 'enabled' }` while EVERY
+            // templated email threw ENOENT — the status surface asserted a
+            // working mailer that could not send a single message. `degraded`
+            // is a non-secret label (no vendor name), consistent with the
+            // stripping note above.
             key: 'email',
             configured: emailConfigured,
-            mode: emailConfigured ? 'enabled' : 'disabled',
+            mode: !emailConfigured ? 'disabled' : inspectTemplatesDir().ok ? 'enabled' : 'degraded',
         },
         {
             key: 'storage',

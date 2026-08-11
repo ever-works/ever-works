@@ -53,6 +53,35 @@ COPY scripts/strip-non-core-plugins.js scripts/strip-non-core-plugins.js
 RUN pnpm exec turbo build --filter=ever-works-api...
 RUN pnpm exec turbo build --filter="./packages/plugins/*"
 RUN pnpm deploy --filter=ever-works-api --prod --legacy /app/deploy
+
+# Packaging gate: the Handlebars email templates MUST reach the runtime image.
+#
+# They previously did not. `apps/api/nest-cli.json` declared
+# `assets: ["src/templates/**/*"]`, but the Nest CLI resolves asset globs
+# relative to `sourceRoot` — so it globbed `apps/api/src/src/templates/**/*`,
+# matched nothing, and copied nothing. The build stayed green, the image
+# shipped with zero `.hbs` files, and every templated email (signup
+# confirmation, password reset, magic link, invitations, budget alerts) threw
+# `ENOENT: /app/src/templates/<name>.hbs` in every environment — which left
+# new accounts unable to verify their email and therefore locked out.
+#
+# Compare against the count in the source tree rather than a hard-coded
+# number: that is a known-good control, so an empty result can never be
+# mistaken for "there are no templates to ship".
+RUN set -e; \
+    src_count="$(find /app/apps/api/src/templates -name '*.hbs' | wc -l)"; \
+    out_count="$(find /app/deploy/dist/templates -name '*.hbs' 2>/dev/null | wc -l)"; \
+    echo "==> email templates: source=${src_count} shipped=${out_count}"; \
+    if [ "$src_count" -eq 0 ]; then \
+        echo "FATAL: no .hbs templates found in apps/api/src/templates — the control failed, not the build." >&2; \
+        exit 1; \
+    fi; \
+    if [ "$out_count" -ne "$src_count" ]; then \
+        echo "FATAL: ${out_count}/${src_count} email templates reached dist/templates." >&2; \
+        echo "       Check apps/api/nest-cli.json compilerOptions.assets (globs are relative to sourceRoot)." >&2; \
+        exit 1; \
+    fi
+
 RUN node scripts/prepare-docker-plugins.js
 
 # EW-693 / T29 — dual-mode image.
