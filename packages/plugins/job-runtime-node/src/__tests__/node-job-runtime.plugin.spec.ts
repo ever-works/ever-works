@@ -193,6 +193,21 @@ describe('NodeWorkerHostFactory', () => {
 	// Windows timer granularity makes a tight budget flaky rather than fast.
 	const settle = (): Promise<void> => new Promise((resolve) => setTimeout(resolve, 250));
 
+	/**
+	 * Wait for the loop to reach an observable state, rather than sleeping a
+	 * guessed duration and hoping.
+	 *
+	 * A fixed `settle()` is a bet that 250ms of wall clock is always enough.
+	 * The poll loop crosses two real timer boundaries per iteration, so on a
+	 * loaded machine that budget stretches and the bet loses — this file timed
+	 * out at 7026ms against vitest's 5s default on a saturated CI runner, with
+	 * no assertion failure, purely because the timers had not fired yet.
+	 * Polling for the condition returns as soon as it holds (microseconds when
+	 * idle) and tolerates an arbitrarily slow machine, so it is both faster and
+	 * immune to load.
+	 */
+	const until = (assertion: () => void): Promise<void> => vi.waitFor(assertion, { timeout: 5_000, interval: 5 });
+
 	it('fails a leased job whose kind has no executor, naming the kind', async () => {
 		const complete = vi.fn(async () => true);
 		let handedOut = false;
@@ -210,7 +225,7 @@ describe('NodeWorkerHostFactory', () => {
 		});
 
 		const handle = await host.start({ concurrency: 1 });
-		await settle();
+		await until(() => expect(complete).toHaveBeenCalled());
 		await handle.stop();
 
 		expect(complete).toHaveBeenCalledWith(
@@ -242,7 +257,7 @@ describe('NodeWorkerHostFactory', () => {
 		});
 
 		const handle = await host.start({ concurrency: 1 });
-		await settle();
+		await until(() => expect(complete).toHaveBeenCalled());
 		await handle.stop();
 
 		expect(complete).toHaveBeenCalledWith(

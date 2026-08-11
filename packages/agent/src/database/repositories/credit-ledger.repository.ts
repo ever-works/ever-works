@@ -190,6 +190,22 @@ export class CreditLedgerRepository {
      * half-open `[from, to)` window. ONE grouped query using the
      * `(userId, createdAt)` index; `CASE WHEN` is standard SQL so the
      * same statement runs on SQLite (CI/dev) and Postgres (prod).
+     *
+     * Negation is written `-1 * e.amountCredits`, never `-e.amountCredits`.
+     * TypeORM rewrites `alias.property` into a quoted `"alias"."column"`
+     * only when the reference is preceded by a space, `=`, `(` or the start
+     * of the string — its regex is literally `([ =(]|^.{0})`. A unary minus
+     * is not in that set, so `-e.amountCredits` survives into the emitted
+     * SQL unquoted, Postgres folds it to `e.amountcredits`, and the whole
+     * statement fails with 42703 ("column e.amountcredits does not exist").
+     *
+     * That made `GET /api/credits/usage-summary` return 500 on every
+     * Postgres environment while CI stayed green, because SQLite matches
+     * unquoted identifiers case-insensitively — the failure could not
+     * reproduce on the driver the tests run against. `-1 *` puts a space
+     * before the reference, so the rewrite fires and the column stays
+     * quoted on both drivers. See the guard in
+     * `credit-ledger.period-totals-sql.integration.spec.ts`.
      */
     async getPeriodTotals(
         userId: string,
@@ -199,7 +215,7 @@ export class CreditLedgerRepository {
         const row = await this.repository
             .createQueryBuilder('e')
             .select(
-                'COALESCE(SUM(CASE WHEN e.amountCredits < 0 THEN -e.amountCredits ELSE 0 END), 0)',
+                'COALESCE(SUM(CASE WHEN e.amountCredits < 0 THEN -1 * e.amountCredits ELSE 0 END), 0)',
                 'consumed',
             )
             .addSelect(

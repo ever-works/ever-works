@@ -596,19 +596,37 @@ describe('StepPipelineExecutorService', () => {
                 name: 'Start',
                 run: jest.fn().mockResolvedValue(undefined),
             };
+
+            // Concurrency is measured by OVERLAP, not by elapsed time.
+            //
+            // This used to assert `duration < 200ms` on the theory that parallel
+            // is ~50ms and sequential ~100ms. That was wrong in both directions:
+            // sequential (~100ms) also passes a 200ms bar, so a regression to
+            // sequential execution would NOT have been caught; and on a loaded
+            // runner even the parallel path overshoots — it was observed at
+            // 247ms, failing a PR that touched an unrelated package.
+            //
+            // Counting how many step bodies are in flight at once decides the
+            // question exactly: 2 only if they genuinely overlap, 1 if they are
+            // serialised. It is independent of how fast the machine is.
+            let inFlight = 0;
+            let maxInFlight = 0;
+            const overlappingBody = async (): Promise<void> => {
+                inFlight += 1;
+                maxInFlight = Math.max(maxInFlight, inFlight);
+                await new Promise((resolve) => setTimeout(resolve, 50));
+                inFlight -= 1;
+            };
+
             const parallel1 = {
                 id: 'p1',
                 name: 'Parallel 1',
-                run: jest
-                    .fn()
-                    .mockImplementation(() => new Promise((resolve) => setTimeout(resolve, 50))),
+                run: jest.fn().mockImplementation(overlappingBody),
             };
             const parallel2 = {
                 id: 'p2',
                 name: 'Parallel 2',
-                run: jest
-                    .fn()
-                    .mockImplementation(() => new Promise((resolve) => setTimeout(resolve, 50))),
+                run: jest.fn().mockImplementation(overlappingBody),
             };
 
             // Mock the build method to return our manual parallel structure
@@ -638,17 +656,11 @@ describe('StepPipelineExecutorService', () => {
             standardPlugin.registerStepExecutor('p1', parallel1);
             standardPlugin.registerStepExecutor('p2', parallel2);
 
-            const startTime = Date.now();
             await service.execute(standardPlugin, mockWork, mockRequest, mockExisting);
-            const duration = Date.now() - startTime;
 
-            // Verification
-            // Both parallel steps take 50ms.
-            // If sequential: 50 + 50 = 100ms (+ overhead)
-            // If parallel: max(50, 50) = 50ms (+ overhead)
-            // We expect the total duration to be closer to 50ms than 100ms
-            // Using a slightly loose check to account for test overhead
-            expect(duration).toBeLessThan(200);
+            // Both bodies were in flight at the same moment — the definition of
+            // running concurrently. Serialised execution leaves this at 1.
+            expect(maxInFlight).toBe(2);
             expect(parallel1.run).toHaveBeenCalled();
             expect(parallel2.run).toHaveBeenCalled();
         });
