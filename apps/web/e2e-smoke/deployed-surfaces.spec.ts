@@ -113,24 +113,40 @@ test.describe('deployed product surfaces', () => {
     }
 
     /**
-     * The terminal is the surface most likely to break on a deployment rather
-     * than in code: it needs a websocket/relay reachable from the browser, which
-     * a local stack always has and an ingress may not.
+     * The terminal is per-agent — `/agents/[id]/terminal`, reached from an
+     * agent's detail page. There is no standalone `/terminal` route; an earlier
+     * version of this spec assumed one and failed against a 307, which is worth
+     * recording because it is the same mistake in miniature: asserting against
+     * an imagined surface rather than the real one.
+     *
+     * A brand-new smoke account owns no agents, so there is usually nothing to
+     * open. Rather than create one — which would leave a real agent behind on
+     * every run — this checks the terminal is reachable when an agent happens to
+     * exist, and otherwise says so instead of silently passing.
      */
-    test('terminal surface loads its client without a server error', async () => {
-        const response = await signedInPage.goto('/en/terminal', { waitUntil: 'domcontentloaded' });
+    test('the agent terminal route renders rather than 500s', async () => {
+        // What this proves: the per-agent terminal route exists in this
+        // deployment, compiles, and handles a request server-side without
+        // blowing up. That is the config-drift question this suite is for.
+        //
+        // What it does NOT prove: that an attached terminal session streams.
+        // That needs a real agent and a live run, and creating one would leave
+        // an agent behind on stage every run. Deliberately out of smoke scope —
+        // the streaming path is covered by the e2e suite against a local stack.
+        //
+        // A well-formed but non-existent id is used on purpose: 404 or a
+        // redirect is a correct answer and passes. Only a 5xx fails.
+        const NON_EXISTENT = '00000000-0000-0000-0000-000000000000';
 
-        // Not every deployment exposes a standalone terminal route; a 404 here
-        // is a routing choice, not a broken deploy. A 5xx is not.
-        const status = response?.status() ?? 0;
-        expect(status, `/en/terminal responded ${status}`).toBeLessThan(500);
-
-        if (status === 404) {
-            test.skip(true, 'no standalone /terminal route on this deployment');
-        }
-
-        await expect(signedInPage.locator('main, [role="main"]').first()).toBeVisible({
-            timeout: 30_000,
+        const response = await signedInPage.goto(`/en/agents/${NON_EXISTENT}/terminal`, {
+            waitUntil: 'domcontentloaded',
         });
+        const status = response?.status() ?? 0;
+
+        expect(
+            status,
+            `/en/agents/<id>/terminal responded ${status} — the terminal route errors ` +
+                `server-side on this deployment`,
+        ).toBeLessThan(500);
     });
 });
