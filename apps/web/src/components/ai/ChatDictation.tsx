@@ -1,9 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Loader2, Mic, Square } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { Select } from '@/components/ui/select';
+import { buildDictationProviderIcons, DICTATION_AUTO_ICON_KEY } from './dictation-provider-icons';
 
 /**
  * Push-to-talk dictation for the chat composer.
@@ -161,6 +163,12 @@ export function ChatDictation({
         recorderRef.current = null;
     }, []);
 
+    // Built from the live list so a provider with no drawn brand mark still
+    // gets a monogram — `Select` skips the icon column entirely on a miss,
+    // which would leave that one row's label out of line with the others.
+    // Above the `unsupported` bail so the hook order never changes.
+    const providerIcons = useMemo(() => buildDictationProviderIcons(providers), [providers]);
+
     if (unsupported) return null;
 
     const label =
@@ -174,31 +182,36 @@ export function ChatDictation({
     // A select showing one option is pure noise in a composer toolbar.
     const picker =
         providers.length > 1 ? (
-            <select
+            <Select
+                size="xs"
                 aria-label={t('provider')}
                 data-testid="chat-dictation-provider"
                 value={providerId ?? ''}
                 disabled={disabled || state !== 'idle'}
-                onChange={(e) => {
-                    const next = e.target.value || null;
+                onValueChange={(value) => {
+                    const next = value || null;
                     setProviderId(next);
                     if (next) window.localStorage.setItem(PROVIDER_STORAGE_KEY, next);
                     else window.localStorage.removeItem(PROVIDER_STORAGE_KEY);
                 }}
-                className={cn(
-                    'h-7 max-w-28 rounded-lg border bg-transparent px-1 text-[10px]',
-                    'border-border text-text-muted dark:border-white/15 dark:text-white/40',
-                    'disabled:cursor-not-allowed disabled:opacity-40',
-                )}
+                iconMap={providerIcons}
+                // `size="xs"` is the smallest the shared Select offers (h-8
+                // text-xs) and is set on its trigger, which `className` — the
+                // container — cannot reach. Reach the trigger directly so the
+                // picker matches the 10px composer hint beside it instead of
+                // towering over the 28px mic button.
+                className="w-28 shrink-0 [&>button]:h-7 [&>button]:text-[10px]"
             >
                 {/* Empty value = defer to the activated plugin. */}
-                <option value="">{t('providerAuto')}</option>
+                <option value="" data-icon={DICTATION_AUTO_ICON_KEY}>
+                    {t('providerAuto')}
+                </option>
                 {providers.map((p) => (
-                    <option key={p.id} value={p.id}>
+                    <option key={p.id} value={p.id} data-icon={p.id}>
                         {p.name}
                     </option>
                 ))}
-            </select>
+            </Select>
         ) : null;
 
     return (
@@ -213,7 +226,7 @@ export function ChatDictation({
                 disabled={disabled || state === 'transcribing'}
                 onClick={() => (state === 'recording' ? stop() : void start())}
                 className={cn(
-                    'flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg transition-colors',
+                    'flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg transition-colors',
                     state === 'recording'
                         ? 'bg-danger/10 text-danger hover:bg-danger/20'
                         : 'text-text-muted hover:bg-card-hover hover:text-text dark:text-white/40 dark:hover:bg-white/10 dark:hover:text-white',

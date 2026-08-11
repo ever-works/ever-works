@@ -149,11 +149,18 @@ export function ChatInput({ isStreaming, onSubmit, onStop }: ChatInputProps) {
                         disabled={isStreaming}
                         autoComplete="off"
                     />
-                    <div className="flex items-center justify-between px-3 pb-2.5 pt-1">
-                        <div className="flex items-center gap-1">
+                    <div className="flex items-center justify-between gap-2 px-3 pb-2.5 pt-1">
+                        <div className="flex min-w-0 flex-1 items-center gap-1">
                             <ChatAttachButton onFiles={addFiles} disabled={isStreaming} />
                             <ChatDictation onText={appendDictated} disabled={isStreaming} />
-                            <span className="text-[10px] text-text-muted dark:text-white/20 select-none">
+                            {/* The panel is user-resizable, so this hint is the
+                                one thing here that must give way: truncating it
+                                keeps the controls and the send button in place
+                                at any width instead of crowding them out. */}
+                            <span
+                                title={t('sendHint')}
+                                className="min-w-0 truncate text-[10px] text-text-muted dark:text-white/20 select-none"
+                            >
                                 {t('sendHint')}
                             </span>
                         </div>
@@ -162,7 +169,7 @@ export function ChatInput({ isStreaming, onSubmit, onStop }: ChatInputProps) {
                                 type="button"
                                 onClick={onStop}
                                 aria-label={t('stopGenerating')}
-                                className="flex cursor-pointer items-center justify-center w-7 h-7 rounded-lg bg-danger/10 text-danger hover:bg-danger/20 transition-all duration-150"
+                                className="flex shrink-0 cursor-pointer items-center justify-center w-7 h-7 rounded-lg bg-danger/10 text-danger hover:bg-danger/20 transition-all duration-150"
                             >
                                 <Square className="w-3 h-3" />
                             </button>
@@ -172,7 +179,7 @@ export function ChatInput({ isStreaming, onSubmit, onStop }: ChatInputProps) {
                                 disabled={!canSend}
                                 aria-label={t('sendButton')}
                                 className={cn(
-                                    'flex cursor-pointer items-center justify-center w-7 h-7 rounded-lg transition-all duration-150',
+                                    'flex shrink-0 cursor-pointer items-center justify-center w-7 h-7 rounded-lg transition-all duration-150',
                                     'bg-primary dark:bg-primary/80 text-white hover:bg-primary-hover dark:hover:bg-primary/90 shadow-sm',
                                     'disabled:cursor-not-allowed disabled:opacity-40',
                                 )}

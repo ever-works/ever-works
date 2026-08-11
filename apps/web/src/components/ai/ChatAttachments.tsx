@@ -191,7 +191,7 @@ export function ChatAttachButton({
                 data-testid="chat-attachment-button"
                 onClick={() => inputRef.current?.click()}
                 className={cn(
-                    'flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg transition-colors',
+                    'flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg transition-colors',
                     'text-text-muted hover:bg-card-hover hover:text-text',
                     'dark:text-white/40 dark:hover:bg-white/10 dark:hover:text-white',
                     'disabled:cursor-not-allowed disabled:opacity-40',
