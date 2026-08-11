@@ -22,7 +22,9 @@ overrides:
   effect@<3.20.0: '>=3.20.0'
   nodemailer@<=9.0.0: '>=9.0.1'
   serialize-javascript@<7.0.3: '>=7.0.3'
-  socket.io-parser@<4.2.6: '>=4.2.6'
+  socket.io-parser@<3.3.6: '>=3.3.6 <3.4.0'
+  socket.io-parser@>=3.4.0 <3.4.5: '>=3.4.5 <4.0.0'
+  socket.io-parser@>=4.0.0 <4.2.7: '>=4.2.7 <5.0.0'
   systeminformation@<5.31.7: '>=5.31.7'
   websocket-driver@<0.7.5: '>=0.7.5'
   defu@<6.1.5: '>=6.1.5'
@@ -20722,8 +20724,8 @@ packages:
     resolution: {integrity: sha512-sJ/tqHOCe7Z50JCBCXrsY3I2k03iOiUe+tj1OmKeD2lXPiGH/RUCdTZFoqVyN7l1MnpIzPrGtLcijffmeouNlQ==}
     engines: {node: '>=10.0.0'}
 
-  socket.io-parser@4.2.6:
-    resolution: {integrity: sha512-asJqbVBDsBCJx0pTqw3WfesSY0iRX+2xzWEWzrpcH7L6fLzrhyF8WPI8UaeM4YCuDfpwA/cgsdugMsmtz8EJeg==}
+  socket.io-parser@4.2.7:
+    resolution: {integrity: sha512-IH/iSeO9T6gz1KkFleGDWkG9N3dl4jXVYUtMhIqH10Md0ttMer8nUNWiP1DKuNrybD2xBrixLJdCC9J6ECoYkg==}
     engines: {node: '>=10.0.0'}
 
   socket.io@4.7.4:
@@ -44347,7 +44349,7 @@ snapshots:
       '@socket.io/component-emitter': 3.1.2
       debug: 4.3.7(supports-color@10.2.2)
       engine.io-client: 6.5.4(supports-color@10.2.2)
-      socket.io-parser: 4.2.6(supports-color@10.2.2)
+      socket.io-parser: 4.2.7(supports-color@10.2.2)
     transitivePeerDependencies:
       - bufferutil
       - supports-color
@@ -44358,13 +44360,13 @@ snapshots:
       '@socket.io/component-emitter': 3.1.2
       debug: 4.3.7(supports-color@10.2.2)
       engine.io-client: 6.5.4(supports-color@10.2.2)
-      socket.io-parser: 4.2.6(supports-color@10.2.2)
+      socket.io-parser: 4.2.7(supports-color@10.2.2)
     transitivePeerDependencies:
       - bufferutil
       - supports-color
       - utf-8-validate
 
-  socket.io-parser@4.2.6(supports-color@10.2.2):
+  socket.io-parser@4.2.7(supports-color@10.2.2):
     dependencies:
       '@socket.io/component-emitter': 3.1.2
       debug: 4.4.3(supports-color@10.2.2)
@@ -44379,7 +44381,7 @@ snapshots:
       debug: 4.3.7(supports-color@10.2.2)
       engine.io: 6.6.9(supports-color@10.2.2)
       socket.io-adapter: 2.5.6(supports-color@10.2.2)
-      socket.io-parser: 4.2.6(supports-color@10.2.2)
+      socket.io-parser: 4.2.7(supports-color@10.2.2)
     transitivePeerDependencies:
       - bufferutil
       - supports-color

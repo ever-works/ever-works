@@ -81,8 +81,8 @@ import { API_BASE, authedHeaders, createWorkViaAPI, registerUserViaAPI } from '.
  *       - format=json -> 400 "Unsupported format 'json'. Only 'csv' is supported in V1."
  *
  *   ADMIN USAGE  (AdminUsageController @Controller('admin/usage'), IsPlatformAdminGuard)
- *     GET /api/admin/usage      -> 404 (api/-prefixed path is NOT a route — mounted at bare 'admin/usage')
- *     GET /admin/usage (unauth) -> 401 ; (non-admin) -> 403 "Platform admin access required"
+ *     GET /admin/usage          -> 404 (bare path is NOT a route — mounted at 'api/admin/usage' since #2012)
+ *     GET /api/admin/usage (unauth) -> 401 ; (non-admin) -> 403 "Platform admin access required"
  *
  *   ACCOUNT-WIDE  (AccountUsageController @Controller('api/me/usage'))
  *     GET /api/me/usage/account-wide
@@ -786,15 +786,15 @@ test.describe('Flow: admin + account-wide closure (theme bookend)', () => {
     test('admin cross-user usage is gated: api-prefixed 404, /admin/usage 401 unauth + 403 non-admin', async ({
         request,
     }) => {
-        // The `api/`-prefixed path is NOT a route — the controller mounts at bare 'admin/usage'.
-        expect((await request.get(`${API_BASE}/api/admin/usage`)).status()).toBe(404);
+        // The BARE path is NOT a route — the controller mounts at 'api/admin/usage'.
+        expect((await request.get(`${API_BASE}/admin/usage`)).status()).toBe(404);
 
         // The real route requires auth.
-        expect((await request.get(`${API_BASE}/admin/usage`)).status()).toBe(401);
+        expect((await request.get(`${API_BASE}/api/admin/usage`)).status()).toBe(401);
 
         // An authenticated NON-admin is forbidden (route exists, platform-admin guard rejects).
         const u = await registerUserViaAPI(request);
-        const nonAdmin = await request.get(`${API_BASE}/admin/usage`, {
+        const nonAdmin = await request.get(`${API_BASE}/api/admin/usage`, {
             headers: authedHeaders(u.access_token),
         });
         expect(nonAdmin.status()).toBe(403);

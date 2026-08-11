@@ -15,6 +15,7 @@ The mail system handles all transactional email delivery for the platform, suppo
 apps/api/src/mail/
   mail.service.ts                   # Event listeners and email orchestration
   mail.module.ts                    # Module config (SMTP, Resend, templates)
+  templates.ts                      # Template dir resolution + packaging checks
   types.ts                          # SendMailOptions interface
   providers/
     mailer.service.ts               # Multi-provider dispatch (SMTP, Resend, faker)
@@ -103,6 +104,30 @@ async sendSignupConfirmation(data: UserCreatedEvent): Promise<void> {
 
 All email sends are wrapped in try/catch blocks and errors are logged without throwing, ensuring email failures do not break the calling flow.
 
+## Template Packaging
+
+The `.hbs` templates are **not** TypeScript, so they only reach the runtime
+because `apps/api/nest-cli.json` lists them under `compilerOptions.assets`.
+Two rules matter, and both were violated at once in the defect that made
+every templated email fail in every environment:
+
+- **Asset globs are relative to `sourceRoot`.** `"templates/**/*"` is
+  correct; `"src/templates/**/*"` silently resolves to
+  `apps/api/src/src/templates/**/*`, matches nothing and copies nothing —
+  with no build error.
+- **The runtime path must be relative to the compiled module, not to
+  `process.cwd()`.** The container starts the process in `/app` with the app
+  in `/app/dist`; a cwd-relative `src/templates` does not exist there. Both
+  consumers now go through `TEMPLATES_DIR` in
+  `apps/api/src/mail/templates.ts`, which resolves `<dirname>/../templates`
+  and is therefore correct for `src/`, `dist/` and the image alike.
+
+Three independent guards keep this from regressing: a Jest suite that renders
+every template with the working directory moved elsewhere, a boot-time check
+that logs `EMAIL TEMPLATES MISSING` and reports `email: degraded` on
+`/api/health/ready`, and a `RUN` step in `.deploy/docker/api/Dockerfile` that
+fails the image build unless every source template reached `dist/templates`.
+
 ## Adding a New Template
 
 1. Create a `.hbs` file in `apps/api/src/templates/`:
@@ -112,6 +137,12 @@ All email sends are wrapped in try/catch blocks and errors are logged without th
     <p>Your notification from {{appName}}.</p>
     <p>&copy; {{currentYear}} {{companyOwner}}</p>
     ```
+
+    Then register its slug in `KNOWN_EMAIL_TEMPLATES`
+    (`apps/api/src/mail/templates.ts`). `templates.spec.ts` asserts the list
+    and the directory match in both directions, so an unregistered template
+    fails the suite — that registry is what the boot-time check and the API
+    Dockerfile's packaging gate compare against.
 
 2. Define a new event class in `apps/api/src/events/`.
 
@@ -163,7 +194,13 @@ interface SendMailOptions {
 				transport: { host, port, secure, auth: { user, pass } },
 				defaults: { from: config.mail.from() },
 				template: {
-					dir: path.join(process.cwd(), 'src/templates'),
+					// Resolved from the module's own location (see
+					// `apps/api/src/mail/templates.ts`), NOT from
+					// `process.cwd()`. In the container the process starts in
+					// `/app` and the compiled app lives in `/app/dist`, so a
+					// cwd-relative `src/templates` does not exist and every
+					// templated email fails with ENOENT.
+					dir: TEMPLATES_DIR,
 					adapter: new HandlebarsAdapter(undefined, { inlineCssEnabled: true })
 				}
 			})

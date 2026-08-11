@@ -39,7 +39,23 @@ type TurnstileRenderOptions = {
     sitekey: string;
     appearance: 'always' | 'execute' | 'interaction-only';
     execution: 'render' | 'execute';
-    size: 'normal' | 'compact' | 'invisible';
+    /**
+     * Cloudflare accepts exactly `normal`, `compact` and `flexible` here.
+     *
+     * `invisible` was in this union and was being passed to `render()`, which
+     * made Turnstile throw before the widget existed:
+     *
+     *     Uncaught TurnstileError: [Cloudflare Turnstile] Invalid value for
+     *     parameter "size", expected "compact", "flexible", or "normal",
+     *     got "invisible".
+     *
+     * No widget meant no token, so every anonymous visitor arriving from the
+     * marketing site's prompt hand-off saw "We couldn't verify your browser."
+     * Invisibility is not a `size` — it comes from `appearance: 'execute'` +
+     * `execution: 'execute'`, which are already set below, and the container
+     * is positioned off-screen. So the option was invalid AND redundant.
+     */
+    size?: 'normal' | 'compact' | 'flexible';
     callback?: (token: string) => void;
     'error-callback'?: (errorCode: string) => void;
     'expired-callback'?: () => void;
@@ -128,7 +144,9 @@ export function useTurnstile(sitekey: string = TURNSTILE_SITEKEY) {
             sitekey,
             appearance: 'execute',
             execution: 'execute',
-            size: 'invisible',
+            // No `size` — see TurnstileRenderOptions. `appearance`/`execution`
+            // give the invisible behaviour; the container above is already
+            // parked off-screen.
             retry: 'auto',
             callback: (token: string) => {
                 pendingResolveRef.current?.(token);

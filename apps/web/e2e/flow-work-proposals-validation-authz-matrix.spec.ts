@@ -61,8 +61,9 @@ import { API_BASE, authedHeaders, registerUserViaAPI, createWorkViaAPI } from '.
  *  GET  /api/me/work-proposals?search=…
  *    · 501 chars → 400 "search must be shorter than or equal to 500 characters"
  *      (validation fires BEFORE the handler). A ≤500 well-formed search PASSES
- *      validation but EXECUTES a Postgres ILIKE the sqlite CI stack can't run →
- *      env-adaptive [200 (pg) | 500 (sqlite ILIKE)]. Tolerated, not asserted 200.
+ *      validation and EXECUTES a portable `LOWER(col) LIKE :p ESCAPE '\'` on
+ *      every driver → 200. (It used to build a Postgres-only ILIKE and 500 on
+ *      sqlite; this spec tolerated the 500 instead of failing on it.)
  *  GET  /api/me/work-proposals?<unknown>=… → 400 "property <x> should not exist".
  *  AUTHZ: every route without a bearer → 401; a garbage bearer → 401. A stranger
  *    reading/dismissing/listing-works another user's Idea → 404 (NEVER 403), and
@@ -342,16 +343,14 @@ test.describe('Work-Proposals list — ?search validation & env-adaptive executi
             /search must be shorter than or equal to 500 characters/i,
         );
 
-        // A 500-char search is VALID input, but the repo builds a Postgres
-        // `ILIKE` predicate the sqlite in-memory CI stack can't execute → 500.
-        // On a Postgres deployment the same query is a 200. Env-adaptive: accept
-        // either, but NEVER a 4xx (the input already passed validation) other
-        // than the 500 server-error we know sqlite raises.
+        // A 500-char search is VALID input and the repo now builds a portable
+        // `LOWER(col) LIKE :p ESCAPE '\'` predicate, so this executes on the
+        // sqlite CI stack exactly as it does on a Postgres deployment → 200.
         const maxLen = await request.get(
             `${API_BASE}/api/me/work-proposals?search=${'s'.repeat(500)}`,
             { headers },
         );
-        expect([200, 500]).toContain(maxLen.status());
+        expect(maxLen.status()).toBe(200);
     });
 });
 

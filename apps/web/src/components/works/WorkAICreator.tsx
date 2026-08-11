@@ -64,6 +64,12 @@ type InitialWorkKind = 'website' | 'landing-page' | 'blog' | 'directory' | 'awes
 interface WorkAICreatorProps {
     gitProvider?: string;
     gitConnected?: boolean;
+    /**
+     * True when Work repositories go to the managed Ever Works GitHub org.
+     * Purely presentational here — the server action re-resolves the storage
+     * choice itself and never trusts a client-supplied value.
+     */
+    managedGitStorage?: boolean;
     deployProvider?: string;
     websiteTemplates: WebsiteTemplateOption[];
     /** Manifest Work blueprints (Works Templates catalog); may be empty. */
@@ -76,6 +82,7 @@ interface WorkAICreatorProps {
 export function WorkAICreator({
     gitProvider,
     gitConnected,
+    managedGitStorage = false,
     deployProvider,
     websiteTemplates,
     workBlueprints = [],
@@ -285,8 +292,19 @@ export function WorkAICreator({
                     router.push(ROUTES.DASHBOARD_WORKS);
                 }
             } else if (result.requiresGitProvider) {
+                // Stay put. This used to `router.push(ROUTES.DASHBOARD_WORKS_NEW)`,
+                // which is THIS page minus its query string — and
+                // `works/new/page.tsx` redirects to `/new` whenever `mode` is
+                // absent. So the one branch a user is most likely to hit (no Git
+                // provider connected yet) threw away everything they had typed —
+                // name, slug, prompt, template, provider selections — and dropped
+                // them on an empty composer, with no way back to the filled form.
+                //
+                // There is nowhere to send them anyway: the Git-provider
+                // "Connect" control lives on this very page, right above the
+                // button they just pressed. Showing the error and leaving the
+                // form intact is what makes the toast actionable.
                 toast.error(result.error || t('errors.githubRequired'));
-                router.push(ROUTES.DASHBOARD_WORKS_NEW);
             } else {
                 toast.error(result.error || t('errors.createFailed'));
             }
@@ -441,6 +459,7 @@ export function WorkAICreator({
             <RepositoryOwnerCard
                 gitProvider={gitProvider}
                 gitConnected={gitConnected}
+                managedGitStorage={managedGitStorage}
                 owner={owner}
                 onChange={(value, isOrganization) => {
                     setOwner(value);

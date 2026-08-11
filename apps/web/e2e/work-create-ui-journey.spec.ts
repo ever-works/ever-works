@@ -103,17 +103,35 @@ test.describe('Work create — full UI wizard', () => {
             await promptField.fill(`e2e ui description ${name}`);
         }
 
-        // The real submit button is "Generate with AI". Best-effort click to
-        // exercise the submit path; in the git-less e2e stack this surfaces a
-        // `requiresGitProvider` toast + redirect rather than a Work, which we
-        // tolerate — the deterministic Work creation happens via the API below.
+        // The real submit button is "Generate with AI". In the git-less e2e stack
+        // this takes the `requiresGitProvider` branch: an error toast, and NO Work.
+        //
+        // That branch used to also `router.push(ROUTES.DASHBOARD_WORKS_NEW)` — this
+        // page minus its query string — and `works/new/page.tsx` redirects to `/new`
+        // whenever `mode` is absent. So the single most likely outcome for a new user
+        // threw away everything they had typed and dropped them on an empty composer.
+        // This spec previously tolerated that ("we only need to exercise the click,
+        // not its aftermath"), which is how the data loss stayed invisible.
+        //
+        // The aftermath IS the contract now: the user must still be on the form, with
+        // their input intact, next to the "Connect" control that resolves the error.
         const submit = page.getByRole('button', { name: /generate|create|save|submit/i }).first();
         if (await submit.isVisible({ timeout: 5_000 }).catch(() => false)) {
-            // noWaitAfter: the submit fires the createWorkWithAI server action,
-            // whose git-less redirect back to /works/new would otherwise make
-            // Playwright's click auto-wait on a navigation that stalls the whole
-            // test. We only need to exercise the click, not its aftermath.
-            await submit.click({ noWaitAfter: true, timeout: 8_000 }).catch(() => undefined);
+            await submit.click({ timeout: 8_000 }).catch(() => undefined);
+
+            // Give the server action time to resolve and any navigation to settle,
+            // so this asserts the settled state rather than racing it.
+            await page.waitForLoadState('networkidle').catch(() => {});
+
+            await expect(
+                page,
+                'a failed git-less submit must NOT bounce the user to the empty composer',
+            ).not.toHaveURL(/\/new(\?|$)/);
+
+            await expect(
+                page.locator('input[name="name"]'),
+                'the work-name field must survive a failed submit',
+            ).toHaveValue(name, { timeout: 10_000 });
         }
 
         // --- Create the Work deterministically (git-less) as the browser user. ---

@@ -13,6 +13,14 @@ This section covers the individual capabilities that make that possible, beyond 
 
 > New here? Read the [Platform Overview](../overview.md) for the big picture, or the [Founder Journey guide](../guides/founder-journey.md) for the Start → Build → Sell → Scale playbook that ties these features together.
 
+## Getting started
+
+| Feature                                      | Description                                                                                   |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| [Creating an Account](./creating-an-account) | Signing up, social sign-in, magic links, password reset — and what the terms checkbox records |
+| [Onboarding & Setup Wizard](./onboarding)    | The guided walkthrough that picks your AI, storage, database, deployment and plugins          |
+| [The Settings Map](./settings-map)           | What lives where under Settings, including Usage & Credits                                    |
+
 ## The core loop
 
 | Feature                                        | Description                                                                                                |
