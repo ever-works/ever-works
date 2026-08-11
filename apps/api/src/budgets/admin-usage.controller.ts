@@ -41,7 +41,14 @@ interface AdminUsageResponse {
  * render a sortable table without N+1 lookups.
  */
 @ApiTags('Admin')
-@Controller('admin/usage')
+// `api/admin/usage`, not `admin/usage` — this app has no `setGlobalPrefix`, so
+// each controller carries the segment itself. Served un-prefixed, this route
+// answered on `/admin/usage` while `adminUsageAPI` calls
+// `serverFetch('/admin/usage')`, which resolves against an `API_URL` that
+// always ends in `/api` — so the admin usage page requested
+// `/api/admin/usage` and got a 404. Pinned by the guard in
+// `terms/terms.controller.spec.ts`.
+@Controller('api/admin/usage')
 @UseGuards(IsPlatformAdminGuard)
 export class AdminUsageController {
     constructor(
