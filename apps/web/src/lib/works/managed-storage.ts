@@ -48,6 +48,16 @@ export interface ManagedStorageStatus {
 }
 
 /**
+ * Normalize a caller-supplied storage provider the way the API's
+ * `@Transform(trim().toLowerCase())` on `CreateWorkDto.storageProvider` does,
+ * so `'Ever-Works-Git'` is recognised here exactly as it will be there.
+ */
+function normalizeStorageOverride(value: string | undefined): string | undefined {
+    const normalized = value?.trim().toLowerCase();
+    return normalized ? normalized : undefined;
+}
+
+/**
  * Pure resolver — exported so the precedence rules are unit-testable without
  * standing up the onboarding endpoints.
  *
@@ -56,12 +66,18 @@ export interface ManagedStorageStatus {
  * `catalog` is the platform capability document; `null` means "we could not
  * ask", which deliberately resolves to NOT managed so the caller keeps the
  * personal-provider gate rather than waving an unverified user through.
+ * `override` is an explicit `CreateWorkDto.storageProvider` from the caller;
+ * it wins, mirroring `resolveProviderDefaults`' DTO-first precedence, so the
+ * gate is always decided from the SAME value the request will carry.
  */
 export function resolveManagedStorage(
     state: OnboardingWizardStateV2 | null | undefined,
     catalog: OnboardingCatalogResponse | null | undefined,
+    override?: string,
 ): ManagedStorageStatus {
-    const storageChoice = state?.storage?.choice ?? DEFAULT_STORAGE_CHOICE;
+    const storageChoice = (normalizeStorageOverride(override) ??
+        state?.storage?.choice ??
+        DEFAULT_STORAGE_CHOICE) as OnboardingStorageChoice;
 
     const everWorksGitAvailable =
         catalog?.storage?.find((card) => card.choice === EVER_WORKS_GIT_STORAGE)?.available ===
@@ -91,7 +107,9 @@ export function resolveManagedStorage(
  * never let an unconnected `user-github` user through — the whole point of
  * the gate is that their create would fail server-side.
  */
-export async function resolveManagedStorageStatus(): Promise<ManagedStorageStatus> {
+export async function resolveManagedStorageStatus(
+    override?: string,
+): Promise<ManagedStorageStatus> {
     const [stateResult, catalogResult] = await Promise.allSettled([
         onboardingAPI.getState(),
         onboardingAPI.getCatalog(),
@@ -113,5 +131,6 @@ export async function resolveManagedStorageStatus(): Promise<ManagedStorageStatu
     return resolveManagedStorage(
         stateResult.status === 'fulfilled' ? stateResult.value?.state : null,
         catalogResult.status === 'fulfilled' ? catalogResult.value : null,
+        override,
     );
 }

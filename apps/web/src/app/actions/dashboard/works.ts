@@ -240,7 +240,12 @@ export async function createWork(data: CreateWorkDto) {
         }
 
         const providerId = validation.data.gitProvider;
-        const managedStorage = await resolveManagedStorageStatus();
+        // An explicit `storageProvider` on the DTO wins, exactly as it does in
+        // `resolveProviderDefaults` — so the gate below is decided from the
+        // same value this request will carry to the API. Resolving the gate
+        // from onboarding state while sending a different provider is how the
+        // two tiers would silently disagree again.
+        const managedStorage = await resolveManagedStorageStatus(validation.data.storageProvider);
 
         const gate = await resolveCreateWorkGitGate(providerId, managedStorage);
         if (!gate.ok) {
@@ -255,16 +260,15 @@ export async function createWork(data: CreateWorkDto) {
 
         const { organization, owner } = checkOrganization(gate.connectionInfo, validation.data);
 
+        // Under managed storage the API replaces owner / organization with the
+        // platform org once it has provisioned the repo, so these two only
+        // matter on the personal path.
         validation.data.organization = organization;
         validation.data.owner = owner;
         validation.data.gitProvider = providerId;
         validation.data.deployProvider = data.deployProvider || undefined;
-        // An explicit caller-supplied choice wins; otherwise send the one we
-        // just resolved. Under managed storage the API replaces owner /
-        // organization with the platform org after it provisions the repo, so
-        // the two lines above only matter on the personal path.
         validation.data.storageProvider =
-            data.storageProvider ?? storageProviderForCreate(managedStorage);
+            validation.data.storageProvider ?? storageProviderForCreate(managedStorage);
 
         // Security: do not log validated work-creation payload (contains git
         // provider id, owner/org, slug, name, description) to server stdout.

@@ -282,6 +282,56 @@ describe('Work creation honours the managed Ever Works Git storage choice', () =
         });
     });
 
+    describe('an explicit DTO storageProvider decides the gate too', () => {
+        // `resolveProviderDefaults` puts the DTO first, so the gate must be
+        // resolved from the SAME value the request will carry. Deciding it
+        // from onboarding state while sending a different provider is exactly
+        // how the two tiers silently disagreed in the first place — and a
+        // server action is reachable as a POST endpoint, so the override is
+        // attacker-controllable.
+        beforeEach(() => {
+            getCatalogMock.mockResolvedValue(catalogWithEverWorksGit(true));
+        });
+
+        it('keeps the gate when the DTO overrides a managed onboarding choice with user-github', async () => {
+            getStateMock.mockResolvedValue(onboardingStateWith('ever-works-git'));
+            checkGitProviderConnectionMock.mockResolvedValue({ success: true, connected: false });
+            const { createWork } = await import('./works');
+
+            const result = await createWork({
+                slug: 'k8s-operators',
+                name: 'K8s Operators',
+                description: 'A directory of open-source Kubernetes database operators.',
+                organization: false,
+                gitProvider: 'github',
+                storageProvider: 'user-github',
+            });
+
+            expect(result.success).toBe(false);
+            expect(result.requiresGitProvider).toBe(true);
+            expect(workAPICreateMock).not.toHaveBeenCalled();
+        });
+
+        it('lifts the gate when the DTO explicitly asks for ever-works-git', async () => {
+            getStateMock.mockResolvedValue(onboardingStateWith('user-github'));
+            const { createWork } = await import('./works');
+
+            const result = await createWork({
+                slug: 'k8s-operators',
+                name: 'K8s Operators',
+                description: 'A directory of open-source Kubernetes database operators.',
+                organization: false,
+                storageProvider: 'ever-works-git',
+            });
+
+            expect(result.success).toBe(true);
+            expect(checkGitProviderConnectionMock).not.toHaveBeenCalled();
+            expect(workAPICreateMock.mock.calls[0]![0]).toMatchObject({
+                storageProvider: 'ever-works-git',
+            });
+        });
+    });
+
     describe('platform capability is read from the catalog, never assumed', () => {
         it('keeps the gate when the user chose ever-works-git but the platform has it OFF (e.g. dev)', async () => {
             getStateMock.mockResolvedValue(onboardingStateWith('ever-works-git'));
