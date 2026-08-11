@@ -502,7 +502,7 @@ describe('IdeaCard (Phase 5 PR M)', () => {
               class="relative z-10 mt-auto flex items-center gap-2"
             >
               <button
-                class="flex-1 inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-white transition-colors active:scale-[0.98] cursor-pointer bg-black hover:bg-black/80 dark:bg-white/6 dark:hover:bg-white/10"
+                class="inline-flex items-center gap-1.5 font-medium transition-colors active:scale-[0.98] cursor-pointer flex-1 justify-center rounded-md px-3 py-2 text-sm text-white bg-black hover:bg-black/80 dark:bg-white/6 dark:hover:bg-white/10"
                 type="button"
               >
                 actions.accept

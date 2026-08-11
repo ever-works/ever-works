@@ -246,23 +246,26 @@ export function IdeaCard({ proposal, onDismissed, matchedWorkId = null }: IdeaCa
                     type="button"
                     onClick={handleAccept}
                     className={cn(
-                        'flex-1 inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-white transition-colors active:scale-[0.98] cursor-pointer',
-                        // The "View Work" state uses the success color and
-                        // a checkmark icon. Visually distinct from the
-                        // primary Build CTA so an Idea that already has a
-                        // Work reads as "completed" at a glance. Every
-                        // other status (pending/queued/building/failed)
-                        // shares the Build styling and stays clickable —
-                        // clicking opens the /works/new build flow.
+                        'inline-flex items-center gap-1.5 font-medium transition-colors active:scale-[0.98] cursor-pointer',
+                        // A built Idea has nothing left to act on, so its
+                        // CTA drops to a plain "View Work →" text link —
+                        // no fill, no padding, one step down in type size —
+                        // instead of a second solid button competing with
+                        // the Build state. `mr-auto` keeps the Agent
+                        // shortcut pinned right now that the link no longer
+                        // stretches. Every other status (pending/queued/
+                        // building/failed) keeps the filled Build styling
+                        // and stays clickable — clicking opens the
+                        // /works/new build flow.
                         hasWork
-                            ? 'bg-success hover:bg-success/90'
-                            : 'bg-black hover:bg-black/80 dark:bg-white/6 dark:hover:bg-white/10',
+                            ? 'mr-auto text-xs text-success hover:text-success/80'
+                            : 'flex-1 justify-center rounded-md px-3 py-2 text-sm text-white bg-black hover:bg-black/80 dark:bg-white/6 dark:hover:bg-white/10',
                     )}
                 >
                     {hasWork ? (
                         <>
-                            <CheckCircle2 className="w-4 h-4" aria-hidden="true" />
                             {t('actions.viewWork')}
+                            <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
                         </>
                     ) : isBuilding ? (
                         <>
