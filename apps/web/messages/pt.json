@@ -1833,7 +1833,7 @@
                         "build-in-flight": "Não é possível eliminar durante uma construção. Aguarde que termine.",
                         "unknown": "Não é possível eliminar esta Ideia neste momento."
                     },
-                    "unlinksWorks": "Esta Ideia está vinculada a {count} Work(s). Eles serão mantidos — apenas o vínculo é removido."
+                    "unlinksWorks": "{count, plural, one {Esta Ideia está vinculada a # Work. O Work será mantido — apenas o vínculo é removido.} other {Esta Ideia está vinculada a # Works. Os Works serão mantidos — apenas o vínculo é removido.}}"
                 },
                 "toasts": {
                     "built": "Work construído a partir desta Ideia",

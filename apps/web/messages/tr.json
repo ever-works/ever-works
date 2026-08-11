@@ -1833,7 +1833,7 @@
                         "build-in-flight": "Yapım sürerken silinemez. Bitmesini bekleyin.",
                         "unknown": "Bu Fikir şu anda silinemiyor."
                     },
-                    "unlinksWorks": "Bu Fikir {count} Work ile bağlantılı. Onlar korunacak — yalnızca bağlantı kaldırılır."
+                    "unlinksWorks": "{count, plural, one {Bu Fikir # Work ile bağlantılı. O korunacak — yalnızca bağlantı kaldırılır.} other {Bu Fikir # Work ile bağlantılı. Onlar korunacak — yalnızca bağlantı kaldırılır.}}"
                 },
                 "toasts": {
                     "built": "Bu Fikirden Work üretildi",

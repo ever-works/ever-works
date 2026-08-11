@@ -1833,7 +1833,7 @@
                         "build-in-flight": "Tidak bisa dihapus saat build berjalan. Tunggu hingga selesai.",
                         "unknown": "Ide ini tidak bisa dihapus sekarang."
                     },
-                    "unlinksWorks": "Ide ini tertaut ke {count} Work(s). Semuanya akan dipertahankan — hanya tautannya yang dihapus."
+                    "unlinksWorks": "Ide ini tertaut ke {count} Work. Work tersebut akan dipertahankan — hanya tautannya yang dihapus."
                 },
                 "toasts": {
                     "built": "Work dibangun dari Ide ini",

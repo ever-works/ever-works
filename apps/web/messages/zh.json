@@ -1833,7 +1833,7 @@
                         "build-in-flight": "构建进行中无法删除，请等待完成。",
                         "unknown": "当前无法删除该想法。"
                     },
-                    "unlinksWorks": "该想法关联了 {count} 个 Work。它们会被保留，仅移除关联。"
+                    "unlinksWorks": "该想法关联了 {count} 个 Work。Work 会被保留，仅移除关联。"
                 },
                 "toasts": {
                     "built": "已从该想法构建 Work",

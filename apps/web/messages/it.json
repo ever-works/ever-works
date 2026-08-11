@@ -1799,9 +1799,9 @@
                 },
                 "agents": {
                     "empty": "Nessun Agente associato a questa Idea.",
-                    "assignExisting": "Assegna esistente",
+                    "assignExisting": "Assegna Agente esistente",
                     "assignTitle": "Assegna un Agente a questa Idea",
-                    "assignSubtitle": "Metti su questa Idea un Agente che hai già invece di crearne un altro.",
+                    "assignSubtitle": "Assegna a questa Idea un Agente che hai già invece di crearne un altro.",
                     "assignSearchPlaceholder": "Cerca Agenti…",
                     "assignLoading": "Caricamento Agenti…",
                     "assignNoneAvailable": "Nessun altro Agente da assegnare.",
@@ -1833,7 +1833,7 @@
                         "build-in-flight": "Impossibile eliminare durante una build. Attendi il completamento.",
                         "unknown": "Impossibile eliminare questa Idea al momento."
                     },
-                    "unlinksWorks": "Questa Idea è collegata a {count} Work. Verranno conservati: viene rimosso solo il collegamento."
+                    "unlinksWorks": "{count, plural, one {Questa Idea è collegata a # Work. Il Work verrà conservato: verrà rimosso solo il collegamento.} other {Questa Idea è collegata a # Work. I Work verranno conservati: verrà rimosso solo il collegamento.}}"
                 },
                 "toasts": {
                     "built": "Work costruito da questa Idea",

@@ -1810,9 +1810,9 @@
                     "assignedToast": "{name} toegewezen aan dit Idee",
                     "assignFailed": "Kon Agent niet toewijzen",
                     "assignCancel": "Annuleren",
-                    "unassign": "Verwijderen van dit Idee",
-                    "unassignedToast": "{name} verwijderd van dit Idee",
-                    "unassignFailed": "Kon Agent niet verwijderen"
+                    "unassign": "Loskoppelen van dit Idee",
+                    "unassignedToast": "{name} losgekoppeld van dit Idee",
+                    "unassignFailed": "Kon Agent niet loskoppelen"
                 },
                 "meta": {
                     "source": "Bron",
@@ -1833,7 +1833,7 @@
                         "build-in-flight": "Verwijderen kan niet tijdens een build. Wacht tot die klaar is.",
                         "unknown": "Dit Idee kan nu niet worden verwijderd."
                     },
-                    "unlinksWorks": "Dit Idee is gekoppeld aan {count} Work(s). Die blijven behouden — alleen de koppeling wordt verwijderd."
+                    "unlinksWorks": "{count, plural, one {Dit Idee is gekoppeld aan # Work. Dat Work blijft behouden — alleen de koppeling wordt verwijderd.} other {Dit Idee is gekoppeld aan # Works. Die Works blijven behouden — alleen de koppeling wordt verwijderd.}}"
                 },
                 "toasts": {
                     "built": "Work gebouwd uit dit Idee",

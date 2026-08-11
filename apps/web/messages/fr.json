@@ -1864,7 +1864,7 @@
                         "build-in-flight": "Suppression impossible pendant une construction. Attendez la fin.",
                         "unknown": "Impossible de supprimer cette Idée pour le moment."
                     },
-                    "unlinksWorks": "Cette Idée est liée à {count} Work(s). Ils seront conservés — seul le lien est supprimé."
+                    "unlinksWorks": "{count, plural, one {Cette Idée est liée à # Work. Ce Work sera conservé — seul le lien est supprimé.} other {Cette Idée est liée à # Works. Ces Works seront conservés — seul le lien est supprimé.}}"
                 },
                 "toasts": {
                     "built": "Work construit à partir de cette Idée",

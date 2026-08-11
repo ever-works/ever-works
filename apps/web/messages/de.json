@@ -1864,7 +1864,7 @@
                         "build-in-flight": "Löschen während eines laufenden Builds nicht möglich. Bitte warten.",
                         "unknown": "Diese Idee kann derzeit nicht gelöscht werden."
                     },
-                    "unlinksWorks": "Diese Idee ist mit {count} Work(s) verknüpft. Sie bleiben erhalten — nur die Verknüpfung wird entfernt."
+                    "unlinksWorks": "{count, plural, one {Diese Idee ist mit # Work verknüpft. Das Work bleibt erhalten — nur die Verknüpfung wird entfernt.} other {Diese Idee ist mit # Works verknüpft. Die Works bleiben erhalten — nur die Verknüpfung wird entfernt.}}"
                 },
                 "toasts": {
                     "built": "Work aus dieser Idee gebaut",
