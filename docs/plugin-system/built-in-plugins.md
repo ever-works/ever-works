@@ -919,6 +919,19 @@ Pipeline plugin that executes Composio tools during work generation. Gives Ever 
 
 See [Composio Plugin](./composio-plugin.md) for setup. Refer to `packages/plugins/composio/src/` for the current settings schema.
 
+### Activepieces Automation
+
+Pipeline plugin that delegates work generation to Activepieces flows. It triggers a flow webhook at the execute stage and collects structured items from the flow's Return Response action — an AI-first, open-source alternative to Make.com and Zapier that you can self-host or run on Activepieces Cloud.
+
+| Field              | Value                              |
+| ------------------ | ---------------------------------- |
+| Plugin ID          | `activepieces`                     |
+| Configuration Mode | `user-required`                    |
+| Auto Enable        | No                                 |
+| Capabilities       | `pipeline`, `form-schema-provider` |
+
+See [Activepieces Plugin](./activepieces-plugin.md) for setup. Refer to `packages/plugins/activepieces/src/` for the current settings schema.
+
 ## Prompt Management
 
 ### Langfuse

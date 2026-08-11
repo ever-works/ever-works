@@ -262,6 +262,7 @@ const sidebars: SidebarsConfig = {
 				'plugin-system/sim-ai-plugin',
 				'plugin-system/zapier-plugin',
 				'plugin-system/composio-plugin',
+				'plugin-system/activepieces-plugin',
 				'plugin-system/linkup-plugin',
 				'plugin-system/langfuse-plugin',
 				'plugin-system/vercel-ai-gateway-plugin',
