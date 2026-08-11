@@ -83,7 +83,7 @@ Three things are worth knowing before you start:
 
 - **Every step that asks you something can be skipped.** The footer
   carries a skip action all the way to the final step — labelled
-  *Skip — set up later* on the plugins step — and skipping is recorded,
+  _Skip — set up later_ on the plugins step — and skipping is recorded,
   not punished. You can also leave the whole thing with **Close wizard**
   at the bottom of the stepper.
 - **Your choices are saved as you make them.** Each transition is written
@@ -102,18 +102,18 @@ again. Dismissing that badge does not mark setup as complete.
 
 With the Ever Works defaults kept, the wizard is ten steps:
 
-| #   | Step                        | What you choose                                                  |
-| --- | --------------------------- | ---------------------------------------------------------------- |
-| 1   | **Welcome**                 | Nothing — an intro plus a preview of the steps ahead.            |
-| 2   | **Your AI choice**          | Which AI provider powers content generation.                     |
-| 3   | **Your Git Storage**        | Where your Work repositories live.                               |
-| 4   | **Your DB Storage**         | Where your Works store their data.                               |
-| 5   | **Your deployment**         | Where your Works get deployed.                                   |
-| 6   | **Where it runs**           | Whether Ever Works itself runs hosted, on your machine, or on your machines. |
-| 7   | **What do you do**          | Your roles and team size — used to suggest starting points.      |
-| 8   | **Communication**           | The chat workspace your team lives in.                           |
-| 9   | **Plugins & Integrations**  | Optional power-user integrations.                                |
-| 10  | **Create your first Work**  | The prompt, and the button that generates it.                    |
+| #   | Step                       | What you choose                                                              |
+| --- | -------------------------- | ---------------------------------------------------------------------------- |
+| 1   | **Welcome**                | Nothing — an intro plus a preview of the steps ahead.                        |
+| 2   | **Your AI choice**         | Which AI provider powers content generation.                                 |
+| 3   | **Your Git Storage**       | Where your Work repositories live.                                           |
+| 4   | **Your DB Storage**        | Where your Works store their data.                                           |
+| 5   | **Your deployment**        | Where your Works get deployed.                                               |
+| 6   | **Where it runs**          | Whether Ever Works itself runs hosted, on your machine, or on your machines. |
+| 7   | **What do you do**         | Your roles and team size — used to suggest starting points.                  |
+| 8   | **Communication**          | The chat workspace your team lives in.                                       |
+| 9   | **Plugins & Integrations** | Optional power-user integrations.                                            |
+| 10  | **Create your first Work** | The prompt, and the button that generates it.                                |
 
 Picking a bring-your-own option adds a configuration step immediately
 after the choice it belongs to, so the wizard gets **longer** as you move
@@ -150,14 +150,14 @@ follow. There is nothing to choose; **Next** moves on.
 
 Pick the AI provider that powers content generation. Six options:
 
-| Option              | Notes                                                                   |
-| ------------------- | ----------------------------------------------------------------------- |
-| **Ever Works AI**   | The default. Uses the provider Ever Works has configured. No setup.     |
-| **OpenRouter**      | Route AI calls through OpenRouter with your own API key.                |
-| **Claude Code**     | Anthropic Claude via the Claude Code CLI.                               |
-| **Codex**           | OpenAI Codex CLI, connected through a device-authorisation flow.        |
-| **Gemini**          | Google Gemini via your AI Studio API key.                               |
-| **Grok (xAI)**      | xAI Grok via your xAI API key.                                          |
+| Option            | Notes                                                               |
+| ----------------- | ------------------------------------------------------------------- |
+| **Ever Works AI** | The default. Uses the provider Ever Works has configured. No setup. |
+| **OpenRouter**    | Route AI calls through OpenRouter with your own API key.            |
+| **Claude Code**   | Anthropic Claude via the Claude Code CLI.                           |
+| **Codex**         | OpenAI Codex CLI, connected through a device-authorisation flow.    |
+| **Gemini**        | Google Gemini via your AI Studio API key.                           |
+| **Grok (xAI)**    | xAI Grok via your xAI API key.                                      |
 
 Every option except **Ever Works AI** is marked **BYOK** — bring your own
 key — and adds the **Configure AI** step where you supply the credential.
@@ -166,12 +166,12 @@ key — and adds the **Configure AI** step where you supply the credential.
 
 Where your Work repositories live. Four options:
 
-| Option              | Notes                                                     |
-| ------------------- | --------------------------------------------------------- |
-| **Ever Works Git**  | The default — a managed Ever Works GitHub org.            |
-| **Your GitHub**     | Your own GitHub account or organization.                  |
-| **Your GitLab**     | Bring your own GitLab.                                    |
-| **Your Git**        | A self-hosted Git server.                                 |
+| Option             | Notes                                          |
+| ------------------ | ---------------------------------------------- |
+| **Ever Works Git** | The default — a managed Ever Works GitHub org. |
+| **Your GitHub**    | Your own GitHub account or organization.       |
+| **Your GitLab**    | Bring your own GitLab.                         |
+| **Your Git**       | A self-hosted Git server.                      |
 
 **Your GitHub** adds the **Configure storage** step, where you sign in with
 GitHub so the platform can create repositories for you.
@@ -190,30 +190,30 @@ Where your Works keep their data. Two options:
 
 Where your Works get deployed. Three options:
 
-| Option           | Notes                                                                                     |
-| ---------------- | ----------------------------------------------------------------------------------------- |
-| **Ever Works**   | The default — deploy to the Ever Works tenant cluster. The card states the per-account cap on active Works. |
-| **Vercel**       | Your own Vercel team, using your API token.                                               |
-| **Kubernetes**   | Your own cluster — you paste a kubeconfig.                                                |
+| Option         | Notes                                                                                                       |
+| -------------- | ----------------------------------------------------------------------------------------------------------- |
+| **Ever Works** | The default — deploy to the Ever Works tenant cluster. The card states the per-account cap on active Works. |
+| **Vercel**     | Your own Vercel team, using your API token.                                                                 |
+| **Kubernetes** | Your own cluster — you paste a kubeconfig.                                                                  |
 
 **Vercel** and **Kubernetes** both add the **Configure deployment** step.
 
 ### Step 6 — Where it runs
 
 Unlike the four steps before it, this one names no provider. It records
-where Ever Works *itself* runs, which decides the guidance you get at the
+where Ever Works _itself_ runs, which decides the guidance you get at the
 end of the wizard. Three options, all always available:
 
-| Option                    | Meaning                                                                        |
-| ------------------------- | ------------------------------------------------------------------------------ |
-| **The hosted platform**   | The default. Everything runs on Ever Works; nothing to install.                |
-| **On my machine**         | [Ever Works Desktop](./desktop-app.md) runs the API and web app locally and supervises them. |
-| **On my own machines**    | The platform runs wherever you like, but your machines execute the work — enrolled as [Fleet](./fleet.md) nodes. |
+| Option                  | Meaning                                                                                                          |
+| ----------------------- | ---------------------------------------------------------------------------------------------------------------- |
+| **The hosted platform** | The default. Everything runs on Ever Works; nothing to install.                                                  |
+| **On my machine**       | [Ever Works Desktop](./desktop-app.md) runs the API and web app locally and supervises them.                     |
+| **On my own machines**  | The platform runs wherever you like, but your machines execute the work — enrolled as [Fleet](./fleet.md) nodes. |
 
 The choice decides the closing advice on the last step. Picking
-**On my machine** adds a *Finish your desktop setup* block pointing at
-**Settings → Job Runtime**; picking **On my own machines** adds an *Add
-your first node* block pointing at **Settings → Fleet**. The hosted
+**On my machine** adds a _Finish your desktop setup_ block pointing at
+**Settings → Job Runtime**; picking **On my own machines** adds an _Add
+your first node_ block pointing at **Settings → Fleet**. The hosted
 default adds nothing — there is nothing left to install.
 
 ### Step 7 — What do you do
@@ -224,22 +224,22 @@ Nothing is hidden or gated based on your answers.
 **Your roles** is a multi-select — pick as many as apply. There are
 fourteen:
 
-| Role              | As the card describes it                        |
-| ----------------- | ----------------------------------------------- |
-| Founder / CEO     | I run the company and wear many hats            |
-| Engineering       | I build and ship software                       |
-| Product           | I define what we build and why                  |
-| Marketing         | I grow awareness, content, and campaigns        |
-| Sales             | I find, pitch, and close customers              |
-| Consultant        | I deliver projects and advice for clients       |
-| Research          | I investigate, analyze, and synthesize          |
-| Operations        | I keep the business running smoothly            |
-| Support           | I help customers succeed and resolve issues     |
-| Finance           | I manage budgets, billing, and reporting        |
-| HR                | I hire, onboard, and support our people         |
-| Legal             | I handle contracts, compliance, and policy      |
-| Education         | I teach, train, or create learning content      |
-| Other             | Something else — tell us more later             |
+| Role          | As the card describes it                    |
+| ------------- | ------------------------------------------- |
+| Founder / CEO | I run the company and wear many hats        |
+| Engineering   | I build and ship software                   |
+| Product       | I define what we build and why              |
+| Marketing     | I grow awareness, content, and campaigns    |
+| Sales         | I find, pitch, and close customers          |
+| Consultant    | I deliver projects and advice for clients   |
+| Research      | I investigate, analyze, and synthesize      |
+| Operations    | I keep the business running smoothly        |
+| Support       | I help customers succeed and resolve issues |
+| Finance       | I manage budgets, billing, and reporting    |
+| HR            | I hire, onboard, and support our people     |
+| Legal         | I handle contracts, compliance, and policy  |
+| Education     | I teach, train, or create learning content  |
+| Other         | Something else — tell us more later         |
 
 **Team size** is a single-select: **Solo**, **Small (2–10)**,
 **Mid (11–50)**, **Large (51–200)** or **Enterprise (200+)**.
@@ -283,10 +283,10 @@ case the step says there are no additional integrations available.
 ### Step 10 — Create your first Work
 
 The last step. If you arrived with a prompt — typed on the marketing site,
-or carried in from earlier — the step reads *Ready to generate* and shows
+or carried in from earlier — the step reads _Ready to generate_ and shows
 the prompt in an editable box with a **Generate now** button that creates
 the Work and starts generation in one click, using the choices you just
-made. Without a prompt it reads *Create your first Work* and links into the
+made. Without a prompt it reads _Create your first Work_ and links into the
 full [Create a Work](./creating-a-work.md) form instead.
 
 Below the primary action sits the follow-on guidance chosen by
@@ -298,15 +298,15 @@ Below the primary action sits the follow-on guidance chosen by
 Nothing chosen in the wizard is locked in. The provider buckets map onto
 the plugin categories in Settings:
 
-| Wizard step        | Where to change it afterwards         |
-| ------------------ | ------------------------------------- |
-| Your AI choice     | **Settings → AI Providers**           |
-| Your Git Storage   | **Settings → Git Providers**          |
-| Your DB Storage    | **Settings → Database**               |
-| Your deployment    | **Settings → Deployment**             |
-| Where it runs      | **Settings → Fleet** / **Job Runtime** |
-| Communication      | **Settings → Plugins**                |
-| Plugins & Integrations | **Settings → Plugins**            |
+| Wizard step            | Where to change it afterwards          |
+| ---------------------- | -------------------------------------- |
+| Your AI choice         | **Settings → AI Providers**            |
+| Your Git Storage       | **Settings → Git Providers**           |
+| Your DB Storage        | **Settings → Database**                |
+| Your deployment        | **Settings → Deployment**              |
+| Where it runs          | **Settings → Fleet** / **Job Runtime** |
+| Communication          | **Settings → Plugins**                 |
+| Plugins & Integrations | **Settings → Plugins**                 |
 
 See [The Settings Map](./settings-map.md) for the full layout.
 

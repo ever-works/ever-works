@@ -18,12 +18,12 @@ into a real account — or start with one.
 Go to **`/register`** — on the hosted platform, `https://app.ever.works/register`. The form asks for
 four things:
 
-| Field                | Notes                                                             |
-| -------------------- | ----------------------------------------------------------------- |
-| **Full name**        | At least 3 characters. This becomes your display name.            |
-| **Email address**    | Must be a valid address; it is also your sign-in identifier.      |
-| **Password**         | At least 8 characters — the hint under the field says so.         |
-| **Confirm password** | Must match **Password** exactly, or the form refuses to submit.   |
+| Field                | Notes                                                           |
+| -------------------- | --------------------------------------------------------------- |
+| **Full name**        | At least 3 characters. This becomes your display name.          |
+| **Email address**    | Must be a valid address; it is also your sign-in identifier.    |
+| **Password**         | At least 8 characters — the hint under the field says so.       |
+| **Confirm password** | Must match **Password** exactly, or the form refuses to submit. |
 
 Then tick **I agree to the Terms of Service and Privacy Policy** and choose **Create account**. The
 checkbox is required: without it the form shows "Please accept the Terms of Service and Privacy
@@ -99,14 +99,14 @@ has magic links enabled — otherwise the page is just the password form.
 ### Signing in with a magic link
 
 Choose **Email me a link**, enter your email address, and choose **Send magic link**. The page then
-says *Check your inbox* and offers **Send another link** if the first one does not arrive.
+says _Check your inbox_ and offers **Send another link** if the first one does not arrive.
 
 A magic link **can only be used once and stays valid for 15 minutes**. Opening it takes you to a
 short "Signing you in" page that redeems the token and drops you at the dashboard. If the link has
 expired or has already been used, you get "This link can't be used" with a **Send a new link**
 action rather than a silent failure.
 
-The confirmation is phrased conditionally — *if* an account exists for that address, a sign-in link
+The confirmation is phrased conditionally — _if_ an account exists for that address, a sign-in link
 was sent — and reads the same either way, so the page cannot be used to discover which addresses are
 registered.
 

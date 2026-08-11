@@ -51,7 +51,7 @@ The purchase, payment-method and auto-recharge surfaces are flag-gated behind `P
 The controls at the top-right of the page offer three ways to set it:
 
 - **7d** and **30d** — rolling windows.
-- A **calendar month** picker (*Pick a month*), listing the last twelve months newest-first.
+- A **calendar month** picker (_Pick a month_), listing the last twelve months newest-first.
 - The page defaults to the **current calendar month**.
 
 A `?period=` query parameter is honoured server-side, so a link like `/settings/usage?period=2026-07` renders exactly the month it names. An unrecognised value falls back to the current month rather than blanking the page. Switching back to a period you already viewed is instant — each period's snapshot is cached client-side for the session.
@@ -72,12 +72,12 @@ A line under the tiles names the period they describe, so a screenshot is never 
 
 ### The four breakdowns
 
-| Chart              | Breaks the window down by                      |
-| ------------------ | ---------------------------------------------- |
-| **Usage per day**  | Each day in the period.                        |
-| **Usage by model** | The AI models the spend went to.               |
-| **Usage by agent** | The Agents that spent it.                      |
-| **Usage by Work**  | The Works it was spent on.                     |
+| Chart              | Breaks the window down by        |
+| ------------------ | -------------------------------- |
+| **Usage per day**  | Each day in the period.          |
+| **Usage by model** | The AI models the spend went to. |
+| **Usage by agent** | The Agents that spent it.        |
+| **Usage by Work**  | The Works it was spent on.       |
 
 Rows that cannot be attributed to a model, agent or Work are grouped under **Unattributed** rather than dropped, so the breakdowns still add up. A period with no activity says "No usage in this period." instead of drawing an empty chart, and if a panel fails to load the page says so rather than showing a misleading zero.
 

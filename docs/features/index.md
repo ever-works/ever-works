@@ -15,11 +15,11 @@ This section covers the individual capabilities that make that possible, beyond 
 
 ## Getting started
 
-| Feature                                              | Description                                                                                       |
-| ---------------------------------------------------- | ------------------------------------------------------------------------------------------------- |
-| [Creating an Account](./creating-an-account)         | Signing up, social sign-in, magic links, password reset — and what the terms checkbox records     |
-| [Onboarding & Setup Wizard](./onboarding)            | The guided walkthrough that picks your AI, storage, database, deployment and plugins              |
-| [The Settings Map](./settings-map)                   | What lives where under Settings, including Usage & Credits                                        |
+| Feature                                      | Description                                                                                   |
+| -------------------------------------------- | --------------------------------------------------------------------------------------------- |
+| [Creating an Account](./creating-an-account) | Signing up, social sign-in, magic links, password reset — and what the terms checkbox records |
+| [Onboarding & Setup Wizard](./onboarding)    | The guided walkthrough that picks your AI, storage, database, deployment and plugins          |
+| [The Settings Map](./settings-map)           | What lives where under Settings, including Usage & Credits                                    |
 
 ## The core loop
 
