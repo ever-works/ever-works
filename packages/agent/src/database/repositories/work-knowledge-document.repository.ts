@@ -10,7 +10,11 @@ import {
     KbLockMode,
     KbReviewState,
 } from '../../entities/kb-types';
-import { sanitizeLikePattern } from '../utils';
+import {
+    buildCaseInsensitiveLikeClause,
+    prepareCaseInsensitiveContainsPattern,
+    sanitizeLikePattern,
+} from '../utils';
 
 export interface KbDocumentListOptions {
     workId?: string;
@@ -121,28 +125,53 @@ export class WorkKnowledgeDocumentRepository {
      * for idempotency on `metadata.transcribedFromUploadId` so a
      * Trigger.dev retry never produces a duplicate transcript document.
      *
-     * The `metadata` column is `text` (TypeORM `simple-json`), not
-     * `jsonb`, so we must cast before applying `->>` — otherwise
-     * PostgreSQL throws `operator does not exist: text ->> unknown`
-     * and the entire transcribe pipeline crashes at the idempotency
-     * check (Greptile P2 on PR #1219). The cast is cheap and runs
-     * once per query. SQLite + Postgres path-pick differs but the
-     * `simple-json` columnar comparison still works because TypeORM
-     * stringifies on read and `LIKE` matches the JSON literal —
-     * we use the Postgres-shaped query because the production DB
-     * is Postgres; the test DB uses an in-memory mock at the repo
-     * layer (no SQL is exercised).
+     * Driver-branched, exactly like `work-knowledge-chunk.repository.ts`
+     * does for its pgvector query:
+     *
+     * - **PostgreSQL.** The `metadata` column is `text` (TypeORM
+     *   `simple-json`), not `jsonb`, so it must be cast before applying
+     *   `->>` — otherwise PostgreSQL throws
+     *   `operator does not exist: text ->> unknown` and the whole
+     *   transcribe pipeline crashes at the idempotency check (Greptile P2
+     *   on PR #1219). The cast is cheap and runs once per query.
+     * - **Everything else** (SQLite: demo, OSS self-host, local dev, CI).
+     *   `::` and `->>` are PostgreSQL-only syntax, so the statement above
+     *   is a hard syntax error there — the transcribe pipeline used to die
+     *   at exactly the check that is supposed to make it retry-safe. The
+     *   portable path narrows candidates with a LIKE over the serialized
+     *   JSON, then compares the parsed value in JS. The LIKE is only a
+     *   pre-filter (it looks for the JSON-encoded VALUE, so it is immune
+     *   to key ordering and whitespace); the in-JS `===` is authoritative,
+     *   so a nested or same-valued-different-key document cannot produce a
+     *   false positive.
      */
     async findByMetadataKey(
         workId: string,
         key: string,
         value: string,
     ): Promise<WorkKnowledgeDocument | null> {
-        return this.repository
+        const driverType = this.repository.manager.connection.options.type;
+
+        if (driverType === 'postgres') {
+            return this.repository
+                .createQueryBuilder('doc')
+                .where('doc.workId = :workId', { workId })
+                .andWhere(`(doc.metadata::jsonb) ->> :key = :value`, { key, value })
+                .getOne();
+        }
+
+        const candidates = await this.repository
             .createQueryBuilder('doc')
             .where('doc.workId = :workId', { workId })
-            .andWhere(`(doc.metadata::jsonb) ->> :key = :value`, { key, value })
-            .getOne();
+            .andWhere(buildCaseInsensitiveLikeClause('doc.metadata', 'metadataMarker'), {
+                // `JSON.stringify` produces exactly the encoding TypeORM's
+                // `simple-json` writes, so the encoded value is a substring of
+                // the stored text whenever the document really carries it.
+                metadataMarker: `%${sanitizeLikePattern(JSON.stringify(value)).toLowerCase()}%`,
+            })
+            .getMany();
+
+        return candidates.find((doc) => doc.metadata?.[key] === value) ?? null;
     }
 
     /**
@@ -259,14 +288,33 @@ export class WorkKnowledgeDocumentRepository {
             // unescaped wildcards otherwise let a caller bypass the filter
             // (e.g. `%`) or force an index-defeating leading-wildcard scan
             // (DoS amplification within the caller's authorized Work/Org).
-            // Mirrors agent.repository.ts; escape-only (no LOWER()) preserves
-            // the existing matching for legitimate input.
-            const predicate = opts.searchBody
-                ? "(doc.title LIKE :q ESCAPE '\\' OR doc.description LIKE :q ESCAPE '\\' OR doc.metadata LIKE :q ESCAPE '\\')"
-                : "(doc.title LIKE :q ESCAPE '\\' OR doc.description LIKE :q ESCAPE '\\')";
-            qb.andWhere(predicate, {
-                q: `%${sanitizeLikePattern(opts.q)}%`,
-            });
+            //
+            // Both sides are lower-cased (LOWER() on the column via
+            // `buildCaseInsensitiveLikeClause`, `.toLowerCase()` on the
+            // pattern via `prepareCaseInsensitiveContainsPattern`). SQLite's
+            // LIKE folds ASCII case for free; PostgreSQL's does not, so the
+            // previous bare LIKE made KB search case-SENSITIVE in stage and
+            // production while CI (SQLite) saw the correct results.
+            // Mirrors agent.repository.ts / work.repository.ts.
+            const searchPattern = prepareCaseInsensitiveContainsPattern(opts.q);
+            if (searchPattern) {
+                qb.andWhere(
+                    new Brackets((searchQb) => {
+                        searchQb
+                            .where(buildCaseInsensitiveLikeClause('doc.title', 'q'), {
+                                q: searchPattern,
+                            })
+                            .orWhere(buildCaseInsensitiveLikeClause('doc.description', 'q'), {
+                                q: searchPattern,
+                            });
+                        if (opts.searchBody) {
+                            searchQb.orWhere(buildCaseInsensitiveLikeClause('doc.metadata', 'q'), {
+                                q: searchPattern,
+                            });
+                        }
+                    }),
+                );
+            }
         }
 
         qb.orderBy('doc.updatedAt', 'DESC');
@@ -326,10 +374,22 @@ export class WorkKnowledgeDocumentRepository {
             // pair each predicate with an explicit ESCAPE clause — mirrors
             // `list()` above. Value is bound (not SQLi); escaping stops a
             // caller bypassing the filter or forcing a leading-wildcard scan.
-            qb.andWhere(
-                "(doc.title LIKE :aggQ ESCAPE '\\' OR doc.description LIKE :aggQ ESCAPE '\\')",
-                { aggQ: `%${sanitizeLikePattern(opts.q)}%` },
-            );
+            // Case-folded on both sides for the same PostgreSQL-vs-SQLite
+            // reason documented in `list()`.
+            const searchPattern = prepareCaseInsensitiveContainsPattern(opts.q);
+            if (searchPattern) {
+                qb.andWhere(
+                    new Brackets((searchQb) => {
+                        searchQb
+                            .where(buildCaseInsensitiveLikeClause('doc.title', 'aggQ'), {
+                                aggQ: searchPattern,
+                            })
+                            .orWhere(buildCaseInsensitiveLikeClause('doc.description', 'aggQ'), {
+                                aggQ: searchPattern,
+                            });
+                    }),
+                );
+            }
         }
     }
 

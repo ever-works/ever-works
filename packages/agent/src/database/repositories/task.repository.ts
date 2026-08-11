@@ -1,8 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { LessThanOrEqual, Repository } from 'typeorm';
+import { Brackets, LessThanOrEqual, Repository } from 'typeorm';
 import { Task, TaskStatus } from '../../entities/task.entity';
-import { sanitizeLikePattern } from '../utils';
+import {
+    buildCaseInsensitiveLikeClause,
+    prepareCaseInsensitiveContainsPattern,
+    sanitizeLikePattern,
+} from '../utils';
 
 export interface ListTasksFilter {
     status?: TaskStatus | TaskStatus[];
@@ -145,19 +149,35 @@ export class TaskRepository {
             qb.andWhere('task.parentTaskId = :parentTaskId', { parentTaskId: filter.parentTaskId });
 
         if (filter.search) {
-            // Security: escape LIKE wildcards (%/_/\) in the user-supplied
-            // search term and pair each predicate with an explicit ESCAPE
-            // clause. The value is already bound, so this is not SQLi, but
-            // unescaped wildcards otherwise let a caller bypass the filter
-            // (e.g. `%`) or force an index-defeating leading-wildcard scan.
-            // Mirrors agent.repository.ts. Escape-only (no LOWER()) preserves
-            // the existing case-sensitive matching for legitimate input.
-            qb.andWhere(
-                "(task.title LIKE :q ESCAPE '\\' OR task.slug LIKE :q ESCAPE '\\' OR task.description LIKE :q ESCAPE '\\')",
-                {
-                    q: `%${sanitizeLikePattern(filter.search)}%`,
-                },
-            );
+            // Escape LIKE wildcards (%/_/\) in the user-supplied search term
+            // and pair each predicate with an explicit ESCAPE clause. The
+            // value is already bound, so this is not SQLi, but unescaped
+            // wildcards otherwise let a caller bypass the filter (e.g. `%`)
+            // or force an index-defeating leading-wildcard scan.
+            //
+            // Both the column (LOWER(), via `buildCaseInsensitiveLikeClause`)
+            // and the pattern (via `prepareCaseInsensitiveContainsPattern`)
+            // are folded — a bare LIKE is case-SENSITIVE on PostgreSQL and
+            // case-INSENSITIVE on SQLite, so the previous clause silently
+            // returned fewer rows in stage and production than it did in CI.
+            // Mirrors agent.repository.ts / work.repository.ts.
+            const searchPattern = prepareCaseInsensitiveContainsPattern(filter.search);
+            if (searchPattern) {
+                qb.andWhere(
+                    new Brackets((searchQb) => {
+                        searchQb
+                            .where(buildCaseInsensitiveLikeClause('task.title', 'q'), {
+                                q: searchPattern,
+                            })
+                            .orWhere(buildCaseInsensitiveLikeClause('task.slug', 'q'), {
+                                q: searchPattern,
+                            })
+                            .orWhere(buildCaseInsensitiveLikeClause('task.description', 'q'), {
+                                q: searchPattern,
+                            });
+                    }),
+                );
+            }
         }
 
         // `labels` is a simple-json array; we hit it as a substring match
@@ -168,10 +188,15 @@ export class TaskRepository {
             // label before wrapping it in the `"<label>"` JSON-token match,
             // and add an explicit ESCAPE clause. Bound param (not SQLi), but
             // unescaped wildcards would let `%` match every labelled task and
-            // break out of the intended quoted-token boundary. Escape-only
-            // preserves the exact match for legitimate, wildcard-free labels.
-            qb.andWhere("task.labels LIKE :label ESCAPE '\\'", {
-                label: `%"${sanitizeLikePattern(filter.label)}"%`,
+            // break out of the intended quoted-token boundary.
+            //
+            // BOTH sides are lower-cased so the filter behaves identically on
+            // PostgreSQL and SQLite: `?label=bug` previously did not match the
+            // stored label `Bug` in stage or production, while matching fine
+            // in CI. The surrounding `"` quotes are preserved, so folding case
+            // does not widen the match from a whole JSON token to a substring.
+            qb.andWhere(buildCaseInsensitiveLikeClause('task.labels', 'label'), {
+                label: `%"${sanitizeLikePattern(filter.label).toLowerCase()}"%`,
             });
         }
 
