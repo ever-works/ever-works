@@ -14,6 +14,9 @@
 /coverage
 /e2e/.auth/
 /e2e/test-results/
+# The post-deploy smoke suite (playwright.smoke.config.ts) writes here rather
+# than under /e2e, since its testDir is /e2e-smoke.
+/test-results/
 /playwright-report/
 /blob-report/
 
