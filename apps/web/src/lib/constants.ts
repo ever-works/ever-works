@@ -9,6 +9,32 @@ export const COMPANY_OWNER_WEBSITE =
     process.env.COMPANY_OWNER_WEBSITE ||
     'https://ever.works';
 
+/**
+ * Locales written right-to-left.
+ *
+ * `<html dir>` was never set, so Arabic and Hebrew rendered left-to-right —
+ * translated text laid out backwards, with every directional CSS property
+ * (margins, alignment, icon placement) pointing the wrong way.
+ *
+ * The e2e guard did not catch it because it asserted
+ *
+ *     expect(dir).not.toBe('ltr')
+ *
+ * and `document.documentElement.dir` returns the empty string when the
+ * attribute is absent. `'' !== 'ltr'`, so an entirely missing `dir` satisfied
+ * the assertion. The spec now asserts `toBe('rtl')`.
+ *
+ * Kept as a Set of the locales this app actually ships. Adding an RTL locale
+ * to LOCALES without adding it here is the failure mode to watch for, which is
+ * why the spec iterates the real RTL list rather than a hard-coded pair.
+ */
+export const RTL_LOCALES = new Set(['ar', 'he']);
+
+/** `dir` for `<html>`: `rtl` for right-to-left locales, otherwise `ltr`. */
+export function localeDirection(locale: string): 'rtl' | 'ltr' {
+    return RTL_LOCALES.has(locale) ? 'rtl' : 'ltr';
+}
+
 // i18n
 export const LOCALES = [
     'en',

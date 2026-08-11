@@ -1,11 +1,25 @@
 import { test, expect } from '@playwright/test';
 
 /**
- * RTL locale support — pass 8. If Arabic / Hebrew / Persian locales
- * are supported, the rendered `<html dir="rtl">` should be set
- * automatically (next-intl exposes `getDir(locale)`). We don't pin a
- * specific RTL locale set — we probe the candidates and skip cleanly
- * if none are available.
+ * RTL locale support.
+ *
+ * This spec used to pass while RTL was **entirely unimplemented**. It asserted
+ *
+ *     expect(dir).not.toBe('ltr')
+ *
+ * and `document.documentElement.dir` returns the EMPTY STRING when the
+ * attribute is absent. `'' !== 'ltr'`, so a page with no `dir` at all satisfied
+ * it. Verified live on app-dev.ever.works with the locale switched to Arabic:
+ * `lang="ar"` and 530 Arabic characters rendered, but no element in the entire
+ * document carried a `dir` attribute and the computed direction from `<main>`
+ * up to `<html>` was `ltr` at every level.
+ *
+ * "Not ltr" is not the contract. The contract is `rtl`, so that is what this
+ * asserts now — an unset or `auto` value fails, which is the only way this test
+ * can notice the thing it exists to notice.
+ *
+ * `fa` and `ur` are probed too but are not shipped locales; they skip cleanly
+ * on 404 rather than failing.
  */
 
 const RTL_LOCALES = ['ar', 'he', 'fa', 'ur'];
@@ -21,9 +35,17 @@ test.describe('RTL locales — <html dir> is set when locale is RTL', () => {
             }
             expect(res!.status()).toBeLessThan(500);
             const dir = await page.evaluate(() => document.documentElement.dir);
-            // Some builds default to `auto` and let the browser detect
-            // — that's also acceptable. The wrong answer is `ltr`.
-            expect(dir, `<html dir="${dir}"> for ${loc} locale`).not.toBe('ltr');
+            expect(
+                dir,
+                `<html dir="${dir}"> for ${loc} locale — an unset or 'auto' dir is what let this ` +
+                    `spec pass while RTL was unimplemented, so only 'rtl' counts`,
+            ).toBe('rtl');
+
+            // The attribute is only half the contract: it has to actually take
+            // effect. A stylesheet forcing `direction: ltr` would leave the
+            // attribute set and the layout still backwards.
+            const computed = await page.evaluate(() => getComputedStyle(document.body).direction);
+            expect(computed, `computed direction on <body> for ${loc}`).toBe('rtl');
         });
     }
 });
