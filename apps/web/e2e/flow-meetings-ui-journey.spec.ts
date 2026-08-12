@@ -340,6 +340,63 @@ test.describe('Meetings — /meetings/:id detail (UI)', () => {
         const recording = page.getByTestId('meeting-recording-link');
         await expect(recording).toHaveAttribute('href', 'https://example.com/recording/1');
         await expect(recording).toHaveAttribute('rel', /noopener/);
+
+        // The edit card exposes every field PATCH accepts. `startedAt` and
+        // `participants` are on that list: both were previously write-once in
+        // the UI (settable at capture, uneditable afterwards) even though the
+        // API has always patched them.
+        await expect(page.getByTestId('meeting-edit-started-at')).toBeVisible();
+        await expect(page.getByTestId('meeting-edit-ended-at')).toBeVisible();
+        await expect(page.getByTestId('meeting-edit-participants')).toBeVisible();
+    });
+
+    test('the edit card rewrites the roster and the change persists', async ({ page, request }) => {
+        const token = await seededToken(request);
+        const meeting = await createMeeting(request, token, {
+            title: `Edit Roster ${suffix()}`,
+            participants: [{ name: 'Ada Lovelace', email: 'ada@example.com' }],
+        });
+
+        await page.goto(`/en/meetings/${meeting.id}`, { waitUntil: 'domcontentloaded' });
+        const roster = page.getByTestId('meeting-edit-participants');
+        await expect(roster).toBeVisible({ timeout: 30_000 });
+        // Seeded from the stored roster in the same `Name <email>` shape the
+        // capture form parses — formatParticipants is the exact inverse of
+        // parseParticipants, so the textarea round-trips without edits.
+        await expect(roster).toHaveValue('Ada Lovelace <ada@example.com>');
+
+        const save = page.getByTestId('meeting-save');
+        const next = 'Grace Hopper <grace@example.com>\nAlan Turing';
+
+        // Post-condition = the PERSISTED roster (same idiom as the rename test):
+        // re-fill only if the textarea lost its value, and stop as soon as the
+        // write lands.
+        await expect(async () => {
+            const current = (await readMeeting(request, token, meeting.id).catch(() => null)) as {
+                participants?: Array<{ name: string }>;
+            } | null;
+            if (!(current?.participants ?? []).some((p) => p.name === 'Alan Turing')) {
+                if ((await roster.inputValue().catch(() => '')) !== next) {
+                    await roster.fill(next).catch(() => undefined);
+                }
+                await save.click({ timeout: 5_000, noWaitAfter: true }).catch(() => undefined);
+            }
+            const persisted = (await readMeeting(request, token, meeting.id)) as {
+                participants: Array<{ name: string; email?: string }>;
+            };
+            expect(persisted.participants.map((p) => p.name)).toEqual([
+                'Grace Hopper',
+                'Alan Turing',
+            ]);
+            // A bare name stores no email; `Name <email>` stores both.
+            expect(persisted.participants[0].email).toBe('grace@example.com');
+            expect(persisted.participants[1].email).toBeUndefined();
+        }).toPass({ timeout: 60_000 });
+
+        // …and the read-only roster beside the form reflects the new list.
+        await expect(page.getByTestId('meeting-participants')).toContainText('Alan Turing', {
+            timeout: 30_000,
+        });
     });
 
     test('a stored transcript renders in the body and hides the composer behind Replace', async ({
@@ -446,22 +503,38 @@ test.describe('Meetings — /meetings/:id detail (UI)', () => {
         await expect(cardFor(page, meeting.id)).toContainText(renamed, { timeout: 30_000 });
     });
 
-    test('UI Delete removes the meeting and returns to the catalog', async ({ page, request }) => {
+    test('UI Delete confirms in a dialog, removes the meeting and returns to the catalog', async ({
+        page,
+        request,
+    }) => {
         const token = await seededToken(request);
         const meeting = await createMeeting(request, token, { title: `UI Delete ${suffix()}` });
 
         await page.goto(`/en/meetings/${meeting.id}`, { waitUntil: 'domcontentloaded' });
         const del = page.getByTestId('meeting-delete');
         await expect(del).toBeVisible({ timeout: 30_000 });
-        // The delete flow guards with window.confirm().
-        page.on('dialog', (dialog) => dialog.accept());
-        // Post-condition: the client `router.push('/meetings')` landed us back on
-        // the catalog. A click before hydration never even raises the confirm,
-        // and re-clicking is safe because we stop as soon as the URL matches.
-        await clickAndExpectUrl(page, del, /\/meetings$/);
-        await expect(cardFor(page, meeting.id)).toHaveCount(0);
-        // Cascade confirmed at the API: the row is gone.
+
+        // The delete flow guards with the shared in-page confirmation dialog
+        // (the same component the Mission and Task detail pages use), NOT
+        // window.confirm — so the header button opens a modal rather than
+        // deleting outright. A click landing before hydration never opens it.
+        const confirm = page.getByTestId('meeting-delete-confirm');
+        await clickUntil(del, () => confirm.isVisible().catch(() => false));
+        await expect(page.getByTestId('meeting-delete-cancel')).toBeVisible();
+
+        // Post-condition = the PERSISTED delete, not the URL: the confirm click
+        // is itself swallowable pre-hydration, and because clickUntil re-checks
+        // BEFORE clicking, a delete that already landed is never re-fired into
+        // a 404 that would surface the dialog's error row instead of navigating.
+        await clickUntil(
+            confirm,
+            async () => (await getMeetingStatus(request, token, meeting.id)) === 404,
+        );
         expect(await getMeetingStatus(request, token, meeting.id)).toBe(404);
+
+        // …and the successful delete pushed us back to the catalog.
+        await expect(page).toHaveURL(/\/meetings$/, { timeout: 30_000 });
+        await expect(cardFor(page, meeting.id)).toHaveCount(0);
     });
 
     test('an unknown meeting id renders the not-found surface, not a detail page', async ({
