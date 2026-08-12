@@ -6939,11 +6939,13 @@
             "backToMeetings": "Back to Meetings",
             "actions": {
                 "openRecording": "Open recording",
+                "edit": "编辑",
                 "delete": "Delete",
                 "attachTranscript": "Attach transcript",
                 "replaceTranscript": "Replace transcript",
                 "cancelReplace": "Cancel replace",
-                "save": "Save changes"
+                "save": "Save changes",
+                "cancel": "取消"
             },
             "sections": {
                 "summary": "Summary",

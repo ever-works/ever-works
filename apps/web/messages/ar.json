@@ -6969,11 +6969,13 @@
             "backToMeetings": "Back to Meetings",
             "actions": {
                 "openRecording": "Open recording",
+                "edit": "تعديل",
                 "delete": "Delete",
                 "attachTranscript": "Attach transcript",
                 "replaceTranscript": "Replace transcript",
                 "cancelReplace": "Cancel replace",
-                "save": "Save changes"
+                "save": "Save changes",
+                "cancel": "إلغاء"
             },
             "sections": {
                 "summary": "Summary",

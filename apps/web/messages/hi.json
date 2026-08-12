@@ -6939,11 +6939,13 @@
             "backToMeetings": "Back to Meetings",
             "actions": {
                 "openRecording": "Open recording",
+                "edit": "संपादित करें",
                 "delete": "Delete",
                 "attachTranscript": "Attach transcript",
                 "replaceTranscript": "Replace transcript",
                 "cancelReplace": "Cancel replace",
-                "save": "Save changes"
+                "save": "Save changes",
+                "cancel": "रद्द करें"
             },
             "sections": {
                 "summary": "Summary",
