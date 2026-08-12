@@ -6975,17 +6975,21 @@
                 "noParticipants": "No participants recorded."
             },
             "edit": {
-                "hint": "Rename the meeting, close it out, point it at a recording, or re-route it to a Work."
+                "hint": "Corrija os horários, renomeie a reunião, ajuste a lista de participantes, aponte para uma gravação ou redirecione-a para um Trabalho."
             },
             "fields": {
                 "title": "Title",
+                "startedAt": "Início",
                 "endedAt": "Ended at",
                 "sourceUrl": "Recording link",
                 "work": "Work",
-                "workNone": "Org-wide (no Work)"
+                "workNone": "Org-wide (no Work)",
+                "participants": "Participantes",
+                "participantsHint": "Um por linha. Use \"Nome <e-mail>\" para registrar um endereço."
             },
             "errors": {
                 "titleRequired": "Title is required.",
+                "startedAtInvalid": "A hora de início não é uma data válida.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
                 "transcriptRequired": "Transcript text is required."
@@ -6999,8 +7003,13 @@
                 "deleted": "Meeting deleted",
                 "deleteError": "Couldn't delete the meeting."
             },
-            "confirm": {
-                "delete": "Delete this meeting? Its transcript and summary will be removed. This cannot be undone."
+            "deleteDialog": {
+                "title": "Excluir esta reunião?",
+                "body": "{title} será excluída permanentemente, junto com sua transcrição e seu resumo. Esta ação não pode ser desfeita.",
+                "confirm": "Excluir reunião",
+                "cancel": "Cancelar",
+                "deleting": "Excluindo…",
+                "error": "Falha ao excluir a reunião"
             }
         },
         "agentsPreview": {

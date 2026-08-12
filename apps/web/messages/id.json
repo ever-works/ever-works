@@ -6975,17 +6975,21 @@
                 "noParticipants": "No participants recorded."
             },
             "edit": {
-                "hint": "Rename the meeting, close it out, point it at a recording, or re-route it to a Work."
+                "hint": "Perbaiki waktunya, ganti nama rapat, perbarui daftar peserta, tautkan ke rekaman, atau alihkan ke sebuah Karya."
             },
             "fields": {
                 "title": "Title",
+                "startedAt": "Mulai",
                 "endedAt": "Ended at",
                 "sourceUrl": "Recording link",
                 "work": "Work",
-                "workNone": "Org-wide (no Work)"
+                "workNone": "Org-wide (no Work)",
+                "participants": "Peserta",
+                "participantsHint": "Satu per baris. Gunakan \"Nama <email>\" untuk mencatat alamat."
             },
             "errors": {
                 "titleRequired": "Title is required.",
+                "startedAtInvalid": "Waktu mulai bukan tanggal yang valid.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
                 "transcriptRequired": "Transcript text is required."
@@ -6999,8 +7003,13 @@
                 "deleted": "Meeting deleted",
                 "deleteError": "Couldn't delete the meeting."
             },
-            "confirm": {
-                "delete": "Delete this meeting? Its transcript and summary will be removed. This cannot be undone."
+            "deleteDialog": {
+                "title": "Hapus rapat ini?",
+                "body": "{title} akan dihapus secara permanen, beserta transkrip dan ringkasannya. Tindakan ini tidak dapat dibatalkan.",
+                "confirm": "Hapus rapat",
+                "cancel": "Batal",
+                "deleting": "Menghapus…",
+                "error": "Gagal menghapus rapat"
             }
         },
         "agentsPreview": {

@@ -6975,17 +6975,21 @@
                 "noParticipants": "No participants recorded."
             },
             "edit": {
-                "hint": "Rename the meeting, close it out, point it at a recording, or re-route it to a Work."
+                "hint": "Correggi gli orari, rinomina la riunione, sistema l'elenco dei partecipanti, collega una registrazione o riassegnala a un Lavoro."
             },
             "fields": {
                 "title": "Title",
+                "startedAt": "Inizio",
                 "endedAt": "Ended at",
                 "sourceUrl": "Recording link",
                 "work": "Work",
-                "workNone": "Org-wide (no Work)"
+                "workNone": "Org-wide (no Work)",
+                "participants": "Partecipanti",
+                "participantsHint": "Uno per riga. Usa \"Nome <email>\" per registrare un indirizzo."
             },
             "errors": {
                 "titleRequired": "Title is required.",
+                "startedAtInvalid": "L'ora di inizio non è una data valida.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
                 "transcriptRequired": "Transcript text is required."
@@ -6999,8 +7003,13 @@
                 "deleted": "Meeting deleted",
                 "deleteError": "Couldn't delete the meeting."
             },
-            "confirm": {
-                "delete": "Delete this meeting? Its transcript and summary will be removed. This cannot be undone."
+            "deleteDialog": {
+                "title": "Eliminare questa riunione?",
+                "body": "{title} verrà eliminata definitivamente, insieme alla sua trascrizione e al suo riepilogo. Questa azione non può essere annullata.",
+                "confirm": "Elimina riunione",
+                "cancel": "Annulla",
+                "deleting": "Eliminazione…",
+                "error": "Impossibile eliminare la riunione"
             }
         },
         "agentsPreview": {

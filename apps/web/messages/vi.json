@@ -6975,17 +6975,21 @@
                 "noParticipants": "No participants recorded."
             },
             "edit": {
-                "hint": "Rename the meeting, close it out, point it at a recording, or re-route it to a Work."
+                "hint": "Sửa thời gian, đổi tên cuộc họp, chỉnh danh sách người tham dự, liên kết bản ghi, hoặc chuyển sang một Công việc."
             },
             "fields": {
                 "title": "Title",
+                "startedAt": "Bắt đầu",
                 "endedAt": "Ended at",
                 "sourceUrl": "Recording link",
                 "work": "Work",
-                "workNone": "Org-wide (no Work)"
+                "workNone": "Org-wide (no Work)",
+                "participants": "Người tham dự",
+                "participantsHint": "Mỗi dòng một người. Dùng \"Tên <email>\" để ghi lại địa chỉ."
             },
             "errors": {
                 "titleRequired": "Title is required.",
+                "startedAtInvalid": "Thời gian bắt đầu không phải là ngày hợp lệ.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
                 "transcriptRequired": "Transcript text is required."
@@ -6999,8 +7003,13 @@
                 "deleted": "Meeting deleted",
                 "deleteError": "Couldn't delete the meeting."
             },
-            "confirm": {
-                "delete": "Delete this meeting? Its transcript and summary will be removed. This cannot be undone."
+            "deleteDialog": {
+                "title": "Xóa cuộc họp này?",
+                "body": "{title} sẽ bị xóa vĩnh viễn, cùng với bản ghi và bản tóm tắt của nó. Không thể hoàn tác thao tác này.",
+                "confirm": "Xóa cuộc họp",
+                "cancel": "Hủy",
+                "deleting": "Đang xóa…",
+                "error": "Không thể xóa cuộc họp"
             }
         },
         "agentsPreview": {
