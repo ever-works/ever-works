@@ -71,6 +71,10 @@ export function ChatDictation({
     const recorderRef = useRef<MediaRecorder | null>(null);
     const chunksRef = useRef<Blob[]>([]);
     const streamRef = useRef<MediaStream | null>(null);
+    // Bumped whenever a session is abandoned. Anything still in flight from
+    // an earlier generation drops its text instead of appending it to a
+    // composer that has since moved on.
+    const generationRef = useRef(0);
 
     const stopTracks = useCallback(() => {
         streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -110,6 +114,7 @@ export function ChatDictation({
 
     const transcribe = useCallback(
         async (blob: Blob) => {
+            const generation = generationRef.current;
             setState('transcribing');
             try {
                 const form = new FormData();
@@ -125,7 +130,7 @@ export function ChatDictation({
                 if (!res.ok) return;
                 const body = (await res.json()) as { text?: string };
                 const text = (body.text ?? '').trim();
-                if (text) onText(text);
+                if (text && generationRef.current === generation) onText(text);
             } catch {
                 // Swallow: a failed dictation leaves the composer exactly
                 // as the user left it, which is the safe outcome.
@@ -142,6 +147,7 @@ export function ChatDictation({
             return;
         }
         try {
+            const generation = generationRef.current;
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             streamRef.current = stream;
             const recorder = new MediaRecorder(stream);
@@ -155,6 +161,13 @@ export function ChatDictation({
                     type: recorder.mimeType || 'audio/webm',
                 });
                 chunksRef.current = [];
+                // Checked HERE, not in `cancel`: `stop()` queues one last
+                // `dataavailable` after the caller returns, so the final
+                // chunk always arrives too late for the canceller to drop.
+                if (generationRef.current !== generation) {
+                    setState('idle');
+                    return;
+                }
                 if (blob.size > 0) void transcribe(blob);
                 else setState('idle');
             };
@@ -173,6 +186,25 @@ export function ChatDictation({
         recorderRef.current?.stop();
         recorderRef.current = null;
     }, []);
+
+    /** Abandon the session outright: release the mic, keep no audio, say nothing. */
+    const cancel = useCallback(() => {
+        generationRef.current += 1;
+        recorderRef.current?.stop();
+        recorderRef.current = null;
+        stopTracks();
+        setState('idle');
+    }, [stopTracks]);
+
+    // The composer can go disabled mid-recording — a reply starts streaming
+    // while the user is still speaking. Disabling the button alone would
+    // leave the recorder running with no way to reach it, the browser's
+    // recording indicator lit the whole time. The clip is DISCARDED rather
+    // than transcribed: the message it was meant for has already been sent,
+    // so its words would otherwise land in the next one.
+    useEffect(() => {
+        if (disabled && state !== 'idle') cancel();
+    }, [disabled, state, cancel]);
 
     // Built from the live list so a provider with no drawn brand mark still
     // gets a monogram — `Select` skips the icon column entirely on a miss,
