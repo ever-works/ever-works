@@ -1,6 +1,6 @@
 'use client';
 
-import { DragEvent, FormEvent, useCallback, useEffect, useRef, useState } from 'react';
+import { DragEvent, FormEvent, useEffect, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
 import { Mic, SendHorizonal, Square } from 'lucide-react';
@@ -10,6 +10,7 @@ import {
     filesFromDataTransfer,
     useChatAttachments,
 } from './ChatAttachments';
+import { ChatDictation } from './ChatDictation';
 import { useDictation } from '@/components/common/composer/use-dictation';
 import { VoiceBar } from '@/components/common/composer/VoiceBar';
 import type { ChatAttachmentRef } from '@/lib/ai/attachments';
@@ -19,8 +20,6 @@ interface ChatInputProps {
     onSubmit: (text: string, attachments: ReadonlyArray<ChatAttachmentRef>) => void;
     onStop: () => void;
 }
-
-const MAX_TEXTAREA_HEIGHT = 160;
 
 export function ChatInput({ isStreaming, onSubmit, onStop }: ChatInputProps) {
     const t = useTranslations('dashboard.aiChat');
@@ -45,7 +44,7 @@ export function ChatInput({ isStreaming, onSubmit, onStop }: ChatInputProps) {
         const el = textareaRef.current;
         if (!el) return;
         el.style.height = 'auto';
-        el.style.height = `${Math.min(el.scrollHeight, MAX_TEXTAREA_HEIGHT)}px`;
+        el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
     };
 
     // An attachment with no text is a legitimate message ("here, look at
@@ -54,54 +53,74 @@ export function ChatInput({ isStreaming, onSubmit, onStop }: ChatInputProps) {
     // which is the failure this surface exists to prevent.
     const canSend = !isStreaming && !uploading && (hasText || items.some((i) => i.ref));
 
-    /* ------------------------------------------------------------------ */
-    /* Dictation — same engine and bar as the /works composer             */
-    /* ------------------------------------------------------------------ */
-
-    // Writes straight to the DOM node and `inputRef` because the textarea is
-    // uncontrolled; going through state here would re-render the panel on
-    // every recognized phrase.
-    const writeValue = useCallback((next: string) => {
+    // Dictated text is APPENDED to whatever is already typed, never sent
+    // on its own — the user still reads it and presses send. The textarea
+    // is uncontrolled, so the DOM value and `inputRef` are updated
+    // together and `hasText` re-enables the send button.
+    const appendDictated = (text: string) => {
+        const el = textareaRef.current;
+        const existing = inputRef.current;
+        const next = existing ? `${existing.replace(/\s*$/, '')} ${text}` : text;
         inputRef.current = next;
         setHasText(next.trim().length > 0);
-        const el = textareaRef.current;
-        if (!el) return;
-        el.value = next;
-        el.style.height = 'auto';
-        el.style.height = `${Math.min(el.scrollHeight, MAX_TEXTAREA_HEIGHT)}px`;
-    }, []);
+        if (el) {
+            el.value = next;
+            el.style.height = 'auto';
+            el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+            el.focus();
+        }
+    };
+
+    /* ------------------------------------------------------------------ */
+    /* Live dictation — the /works composer's engine and bar              */
+    /*                                                                    */
+    /* One mic, two possible engines behind it. This one recognizes in    */
+    /* the browser, so text lands while you speak and no audio leaves the */
+    /* device — but it exists only where the Web Speech API does. Where   */
+    /* it doesn't, ChatDictation takes the same slot and records-and-     */
+    /* uploads instead. Both feed `appendDictated`, so either way the     */
+    /* text is appended and never sent on its own.                        */
+    /* ------------------------------------------------------------------ */
 
     // Everything this dictation session appended, so "discard" can put the
     // message back exactly as it was instead of clearing the whole field.
     const dictatedRef = useRef('');
 
-    // Dictated text is APPENDED to whatever is already typed, never sent on
-    // its own — the user still reads it and presses send.
-    const appendDictated = useCallback(
-        (text: string) => {
-            const existing = inputRef.current;
-            const separator = existing.length > 0 && !/\s$/.test(existing) ? ' ' : '';
-            const next = `${existing}${separator}${text}`;
-            dictatedRef.current += next.slice(existing.length);
-            writeValue(next);
-        },
-        [writeValue],
-    );
+    // Wraps `appendDictated` instead of duplicating it: measure the field
+    // before and after so what gets recorded is exactly what landed,
+    // separator included. Plain function, like its neighbours — useDictation
+    // parks the callback in a ref, so its identity never matters.
+    const appendLive = (text: string) => {
+        const before = inputRef.current;
+        appendDictated(text);
+        dictatedRef.current += inputRef.current.slice(before.length);
+    };
 
-    const dictation = useDictation(appendDictated);
+    const dictation = useDictation(appendLive);
 
-    const startDictation = useCallback(() => {
+    // `useDictation` can only detect Web Speech from a mount effect, so its
+    // first render always reports "unsupported". Picking the engine on that
+    // frame would mount ChatDictation in Chrome too, firing its authenticated
+    // providers request on every load before unmounting. Wait for the same
+    // effect flush that sets `supported` and choose once.
+    const [engineResolved, setEngineResolved] = useState(false);
+    useEffect(() => {
+        // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot: pairs with the capability detection inside useDictation, which is only knowable after mount.
+        setEngineResolved(true);
+    }, []);
+
+    const startDictation = () => {
         dictatedRef.current = '';
         dictation.start();
-    }, [dictation]);
+    };
 
-    const finishDictation = useCallback(() => {
+    const finishDictation = () => {
         dictation.stop();
         dictatedRef.current = '';
         textareaRef.current?.focus();
-    }, [dictation]);
+    };
 
-    const discardDictation = useCallback(() => {
+    const discardDictation = () => {
         dictation.stop();
         const appended = dictatedRef.current;
         dictatedRef.current = '';
@@ -110,10 +129,18 @@ export function ChatInput({ isStreaming, onSubmit, onStop }: ChatInputProps) {
         // edited mid-dictation we leave their text alone rather than
         // guessing which part to cut.
         if (appended && current.endsWith(appended)) {
-            writeValue(current.slice(0, current.length - appended.length));
+            const next = current.slice(0, current.length - appended.length);
+            inputRef.current = next;
+            setHasText(next.trim().length > 0);
+            const el = textareaRef.current;
+            if (el) {
+                el.value = next;
+                el.style.height = 'auto';
+                el.style.height = `${Math.min(el.scrollHeight, 160)}px`;
+            }
         }
         textareaRef.current?.focus();
-    }, [dictation, writeValue]);
+    };
 
     // A composer that goes disabled mid-sentence (a reply started streaming)
     // must not leave the mic open behind it.
@@ -138,7 +165,6 @@ export function ChatInput({ isStreaming, onSubmit, onStop }: ChatInputProps) {
         if (!trimmed && ready.length === 0) return;
         onSubmit(trimmed, ready);
         inputRef.current = '';
-        dictatedRef.current = '';
         setHasText(false);
         clear();
         if (textareaRef.current) {
@@ -146,14 +172,6 @@ export function ChatInput({ isStreaming, onSubmit, onStop }: ChatInputProps) {
             textareaRef.current.style.height = 'auto';
         }
     };
-
-    const toolbarButtonClass = cn(
-        'flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg transition-colors',
-        'text-text-muted hover:bg-card-hover hover:text-text',
-        'dark:text-white/40 dark:hover:bg-white/10 dark:hover:text-white',
-        'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-text-muted/40',
-        'disabled:cursor-not-allowed disabled:opacity-40',
-    );
 
     return (
         <div className="mt-auto px-4 pb-4 pt-2 shrink-0">
@@ -219,10 +237,9 @@ export function ChatInput({ isStreaming, onSubmit, onStop }: ChatInputProps) {
                         disabled={isStreaming}
                         autoComplete="off"
                     />
-
-                    {/* Recording is a MODE, not one more lit-up button: the bar
-                        takes the toolbar's place for as long as the mic is
-                        open, exactly as it does in the /works composer. */}
+                    {/* Live dictation is a MODE, not one more lit-up button:
+                        the bar takes the toolbar's place for as long as the
+                        mic is open, exactly as it does in the /works composer. */}
                     {dictating && dictation.startedAt !== null ? (
                         <VoiceBar
                             startedAt={dictation.startedAt}
@@ -233,63 +250,78 @@ export function ChatInput({ isStreaming, onSubmit, onStop }: ChatInputProps) {
                             testId="chat-composer"
                         />
                     ) : (
-                        <div
-                            className={cn(
-                                'flex items-center gap-0.5 px-2 pb-2 pt-1.5',
-                                'border-t border-border/[0.15] dark:border-white/[0.06]',
-                            )}
-                        >
-                            <ChatAttachButton onFiles={addFiles} disabled={isStreaming} />
-                            {dictation.supported ? (
-                                <button
-                                    type="button"
-                                    onClick={startDictation}
-                                    disabled={isStreaming}
-                                    aria-label={t('dictation.start')}
-                                    title={t('dictation.start')}
-                                    data-testid="chat-dictation-button"
-                                    className={toolbarButtonClass}
-                                >
-                                    <Mic className="h-3.5 w-3.5" aria-hidden="true" />
-                                </button>
-                            ) : null}
-
-                            {/* The panel is user-resizable, so this hint is the
+                        <div className="flex items-center justify-between gap-2 px-3 pb-2.5 pt-1">
+                            <div className="flex min-w-0 flex-1 items-center gap-1">
+                                <ChatAttachButton onFiles={addFiles} disabled={isStreaming} />
+                                {/* ONE mic, not one per engine. Where the
+                                    browser speaks (Chrome / Edge / Safari) it
+                                    drives the live engine and ChatDictation is
+                                    reduced to its provider picker; elsewhere
+                                    ChatDictation supplies both the mic and the
+                                    picker and records-and-uploads instead.
+                                    Either way the user sees one mic, because
+                                    to them it is one gesture. */}
+                                {!engineResolved ? null : dictation.supported ? (
+                                    <>
+                                        <ChatDictation
+                                            onText={appendDictated}
+                                            disabled={isStreaming}
+                                            pickerOnly
+                                        />
+                                        <button
+                                            type="button"
+                                            onClick={startDictation}
+                                            disabled={isStreaming}
+                                            aria-label={t('dictation.start')}
+                                            title={t('dictation.start')}
+                                            data-testid="chat-dictation-button"
+                                            className={cn(
+                                                'flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg transition-colors',
+                                                'text-text-muted hover:bg-card-hover hover:text-text',
+                                                'dark:text-white/40 dark:hover:bg-white/10 dark:hover:text-white',
+                                                'disabled:cursor-not-allowed disabled:opacity-40',
+                                            )}
+                                        >
+                                            <Mic className="h-3.5 w-3.5" aria-hidden="true" />
+                                        </button>
+                                    </>
+                                ) : (
+                                    <ChatDictation onText={appendDictated} disabled={isStreaming} />
+                                )}
+                                {/* The panel is user-resizable, so this hint is the
                                 one thing here that must give way: truncating it
                                 keeps the controls and the send button in place
                                 at any width instead of crowding them out. */}
-                            <span
-                                title={t('sendHint')}
-                                className="min-w-0 truncate pl-1 text-[10px] text-text-muted dark:text-white/20 select-none"
-                            >
-                                {t('sendHint')}
-                            </span>
-
-                            <div className="ml-auto flex shrink-0 items-center pl-2">
-                                {isStreaming ? (
-                                    <button
-                                        type="button"
-                                        onClick={onStop}
-                                        aria-label={t('stopGenerating')}
-                                        className="flex shrink-0 cursor-pointer items-center justify-center w-7 h-7 rounded-lg bg-danger/10 text-danger hover:bg-danger/20 transition-all duration-150"
-                                    >
-                                        <Square className="w-3 h-3" />
-                                    </button>
-                                ) : (
-                                    <button
-                                        type="submit"
-                                        disabled={!canSend}
-                                        aria-label={t('sendButton')}
-                                        className={cn(
-                                            'flex shrink-0 cursor-pointer items-center justify-center w-7 h-7 rounded-lg transition-all duration-150',
-                                            'bg-primary dark:bg-primary/80 text-white hover:bg-primary-hover dark:hover:bg-primary/90 shadow-sm',
-                                            'disabled:cursor-not-allowed disabled:opacity-40',
-                                        )}
-                                    >
-                                        <SendHorizonal className="w-3.5 h-3.5" />
-                                    </button>
-                                )}
+                                <span
+                                    title={t('sendHint')}
+                                    className="min-w-0 truncate text-[10px] text-text-muted dark:text-white/20 select-none"
+                                >
+                                    {t('sendHint')}
+                                </span>
                             </div>
+                            {isStreaming ? (
+                                <button
+                                    type="button"
+                                    onClick={onStop}
+                                    aria-label={t('stopGenerating')}
+                                    className="flex shrink-0 cursor-pointer items-center justify-center w-7 h-7 rounded-lg bg-danger/10 text-danger hover:bg-danger/20 transition-all duration-150"
+                                >
+                                    <Square className="w-3 h-3" />
+                                </button>
+                            ) : (
+                                <button
+                                    type="submit"
+                                    disabled={!canSend}
+                                    aria-label={t('sendButton')}
+                                    className={cn(
+                                        'flex shrink-0 cursor-pointer items-center justify-center w-7 h-7 rounded-lg transition-all duration-150',
+                                        'bg-primary dark:bg-primary/80 text-white hover:bg-primary-hover dark:hover:bg-primary/90 shadow-sm',
+                                        'disabled:cursor-not-allowed disabled:opacity-40',
+                                    )}
+                                >
+                                    <SendHorizonal className="w-3.5 h-3.5" />
+                                </button>
+                            )}
                         </div>
                     )}
                 </div>
