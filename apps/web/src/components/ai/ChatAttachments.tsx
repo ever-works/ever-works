@@ -64,10 +64,6 @@ const nextLocalId = () => `att-${Date.now()}-${(seq += 1)}`;
 export function useChatAttachments() {
     const t = useTranslations('dashboard.aiChat.attachments');
     const [items, setItems] = useState<ChatAttachment[]>([]);
-    const itemsRef = useRef<ChatAttachment[]>([]);
-    useEffect(() => {
-        itemsRef.current = items;
-    }, [items]);
 
     // An object URL pins the whole file in memory until revoked, so every one
     // minted here is tracked and released on removal, clear and unmount.
@@ -157,20 +153,27 @@ export function useChatAttachments() {
         (localId: string) => {
             // Revoked outside the updater — state updaters must stay pure
             // (StrictMode runs them twice in development).
-            releaseUrl(itemsRef.current.find((i) => i.localId === localId)?.previewUrl);
+            releaseUrl(items.find((i) => i.localId === localId)?.previewUrl);
             setItems((prev) => prev.filter((i) => i.localId !== localId));
         },
-        [releaseUrl],
+        [items, releaseUrl],
     );
     const clear = useCallback(() => {
-        itemsRef.current.forEach((i) => releaseUrl(i.previewUrl));
+        items.forEach((i) => releaseUrl(i.previewUrl));
         setItems([]);
-    }, [releaseUrl]);
+    }, [items, releaseUrl]);
 
-    /** Only fully-uploaded attachments are worth sending. */
+    /**
+     * Only fully-uploaded attachments are worth sending.
+     *
+     * Read off `items` — the SAME state the send button gates on. Reading a
+     * ref synced by an effect instead would let a send land in the window
+     * between an upload committing (send unlocks) and the mirror catching
+     * up, submitting the message without the file that just arrived.
+     */
     const readyRefs = useCallback(
-        () => itemsRef.current.map((i) => i.ref).filter((r): r is ChatAttachmentRef => Boolean(r)),
-        [],
+        () => items.map((i) => i.ref).filter((r): r is ChatAttachmentRef => Boolean(r)),
+        [items],
     );
     const uploading = items.some((i) => i.uploading);
 
@@ -185,7 +188,14 @@ export function ChatAttachmentChips({
     readonly onRemove: (localId: string) => void;
 }) {
     const t = useTranslations('dashboard.aiChat.attachments');
-    const previewable = useMemo(() => items.filter(isPreviewableAttachment), [items]);
+    // Exactly the set whose chips are clickable (see `canPreview` below).
+    // A failed attachment renders its error instead of a preview button, so
+    // letting the overlay's arrow keys step onto it would open something the
+    // strip itself says cannot be opened.
+    const previewable = useMemo(
+        () => items.filter((i) => isPreviewableAttachment(i) && !i.error),
+        [items],
+    );
     const [previewId, setPreviewId] = useState<string | null>(null);
     const previewIndex = previewId ? previewable.findIndex((a) => a.localId === previewId) : -1;
 

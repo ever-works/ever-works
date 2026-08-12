@@ -34,6 +34,12 @@ function textFile(name = 'notes.txt') {
 function pdfFile(name = 'brief.pdf') {
     return new File(['%PDF-'], name, { type: 'application/pdf' });
 }
+/** Over the 25 MB cap, so it lands with an error but still has a thumbnail. */
+function oversizeImage(name = 'huge.png') {
+    const file = imageFile(name);
+    Object.defineProperty(file, 'size', { value: 26 * 1024 * 1024 });
+    return file;
+}
 
 function Harness() {
     const { items, addFiles, remove } = useChatAttachments();
@@ -115,6 +121,27 @@ describe('ChatAttachmentChips', () => {
             expect(screen.getByTestId('chat-attachment-lightbox-image')).toHaveAttribute(
                 'alt',
                 'two.png',
+            ),
+        );
+    });
+
+    // A failed attachment's chip offers no preview button, so the overlay's
+    // arrow keys must not be able to reach it either — otherwise a file the
+    // strip says cannot be opened opens anyway, one keypress sideways.
+    it('keeps a failed attachment out of the arrow-key sequence', async () => {
+        render(<Harness />);
+        pick(imageFile('ok.png'), oversizeImage());
+
+        await waitFor(() => expect(screen.getAllByTestId('chat-attachment-chip')).toHaveLength(2));
+        expect(screen.getAllByTestId('chat-attachment-preview')).toHaveLength(1);
+
+        fireEvent.click(screen.getByTestId('chat-attachment-preview'));
+        fireEvent.keyDown(document, { key: 'ArrowRight' });
+
+        await waitFor(() =>
+            expect(screen.getByTestId('chat-attachment-lightbox-image')).toHaveAttribute(
+                'alt',
+                'ok.png',
             ),
         );
     });
