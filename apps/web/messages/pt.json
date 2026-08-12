@@ -6918,7 +6918,7 @@
                 "externalId": "Provider meeting ID (optional)",
                 "externalIdHint": "Used to de-duplicate against a later connector sync of the same meeting.",
                 "participants": "Participants",
-                "participantsHint": "One per line. Use \"Name <email>\" to record an address.",
+                "participantsHint": "One per line. Use \"Name '<'email>\" to record an address.",
                 "transcript": "Transcript (optional)",
                 "transcriptPlaceholder": "Ada: shipping the gate.\nGrace: reviewing the branch.",
                 "transcriptHint": "Adding a transcript runs the summary, Memory and activity pipeline. You can also attach it later from the meeting page."
@@ -6985,7 +6985,7 @@
                 "work": "Work",
                 "workNone": "Org-wide (no Work)",
                 "participants": "Participantes",
-                "participantsHint": "Um por linha. Use \"Nome <e-mail>\" para registrar um endereço."
+                "participantsHint": "Um por linha. Use \"Nome '<'e-mail>\" para registrar um endereço."
             },
             "errors": {
                 "titleRequired": "Title is required.",
