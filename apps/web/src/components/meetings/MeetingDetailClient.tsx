@@ -6,6 +6,7 @@ import {
     ChevronLeft,
     ExternalLink,
     FileText,
+    Folder,
     Info,
     Pencil,
     Sparkles,
@@ -71,8 +72,11 @@ const sectionCard =
 
 const fieldLabel = 'block text-xs font-medium text-text dark:text-text-dark mb-2';
 
+// `text-xs` throughout the edit dialog's controls, matching the Work
+// picker (Select `size="xs"`) and the roster textarea so every field in
+// the form renders at one type size.
 const dateInput = cn(
-    'w-full text-sm rounded-lg transition-colors outline-none px-4 py-2',
+    'w-full text-xs rounded-lg transition-colors outline-none px-4 py-2',
     'bg-card dark:bg-card-primary-dark',
     'border border-card-border dark:border-white/9',
     'text-text dark:text-text-dark',
@@ -624,7 +628,7 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
                         <DialogTitle className="text-base font-semibold text-text dark:text-text-dark">
                             {t('sections.edit')}
                         </DialogTitle>
-                        <DialogDescription>{t('edit.hint')}</DialogDescription>
+                        <DialogDescription className="text-xs">{t('edit.hint')}</DialogDescription>
                     </DialogHeader>
                     <div className="space-y-4" data-testid="meeting-edit">
                         <Input
@@ -632,32 +636,40 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
                             value={title}
                             onChange={(e) => setTitle(e.target.value)}
                             maxLength={MEETING_TITLE_MAX_CHARS}
+                            className="text-xs"
                         />
-                        <div>
-                            <label className={fieldLabel} htmlFor="meeting-edit-started-at">
-                                {t('fields.startedAt')}
-                            </label>
-                            <input
-                                id="meeting-edit-started-at"
-                                data-testid="meeting-edit-started-at"
-                                type="datetime-local"
-                                value={startedAt}
-                                onChange={(e) => setStartedAt(e.target.value)}
-                                className={dateInput}
-                            />
-                        </div>
-                        <div>
-                            <label className={fieldLabel} htmlFor="meeting-edit-ended-at">
-                                {t('fields.endedAt')}
-                            </label>
-                            <input
-                                id="meeting-edit-ended-at"
-                                data-testid="meeting-edit-ended-at"
-                                type="datetime-local"
-                                value={endedAt}
-                                onChange={(e) => setEndedAt(e.target.value)}
-                                className={dateInput}
-                            />
+                        {/* The two ends of the meeting are one fact, so they
+                            sit on one row. Paired on the viewport breakpoint
+                            rather than a container query: the dialog is
+                            portalled out of the page's `main` container, so
+                            an @lg/main step would never match here. */}
+                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                            <div>
+                                <label className={fieldLabel} htmlFor="meeting-edit-started-at">
+                                    {t('fields.startedAt')}
+                                </label>
+                                <input
+                                    id="meeting-edit-started-at"
+                                    data-testid="meeting-edit-started-at"
+                                    type="datetime-local"
+                                    value={startedAt}
+                                    onChange={(e) => setStartedAt(e.target.value)}
+                                    className={dateInput}
+                                />
+                            </div>
+                            <div>
+                                <label className={fieldLabel} htmlFor="meeting-edit-ended-at">
+                                    {t('fields.endedAt')}
+                                </label>
+                                <input
+                                    id="meeting-edit-ended-at"
+                                    data-testid="meeting-edit-ended-at"
+                                    type="datetime-local"
+                                    value={endedAt}
+                                    onChange={(e) => setEndedAt(e.target.value)}
+                                    className={dateInput}
+                                />
+                            </div>
                         </div>
                         <Input
                             label={t('fields.sourceUrl')}
@@ -665,19 +677,33 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
                             onChange={(e) => setSourceUrl(e.target.value)}
                             maxLength={MEETING_SOURCE_URL_MAX_CHARS}
                             placeholder="https://example.com/recordings/123"
+                            className="text-xs"
                         />
                         {works.length > 0 ? (
                             <div>
                                 <label className={fieldLabel}>{t('fields.work')}</label>
+                                {/* `data-icon` on every option (the org-wide
+                                    row included) keeps the folder in the
+                                    trigger whatever is selected, rather than
+                                    letting it appear and vanish with the
+                                    choice. */}
                                 <Select
                                     value={workId}
                                     onValueChange={setWorkId}
                                     placeholder={t('fields.workNone')}
+                                    size="xs"
                                     data-testid="meeting-edit-work"
+                                    iconMap={{
+                                        work: (
+                                            <Folder className="h-3.5 w-3.5 text-text-muted dark:text-text-muted-dark" />
+                                        ),
+                                    }}
                                 >
-                                    <option value="">{t('fields.workNone')}</option>
+                                    <option value="" data-icon="work">
+                                        {t('fields.workNone')}
+                                    </option>
                                     {works.map((work) => (
-                                        <option key={work.id} value={work.id}>
+                                        <option key={work.id} value={work.id} data-icon="work">
                                             {work.name}
                                         </option>
                                     ))}
