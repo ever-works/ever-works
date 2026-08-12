@@ -1,10 +1,16 @@
 'use client';
 
-import { useCallback, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { FileText, Loader2, Paperclip, X } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
 import { uploadFile, UploadError } from '@/lib/api/uploads';
+import { AttachmentPreview } from '@/components/common/composer/AttachmentPreview';
+import {
+    isImageFile,
+    isPreviewableAttachment,
+    type ComposerFileAttachment,
+} from '@/components/common/composer/attachments';
 import type { ChatAttachmentRef } from '@/lib/ai/attachments';
 
 /**
@@ -29,18 +35,24 @@ import type { ChatAttachmentRef } from '@/lib/ai/attachments';
  *
  * Intake lives in the HOOK, not the component, so the picker, drag-drop
  * and paste all reach the same code path instead of three copies drifting.
+ *
+ * An attachment keeps the picked `File`, which is what makes preview
+ * possible: images render from a local object URL and text / code / CSV
+ * documents are read off the file itself, so both open the moment they are
+ * picked rather than after the upload lands. The overlay is the /works
+ * composer's `AttachmentPreview`, shared rather than reimplemented — the
+ * chat panel is narrower, so only the strip differs (compact chips instead
+ * of 64px tiles); what opens out of them is identical.
  */
 
-export interface ChatAttachment {
-    /** Stable client id — a File has no natural key before upload. */
-    readonly localId: string;
-    readonly name: string;
-    readonly size: number;
-    /** 0-100 while uploading. */
-    progress: number;
+/**
+ * Structurally a `ComposerFileAttachment` so the shared preview overlay
+ * accepts it as-is, plus the resolved `ref` the chat send path forwards.
+ */
+export interface ChatAttachment extends ComposerFileAttachment {
+    readonly kind: 'file';
     /** Set once the upload resolves. */
     ref?: ChatAttachmentRef;
-    error?: string;
 }
 
 /** Matches the API's own default cap so the user is told before the wire. */
@@ -53,7 +65,25 @@ export function useChatAttachments() {
     const t = useTranslations('dashboard.aiChat.attachments');
     const [items, setItems] = useState<ChatAttachment[]>([]);
     const itemsRef = useRef<ChatAttachment[]>([]);
-    itemsRef.current = items;
+    useEffect(() => {
+        itemsRef.current = items;
+    }, [items]);
+
+    // An object URL pins the whole file in memory until revoked, so every one
+    // minted here is tracked and released on removal, clear and unmount.
+    const objectUrlsRef = useRef<Set<string>>(new Set());
+    const releaseUrl = useCallback((url: string | undefined) => {
+        if (!url || !objectUrlsRef.current.has(url)) return;
+        URL.revokeObjectURL(url);
+        objectUrlsRef.current.delete(url);
+    }, []);
+    useEffect(
+        () => () => {
+            objectUrlsRef.current.forEach((url) => URL.revokeObjectURL(url));
+            objectUrlsRef.current.clear();
+        },
+        [],
+    );
 
     const patch = useCallback((localId: string, changes: Partial<ChatAttachment>) => {
         setItems((prev) => prev.map((i) => (i.localId === localId ? { ...i, ...changes } : i)));
@@ -64,13 +94,32 @@ export function useChatAttachments() {
             const list = Array.from(files);
             if (list.length === 0) return;
 
-            const staged: ChatAttachment[] = list.map((file) => ({
-                localId: nextLocalId(),
-                name: file.name,
-                size: file.size,
-                progress: 0,
-                error: file.size > MAX_BYTES ? t('tooLarge') : undefined,
-            }));
+            const staged: ChatAttachment[] = list.map((file) => {
+                const tooLarge = file.size > MAX_BYTES;
+
+                // Minted at pick time so an image's thumbnail and preview are
+                // there immediately, not once the upload resolves.
+                let previewUrl: string | undefined;
+                if (isImageFile(file)) {
+                    try {
+                        previewUrl = URL.createObjectURL(file);
+                        objectUrlsRef.current.add(previewUrl);
+                    } catch {
+                        /* no thumbnail — degrades to the file glyph */
+                    }
+                }
+
+                return {
+                    kind: 'file' as const,
+                    localId: nextLocalId(),
+                    file,
+                    displayName: file.name,
+                    progress: 0,
+                    uploading: !tooLarge,
+                    previewUrl,
+                    error: tooLarge ? t('tooLarge') : undefined,
+                };
+            });
             setItems((prev) => [...prev, ...staged]);
 
             list.forEach((file, index) => {
@@ -82,6 +131,9 @@ export function useChatAttachments() {
                     .then((res) => {
                         patch(entry.localId, {
                             progress: 100,
+                            uploading: false,
+                            url: res.url,
+                            mimeType: res.mimeType,
                             ref: {
                                 name: res.filename || file.name,
                                 url: res.url,
@@ -92,6 +144,7 @@ export function useChatAttachments() {
                     })
                     .catch((err: unknown) => {
                         patch(entry.localId, {
+                            uploading: false,
                             error: err instanceof UploadError ? err.message : t('failed'),
                         });
                     });
@@ -101,17 +154,25 @@ export function useChatAttachments() {
     );
 
     const remove = useCallback(
-        (localId: string) => setItems((prev) => prev.filter((i) => i.localId !== localId)),
-        [],
+        (localId: string) => {
+            // Revoked outside the updater — state updaters must stay pure
+            // (StrictMode runs them twice in development).
+            releaseUrl(itemsRef.current.find((i) => i.localId === localId)?.previewUrl);
+            setItems((prev) => prev.filter((i) => i.localId !== localId));
+        },
+        [releaseUrl],
     );
-    const clear = useCallback(() => setItems([]), []);
+    const clear = useCallback(() => {
+        itemsRef.current.forEach((i) => releaseUrl(i.previewUrl));
+        setItems([]);
+    }, [releaseUrl]);
 
     /** Only fully-uploaded attachments are worth sending. */
     const readyRefs = useCallback(
         () => itemsRef.current.map((i) => i.ref).filter((r): r is ChatAttachmentRef => Boolean(r)),
         [],
     );
-    const uploading = items.some((i) => !i.ref && !i.error);
+    const uploading = items.some((i) => i.uploading);
 
     return { items, addFiles, remove, clear, readyRefs, uploading };
 }
@@ -124,40 +185,91 @@ export function ChatAttachmentChips({
     readonly onRemove: (localId: string) => void;
 }) {
     const t = useTranslations('dashboard.aiChat.attachments');
+    const previewable = useMemo(() => items.filter(isPreviewableAttachment), [items]);
+    const [previewId, setPreviewId] = useState<string | null>(null);
+    const previewIndex = previewId ? previewable.findIndex((a) => a.localId === previewId) : -1;
+
     if (items.length === 0) return null;
+
     return (
-        <ul data-testid="chat-attachment-chips" className="flex flex-wrap gap-1.5 px-3 pt-2">
-            {items.map((item) => (
-                <li
-                    key={item.localId}
-                    data-testid="chat-attachment-chip"
-                    className={cn(
-                        'flex max-w-56 items-center gap-1.5 rounded-md border px-2 py-1 text-[11px]',
-                        item.error
-                            ? 'border-red-500/40 text-red-600 dark:text-red-400'
-                            : 'border-border text-text-muted dark:border-white/15 dark:text-white/60',
-                    )}
-                    title={item.error ?? item.name}
-                >
-                    {item.ref || item.error ? (
-                        <FileText className="h-3 w-3 shrink-0" aria-hidden="true" />
-                    ) : (
-                        <Loader2 className="h-3 w-3 shrink-0 animate-spin" aria-hidden="true" />
-                    )}
-                    <span className="truncate">{item.name}</span>
-                    {!item.ref && !item.error ? <span>{item.progress}%</span> : null}
-                    <button
-                        type="button"
-                        aria-label={t('remove')}
-                        data-testid="chat-attachment-remove"
-                        onClick={() => onRemove(item.localId)}
-                        className="ml-0.5 shrink-0 rounded hover:text-text dark:hover:text-white"
-                    >
-                        <X className="h-3 w-3" />
-                    </button>
-                </li>
-            ))}
-        </ul>
+        <>
+            <ul data-testid="chat-attachment-chips" className="flex flex-wrap gap-1.5 px-3 pt-2">
+                {items.map((item) => {
+                    const canPreview = isPreviewableAttachment(item) && !item.error;
+                    const face =
+                        item.previewUrl && !item.error ? (
+                            /* eslint-disable-next-line @next/next/no-img-element --
+                               local `blob:` object URL for a just-picked file;
+                               nothing for next/image to optimize or allowlist. */
+                            <img
+                                src={item.previewUrl}
+                                alt=""
+                                decoding="async"
+                                className="size-3.5 shrink-0 rounded-sm object-cover"
+                            />
+                        ) : item.uploading ? (
+                            <Loader2 className="h-3 w-3 shrink-0 animate-spin" aria-hidden="true" />
+                        ) : (
+                            <FileText className="h-3 w-3 shrink-0" aria-hidden="true" />
+                        );
+
+                    return (
+                        <li
+                            key={item.localId}
+                            data-testid="chat-attachment-chip"
+                            className={cn(
+                                'flex max-w-56 items-center gap-1.5 rounded-md border px-2 py-1 text-[11px]',
+                                item.error
+                                    ? 'border-red-500/40 text-red-600 dark:text-red-400'
+                                    : 'border-border text-text-muted dark:border-white/15 dark:text-white/60',
+                            )}
+                            title={item.error ?? item.displayName}
+                        >
+                            {/* The chip body opens the preview; the remove
+                                button stays outside it so removing never also
+                                opens the overlay on the way out. */}
+                            {canPreview ? (
+                                <button
+                                    type="button"
+                                    onClick={() => setPreviewId(item.localId)}
+                                    aria-label={t('preview', { name: item.displayName })}
+                                    data-testid="chat-attachment-preview"
+                                    className="flex min-w-0 cursor-pointer items-center gap-1.5 rounded underline-offset-2 hover:text-text hover:underline dark:hover:text-white"
+                                >
+                                    {face}
+                                    <span className="truncate">{item.displayName}</span>
+                                </button>
+                            ) : (
+                                <>
+                                    {face}
+                                    <span className="truncate">{item.displayName}</span>
+                                </>
+                            )}
+                            {item.uploading ? <span>{item.progress}%</span> : null}
+                            <button
+                                type="button"
+                                aria-label={t('remove')}
+                                data-testid="chat-attachment-remove"
+                                onClick={() => onRemove(item.localId)}
+                                className="ml-0.5 shrink-0 rounded hover:text-text dark:hover:text-white"
+                            >
+                                <X className="h-3 w-3" />
+                            </button>
+                        </li>
+                    );
+                })}
+            </ul>
+
+            {previewIndex >= 0 ? (
+                <AttachmentPreview
+                    attachments={previewable}
+                    index={previewIndex}
+                    onIndexChange={(next) => setPreviewId(previewable[next]?.localId ?? null)}
+                    onClose={() => setPreviewId(null)}
+                    testId="chat-attachment"
+                />
+            ) : null}
+        </>
     );
 }
 
