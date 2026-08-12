@@ -1,5 +1,5 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 
 vi.mock('next-intl', () => ({
     useTranslations: () => (key: string) => key,
@@ -164,17 +164,66 @@ describe('MeetingDetailClient — delete', () => {
     });
 });
 
-describe('MeetingDetailClient — edit panel', () => {
+/** Render, then open the edit dialog that holds the editable fields. */
+function renderWithEditOpen(
+    meeting: Meeting = mkMeeting(),
+    works: { id: string; name: string }[] = [],
+) {
+    const result = render(<MeetingDetailClient meeting={meeting} works={works} />);
+    fireEvent.click(screen.getByTestId('meeting-edit-open'));
+    return result;
+}
+
+describe('MeetingDetailClient — edit dialog', () => {
+    it('keeps the form behind the header Edit button rather than in the page body', () => {
+        render(<MeetingDetailClient meeting={mkMeeting()} />);
+        expect(screen.queryByTestId('meeting-edit')).toBeNull();
+        expect(screen.queryByTestId('meeting-save')).toBeNull();
+
+        fireEvent.click(screen.getByTestId('meeting-edit-open'));
+
+        expect(screen.getByTestId('meeting-edit')).toBeTruthy();
+        expect(screen.getByTestId('meeting-save')).toBeTruthy();
+    });
+
+    it('Cancel closes the dialog without patching', () => {
+        renderWithEditOpen();
+        fireEvent.change(screen.getByLabelText('fields.title'), { target: { value: 'Renamed' } });
+        fireEvent.click(screen.getByTestId('meeting-edit-cancel'));
+        expect(updateMock).not.toHaveBeenCalled();
+    });
+
+    it('re-opening discards an abandoned draft', () => {
+        renderWithEditOpen();
+        const titleInput = () => screen.getByLabelText('fields.title') as HTMLInputElement;
+        fireEvent.change(titleInput(), { target: { value: 'Abandoned rename' } });
+        fireEvent.click(screen.getByTestId('meeting-edit-cancel'));
+
+        fireEvent.click(screen.getByTestId('meeting-edit-open'));
+        // Re-seeded from the canonical row, not left holding the draft.
+        expect(titleInput().value).toBe('Weekly roadmap review');
+    });
+
+    it('offers the Work picker, defaulting to the org-wide row, only when Works exist', () => {
+        renderWithEditOpen();
+        // Nothing to route to → no picker at all, rather than an empty one.
+        expect(screen.queryByTestId('meeting-edit-work')).toBeNull();
+
+        cleanup();
+        renderWithEditOpen(mkMeeting(), [{ id: 'work-1', name: 'Cats Directory' }]);
+        const picker = screen.getByTestId('meeting-edit-work');
+        // An org-wide meeting shows the "no Work" row as the current value.
+        expect(picker.textContent).toContain('fields.workNone');
+    });
+
     it('seeds the roster textarea from the stored participants', () => {
-        render(
-            <MeetingDetailClient
-                meeting={mkMeeting({
-                    participants: [
-                        { name: 'Ada Lovelace', email: 'ada@example.com' },
-                        { name: 'Grace Hopper' },
-                    ],
-                })}
-            />,
+        renderWithEditOpen(
+            mkMeeting({
+                participants: [
+                    { name: 'Ada Lovelace', email: 'ada@example.com' },
+                    { name: 'Grace Hopper' },
+                ],
+            }),
         );
         // formatParticipants is the exact inverse of the capture form's parser.
         expect((screen.getByTestId('meeting-edit-participants') as HTMLTextAreaElement).value).toBe(
@@ -184,7 +233,7 @@ describe('MeetingDetailClient — edit panel', () => {
 
     it('patches startedAt and participants — the two fields the UI could not edit before', async () => {
         updateMock.mockResolvedValueOnce(mkMeeting());
-        render(<MeetingDetailClient meeting={mkMeeting()} />);
+        renderWithEditOpen();
 
         fireEvent.change(screen.getByTestId('meeting-edit-started-at'), {
             target: { value: LOCAL_START },
@@ -210,11 +259,7 @@ describe('MeetingDetailClient — edit panel', () => {
 
     it('an emptied roster patches an empty array rather than skipping the field', async () => {
         updateMock.mockResolvedValueOnce(mkMeeting());
-        render(
-            <MeetingDetailClient
-                meeting={mkMeeting({ participants: [{ name: 'Ada Lovelace' }] })}
-            />,
-        );
+        renderWithEditOpen(mkMeeting({ participants: [{ name: 'Ada Lovelace' }] }));
 
         fireEvent.change(screen.getByTestId('meeting-edit-participants'), {
             target: { value: '   \n  ' },
@@ -230,7 +275,7 @@ describe('MeetingDetailClient — edit panel', () => {
     });
 
     it('refuses to save with an emptied start time (the API requires one)', () => {
-        render(<MeetingDetailClient meeting={mkMeeting()} />);
+        renderWithEditOpen();
         fireEvent.change(screen.getByTestId('meeting-edit-started-at'), { target: { value: '' } });
         fireEvent.click(screen.getByTestId('meeting-save'));
 
@@ -239,7 +284,7 @@ describe('MeetingDetailClient — edit panel', () => {
     });
 
     it('refuses to save a title that is only whitespace', () => {
-        render(<MeetingDetailClient meeting={mkMeeting()} />);
+        renderWithEditOpen();
         fireEvent.change(screen.getByLabelText('fields.title'), { target: { value: '   ' } });
         fireEvent.click(screen.getByTestId('meeting-save'));
 
@@ -248,7 +293,7 @@ describe('MeetingDetailClient — edit panel', () => {
     });
 
     it('rejects an end time before the start time', () => {
-        render(<MeetingDetailClient meeting={mkMeeting()} />);
+        renderWithEditOpen();
         fireEvent.change(screen.getByTestId('meeting-edit-started-at'), {
             target: { value: LOCAL_END },
         });
@@ -266,7 +311,7 @@ describe('MeetingDetailClient — edit panel', () => {
         // validating the new end against the PERSISTED start would too, but
         // validating a new *earlier* pair proves the draft is what counts.
         updateMock.mockResolvedValueOnce(mkMeeting());
-        render(<MeetingDetailClient meeting={mkMeeting({ endedAt: LOCAL_END_ISO })} />);
+        renderWithEditOpen(mkMeeting({ endedAt: LOCAL_END_ISO }));
 
         fireEvent.change(screen.getByTestId('meeting-edit-started-at'), {
             target: { value: '2026-05-24T07:00' },
@@ -290,11 +335,7 @@ describe('MeetingDetailClient — edit panel', () => {
 
     it('clears sourceUrl and workId with an explicit null so the API patches them', async () => {
         updateMock.mockResolvedValueOnce(mkMeeting());
-        render(
-            <MeetingDetailClient
-                meeting={mkMeeting({ sourceUrl: 'https://example.com/rec/1', workId: 'work-1' })}
-            />,
-        );
+        renderWithEditOpen(mkMeeting({ sourceUrl: 'https://example.com/rec/1', workId: 'work-1' }));
 
         fireEvent.change(screen.getByLabelText('fields.sourceUrl'), { target: { value: '  ' } });
         fireEvent.click(screen.getByTestId('meeting-save'));

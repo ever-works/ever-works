@@ -158,10 +158,14 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
  * Layout mirrors `MissionDetailClient`: every page-level action sits in a
  * single top bar on the breadcrumb line (destructive intent separated by a
  * divider), and the body splits into a content column (what the meeting
- * *says* — summary, transcript) and a context rail (what it *is* —
- * provenance, editable fields). Delete goes through the same confirmation
- * dialog the Mission and Task detail pages use, rather than a blocking
- * `window.confirm` the design system cannot style, translate or test.
+ * *says* — summary, transcript) beside a context rail (what it *is* — the
+ * provenance rows and roster).
+ *
+ * Both mutations that change the record outright — Edit and Delete — are
+ * dialogs behind that top bar, so the page itself reads as a record rather
+ * than a form. Delete uses the same confirmation dialog the Mission and
+ * Task detail pages use, rather than a blocking `window.confirm` the design
+ * system cannot style, translate or test.
  *
  * The transcript panel is deliberately honest about the pipeline's
  * BEST-EFFORT half: the API stores the transcript and only then tries
@@ -184,6 +188,7 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
 
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [deleteError, setDeleteError] = useState<string | null>(null);
+    const [editOpen, setEditOpen] = useState(false);
 
     const [title, setTitle] = useState(initial.title);
     const [sourceUrl, setSourceUrl] = useState(initial.sourceUrl ?? '');
@@ -227,6 +232,26 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
                 toast.error(err instanceof Error ? err.message : t('toasts.transcriptError'));
             }
         });
+    };
+
+    /**
+     * Re-seed every draft from the canonical row before showing the form, so
+     * a cancelled edit is genuinely discarded rather than lingering as a
+     * stale draft the next time the dialog opens.
+     */
+    const openEdit = () => {
+        setTitle(meeting.title);
+        setSourceUrl(meeting.sourceUrl ?? '');
+        setStartedAt(isoToLocalInput(meeting.startedAt));
+        setEndedAt(isoToLocalInput(meeting.endedAt));
+        setWorkId(meeting.workId ?? '');
+        setParticipantsDraft(formatParticipants(meeting.participants ?? []));
+        setEditOpen(true);
+    };
+
+    const closeEdit = () => {
+        if (pendingSave) return;
+        setEditOpen(false);
     };
 
     const saveDetails = () => {
@@ -288,6 +313,7 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
                 setEndedAt(isoToLocalInput(updated.endedAt));
                 setWorkId(updated.workId ?? '');
                 setParticipantsDraft(formatParticipants(updated.participants ?? []));
+                setEditOpen(false);
                 toast.success(t('toasts.saved'));
                 router.refresh();
             } catch (err) {
@@ -351,14 +377,20 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
                                 {t('actions.openRecording')}
                             </a>
                         ) : null}
-                        {/* The divider only earns its place when something
-                            sits to the left of it to be divided from. */}
-                        {meeting.sourceUrl ? (
-                            <span
-                                aria-hidden
-                                className="h-5 w-px shrink-0 bg-border dark:bg-border-dark"
-                            />
-                        ) : null}
+                        <button
+                            type="button"
+                            onClick={openEdit}
+                            disabled={pendingSave}
+                            className={cn(btn, 'shrink-0')}
+                            data-testid="meeting-edit-open"
+                        >
+                            <Pencil className="h-3.5 w-3.5" />
+                            {t('actions.edit')}
+                        </button>
+                        <span
+                            aria-hidden
+                            className="h-5 w-px shrink-0 bg-border dark:bg-border-dark"
+                        />
                         <button
                             type="button"
                             onClick={openDelete}
@@ -576,103 +608,124 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
                             )}
                         </div>
                     </section>
-
-                    {/* ── Edit ─────────────────────────────────────────── */}
-                    <section className={sectionCard} data-testid="meeting-edit">
-                        <SectionHeader icon={Pencil} title={t('sections.edit')} />
-                        <p className="-mt-2 mb-4 text-xs text-text-muted dark:text-text-muted-dark">
-                            {t('edit.hint')}
-                        </p>
-                        <div className="space-y-4">
-                            <Input
-                                label={t('fields.title')}
-                                value={title}
-                                onChange={(e) => setTitle(e.target.value)}
-                                maxLength={MEETING_TITLE_MAX_CHARS}
-                            />
-                            <div>
-                                <label className={fieldLabel} htmlFor="meeting-edit-started-at">
-                                    {t('fields.startedAt')}
-                                </label>
-                                <input
-                                    id="meeting-edit-started-at"
-                                    data-testid="meeting-edit-started-at"
-                                    type="datetime-local"
-                                    value={startedAt}
-                                    onChange={(e) => setStartedAt(e.target.value)}
-                                    className={dateInput}
-                                />
-                            </div>
-                            <div>
-                                <label className={fieldLabel} htmlFor="meeting-edit-ended-at">
-                                    {t('fields.endedAt')}
-                                </label>
-                                <input
-                                    id="meeting-edit-ended-at"
-                                    data-testid="meeting-edit-ended-at"
-                                    type="datetime-local"
-                                    value={endedAt}
-                                    onChange={(e) => setEndedAt(e.target.value)}
-                                    className={dateInput}
-                                />
-                            </div>
-                            <Input
-                                label={t('fields.sourceUrl')}
-                                value={sourceUrl}
-                                onChange={(e) => setSourceUrl(e.target.value)}
-                                maxLength={MEETING_SOURCE_URL_MAX_CHARS}
-                                placeholder="https://example.com/recordings/123"
-                            />
-                            {works.length > 0 ? (
-                                <div>
-                                    <label className={fieldLabel}>{t('fields.work')}</label>
-                                    <Select
-                                        value={workId}
-                                        onValueChange={setWorkId}
-                                        placeholder={t('fields.workNone')}
-                                        data-testid="meeting-edit-work"
-                                    >
-                                        <option value="">{t('fields.workNone')}</option>
-                                        {works.map((work) => (
-                                            <option key={work.id} value={work.id}>
-                                                {work.name}
-                                            </option>
-                                        ))}
-                                    </Select>
-                                </div>
-                            ) : null}
-                            <div>
-                                <label className={fieldLabel} htmlFor="meeting-edit-participants">
-                                    {t('fields.participants')}
-                                </label>
-                                <Textarea
-                                    id="meeting-edit-participants"
-                                    data-testid="meeting-edit-participants"
-                                    value={participantsDraft}
-                                    onChange={(e) => setParticipantsDraft(e.target.value)}
-                                    rows={4}
-                                    placeholder={'Ada Lovelace <ada@example.com>\nGrace Hopper'}
-                                    className="font-mono text-xs"
-                                />
-                                <p className="mt-1.5 text-xs text-text-muted dark:text-text-muted-dark">
-                                    {t('fields.participantsHint')}
-                                </p>
-                            </div>
-                        </div>
-                        <div className="mt-5 border-t border-border/60 pt-4 dark:border-border-dark/60">
-                            <button
-                                type="button"
-                                onClick={saveDetails}
-                                disabled={pendingSave}
-                                className={btn}
-                                data-testid="meeting-save"
-                            >
-                                {t('actions.save')}
-                            </button>
-                        </div>
-                    </section>
                 </aside>
             </div>
+
+            {/* ── Edit modal ───────────────────────────────────────────────
+                The editable fields used to sit in a permanently-open card in
+                the rail, which put a form the reader rarely needs directly
+                beside the provenance rows they always read. It is now a
+                dialog behind the header's Edit button, so the page reads as
+                a record and editing is an explicit act. */}
+            <Dialog open={editOpen} onOpenChange={(next) => (next ? openEdit() : closeEdit())}>
+                <DialogContent className="max-w-lg">
+                    <DialogClose onClose={closeEdit} />
+                    <DialogHeader>
+                        <DialogTitle className="text-base font-semibold text-text dark:text-text-dark">
+                            {t('sections.edit')}
+                        </DialogTitle>
+                        <DialogDescription>{t('edit.hint')}</DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4" data-testid="meeting-edit">
+                        <Input
+                            label={t('fields.title')}
+                            value={title}
+                            onChange={(e) => setTitle(e.target.value)}
+                            maxLength={MEETING_TITLE_MAX_CHARS}
+                        />
+                        <div>
+                            <label className={fieldLabel} htmlFor="meeting-edit-started-at">
+                                {t('fields.startedAt')}
+                            </label>
+                            <input
+                                id="meeting-edit-started-at"
+                                data-testid="meeting-edit-started-at"
+                                type="datetime-local"
+                                value={startedAt}
+                                onChange={(e) => setStartedAt(e.target.value)}
+                                className={dateInput}
+                            />
+                        </div>
+                        <div>
+                            <label className={fieldLabel} htmlFor="meeting-edit-ended-at">
+                                {t('fields.endedAt')}
+                            </label>
+                            <input
+                                id="meeting-edit-ended-at"
+                                data-testid="meeting-edit-ended-at"
+                                type="datetime-local"
+                                value={endedAt}
+                                onChange={(e) => setEndedAt(e.target.value)}
+                                className={dateInput}
+                            />
+                        </div>
+                        <Input
+                            label={t('fields.sourceUrl')}
+                            value={sourceUrl}
+                            onChange={(e) => setSourceUrl(e.target.value)}
+                            maxLength={MEETING_SOURCE_URL_MAX_CHARS}
+                            placeholder="https://example.com/recordings/123"
+                        />
+                        {works.length > 0 ? (
+                            <div>
+                                <label className={fieldLabel}>{t('fields.work')}</label>
+                                <Select
+                                    value={workId}
+                                    onValueChange={setWorkId}
+                                    placeholder={t('fields.workNone')}
+                                    data-testid="meeting-edit-work"
+                                >
+                                    <option value="">{t('fields.workNone')}</option>
+                                    {works.map((work) => (
+                                        <option key={work.id} value={work.id}>
+                                            {work.name}
+                                        </option>
+                                    ))}
+                                </Select>
+                            </div>
+                        ) : null}
+                        <div>
+                            <label className={fieldLabel} htmlFor="meeting-edit-participants">
+                                {t('fields.participants')}
+                            </label>
+                            <Textarea
+                                id="meeting-edit-participants"
+                                data-testid="meeting-edit-participants"
+                                value={participantsDraft}
+                                onChange={(e) => setParticipantsDraft(e.target.value)}
+                                rows={4}
+                                placeholder={'Ada Lovelace <ada@example.com>\nGrace Hopper'}
+                                className="font-mono text-xs"
+                            />
+                            <p className="mt-1.5 text-xs text-text-muted dark:text-text-muted-dark">
+                                {t('fields.participantsHint')}
+                            </p>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button
+                            type="button"
+                            variant="secondary"
+                            size="sm"
+                            data-testid="meeting-edit-cancel"
+                            disabled={pendingSave}
+                            onClick={closeEdit}
+                        >
+                            {t('actions.cancel')}
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="primary"
+                            size="sm"
+                            data-testid="meeting-save"
+                            loading={pendingSave}
+                            onClick={saveDetails}
+                        >
+                            {t('actions.save')}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
 
             {/* ── Delete modal (mirrors the Mission detail delete dialog) ──── */}
             <Dialog
