@@ -6240,6 +6240,7 @@
             "attachments": {
                 "attach": "Attach files",
                 "remove": "Remove attachment",
+                "preview": "Vista previa de {name}",
                 "tooLarge": "File is larger than the 25 MB limit",
                 "failed": "Upload failed"
             },

@@ -6173,6 +6173,7 @@
             "attachments": {
                 "attach": "Attach files",
                 "remove": "Remove attachment",
+                "preview": "{name} 미리 보기",
                 "tooLarge": "File is larger than the 25 MB limit",
                 "failed": "Upload failed"
             },
