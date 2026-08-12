@@ -247,6 +247,7 @@ export function ChatInput({ isStreaming, onSubmit, onStop }: ChatInputProps) {
                             waveformActive={dictation.waveformActive}
                             onCancel={discardDictation}
                             onDone={finishDictation}
+                            compact
                             testId="chat-composer"
                         />
                     ) : (
