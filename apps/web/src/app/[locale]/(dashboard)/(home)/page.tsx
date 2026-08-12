@@ -18,8 +18,8 @@ import { agentsAPI } from '@/lib/api/agents';
 import { tasksAPI } from '@/lib/api/tasks';
 import { agentApprovalsAPI } from '@/lib/api/agent-approvals';
 // Dashboard blocks (spec §3) — Teams count, Soon runs, and the
-// server-composed Attention list. All three degrade gracefully when
-// their sibling-PR backends (Teams #1647, Schedules front) are absent.
+// server-composed Attention list. All three degrade gracefully (and log)
+// when their backend call fails.
 import { composeAttentionItems, getSoonRuns, getTeamsTotal } from './dashboard-data';
 
 export async function generateMetadata(): Promise<Metadata> {
@@ -134,7 +134,10 @@ export default async function Dashboard({ searchParams }: DashboardPageProps) {
             .catch(() => ({ data: [], meta: { total: 0, limit: 6, offset: 0 } })),
         // Teams count (9th tile) — `undefined` until Teams (PR #1647) wires it.
         getTeamsTotal().catch(() => undefined),
-        // Soon runs — empty until the Schedules front ships `/api/schedules`.
+        // Soon runs — the soonest upcoming Work-schedule / Mission runs from
+        // the Schedules front's `/api/schedules` aggregation. `getSoonRuns`
+        // already logs and absorbs its own transport failures; this catch is
+        // the outer belt-and-braces so the home page still renders.
         getSoonRuns().catch(() => ({ items: [], total: 0 })),
         // Match candidates for the Ideas preview's Built badge. The
         // separate `worksResponse` fetch above is capped at the 6 Works

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { UnauthorizedException, type ExecutionContext } from '@nestjs/common';
 import { ApiKeyGuard } from '../src/guards/api-key.guard.js';
 import { McpConfigService } from '../src/config/mcp-config.service.js';
+import { CallerContextService } from '../src/context/caller-context.service.js';
 
 function buildContext(headers: Record<string, string | string[]> | undefined): ExecutionContext {
 	const request = headers === undefined ? {} : { headers };
@@ -18,9 +19,9 @@ function buildContext(headers: Record<string, string | string[]> | undefined): E
 // EVER_WORKS_MCP_AUTH_MODE + EVER_WORKS_API_KEY at construction time).
 // Build a guard against a freshly-constructed config so each test gets the
 // env it expects.
-function buildGuard(): ApiKeyGuard {
+function buildGuard(callerContext: CallerContextService = new CallerContextService()): ApiKeyGuard {
 	const config = new McpConfigService();
-	return new ApiKeyGuard(config);
+	return new ApiKeyGuard(config, callerContext);
 }
 
 describe('ApiKeyGuard (H-08 constant-time + H-21 dual mode)', () => {

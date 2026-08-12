@@ -7,13 +7,23 @@ import { toast } from 'sonner';
 import { ROUTES } from '@/lib/constants';
 import { useTranslations } from 'next-intl';
 import Image from 'next/image';
-import { Github, GitlabIcon, Boxes, Check, Link as LinkIcon } from 'lucide-react';
+import { Github, GitlabIcon, Boxes, Check, Link as LinkIcon, ShieldCheck } from 'lucide-react';
 import type { ProviderWithConnection } from './page';
 
 interface GitProviderSelectorProps {
     providers: ProviderWithConnection[];
     selectedProviderId: string | null;
     onSelect: (providerId: string) => void;
+    /**
+     * True when the user's Works are pushed to the managed Ever Works GitHub
+     * org (onboarding storage choice `ever-works-git`, feature enabled).
+     * Resolved server-side — the flag behind it is an API env var.
+     *
+     * In that mode this section previously rendered "Not connected" with a
+     * Connect button for a connection nobody needs: the platform's own PAT
+     * creates the repository. We show where repos go instead.
+     */
+    managedGitStorage?: boolean;
     compact?: boolean;
 }
 
@@ -55,6 +65,7 @@ export function GitProviderSelector({
     providers,
     selectedProviderId,
     onSelect,
+    managedGitStorage = false,
     compact = false,
 }: GitProviderSelectorProps) {
     const [isPending, startTransition] = useTransition();
@@ -71,6 +82,40 @@ export function GitProviderSelector({
             }
         });
     };
+
+    // Managed Ever Works Git. Rendered INSTEAD of the provider list: with the
+    // platform creating the repository in its own org, picking a personal
+    // provider here changes nothing, and the old "Not connected / Connect"
+    // affordance pointed at an OAuth flow the user does not need.
+    if (managedGitStorage) {
+        return (
+            <div
+                className={cn(
+                    compact ? 'p-3' : 'p-4',
+                    'rounded-lg',
+                    'bg-surface dark:bg-surface-dark',
+                    'border border-border dark:border-border-dark',
+                )}
+            >
+                <div className="flex items-start gap-2.5">
+                    <div className="w-7 h-7 rounded-lg bg-emerald-500/10 flex items-center justify-center shrink-0">
+                        <ShieldCheck
+                            className="w-4 h-4 text-emerald-500 dark:text-emerald-400"
+                            strokeWidth={1.8}
+                        />
+                    </div>
+                    <div className="min-w-0">
+                        <p className="text-xs font-medium text-text dark:text-text-dark leading-none">
+                            {t('managed.title')}
+                        </p>
+                        <p className="text-[11px] text-text-muted dark:text-text-muted-dark mt-1.5 leading-snug">
+                            {t('managed.description')}
+                        </p>
+                    </div>
+                </div>
+            </div>
+        );
+    }
 
     if (providers.length === 0) {
         return (

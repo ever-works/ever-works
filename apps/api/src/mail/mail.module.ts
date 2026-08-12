@@ -1,4 +1,3 @@
-import path from 'node:path';
 import { Module } from '@nestjs/common';
 import { MailerModule } from '@nestjs-modules/mailer';
 import { HandlebarsAdapter } from '@nestjs-modules/mailer/adapters/handlebars.adapter';
@@ -9,6 +8,7 @@ import { MailService } from './mail.service';
 import { FakerMailerService } from './providers/faker-mailer.service';
 import { config } from '@src/config/constants';
 import { MailerService } from './providers/mailer.service';
+import { TEMPLATES_DIR } from './templates';
 
 @Module({
     imports: [
@@ -53,7 +53,13 @@ import { MailerService } from './providers/mailer.service';
                     from: config.mail.from(),
                 },
                 template: {
-                    dir: path.join(process.cwd(), 'src/templates'),
+                    // Resolved from this module's own location, not from
+                    // `process.cwd()`. The old cwd-relative path only existed
+                    // when the API was started from `apps/api` with the TS
+                    // sources present; in the container the process starts in
+                    // `/app` and there is no `/app/src`, so every SMTP
+                    // templated email failed with ENOENT. See ./templates.ts.
+                    dir: TEMPLATES_DIR,
                     adapter: new HandlebarsAdapter(undefined, { inlineCssEnabled: true }),
                     options: {
                         strict: true,

@@ -12,9 +12,9 @@ import {
  * `GET /api/me/work-proposals`. This file owns the runtime BEHAVIOUR of the list
  * projection: the generatedAt-DESC ordering contract (status-agnostic, tie-
  * tolerant), the limit/offset windowing algebra, the `?statuses=` UNION semantics
- * (repeated params union — comma does NOT), the env-adaptive `?search=` ILIKE
- * execution, ORDER-BY injection hardening, and own-only scoping under every one
- * of those axes.
+ * (repeated params union — comma does NOT), the `?search=` substring filter,
+ * ORDER-BY injection hardening, and own-only scoping under every one of those
+ * axes.
  *
  * Every status code, ordering rule, and env-adaptive branch asserted below was
  * probed against the LIVE API at http://127.0.0.1:3100 (sqlite in-memory,
@@ -63,10 +63,12 @@ import {
  *      string is a single invalid enum member — comma is NOT a union operator
  *      here); one bogus among repeated valid values → 400.
  *    · ?search: a whitespace-only / empty ?search trims to undefined in the
- *      controller → the ILIKE branch never runs → 200 with the UNFILTERED own
- *      set. A non-empty ?search builds a Postgres ILIKE the sqlite CI stack
- *      can't execute → env-adaptive [200 (pg) | 500 (sqlite)]; NEVER a 4xx once
- *      it passed maxLength validation.
+ *      controller → the search branch never runs → 200 with the UNFILTERED own
+ *      set. A non-empty ?search builds a portable, case-insensitive
+ *      `LOWER(col) LIKE :p ESCAPE '\'` predicate that executes identically on
+ *      Postgres and sqlite → always 200. (It used to build a Postgres-only
+ *      `ILIKE` and 500 on sqlite; these assertions tolerated the 500, which is
+ *      why nothing failed. Fixed in `work-proposal.repository.ts`.)
  *    · HARDENING: ?sort / ?order / ?orderBy / ?direction (ORDER-BY injection
  *      vectors) are rejected 400 "property <x> should not exist" — no attacker-
  *      controlled ORDER BY ever reaches the query builder.
@@ -444,7 +446,13 @@ test.describe('Work-Proposals list — ?statuses union semantics', () => {
 });
 
 // ─────────────────────────────────────────────────────────────────────────────
-// D. ?search — trim-to-no-op 200 path + env-adaptive ILIKE execution
+// D. ?search — trim-to-no-op 200 path + portable search execution
+//
+// These assertions used to read `expect([200, 500]).toContain(...)` because the
+// repository built a Postgres-only `ILIKE` that threw on sqlite. A test that
+// accepts a 500 cannot fail when the 500 spreads, so it hid the defect for as
+// long as it existed. The predicate is now portable, so 200 is the ONLY correct
+// outcome on every driver.
 // ─────────────────────────────────────────────────────────────────────────────
 test.describe('Work-Proposals list — ?search execution', () => {
     test('a whitespace-only / empty ?search trims to a no-op → 200 with the UNFILTERED own set', async ({
@@ -454,8 +462,7 @@ test.describe('Work-Proposals list — ?search execution', () => {
         const created = await createFastIdeas(request, user.access_token, 3, `noop-${stamp()}`);
 
         // The controller does `search?.trim() || undefined`, so a blank search
-        // never builds an ILIKE — it can NEVER hit the sqlite ILIKE 500 and always
-        // returns the full unfiltered list.
+        // never builds a predicate at all and always returns the full list.
         for (const qs of ['?search=', '?search=%20%20%20', '?search=%09%09']) {
             const res = await listRes(request, user.access_token, qs);
             expect(res.status(), `blank search ${qs}`).toBe(200);
@@ -466,7 +473,7 @@ test.describe('Work-Proposals list — ?search execution', () => {
         }
     });
 
-    test('a real ?search term is env-adaptive [200 | 500] and, when it executes, filters by title/description', async ({
+    test('a real ?search term returns 200 on every driver and filters by title/description', async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
@@ -477,40 +484,47 @@ test.describe('Work-Proposals list — ?search execution', () => {
         const other = await createIdea(request, token, `${IDEA_DESC_MIN} unrelated ${stamp()}`);
 
         const res = await listRes(request, token, `?search=${term}`);
-        // Postgres runs the ILIKE (200); the sqlite CI driver cannot (500). Never a
-        // 4xx — the input already passed @MaxLength(500) validation.
-        expect([200, 500]).toContain(res.status());
-        if (res.status() === 200) {
-            const rows = (await res.json()) as IdeaRow[];
-            const ids = rows.map((r) => r.id);
-            expect(ids).toContain(match.id);
-            expect(ids).not.toContain(other.id);
-            // A term nothing matches → an empty result (still 200).
-            const none = await listRes(request, token, `?search=nomatch${term}`);
-            if (none.status() === 200) {
-                expect(await none.json()).toEqual([]);
-            }
-        }
+        expect(res.status()).toBe(200);
+
+        const rows = (await res.json()) as IdeaRow[];
+        const ids = rows.map((r) => r.id);
+        expect(ids).toContain(match.id);
+        expect(ids).not.toContain(other.id);
+
+        // A term nothing matches → an empty result (still 200).
+        const none = await listRes(request, token, `?search=nomatch${term}`);
+        expect(none.status()).toBe(200);
+        expect(await none.json()).toEqual([]);
+
+        // Case-insensitive on EVERY driver: the repository lowers both the
+        // column and the pattern. A bare LIKE would match here on sqlite and
+        // silently miss on Postgres.
+        const upper = await listRes(request, token, `?search=${term.toUpperCase()}`);
+        expect(upper.status()).toBe(200);
+        expect(((await upper.json()) as IdeaRow[]).map((r) => r.id)).toContain(match.id);
     });
 
-    test('degenerate LIKE-wildcard searches (%, _, %%) are env-adaptive and never a 4xx', async ({
+    test('degenerate LIKE-wildcard searches (%, _, %%) return 200 and are escaped, not wildcards', async ({
         request,
     }) => {
         const user = await registerUserViaAPI(request);
-        await createFastIdeas(request, user.access_token, 2, `wild-${stamp()}`);
+        const created = await createFastIdeas(request, user.access_token, 2, `wild-${stamp()}`);
 
-        // Raw LIKE metacharacters are still valid INPUT (they only affect the SQL
-        // pattern) — validation passes, so the only outcomes are 200 (pg) or 500
-        // (sqlite ILIKE), never a client error.
+        // Raw LIKE metacharacters are valid INPUT — they are escaped into the
+        // pattern, so they match literally instead of acting as wildcards.
         for (const qs of ['?search=%25', '?search=_', '?search=%25%25']) {
             const res = await listRes(request, user.access_token, qs);
-            expect([200, 500], `wildcard ${qs}`).toContain(res.status());
+            expect(res.status(), `wildcard ${qs}`).toBe(200);
+            // The decisive property: an UNESCAPED `%` would match every one of
+            // the caller's Ideas (filter bypass). Escaped, it cannot.
+            const ids = ((await res.json()) as IdeaRow[]).map((r) => r.id);
+            expect(ids, `wildcard ${qs} must not return the whole own set`).not.toEqual(
+                expect.arrayContaining(created),
+            );
         }
     });
 
-    test('?search composes with ?statuses — still env-adaptive [200 | 500], never a 4xx', async ({
-        request,
-    }) => {
+    test('?search composes with ?statuses — 200, never a 4xx or 5xx', async ({ request }) => {
         const user = await registerUserViaAPI(request);
         await createFastIdeas(request, user.access_token, 2, `combo-${stamp()}`);
 
@@ -519,8 +533,7 @@ test.describe('Work-Proposals list — ?search execution', () => {
             user.access_token,
             '?statuses=pending&search=somethingHere',
         );
-        // Both fields validate cleanly; the ILIKE execution is what varies by driver.
-        expect([200, 500]).toContain(res.status());
+        expect(res.status()).toBe(200);
     });
 });
 

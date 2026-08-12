@@ -1,7 +1,9 @@
-import { Module, OnApplicationBootstrap, Inject } from '@nestjs/common';
+import { Module, OnApplicationBootstrap, Inject, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { McpModule, McpTransportType } from '@rekog/mcp-nest';
 import { McpConfigModule } from './config/config.module.js';
 import { ApiClientModule } from './api-client/api-client.module.js';
+import { CallerContextModule } from './context/caller-context.module.js';
+import { CallerContextMiddleware } from './context/caller-context.middleware.js';
 import { OpenApiToolsModule } from './openapi-tools/openapi-tools.module.js';
 import { ToolRegistrationService } from './openapi-tools/tool-registration.service.js';
 import { HealthController } from './health.controller.js';
@@ -37,14 +39,37 @@ const isHttp = transport === McpTransportType.STREAMABLE_HTTP;
 				: {})
 		}),
 		McpConfigModule,
+		CallerContextModule,
 		ApiClientModule,
 		OpenApiToolsModule
 	],
 	controllers: isHttp ? [HealthController] : [],
-	providers: [ToolRegistrationService, ApiKeyGuard, PingTool, RegisterWorkTool, ...KB_TOOL_PROVIDERS]
+	providers: [
+		ToolRegistrationService,
+		ApiKeyGuard,
+		CallerContextMiddleware,
+		PingTool,
+		RegisterWorkTool,
+		...KB_TOOL_PROVIDERS
+	]
 })
-export class AppModule implements OnApplicationBootstrap {
+export class AppModule implements OnApplicationBootstrap, NestModule {
 	constructor(@Inject(ToolRegistrationService) private readonly toolRegistration: ToolRegistrationService) {}
+
+	/**
+	 * Open the caller-context frame for every inbound HTTP request, before
+	 * guards run. Applied to `*` rather than just `/mcp` so any route added
+	 * later is covered by default — a route that silently ran outside the
+	 * frame would reintroduce exactly the dropped-identity bug this fixes.
+	 *
+	 * Not applicable to the stdio transport, which serves no HTTP routes;
+	 * there the AsyncLocalStorage store is simply absent and
+	 * `ApiClientService` falls back to the shared key, as before.
+	 */
+	configure(consumer: MiddlewareConsumer) {
+		if (!isHttp) return;
+		consumer.apply(CallerContextMiddleware).forRoutes('*');
+	}
 
 	onApplicationBootstrap() {
 		this.toolRegistration.registerTools();

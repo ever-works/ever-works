@@ -8,7 +8,7 @@ import { Toaster } from 'sonner';
 import './globals.css';
 import { themeInitScript } from '@/lib/theme-init';
 import { TopLoader } from '@/components/ui/top-loader';
-import { APP_NAME } from '@/lib/constants';
+import { APP_NAME, localeDirection } from '@/lib/constants';
 import { PostHogProvider } from '@/components/posthog/PostHogProvider';
 
 export const metadata: Metadata = {
@@ -36,7 +36,7 @@ export default async function RootLayout({
     }
 
     return (
-        <html lang={locale} suppressHydrationWarning>
+        <html lang={locale} dir={localeDirection(locale)} suppressHydrationWarning>
             <body className="antialiased" suppressHydrationWarning>
                 <Script
                     id="theme-init"

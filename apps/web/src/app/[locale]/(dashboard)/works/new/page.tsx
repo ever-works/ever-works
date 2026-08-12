@@ -18,6 +18,7 @@ import type { DeployProvider } from './deploy-provider-selector';
 import { workProposalsAPI } from '@/lib/api/work-proposals';
 import type { WorkProposal } from '@/lib/api/work-proposals';
 import { ROUTES } from '@/lib/constants';
+import { resolveManagedStorageStatus } from '@/lib/works/managed-storage';
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations('metadata.pages');
@@ -160,6 +161,15 @@ export default async function NewWorkPage({ searchParams }: NewWorkPageProps) {
     const disabledSet = await getDisabledWorkKinds(ALL_WORK_KIND_CHIP_VALUES, user.id);
     const disabledKinds = Array.from(disabledSet);
 
+    // Whether this user's Works are pushed to the managed Ever Works GitHub
+    // org. Resolved on the server from the onboarding state (the user's
+    // choice) + the onboarding catalog (the platform capability) — the same
+    // two inputs `POST /works` uses — because the flag behind it is an API
+    // env var that a client component cannot see. When it's on, the Git
+    // Provider section must not claim "Not connected": there is nothing to
+    // connect.
+    const managedStorage = await resolveManagedStorageStatus();
+
     // A kind disabled by a feature flag must not be preselectable via the
     // `?kind=` URL handoff — otherwise a user could deep-link a "Soon"
     // chip into the selected state and submit it. If the resolved kind is
@@ -181,6 +191,7 @@ export default async function NewWorkPage({ searchParams }: NewWorkPageProps) {
             initialPrompt={initialPrompt}
             initialKind={safeInitialKind}
             disabledKinds={disabledKinds}
+            managedGitStorage={managedStorage.managedGitActive}
         />
     );
 }

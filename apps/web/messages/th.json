@@ -6188,6 +6188,7 @@
             "attachments": {
                 "attach": "Attach files",
                 "remove": "Remove attachment",
+                "preview": "ดูตัวอย่าง {name}",
                 "tooLarge": "File is larger than the 25 MB limit",
                 "failed": "Upload failed"
             },

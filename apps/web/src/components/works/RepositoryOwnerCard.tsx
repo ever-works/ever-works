@@ -3,11 +3,18 @@
 import { cn } from '@/lib/utils/cn';
 import { useTranslations } from 'next-intl';
 import { OrganizationSelector } from './OrganizationSelector';
-import { GitBranch } from 'lucide-react';
+import { GitBranch, ShieldCheck } from 'lucide-react';
 
 interface RepositoryOwnerCardProps {
     gitProvider?: string;
     gitConnected?: boolean;
+    /**
+     * True when repositories are created in the managed Ever Works GitHub
+     * org. The owner is then the platform org, not something the user picks —
+     * so neither the organization selector nor the "connect a Git provider"
+     * prompt applies.
+     */
+    managedGitStorage?: boolean;
     owner: string;
     onChange: (value: string, isOrganization: boolean) => void;
     disabled?: boolean;
@@ -16,6 +23,7 @@ interface RepositoryOwnerCardProps {
 export function RepositoryOwnerCard({
     gitProvider,
     gitConnected = false,
+    managedGitStorage = false,
     owner,
     onChange,
     disabled,
@@ -37,7 +45,22 @@ export function RepositoryOwnerCard({
                     'border border-card-border dark:border-border-secondary-dark',
                 )}
             >
-                {gitProvider && gitConnected ? (
+                {managedGitStorage ? (
+                    <div className="flex items-start gap-3">
+                        <ShieldCheck
+                            className="w-8 h-8 rounded-sm bg-emerald-500/10 p-1 text-emerald-500 dark:text-emerald-400 mt-0.5 shrink-0"
+                            strokeWidth={1.4}
+                        />
+                        <div>
+                            <p className="text-sm font-normal text-text dark:text-text-dark">
+                                {t('organizationSelector.label')}
+                            </p>
+                            <p className="text-sm text-text-muted dark:text-text-muted-dark mt-1">
+                                {t('organizationSelector.managedByEverWorks')}
+                            </p>
+                        </div>
+                    </div>
+                ) : gitProvider && gitConnected ? (
                     <OrganizationSelector
                         value={owner}
                         providerId={gitProvider}

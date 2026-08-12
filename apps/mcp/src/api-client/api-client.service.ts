@@ -1,26 +1,35 @@
 import { Injectable, Inject, Scope, Optional } from '@nestjs/common';
 import { REQUEST } from '@nestjs/core';
 import { McpConfigService } from '../config/mcp-config.service.js';
+import { CallerContextService } from '../context/caller-context.service.js';
 import { ApiError } from './api-error.js';
 import { sanitizeResponse } from './sanitize.js';
 
 /**
  * H-21 — request-scoped HTTP client.
  *
- * Reads the per-user JWT (if any) from the incoming MCP request and
+ * Reads the per-user JWT (if any) for the request in flight and
  * forwards it to the upstream API. The shared `EVER_WORKS_API_KEY` is
  * still used as a fallback when the request didn't carry a JWT (`hybrid`
- * or `shared-key` modes). In `per-user-jwt` mode, the shared key is
- * never sent — only the caller's JWT — so cross-tenant access via a
- * leaked platform key becomes impossible.
+ * or `shared-key` modes) and by the stdio transport, which has no HTTP
+ * request at all. In `per-user-jwt` mode the shared key is null on the
+ * config, so it is never sent — only the caller's JWT — and cross-tenant
+ * access via a leaked platform key stays impossible.
+ *
+ * The caller's identity arrives via `CallerContextService`
+ * (`AsyncLocalStorage`), NOT via the injected `REQUEST`. See that
+ * service for why: the MCP transport binds its own adapter wrapper to
+ * the `REQUEST` token, so `httpRequest.__callerJwt` was always
+ * `undefined` and every data tool 401'd.
  */
 @Injectable({ scope: Scope.REQUEST })
 export class ApiClientService {
 	constructor(
 		@Inject(McpConfigService) private readonly config: McpConfigService,
-		// REQUEST is the inbound HTTP request when MCP is running over the
-		// HTTP transport. For stdio transport the request is absent and we
-		// fall back to the shared key.
+		@Inject(CallerContextService) private readonly callerContext: CallerContextService,
+		// Retained as a secondary source for any transport that binds the
+		// real request object to REQUEST. Never the only channel — that is
+		// exactly what broke.
 		@Optional()
 		@Inject(REQUEST)
 		private readonly httpRequest: { __callerJwt?: string } | null = null
@@ -36,7 +45,10 @@ export class ApiClientService {
 		// H-21: forward the per-user JWT if present, fall back to shared key.
 		// In `per-user-jwt` mode the shared key is null on the config, so
 		// we never send it even if a JWT is missing — the upstream will reject.
-		const callerJwt = this.httpRequest?.__callerJwt;
+		// A missing caller identity must stay a rejection: silently upgrading
+		// it to the shared platform key would turn an auth bug into a
+		// privilege-escalation bug.
+		const callerJwt = this.callerContext.getCallerJwt() ?? this.httpRequest?.__callerJwt;
 		if (callerJwt) {
 			headers['Authorization'] = `Bearer ${callerJwt}`;
 		} else if (this.config.apiKey) {

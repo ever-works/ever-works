@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import {
+    Brackets,
     EntityManager,
     FindOptionsWhere,
     In,
@@ -11,7 +12,7 @@ import {
 } from 'typeorm';
 import { Agent, AgentScope, AgentStatus, type AgentTarget } from '../../entities/agent.entity';
 import { AgentMembership } from '../../entities/agent-membership.entity';
-import { sanitizeLikePattern } from '../utils';
+import { buildCaseInsensitiveLikeClause, prepareCaseInsensitiveContainsPattern } from '../utils';
 
 /**
  * Filter shape for `findByUserIdScoped`. All fields optional — caller
@@ -171,20 +172,38 @@ export class AgentRepository {
             });
         }
         if (filter.search) {
-            // Security: escape LIKE wildcards (%/_/\) in the user-supplied
-            // search term and pair each predicate with an explicit ESCAPE
-            // clause. The value is already bound, so this is not SQLi, but
-            // unescaped wildcards otherwise let a caller bypass the filter
-            // (e.g. `%`) or force an index-defeating leading-wildcard scan
-            // (DoS amplification). Mirrors work.repository.ts /
-            // activity-log.repository.ts. Escape-only (no LOWER()) preserves
-            // the existing case-sensitive matching for legitimate input.
-            qb.andWhere(
-                "(agent.name LIKE :q ESCAPE '\\' OR agent.slug LIKE :q ESCAPE '\\' OR agent.title LIKE :q ESCAPE '\\')",
-                {
-                    q: `%${sanitizeLikePattern(filter.search)}%`,
-                },
-            );
+            // Escape LIKE wildcards (%/_/\) in the user-supplied search term
+            // and pair each predicate with an explicit ESCAPE clause. The
+            // value is already bound, so this is not SQLi, but unescaped
+            // wildcards otherwise let a caller bypass the filter (e.g. `%`)
+            // or force an index-defeating leading-wildcard scan (DoS
+            // amplification).
+            //
+            // `buildCaseInsensitiveLikeClause` also folds the column with
+            // LOWER() while `prepareCaseInsensitiveContainsPattern` folds the
+            // pattern. Both halves are required: SQLite's LIKE is
+            // case-insensitive for ASCII but PostgreSQL's is not, so a bare
+            // `LIKE` matched case-SENSITIVELY in stage and production only —
+            // searching `deploy` silently missed an Agent named `Deploy Bot`,
+            // with no error and no log line. Mirrors work.repository.ts /
+            // skill.repository.ts / activity-log.repository.ts.
+            const searchPattern = prepareCaseInsensitiveContainsPattern(filter.search);
+            if (searchPattern) {
+                qb.andWhere(
+                    new Brackets((searchQb) => {
+                        searchQb
+                            .where(buildCaseInsensitiveLikeClause('agent.name', 'q'), {
+                                q: searchPattern,
+                            })
+                            .orWhere(buildCaseInsensitiveLikeClause('agent.slug', 'q'), {
+                                q: searchPattern,
+                            })
+                            .orWhere(buildCaseInsensitiveLikeClause('agent.title', 'q'), {
+                                q: searchPattern,
+                            });
+                    }),
+                );
+            }
         }
 
         const total = await qb.getCount();

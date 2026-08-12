@@ -51,8 +51,14 @@ const sidebars: SidebarsConfig = {
 			collapsed: false,
 			link: { type: 'doc', id: 'features/index' },
 			items: [
+				// A new user's first two screens, in the order they meet
+				// them: create the account, then walk the setup wizard.
+				// The settings map follows the wizard because every choice
+				// the wizard makes is changed there afterwards.
+				'features/creating-an-account',
 				'features/creating-a-work',
 				'features/onboarding',
+				'features/settings-map',
 				'features/missions',
 				'features/ideas',
 				'features/agents',

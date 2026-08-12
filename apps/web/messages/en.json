@@ -5533,7 +5533,8 @@
                 "organizations": "Organizations",
                 "personalHelp": "The repository will be created under your personal GitHub account",
                 "organizationHelp": "The repository will be created under the {org} organization",
-                "connectRequired": "Connect a Git provider in the sidebar to choose where your repository will be created."
+                "connectRequired": "Connect a Git provider in the sidebar to choose where your repository will be created.",
+                "managedByEverWorks": "The repository will be created in the managed Ever Works GitHub organization."
             },
             "ai": {
                 "title": "Create with AI",
@@ -5905,7 +5906,11 @@
                 "connected": "Connected",
                 "connecting": "Connecting...",
                 "connect": "Connect",
-                "connectError": "Failed to connect"
+                "connectError": "Failed to connect",
+                "managed": {
+                    "title": "Ever Works Git",
+                    "description": "Your repositories are created in the managed Ever Works GitHub org — nothing to connect. Change this in onboarding under Storage."
+                }
             },
             "settings": {
                 "title": "Git Provider Connections",
@@ -6487,6 +6492,7 @@
             "attachments": {
                 "attach": "Attach files",
                 "remove": "Remove attachment",
+                "preview": "Preview {name}",
                 "tooLarge": "File is larger than the 25 MB limit",
                 "failed": "Upload failed"
             },

@@ -10,6 +10,10 @@ import {
     type WorkProposalField,
     type WorkProposalRecommendedPlugin,
 } from '../entities/work-proposal.entity';
+import {
+    buildCaseInsensitiveLikeClause,
+    prepareCaseInsensitiveContainsPattern,
+} from '../database/utils';
 
 export interface CreateWorkProposalInput {
     userId: string;
@@ -75,13 +79,29 @@ export class WorkProposalRepository {
             qb.andWhere('p.missionId = :missionId', { missionId: opts.missionId });
         }
 
-        const search = opts.search?.trim();
-        if (search) {
+        // `ILIKE` is PostgreSQL-only. SQLite has no such operator, so the
+        // previous clause threw and `GET /api/me/work-proposals?search=`
+        // returned a raw 500 on every SQLite-backed deployment (demo, OSS
+        // self-host, local dev) — the /ideas page rendered its
+        // "Could not load Ideas." alert instead of results.
+        //
+        // `buildCaseInsensitiveLikeClause` emits `LOWER(col) LIKE :p ESCAPE
+        // '\'`, which runs on PostgreSQL, MySQL and SQLite alike and is
+        // case-insensitive on all three — the same mechanism every other
+        // search surface in the repo already uses.
+        //
+        // It also closes a second gap: this was the only search path that
+        // skipped `sanitizeLikePattern`, so `?search=%` matched every row
+        // instead of a literal percent sign.
+        const searchPattern = prepareCaseInsensitiveContainsPattern(opts.search);
+        if (searchPattern) {
             qb.andWhere(
                 new Brackets((subQb) => {
                     subQb
-                        .where('p.title ILIKE :search', { search: `%${search}%` })
-                        .orWhere('p.description ILIKE :search', { search: `%${search}%` });
+                        .where(buildCaseInsensitiveLikeClause('p.title'), { search: searchPattern })
+                        .orWhere(buildCaseInsensitiveLikeClause('p.description'), {
+                            search: searchPattern,
+                        });
                 }),
             );
         }
