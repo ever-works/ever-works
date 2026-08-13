@@ -50,11 +50,27 @@ test.describe('Agents — list filtering', () => {
         expect(active.data.length).toBe(1);
         expect(active.data[0].status).toBe('active');
 
-        // Archived agents stay out of list queries even when explicitly requested.
+        // Archived agents are hidden from list queries BY DEFAULT, but are
+        // returned when explicitly requested — `AgentRepository
+        // .findByUserIdScoped` has a deliberate carve-out for exactly this,
+        // and `/agents/archived/page.tsx` depends on it: it renders
+        // `agentsAPI.list({ status: 'archived' })`.
+        //
+        // This assertion used to expect an empty list ("archived agents stay
+        // out of list queries even when explicitly requested"), which is the
+        // behaviour the carve-out was added to FIX — the repository's own
+        // comment notes that without it "the archived view is always empty".
+        // So the spec was pinning a state in which the Archived tab could
+        // never show anything, and failed against the shipped code.
+        //
+        // The default-exclusion half is covered by the sibling test above,
+        // 'default list excludes archived agents'.
         const archived = await (
             await request.get(`${API_BASE}/api/agents?status=archived`, { headers })
         ).json();
-        expect(archived.data.length).toBe(0);
+        expect(archived.data.length).toBe(1);
+        expect(archived.data[0].status).toBe('archived');
+        expect(archived.data[0].name).toBe('Gamma Archived');
     });
 
     test('?search matches on agent name', async ({ request }) => {
