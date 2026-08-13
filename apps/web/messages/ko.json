@@ -7004,6 +7004,7 @@
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
                 "participantEmailInvalid": "유효한 이메일 주소를 입력하거나 비워 두세요.",
+                "participantDuplicate": "이미 목록에 있는 사람입니다.",
                 "transcriptRequired": "Transcript text is required."
             },
             "toasts": {
@@ -7011,6 +7012,7 @@
                 "transcriptSummarized": "Transcript attached and summarized",
                 "transcriptError": "Couldn't attach the transcript.",
                 "saved": "Meeting updated",
+                "participantAdded": "참석자를 추가했습니다",
                 "saveError": "Couldn't update the meeting.",
                 "deleted": "Meeting deleted",
                 "deleteError": "Couldn't delete the meeting."
