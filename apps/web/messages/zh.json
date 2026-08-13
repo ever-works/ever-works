@@ -6942,6 +6942,7 @@
                 "edit": "编辑",
                 "delete": "Delete",
                 "attachTranscript": "Attach transcript",
+                "attaching": "正在附加…",
                 "replaceTranscript": "Replace transcript",
                 "cancelReplace": "Cancel replace",
                 "save": "Save changes",
@@ -6954,6 +6955,8 @@
                 "edit": "Edit meeting"
             },
             "summary": {
+                "generating": "正在生成摘要…",
+                "generatingHint": "正在阅读转录内容并撰写摘要，通常需要几秒钟。",
                 "notGenerated": "No summary was generated for this transcript. Enable an AI provider and re-attach the transcript to try again.",
                 "noTranscript": "Attach a transcript to generate a summary."
             },

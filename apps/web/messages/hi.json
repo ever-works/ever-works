@@ -6942,6 +6942,7 @@
                 "edit": "संपादित करें",
                 "delete": "Delete",
                 "attachTranscript": "Attach transcript",
+                "attaching": "जोड़ा जा रहा है…",
                 "replaceTranscript": "Replace transcript",
                 "cancelReplace": "Cancel replace",
                 "save": "Save changes",
@@ -6954,6 +6955,8 @@
                 "edit": "Edit meeting"
             },
             "summary": {
+                "generating": "सारांश तैयार किया जा रहा है…",
+                "generatingHint": "ट्रांसक्रिप्ट पढ़ा जा रहा है और सारांश लिखा जा रहा है — इसमें आम तौर पर कुछ सेकंड लगते हैं।",
                 "notGenerated": "No summary was generated for this transcript. Enable an AI provider and re-attach the transcript to try again.",
                 "noTranscript": "Attach a transcript to generate a summary."
             },

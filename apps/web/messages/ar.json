@@ -6972,6 +6972,7 @@
                 "edit": "تعديل",
                 "delete": "Delete",
                 "attachTranscript": "Attach transcript",
+                "attaching": "جارٍ الإرفاق…",
                 "replaceTranscript": "Replace transcript",
                 "cancelReplace": "Cancel replace",
                 "save": "Save changes",
@@ -6984,6 +6985,8 @@
                 "edit": "Edit meeting"
             },
             "summary": {
+                "generating": "جارٍ إنشاء الملخص…",
+                "generatingHint": "نقرأ النص ونكتب الملخص — يستغرق ذلك عادةً بضع ثوانٍ.",
                 "notGenerated": "No summary was generated for this transcript. Enable an AI provider and re-attach the transcript to try again.",
                 "noTranscript": "Attach a transcript to generate a summary."
             },

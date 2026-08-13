@@ -6942,6 +6942,7 @@
                 "edit": "Редагувати",
                 "delete": "Delete",
                 "attachTranscript": "Attach transcript",
+                "attaching": "Прикріплюємо…",
                 "replaceTranscript": "Replace transcript",
                 "cancelReplace": "Cancel replace",
                 "save": "Save changes",
@@ -6954,6 +6955,8 @@
                 "edit": "Edit meeting"
             },
             "summary": {
+                "generating": "Створюємо стислий виклад…",
+                "generatingHint": "Читаємо транскрипцію та пишемо стислий виклад — зазвичай це триває кілька секунд.",
                 "notGenerated": "No summary was generated for this transcript. Enable an AI provider and re-attach the transcript to try again.",
                 "noTranscript": "Attach a transcript to generate a summary."
             },

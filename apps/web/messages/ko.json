@@ -6942,6 +6942,7 @@
                 "edit": "편집",
                 "delete": "Delete",
                 "attachTranscript": "Attach transcript",
+                "attaching": "첨부하는 중…",
                 "replaceTranscript": "Replace transcript",
                 "cancelReplace": "Cancel replace",
                 "save": "Save changes",
@@ -6954,6 +6955,8 @@
                 "edit": "Edit meeting"
             },
             "summary": {
+                "generating": "요약을 생성하는 중…",
+                "generatingHint": "대화록을 읽고 요약을 작성하고 있습니다. 보통 몇 초 정도 걸립니다.",
                 "notGenerated": "No summary was generated for this transcript. Enable an AI provider and re-attach the transcript to try again.",
                 "noTranscript": "Attach a transcript to generate a summary."
             },

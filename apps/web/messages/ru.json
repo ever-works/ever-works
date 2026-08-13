@@ -6942,6 +6942,7 @@
                 "edit": "Изменить",
                 "delete": "Delete",
                 "attachTranscript": "Attach transcript",
+                "attaching": "Прикрепляем…",
                 "replaceTranscript": "Replace transcript",
                 "cancelReplace": "Cancel replace",
                 "save": "Save changes",
@@ -6954,6 +6955,8 @@
                 "edit": "Edit meeting"
             },
             "summary": {
+                "generating": "Создаём краткое содержание…",
+                "generatingHint": "Читаем расшифровку и пишем краткое содержание — обычно это занимает несколько секунд.",
                 "notGenerated": "No summary was generated for this transcript. Enable an AI provider and re-attach the transcript to try again.",
                 "noTranscript": "Attach a transcript to generate a summary."
             },

@@ -6942,6 +6942,7 @@
                 "edit": "Editar",
                 "delete": "Delete",
                 "attachTranscript": "Attach transcript",
+                "attaching": "Anexando…",
                 "replaceTranscript": "Replace transcript",
                 "cancelReplace": "Cancel replace",
                 "save": "Save changes",
@@ -6954,6 +6955,8 @@
                 "edit": "Edit meeting"
             },
             "summary": {
+                "generating": "Gerando o resumo…",
+                "generatingHint": "Estamos lendo a transcrição e escrevendo o resumo — normalmente leva alguns segundos.",
                 "notGenerated": "No summary was generated for this transcript. Enable an AI provider and re-attach the transcript to try again.",
                 "noTranscript": "Attach a transcript to generate a summary."
             },

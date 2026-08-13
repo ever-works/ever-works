@@ -6942,6 +6942,7 @@
                 "edit": "Chỉnh sửa",
                 "delete": "Delete",
                 "attachTranscript": "Attach transcript",
+                "attaching": "Đang đính kèm…",
                 "replaceTranscript": "Replace transcript",
                 "cancelReplace": "Cancel replace",
                 "save": "Save changes",
@@ -6954,6 +6955,8 @@
                 "edit": "Edit meeting"
             },
             "summary": {
+                "generating": "Đang tạo bản tóm tắt…",
+                "generatingHint": "Đang đọc bản ghi và viết bản tóm tắt — việc này thường mất vài giây.",
                 "notGenerated": "No summary was generated for this transcript. Enable an AI provider and re-attach the transcript to try again.",
                 "noTranscript": "Attach a transcript to generate a summary."
             },

@@ -6942,6 +6942,7 @@
                 "edit": "แก้ไข",
                 "delete": "Delete",
                 "attachTranscript": "Attach transcript",
+                "attaching": "กำลังแนบ…",
                 "replaceTranscript": "Replace transcript",
                 "cancelReplace": "Cancel replace",
                 "save": "Save changes",
@@ -6954,6 +6955,8 @@
                 "edit": "Edit meeting"
             },
             "summary": {
+                "generating": "กำลังสร้างสรุป…",
+                "generatingHint": "กำลังอ่านข้อความถอดเสียงและเขียนสรุป โดยปกติใช้เวลาไม่กี่วินาที",
                 "notGenerated": "No summary was generated for this transcript. Enable an AI provider and re-attach the transcript to try again.",
                 "noTranscript": "Attach a transcript to generate a summary."
             },
