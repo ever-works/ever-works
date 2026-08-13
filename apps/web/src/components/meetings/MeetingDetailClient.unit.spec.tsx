@@ -426,6 +426,17 @@ describe('MeetingDetailClient — edit dialog', () => {
     });
 });
 
+/** A meeting whose transcript has already landed. */
+const STORED = 'Ada: the gate is green.';
+
+function withTranscript(overrides: Partial<Meeting> = {}): Meeting {
+    return mkMeeting({ hasTranscript: true, transcriptText: STORED, ...overrides });
+}
+
+function composer(): HTMLTextAreaElement {
+    return screen.getByTestId('meeting-transcript-composer') as HTMLTextAreaElement;
+}
+
 describe('MeetingDetailClient — transcript', () => {
     it('shows the composer when no transcript has landed yet', () => {
         render(<MeetingDetailClient meeting={mkMeeting()} />);
@@ -435,22 +446,69 @@ describe('MeetingDetailClient — transcript', () => {
         expect(screen.getByText('summary.noTranscript')).toBeTruthy();
     });
 
-    it('collapses the composer behind Replace once a transcript exists', () => {
-        render(
-            <MeetingDetailClient
-                meeting={mkMeeting({
-                    hasTranscript: true,
-                    transcriptText: 'Ada: the gate is green.',
-                })}
-            />,
-        );
-        expect(screen.getByTestId('meeting-transcript-body').textContent).toContain(
-            'Ada: the gate is green.',
-        );
+    it('collapses the composer behind Edit once a transcript exists', () => {
+        render(<MeetingDetailClient meeting={withTranscript()} />);
+        expect(screen.getByTestId('meeting-transcript-body').textContent).toContain(STORED);
         expect(screen.queryByTestId('meeting-transcript-composer')).toBeNull();
 
-        fireEvent.click(screen.getByTestId('meeting-replace-transcript-toggle'));
+        fireEvent.click(screen.getByTestId('meeting-edit-transcript-toggle'));
         expect(screen.getByTestId('meeting-transcript-composer')).toBeTruthy();
+    });
+
+    it('edits the stored transcript in place rather than opening an empty second box', () => {
+        render(<MeetingDetailClient meeting={withTranscript()} />);
+        fireEvent.click(screen.getByTestId('meeting-edit-transcript-toggle'));
+
+        // The whole point: the editor starts from the stored text, and the
+        // read-only copy steps aside instead of sitting above a blank box.
+        expect(composer().value).toBe(STORED);
+        expect(screen.queryByTestId('meeting-transcript-body')).toBeNull();
+    });
+
+    it('posts the edited text, not a whole re-paste', async () => {
+        ingestMock.mockResolvedValueOnce({
+            meeting: withTranscript({ transcriptText: 'Ada: the gate is GREEN.' }),
+            memorySaved: false,
+            envelopeEmitted: false,
+        });
+        render(<MeetingDetailClient meeting={withTranscript()} />);
+
+        fireEvent.click(screen.getByTestId('meeting-edit-transcript-toggle'));
+        fireEvent.change(composer(), { target: { value: 'Ada: the gate is GREEN.' } });
+        fireEvent.click(screen.getByTestId('meeting-attach-transcript'));
+
+        await waitFor(() =>
+            expect(ingestMock).toHaveBeenCalledWith('mtg-1', 'Ada: the gate is GREEN.'),
+        );
+    });
+
+    it('Cancel drops the draft and leaves the stored transcript alone', () => {
+        render(<MeetingDetailClient meeting={withTranscript()} />);
+
+        fireEvent.click(screen.getByTestId('meeting-edit-transcript-toggle'));
+        fireEvent.change(composer(), { target: { value: 'Ada: nonsense.' } });
+        fireEvent.click(screen.getByTestId('meeting-edit-transcript-toggle'));
+
+        expect(ingestMock).not.toHaveBeenCalled();
+        expect(screen.getByTestId('meeting-transcript-body').textContent).toContain(STORED);
+
+        // Re-opening starts from the stored text again, not the abandoned draft.
+        fireEvent.click(screen.getByTestId('meeting-edit-transcript-toggle'));
+        expect(composer().value).toBe(STORED);
+    });
+
+    it('labels the button Save for an existing transcript and Attach for the first one', () => {
+        const { unmount } = render(<MeetingDetailClient meeting={mkMeeting()} />);
+        expect(screen.getByTestId('meeting-attach-transcript').textContent).toContain(
+            'actions.attachTranscript',
+        );
+        unmount();
+
+        render(<MeetingDetailClient meeting={withTranscript()} />);
+        fireEvent.click(screen.getByTestId('meeting-edit-transcript-toggle'));
+        expect(screen.getByTestId('meeting-attach-transcript').textContent).toContain(
+            'actions.saveTranscript',
+        );
     });
 
     it('reports honestly when the best-effort summary leg produced nothing', async () => {
@@ -582,6 +640,53 @@ describe('MeetingDetailClient — summary generation', () => {
             envelopeEmitted: false,
         });
         await waitFor(() => expect(screen.queryByTestId('meeting-summary-generating')).toBeNull());
+    });
+
+    it('scrolls the Summary card into view when the transcript is submitted', async () => {
+        const pending = deferred<unknown>();
+        ingestMock.mockReturnValueOnce(pending.promise);
+        render(<MeetingDetailClient meeting={mkMeeting()} />);
+
+        // jsdom has no layout, so `scrollIntoView` is absent entirely. Stubbing
+        // it on the summary node alone also proves WHICH element is scrolled to.
+        const scrollSpy = vi.fn();
+        screen.getByTestId('meeting-summary').scrollIntoView = scrollSpy;
+
+        fireEvent.change(screen.getByTestId('meeting-transcript-composer'), {
+            target: { value: 'Ada: hello.' },
+        });
+        fireEvent.click(screen.getByTestId('meeting-attach-transcript'));
+
+        // At SUBMIT time, not on completion: what the reader is carried to is
+        // the generating state, not a result that has already landed. The
+        // scroll runs once that state has committed, so the browser is not
+        // animating toward a position the same frame's growth invalidates.
+        await screen.findByTestId('meeting-summary-generating');
+        await waitFor(() =>
+            expect(scrollSpy).toHaveBeenCalledWith({ behavior: 'smooth', block: 'start' }),
+        );
+        expect(scrollSpy).toHaveBeenCalledTimes(1);
+
+        pending.resolve({
+            meeting: mkMeeting({ hasTranscript: true, transcriptText: 'Ada: hello.' }),
+            memorySaved: false,
+            envelopeEmitted: false,
+        });
+        await waitFor(() => expect(screen.queryByTestId('meeting-summary-generating')).toBeNull());
+    });
+
+    it('does not scroll when the draft is empty — nothing was submitted', () => {
+        render(<MeetingDetailClient meeting={mkMeeting()} />);
+        const scrollSpy = vi.fn();
+        screen.getByTestId('meeting-summary').scrollIntoView = scrollSpy;
+
+        fireEvent.change(screen.getByTestId('meeting-transcript-composer'), {
+            target: { value: '   ' },
+        });
+        fireEvent.click(screen.getByTestId('meeting-attach-transcript'));
+
+        expect(scrollSpy).not.toHaveBeenCalled();
+        expect(toastErrorMock).toHaveBeenCalledWith('errors.transcriptRequired');
     });
 
     it('falls back to the not-generated copy when no summary came back', async () => {
