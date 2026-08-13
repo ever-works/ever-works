@@ -1,9 +1,11 @@
 'use client';
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Loader2, Mic, Square } from 'lucide-react';
 import { cn } from '@/lib/utils/cn';
+import { Select } from '@/components/ui/select';
+import { buildDictationProviderIcons, DICTATION_AUTO_ICON_KEY } from './dictation-provider-icons';
 
 /**
  * Push-to-talk dictation for the chat composer.
@@ -40,9 +42,20 @@ const PROVIDER_STORAGE_KEY = 'ever-works.dictation.providerId';
 export function ChatDictation({
     onText,
     disabled,
+    pickerOnly,
 }: {
     readonly onText: (text: string) => void;
     readonly disabled?: boolean;
+    /**
+     * Render the provider picker WITHOUT this component's own mic button.
+     *
+     * For composers that supply their own mic and drive a different engine
+     * behind it — the chat composer dictates through the Web Speech API
+     * where the browser has it. The choice made here is still remembered
+     * per browser, so it applies the moment the upload path is the one
+     * that runs.
+     */
+    readonly pickerOnly?: boolean;
 }) {
     const t = useTranslations('dashboard.aiChat.dictation');
     const [state, setState] = useState<State>('idle');
@@ -58,6 +71,10 @@ export function ChatDictation({
     const recorderRef = useRef<MediaRecorder | null>(null);
     const chunksRef = useRef<Blob[]>([]);
     const streamRef = useRef<MediaStream | null>(null);
+    // Bumped whenever a session is abandoned. Anything still in flight from
+    // an earlier generation drops its text instead of appending it to a
+    // composer that has since moved on.
+    const generationRef = useRef(0);
 
     const stopTracks = useCallback(() => {
         streamRef.current?.getTracks().forEach((track) => track.stop());
@@ -97,6 +114,7 @@ export function ChatDictation({
 
     const transcribe = useCallback(
         async (blob: Blob) => {
+            const generation = generationRef.current;
             setState('transcribing');
             try {
                 const form = new FormData();
@@ -112,7 +130,7 @@ export function ChatDictation({
                 if (!res.ok) return;
                 const body = (await res.json()) as { text?: string };
                 const text = (body.text ?? '').trim();
-                if (text) onText(text);
+                if (text && generationRef.current === generation) onText(text);
             } catch {
                 // Swallow: a failed dictation leaves the composer exactly
                 // as the user left it, which is the safe outcome.
@@ -129,6 +147,7 @@ export function ChatDictation({
             return;
         }
         try {
+            const generation = generationRef.current;
             const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
             streamRef.current = stream;
             const recorder = new MediaRecorder(stream);
@@ -142,6 +161,13 @@ export function ChatDictation({
                     type: recorder.mimeType || 'audio/webm',
                 });
                 chunksRef.current = [];
+                // Checked HERE, not in `cancel`: `stop()` queues one last
+                // `dataavailable` after the caller returns, so the final
+                // chunk always arrives too late for the canceller to drop.
+                if (generationRef.current !== generation) {
+                    setState('idle');
+                    return;
+                }
                 if (blob.size > 0) void transcribe(blob);
                 else setState('idle');
             };
@@ -161,6 +187,31 @@ export function ChatDictation({
         recorderRef.current = null;
     }, []);
 
+    /** Abandon the session outright: release the mic, keep no audio, say nothing. */
+    const cancel = useCallback(() => {
+        generationRef.current += 1;
+        recorderRef.current?.stop();
+        recorderRef.current = null;
+        stopTracks();
+        setState('idle');
+    }, [stopTracks]);
+
+    // The composer can go disabled mid-recording — a reply starts streaming
+    // while the user is still speaking. Disabling the button alone would
+    // leave the recorder running with no way to reach it, the browser's
+    // recording indicator lit the whole time. The clip is DISCARDED rather
+    // than transcribed: the message it was meant for has already been sent,
+    // so its words would otherwise land in the next one.
+    useEffect(() => {
+        if (disabled && state !== 'idle') cancel();
+    }, [disabled, state, cancel]);
+
+    // Built from the live list so a provider with no drawn brand mark still
+    // gets a monogram — `Select` skips the icon column entirely on a miss,
+    // which would leave that one row's label out of line with the others.
+    // Above the `unsupported` bail so the hook order never changes.
+    const providerIcons = useMemo(() => buildDictationProviderIcons(providers), [providers]);
+
     if (unsupported) return null;
 
     const label =
@@ -174,32 +225,39 @@ export function ChatDictation({
     // A select showing one option is pure noise in a composer toolbar.
     const picker =
         providers.length > 1 ? (
-            <select
+            <Select
+                size="xs"
                 aria-label={t('provider')}
                 data-testid="chat-dictation-provider"
                 value={providerId ?? ''}
                 disabled={disabled || state !== 'idle'}
-                onChange={(e) => {
-                    const next = e.target.value || null;
+                onValueChange={(value) => {
+                    const next = value || null;
                     setProviderId(next);
                     if (next) window.localStorage.setItem(PROVIDER_STORAGE_KEY, next);
                     else window.localStorage.removeItem(PROVIDER_STORAGE_KEY);
                 }}
-                className={cn(
-                    'h-7 max-w-28 rounded-lg border bg-transparent px-1 text-[10px]',
-                    'border-border text-text-muted dark:border-white/15 dark:text-white/40',
-                    'disabled:cursor-not-allowed disabled:opacity-40',
-                )}
+                iconMap={providerIcons}
+                // `size="xs"` is the smallest the shared Select offers (h-8
+                // text-xs) and is set on its trigger, which `className` — the
+                // container — cannot reach. Reach the trigger directly so the
+                // picker matches the 10px composer hint beside it instead of
+                // towering over the 28px mic button.
+                className="w-28 shrink-0 [&>button]:h-7 [&>button]:text-[10px]"
             >
                 {/* Empty value = defer to the activated plugin. */}
-                <option value="">{t('providerAuto')}</option>
+                <option value="" data-icon={DICTATION_AUTO_ICON_KEY}>
+                    {t('providerAuto')}
+                </option>
                 {providers.map((p) => (
-                    <option key={p.id} value={p.id}>
+                    <option key={p.id} value={p.id} data-icon={p.id}>
                         {p.name}
                     </option>
                 ))}
-            </select>
+            </Select>
         ) : null;
+
+    if (pickerOnly) return picker;
 
     return (
         <>
@@ -213,7 +271,7 @@ export function ChatDictation({
                 disabled={disabled || state === 'transcribing'}
                 onClick={() => (state === 'recording' ? stop() : void start())}
                 className={cn(
-                    'flex h-7 w-7 cursor-pointer items-center justify-center rounded-lg transition-colors',
+                    'flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg transition-colors',
                     state === 'recording'
                         ? 'bg-danger/10 text-danger hover:bg-danger/20'
                         : 'text-text-muted hover:bg-card-hover hover:text-text dark:text-white/40 dark:hover:bg-white/10 dark:hover:text-white',

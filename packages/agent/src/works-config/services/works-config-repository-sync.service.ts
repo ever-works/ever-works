@@ -27,6 +27,26 @@ export class WorksConfigRepositorySyncService {
         private readonly eventEmitter?: EventEmitter2,
     ) {}
 
+    /**
+     * Every git-facade call here passes `workId`, and that is load-bearing.
+     *
+     * `GitFacade.resolveToken` short-circuits to the platform PAT via
+     * `tryResolveEverWorksGitPlatformToken`, whose FIRST line is
+     * `if (!options.workId) return null`. It needs the id to look the Work up
+     * and check `storageProvider === ever-works-git`.
+     *
+     * These calls used to pass only `{ userId, providerId }`. So for a Work on
+     * managed storage the short-circuit could never fire, the facade fell
+     * through to the per-user credential lookup, and sync died with
+     *
+     *     NoGitCredentialsError: No connected account found for user <id>
+     *     with provider github
+     *
+     * which the API surfaced as `400 Repository not found`. A user on managed
+     * storage has no personal GitHub connection BY DESIGN — that is the whole
+     * point of the option — so Work creation failed for every such user while
+     * the repo lived in the platform org they were never asked to connect to.
+     */
     async syncWork(options: WorksConfigRepositorySyncOptions): Promise<void> {
         const work = await this.workRepository.findById(options.workId);
         if (!work?.user) {
@@ -43,7 +63,7 @@ export class WorksConfigRepositorySyncService {
         try {
             const dest = await this.gitFacade.cloneOrPull(
                 { owner, repo, committer },
-                { userId: options.userId, providerId: work.gitProvider },
+                { userId: options.userId, providerId: work.gitProvider, workId: work.id },
             );
             const dataRepository = await DataRepository.create(dest);
 
@@ -69,8 +89,9 @@ export class WorksConfigRepositorySyncService {
             await this.gitFacade.pull(dest, committer, {
                 userId: options.userId,
                 providerId: work.gitProvider,
+                workId: work.id,
             });
-            await this.pushSyncedConfig(dest, options.userId, work.gitProvider);
+            await this.pushSyncedConfig(dest, options.userId, work.gitProvider, work.id);
         } catch (error) {
             const errorMessage = error instanceof Error ? error.message : String(error);
 
@@ -90,9 +111,14 @@ export class WorksConfigRepositorySyncService {
         }
     }
 
-    private async pushSyncedConfig(dir: string, userId: string, providerId: string): Promise<void> {
+    private async pushSyncedConfig(
+        dir: string,
+        userId: string,
+        providerId: string,
+        workId: string,
+    ): Promise<void> {
         try {
-            await this.gitFacade.push({ dir }, { userId, providerId });
+            await this.gitFacade.push({ dir }, { userId, providerId, workId });
         } catch (error) {
             if (!this.isNonFastForwardPushError(error)) {
                 throw error;
@@ -105,7 +131,7 @@ export class WorksConfigRepositorySyncService {
             this.logger.warn(
                 `.works/works.yml sync push was rejected as non-fast-forward for ${dir}; force pushing (remote history will be overwritten)`,
             );
-            await this.gitFacade.push({ dir, force: true }, { userId, providerId });
+            await this.gitFacade.push({ dir, force: true }, { userId, providerId, workId });
         }
     }
 
