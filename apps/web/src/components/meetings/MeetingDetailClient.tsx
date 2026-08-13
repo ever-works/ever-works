@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, useTransition } from 'react';
+import { useEffect, useMemo, useRef, useState, useTransition } from 'react';
 import {
     CalendarClock,
     ChevronLeft,
@@ -10,12 +10,14 @@ import {
     Info,
     Loader2,
     Pencil,
+    Save,
     Sparkles,
     Trash2,
     TriangleAlertIcon,
     Upload,
     Users,
     Video,
+    X,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
@@ -182,8 +184,8 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
  *
  * Renders the AI summary, the captured transcript, the roster and the
  * provenance rows, and hosts the three mutations the API supports for a
- * single meeting: attach/replace transcript, patch the editable fields,
- * and delete.
+ * single meeting: attach or edit the transcript, patch the editable
+ * fields, and delete.
  *
  * Layout mirrors `MissionDetailClient`: every page-level action sits in a
  * single top bar on the breadcrumb line (destructive intent separated by a
@@ -214,7 +216,10 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
     const [pendingDelete, startDelete] = useTransition();
 
     const [transcriptDraft, setTranscriptDraft] = useState('');
-    const [replacing, setReplacing] = useState(false);
+    const [editingTranscript, setEditingTranscript] = useState(false);
+
+    /** The Summary card, so a submitted transcript can scroll it into view. */
+    const summaryRef = useRef<HTMLElement | null>(null);
 
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -235,7 +240,34 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
     );
     const transcript = meeting.transcriptText ?? '';
     const hasTranscript = meeting.hasTranscript || transcript.length > 0;
-    const showComposer = !hasTranscript || replacing;
+    const showComposer = !hasTranscript || editingTranscript;
+
+    const openTranscriptEditor = () => {
+        setTranscriptDraft(transcript);
+        setEditingTranscript(true);
+    };
+
+    /** Discard the draft outright — the stored transcript is untouched. */
+    const cancelTranscriptEdit = () => {
+        if (pendingTranscript) return;
+        setEditingTranscript(false);
+        setTranscriptDraft('');
+    };
+
+    useEffect(() => {
+        if (!pendingTranscript) return;
+        const node = summaryRef.current;
+        // Absent under jsdom, which has no layout to scroll.
+        if (typeof node?.scrollIntoView !== 'function') return;
+        const reducedMotion =
+            typeof window.matchMedia === 'function' &&
+            window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        node.scrollIntoView({ behavior: reducedMotion ? 'auto' : 'smooth', block: 'start' });
+    }, [pendingTranscript]);
+    const SubmitIcon = pendingTranscript ? Loader2 : hasTranscript ? Save : Upload;
+    const submitLabel = pendingTranscript
+        ? t(hasTranscript ? 'actions.savingTranscript' : 'actions.attaching')
+        : t(hasTranscript ? 'actions.saveTranscript' : 'actions.attachTranscript');
 
     const attachTranscript = () => {
         const text = transcriptDraft.trim();
@@ -251,7 +283,7 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
                 );
                 setMeeting(result.meeting);
                 setTranscriptDraft('');
-                setReplacing(false);
+                setEditingTranscript(false);
                 // Honest reporting: the summary leg is best-effort and is
                 // simply absent on a stack with no AI provider.
                 toast.success(
@@ -481,7 +513,13 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
                 {/* ── Content column ───────────────────────────────────── */}
                 <div className="min-w-0 space-y-5 @5xl/main:col-span-8">
                     {/* ── Summary ──────────────────────────────────────── */}
-                    <section className={sectionCard} data-testid="meeting-summary">
+                    <section
+                        ref={summaryRef}
+                        // `scroll-mt` keeps the card clear of the dashboard's
+                        // sticky top bar when it is scrolled to.
+                        className={cn(sectionCard, 'scroll-mt-6')}
+                        data-testid="meeting-summary"
+                    >
                         <SectionHeader
                             icon={Sparkles}
                             title={t('sections.summary')}
@@ -517,30 +555,39 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
                                 hasTranscript ? (
                                     <button
                                         type="button"
-                                        onClick={() => setReplacing((v) => !v)}
+                                        onClick={
+                                            editingTranscript
+                                                ? cancelTranscriptEdit
+                                                : openTranscriptEditor
+                                        }
+                                        disabled={pendingTranscript}
                                         className={cn(btn, 'shrink-0')}
-                                        data-testid="meeting-replace-transcript-toggle"
+                                        data-testid="meeting-edit-transcript-toggle"
                                     >
-                                        <Upload className="h-3.5 w-3.5" />
-                                        {replacing
-                                            ? t('actions.cancelReplace')
-                                            : t('actions.replaceTranscript')}
+                                        {editingTranscript ? (
+                                            <X className="h-3.5 w-3.5" />
+                                        ) : (
+                                            <Pencil className="h-3.5 w-3.5" />
+                                        )}
+                                        {editingTranscript
+                                            ? t('actions.cancelEdit')
+                                            : t('actions.editTranscript')}
                                     </button>
                                 ) : undefined
                             }
                         />
 
-                        {hasTranscript ? (
+                        {hasTranscript && !editingTranscript ? (
                             <pre
                                 data-testid="meeting-transcript-body"
-                                className="max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border/50 bg-surface/40 p-4 font-mono text-xs leading-relaxed text-text dark:border-border-dark/50 dark:bg-surface-dark/30 dark:text-text-dark"
+                                className="max-h-96 overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border/50 bg-surface p-4 font-mono text-xs leading-relaxed text-text dark:border-border-dark/50 dark:bg-surface-dark dark:text-text-dark"
                             >
                                 {transcript || t('transcript.storedElsewhere')}
                             </pre>
                         ) : null}
 
                         {showComposer ? (
-                            <div className={hasTranscript ? 'mt-4' : ''}>
+                            <div>
                                 <label className={fieldLabel} htmlFor="meeting-transcript-draft">
                                     {t('transcript.composerLabel')}
                                 </label>
@@ -549,14 +596,14 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
                                     data-testid="meeting-transcript-composer"
                                     value={transcriptDraft}
                                     onChange={(e) => setTranscriptDraft(e.target.value)}
-                                    rows={8}
+                                    rows={hasTranscript ? 14 : 8}
                                     maxLength={MEETING_TRANSCRIPT_MAX_CHARS}
                                     placeholder={t('transcript.composerPlaceholder')}
-                                    // The text is already in flight; editing it
-                                    // mid-request would only ever describe a
-                                    // transcript the server never saw.
                                     disabled={pendingTranscript}
-                                    className="font-mono text-xs"
+                                    className={cn(
+                                        'bg-surface font-mono text-xs dark:bg-surface-dark',
+                                        'disabled:bg-surface dark:disabled:bg-surface-dark',
+                                    )}
                                 />
                                 <div className="mt-3 flex items-center gap-2">
                                     <button
@@ -566,14 +613,13 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
                                         className={btn}
                                         data-testid="meeting-attach-transcript"
                                     >
-                                        {pendingTranscript ? (
-                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                                        ) : (
-                                            <Upload className="h-3.5 w-3.5" />
-                                        )}
-                                        {pendingTranscript
-                                            ? t('actions.attaching')
-                                            : t('actions.attachTranscript')}
+                                        <SubmitIcon
+                                            className={cn(
+                                                'h-3.5 w-3.5',
+                                                pendingTranscript && 'animate-spin',
+                                            )}
+                                        />
+                                        {submitLabel}
                                     </button>
                                     <p className="text-[11px] text-text-muted dark:text-text-muted-dark">
                                         {t('transcript.pipelineHint')}
@@ -670,13 +716,6 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
                     </section>
                 </aside>
             </div>
-
-            {/* ── Edit modal ───────────────────────────────────────────────
-                The editable fields used to sit in a permanently-open card in
-                the rail, which put a form the reader rarely needs directly
-                beside the provenance rows they always read. It is now a
-                dialog behind the header's Edit button, so the page reads as
-                a record and editing is an explicit act. */}
             <Dialog open={editOpen} onOpenChange={(next) => (next ? openEdit() : closeEdit())}>
                 <DialogContent className="max-w-lg">
                     <DialogClose onClose={closeEdit} />
@@ -694,11 +733,6 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
                             maxLength={MEETING_TITLE_MAX_CHARS}
                             className="text-xs"
                         />
-                        {/* The two ends of the meeting are one fact, so they
-                            sit on one row. Paired on the viewport breakpoint
-                            rather than a container query: the dialog is
-                            portalled out of the page's `main` container, so
-                            an @lg/main step would never match here. */}
                         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                             <div>
                                 <label className={fieldLabel} htmlFor="meeting-edit-started-at">
@@ -738,11 +772,6 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
                         {works.length > 0 ? (
                             <div>
                                 <label className={fieldLabel}>{t('fields.work')}</label>
-                                {/* `data-icon` on every option (the org-wide
-                                    row included) keeps the folder in the
-                                    trigger whatever is selected, rather than
-                                    letting it appear and vanish with the
-                                    choice. */}
                                 <Select
                                     value={workId}
                                     onValueChange={setWorkId}

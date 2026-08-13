@@ -3,29 +3,6 @@
 import { useTranslations } from 'next-intl';
 import { ShinyText } from '@/components/ui/ShinyText';
 
-/**
- * Meeting detail — the "the summary is being written" state of the
- * `/meetings/:id` Summary card.
- *
- * Attaching a transcript is a single opaque round trip: the API stores the
- * text, then runs the best-effort fan-out (AI summary → Memory observation →
- * activity envelope) and answers once. There is no percentage to report and
- * no stage to poll, so nothing here pretends otherwise — the panel says
- * "still working" with a shimmering stand-in for the paragraph that is
- * coming, and an indeterminate bar.
- *
- * The skeleton lines sit exactly where the summary paragraph will land, at
- * the same rhythm, so the finished text resolves into the shape the reader
- * has already been looking at rather than displacing it.
- *
- * Motion lives in CSS (`ms-summary-*` in `globals.css`) — no JS timers after
- * mount, and the whole panel goes still under `prefers-reduced-motion`.
- */
-
-/**
- * Widths of the stand-in lines, in the ragged pattern a short paragraph
- * actually makes — an even stack of equal bars reads as a table, not prose.
- */
 const SKELETON_LINES = ['100%', '94%', '82%', '58%'] as const;
 
 export function MeetingSummaryGenerating() {
@@ -64,17 +41,6 @@ export function MeetingSummaryGenerating() {
                         <span className="gp-shimmer" style={{ animationDelay: `${i * 0.18}s` }} />
                     </div>
                 ))}
-            </div>
-
-            <div
-                className="relative h-0.75 overflow-hidden rounded-full"
-                style={{ background: 'var(--gp-bar-track)' }}
-                aria-hidden
-            >
-                <div
-                    className="ms-summary-slide absolute inset-y-0 left-0 w-1/3 rounded-full"
-                    style={{ background: 'var(--gp-bar-fill)' }}
-                />
             </div>
         </div>
     );
