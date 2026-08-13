@@ -78,14 +78,25 @@ function RepositoryRow({
     return (
         <li className="flex items-center gap-1">
             {hasVisibility && <RepoVisibilityIcon isPrivate={isPrivate} label={label} />}
-            <Link
-                href={href || '#'}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-primary hover:text-primary-hover"
-            >
-                {label}
-            </Link>
+            {/* EW-037: `href={href || '#'}` turned an unknown repository into a
+                link to `#` — visually identical to a working one, and a dead
+                click. `repoLink()` now returns `undefined` for a repository
+                whose real name we cannot know (managed storage records the
+                name it provisioned; there is nothing to guess). Render the
+                label as plain text in that case: the repository is still worth
+                naming, it just has no address to point at. */}
+            {href ? (
+                <Link
+                    href={href}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-primary hover:text-primary-hover"
+                >
+                    {label}
+                </Link>
+            ) : (
+                <span className="text-foreground-muted">{label}</span>
+            )}
             <InfoPopover title={helpTitle} body={helpBody} ariaLabel={helpAriaLabel} />
         </li>
     );

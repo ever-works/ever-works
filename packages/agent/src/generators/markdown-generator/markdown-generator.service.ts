@@ -1,5 +1,6 @@
 import { Injectable, Logger, Optional } from '@nestjs/common';
 import * as fs from 'node:fs/promises';
+import * as path from 'node:path';
 import { GitFacadeService } from '../../facades/git.facade';
 import type { Category, Identifiable, ItemData, Tag } from '@ever-works/contracts';
 import { Work, shouldGenerateProviderRepository } from '../../entities/work.entity';
@@ -144,6 +145,31 @@ export class MarkdownGeneratorService {
         const markdownRepo = new MarkdownRepository(markdownPath);
         const dataRepo = await DataRepository.create(dataPath);
 
+        // Managed "Ever Works Git" storage provisions ONE repository and records
+        // it under both the `work` and `data` roles, so `markdownRepository.name`
+        // and `work.getDataRepo()` can be the SAME repo. `GitOperations.getLocalDir`
+        // is deterministic —
+        //
+        //     path.join(baseDir, slugifyText(`${owner}-${repo}`))
+        //
+        // — so the two clones above then resolve to the SAME working directory.
+        // Everything below that treats them as two independent checkouts becomes
+        // destructive: `resetFiles()` is an `rm -rf` of everything outside a
+        // six-entry allowlist, and the PR path runs two concurrent `switchBranch`
+        // checkouts against one tree.
+        //
+        // Compare the resolved paths rather than the repo names — the names come
+        // from different sources (a created-repository target vs the entity's
+        // role lookup) and can differ in case or owner spelling while still
+        // slugifying to one directory.
+        const sharesOneRepo = path.resolve(markdownRepo.dir) === path.resolve(dataRepo.dir);
+        if (sharesOneRepo) {
+            this.logger.log(
+                `Work ${work.id}: markdown and data resolve to one repository (${markdownRepo.dir}) — ` +
+                    'single-repo managed storage; skipping the destructive reset and the duplicate checkout.',
+            );
+        }
+
         try {
             const slugs = await fs.readdir(dataRepo.dataDir);
             await markdownRepo.ensureWorksExist();
@@ -174,13 +200,38 @@ export class MarkdownGeneratorService {
                         });
                 }
 
-                await markdownRepo.resetFiles();
+                // 🛑 `resetFiles()` deletes every entry in the directory except
+                // `.git*`, `.github`, `.vscode`, `.env`, `.nvmrc`. When the data
+                // repo IS this directory that removes `data/`, `categories.yml`,
+                // `tags.yml` and `.works/` — and the deletions are then staged,
+                // committed and PUSHED, so the user's only repository is emptied.
+                //
+                // Worse, it is silent: the item loop's reads swallow ENOENT and
+                // return undefined, so no warning is raised and no error logged.
+                //
+                // The reset exists to clear STALE MARKDOWN before regenerating it.
+                // On single-repo storage the markdown lives alongside the source
+                // data, so there is nothing safe to bulk-delete — the generator
+                // overwrites `README.md` and the per-item files it owns anyway.
+                if (!sharesOneRepo) {
+                    await markdownRepo.resetFiles();
+                } else {
+                    // Still guarantee the layout the generator writes into.
+                    await markdownRepo.ensureWorksExist();
+                }
             } else if (canCreatePR) {
-                // Switch to PR branch (both repos)
-                await Promise.all([
-                    this.gitFacade.switchBranch(provider, markdownRepo.dir, pr_update.branch, true),
-                    this.gitFacade.switchBranch(provider, dataRepo.dir, pr_update.branch, true),
-                ]).catch((err) => {
+                // Switch to the PR branch. When both roles are one repository
+                // this must happen ONCE — two concurrent `switchBranch` calls on
+                // the same working tree race on `.git`, which is the corruption
+                // `BranchSyncService` documents.
+                const branchTargets = sharesOneRepo
+                    ? [markdownRepo.dir]
+                    : [markdownRepo.dir, dataRepo.dir];
+                await Promise.all(
+                    branchTargets.map((dir) =>
+                        this.gitFacade.switchBranch(provider, dir, pr_update.branch, true),
+                    ),
+                ).catch((err) => {
                     canCreatePR = false;
                     this.logger.error('Failed to switch to PR branch', err);
                 });
