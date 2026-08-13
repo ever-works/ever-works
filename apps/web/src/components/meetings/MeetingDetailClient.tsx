@@ -59,6 +59,7 @@ import {
     participantsFromRows,
     type ParticipantRow,
 } from './MeetingParticipantsEditor';
+import { MeetingSummary } from './MeetingSummary';
 import { MeetingSummaryGenerating } from './MeetingSummaryGenerating';
 import { deleteMeetingAction, ingestMeetingTranscriptAction, updateMeetingAction } from './actions';
 
@@ -531,12 +532,9 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
                             // Keyed on the text so a freshly generated summary
                             // replays the reveal, resolving into the space the
                             // skeleton just held rather than snapping in.
-                            <p
-                                key={meeting.summary}
-                                className="ms-summary-reveal whitespace-pre-wrap text-sm leading-relaxed text-text dark:text-text-dark"
-                            >
-                                {meeting.summary}
-                            </p>
+                            <div key={meeting.summary} className="ms-summary-reveal">
+                                <MeetingSummary text={meeting.summary} />
+                            </div>
                         ) : (
                             <p className="text-xs text-text-muted dark:text-text-muted-dark">
                                 {hasTranscript
