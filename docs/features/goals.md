@@ -17,10 +17,10 @@ saw, and reports progress toward a target.
 
 | You want to…                                                    | Use a…      |
 | --------------------------------------------------------------- | ----------- |
-| Keep producing new Works and Ideas on a theme                    | **Mission** |
-| Track "monthly revenue reaches $1,000" and know when it happens  | **Goal**    |
-| Track "support tickets stay below 20 a week"                     | **Goal**    |
-| Build one site from one prompt                                   | **Work**    |
+| Keep producing new Works and Ideas on a theme                   | **Mission** |
+| Track "monthly revenue reaches $1,000" and know when it happens | **Goal**    |
+| Track "support tickets stay below 20 a week"                    | **Goal**    |
+| Build one site from one prompt                                  | **Work**    |
 
 Goals and Missions are independent — you can run either without the other.
 
@@ -30,21 +30,21 @@ From `/goals`, choose **New Goal**. The form at `/goals/new` collects:
 
 | Field                  | Required | Notes                                                                            |
 | ---------------------- | -------- | -------------------------------------------------------------------------------- |
-| **Title**              | yes      | Up to 200 characters. Shown on the catalog and the detail page.                   |
-| **Description**        | no       | Free context for whoever reads the Goal later.                                    |
-| **Provider plugin ID** | yes      | The metrics plugin that supplies the number — see below.                          |
-| **Metric ID**          | yes      | Which metric to read from that plugin.                                            |
-| **Parameters (JSON)**  | no       | Passed to the provider, e.g. `{ "currency": "usd" }`. Must be a JSON **object**.  |
-| **Direction**          | yes      | *At least* (grow to target) or *At most* (stay under it).                         |
-| **Target value**       | yes      | The number you are aiming at. See the note below.                                 |
-| **Unit**               | yes      | Free text — `usd`, `tickets`, `signups`.                                          |
-| **Window**             | yes      | Daily, Weekly, Monthly, Total, or Point-in-time.                                  |
-| **Deadline**           | no       | Optional date the Goal should be met by.                                          |
-| **Check frequency**    | yes      | Minutes between evaluations. **Clamped server-side to a 15-minute minimum.**      |
+| **Title**              | yes      | Up to 200 characters. Shown on the catalog and the detail page.                  |
+| **Description**        | no       | Free context for whoever reads the Goal later.                                   |
+| **Provider plugin ID** | yes      | The metrics plugin that supplies the number — see below.                         |
+| **Metric ID**          | yes      | Which metric to read from that plugin.                                           |
+| **Parameters (JSON)**  | no       | Passed to the provider, e.g. `{ "currency": "usd" }`. Must be a JSON **object**. |
+| **Direction**          | yes      | _At least_ (grow to target) or _At most_ (stay under it).                        |
+| **Target value**       | yes      | The number you are aiming at. See the note below.                                |
+| **Unit**               | yes      | Free text — `usd`, `tickets`, `signups`.                                         |
+| **Window**             | yes      | Daily, Weekly, Monthly, Total, or Point-in-time.                                 |
+| **Deadline**           | no       | Optional date the Goal should be met by.                                         |
+| **Check frequency**    | yes      | Minutes between evaluations. **Clamped server-side to a 15-minute minimum.**     |
 
 :::caution Target value is required, including zero
 Leave **Target value** blank and the form rejects it. This matters more than it looks: a blank field
-used to be stored as a target of `0`, and combined with *At least*, that produced a Goal meaning
+used to be stored as a target of `0`, and combined with _At least_, that produced a Goal meaning
 "reach at least 0" — satisfied by every possible value, so it reported success immediately and silently.
 
 An **explicit** `0` is still perfectly valid. "Keep failures at most 0" is a real Goal.
@@ -55,7 +55,7 @@ New Goals are created in **draft**. Nothing is evaluated until you activate them
 ## The metric source
 
 A Goal reads its number from a **metrics provider plugin**, identified by the pair
-(*Provider plugin ID*, *Metric ID*). The provider must be installed and enabled for your account
+(_Provider plugin ID_, _Metric ID_). The provider must be installed and enabled for your account
 before the Goal can read anything.
 
 :::warning The form's placeholder text is not a working example
@@ -75,12 +75,12 @@ evaluation, not at creation.
 
 A Goal moves through four states:
 
-| Status        | Meaning                                                     |
-| ------------- | ----------------------------------------------------------- |
-| **draft**     | created, never evaluated. No schedule is running.           |
-| **active**    | evaluated on the check frequency.                           |
-| **paused**    | schedule stopped; history kept.                             |
-| **completed** | finished, with an optional outcome recorded.                |
+| Status        | Meaning                                           |
+| ------------- | ------------------------------------------------- |
+| **draft**     | created, never evaluated. No schedule is running. |
+| **active**    | evaluated on the check frequency.                 |
+| **paused**    | schedule stopped; history kept.                   |
+| **completed** | finished, with an optional outcome recorded.      |
 
 The action bar shows only the transitions that make sense for the current state — a draft Goal offers
 **Activate** and **Delete**; an active one offers **Evaluate now** and **Pause**.
