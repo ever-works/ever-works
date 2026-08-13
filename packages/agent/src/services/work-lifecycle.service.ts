@@ -296,9 +296,32 @@ export class WorkLifecycleService {
         // identifier is then woven into the workData so:
         //   - `work.owner` becomes the platform org (drives `getRepoOwner()`)
         //   - `work.organization` is true (the owner is an org, not a user)
-        //   - `sourceRepository.relatedRepositories.work` records the
-        //     resolved repo coordinates (handles the collision-suffix path
-        //     the provider transparently does on `422 name already exists`)
+        //   - `sourceRepository.relatedRepositories` records the resolved repo
+        //     coordinates (handles the collision-suffix path the provider
+        //     transparently does on `422 name already exists`)
+        //
+        // The provisioned repo is registered under BOTH the `work` and `data`
+        // roles because managed storage is a SINGLE-repo model: one repo in the
+        // platform org holds the work and its data, which is what
+        // `sourceRepository.type = 'data_repo'` below already declares.
+        //
+        // Registering only `work` (as this did until EW-028) left the `data`
+        // role unrecorded, and `Work.getRelatedRepository` then falls back per
+        // FIELD, not per role — so the owner resolved correctly from
+        // `work.owner` while the repo silently fell through to the DERIVED
+        // default `${slug}-data`, a repo nobody ever creates. Two consumers
+        // broke on that, in different ways:
+        //
+        //   - `WorksConfigRepositorySyncService` cloned
+        //     `<org>/<slug>-data` -> HTTP 404, so `.works/works.yml` never
+        //     synced. Observed on production 2026-08-13: the real repo
+        //     `ever-works-cloud/anon-1d565e12-ew027-verify-directory` had been
+        //     created 4 seconds earlier and sat unused beside it.
+        //   - `WorkRepository.findByDataRepoFullName` (routes inbound GitHub
+        //     App push webhooks to a Work) requires the `data` role outright —
+        //     `if (!data?.owner || !data?.repo) return false`. With the role
+        //     absent it matched ZERO works, so webhooks were dropped with no
+        //     error and no log at all.
         //
         // We pre-generate the Work UUID so `EverWorksGitProvider.buildRepoName`
         // can derive a deterministic collision suffix from it. The same UUID
@@ -331,6 +354,7 @@ export class WorkLifecycleService {
                 importedAt: new Date(),
                 relatedRepositories: {
                     work: { owner: everWorksRepo!.owner, repo: everWorksRepo!.repo },
+                    data: { owner: everWorksRepo!.owner, repo: everWorksRepo!.repo },
                 },
             };
         }
