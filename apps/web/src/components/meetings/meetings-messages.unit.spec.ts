@@ -92,21 +92,20 @@ describe('Meetings messages — ICU syntax', () => {
         });
     }
 
-    it('the roster hint still shows the literal Name <email> format after escaping', () => {
-        // Only the CAPTURE form still teaches the syntax: `/meetings/[id]`
-        // edits its roster through a row editor now, so `meetingDetail` has
-        // no hint left to escape.
-        const messages = JSON.parse(readFileSync(join(MESSAGES_DIR, 'en.json'), 'utf8'));
-        const t = createTranslator({
-            locale: 'en',
-            messages,
-            namespace: 'dashboard.meetingNew',
-            onError: (error) => {
-                throw error;
-            },
-        });
-        // The escape must survive as literal text — escaping it away
-        // would "fix" the error by deleting the thing the hint teaches.
-        expect(t('fields.participantsHint')).toContain('<email>');
+    it('no Meetings message teaches the `Name <email>` syntax any more', () => {
+        // Both roster surfaces author through the row editor now — the
+        // capture form was the last one still explaining the format — so
+        // there is no escaped angle bracket left to protect. The parse
+        // guard above stays: it is what catches the fault class if copy
+        // ever reintroduces one.
+        for (const locale of locales) {
+            const messages = JSON.parse(
+                readFileSync(join(MESSAGES_DIR, `${locale}.json`), 'utf8'),
+            ) as { dashboard: Record<string, Tree> };
+            expect(
+                'participantsHint' in (messages.dashboard.meetingNew as { fields: Tree }).fields,
+                `${locale}: the retired roster syntax hint is back`,
+            ).toBe(false);
+        }
     });
 });
