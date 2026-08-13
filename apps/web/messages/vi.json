@@ -6987,13 +6987,19 @@
                 "work": "Work",
                 "workNone": "Org-wide (no Work)",
                 "participants": "Người tham dự",
-                "participantsHint": "Mỗi dòng một người. Dùng \"Tên '<'email>\" để ghi lại địa chỉ."
+                "participantsHint": "Mỗi dòng một người. Dùng \"Tên '<'email>\" để ghi lại địa chỉ.",
+                "participantName": "Tên",
+                "participantEmail": "Email (tùy chọn)",
+                "participantAdd": "Thêm người tham gia",
+                "participantRemove": "Xóa người tham gia",
+                "participantsEmpty": "Chưa có ai được ghi nhận."
             },
             "errors": {
                 "titleRequired": "Title is required.",
                 "startedAtInvalid": "Thời gian bắt đầu không phải là ngày hợp lệ.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
+                "participantEmailInvalid": "Nhập địa chỉ email hợp lệ, hoặc để trống.",
                 "transcriptRequired": "Transcript text is required."
             },
             "toasts": {

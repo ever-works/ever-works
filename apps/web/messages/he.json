@@ -7017,13 +7017,19 @@
                 "work": "Work",
                 "workNone": "Org-wide (no Work)",
                 "participants": "משתתפים",
-                "participantsHint": "אחד בכל שורה. השתמשו ב-\"שם '<'אימייל>\" כדי לרשום כתובת."
+                "participantsHint": "אחד בכל שורה. השתמשו ב-\"שם '<'אימייל>\" כדי לרשום כתובת.",
+                "participantName": "שם",
+                "participantEmail": "אימייל (אופציונלי)",
+                "participantAdd": "הוספת משתתף",
+                "participantRemove": "הסרת המשתתף",
+                "participantsEmpty": "עדיין לא נרשם אף אחד."
             },
             "errors": {
                 "titleRequired": "Title is required.",
                 "startedAtInvalid": "שעת ההתחלה אינה תאריך תקין.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
+                "participantEmailInvalid": "הזינו כתובת אימייל תקינה או השאירו ריק.",
                 "transcriptRequired": "Transcript text is required."
             },
             "toasts": {

@@ -6987,13 +6987,19 @@
                 "work": "Work",
                 "workNone": "Org-wide (no Work)",
                 "participants": "Partecipanti",
-                "participantsHint": "Uno per riga. Usa \"Nome '<'email>\" per registrare un indirizzo."
+                "participantsHint": "Uno per riga. Usa \"Nome '<'email>\" per registrare un indirizzo.",
+                "participantName": "Nome",
+                "participantEmail": "Email (facoltativa)",
+                "participantAdd": "Aggiungi partecipante",
+                "participantRemove": "Rimuovi partecipante",
+                "participantsEmpty": "Nessuno registrato per ora."
             },
             "errors": {
                 "titleRequired": "Title is required.",
                 "startedAtInvalid": "L'ora di inizio non è una data valida.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
+                "participantEmailInvalid": "Inserisci un indirizzo email valido oppure lascialo vuoto.",
                 "transcriptRequired": "Transcript text is required."
             },
             "toasts": {

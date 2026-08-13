@@ -6325,13 +6325,19 @@
                 "work": "Work",
                 "workNone": "Org-wide (no Work)",
                 "participants": "Participants",
-                "participantsHint": "One per line. Use \"Name '<'email>\" to record an address."
+                "participantsHint": "One per line. Use \"Name '<'email>\" to record an address.",
+                "participantName": "Name",
+                "participantEmail": "Email (optional)",
+                "participantAdd": "Add participant",
+                "participantRemove": "Remove participant",
+                "participantsEmpty": "No one recorded yet."
             },
             "errors": {
                 "titleRequired": "Title is required.",
                 "startedAtInvalid": "Start time is not a valid date.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
+                "participantEmailInvalid": "Enter a valid email address, or leave it blank.",
                 "transcriptRequired": "Transcript text is required."
             },
             "toasts": {
