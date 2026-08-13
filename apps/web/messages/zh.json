@@ -6987,7 +6987,6 @@
                 "work": "Work",
                 "workNone": "Org-wide (no Work)",
                 "participants": "参与者",
-                "participantsHint": "每行一位。使用“姓名 '<'邮箱>”记录邮箱地址。",
                 "participantName": "姓名",
                 "participantEmail": "邮箱（可选）",
                 "participantAdd": "添加参与者",

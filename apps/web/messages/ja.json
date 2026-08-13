@@ -6987,7 +6987,6 @@
                 "work": "Work",
                 "workNone": "Org-wide (no Work)",
                 "participants": "参加者",
-                "participantsHint": "1行に1人。メールアドレスを記録するには「名前 '<'メール>」の形式を使用します。",
                 "participantName": "名前",
                 "participantEmail": "メールアドレス（任意）",
                 "participantAdd": "参加者を追加",

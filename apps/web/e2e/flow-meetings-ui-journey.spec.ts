@@ -357,6 +357,7 @@ test.describe('Meetings — /meetings/:id detail (UI)', () => {
         await expect(page.getByTestId('meeting-edit-started-at')).toBeVisible();
         await expect(page.getByTestId('meeting-edit-ended-at')).toBeVisible();
         await expect(page.getByTestId('meeting-edit-participants')).toBeVisible();
+        await expect(page.getByTestId('meeting-edit-participant-add')).toBeVisible();
         await expect(page.getByTestId('meeting-edit-cancel')).toBeVisible();
     });
 
@@ -372,18 +373,22 @@ test.describe('Meetings — /meetings/:id detail (UI)', () => {
         await expect(editOpen).toBeVisible({ timeout: 30_000 });
 
         const roster = page.getByTestId('meeting-edit-participants');
+        const names = page.getByTestId('meeting-edit-participant-name');
+        const emails = page.getByTestId('meeting-edit-participant-email');
+        const addRow = page.getByTestId('meeting-edit-participant-add');
+
         await clickUntil(editOpen, () => roster.isVisible().catch(() => false));
-        // Seeded from the stored roster in the same `Name <email>` shape the
-        // capture form parses — formatParticipants is the exact inverse of
-        // parseParticipants, so the textarea round-trips without edits.
-        await expect(roster).toHaveValue('Ada Lovelace <ada@example.com>');
+        // One row per stored participant, with the address in its own field
+        // rather than encoded into the name as `Name <email>`.
+        await expect(names).toHaveCount(1);
+        await expect(names.first()).toHaveValue('Ada Lovelace');
+        await expect(emails.first()).toHaveValue('ada@example.com');
 
         const save = page.getByTestId('meeting-save');
-        const next = 'Grace Hopper <grace@example.com>\nAlan Turing';
 
         // Post-condition = the PERSISTED roster (same idiom as the rename test):
-        // re-open the dialog if it closed, re-fill only if the textarea lost
-        // its value, and stop as soon as the write lands.
+        // re-open the dialog if it closed, re-fill only what actually lost its
+        // value, and stop as soon as the write lands.
         await expect(async () => {
             const current = (await readMeeting(request, token, meeting.id).catch(() => null)) as {
                 participants?: Array<{ name: string }>;
@@ -394,8 +399,39 @@ test.describe('Meetings — /meetings/:id detail (UI)', () => {
                         .click({ timeout: 5_000, noWaitAfter: true })
                         .catch(() => undefined);
                 }
-                if ((await roster.inputValue().catch(() => '')) !== next) {
-                    await roster.fill(next).catch(() => undefined);
+                // Rewrite the existing row in place…
+                if (
+                    (await names
+                        .first()
+                        .inputValue()
+                        .catch(() => '')) !== 'Grace Hopper'
+                ) {
+                    await names
+                        .first()
+                        .fill('Grace Hopper')
+                        .catch(() => undefined);
+                    await emails
+                        .first()
+                        .fill('grace@example.com')
+                        .catch(() => undefined);
+                }
+                // …and add the second person on a row of their own, which is
+                // the whole point of the editor: no retyping the list.
+                if ((await names.count().catch(() => 0)) < 2) {
+                    await addRow
+                        .click({ timeout: 5_000, noWaitAfter: true })
+                        .catch(() => undefined);
+                }
+                if (
+                    (await names
+                        .nth(1)
+                        .inputValue()
+                        .catch(() => '')) !== 'Alan Turing'
+                ) {
+                    await names
+                        .nth(1)
+                        .fill('Alan Turing')
+                        .catch(() => undefined);
                 }
                 await save.click({ timeout: 5_000, noWaitAfter: true }).catch(() => undefined);
             }
@@ -406,7 +442,7 @@ test.describe('Meetings — /meetings/:id detail (UI)', () => {
                 'Grace Hopper',
                 'Alan Turing',
             ]);
-            // A bare name stores no email; `Name <email>` stores both.
+            // An untouched email field stores no address; a filled one does.
             expect(persisted.participants[0].email).toBe('grace@example.com');
             expect(persisted.participants[1].email).toBeUndefined();
         }).toPass({ timeout: 60_000 });

@@ -7017,7 +7017,6 @@
                 "work": "Work",
                 "workNone": "Org-wide (no Work)",
                 "participants": "Teilnehmende",
-                "participantsHint": "Eine pro Zeile. Verwende \"Name '<'E-Mail>\", um eine Adresse zu erfassen.",
                 "participantName": "Name",
                 "participantEmail": "E-Mail (optional)",
                 "participantAdd": "Teilnehmer hinzufügen",

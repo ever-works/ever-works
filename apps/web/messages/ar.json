@@ -7017,7 +7017,6 @@
                 "work": "Work",
                 "workNone": "Org-wide (no Work)",
                 "participants": "المشاركون",
-                "participantsHint": "واحد في كل سطر. استخدم \"الاسم '<'البريد الإلكتروني>\" لتسجيل عنوان.",
                 "participantName": "الاسم",
                 "participantEmail": "البريد الإلكتروني (اختياري)",
                 "participantAdd": "إضافة مشارك",

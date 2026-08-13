@@ -6987,7 +6987,6 @@
                 "work": "Work",
                 "workNone": "Org-wide (no Work)",
                 "participants": "Người tham dự",
-                "participantsHint": "Mỗi dòng một người. Dùng \"Tên '<'email>\" để ghi lại địa chỉ.",
                 "participantName": "Tên",
                 "participantEmail": "Email (tùy chọn)",
                 "participantAdd": "Thêm người tham gia",

@@ -174,6 +174,20 @@ function renderWithEditOpen(
     return result;
 }
 
+/**
+ * Roster rows are addressed by their accessible name rather than a
+ * testid: `useTranslations` is mocked to echo the key, so the label the
+ * screen reader announces is the handle the spec uses — the two cannot
+ * drift apart. Order matches the roster.
+ */
+function participantNameInputs(): HTMLInputElement[] {
+    return screen.queryAllByLabelText('fields.participantName') as HTMLInputElement[];
+}
+
+function participantEmailInputs(): HTMLInputElement[] {
+    return screen.queryAllByLabelText('fields.participantEmail') as HTMLInputElement[];
+}
+
 describe('MeetingDetailClient — edit dialog', () => {
     it('keeps the form behind the header Edit button rather than in the page body', () => {
         render(<MeetingDetailClient meeting={mkMeeting()} />);
@@ -216,7 +230,7 @@ describe('MeetingDetailClient — edit dialog', () => {
         expect(picker.textContent).toContain('fields.workNone');
     });
 
-    it('seeds the roster textarea from the stored participants', () => {
+    it('seeds one editable row per stored participant', () => {
         renderWithEditOpen(
             mkMeeting({
                 participants: [
@@ -225,21 +239,44 @@ describe('MeetingDetailClient — edit dialog', () => {
                 ],
             }),
         );
-        // formatParticipants is the exact inverse of the capture form's parser.
-        expect((screen.getByTestId('meeting-edit-participants') as HTMLTextAreaElement).value).toBe(
-            'Ada Lovelace <ada@example.com>\nGrace Hopper',
+        expect(participantNameInputs().map((i) => i.value)).toEqual([
+            'Ada Lovelace',
+            'Grace Hopper',
+        ]);
+        // The address is its own field now, not `<>` syntax inside the name.
+        expect(participantEmailInputs().map((i) => i.value)).toEqual(['ada@example.com', '']);
+    });
+
+    it('adds a participant on a new row, leaving the existing roster alone', async () => {
+        updateMock.mockResolvedValueOnce(mkMeeting());
+        renderWithEditOpen(mkMeeting({ participants: [{ name: 'Ada Lovelace' }] }));
+
+        // The whole point of the editor: adding someone must not require
+        // retyping (or even touching) the people already on the list.
+        fireEvent.click(screen.getByTestId('meeting-edit-participant-add'));
+        const names = participantNameInputs();
+        fireEvent.change(names[names.length - 1], { target: { value: 'Alan Turing' } });
+        fireEvent.click(screen.getByTestId('meeting-save'));
+
+        await waitFor(() =>
+            expect(updateMock).toHaveBeenCalledWith(
+                'mtg-1',
+                expect.objectContaining({
+                    participants: [{ name: 'Ada Lovelace' }, { name: 'Alan Turing' }],
+                }),
+            ),
         );
     });
 
     it('patches startedAt and participants — the two fields the UI could not edit before', async () => {
         updateMock.mockResolvedValueOnce(mkMeeting());
-        renderWithEditOpen();
+        renderWithEditOpen(mkMeeting({ participants: [{ name: 'Grace Hopper' }] }));
 
         fireEvent.change(screen.getByTestId('meeting-edit-started-at'), {
             target: { value: LOCAL_START },
         });
-        fireEvent.change(screen.getByTestId('meeting-edit-participants'), {
-            target: { value: 'Grace Hopper <grace@example.com>\nAlan Turing' },
+        fireEvent.change(participantEmailInputs()[0], {
+            target: { value: 'grace@example.com' },
         });
         fireEvent.click(screen.getByTestId('meeting-save'));
 
@@ -248,11 +285,25 @@ describe('MeetingDetailClient — edit dialog', () => {
                 'mtg-1',
                 expect.objectContaining({
                     startedAt: LOCAL_START_ISO,
-                    participants: [
-                        { name: 'Grace Hopper', email: 'grace@example.com' },
-                        { name: 'Alan Turing' },
-                    ],
+                    participants: [{ name: 'Grace Hopper', email: 'grace@example.com' }],
                 }),
+            ),
+        );
+    });
+
+    it('removes a participant through that row’s own control', async () => {
+        updateMock.mockResolvedValueOnce(mkMeeting());
+        renderWithEditOpen(
+            mkMeeting({ participants: [{ name: 'Ada Lovelace' }, { name: 'Grace Hopper' }] }),
+        );
+
+        fireEvent.click(screen.getAllByTestId('meeting-edit-participant-remove')[0]);
+        fireEvent.click(screen.getByTestId('meeting-save'));
+
+        await waitFor(() =>
+            expect(updateMock).toHaveBeenCalledWith(
+                'mtg-1',
+                expect.objectContaining({ participants: [{ name: 'Grace Hopper' }] }),
             ),
         );
     });
@@ -261,9 +312,8 @@ describe('MeetingDetailClient — edit dialog', () => {
         updateMock.mockResolvedValueOnce(mkMeeting());
         renderWithEditOpen(mkMeeting({ participants: [{ name: 'Ada Lovelace' }] }));
 
-        fireEvent.change(screen.getByTestId('meeting-edit-participants'), {
-            target: { value: '   \n  ' },
-        });
+        fireEvent.click(screen.getByTestId('meeting-edit-participant-remove'));
+        expect(screen.getByTestId('meeting-edit-participants-empty')).toBeTruthy();
         fireEvent.click(screen.getByTestId('meeting-save'));
 
         await waitFor(() =>
@@ -272,6 +322,33 @@ describe('MeetingDetailClient — edit dialog', () => {
                 expect.objectContaining({ participants: [] }),
             ),
         );
+    });
+
+    it('drops a row left blank instead of refusing the save', async () => {
+        updateMock.mockResolvedValueOnce(mkMeeting());
+        renderWithEditOpen(mkMeeting({ participants: [{ name: 'Ada Lovelace' }] }));
+
+        // "Add participant" produces an empty row; abandoning it must not
+        // block the save or post a nameless participant.
+        fireEvent.click(screen.getByTestId('meeting-edit-participant-add'));
+        fireEvent.click(screen.getByTestId('meeting-save'));
+
+        await waitFor(() =>
+            expect(updateMock).toHaveBeenCalledWith(
+                'mtg-1',
+                expect.objectContaining({ participants: [{ name: 'Ada Lovelace' }] }),
+            ),
+        );
+    });
+
+    it('refuses to save a malformed address, and says so', () => {
+        renderWithEditOpen(mkMeeting({ participants: [{ name: 'Ada Lovelace' }] }));
+
+        fireEvent.change(participantEmailInputs()[0], { target: { value: 'ada@' } });
+        fireEvent.click(screen.getByTestId('meeting-save'));
+
+        expect(updateMock).not.toHaveBeenCalled();
+        expect(toastErrorMock).toHaveBeenCalledWith('errors.participantEmailInvalid');
     });
 
     it('refuses to save with an emptied start time (the API requires one)', () => {

@@ -6987,7 +6987,6 @@
                 "work": "Work",
                 "workNone": "Org-wide (no Work)",
                 "participants": "ผู้เข้าร่วม",
-                "participantsHint": "หนึ่งรายการต่อบรรทัด ใช้ \"ชื่อ '<'อีเมล>\" เพื่อบันทึกที่อยู่อีเมล",
                 "participantName": "ชื่อ",
                 "participantEmail": "อีเมล (ไม่บังคับ)",
                 "participantAdd": "เพิ่มผู้เข้าร่วม",

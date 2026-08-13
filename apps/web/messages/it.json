@@ -6987,7 +6987,6 @@
                 "work": "Work",
                 "workNone": "Org-wide (no Work)",
                 "participants": "Partecipanti",
-                "participantsHint": "Uno per riga. Usa \"Nome '<'email>\" per registrare un indirizzo.",
                 "participantName": "Nome",
                 "participantEmail": "Email (facoltativa)",
                 "participantAdd": "Aggiungi partecipante",

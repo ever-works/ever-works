@@ -39,8 +39,6 @@ import {
     MEETING_SOURCE_URL_MAX_CHARS,
     MEETING_TITLE_MAX_CHARS,
     MEETING_TRANSCRIPT_MAX_CHARS,
-    formatParticipants,
-    parseParticipants,
 } from '@/lib/api/meetings.shared';
 import type { Meeting } from '@/lib/api/meetings';
 import type { MeetingWorkOption } from './MeetingsList';
@@ -52,6 +50,12 @@ import {
     isoToLocalInput,
     localInputToIso,
 } from './meeting-ui';
+import {
+    MeetingParticipantsEditor,
+    participantRowsFrom,
+    participantsFromRows,
+    type ParticipantRow,
+} from './MeetingParticipantsEditor';
 import { deleteMeetingAction, ingestMeetingTranscriptAction, updateMeetingAction } from './actions';
 
 export interface MeetingDetailClientProps {
@@ -142,7 +146,10 @@ function DetailRow({ label, children }: { label: string; children: React.ReactNo
             <span className="shrink-0 text-xs text-text-muted dark:text-text-muted-dark">
                 {label}
             </span>
-            <span className="min-w-0 truncate text-right text-xs font-medium text-text dark:text-text-dark">
+            {/* One step below the label: the value is the denser column
+                (timestamps, ids, the source pill), and `text-[11px]`
+                matches the chips it sits alongside. */}
+            <span className="min-w-0 truncate text-right text-[11px] font-medium text-text dark:text-text-dark">
                 {children}
             </span>
         </div>
@@ -199,8 +206,8 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
     const [startedAt, setStartedAt] = useState(isoToLocalInput(initial.startedAt));
     const [endedAt, setEndedAt] = useState(isoToLocalInput(initial.endedAt));
     const [workId, setWorkId] = useState(initial.workId ?? '');
-    const [participantsDraft, setParticipantsDraft] = useState(
-        formatParticipants(initial.participants ?? []),
+    const [participantRows, setParticipantRows] = useState<ParticipantRow[]>(() =>
+        participantRowsFrom(initial.participants ?? []),
     );
 
     const minutes = useMemo(
@@ -249,7 +256,7 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
         setStartedAt(isoToLocalInput(meeting.startedAt));
         setEndedAt(isoToLocalInput(meeting.endedAt));
         setWorkId(meeting.workId ?? '');
-        setParticipantsDraft(formatParticipants(meeting.participants ?? []));
+        setParticipantRows(participantRowsFrom(meeting.participants ?? []));
         setEditOpen(true);
     };
 
@@ -289,6 +296,14 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
             }
         }
 
+        // Malformed addresses are caught here rather than at the API, so
+        // the message names the typo instead of surfacing a 400.
+        const { participants, invalidEmail } = participantsFromRows(participantRows);
+        if (invalidEmail) {
+            toast.error(t('errors.participantEmailInvalid'));
+            return;
+        }
+
         startSave(async () => {
             try {
                 const updated = await updateMeetingAction(meeting.id, {
@@ -305,7 +320,7 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
                         : null,
                     // An emptied roster posts `[]`, which is a real edit
                     // ("nobody recorded"), not a no-op.
-                    participants: parseParticipants(participantsDraft),
+                    participants,
                 });
                 setMeeting(updated);
                 // Re-seed the drafts from the canonical row so the panel shows
@@ -316,7 +331,7 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
                 setStartedAt(isoToLocalInput(updated.startedAt));
                 setEndedAt(isoToLocalInput(updated.endedAt));
                 setWorkId(updated.workId ?? '');
-                setParticipantsDraft(formatParticipants(updated.participants ?? []));
+                setParticipantRows(participantRowsFrom(updated.participants ?? []));
                 setEditOpen(false);
                 toast.success(t('toasts.saved'));
                 router.refresh();
@@ -710,23 +725,12 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
                                 </Select>
                             </div>
                         ) : null}
-                        <div>
-                            <label className={fieldLabel} htmlFor="meeting-edit-participants">
-                                {t('fields.participants')}
-                            </label>
-                            <Textarea
-                                id="meeting-edit-participants"
-                                data-testid="meeting-edit-participants"
-                                value={participantsDraft}
-                                onChange={(e) => setParticipantsDraft(e.target.value)}
-                                rows={4}
-                                placeholder={'Ada Lovelace <ada@example.com>\nGrace Hopper'}
-                                className="font-mono text-xs"
-                            />
-                            <p className="mt-1.5 text-xs text-text-muted dark:text-text-muted-dark">
-                                {t('fields.participantsHint')}
-                            </p>
-                        </div>
+                        <MeetingParticipantsEditor
+                            label={t('fields.participants')}
+                            rows={participantRows}
+                            onChange={setParticipantRows}
+                            disabled={pendingSave}
+                        />
                     </div>
                     <DialogFooter>
                         <Button

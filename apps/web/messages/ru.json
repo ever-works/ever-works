@@ -6987,7 +6987,6 @@
                 "work": "Work",
                 "workNone": "Org-wide (no Work)",
                 "participants": "Участники",
-                "participantsHint": "По одному в строке. Используйте «Имя '<'эл. почта>», чтобы записать адрес.",
                 "participantName": "Имя",
                 "participantEmail": "Эл. почта (необязательно)",
                 "participantAdd": "Добавить участника",

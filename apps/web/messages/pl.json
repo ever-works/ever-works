@@ -6987,7 +6987,6 @@
                 "work": "Work",
                 "workNone": "Org-wide (no Work)",
                 "participants": "Uczestnicy",
-                "participantsHint": "Jeden w wierszu. Użyj \"Imię '<'e-mail>\", aby zapisać adres.",
                 "participantName": "Imię i nazwisko",
                 "participantEmail": "E-mail (opcjonalnie)",
                 "participantAdd": "Dodaj uczestnika",

@@ -6987,7 +6987,6 @@
                 "work": "Work",
                 "workNone": "Org-wide (no Work)",
                 "participants": "Deelnemers",
-                "participantsHint": "Eén per regel. Gebruik \"Naam '<'e-mail>\" om een adres vast te leggen.",
                 "participantName": "Naam",
                 "participantEmail": "E-mail (optioneel)",
                 "participantAdd": "Deelnemer toevoegen",

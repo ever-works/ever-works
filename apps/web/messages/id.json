@@ -6987,7 +6987,6 @@
                 "work": "Work",
                 "workNone": "Org-wide (no Work)",
                 "participants": "Peserta",
-                "participantsHint": "Satu per baris. Gunakan \"Nama '<'email>\" untuk mencatat alamat.",
                 "participantName": "Nama",
                 "participantEmail": "Email (opsional)",
                 "participantAdd": "Tambah peserta",

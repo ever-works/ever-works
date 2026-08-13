@@ -6987,7 +6987,6 @@
                 "work": "Work",
                 "workNone": "Org-wide (no Work)",
                 "participants": "Katılımcılar",
-                "participantsHint": "Her satıra bir kişi. Adres kaydetmek için \"Ad '<'e-posta>\" biçimini kullanın.",
                 "participantName": "Ad",
                 "participantEmail": "E-posta (isteğe bağlı)",
                 "participantAdd": "Katılımcı ekle",

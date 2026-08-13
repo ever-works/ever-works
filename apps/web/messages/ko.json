@@ -6987,7 +6987,6 @@
                 "work": "Work",
                 "workNone": "Org-wide (no Work)",
                 "participants": "참석자",
-                "participantsHint": "한 줄에 한 명씩. 이메일 주소를 기록하려면 \"이름 '<'이메일>\" 형식을 사용하세요.",
                 "participantName": "이름",
                 "participantEmail": "이메일(선택)",
                 "participantAdd": "참가자 추가",

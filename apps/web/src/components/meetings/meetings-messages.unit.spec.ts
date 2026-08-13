@@ -93,19 +93,20 @@ describe('Meetings messages — ICU syntax', () => {
     }
 
     it('the roster hint still shows the literal Name <email> format after escaping', () => {
+        // Only the CAPTURE form still teaches the syntax: `/meetings/[id]`
+        // edits its roster through a row editor now, so `meetingDetail` has
+        // no hint left to escape.
         const messages = JSON.parse(readFileSync(join(MESSAGES_DIR, 'en.json'), 'utf8'));
-        for (const namespace of ['meetingNew', 'meetingDetail']) {
-            const t = createTranslator({
-                locale: 'en',
-                messages,
-                namespace: `dashboard.${namespace}`,
-                onError: (error) => {
-                    throw error;
-                },
-            });
-            // The escape must survive as literal text — escaping it away
-            // would "fix" the error by deleting the thing the hint teaches.
-            expect(t('fields.participantsHint')).toContain('<email>');
-        }
+        const t = createTranslator({
+            locale: 'en',
+            messages,
+            namespace: 'dashboard.meetingNew',
+            onError: (error) => {
+                throw error;
+            },
+        });
+        // The escape must survive as literal text — escaping it away
+        // would "fix" the error by deleting the thing the hint teaches.
+        expect(t('fields.participantsHint')).toContain('<email>');
     });
 });

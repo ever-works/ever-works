@@ -6325,7 +6325,6 @@
                 "work": "Work",
                 "workNone": "Org-wide (no Work)",
                 "participants": "Participants",
-                "participantsHint": "One per line. Use \"Name '<'email>\" to record an address.",
                 "participantName": "Name",
                 "participantEmail": "Email (optional)",
                 "participantAdd": "Add participant",
