@@ -400,12 +400,23 @@ describe('WorkLifecycleService.createWork — provider defaults + quota', () => 
         expect(persisted.organization).toBe(true);
         expect(persisted.storageProvider).toBe('ever-works-git');
         expect(persisted.gitProvider).toBe('github');
+        // EW-028 — the provisioned repo is registered under BOTH roles.
+        // Managed storage is a single-repo model, and `getDataRepo()` reads the
+        // `data` role: with only `work` recorded it fell through to the DERIVED
+        // name `${slug}-data`, a repo nobody creates. This expectation used to
+        // pin the `work`-only shape, i.e. it agreed with the bug.
+        //
+        // Note `relatedRepositories` is a PLAIN object inside `objectContaining`,
+        // so it is matched EXACTLY — an extra role here is a failure, not a pass.
+        // That is deliberate: it keeps this assertion honest about the roles a
+        // managed Work actually gets.
         expect(persisted.sourceRepository).toEqual(
             expect.objectContaining({
                 owner: 'ever-works-cloud',
                 repo: 'evereq-my-work',
                 relatedRepositories: {
                     work: { owner: 'ever-works-cloud', repo: 'evereq-my-work' },
+                    data: { owner: 'ever-works-cloud', repo: 'evereq-my-work' },
                 },
             }),
         );
