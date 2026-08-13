@@ -6,6 +6,15 @@ jest.mock('@src/generators/data-generator/data-repository', () => ({
 }));
 
 describe('WorksConfigRepositorySyncService', () => {
+    // `workId` appears in every facade options object below on purpose. Without
+    // it, GitFacade.resolveToken cannot reach its managed-storage short-circuit
+    // — whose first line is `if (!options.workId) return null` — so it falls
+    // through to a per-user credential lookup and demands a personal GitHub
+    // account that a managed-storage user does not have by design.
+    //
+    // These assertions previously pinned the shape WITHOUT workId, i.e. exactly
+    // the shape that made Work creation fail on production for every user on
+    // managed "Ever Works Git" storage.
     const work = {
         id: 'dir-1',
         gitProvider: 'github',
@@ -96,11 +105,11 @@ describe('WorksConfigRepositorySyncService', () => {
         expect(gitFacade.pull).toHaveBeenCalledWith(
             '/tmp/data-repo',
             { name: 'User One', email: 'user@example.com' },
-            { userId: 'user-1', providerId: 'github' },
+            { userId: 'user-1', providerId: 'github', workId: 'dir-1' },
         );
         expect(gitFacade.push).toHaveBeenCalledWith(
             { dir: '/tmp/data-repo' },
-            { userId: 'user-1', providerId: 'github' },
+            { userId: 'user-1', providerId: 'github', workId: 'dir-1' },
         );
         expect(gitFacade.pull.mock.invocationCallOrder[0]).toBeLessThan(
             gitFacade.push.mock.invocationCallOrder[0],
@@ -129,12 +138,12 @@ describe('WorksConfigRepositorySyncService', () => {
         expect(gitFacade.push).toHaveBeenNthCalledWith(
             1,
             { dir: '/tmp/data-repo' },
-            { userId: 'user-1', providerId: 'github' },
+            { userId: 'user-1', providerId: 'github', workId: 'dir-1' },
         );
         expect(gitFacade.push).toHaveBeenNthCalledWith(
             2,
             { dir: '/tmp/data-repo', force: true },
-            { userId: 'user-1', providerId: 'github' },
+            { userId: 'user-1', providerId: 'github', workId: 'dir-1' },
         );
     });
 
