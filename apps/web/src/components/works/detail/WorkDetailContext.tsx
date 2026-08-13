@@ -12,8 +12,12 @@ type WorkDetailContextType = {
     config: WorkConfig | null;
     repoLinks: {
         main: string | null;
-        dataRepo: string | null;
-        websiteRepo: string | null;
+        // EW-037: `undefined` where the repository's real name is unknowable —
+        // managed storage provisions collision-suffixed names, so a derived
+        // `${slug}-data` URL points at a repo that does not exist. Consumers
+        // must render something other than a link in that case.
+        dataRepo: string | null | undefined;
+        websiteRepo: string | null | undefined;
     } | null;
     permissions: WorkPermissions;
 };
@@ -70,7 +74,12 @@ export const useWorkPermissions = () => {
     return permissions;
 };
 
-function repoLink(work: Work, oauthConnection: GitProviderConnectionInfo | null) {
+/**
+ * Exported for unit testing (EW-037). Building a repository URL is exactly the
+ * kind of logic that looks obviously right and silently produces links to
+ * repositories that do not exist.
+ */
+export function repoLink(work: Work, oauthConnection: GitProviderConnectionInfo | null) {
     if (!oauthConnection) {
         return null;
     }
@@ -95,12 +104,53 @@ function repoLink(work: Work, oauthConnection: GitProviderConnectionInfo | null)
     const dataRepository = relatedRepositories?.data;
     const websiteRepository = relatedRepositories?.website;
 
+    // EW-037 — do not invent a URL for a repository that was never created.
+    //
+    // Managed "Ever Works Git" storage names repos with a collision-resistant
+    // prefix (`anon-<hash>-<slug>`, see `EverWorksGitProvider.buildRepoName`),
+    // so a derived `${slug}-data` name is NEVER right for such a Work. The
+    // detail page linked all three of these for `EW027 Verify Directory`:
+    //   ever-works-cloud/anon-1d565e12-ew027-verify-directory   (exists)
+    //   ever-works-cloud/ew027-verify-directory-data            (404)
+    //   ever-works-cloud/ew027-verify-directory-website         (404)
+    //
+    // The discriminator is STRUCTURAL rather than `storageProvider`, which the
+    // API does not expose on the Work read model: when `relatedRepositories`
+    // is present at all, the platform recorded exactly what it provisioned, so
+    // a MISSING role means that repository does not exist — not that we forgot
+    // to record it. When the whole object is absent (self-hosted / legacy
+    // Works that predate it), the `${slug}-data` convention is how the user's
+    // own repos really are named, so keep deriving and keep those links alive.
+    //
+    // Returning `undefined` lets the row render as plain text instead of a
+    // link — see `RepositoryRow`.
+    const rolesAreRecorded = Boolean(relatedRepositories);
+    const derived = (recorded: string | undefined, fallback: string) => {
+        if (recorded) return encodeURIComponent(recorded);
+        return rolesAreRecorded ? undefined : encodeURIComponent(fallback);
+    };
+
     // Security: encodeURIComponent applied to all user-controlled path segments to prevent
     // path-traversal via malicious slug or repository names (e.g. "../../evil").
-    const encSlug = encodeURIComponent(work.slug);
+    // NB the segments below are encoded exactly ONCE — `work.slug` is passed raw
+    // into `derived()` rather than pre-encoded, because encoding it first and
+    // then encoding `"${encSlug}-data"` again double-escapes any slug that
+    // needed encoding at all (`a b` -> `a%2520b-data`).
+    const link = (
+        repository: { owner?: string; repo?: string } | undefined,
+        fallbackRepo: string,
+    ) => {
+        const repoSegment = derived(repository?.repo, fallbackRepo);
+        if (!repoSegment) return undefined;
+        return `${baseUrl}/${encodeURIComponent(repository?.owner || owner)}/${repoSegment}`;
+    };
+
     return {
+        // The `work` role is always recorded for managed storage, and for
+        // self-hosted storage the bare slug is the repo name, so this one
+        // needs no suppression.
         main: `${baseUrl}/${encodeURIComponent(mainRepository?.owner || owner)}/${encodeURIComponent(mainRepository?.repo || work.slug)}`,
-        dataRepo: `${baseUrl}/${encodeURIComponent(dataRepository?.owner || owner)}/${encodeURIComponent(dataRepository?.repo || `${encSlug}-data`)}`,
-        websiteRepo: `${baseUrl}/${encodeURIComponent(websiteRepository?.owner || owner)}/${encodeURIComponent(websiteRepository?.repo || `${encSlug}-website`)}`,
+        dataRepo: link(dataRepository, `${work.slug}-data`),
+        websiteRepo: link(websiteRepository, `${work.slug}-website`),
     };
 }
