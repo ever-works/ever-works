@@ -20,8 +20,11 @@ import {
     type MeetingSource,
 } from '@/lib/api/meetings.shared';
 import type { MeetingWorkOption } from './MeetingsList';
-import { localInputToIso } from './meeting-ui';
+import { localInputToIso, sourceIconMap } from './meeting-ui';
 import { createMeetingAction } from './actions';
+
+/** Stable across renders — the marks never depend on form state. */
+const SOURCE_ICONS = sourceIconMap(MEETING_CREATABLE_SOURCES);
 
 const sectionCard =
     'rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 space-y-4';
@@ -210,9 +213,10 @@ export function MeetingForm({ works = [] }: { works?: MeetingWorkOption[] }) {
                             value={source}
                             onValueChange={(v) => setSource(v as MeetingSource)}
                             data-testid="meeting-source-select"
+                            iconMap={SOURCE_ICONS}
                         >
                             {MEETING_CREATABLE_SOURCES.map((s) => (
-                                <option key={s} value={s}>
+                                <option key={s} value={s} data-icon={s}>
                                     {t(`sources.${s}`)}
                                 </option>
                             ))}
