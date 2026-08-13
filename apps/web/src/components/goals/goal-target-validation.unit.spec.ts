@@ -27,52 +27,52 @@ import { describe, it, expect } from 'vitest';
 
 /** The guard as it now stands in GoalForm.handleSubmit. */
 function targetValueIsAcceptable(raw: string): boolean {
-	const trimmed = raw.trim();
-	const n = Number(trimmed);
-	return trimmed.length > 0 && Number.isFinite(n);
+    const trimmed = raw.trim();
+    const n = Number(trimmed);
+    return trimmed.length > 0 && Number.isFinite(n);
 }
 
 /** The guard as it was — kept so the regression is demonstrable, not asserted. */
 function legacyGuard(raw: string): boolean {
-	return Number.isFinite(Number(raw));
+    return Number.isFinite(Number(raw));
 }
 
 describe('Goal target value validation', () => {
-	it('control: the legacy guard really did accept an empty string', () => {
-		// If this ever fails, the bug this spec exists for was never real and the
-		// rest of the file is theatre. Pinning it makes the regression concrete.
-		expect(legacyGuard('')).toBe(true);
-		expect(Number('')).toBe(0);
-		expect(Number('   ')).toBe(0);
-	});
+    it('control: the legacy guard really did accept an empty string', () => {
+        // If this ever fails, the bug this spec exists for was never real and the
+        // rest of the file is theatre. Pinning it makes the regression concrete.
+        expect(legacyGuard('')).toBe(true);
+        expect(Number('')).toBe(0);
+        expect(Number('   ')).toBe(0);
+    });
 
-	it.each([
-		['', 'empty'],
-		['   ', 'whitespace only'],
-		['abc', 'not a number'],
-		['NaN', 'literal NaN'],
-		['Infinity', 'infinite'],
-		['-Infinity', 'negative infinite'],
-	])('rejects %j (%s)', (raw) => {
-		expect(targetValueIsAcceptable(raw)).toBe(false);
-	});
+    it.each([
+        ['', 'empty'],
+        ['   ', 'whitespace only'],
+        ['abc', 'not a number'],
+        ['NaN', 'literal NaN'],
+        ['Infinity', 'infinite'],
+        ['-Infinity', 'negative infinite'],
+    ])('rejects %j (%s)', (raw) => {
+        expect(targetValueIsAcceptable(raw)).toBe(false);
+    });
 
-	it.each([
-		['1000', 'a plain integer'],
-		['0', 'an EXPLICIT zero — a deliberate target of 0 is still legitimate'],
-		['0.5', 'a fraction'],
-		['-25', 'a negative target, e.g. shrinking a cost'],
-		[' 42 ', 'padded but valid'],
-	])('accepts %j (%s)', (raw) => {
-		expect(targetValueIsAcceptable(raw)).toBe(true);
-	});
+    it.each([
+        ['1000', 'a plain integer'],
+        ['0', 'an EXPLICIT zero — a deliberate target of 0 is still legitimate'],
+        ['0.5', 'a fraction'],
+        ['-25', 'a negative target, e.g. shrinking a cost'],
+        [' 42 ', 'padded but valid'],
+    ])('accepts %j (%s)', (raw) => {
+        expect(targetValueIsAcceptable(raw)).toBe(true);
+    });
 
-	it('distinguishes an explicit 0 from a blank field — the whole point of the fix', () => {
-		// The old guard could not tell these apart; that is what made the bug
-		// invisible. A user who genuinely wants a target of 0 must still be able
-		// to say so, so the fix must not simply reject falsy numbers.
-		expect(targetValueIsAcceptable('0')).toBe(true);
-		expect(targetValueIsAcceptable('')).toBe(false);
-		expect(legacyGuard('0')).toBe(legacyGuard('')); // both true — indistinguishable
-	});
+    it('distinguishes an explicit 0 from a blank field — the whole point of the fix', () => {
+        // The old guard could not tell these apart; that is what made the bug
+        // invisible. A user who genuinely wants a target of 0 must still be able
+        // to say so, so the fix must not simply reject falsy numbers.
+        expect(targetValueIsAcceptable('0')).toBe(true);
+        expect(targetValueIsAcceptable('')).toBe(false);
+        expect(legacyGuard('0')).toBe(legacyGuard('')); // both true — indistinguishable
+    });
 });
