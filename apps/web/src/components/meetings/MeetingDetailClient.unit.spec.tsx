@@ -510,3 +510,96 @@ describe('MeetingDetailClient — transcript', () => {
         expect(ingestMock).not.toHaveBeenCalled();
     });
 });
+
+describe('MeetingDetailClient — summary generation', () => {
+    /** A promise the spec resolves by hand, so the request can be held open. */
+    function deferred<T>() {
+        let resolve!: (value: T) => void;
+        const promise = new Promise<T>((r) => {
+            resolve = r;
+        });
+        return { promise, resolve };
+    }
+
+    it('shows the generating panel while the transcript is in flight, then the summary', async () => {
+        const pending = deferred<unknown>();
+        ingestMock.mockReturnValueOnce(pending.promise);
+        render(<MeetingDetailClient meeting={mkMeeting()} />);
+
+        // Before the request: the empty state explains itself, nothing is
+        // pretending to work.
+        expect(screen.queryByTestId('meeting-summary-generating')).toBeNull();
+        expect(screen.getByText('summary.noTranscript')).toBeTruthy();
+
+        fireEvent.change(screen.getByTestId('meeting-transcript-composer'), {
+            target: { value: 'Ada: hello.' },
+        });
+        fireEvent.click(screen.getByTestId('meeting-attach-transcript'));
+
+        const panel = await screen.findByTestId('meeting-summary-generating');
+        // ShinyText renders one span per character, so the label is asserted
+        // on the concatenated text rather than as a single text node.
+        expect(panel.textContent).toContain('summary.generating');
+        expect(panel.getAttribute('role')).toBe('status');
+        expect(panel.getAttribute('aria-live')).toBe('polite');
+        // The empty-state copy steps aside rather than sitting under a
+        // panel that says a summary is coming.
+        expect(screen.queryByText('summary.noTranscript')).toBeNull();
+
+        pending.resolve({
+            meeting: mkMeeting({
+                hasTranscript: true,
+                transcriptText: 'Ada: hello.',
+                summary: 'They said hello.',
+            }),
+            summary: 'They said hello.',
+            memorySaved: true,
+            envelopeEmitted: true,
+        });
+
+        expect(await screen.findByText('They said hello.')).toBeTruthy();
+        expect(screen.queryByTestId('meeting-summary-generating')).toBeNull();
+    });
+
+    it('locks the composer and labels the button while the request is open', async () => {
+        const pending = deferred<unknown>();
+        ingestMock.mockReturnValueOnce(pending.promise);
+        render(<MeetingDetailClient meeting={mkMeeting()} />);
+
+        const composer = screen.getByTestId('meeting-transcript-composer') as HTMLTextAreaElement;
+        fireEvent.change(composer, { target: { value: 'Ada: hello.' } });
+        fireEvent.click(screen.getByTestId('meeting-attach-transcript'));
+
+        await screen.findByTestId('meeting-summary-generating');
+        const button = screen.getByTestId('meeting-attach-transcript') as HTMLButtonElement;
+        expect(button.disabled).toBe(true);
+        expect(button.textContent).toContain('actions.attaching');
+        expect(composer.disabled).toBe(true);
+
+        pending.resolve({
+            meeting: mkMeeting({ hasTranscript: true, transcriptText: 'Ada: hello.' }),
+            memorySaved: false,
+            envelopeEmitted: false,
+        });
+        await waitFor(() => expect(screen.queryByTestId('meeting-summary-generating')).toBeNull());
+    });
+
+    it('falls back to the not-generated copy when no summary came back', async () => {
+        ingestMock.mockResolvedValueOnce({
+            meeting: mkMeeting({ hasTranscript: true, transcriptText: 'Ada: hello.' }),
+            memorySaved: false,
+            envelopeEmitted: false,
+        });
+        render(<MeetingDetailClient meeting={mkMeeting()} />);
+
+        fireEvent.change(screen.getByTestId('meeting-transcript-composer'), {
+            target: { value: 'Ada: hello.' },
+        });
+        fireEvent.click(screen.getByTestId('meeting-attach-transcript'));
+
+        // The animation must not outlive the request: with no AI provider the
+        // panel resolves to the honest explanation, not an endless shimmer.
+        expect(await screen.findByText('summary.notGenerated')).toBeTruthy();
+        expect(screen.queryByTestId('meeting-summary-generating')).toBeNull();
+    });
+});
