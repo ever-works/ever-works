@@ -6973,8 +6973,10 @@
                 "delete": "Delete",
                 "attachTranscript": "Attach transcript",
                 "attaching": "Ajout en cours…",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
+                "editTranscript": "Modifier la transcription",
+                "cancelEdit": "Annuler la modification",
+                "saveTranscript": "Enregistrer la transcription",
+                "savingTranscript": "Enregistrement…",
                 "save": "Save changes",
                 "cancel": "Annuler"
             },

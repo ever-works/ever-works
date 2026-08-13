@@ -6973,8 +6973,10 @@
                 "delete": "Delete",
                 "attachTranscript": "Attach transcript",
                 "attaching": "Прикачване…",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
+                "editTranscript": "Редактиране на стенограмата",
+                "cancelEdit": "Отказ на редакцията",
+                "saveTranscript": "Запазване на стенограмата",
+                "savingTranscript": "Запазване…",
                 "save": "Save changes",
                 "cancel": "Отказ"
             },

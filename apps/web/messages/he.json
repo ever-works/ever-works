@@ -6973,8 +6973,10 @@
                 "delete": "Delete",
                 "attachTranscript": "Attach transcript",
                 "attaching": "מצרפים…",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
+                "editTranscript": "עריכת התמליל",
+                "cancelEdit": "ביטול העריכה",
+                "saveTranscript": "שמירת התמליל",
+                "savingTranscript": "שומרים…",
                 "save": "Save changes",
                 "cancel": "ביטול"
             },

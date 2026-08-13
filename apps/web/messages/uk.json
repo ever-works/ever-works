@@ -6943,8 +6943,10 @@
                 "delete": "Delete",
                 "attachTranscript": "Attach transcript",
                 "attaching": "Прикріплюємо…",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
+                "editTranscript": "Редагувати транскрипцію",
+                "cancelEdit": "Скасувати редагування",
+                "saveTranscript": "Зберегти транскрипцію",
+                "savingTranscript": "Зберігаємо…",
                 "save": "Save changes",
                 "cancel": "Скасувати"
             },

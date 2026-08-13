@@ -6943,8 +6943,10 @@
                 "delete": "Delete",
                 "attachTranscript": "Attach transcript",
                 "attaching": "Ekleniyor…",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
+                "editTranscript": "Dökümü düzenle",
+                "cancelEdit": "Düzenlemeyi iptal et",
+                "saveTranscript": "Dökümü kaydet",
+                "savingTranscript": "Kaydediliyor…",
                 "save": "Save changes",
                 "cancel": "İptal"
             },

@@ -6943,8 +6943,10 @@
                 "delete": "Delete",
                 "attachTranscript": "Attach transcript",
                 "attaching": "Melampirkan…",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
+                "editTranscript": "Edit transkrip",
+                "cancelEdit": "Batalkan pengeditan",
+                "saveTranscript": "Simpan transkrip",
+                "savingTranscript": "Menyimpan…",
                 "save": "Save changes",
                 "cancel": "Batal"
             },

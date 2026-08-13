@@ -6943,8 +6943,10 @@
                 "delete": "Delete",
                 "attachTranscript": "Attach transcript",
                 "attaching": "Anexando…",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
+                "editTranscript": "Editar a transcrição",
+                "cancelEdit": "Cancelar a edição",
+                "saveTranscript": "Salvar a transcrição",
+                "savingTranscript": "Salvando…",
                 "save": "Save changes",
                 "cancel": "Cancelar"
             },

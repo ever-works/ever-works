@@ -6943,8 +6943,10 @@
                 "delete": "Delete",
                 "attachTranscript": "Attach transcript",
                 "attaching": "正在附加…",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
+                "editTranscript": "编辑转录内容",
+                "cancelEdit": "取消编辑",
+                "saveTranscript": "保存转录内容",
+                "savingTranscript": "正在保存…",
                 "save": "Save changes",
                 "cancel": "取消"
             },

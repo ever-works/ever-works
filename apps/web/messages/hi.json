@@ -6943,8 +6943,10 @@
                 "delete": "Delete",
                 "attachTranscript": "Attach transcript",
                 "attaching": "जोड़ा जा रहा है…",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
+                "editTranscript": "ट्रांसक्रिप्ट संपादित करें",
+                "cancelEdit": "संपादन रद्द करें",
+                "saveTranscript": "ट्रांसक्रिप्ट सहेजें",
+                "savingTranscript": "सहेजा जा रहा है…",
                 "save": "Save changes",
                 "cancel": "रद्द करें"
             },

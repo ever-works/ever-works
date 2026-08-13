@@ -6943,8 +6943,10 @@
                 "delete": "Delete",
                 "attachTranscript": "Attach transcript",
                 "attaching": "Đang đính kèm…",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
+                "editTranscript": "Chỉnh sửa bản ghi",
+                "cancelEdit": "Hủy chỉnh sửa",
+                "saveTranscript": "Lưu bản ghi",
+                "savingTranscript": "Đang lưu…",
                 "save": "Save changes",
                 "cancel": "Hủy"
             },

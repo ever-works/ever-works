@@ -6943,8 +6943,10 @@
                 "delete": "Delete",
                 "attachTranscript": "Attach transcript",
                 "attaching": "กำลังแนบ…",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
+                "editTranscript": "แก้ไขข้อความถอดเสียง",
+                "cancelEdit": "ยกเลิกการแก้ไข",
+                "saveTranscript": "บันทึกข้อความถอดเสียง",
+                "savingTranscript": "กำลังบันทึก…",
                 "save": "Save changes",
                 "cancel": "ยกเลิก"
             },

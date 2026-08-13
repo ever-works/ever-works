@@ -6943,8 +6943,10 @@
                 "delete": "Delete",
                 "attachTranscript": "Attach transcript",
                 "attaching": "添付しています…",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
+                "editTranscript": "文字起こしを編集",
+                "cancelEdit": "編集をキャンセル",
+                "saveTranscript": "文字起こしを保存",
+                "savingTranscript": "保存しています…",
                 "save": "Save changes",
                 "cancel": "キャンセル"
             },

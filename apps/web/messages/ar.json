@@ -6973,8 +6973,10 @@
                 "delete": "Delete",
                 "attachTranscript": "Attach transcript",
                 "attaching": "جارٍ الإرفاق…",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
+                "editTranscript": "تعديل النص",
+                "cancelEdit": "إلغاء التعديل",
+                "saveTranscript": "حفظ النص",
+                "savingTranscript": "جارٍ الحفظ…",
                 "save": "Save changes",
                 "cancel": "إلغاء"
             },

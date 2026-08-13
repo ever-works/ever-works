@@ -6943,8 +6943,10 @@
                 "delete": "Delete",
                 "attachTranscript": "Attach transcript",
                 "attaching": "첨부하는 중…",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
+                "editTranscript": "대화록 편집",
+                "cancelEdit": "편집 취소",
+                "saveTranscript": "대화록 저장",
+                "savingTranscript": "저장하는 중…",
                 "save": "Save changes",
                 "cancel": "취소"
             },

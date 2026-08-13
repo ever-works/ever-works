@@ -6281,8 +6281,10 @@
                 "delete": "Delete",
                 "attachTranscript": "Attach transcript",
                 "attaching": "Attaching…",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
+                "editTranscript": "Edit transcript",
+                "cancelEdit": "Cancel edit",
+                "saveTranscript": "Save transcript",
+                "savingTranscript": "Saving…",
                 "save": "Save changes",
                 "cancel": "Cancel"
             },
