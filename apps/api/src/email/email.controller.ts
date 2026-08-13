@@ -26,6 +26,7 @@ import {
 } from '@ever-works/agent/notifications';
 import type { EmailAddressDirection } from '@ever-works/agent/entities';
 import { CurrentUser, AuthSessionGuard, Public } from '../auth';
+import { toPublicEmailAddress, toPublicEmailAddresses } from './email-address.projection';
 import { AuthenticatedUser } from '@src/auth/types/auth.types';
 import {
     EmailService,
@@ -98,7 +99,7 @@ export class EmailController {
         @Query('direction') direction?: EmailAddressDirection,
     ) {
         const addresses = await this.emailService.listAddresses(auth.userId, direction);
-        return { addresses };
+        return { addresses: toPublicEmailAddresses(addresses) };
     }
 
     @UseGuards(AuthSessionGuard)
@@ -111,7 +112,7 @@ export class EmailController {
         @Body() body: CreateEmailAddressInput,
     ) {
         const address = await this.emailService.createAddress(auth.userId, body);
-        return { address };
+        return { address: toPublicEmailAddress(address) };
     }
 
     @UseGuards(AuthSessionGuard)
@@ -124,7 +125,7 @@ export class EmailController {
         @Body() body: UpdateEmailAddressInput,
     ) {
         const address = await this.emailService.updateAddress(auth.userId, id, body);
-        return { address };
+        return { address: toPublicEmailAddress(address) };
     }
 
     @UseGuards(AuthSessionGuard)
