@@ -447,7 +447,7 @@ test.describe('GET /api/agents — filters', () => {
         expect((await listRaw(request, u.access_token, '?status=bogus')).status()).toBe(400);
     });
 
-    test('archived agents are excluded from the default list and ?status=archived is always empty', async ({
+    test('archived agents are excluded by default but returned when explicitly requested', async ({
         request,
     }) => {
         const u = await freshUser(request);
@@ -461,11 +461,24 @@ test.describe('GET /api/agents — filters', () => {
         expect(def.meta.total).toBe(2); // archived one dropped
         expect(def.data.map((r) => r.id)).not.toContain(ids[0]);
 
-        // `archived` is a valid enum (200) but the repo filters `status != archived`
-        // BEFORE applying the status filter → the intersection is always empty.
+        // `?status=archived` RETURNS the archived rows. `AgentRepository
+        // .findByUserIdScoped` computes `wantsArchived` and SKIPS the blanket
+        // `status != archived` predicate when the caller asks for them
+        // explicitly, then ANDs `status = archived`.
+        //
+        // This used to expect an empty list, describing the two predicates as
+        // contradicting each other. That contradiction is exactly what the
+        // carve-out was added to FIX — the repository's own comment notes that
+        // without it "the archived view is always empty" — and
+        // `app/[locale]/(dashboard)/agents/archived/page.tsx` renders
+        // `agentsAPI.list({ status: 'archived' })`, so the old expectation
+        // described a state in which that tab could never show anything.
         const arch = await list(request, u.access_token, '?status=archived');
-        expect(arch.meta.total).toBe(0);
-        expect(arch.data).toEqual([]);
+        expect(arch.meta.total).toBe(1);
+        // Identify the row, not just the count — a bare count would also pass
+        // if the wrong agent came back.
+        expect(arch.data.map((r) => r.id)).toEqual([ids[0]]);
+        expect(arch.data[0].status).toBe('archived');
     });
 
     test('?search matches on the agent name and total reflects only the matches', async ({
