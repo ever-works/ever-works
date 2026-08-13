@@ -39,6 +39,7 @@ import {
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
 import {
+    MEETING_PARTICIPANTS_MAX,
     MEETING_SOURCE_URL_MAX_CHARS,
     MEETING_TITLE_MAX_CHARS,
     MEETING_TRANSCRIPT_MAX_CHARS,
@@ -55,10 +56,12 @@ import {
 } from './meeting-ui';
 import {
     MeetingParticipantsEditor,
+    newParticipantRow,
     participantRowsFrom,
     participantsFromRows,
     type ParticipantRow,
 } from './MeetingParticipantsEditor';
+import { MeetingParticipantQuickAdd } from './MeetingParticipantQuickAdd';
 import { MeetingSummary } from './MeetingSummary';
 import { MeetingSummaryGenerating } from './MeetingSummaryGenerating';
 import { deleteMeetingAction, ingestMeetingTranscriptAction, updateMeetingAction } from './actions';
@@ -221,6 +224,11 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
 
     /** The Summary card, so a submitted transcript can scroll it into view. */
     const summaryRef = useRef<HTMLElement | null>(null);
+
+    // Plain state rather than a transition: the quick-add form awaits the
+    // result to decide whether to clear itself, and `useTransition` has no
+    // handle to await.
+    const [addingParticipant, setAddingParticipant] = useState(false);
 
     const [deleteOpen, setDeleteOpen] = useState(false);
     const [deleteError, setDeleteError] = useState<string | null>(null);
@@ -392,6 +400,45 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
             }
         });
     };
+    const addParticipant = async (rawName: string, rawEmail: string): Promise<boolean> => {
+        const { participants: parsed, invalidEmail } = participantsFromRows([
+            newParticipantRow(rawName, rawEmail),
+        ]);
+        if (invalidEmail) {
+            toast.error(t('errors.participantEmailInvalid'));
+            return false;
+        }
+        const entry = parsed[0];
+        if (!entry) return false;
+
+        const existing = meeting.participants ?? [];
+        if (existing.length >= MEETING_PARTICIPANTS_MAX) return false;
+        const duplicate = existing.some((p) =>
+            entry.email && p.email
+                ? p.email.toLowerCase() === entry.email.toLowerCase()
+                : p.name.trim().toLowerCase() === entry.name.trim().toLowerCase(),
+        );
+        if (duplicate) {
+            toast.error(t('errors.participantDuplicate'));
+            return false;
+        }
+
+        setAddingParticipant(true);
+        try {
+            const updated = await updateMeetingAction(meeting.id, {
+                participants: [...existing, entry],
+            });
+            setMeeting(updated);
+            toast.success(t('toasts.participantAdded'));
+            router.refresh();
+            return true;
+        } catch (err) {
+            toast.error(err instanceof Error ? err.message : t('toasts.saveError'));
+            return false;
+        } finally {
+            setAddingParticipant(false);
+        }
+    };
 
     const openDelete = () => {
         setDeleteError(null);
@@ -421,11 +468,6 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
         <div className="mx-auto w-full max-w-screen-2xl space-y-6 p-6" data-testid="meeting-detail">
             {/* ── Header ───────────────────────────────────────────────────── */}
             <div>
-                {/* Top bar — every page-level action lives here on the
-                    breadcrumb line as a single non-wrapping row, with Delete
-                    behind a divider so the destructive intent never reads as
-                    part of the same group. The back link is the one element
-                    that can truncate without losing meaning. */}
                 <div className="flex items-center justify-between gap-3">
                     <Link
                         href={ROUTES.DASHBOARD_MEETINGS}
@@ -503,21 +545,10 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
                     </div>
                 </div>
             </div>
-
-            {/* ── Body ─────────────────────────────────────────────────────
-                Two tracks on wide viewports: the left column carries what the
-                meeting *says* (its summary, then the transcript that produced
-                it), the right rail carries what it *is* — provenance rows and
-                the editable fields. Below @5xl the grid collapses to one
-                column and the DOM order still reads content-first. */}
             <div className="grid items-start gap-5 @5xl/main:grid-cols-12">
-                {/* ── Content column ───────────────────────────────────── */}
                 <div className="min-w-0 space-y-5 @5xl/main:col-span-8">
-                    {/* ── Summary ──────────────────────────────────────── */}
                     <section
                         ref={summaryRef}
-                        // `scroll-mt` keeps the card clear of the dashboard's
-                        // sticky top bar when it is scrolled to.
                         className={cn(sectionCard, 'scroll-mt-6')}
                         data-testid="meeting-summary"
                     >
@@ -529,9 +560,6 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
                         {pendingTranscript ? (
                             <MeetingSummaryGenerating />
                         ) : meeting.summary ? (
-                            // Keyed on the text so a freshly generated summary
-                            // replays the reveal, resolving into the space the
-                            // skeleton just held rather than snapping in.
                             <div key={meeting.summary} className="ms-summary-reveal">
                                 <MeetingSummary text={meeting.summary} />
                             </div>
@@ -684,6 +712,13 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
                                 <span className="ml-auto rounded-full border border-border bg-surface-secondary px-2 py-0.5 text-[11px] font-medium tabular-nums dark:border-border-dark dark:bg-surface-secondary-dark">
                                     {meeting.participants.length}
                                 </span>
+                                <MeetingParticipantQuickAdd
+                                    onAdd={addParticipant}
+                                    pending={addingParticipant}
+                                    atCapacity={
+                                        meeting.participants.length >= MEETING_PARTICIPANTS_MAX
+                                    }
+                                />
                             </div>
                             {meeting.participants.length > 0 ? (
                                 <ul className="space-y-1" data-testid="meeting-participants">
