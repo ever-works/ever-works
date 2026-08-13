@@ -426,6 +426,115 @@ describe('MeetingDetailClient — edit dialog', () => {
     });
 });
 
+describe('MeetingDetailClient — quick-add participant', () => {
+    /** Open the Details rail's inline add form and return its name input. */
+    function openQuickAdd(): HTMLInputElement {
+        fireEvent.click(screen.getByTestId('meeting-participant-quick-add-open'));
+        return screen.getByTestId('meeting-participant-quick-add-name') as HTMLInputElement;
+    }
+
+    it('appends to the stored roster instead of replacing it', async () => {
+        updateMock.mockResolvedValueOnce(
+            mkMeeting({ participants: [{ name: 'Ada Lovelace' }, { name: 'Alan Turing' }] }),
+        );
+        render(
+            <MeetingDetailClient
+                meeting={mkMeeting({ participants: [{ name: 'Ada Lovelace' }] })}
+            />,
+        );
+
+        fireEvent.change(openQuickAdd(), { target: { value: 'Alan Turing' } });
+        fireEvent.click(screen.getByTestId('meeting-participant-quick-add-submit'));
+
+        // Only `participants` is patched: a quick add must not carry some
+        // other field along with it.
+        await waitFor(() =>
+            expect(updateMock).toHaveBeenCalledWith('mtg-1', {
+                participants: [{ name: 'Ada Lovelace' }, { name: 'Alan Turing' }],
+            }),
+        );
+        expect(await screen.findByText('Alan Turing')).toBeTruthy();
+    });
+
+    it('closes and clears once the person has landed', async () => {
+        updateMock.mockResolvedValueOnce(mkMeeting({ participants: [{ name: 'Ada Lovelace' }] }));
+        render(<MeetingDetailClient meeting={mkMeeting()} />);
+
+        fireEvent.change(openQuickAdd(), { target: { value: 'Ada Lovelace' } });
+        fireEvent.click(screen.getByTestId('meeting-participant-quick-add-submit'));
+
+        await waitFor(() =>
+            expect(screen.queryByTestId('meeting-participant-quick-add')).toBeNull(),
+        );
+        expect(screen.getByTestId('meeting-participant-quick-add-open')).toBeTruthy();
+    });
+
+    it('sends the address as the name when only an address is given', async () => {
+        updateMock.mockResolvedValueOnce(mkMeeting());
+        render(<MeetingDetailClient meeting={mkMeeting()} />);
+
+        openQuickAdd();
+        fireEvent.change(screen.getByTestId('meeting-participant-quick-add-email'), {
+            target: { value: 'ada@example.com' },
+        });
+        fireEvent.click(screen.getByTestId('meeting-participant-quick-add-submit'));
+
+        await waitFor(() =>
+            expect(updateMock).toHaveBeenCalledWith('mtg-1', {
+                participants: [{ name: 'ada@example.com', email: 'ada@example.com' }],
+            }),
+        );
+    });
+
+    it('refuses a malformed address and keeps what was typed', () => {
+        render(<MeetingDetailClient meeting={mkMeeting()} />);
+
+        fireEvent.change(openQuickAdd(), { target: { value: 'Ada' } });
+        fireEvent.change(screen.getByTestId('meeting-participant-quick-add-email'), {
+            target: { value: 'ada@' },
+        });
+        fireEvent.click(screen.getByTestId('meeting-participant-quick-add-submit'));
+
+        expect(updateMock).not.toHaveBeenCalled();
+        expect(toastErrorMock).toHaveBeenCalledWith('errors.participantEmailInvalid');
+        // The fix is one keystroke — the form must not throw the entry away.
+        const name = screen.getByTestId('meeting-participant-quick-add-name') as HTMLInputElement;
+        expect(name.value).toBe('Ada');
+    });
+
+    it('refuses someone already on the list', () => {
+        render(
+            <MeetingDetailClient
+                meeting={mkMeeting({
+                    participants: [{ name: 'Ada Lovelace', email: 'ada@example.com' }],
+                })}
+            />,
+        );
+
+        openQuickAdd();
+        fireEvent.change(screen.getByTestId('meeting-participant-quick-add-email'), {
+            // Same person, different casing.
+            target: { value: 'ADA@example.com' },
+        });
+        fireEvent.click(screen.getByTestId('meeting-participant-quick-add-submit'));
+
+        expect(updateMock).not.toHaveBeenCalled();
+        expect(toastErrorMock).toHaveBeenCalledWith('errors.participantDuplicate');
+    });
+
+    it('cannot submit an empty form', () => {
+        render(<MeetingDetailClient meeting={mkMeeting()} />);
+        openQuickAdd();
+
+        const submit = screen.getByTestId(
+            'meeting-participant-quick-add-submit',
+        ) as HTMLButtonElement;
+        expect(submit.disabled).toBe(true);
+        fireEvent.click(submit);
+        expect(updateMock).not.toHaveBeenCalled();
+    });
+});
+
 /** A meeting whose transcript has already landed. */
 const STORED = 'Ada: the gate is green.';
 
