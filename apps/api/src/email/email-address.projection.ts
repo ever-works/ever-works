@@ -1,4 +1,4 @@
-import type { TenantEmailAddress } from '@ever-works/agent';
+import type { TenantEmailAddress } from '@ever-works/agent/entities';
 
 /**
  * The shape of a tenant email address as it may leave the server.
