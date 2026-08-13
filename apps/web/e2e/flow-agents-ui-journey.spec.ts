@@ -132,8 +132,18 @@ test.describe('Agents catalog UI — prompt-first surface', () => {
 
         await page.goto('/en/agents', { waitUntil: 'domcontentloaded' });
         // Scope to the card's own anchor (href ends at /agents/:id) so status
-        // and scope labels can't be satisfied by a neighbouring agent's card.
-        const card = page.locator(`a[href$="/agents/${agent.id}"]`).first();
+        // and scope labels can't be satisfied by a neighbouring agent's card —
+        // then step UP to the card root.
+        //
+        // The anchor is a full-bleed overlay (`absolute inset-0`, no children,
+        // AgentCard.tsx:61-65), so the name/status/scope text is a SIBLING of
+        // it, not a descendant. Searching inside the anchor — which is what
+        // `card.getByText(...)` did while `card` was the anchor itself — can
+        // never find them. Changed by commit 1a5e0144 (2026-08-09, PR #1994) to
+        // stop nesting a button inside an anchor; deliberate, no user-visible
+        // change. The `..` keeps the per-agent scoping the original comment
+        // wanted while looking at the subtree that actually holds the text.
+        const card = page.locator(`a[href$="/agents/${agent.id}"]`).first().locator('xpath=..');
         await expect(card).toBeVisible({ timeout: 30_000 });
         await expect(card.getByText(agent.name)).toBeVisible();
         await expect(card.getByText('Draft', { exact: true })).toBeVisible();

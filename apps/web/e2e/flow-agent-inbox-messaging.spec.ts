@@ -59,16 +59,21 @@ import { createAgentViaAPI } from './helpers/agents-tasks';
  *
  *   POST /api/email/addresses { address, direction:'outbound'|'inbound',
  *                               pluginId, providerSettings, defaultForReplies? }
- *        → 201 { address:{ id, verified:false, verificationToken, disabledAt:null,
- *          defaultForReplies, … } }. The reply-from address lifecycle:
+ *        → 201 { address:{ id, verified:false, disabledAt:null,
+ *          defaultForReplies, … } }. NOTE: `verificationToken` is deliberately
+ *          ABSENT (EW-025) — returning it let a caller verify an address they
+ *          do not own without ever receiving the email. It is stripped on read
+ *          as well as on create. The reply-from address lifecycle:
  *          · GET  /api/email/addresses?direction=outbound → only ACTIVE rows
  *          · PATCH /api/email/addresses/:id { defaultForReplies|disabled }
  *            → 200 { address } (disabled stamps `disabledAt`, drops it from
  *            the active list — i.e. retiring a reply address)
  *          · POST /api/email/addresses/:id/verify → 500 (no provider key);
- *          · GET  /api/email/verify/:token (PUBLIC) → { verified:true } good
- *            token, { verified:false } bogus — the address-confirmation
- *            click-through that makes an address eligible to reply from.
+ *          · GET  /api/email/verify/:token (PUBLIC) → { verified:false } for a
+ *            bogus token. The POSITIVE path is not reachable from e2e: the
+ *            token is no longer returned (EW-025) and the mail goes via the
+ *            provider plugin, not the MailHog SMTP sink. See the note in the
+ *            lifecycle test.
  *        Cross-user: PATCH/DELETE/verify on another user's address → 404.
  *
  *   Auth: every authenticated route 401s without a bearer.
@@ -118,7 +123,8 @@ interface EmailAddress {
     direction: 'outbound' | 'inbound' | 'both';
     pluginId: string;
     verified: boolean;
-    verificationToken: string | null;
+    /** EW-025: never sent over the API — kept optional so tests can assert its ABSENCE. */
+    verificationToken?: never;
     defaultForReplies: boolean;
     disabledAt: string | null;
 }
@@ -402,7 +408,27 @@ test.describe('Agent inbox + messaging', () => {
 
         const addr = await createOutboundAddress(request, token);
         expect(addr.verified).toBe(false);
-        expect(addr.verificationToken, 'a fresh address carries a verification token').toBeTruthy();
+        // EW-025 — this used to assert the token was PRESENT
+        // (`expect(addr.verificationToken).toBeTruthy()`), i.e. it pinned a
+        // vulnerability rather than a feature.
+        //
+        // Ownership of an address is proven by receiving the emailed link, so
+        // returning the token in the creation response removed the only proof
+        // the flow has. Reproduced end to end before the fix:
+        //
+        //   1. POST an address the caller does NOT control -> 201, token in JSON
+        //   2. GET /api/email/verify/<token>  (unauthenticated) -> {"verified":true}
+        //   3. read back -> that address is now `verified`
+        //
+        // No mail was ever sent, and a verified address can then be used as an
+        // outbound sender. `toPublicEmailAddress` now strips the token at the
+        // controller boundary, so this asserts the token is ABSENT — which
+        // makes this test a regression guard for the hole instead of a pin on it.
+        expect(
+            addr.verificationToken,
+            'the verification token must never cross the API boundary — returning it lets a caller ' +
+                'verify an address they do not own without receiving the email',
+        ).toBeUndefined();
         expect(addr.disabledAt).toBeNull();
 
         // It is in the ACTIVE outbound pool (candidate reply-from address).
@@ -424,25 +450,45 @@ test.describe('Agent inbox + messaging', () => {
         ).toBe(true);
 
         // PUBLIC verify click-through: a bogus token is rejected (verified:false),
-        // the real token confirms it (verified:true) — both 200, never throwing.
+        // returning 200 rather than throwing.
         const bad = await request.get(`${API_BASE}/api/email/verify/${uniq('bogus')}`);
         expect(bad.status()).toBe(200);
         expect((await bad.json()).verified).toBe(false);
 
-        const good = await request.get(`${API_BASE}/api/email/verify/${addr.verificationToken}`);
-        expect(good.status()).toBe(200);
-        expect((await good.json()).verified).toBe(true);
-
-        // After confirmation the address reports verified + consumes the token.
-        const afterVerify = (
+        // The address stays unverified until someone actually follows the
+        // emailed link — which is the entire point of EW-025.
+        const stillUnverified = (
             (await (
                 await request.get(`${API_BASE}/api/email/addresses?direction=outbound`, {
                     headers: authedHeaders(token),
                 })
             ).json()) as { addresses: EmailAddress[] }
         ).addresses.find((x) => x.id === addr.id);
-        expect(afterVerify?.verified).toBe(true);
-        expect(afterVerify?.verificationToken ?? null).toBeNull();
+        expect(stillUnverified?.verified).toBe(false);
+        // The list endpoint must not leak the token either — EW-025 strips it
+        // on read as well as on create, so a caller cannot harvest it later.
+        expect(stillUnverified?.verificationToken ?? undefined).toBeUndefined();
+
+        // ── COVERAGE GAP, deliberate and recorded ────────────────────────────
+        // The POSITIVE click-through (`GET /api/email/verify/<real token>` ->
+        // verified:true) is no longer reachable from an e2e test, and both
+        // reasons are by design:
+        //
+        //   1. EW-025 removed the token from every API response, so the test
+        //      cannot read it back. That is the fix, not an oversight.
+        //   2. The email goes out through the PROVIDER PLUGIN —
+        //      `triggerVerification` -> `emailFacade.verifyAddress` -> the
+        //      `postmark` plugin, seeded here with `apiKey: 'ci-fake-key'` —
+        //      not through SMTP. So it never reaches the MailHog sink the
+        //      e2e stack runs (`helpers/mailhog.ts`), and cannot be read from
+        //      there either. I checked; that was the obvious fix and it does
+        //      not work.
+        //
+        // Restoring this coverage needs one of: a fake/loopback email provider
+        // plugin for CI that writes to MailHog, or a test-only hook to fetch
+        // the token. Both are real work and neither belongs in this commit.
+        // Asserting `verified` stays false at least pins that the address is
+        // NOT self-verifiable without the email.
 
         // Retire the address: disabling stamps `disabledAt` and removes it from
         // the active reply pool (findActiveByUser filters disabled rows out).

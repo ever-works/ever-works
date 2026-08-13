@@ -90,7 +90,7 @@ function buildCsp(): string {
         "media-src 'self' https:",
         "font-src 'self' data:",
         "style-src 'self' 'unsafe-inline'",
-        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://us.i.posthog.com https://eu.i.posthog.com https://challenges.cloudflare.com",
+        "script-src 'self' 'unsafe-inline' 'unsafe-eval' https://us.i.posthog.com https://eu.i.posthog.com https://challenges.cloudflare.com https://static.cloudflareinsights.com",
         // EW-617 — Cloudflare Turnstile widget script + challenge iframe. Keep
         // in lock-step with next.config.ts's CSP array (its byte-twin).
         "frame-src 'self' https://challenges.cloudflare.com",
