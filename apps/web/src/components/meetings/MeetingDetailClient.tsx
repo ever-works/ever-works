@@ -8,6 +8,7 @@ import {
     FileText,
     Folder,
     Info,
+    Loader2,
     Pencil,
     Sparkles,
     Trash2,
@@ -56,6 +57,7 @@ import {
     participantsFromRows,
     type ParticipantRow,
 } from './MeetingParticipantsEditor';
+import { MeetingSummaryGenerating } from './MeetingSummaryGenerating';
 import { deleteMeetingAction, ingestMeetingTranscriptAction, updateMeetingAction } from './actions';
 
 export interface MeetingDetailClientProps {
@@ -111,22 +113,39 @@ function SectionHeader({
     title,
     count,
     action,
+    busy = false,
 }: {
     icon: React.ComponentType<{ className?: string }>;
     title: string;
     count?: number;
     action?: React.ReactNode;
+    /**
+     * Work is in flight for this section. The tile takes the `info` accent
+     * and a breathing halo, so the section has ONE focal point for the
+     * running state instead of a second spinner in the body.
+     */
+    busy?: boolean;
 }) {
     return (
         <div className="mb-4 flex items-center justify-between gap-3">
             <div className="flex items-center gap-2.5">
-                <div
-                    className={cn(
-                        'flex h-7 w-7 shrink-0 items-center justify-center rounded-md border',
-                        SECTION_ICON_TILE,
-                    )}
-                >
-                    <Icon className={cn('h-3.5 w-3.5', SECTION_ICON_GLYPH)} />
+                <div className="relative shrink-0">
+                    {busy ? (
+                        <span
+                            aria-hidden
+                            className="ms-summary-halo pointer-events-none absolute -inset-1 rounded-lg bg-info/20"
+                        />
+                    ) : null}
+                    <div
+                        className={cn(
+                            'relative flex h-7 w-7 items-center justify-center rounded-md border transition-colors',
+                            busy ? 'border-info/30 bg-info/10' : SECTION_ICON_TILE,
+                        )}
+                    >
+                        <Icon
+                            className={cn('h-3.5 w-3.5', busy ? 'text-info' : SECTION_ICON_GLYPH)}
+                        />
+                    </div>
                 </div>
                 <h2 className="text-sm font-semibold text-text dark:text-text-dark">{title}</h2>
             </div>
@@ -463,9 +482,21 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
                 <div className="min-w-0 space-y-5 @5xl/main:col-span-8">
                     {/* ── Summary ──────────────────────────────────────── */}
                     <section className={sectionCard} data-testid="meeting-summary">
-                        <SectionHeader icon={Sparkles} title={t('sections.summary')} />
-                        {meeting.summary ? (
-                            <p className="whitespace-pre-wrap text-sm leading-relaxed text-text dark:text-text-dark">
+                        <SectionHeader
+                            icon={Sparkles}
+                            title={t('sections.summary')}
+                            busy={pendingTranscript}
+                        />
+                        {pendingTranscript ? (
+                            <MeetingSummaryGenerating />
+                        ) : meeting.summary ? (
+                            // Keyed on the text so a freshly generated summary
+                            // replays the reveal, resolving into the space the
+                            // skeleton just held rather than snapping in.
+                            <p
+                                key={meeting.summary}
+                                className="ms-summary-reveal whitespace-pre-wrap text-sm leading-relaxed text-text dark:text-text-dark"
+                            >
                                 {meeting.summary}
                             </p>
                         ) : (
@@ -521,6 +552,10 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
                                     rows={8}
                                     maxLength={MEETING_TRANSCRIPT_MAX_CHARS}
                                     placeholder={t('transcript.composerPlaceholder')}
+                                    // The text is already in flight; editing it
+                                    // mid-request would only ever describe a
+                                    // transcript the server never saw.
+                                    disabled={pendingTranscript}
                                     className="font-mono text-xs"
                                 />
                                 <div className="mt-3 flex items-center gap-2">
@@ -531,8 +566,14 @@ export function MeetingDetailClient({ meeting: initial, works = [] }: MeetingDet
                                         className={btn}
                                         data-testid="meeting-attach-transcript"
                                     >
-                                        <Upload className="h-3.5 w-3.5" />
-                                        {t('actions.attachTranscript')}
+                                        {pendingTranscript ? (
+                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                        ) : (
+                                            <Upload className="h-3.5 w-3.5" />
+                                        )}
+                                        {pendingTranscript
+                                            ? t('actions.attaching')
+                                            : t('actions.attachTranscript')}
                                     </button>
                                     <p className="text-[11px] text-text-muted dark:text-text-muted-dark">
                                         {t('transcript.pipelineHint')}
