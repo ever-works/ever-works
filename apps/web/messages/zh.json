@@ -6895,7 +6895,6 @@
             "created": "Meeting captured",
             "sections": {
                 "provenance": "Where it came from",
-                "participants": "Participants",
                 "transcript": "Transcript"
             },
             "sources": {
@@ -6918,7 +6917,6 @@
                 "externalId": "Provider meeting ID (optional)",
                 "externalIdHint": "Used to de-duplicate against a later connector sync of the same meeting.",
                 "participants": "Participants",
-                "participantsHint": "One per line. Use \"Name <email>\" to record an address.",
                 "transcript": "Transcript (optional)",
                 "transcriptPlaceholder": "Ada: shipping the gate.\nGrace: reviewing the branch.",
                 "transcriptHint": "Adding a transcript runs the summary, Memory and activity pipeline. You can also attach it later from the meeting page."
@@ -6928,6 +6926,7 @@
                 "startedAtInvalid": "Start time is not a valid date.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
+                "participantEmailInvalid": "请输入有效的邮箱地址，或留空。",
                 "createFailed": "Couldn't capture the meeting. Please try again."
             },
             "actions": {
@@ -6936,71 +6935,94 @@
             }
         },
         "meetingDetail": {
-            "backToMeetings": "Back to Meetings",
+            "backToMeetings": "返回会议列表",
             "actions": {
-                "openRecording": "Open recording",
-                "delete": "Delete",
-                "attachTranscript": "Attach transcript",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
-                "save": "Save changes"
+                "openRecording": "打开录制文件",
+                "edit": "编辑",
+                "delete": "删除",
+                "attachTranscript": "附加转录内容",
+                "attaching": "正在附加…",
+                "editTranscript": "编辑转录内容",
+                "cancelEdit": "取消编辑",
+                "saveTranscript": "保存转录内容",
+                "savingTranscript": "正在保存…",
+                "save": "保存更改",
+                "cancel": "取消"
             },
             "sections": {
-                "summary": "Summary",
-                "transcript": "Transcript",
-                "details": "Details",
-                "edit": "Edit meeting"
+                "summary": "摘要",
+                "transcript": "转录内容",
+                "details": "详细信息",
+                "edit": "编辑会议"
             },
             "summary": {
-                "notGenerated": "No summary was generated for this transcript. Enable an AI provider and re-attach the transcript to try again.",
-                "noTranscript": "Attach a transcript to generate a summary."
+                "generating": "正在生成摘要…",
+                "generatingHint": "正在阅读转录内容并撰写摘要，通常需要几秒钟。",
+                "notGenerated": "未为此转录内容生成摘要。请启用 AI 提供方，然后重新附加转录内容再试一次。",
+                "noTranscript": "附加转录内容即可生成摘要。"
             },
             "transcript": {
-                "composerLabel": "Transcript text",
-                "composerPlaceholder": "Paste the meeting transcript here.",
-                "pipelineHint": "Stored first, then summarized, remembered and posted to your activity feed — best effort.",
-                "storedElsewhere": "The transcript is stored but was not returned with this view."
+                "composerLabel": "转录文本",
+                "composerPlaceholder": "在此粘贴会议的转录内容。",
+                "pipelineHint": "先存储，随后生成摘要、写入记忆并发布到你的动态信息流——尽力而为。",
+                "storedElsewhere": "转录内容已存储，但未随此视图一并返回。"
             },
             "details": {
-                "source": "Source",
-                "startedAt": "Started",
-                "endedAt": "Ended",
-                "openEnded": "Still open",
-                "duration": "Duration",
-                "work": "Work",
-                "orgWide": "Org-wide",
-                "externalId": "Provider ID",
-                "createdAt": "Captured",
-                "participants": "Participants",
-                "noParticipants": "No participants recorded."
+                "source": "来源",
+                "startedAt": "开始",
+                "endedAt": "结束",
+                "openEnded": "仍在进行",
+                "duration": "时长",
+                "work": "作品",
+                "orgWide": "全组织",
+                "externalId": "提供方 ID",
+                "createdAt": "记录于",
+                "participants": "参与者",
+                "noParticipants": "未记录任何参与者。"
             },
             "edit": {
-                "hint": "Rename the meeting, close it out, point it at a recording, or re-route it to a Work."
+                "hint": "更正时间、重命名会议、调整参与者名单、关联录制文件，或将其重新指向某个作品。"
             },
             "fields": {
-                "title": "Title",
-                "endedAt": "Ended at",
-                "sourceUrl": "Recording link",
-                "work": "Work",
-                "workNone": "Org-wide (no Work)"
+                "title": "标题",
+                "startedAt": "开始时间",
+                "endedAt": "结束时间",
+                "sourceUrl": "录制文件链接",
+                "work": "作品",
+                "workNone": "全组织（不关联作品）",
+                "participants": "参与者",
+                "participantName": "姓名",
+                "participantEmail": "邮箱（可选）",
+                "participantAdd": "添加参与者",
+                "participantRemove": "移除参与者",
+                "participantsEmpty": "尚未记录任何参与者。"
             },
             "errors": {
-                "titleRequired": "Title is required.",
-                "endedAtInvalid": "End time is not a valid date.",
-                "endedBeforeStarted": "End time cannot be before the start time.",
-                "transcriptRequired": "Transcript text is required."
+                "titleRequired": "标题为必填项。",
+                "startedAtInvalid": "开始时间不是有效日期。",
+                "endedAtInvalid": "结束时间不是有效日期。",
+                "endedBeforeStarted": "结束时间不能早于开始时间。",
+                "participantEmailInvalid": "请输入有效的邮箱地址，或留空。",
+                "participantDuplicate": "此人已在列表中。",
+                "transcriptRequired": "转录文本为必填项。"
             },
             "toasts": {
-                "transcriptSaved": "Transcript attached",
-                "transcriptSummarized": "Transcript attached and summarized",
-                "transcriptError": "Couldn't attach the transcript.",
-                "saved": "Meeting updated",
-                "saveError": "Couldn't update the meeting.",
-                "deleted": "Meeting deleted",
-                "deleteError": "Couldn't delete the meeting."
+                "transcriptSaved": "已附加转录内容",
+                "transcriptSummarized": "已附加转录内容并生成摘要",
+                "transcriptError": "无法附加转录内容。",
+                "saved": "已更新会议",
+                "participantAdded": "已添加参与者",
+                "saveError": "无法更新会议。",
+                "deleted": "已删除会议",
+                "deleteError": "无法删除会议。"
             },
-            "confirm": {
-                "delete": "Delete this meeting? Its transcript and summary will be removed. This cannot be undone."
+            "deleteDialog": {
+                "title": "删除此会议？",
+                "body": "{title} 及其转录文本和摘要将被永久删除。此操作无法撤销。",
+                "confirm": "删除会议",
+                "cancel": "取消",
+                "deleting": "正在删除…",
+                "error": "删除会议失败"
             }
         },
         "agentsPreview": {

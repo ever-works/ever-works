@@ -6895,7 +6895,6 @@
             "created": "Meeting captured",
             "sections": {
                 "provenance": "Where it came from",
-                "participants": "Participants",
                 "transcript": "Transcript"
             },
             "sources": {
@@ -6918,7 +6917,6 @@
                 "externalId": "Provider meeting ID (optional)",
                 "externalIdHint": "Used to de-duplicate against a later connector sync of the same meeting.",
                 "participants": "Participants",
-                "participantsHint": "One per line. Use \"Name <email>\" to record an address.",
                 "transcript": "Transcript (optional)",
                 "transcriptPlaceholder": "Ada: shipping the gate.\nGrace: reviewing the branch.",
                 "transcriptHint": "Adding a transcript runs the summary, Memory and activity pipeline. You can also attach it later from the meeting page."
@@ -6928,6 +6926,7 @@
                 "startedAtInvalid": "Start time is not a valid date.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
+                "participantEmailInvalid": "Geçerli bir e-posta adresi girin veya boş bırakın.",
                 "createFailed": "Couldn't capture the meeting. Please try again."
             },
             "actions": {
@@ -6936,71 +6935,94 @@
             }
         },
         "meetingDetail": {
-            "backToMeetings": "Back to Meetings",
+            "backToMeetings": "Toplantılara dön",
             "actions": {
-                "openRecording": "Open recording",
-                "delete": "Delete",
-                "attachTranscript": "Attach transcript",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
-                "save": "Save changes"
+                "openRecording": "Kaydı aç",
+                "edit": "Düzenle",
+                "delete": "Sil",
+                "attachTranscript": "Döküm ekle",
+                "attaching": "Ekleniyor…",
+                "editTranscript": "Dökümü düzenle",
+                "cancelEdit": "Düzenlemeyi iptal et",
+                "saveTranscript": "Dökümü kaydet",
+                "savingTranscript": "Kaydediliyor…",
+                "save": "Değişiklikleri kaydet",
+                "cancel": "İptal"
             },
             "sections": {
-                "summary": "Summary",
-                "transcript": "Transcript",
-                "details": "Details",
-                "edit": "Edit meeting"
+                "summary": "Özet",
+                "transcript": "Döküm",
+                "details": "Ayrıntılar",
+                "edit": "Toplantıyı düzenle"
             },
             "summary": {
-                "notGenerated": "No summary was generated for this transcript. Enable an AI provider and re-attach the transcript to try again.",
-                "noTranscript": "Attach a transcript to generate a summary."
+                "generating": "Özet oluşturuluyor…",
+                "generatingHint": "Döküm okunuyor ve özet yazılıyor — bu genellikle birkaç saniye sürer.",
+                "notGenerated": "Bu döküm için özet oluşturulmadı. Bir yapay zekâ sağlayıcısını etkinleştirip dökümü yeniden ekleyerek tekrar deneyin.",
+                "noTranscript": "Özet oluşturmak için bir döküm ekleyin."
             },
             "transcript": {
-                "composerLabel": "Transcript text",
-                "composerPlaceholder": "Paste the meeting transcript here.",
-                "pipelineHint": "Stored first, then summarized, remembered and posted to your activity feed — best effort.",
-                "storedElsewhere": "The transcript is stored but was not returned with this view."
+                "composerLabel": "Döküm metni",
+                "composerPlaceholder": "Toplantı dökümünü buraya yapıştırın.",
+                "pipelineHint": "Önce saklanır, ardından özetlenir, hatırlanır ve etkinlik akışınızda paylaşılır — elden geldiğince.",
+                "storedElsewhere": "Döküm saklanıyor ancak bu görünümle birlikte döndürülmedi."
             },
             "details": {
-                "source": "Source",
-                "startedAt": "Started",
-                "endedAt": "Ended",
-                "openEnded": "Still open",
-                "duration": "Duration",
-                "work": "Work",
-                "orgWide": "Org-wide",
-                "externalId": "Provider ID",
-                "createdAt": "Captured",
-                "participants": "Participants",
-                "noParticipants": "No participants recorded."
+                "source": "Kaynak",
+                "startedAt": "Başlangıç",
+                "endedAt": "Bitiş",
+                "openEnded": "Hâlâ sürüyor",
+                "duration": "Süre",
+                "work": "İş",
+                "orgWide": "Kuruluş genelinde",
+                "externalId": "Sağlayıcı kimliği",
+                "createdAt": "Kaydedildi",
+                "participants": "Katılımcılar",
+                "noParticipants": "Kayıtlı katılımcı yok."
             },
             "edit": {
-                "hint": "Rename the meeting, close it out, point it at a recording, or re-route it to a Work."
+                "hint": "Saatleri düzeltin, toplantıyı yeniden adlandırın, katılımcı listesini düzenleyin, bir kayda bağlayın veya bir İşe yeniden yönlendirin."
             },
             "fields": {
-                "title": "Title",
-                "endedAt": "Ended at",
-                "sourceUrl": "Recording link",
-                "work": "Work",
-                "workNone": "Org-wide (no Work)"
+                "title": "Başlık",
+                "startedAt": "Başlangıç",
+                "endedAt": "Bitiş",
+                "sourceUrl": "Kayıt bağlantısı",
+                "work": "İş",
+                "workNone": "Kuruluş genelinde (İş yok)",
+                "participants": "Katılımcılar",
+                "participantName": "Ad",
+                "participantEmail": "E-posta (isteğe bağlı)",
+                "participantAdd": "Katılımcı ekle",
+                "participantRemove": "Katılımcıyı kaldır",
+                "participantsEmpty": "Henüz kimse kaydedilmedi."
             },
             "errors": {
-                "titleRequired": "Title is required.",
-                "endedAtInvalid": "End time is not a valid date.",
-                "endedBeforeStarted": "End time cannot be before the start time.",
-                "transcriptRequired": "Transcript text is required."
+                "titleRequired": "Başlık zorunludur.",
+                "startedAtInvalid": "Başlangıç saati geçerli bir tarih değil.",
+                "endedAtInvalid": "Bitiş saati geçerli bir tarih değil.",
+                "endedBeforeStarted": "Bitiş saati başlangıç saatinden önce olamaz.",
+                "participantEmailInvalid": "Geçerli bir e-posta adresi girin veya boş bırakın.",
+                "participantDuplicate": "Bu kişi zaten listede.",
+                "transcriptRequired": "Döküm metni zorunludur."
             },
             "toasts": {
-                "transcriptSaved": "Transcript attached",
-                "transcriptSummarized": "Transcript attached and summarized",
-                "transcriptError": "Couldn't attach the transcript.",
-                "saved": "Meeting updated",
-                "saveError": "Couldn't update the meeting.",
-                "deleted": "Meeting deleted",
-                "deleteError": "Couldn't delete the meeting."
+                "transcriptSaved": "Döküm eklendi",
+                "transcriptSummarized": "Döküm eklendi ve özetlendi",
+                "transcriptError": "Döküm eklenemedi.",
+                "saved": "Toplantı güncellendi",
+                "participantAdded": "Katılımcı eklendi",
+                "saveError": "Toplantı güncellenemedi.",
+                "deleted": "Toplantı silindi",
+                "deleteError": "Toplantı silinemedi."
             },
-            "confirm": {
-                "delete": "Delete this meeting? Its transcript and summary will be removed. This cannot be undone."
+            "deleteDialog": {
+                "title": "Bu toplantı silinsin mi?",
+                "body": "{title} dökümü ve özetiyle birlikte kalıcı olarak silinecek. Bu işlem geri alınamaz.",
+                "confirm": "Toplantıyı Sil",
+                "cancel": "İptal",
+                "deleting": "Siliniyor…",
+                "error": "Toplantı silinemedi"
             }
         },
         "agentsPreview": {

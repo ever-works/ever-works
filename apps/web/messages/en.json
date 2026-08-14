@@ -6233,7 +6233,6 @@
             "created": "Meeting captured",
             "sections": {
                 "provenance": "Where it came from",
-                "participants": "Participants",
                 "transcript": "Transcript"
             },
             "sources": {
@@ -6256,7 +6255,6 @@
                 "externalId": "Provider meeting ID (optional)",
                 "externalIdHint": "Used to de-duplicate against a later connector sync of the same meeting.",
                 "participants": "Participants",
-                "participantsHint": "One per line. Use \"Name <email>\" to record an address.",
                 "transcript": "Transcript (optional)",
                 "transcriptPlaceholder": "Ada: shipping the gate.\nGrace: reviewing the branch.",
                 "transcriptHint": "Adding a transcript runs the summary, Memory and activity pipeline. You can also attach it later from the meeting page."
@@ -6266,6 +6264,7 @@
                 "startedAtInvalid": "Start time is not a valid date.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
+                "participantEmailInvalid": "Enter a valid email address, or leave it blank.",
                 "createFailed": "Couldn't capture the meeting. Please try again."
             },
             "actions": {
@@ -6277,11 +6276,16 @@
             "backToMeetings": "Back to Meetings",
             "actions": {
                 "openRecording": "Open recording",
+                "edit": "Edit",
                 "delete": "Delete",
                 "attachTranscript": "Attach transcript",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
-                "save": "Save changes"
+                "attaching": "Attaching…",
+                "editTranscript": "Edit transcript",
+                "cancelEdit": "Cancel edit",
+                "saveTranscript": "Save transcript",
+                "savingTranscript": "Saving…",
+                "save": "Save changes",
+                "cancel": "Cancel"
             },
             "sections": {
                 "summary": "Summary",
@@ -6290,6 +6294,8 @@
                 "edit": "Edit meeting"
             },
             "summary": {
+                "generating": "Generating summary…",
+                "generatingHint": "Reading the transcript and writing the recap — this usually takes a few seconds.",
                 "notGenerated": "No summary was generated for this transcript. Enable an AI provider and re-attach the transcript to try again.",
                 "noTranscript": "Attach a transcript to generate a summary."
             },
@@ -6313,19 +6319,29 @@
                 "noParticipants": "No participants recorded."
             },
             "edit": {
-                "hint": "Rename the meeting, close it out, point it at a recording, or re-route it to a Work."
+                "hint": "Correct the times, rename the meeting, fix the roster, point it at a recording, or re-route it to a Work."
             },
             "fields": {
                 "title": "Title",
+                "startedAt": "Started at",
                 "endedAt": "Ended at",
                 "sourceUrl": "Recording link",
                 "work": "Work",
-                "workNone": "Org-wide (no Work)"
+                "workNone": "Org-wide (no Work)",
+                "participants": "Participants",
+                "participantName": "Name",
+                "participantEmail": "Email (optional)",
+                "participantAdd": "Add participant",
+                "participantRemove": "Remove participant",
+                "participantsEmpty": "No one recorded yet."
             },
             "errors": {
                 "titleRequired": "Title is required.",
+                "startedAtInvalid": "Start time is not a valid date.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
+                "participantEmailInvalid": "Enter a valid email address, or leave it blank.",
+                "participantDuplicate": "That person is already on the list.",
                 "transcriptRequired": "Transcript text is required."
             },
             "toasts": {
@@ -6333,12 +6349,18 @@
                 "transcriptSummarized": "Transcript attached and summarized",
                 "transcriptError": "Couldn't attach the transcript.",
                 "saved": "Meeting updated",
+                "participantAdded": "Participant added",
                 "saveError": "Couldn't update the meeting.",
                 "deleted": "Meeting deleted",
                 "deleteError": "Couldn't delete the meeting."
             },
-            "confirm": {
-                "delete": "Delete this meeting? Its transcript and summary will be removed. This cannot be undone."
+            "deleteDialog": {
+                "title": "Delete this meeting?",
+                "body": "{title} will be permanently deleted, along with its transcript and summary. This cannot be undone.",
+                "confirm": "Delete meeting",
+                "cancel": "Cancel",
+                "deleting": "Deleting…",
+                "error": "Failed to delete the meeting"
             }
         },
         "sidebar": {
