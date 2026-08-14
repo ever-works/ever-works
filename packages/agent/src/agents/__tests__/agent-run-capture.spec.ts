@@ -139,7 +139,14 @@ describe('AgentRunService — session-detail capture (Feature K)', () => {
         );
     }
 
-    const ctx = { runId: 'r1', agentId: 'a1', userId: 'u1', kind: 'task' as const, taskId: 't1' };
+    const ctx = {
+        runId: 'r1',
+        agentId: 'a1',
+        userId: 'u1',
+        kind: 'task' as const,
+        taskId: 't1',
+        immediateInput: 'Ship the sessions drill-in.',
+    };
 
     function appendedRows(): any[] {
         return runLogs.append.mock.calls.map((c: any[]) => c[0]);
@@ -180,12 +187,32 @@ describe('AgentRunService — session-detail capture (Feature K)', () => {
         const userRow = rows.find((r) => r.step === 'user-message');
         const assistantRow = rows.find((r) => r.step === 'assistant-message');
         expect(userRow).toBeDefined();
-        expect(userRow.message.length).toBeGreaterThan(0);
+        // The HUMAN's text, not the assembled prompt (which fences the
+        // conversation context and, on heartbeats, a machine preamble).
+        expect(userRow.message).toBe('Ship the sessions drill-in.');
+        expect(userRow.metadata).toEqual(
+            expect.objectContaining({ role: 'user', bytes: 'Ship the sessions drill-in.'.length }),
+        );
         expect(assistantRow).toBeDefined();
         expect(assistantRow.message).toBe('Here is my answer.');
         expect(assistantRow.metadata).toEqual(
             expect.objectContaining({ role: 'assistant', bytes: 'Here is my answer.'.length }),
         );
+    });
+
+    it('opens on the assistant turn when the run carries no human input (heartbeat)', async () => {
+        ai.dispatch.mockResolvedValueOnce(aiResponse({ text: 'Tick handled.' }));
+
+        await makeSvc().execute({
+            runId: 'r1',
+            agentId: 'a1',
+            userId: 'u1',
+            kind: 'heartbeat' as const,
+        });
+
+        const rows = appendedRows();
+        expect(rows.find((r) => r.step === 'user-message')).toBeUndefined();
+        expect(rows.find((r) => r.step === 'assistant-message')?.message).toBe('Tick handled.');
     });
 
     it('captures injected steering messages as user-message rows', async () => {

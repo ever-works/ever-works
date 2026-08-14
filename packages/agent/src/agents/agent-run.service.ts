@@ -694,8 +694,14 @@ export class AgentRunService {
         // Session detail (Feature K) — per-loop capture window. Message
         // and tool-preview rows count toward CAPTURE_MAX_ENTRIES; every
         // write is best-effort by contract.
+        //
+        // The opening user row is `context.immediateInput` — the human's
+        // actual text — NOT `prompt.userMessage`, which additionally
+        // carries the assembled conversation-context fences (and, on
+        // heartbeat runs, a machine preamble no human ever typed). A run
+        // with no immediate input simply opens on the assistant's turn.
         const capture = createRunCaptureState();
-        await this.captureMessage(context.runId, capture, 'user', prompt.userMessage);
+        await this.captureMessage(context.runId, capture, 'user', context.immediateInput);
 
         try {
             while (iterations < TOOL_LOOP_MAX_ITERATIONS) {

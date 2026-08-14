@@ -26,16 +26,13 @@ export const CAPTURE_MAX_ENTRIES = 200;
 /** Cap on the per-run `workspaceMeta.filesTouched` list. */
 export const FILES_TOUCHED_CAP = 200;
 
-/** Run-log steps the session-detail timeline is composed from. */
-export const TIMELINE_STEPS = [
-    'assistant-message',
-    'user-message',
-    'tool-invocation',
-    'capture-truncated',
-] as const;
-
-/** Run-log steps that count as "messages" in the detail chips. */
-export const MESSAGE_STEPS = ['assistant-message', 'user-message'] as const;
+// The step names this capture writes — 'assistant-message',
+// 'user-message', 'tool-invocation' and the 'capture-truncated' marker —
+// are mirrored as local literals in `AgentsController`
+// (SESSION_TIMELINE_STEPS / SESSION_MESSAGE_STEPS) rather than imported:
+// several api-side specs jest.mock '@ever-works/agent/agents' with
+// explicit export lists, so a runtime value imported from this barrel
+// would arrive `undefined` there. Renaming a step means touching both.
 
 export interface CapturePreview {
     preview: string;
