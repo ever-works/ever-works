@@ -5,7 +5,11 @@ import { useTranslations } from 'next-intl';
 import { Bot } from 'lucide-react';
 import { toast } from 'sonner';
 import { Switch } from '@/components/ui/switch';
-import { listAgentCollaboratorsAction, setAgentCollaboratorAction } from '@/app/actions/agents';
+import {
+    listAgentCollaboratorsAction,
+    removeAgentCollaboratorAction,
+    setAgentCollaboratorAction,
+} from '@/app/actions/agents';
 import type { AgentCollaboratorCandidate } from '@/lib/api/agents.shared';
 
 interface Props {
@@ -60,6 +64,29 @@ export function AgentCollaboratorsClient({ agentId, initial }: Props) {
         });
     };
 
+    /**
+     * Delete the rule outright rather than switching it off. Disabling
+     * keeps the row (and its history); clearing returns the pair to
+     * UNCONFIGURED, which is the state a never-touched agent is in.
+     * Only offered for rows that actually have a rule.
+     */
+    const clearRule = (collaboratorAgentId: string) => {
+        setTogglingId(collaboratorAgentId);
+        startTransition(() => {
+            void (async () => {
+                try {
+                    await removeAgentCollaboratorAction(agentId, collaboratorAgentId);
+                    const next = await listAgentCollaboratorsAction(agentId);
+                    setRows(next.data);
+                } catch {
+                    toast.error(t('toggleFailed'));
+                } finally {
+                    setTogglingId(null);
+                }
+            })();
+        });
+    };
+
     const enabledCount = rows.filter((row) => row.enabled).length;
 
     return (
@@ -105,6 +132,17 @@ export function AgentCollaboratorsClient({ agentId, initial }: Props) {
                                     {row.title ?? t('noTitle')}
                                 </p>
                             </div>
+                            {row.configured && (
+                                <button
+                                    type="button"
+                                    onClick={() => clearRule(row.agentId)}
+                                    disabled={togglingId === row.agentId}
+                                    className="text-[11px] text-text-muted dark:text-text-muted-dark hover:text-text dark:hover:text-text-dark disabled:opacity-50 shrink-0"
+                                    data-testid={`collaborator-clear-${row.slug}`}
+                                >
+                                    {t('reset')}
+                                </button>
+                            )}
                             <Switch
                                 checked={row.enabled}
                                 disabled={togglingId === row.agentId}

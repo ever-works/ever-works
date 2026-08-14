@@ -1065,6 +1065,7 @@
                 "enabledCount": "{count} enabled",
                 "noTitle": "No role set",
                 "toggleFailed": "Could not update collaborator",
+                "reset": "Clear rule",
                 "legacyNote": "With no collaborators enabled, this agent can only delegate subtasks to itself."
             }
         },
