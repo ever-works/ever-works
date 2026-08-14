@@ -28,7 +28,11 @@ import { TaskTransitionService, type TransitionOptions } from './task-transition
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import { assertNoSecrets } from '../utils/secret-scan';
-import { computeNextOccurrence, validateRecurrenceRule } from './recurrence';
+import {
+    computeNextTemplateOccurrence,
+    validateRecurrenceCron,
+    validateRecurrenceRule,
+} from './recurrence';
 import { AgentRepository } from '../database/repositories/agent.repository';
 import type { Agent } from '../entities/agent.entity';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
@@ -54,6 +58,9 @@ export interface CreateTaskInput {
     parentTaskId?: string | null;
     createdByType: TaskActorType;
     createdById: string;
+    /** Schedule mode "Scheduled": run once at this instant (must be in
+     *  the future). Omitted/null = not scheduled. */
+    scheduledAt?: Date | null;
     requireAllApprovers?: boolean;
     /** Quality gates: `null` = inherit the Work's `checkDefaults` untouched. */
     acceptanceChecks?: TaskAcceptanceCheck[] | null;
@@ -384,6 +391,8 @@ export class TasksService {
             }
         }
 
+        if (input.scheduledAt) this.assertFutureSchedule(input.scheduledAt);
+
         const nextNumber = await this.counter.nextSlug(userId);
         const slug = `T-${nextNumber}`;
 
@@ -409,6 +418,8 @@ export class TasksService {
             acceptanceChecks: input.acceptanceChecks ?? null,
             maxGateAttempts: input.maxGateAttempts ?? null,
             delegationDepth: input.delegationDepth ?? null,
+            scheduledAt: input.scheduledAt ?? null,
+            scheduleClaimedAt: null,
         });
 
         await this.logActivity({
@@ -554,7 +565,11 @@ export class TasksService {
 
     /**
      * Phase 17.2 — make a Task recurring (or update its rule).
-     * Validates the RRULE, computes the initial `nextOccurrenceAt`,
+     *
+     * Accepts EITHER an RFC 5545 RRULE (`recurrenceRule`) OR a 5-field
+     * cron expression (`recurrenceCron`) — exactly one (XOR, service
+     * validation). Computes the initial `nextOccurrenceAt` (RRULE via
+     * the `rrule` package, cron via `cadence.ts#computeNextCronFire`)
      * and flips the recurring columns. The Task row stays as the
      * TEMPLATE; the dispatcher spawns instances pointing back via
      * `parentRecurringTaskId`.
@@ -563,23 +578,41 @@ export class TasksService {
         userId: string,
         id: string,
         input: {
-            recurrenceRule: string;
+            recurrenceRule?: string | null;
+            recurrenceCron?: string | null;
             recurrenceTimezone?: string;
             recurrenceEndsAt?: Date | null;
             recurrenceMaxOccurrences?: number | null;
         },
     ): Promise<Task> {
-        const task = await this.getOne(userId, id);
-        const check = validateRecurrenceRule(input.recurrenceRule);
-        if (check.valid === false) {
-            // Post-rebase narrowing fix: TS doesn't infer `reason` from
-            // `!check.valid` alone on this discriminated union; explicit
-            // equality narrowing surfaces the `false` branch correctly.
-            throw new BadRequestException(check.reason);
+        await this.getOne(userId, id);
+        const hasRule = !!input.recurrenceRule;
+        const hasCron = !!input.recurrenceCron;
+        if (hasRule === hasCron) {
+            // XOR: both or neither is a caller error — the two cadence
+            // dialects would disagree about the next fire.
+            throw new BadRequestException(
+                'Provide exactly one of recurrenceRule (RRULE) or recurrenceCron (cron expression).',
+            );
+        }
+        if (hasRule) {
+            const check = validateRecurrenceRule(input.recurrenceRule!);
+            if (check.valid === false) {
+                // Post-rebase narrowing fix: TS doesn't infer `reason` from
+                // `!check.valid` alone on this discriminated union; explicit
+                // equality narrowing surfaces the `false` branch correctly.
+                throw new BadRequestException(check.reason);
+            }
+        } else {
+            const check = validateRecurrenceCron(input.recurrenceCron!);
+            if (check.valid === false) {
+                throw new BadRequestException(check.reason);
+            }
         }
 
-        const next = computeNextOccurrence({
-            rule: input.recurrenceRule,
+        const next = computeNextTemplateOccurrence({
+            rule: input.recurrenceRule ?? null,
+            cron: input.recurrenceCron ?? null,
             from: new Date(),
             recurrenceEndsAt: input.recurrenceEndsAt ?? null,
             recurrenceMaxOccurrences: input.recurrenceMaxOccurrences ?? null,
@@ -587,21 +620,20 @@ export class TasksService {
         });
         if (!next) {
             throw new BadRequestException(
-                'recurrenceRule yields no future occurrences — refusing to mark as recurring.',
+                'Recurrence yields no future occurrences — refusing to mark as recurring.',
             );
         }
 
         await this.tasks.updateById(id, {
             isRecurring: true,
-            recurrenceRule: input.recurrenceRule,
+            recurrenceRule: input.recurrenceRule ?? null,
+            recurrenceCron: input.recurrenceCron ?? null,
             recurrenceTimezone: input.recurrenceTimezone ?? 'UTC',
             nextOccurrenceAt: next,
             recurrenceEndsAt: input.recurrenceEndsAt ?? null,
             recurrenceMaxOccurrences: input.recurrenceMaxOccurrences ?? null,
         });
-        const refreshed = (await this.tasks.findById(id)) as Task;
-        void task;
-        return refreshed;
+        return (await this.tasks.findById(id)) as Task;
     }
 
     /** Phase 17.2 — turn off recurrence on a template. Existing
@@ -611,11 +643,60 @@ export class TasksService {
         await this.tasks.updateById(id, {
             isRecurring: false,
             recurrenceRule: null,
+            recurrenceCron: null,
             nextOccurrenceAt: null,
             recurrenceEndsAt: null,
             recurrenceMaxOccurrences: null,
         });
         return (await this.tasks.findById(id)) as Task;
+    }
+
+    // ── Schedule mode "Scheduled" (one-shot) ──────────────────────
+
+    /**
+     * Schedule this Task to run once at `runAt`. Re-scheduling an
+     * already-scheduled Task moves the slot and clears any claim so
+     * the dispatcher picks up the NEW time. Mutually exclusive with
+     * recurrence — a recurring template already has a cadence.
+     */
+    async scheduleTask(userId: string, id: string, runAt: Date): Promise<Task> {
+        const task = await this.getOne(userId, id);
+        this.assertFutureSchedule(runAt);
+        if (task.isRecurring) {
+            throw new BadRequestException(
+                'This Task is a recurring template — stop the recurrence before scheduling a one-shot run.',
+            );
+        }
+        await this.tasks.updateById(id, { scheduledAt: runAt, scheduleClaimedAt: null });
+        await this.logActivity({
+            userId,
+            taskId: id,
+            actionType: ActivityActionType.TASK_UPDATED,
+            details: { scheduledAt: runAt.toISOString() },
+        });
+        return (await this.tasks.findById(id)) as Task;
+    }
+
+    /** Remove the one-shot schedule (mode back to Run Once). */
+    async unscheduleTask(userId: string, id: string): Promise<Task> {
+        await this.getOne(userId, id);
+        await this.tasks.updateById(id, { scheduledAt: null, scheduleClaimedAt: null });
+        await this.logActivity({
+            userId,
+            taskId: id,
+            actionType: ActivityActionType.TASK_UPDATED,
+            details: { scheduledAt: null },
+        });
+        return (await this.tasks.findById(id)) as Task;
+    }
+
+    private assertFutureSchedule(runAt: Date): void {
+        if (!(runAt instanceof Date) || Number.isNaN(runAt.getTime())) {
+            throw new BadRequestException('runAt must be a valid datetime.');
+        }
+        if (runAt.getTime() <= Date.now()) {
+            throw new BadRequestException('runAt must be in the future.');
+        }
     }
 
     // ── Board dispatch (kanban M3/M4) ─────────────────────────────
@@ -1042,9 +1123,17 @@ export class TasksService {
      * Task; the uploadId is taken as-is — ownership validation of
      * the upload row lives in the existing KB upload service.
      */
-    async addAttachment(userId: string, taskId: string, uploadId: string) {
+    async addAttachment(
+        userId: string,
+        taskId: string,
+        uploadId: string,
+        role: 'initial' | 'result' = 'initial',
+    ) {
         const task = await this.getOne(userId, taskId);
         if (!uploadId) throw new BadRequestException('uploadId is required.');
+        if (role !== 'initial' && role !== 'result') {
+            throw new BadRequestException(`Invalid attachment role: ${role}`);
+        }
         if (!this.attachments) {
             throw new BadRequestException('Attachment repository not wired in this context.');
         }
@@ -1061,7 +1150,7 @@ export class TasksService {
             throw new BadRequestException(`Upload ${uploadId} not found for this Task's Work.`);
         }
         try {
-            return await this.attachments.add(taskId, uploadId);
+            return await this.attachments.add(taskId, uploadId, role);
         } catch (err) {
             const message = err instanceof Error ? err.message : String(err);
             if (/unique|duplicate|UNIQUE/i.test(message)) {

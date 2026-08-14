@@ -420,6 +420,44 @@ export class TaskRepository {
     }
 
     /**
+     * Schedule modes — one-shot Tasks due to dispatch: `scheduledAt` has
+     * passed and no dispatcher has claimed them yet.
+     *
+     * @internal CRON-ONLY — fetches across ALL tenants/users by design.
+     * Do NOT call from user-facing request handlers; doing so would expose
+     * tasks across tenant boundaries.
+     */
+    async findDueScheduledTasks(limit: number, now: Date = new Date()): Promise<Task[]> {
+        return this.repository
+            .createQueryBuilder('task')
+            .where('task.scheduledAt IS NOT NULL')
+            .andWhere('task.scheduledAt <= :now', { now })
+            .andWhere('task.scheduleClaimedAt IS NULL')
+            .orderBy('task.scheduledAt', 'ASC')
+            .take(limit)
+            .getMany();
+    }
+
+    /**
+     * CAS-claim a due one-shot for dispatch. Atomic: stamps
+     * `scheduleClaimedAt` only while the row still carries the expected
+     * `scheduledAt` AND is unclaimed, so two concurrent dispatcher ticks
+     * (or a reschedule racing a tick) resolve to exactly one winner.
+     * Mirrors {@link casClaimRecurrence}.
+     */
+    async casClaimSchedule(taskId: string, expected: Date, now: Date = new Date()): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(Task)
+            .set({ scheduleClaimedAt: now })
+            .where('id = :id', { id: taskId })
+            .andWhere('scheduledAt = :expected', { expected })
+            .andWhere('scheduleClaimedAt IS NULL')
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
      * Find recurring templates whose `nextOccurrenceAt` is stuck (not
      * advanced) past `olderThan`. Used by the cron-based recovery path in
      * `TaskRecurrenceDispatcherService`.

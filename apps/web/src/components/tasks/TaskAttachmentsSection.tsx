@@ -53,6 +53,9 @@ export function TaskAttachmentsSection({ taskId, workId, initial, initialError =
         mimeType: row.upload?.contentType ?? null,
         sizeBytes: row.upload?.sizeBytes ?? null,
         url: row.upload?.downloadUrl ?? downloadUrl(row.uploadId),
+        // Role chip: `result` marks agent/worked output; the default
+        // `initial` role is the unmarked common case (no chip noise).
+        badge: row.role === 'result' ? t('attachmentRoleResult') : null,
     });
 
     const uploader = async (file: File): Promise<{ id: string; url?: string }> => {

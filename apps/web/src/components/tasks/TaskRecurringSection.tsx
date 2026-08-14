@@ -27,7 +27,7 @@ import { clearTaskRecurringAction, setTaskRecurringAction } from '@/app/actions/
  * with no future occurrences are rejected with a clear error.
  */
 
-type Frequency = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'CUSTOM';
+type Frequency = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'CUSTOM' | 'CRON';
 
 export function TaskRecurringSection({ task }: { task: Task }) {
     if (task.isRecurring) {
@@ -66,9 +66,9 @@ function ActivePanel({ task }: { task: Task }) {
                 {t('section')}
             </h2>
             <dl className="grid grid-cols-[140px_1fr] gap-x-3 gap-y-1 text-xs">
-                <dt className="text-text-muted">Rule</dt>
+                <dt className="text-text-muted">{task.recurrenceCron ? 'Cron' : 'Rule'}</dt>
                 <dd className="font-mono break-all text-text-secondary dark:text-text-secondary-dark">
-                    {task.recurrenceRule ?? '(unknown)'}
+                    {task.recurrenceCron ?? task.recurrenceRule ?? '(unknown)'}
                 </dd>
                 {task.recurrenceTimezone && (
                     <>
@@ -148,6 +148,9 @@ function InactivePanel({ task }: { task: Task }) {
     const [open, setOpen] = useState(false);
     const [frequency, setFrequency] = useState<Frequency>('WEEKLY');
     const [customRule, setCustomRule] = useState('FREQ=WEEKLY;BYDAY=MO');
+    // Schedule-modes upgrade — cron cadence alternative (XOR with the
+    // RRULE server-side; this picker only ever sends one of the two).
+    const [cronExpr, setCronExpr] = useState('0 9 * * 1');
     const [endsAt, setEndsAt] = useState('');
     const [maxOccurrences, setMaxOccurrences] = useState('');
     // FU-7 — friendly RRULE controls. Defaults match the original
@@ -161,6 +164,7 @@ function InactivePanel({ task }: { task: Task }) {
     const [error, setError] = useState<string | null>(null);
 
     const ruleString = useMemo(() => {
+        if (frequency === 'CRON') return cronExpr.trim();
         if (frequency === 'CUSTOM') return customRule.trim();
         const parts: string[] = [`FREQ=${frequency}`];
         // Parse HH:MM → BYHOUR + BYMINUTE. Skip when blank.
@@ -178,12 +182,16 @@ function InactivePanel({ task }: { task: Task }) {
             parts.push(`BYMONTHDAY=${d}`);
         }
         return parts.join(';');
-    }, [frequency, customRule, timeOfDay, daysOfWeek, dayOfMonth]);
+    }, [frequency, customRule, cronExpr, timeOfDay, daysOfWeek, dayOfMonth]);
 
     const isValidRule = useMemo(() => {
         // Lightweight client-side check — fully validated server-side
-        // via the `rrule` package on `TasksService.setRecurring`.
+        // (RRULE via the `rrule` package, cron via parseCron) on
+        // `TasksService.setRecurring`.
         if (!ruleString) return false;
+        if (frequency === 'CRON') {
+            return ruleString.split(/\s+/).length === 5;
+        }
         if (!/FREQ=(DAILY|WEEKLY|MONTHLY|YEARLY|HOURLY|MINUTELY|SECONDLY)/.test(ruleString)) {
             return false;
         }

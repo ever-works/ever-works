@@ -109,6 +109,14 @@ export class CreateTaskDto {
     @Min(1)
     @Max(5)
     maxGateAttempts?: number | null;
+
+    /**
+     * Schedule mode "Scheduled": run once at this instant (ISO datetime,
+     * must be in the future — service validation). Omitted = Run Once.
+     */
+    @IsOptional()
+    @IsDateString()
+    scheduledAt?: string;
 }
 
 export class UpdateTaskDto {
@@ -194,9 +202,17 @@ export class UpdateTaskDto {
 }
 
 export class SetTaskRecurringDto {
+    /** RFC 5545 RRULE — XOR with `recurrenceCron` (service validation). */
+    @IsOptional()
     @IsString()
     @MaxLength(200)
-    recurrenceRule: string;
+    recurrenceRule?: string;
+
+    /** 5-field cron expression — XOR with `recurrenceRule`. */
+    @IsOptional()
+    @IsString()
+    @MaxLength(120)
+    recurrenceCron?: string;
 
     @IsOptional()
     @IsString()
@@ -286,6 +302,17 @@ export class AddBlockerDto {
 export class AddAttachmentDto {
     @IsUUID()
     uploadId: string;
+
+    /** `initial` (input material, default) | `result` (worked output). */
+    @IsOptional()
+    @IsIn(['initial', 'result'])
+    role?: 'initial' | 'result';
+}
+
+/** Schedule mode "Scheduled" — `POST /api/tasks/:id/schedule`. */
+export class ScheduleTaskDto {
+    @IsDateString()
+    runAt: string;
 }
 
 export class AddRelationDto {

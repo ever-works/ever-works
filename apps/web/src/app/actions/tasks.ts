@@ -557,7 +557,9 @@ export async function editTaskChatAction(
 export async function setTaskRecurringAction(
     id: string,
     input: {
-        recurrenceRule: string;
+        recurrenceRule?: string;
+        /** 5-field cron — XOR with recurrenceRule (service validation). */
+        recurrenceCron?: string;
         recurrenceTimezone?: string;
         recurrenceEndsAt?: string;
         recurrenceMaxOccurrences?: number;
@@ -590,18 +592,49 @@ export async function clearTaskRecurringAction(id: string): Promise<Task> {
     return task;
 }
 
+/**
+ * Schedule mode "Scheduled" — run this Task once at `runAt` (ISO,
+ * future; service validation). Re-scheduling moves the slot.
+ */
+export async function scheduleTaskAction(id: string, runAt: string): Promise<Task> {
+    // Security: verify session server-side before mutating data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
+    const task = await tasksAPI.schedule(id, runAt);
+    revalidatePath('/tasks');
+    revalidatePath(`/tasks/${id}`);
+    return task;
+}
+
+/** Remove the one-shot schedule (back to Run Once). */
+export async function unscheduleTaskAction(id: string): Promise<Task> {
+    // Security: verify session server-side before mutating data
+    const user = await getAuthFromCookie();
+    if (!user) redirect(ROUTES.AUTH_LOGIN);
+
+    const task = await tasksAPI.unschedule(id);
+    revalidatePath('/tasks');
+    revalidatePath(`/tasks/${id}`);
+    return task;
+}
+
 // FU-5 — attachment server actions. The actual upload (multipart →
 // /api/uploads) happens client-side via the proxy route at
 // `apps/web/src/app/api/uploads/route.ts`; once the client has the
 // returned uploadId, it calls `attachUploadAction` to wire it into the
 // Task via the existing `POST /api/tasks/:id/attachments` endpoint.
 
-export async function attachUploadAction(taskId: string, uploadId: string) {
+export async function attachUploadAction(
+    taskId: string,
+    uploadId: string,
+    role: 'initial' | 'result' = 'initial',
+) {
     // Security: verify session server-side before mutating data
     const user = await getAuthFromCookie();
     if (!user) redirect(ROUTES.AUTH_LOGIN);
 
-    const row = await tasksAPI.addAttachment(taskId, uploadId);
+    const row = await tasksAPI.addAttachment(taskId, uploadId, role);
     revalidatePath(`/tasks/${taskId}`);
     return row;
 }

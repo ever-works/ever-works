@@ -251,8 +251,12 @@ export class TaskAttachmentRepository {
     async findByTaskId(taskId: string): Promise<TaskAttachment[]> {
         return this.repo.find({ where: { taskId } });
     }
-    async add(taskId: string, uploadId: string): Promise<TaskAttachment> {
-        const entity = this.repo.create({ taskId, uploadId });
+    async add(
+        taskId: string,
+        uploadId: string,
+        role: 'initial' | 'result' = 'initial',
+    ): Promise<TaskAttachment> {
+        const entity = this.repo.create({ taskId, uploadId, role });
         return this.repo.save(entity);
     }
     // Security (IDOR): optional `taskId` scopes the delete (see

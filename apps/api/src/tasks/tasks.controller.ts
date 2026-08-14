@@ -9,6 +9,7 @@ import {
     HttpCode,
     HttpStatus,
     NotFoundException,
+    Optional,
     Param,
     ParseUUIDPipe,
     Patch,
@@ -28,6 +29,9 @@ import {
     type TaskActorType,
     type ListTasksFilter,
 } from '@ever-works/agent/tasks-domain';
+// Tasks upgrades — the per-Task activity feed reads the activity rows the
+// task-domain writers stamp with details.resourceType='task'.
+import { ActivityLogService } from '@ever-works/agent/activity-log';
 // Judgment layer G3 - the Task-detail escalation feed. Provided +
 // exported by AgentsModule, which this module already imports.
 import { AgentEscalationService } from '@ever-works/agent/agents';
@@ -59,6 +63,7 @@ import {
     PostTaskChatDto,
     RunTaskDto,
     RunTasksBatchDto,
+    ScheduleTaskDto,
     SetTaskRecurringDto,
     TransitionTaskDto,
     UpdateTaskDto,
@@ -128,6 +133,11 @@ export class TasksController {
         private readonly escalations: AgentEscalationService,
         // Kanban run cockpit (plan 04 M5/M6) — PR status pill + diff sheet.
         private readonly prInsights: TaskPrStatusService,
+        // Tasks upgrades — per-Task activity feed. Appended LAST +
+        // @Optional() so every existing positional construction in the
+        // specs keeps compiling; the endpoint degrades to an empty feed
+        // when the module graph lacks it.
+        @Optional() private readonly activityLog?: ActivityLogService,
     ) {}
 
     /**
@@ -221,6 +231,7 @@ export class TasksController {
             requireAllApprovers: body.requireAllApprovers,
             acceptanceChecks: body.acceptanceChecks ?? null,
             maxGateAttempts: body.maxGateAttempts ?? null,
+            scheduledAt: body.scheduledAt ? new Date(body.scheduledAt) : null,
         });
     }
 
@@ -295,7 +306,7 @@ export class TasksController {
     @Post(':id/recurring')
     @ApiOperation({
         summary:
-            'Make this Task recurring (or update its rule). Body: {recurrenceRule (RFC 5545 RRULE), recurrenceTimezone?, recurrenceEndsAt?, recurrenceMaxOccurrences?}.',
+            'Make this Task recurring (or update its cadence). Body: exactly one of {recurrenceRule (RFC 5545 RRULE)} or {recurrenceCron (5-field cron)}, plus recurrenceTimezone?, recurrenceEndsAt?, recurrenceMaxOccurrences?.',
     })
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 30, ttl: 60_000 } })
@@ -304,15 +315,73 @@ export class TasksController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: SetTaskRecurringDto,
     ) {
-        if (!body?.recurrenceRule) {
-            throw new BadRequestException('recurrenceRule is required.');
+        if (!body?.recurrenceRule && !body?.recurrenceCron) {
+            throw new BadRequestException('recurrenceRule or recurrenceCron is required.');
         }
         return this.service.setRecurring(auth.userId, id, {
-            recurrenceRule: body.recurrenceRule,
+            recurrenceRule: body.recurrenceRule ?? null,
+            recurrenceCron: body.recurrenceCron ?? null,
             recurrenceTimezone: body.recurrenceTimezone,
             recurrenceEndsAt: body.recurrenceEndsAt ? new Date(body.recurrenceEndsAt) : null,
             recurrenceMaxOccurrences: body.recurrenceMaxOccurrences ?? null,
         });
+    }
+
+    // ── Schedule mode "Scheduled" (one-shot) ──────────────────────
+
+    @Post(':id/schedule')
+    @ApiOperation({
+        summary:
+            'Schedule this Task to run once at a future instant. Re-posting moves the slot. Body: {runAt: ISO datetime}.',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async schedule(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Body() body: ScheduleTaskDto,
+    ) {
+        if (!body?.runAt) throw new BadRequestException('runAt is required.');
+        return this.service.scheduleTask(auth.userId, id, new Date(body.runAt));
+    }
+
+    @Delete(':id/schedule')
+    @ApiOperation({ summary: 'Remove the one-shot schedule (back to Run Once).' })
+    @HttpCode(HttpStatus.OK)
+    async unschedule(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ) {
+        return this.service.unscheduleTask(auth.userId, id);
+    }
+
+    // ── Tasks upgrades — per-Task activity feed ───────────────────
+
+    @Get(':id/activity')
+    @ApiOperation({
+        summary:
+            "Activity rows for this Task (created / updated / transitioned / run dispatches), newest first. Owner-scoped: a Task the caller does not own 404s.",
+    })
+    @HttpCode(HttpStatus.OK)
+    async listActivity(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+        @Query('limit') limit?: string,
+        @Query('offset') offset?: string,
+    ) {
+        // 404-no-leak gate before any activity row is read.
+        await this.service.getOne(auth.userId, id);
+        if (!this.activityLog) {
+            return { data: [], meta: { total: 0 } };
+        }
+        const { activities, total } = await this.activityLog.findResourceEvents({
+            userId: auth.userId,
+            resourceType: 'task',
+            resourceId: id,
+            limit: limit ? Math.min(100, Math.max(1, parseInt(limit, 10) || 25)) : 25,
+            offset: offset ? Math.max(0, parseInt(offset, 10) || 0) : 0,
+        });
+        return { data: activities, meta: { total } };
     }
 
     @Delete(':id/recurring')
@@ -631,7 +700,7 @@ export class TasksController {
         @Body() body: AddAttachmentDto,
     ) {
         if (!body?.uploadId) throw new BadRequestException('uploadId is required.');
-        return this.service.addAttachment(auth.userId, id, body.uploadId);
+        return this.service.addAttachment(auth.userId, id, body.uploadId, body.role ?? 'initial');
     }
 
     @Delete(':id/attachments/:attachmentId')
