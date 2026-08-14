@@ -15,10 +15,6 @@ export const taskTemplatesAPI = {
         return serverFetch<{ data: TaskTemplateRow[] }>('/task-templates', { method: 'GET' });
     },
 
-    async get(id: string) {
-        return serverFetch<TaskTemplateRow>(`/task-templates/${id}`, { method: 'GET' });
-    },
-
     async instantiate(id: string, input: InstantiateTemplateInput) {
         return serverMutation<{ parentTask: Task; subtasks: Task[] }>({
             endpoint: `/task-templates/${id}/instantiate`,
