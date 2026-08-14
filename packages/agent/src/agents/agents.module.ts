@@ -12,6 +12,7 @@ import { AgentRun } from '../entities/agent-run.entity';
 import { AgentRunLog } from '../entities/agent-run-log.entity';
 import { AgentBudget } from '../entities/agent-budget.entity';
 import { AgentMembership } from '../entities/agent-membership.entity';
+import { AgentCollaborator } from '../entities/agent-collaborator.entity';
 import { AgentEscalation } from '../entities/agent-escalation.entity';
 import { TaskReviewRejection } from '../entities/task-review-rejection.entity';
 import { AgentRepository } from '../database/repositories/agent.repository';
@@ -19,6 +20,7 @@ import { AgentRunRepository } from '../database/repositories/agent-run.repositor
 import { AgentRunLogRepository } from '../database/repositories/agent-run-log.repository';
 import { AgentBudgetRepository } from '../database/repositories/agent-budget.repository';
 import { AgentMembershipRepository } from '../database/repositories/agent-membership.repository';
+import { AgentCollaboratorRepository } from '../database/repositories/agent-collaborator.repository';
 import { AgentAttachmentRepository } from '../database/repositories/attachment.repositories';
 import { AgentEscalationRepository } from '../database/repositories/agent-escalation.repository';
 import { TaskReviewRejectionRepository } from '../database/repositories/task-review-rejection.repository';
@@ -67,6 +69,8 @@ import { FacadesModule } from '../facades/facades.module';
             AgentRunLog,
             AgentBudget,
             AgentMembership,
+            // Agent Collaborators — per-agent sub-agent delegation allow-list.
+            AgentCollaborator,
             // Judgment layer G3 - structured escalation records.
             AgentEscalation,
             // Orchestration M9 - durable reviewer rejections replayed by
@@ -119,6 +123,7 @@ import { FacadesModule } from '../facades/facades.module';
         AgentRunLogRepository,
         AgentBudgetRepository,
         AgentMembershipRepository,
+        AgentCollaboratorRepository,
         AgentAttachmentRepository,
         AgentEscalationRepository,
         TaskReviewRejectionRepository,
@@ -178,6 +183,7 @@ import { FacadesModule } from '../facades/facades.module';
         AgentRunLogRepository,
         AgentBudgetRepository,
         AgentMembershipRepository,
+        AgentCollaboratorRepository,
         AgentAttachmentRepository,
         AgentEscalationRepository,
         TaskReviewRejectionRepository,

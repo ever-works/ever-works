@@ -78,6 +78,7 @@ import { AgentRunLog } from '../entities/agent-run-log.entity';
 import { AgentEscalation } from '../entities/agent-escalation.entity';
 import { AgentBudget } from '../entities/agent-budget.entity';
 import { AgentMembership } from '../entities/agent-membership.entity';
+import { AgentCollaborator } from '../entities/agent-collaborator.entity';
 import { Team } from '../entities/team.entity';
 import { TeamMember } from '../entities/team-member.entity';
 import { TeamResource } from '../entities/team-resource.entity';
@@ -207,6 +208,8 @@ export const ENTITIES = [
     AgentEscalation,
     AgentBudget,
     AgentMembership,
+    // Agent Collaborators — per-agent sub-agent delegation allow-list.
+    AgentCollaborator,
     AgentAttachment,
     // Teams & Prebuilt Companies (teams-and-companies spec §2)
     Team,

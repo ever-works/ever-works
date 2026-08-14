@@ -55,6 +55,7 @@ export * from './repositories/agent-run.repository';
 export * from './repositories/agent-run-log.repository';
 export * from './repositories/agent-budget.repository';
 export * from './repositories/agent-membership.repository';
+export * from './repositories/agent-collaborator.repository';
 // Agents/Skills/Tasks PR #1017 — Phase 8. Skill catalog repositories.
 export * from './repositories/skill.repository';
 export * from './repositories/skill-binding.repository';

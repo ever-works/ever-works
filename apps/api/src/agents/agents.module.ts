@@ -111,6 +111,7 @@ import { DatabaseModule } from '@ever-works/agent/database';
 import { ActivityLogModule } from '@ever-works/agent/activity-log';
 import { AuthModule } from '../auth/auth.module';
 import { AgentsController } from './agents.controller';
+import { AgentCollaboratorsController } from './agent-collaborators.controller';
 import { AgentTemplatesController } from './agent-templates.controller';
 import { AgentTemplateCatalogService } from './agent-template-catalog.service';
 
@@ -171,7 +172,7 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
         PrReviewModule,
         PolicyModule,
     ],
-    controllers: [AgentsController, AgentTemplatesController],
+    controllers: [AgentsController, AgentCollaboratorsController, AgentTemplatesController],
     providers: [
         AgentTemplateCatalogService,
         // Security: provided LOCALLY (not exported) so the merge-policy

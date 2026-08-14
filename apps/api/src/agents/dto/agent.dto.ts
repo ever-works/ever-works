@@ -647,3 +647,15 @@ export class AddAgentAttachmentDto {
     @Matches(/^[0-9a-f]{64}$/i)
     uploadId: string;
 }
+
+/**
+ * Payload for `PUT /api/agents/:id/collaborators/:collaboratorAgentId`.
+ *
+ * Agent Collaborators — the upsert body is exactly the toggle state.
+ * Whitelisted (global `forbidNonWhitelisted`): any extra field 400s.
+ */
+export class UpdateAgentCollaboratorDto {
+    @ApiProperty({ description: 'Whether this collaborator may be spawned as a sub-agent.' })
+    @IsBoolean()
+    enabled: boolean;
+}

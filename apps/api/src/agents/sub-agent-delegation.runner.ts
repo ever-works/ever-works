@@ -1,7 +1,16 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
-import type { SubAgentDelegationRequest, SubAgentDelegationResult } from '@ever-works/contracts';
+import {
+    evaluateCollaboratorDelegation,
+    refuseSubAgentDelegation,
+    type SubAgentDelegationRequest,
+    type SubAgentDelegationResult,
+} from '@ever-works/contracts';
 import type { SubAgentDelegationRunner } from '@ever-works/agent/agents';
-import { AgentRepository, AgentRunRepository } from '@ever-works/agent/database';
+import {
+    AgentCollaboratorRepository,
+    AgentRepository,
+    AgentRunRepository,
+} from '@ever-works/agent/database';
 import { TasksService, TaskTransitionService } from '@ever-works/agent/tasks-domain';
 
 /**
@@ -64,6 +73,11 @@ export class SubAgentDelegationRunnerService implements SubAgentDelegationRunner
         private readonly runs: AgentRunRepository,
         private readonly tasks: TasksService,
         private readonly transitions: TaskTransitionService,
+        // Agent Collaborators — the per-agent sub-agent allow-list. NOT
+        // @Optional(): this is a security gate, and an unbound repository
+        // would silently fail OPEN. TasksModule imports the agent-side
+        // AgentsModule (which exports it), so it always resolves.
+        private readonly collaborators: AgentCollaboratorRepository,
         @Optional() @Inject(DELEGATION_CLOCK) private readonly clock?: DelegationClock,
     ) {}
 
@@ -86,6 +100,29 @@ export class SubAgentDelegationRunnerService implements SubAgentDelegationRunner
         // this because it never loads the agents.
         if (child.userId !== parent.userId) {
             return this.failure(request, 'child agent belongs to a different owner');
+        }
+
+        // Agent Collaborators — the allow-list layered on top of the
+        // same-owner check. Self-delegation (childAgentId empty / equal
+        // to the parent) is always admissible; a NAMED child must be an
+        // `enabled` collaborator of the parent. This is a REFUSAL (typed
+        // code, nothing ran), not a failure: the contract said no before
+        // anything was spent. Checked HERE because this runner is the one
+        // choke point every delegation path funnels through (chat tool,
+        // workflow graph node, any future caller).
+        if (childAgentId !== parent.id) {
+            const rules = await this.collaborators.listForAgent(parent.id);
+            const decision = evaluateCollaboratorDelegation(parent.id, childAgentId, rules);
+            if (decision.allowed === false) {
+                this.logger.warn(
+                    `Delegation ${request.delegationId} refused (collaborator-not-allowed): ${decision.message}`,
+                );
+                return refuseSubAgentDelegation(
+                    request.delegationId,
+                    decision.refusalCode,
+                    decision.message,
+                );
+            }
         }
 
         // Recover the parent Task from the parent RUN when the caller did
