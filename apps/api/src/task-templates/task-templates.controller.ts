@@ -105,6 +105,7 @@ export class TaskTemplatesController {
             missionId: body.missionId ?? null,
             ideaId: body.ideaId ?? null,
             branchName: body.branchName ?? null,
+            priority: body.priority,
         });
     }
 }

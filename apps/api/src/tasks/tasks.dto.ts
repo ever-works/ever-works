@@ -14,6 +14,7 @@ import {
     Max,
     MaxLength,
     Min,
+    ValidateIf,
     ValidateNested,
 } from 'class-validator';
 import {
@@ -199,6 +200,17 @@ export class UpdateTaskDto {
     @Min(1)
     @Max(5)
     maxGateAttempts?: number | null;
+
+    /**
+     * Schedule mode "Scheduled" — ISO datetime, must be in the future
+     * (service validation); `null` clears the schedule. Equivalent to
+     * `POST`/`DELETE :id/schedule`, offered here so a form that saves
+     * the whole Task does not need a second round-trip.
+     */
+    @IsOptional()
+    @ValidateIf((_, value) => value !== null)
+    @IsDateString()
+    scheduledAt?: string | null;
 }
 
 export class SetTaskRecurringDto {

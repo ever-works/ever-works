@@ -292,7 +292,33 @@ export class TasksController {
         @Param('id', ParseUUIDPipe) id: string,
         @Body() body: UpdateTaskDto,
     ) {
-        return this.service.update(auth.userId, id, body);
+        // `scheduledAt` arrives as an ISO string on the wire and the
+        // service works in `Date` (the column is a timestamptz). The
+        // three states are distinct: absent = untouched, null = clear
+        // the schedule, string = (re-)schedule.
+        return this.service.update(auth.userId, id, {
+            ...body,
+            scheduledAt:
+                body.scheduledAt === undefined
+                    ? undefined
+                    : body.scheduledAt === null
+                      ? null
+                      : new Date(body.scheduledAt),
+        });
+    }
+
+    @Get(':id/subtasks')
+    @ApiOperation({
+        summary:
+            'Sub-tasks of this Task with their agent assignees and approval gate state (checklist projection). Owner-scoped: a Task the caller does not own 404s.',
+    })
+    @HttpCode(HttpStatus.OK)
+    async listSubtasks(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ) {
+        const { rows, total, doneCount } = await this.service.listSubtasks(auth.userId, id);
+        return { data: rows, meta: { total, doneCount } };
     }
 
     @Delete(':id')
@@ -360,7 +386,7 @@ export class TasksController {
     @Get(':id/activity')
     @ApiOperation({
         summary:
-            "Activity rows for this Task (created / updated / transitioned / run dispatches), newest first. Owner-scoped: a Task the caller does not own 404s.",
+            'Activity rows for this Task (created / updated / transitioned / run dispatches), newest first. Owner-scoped: a Task the caller does not own 404s.',
     })
     @HttpCode(HttpStatus.OK)
     async listActivity(

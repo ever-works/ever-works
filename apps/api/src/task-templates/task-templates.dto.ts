@@ -4,6 +4,7 @@ import {
     ArrayNotEmpty,
     IsArray,
     IsBoolean,
+    IsEnum,
     IsInt,
     IsOptional,
     IsString,
@@ -12,7 +13,7 @@ import {
     Min,
     ValidateNested,
 } from 'class-validator';
-import { MAX_TEMPLATE_STEPS } from '@ever-works/agent/tasks-domain';
+import { MAX_TEMPLATE_STEPS, TaskPriority } from '@ever-works/agent/tasks-domain';
 
 export class TaskTemplateStepDto {
     @IsString()
@@ -129,4 +130,9 @@ export class InstantiateTaskTemplateDto {
     @IsString()
     @MaxLength(200)
     branchName?: string | null;
+
+    /** Priority stamped on the parent Task and every step. Default P2. */
+    @IsOptional()
+    @IsEnum(TaskPriority)
+    priority?: TaskPriority;
 }
