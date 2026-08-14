@@ -3,7 +3,6 @@ import { createHash } from 'node:crypto';
 import type { PluginContext, PluginSettings } from '@ever-works/plugin';
 
 import {
-	PERSISTENT_AGENT_NAME,
 	PERSISTENT_ENVIRONMENT_NAME,
 	SETTING_MANAGED_AGENT_CONFIG_HASH,
 	SETTING_MANAGED_AGENT_ID,
@@ -302,5 +301,3 @@ export async function ensureControlPlane(
 
 	return { agentId, environmentId, ephemeral: false };
 }
-
-export { PERSISTENT_AGENT_NAME };
