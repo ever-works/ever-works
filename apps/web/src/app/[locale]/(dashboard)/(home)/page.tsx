@@ -6,6 +6,8 @@ import { ROUTES, GET_WORK_LIST_LIMIT } from '@/lib/constants';
 import DashboardClient from './dashboard-client';
 import { getWorks, getWorkStats } from '@/app/actions/dashboard/works';
 import { workProposalsAPI } from '@/lib/api/work-proposals';
+import { matchIdeasToWorks } from '@/components/ideas/idea-work-match';
+import { workAPI } from '@/lib/api/work';
 import { missionsAPI } from '@/lib/api/missions';
 import { usageAPI } from '@/lib/api/usage';
 // Phase 18.1 — Agent + Task count fetches for the new Dashboard
@@ -28,6 +30,17 @@ export async function generateMetadata(): Promise<Metadata> {
 interface DashboardPageProps {
     searchParams: Promise<{ newUser?: string }>;
 }
+
+/**
+ * How many Works to pull for the title/description match that backstops
+ * Idea→Work provenance (`idea-work-match.ts`). Mirrors the same constant
+ * on `/ideas`: the two surfaces must match against the SAME candidate
+ * pool, otherwise an Idea reads "Built" on one page and "Not built yet"
+ * on the other. Deliberately NOT `GET_WORK_LIST_LIMIT` (6) — that list
+ * is the 6 Works the dashboard renders, far too narrow a pool to resolve
+ * built-ness against.
+ */
+const MATCH_CANDIDATE_LIMIT = 100;
 
 export default async function Dashboard({ searchParams }: DashboardPageProps) {
     const [
@@ -58,6 +71,7 @@ export default async function Dashboard({ searchParams }: DashboardPageProps) {
         blockedTaskRows,
         teamsTotal,
         soon,
+        matchCandidateWorks,
     ] = await Promise.all([
         searchParams,
         getAuthFromCookie(),
@@ -125,6 +139,14 @@ export default async function Dashboard({ searchParams }: DashboardPageProps) {
         // already logs and absorbs its own transport failures; this catch is
         // the outer belt-and-braces so the home page still renders.
         getSoonRuns().catch(() => ({ items: [], total: 0 })),
+        // Match candidates for the Ideas preview's Built badge. The
+        // separate `worksResponse` fetch above is capped at the 6 Works
+        // the dashboard RENDERS, so it can't serve here. Degraded to `[]`
+        // on failure: a flaky /works costs a Built badge, never the page.
+        workAPI
+            .getAll({ limit: MATCH_CANDIDATE_LIMIT })
+            .then((r) => r.works)
+            .catch(() => []),
     ]);
 
     // Security: defense-in-depth guard — if middleware matcher is misconfigured and
@@ -147,6 +169,15 @@ export default async function Dashboard({ searchParams }: DashboardPageProps) {
         accountWide,
     });
 
+    // Built-state backstop for the Ideas preview, resolved exactly as
+    // `/ideas` resolves it (same helper, same candidate limit) so an Idea
+    // can never read "Built" on one surface and "Not built yet" on the
+    // other. Needed because the list endpoint sends no `idea_works`
+    // rollup, leaving `acceptedWorkId` — stamped only on a legal
+    // transition to ACCEPTED — as the sole provenance signal, which is
+    // null for the Works this very card builds via `/works/new?proposal=`.
+    const matchedWorkIds = matchIdeasToWorks(allIdeas, matchCandidateWorks);
+
     return (
         <DashboardClient
             user={user!}
@@ -162,6 +193,7 @@ export default async function Dashboard({ searchParams }: DashboardPageProps) {
             autoStartProposals={newUser === 'true' && proposals.length === 0}
             initialMissions={missions}
             initialAllIdeas={allIdeas}
+            matchedWorkIds={matchedWorkIds}
             monthSpendCents={accountWide?.currentSpendCents ?? 0}
             monthSpendCurrency={accountWide?.currency ?? 'usd'}
             // Phase 18.1 — Dashboard grid mount.

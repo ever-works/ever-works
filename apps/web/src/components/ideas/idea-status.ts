@@ -36,3 +36,48 @@ export const STATUS_STYLES: Record<WorkProposalStatus, { badge: string; dot: str
         dot: 'bg-gray-400',
     },
 };
+
+/**
+ * Palette for the Built pill. Same tokens as `accepted` — an Idea that
+ * produced a Work reads as a success wherever it is shown.
+ */
+export const BUILT_BADGE_STYLE = 'bg-success/10 text-success ring-success/20';
+
+/**
+ * Statuses that describe work happening RIGHT NOW rather than where the
+ * Idea ended up. They outrank built-ness in the badge (see below).
+ */
+const LIVE_STATUSES: ReadonlySet<WorkProposalStatus> = new Set(['queued', 'building']);
+
+/**
+ * The ONE pill an Idea shows.
+ *
+ * Built-ness and lifecycle status answer different questions — "what
+ * exists" vs "where is this Idea in its own lifecycle" — and rendering
+ * both produced pairs that read as contradictions: `Dismissed` beside
+ * `Built (1)`, or `Pending` beside `Built (1)`. The lifecycle status is
+ * the less useful of the two once a Work exists (nobody needs to know an
+ * Idea was never formally accepted when they can see the Work it
+ * produced), so built-ness wins and the status pill is dropped.
+ *
+ * The one exception is a LIVE build. `queued` / `building` describe
+ * something happening right now, which an older Work cannot convey and
+ * which the user is usually watching for — so a live status outranks
+ * built-ness and keeps the pill. Once the build settles, the Idea falls
+ * back to reading `Built`.
+ *
+ * Lives here rather than in each component so a card and the page it
+ * opens can never disagree, exactly like `deriveIdeaBuiltState`.
+ */
+export type IdeaBadge =
+    | { kind: 'status'; status: WorkProposalStatus }
+    | { kind: 'built'; count: number };
+
+export function deriveIdeaBadge(
+    status: WorkProposalStatus,
+    built: { isBuilt: boolean; workCount: number },
+): IdeaBadge {
+    if (LIVE_STATUSES.has(status)) return { kind: 'status', status };
+    if (built.isBuilt) return { kind: 'built', count: built.workCount };
+    return { kind: 'status', status };
+}
