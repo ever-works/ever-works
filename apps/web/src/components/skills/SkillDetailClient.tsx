@@ -283,6 +283,13 @@ function InvocationSlugSection({ skill }: { skill: Skill }) {
 
 const FILE_KINDS: SkillFileKind[] = ['script', 'reference', 'config', 'asset'];
 
+/**
+ * Mirrors `MAX_FILES_PER_SKILL` in `@ever-works/agent/skills` — that
+ * package is server-only, so the client keeps its own copy purely to
+ * disable the button early. The API is what actually enforces the cap.
+ */
+const MAX_SKILL_FILES = 20;
+
 function formatFileSize(sizeBytes: number): string {
     if (sizeBytes >= 1024 * 1024) return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
     if (sizeBytes >= 1024) return `${(sizeBytes / 1024).toFixed(1)} KB`;
@@ -322,7 +329,9 @@ function FilesSection({
     const [kindOverride, setKindOverride] = useState<'' | SkillFileKind>('');
     const [uploading, setUploading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [dragging, setDragging] = useState(false);
     const inputRef = useRef<HTMLInputElement | null>(null);
+    const atCapacity = files.length >= MAX_SKILL_FILES;
 
     const handlePicked = (picked: FileList | null) => {
         const file = picked?.[0];
@@ -374,8 +383,39 @@ function FilesSection({
         })();
     };
 
+    // Drop target covers the whole card, so a file can be dragged onto
+    // the list as well as the empty state. `dragenter`/`dragover` must
+    // both preventDefault or the browser navigates to the dropped file.
+    const onDragOver = (e: React.DragEvent) => {
+        if (uploading || atCapacity) return;
+        e.preventDefault();
+        setDragging(true);
+    };
+    const onDragLeave = (e: React.DragEvent) => {
+        // Ignore bubbling leaves from children still inside the card.
+        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+        setDragging(false);
+    };
+    const onDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        setDragging(false);
+        if (uploading || atCapacity) return;
+        handlePicked(e.dataTransfer?.files ?? null);
+    };
+
     return (
-        <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 space-y-3">
+        <section
+            onDragEnter={onDragOver}
+            onDragOver={onDragOver}
+            onDragLeave={onDragLeave}
+            onDrop={onDrop}
+            data-testid="skill-files-dropzone"
+            className={`rounded-xl border bg-card dark:bg-card-primary-dark p-5 space-y-3 transition-colors ${
+                dragging
+                    ? 'border-primary ring-2 ring-primary/30'
+                    : 'border-border/60 dark:border-border-dark/60'
+            }`}
+        >
             <div className="flex items-center gap-2">
                 <h2 className="text-sm font-medium text-text dark:text-text-dark flex items-center gap-2">
                     <Paperclip className="w-4 h-4 text-warning" />
@@ -436,7 +476,7 @@ function FilesSection({
                     type="button"
                     size="sm"
                     variant="secondary"
-                    disabled={uploading || files.length >= 20}
+                    disabled={uploading || atCapacity}
                     onClick={() => inputRef.current?.click()}
                     className="gap-1.5"
                 >
