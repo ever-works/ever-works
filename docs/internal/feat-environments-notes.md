@@ -119,6 +119,26 @@ unknown-property 400s and is unaffected by an added optional field).
 - `cd packages/plugins/claude-managed-agent && npx vitest run`
   — client networking payloads + helper + full plugin execute spec
   (with-carrier vs. absent-carrier byte-for-byte).
+- `cd apps/web && npx vitest run src/components/agents/AgentCard.unit.spec.tsx`
+  — web unit fixture covers the widened `Agent` type.
+
+## Continuation pass (2026-08-14, finishing session)
+
+Verified the interrupted session's work end-to-end and fixed the two
+defects the web type-check surfaced:
+
+- `EnvironmentsSettings.tsx` referenced `editor.createTitle` /
+  `editor.editTitle` i18n keys that were never added — added the
+  `dashboard.settings.environments.editor` block (English copy) to all
+  21 locale files.
+- `AgentCard.unit.spec.tsx`'s `makeAgent` fixture lacked the new
+  required `Agent.environmentId` field — set to `null`.
+
+Verification run: turbo build + type-check green for
+`@ever-works/plugin`, `@ever-works/agent`,
+`@ever-works/claude-managed-agent-plugin`, `ever-works-api`,
+`ever-works-web`; all feature Jest/Vitest suites plus the pinned
+module/drift suites pass (see commands above).
 
 ## Divergences from the brief (code won)
 

@@ -2957,6 +2957,10 @@
                 "title": "Environments",
                 "subtitle": "Named, reusable runtime environments — packages and networking — you can assign to your Agents.",
                 "empty": "No environments yet. Create one to define the packages and networking your Agents run with.",
+                "editor": {
+                    "createTitle": "New environment",
+                    "editTitle": "Edit environment"
+                },
                 "table": {
                     "name": "Name",
                     "networking": "Networking",
