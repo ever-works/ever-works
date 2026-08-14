@@ -28,13 +28,15 @@ function makeHarness(rows: McpServerConnection[] = [makeRow()]) {
         findEnabledByUser: jest.fn().mockResolvedValue(rows.filter((r) => r.enabled)),
         findByIdAndUser: jest
             .fn()
-            .mockImplementation(async (id: string, userId: string) =>
-                rows.find((r) => r.id === id && r.userId === userId) ?? null,
+            .mockImplementation(
+                async (id: string, userId: string) =>
+                    rows.find((r) => r.id === id && r.userId === userId) ?? null,
             ),
         findByUserAndName: jest
             .fn()
-            .mockImplementation(async (userId: string, name: string) =>
-                rows.find((r) => r.userId === userId && r.name === name) ?? null,
+            .mockImplementation(
+                async (userId: string, name: string) =>
+                    rows.find((r) => r.userId === userId && r.name === name) ?? null,
             ),
         create: jest
             .fn()
@@ -198,7 +200,9 @@ describe('McpConnectionsService', () => {
 
         it('returns ok:false with the classified error on failure', async () => {
             const { service, client } = makeHarness();
-            client.listTools.mockRejectedValue(new Error('Server unreachable (connection failed).'));
+            client.listTools.mockRejectedValue(
+                new Error('Server unreachable (connection failed).'),
+            );
             const result = await service.test('u1', 'c1');
             expect(result).toEqual({
                 ok: false,
@@ -225,7 +229,14 @@ describe('McpConnectionsService', () => {
 
             const states = await service.listForAgent('u1', 'agent-1');
 
-            expect(states.map((s) => [s.connection.name, s.effectiveEnabled, s.bindingSource, s.inheritedFromTenant])).toEqual([
+            expect(
+                states.map((s) => [
+                    s.connection.name,
+                    s.effectiveEnabled,
+                    s.bindingSource,
+                    s.inheritedFromTenant,
+                ]),
+            ).toEqual([
                 ['inherited', true, 'tenant', true],
                 ['overridden', false, 'agent', false],
                 ['unbound', false, 'none', false],

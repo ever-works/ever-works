@@ -1,5 +1,13 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
-import { IsBoolean, IsEnum, IsObject, IsOptional, IsString, Matches, MaxLength } from 'class-validator';
+import {
+    IsBoolean,
+    IsEnum,
+    IsObject,
+    IsOptional,
+    IsString,
+    Matches,
+    MaxLength,
+} from 'class-validator';
 import type { McpConnectionTransport } from '@ever-works/agent/mcp';
 
 export const MCP_CONNECTION_TRANSPORTS = ['streamable-http', 'sse'] as const;

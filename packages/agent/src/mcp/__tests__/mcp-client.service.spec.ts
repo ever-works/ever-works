@@ -180,7 +180,9 @@ describe('McpClientService', () => {
                 error: string;
             };
 
-            expect(result.error).toBe('MCP server "github": Server unreachable (connection failed).');
+            expect(result.error).toBe(
+                'MCP server "github": Server unreachable (connection failed).',
+            );
             expect(repo.stampConnectionResult).toHaveBeenCalledWith('c1', {
                 ok: false,
                 error: 'Server unreachable (connection failed).',

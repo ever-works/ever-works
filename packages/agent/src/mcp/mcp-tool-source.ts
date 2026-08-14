@@ -1,10 +1,7 @@
 import { Injectable, Logger } from '@nestjs/common';
 import type { Agent } from '../entities/agent.entity';
 import type { McpServerConnection } from '../entities/mcp-server-connection.entity';
-import type {
-    AgentToolDescriptor,
-    AgentToolParameterSchema,
-} from '../agents/agent-tool.service';
+import type { AgentToolDescriptor, AgentToolParameterSchema } from '../agents/agent-tool.service';
 import type { AgentMcpToolSource } from '../agents/agent-mcp-tool-source';
 import { McpClientService, type McpToolInfo } from './mcp-client.service';
 import { McpConnectionsService } from './mcp-connections.service';
@@ -104,7 +101,9 @@ export class McpToolSource implements AgentMcpToolSource {
         }
         const name = `mcp__${connection.name}__${sanitizedTool}`;
         if (name.length > MCP_TOOL_NAME_MAX) {
-            this.logger.warn(`MCP tool name "${name}" exceeds ${MCP_TOOL_NAME_MAX} chars, dropped.`);
+            this.logger.warn(
+                `MCP tool name "${name}" exceeds ${MCP_TOOL_NAME_MAX} chars, dropped.`,
+            );
             return null;
         }
 

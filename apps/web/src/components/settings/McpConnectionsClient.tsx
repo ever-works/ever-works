@@ -205,7 +205,9 @@ export function McpConnectionsClient({ initial }: Props) {
                         <Button
                             size="sm"
                             onClick={submit}
-                            disabled={pending || name.trim().length === 0 || url.trim().length === 0}
+                            disabled={
+                                pending || name.trim().length === 0 || url.trim().length === 0
+                            }
                         >
                             {t('form.save')}
                         </Button>

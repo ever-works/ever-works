@@ -62,14 +62,12 @@ export function createSdkMcpClientFactory(): McpClientFactory {
             const target = new URL(url);
             const requestInit: RequestInit = { headers };
             if (transport === 'sse') {
-                const { SSEClientTransport } = await import(
-                    '@modelcontextprotocol/sdk/client/sse.js'
-                );
+                const { SSEClientTransport } =
+                    await import('@modelcontextprotocol/sdk/client/sse.js');
                 await client.connect(new SSEClientTransport(target, { requestInit }));
             } else {
-                const { StreamableHTTPClientTransport } = await import(
-                    '@modelcontextprotocol/sdk/client/streamableHttp.js'
-                );
+                const { StreamableHTTPClientTransport } =
+                    await import('@modelcontextprotocol/sdk/client/streamableHttp.js');
                 await client.connect(new StreamableHTTPClientTransport(target, { requestInit }));
             }
             return client as unknown as McpSdkClient;
