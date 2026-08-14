@@ -14,7 +14,7 @@ import type {
 } from '@ever-works/plugin';
 import type { GenerationStepLog } from '@ever-works/contracts/api';
 import type { KbContextBundleData } from '@ever-works/contracts';
-import type { IKbToolsFacade } from '@ever-works/plugin';
+import type { IKbToolsFacade, RuntimeEnvironmentData } from '@ever-works/plugin';
 import { buildErrorPipelineResult, createEmptyPipelineOutputs } from '@ever-works/plugin';
 import { PipelineEvents } from './step-pipeline-executor.service';
 import { PipelineFacadeService } from './pipeline-facade.service';
@@ -24,6 +24,7 @@ import { KnowledgeBaseService } from '../services/knowledge-base.service';
 import { KbToolsFacadeAdapter } from '../services/kb-tools-facade.adapter';
 import { AgentMemoryFacadeService } from '../facades/agent-memory.facade';
 import { resolveMemoryRecall } from '../services/memory-recall';
+import { EnvironmentsService } from '../environments/environments.service';
 
 /**
  * Executor for self-managed pipeline plugins.
@@ -57,6 +58,12 @@ export class FullPipelineExecutorService {
         // isolated unit tests without the facades module still
         // construct — recall simply stays off.
         @Optional() private readonly agentMemoryFacade?: AgentMemoryFacadeService,
+        // Environments — resolves `options.agentId` →
+        // `agents.environmentId` → published `environments` row into the
+        // `execContext.runtimeEnvironment` carrier. Same optionality
+        // contract as the services above: absent = the carrier stays
+        // undefined and plugins behave exactly as before Environments.
+        @Optional() private readonly environmentsService?: EnvironmentsService,
     ) {}
 
     /**
@@ -162,6 +169,32 @@ export class FullPipelineExecutorService {
     }
 
     /**
+     * Environments — resolve the runtime Environment for this run, once,
+     * at dispatch. A pre-resolved `options.runtimeEnvironment` wins (the
+     * orchestrator already did the lookup); otherwise `options.agentId`
+     * is resolved through `EnvironmentsService` (agent →
+     * `agents.environmentId` → published row). Best-effort + fail-open:
+     * a resolution failure logs a warning and the generation continues
+     * with no Environment (exactly the pre-Environments behavior).
+     */
+    private async resolveRuntimeEnvironmentSafe(
+        options?: PipelineExecutionOptions,
+    ): Promise<RuntimeEnvironmentData | undefined> {
+        if (options?.runtimeEnvironment) return options.runtimeEnvironment;
+        if (!options?.agentId || !this.environmentsService) return undefined;
+        try {
+            return await this.environmentsService.resolveRuntimeEnvironmentForAgent(
+                options.agentId,
+            );
+        } catch (err) {
+            this.logger.warn(
+                `Runtime environment resolution failed for agent=${options.agentId}: ${(err as Error).message}. Continuing without an Environment.`,
+            );
+            return undefined;
+        }
+    }
+
+    /**
      * Execute using a pipeline plugin
      */
     async execute(
@@ -211,6 +244,9 @@ export class FullPipelineExecutorService {
         const kbContext = await this.resolveKbContextSafe(work, request);
         const kbTools = this.resolveKbToolsFacadeSafe(work);
         const memoryRecall = await this.resolveMemoryRecallSafe(work, request, options);
+        // Environments — resolved after the carriers above; independent
+        // of them and equally fail-open.
+        const runtimeEnvironment = await this.resolveRuntimeEnvironmentSafe(options);
 
         try {
             // Create execContext for the plugin to use facades
@@ -223,6 +259,7 @@ export class FullPipelineExecutorService {
                 kbTools,
                 options?.memorySessionId,
                 memoryRecall,
+                runtimeEnvironment,
             );
 
             // Delegate to the plugin's execute method with execContext

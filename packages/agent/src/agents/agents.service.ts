@@ -6,6 +6,7 @@ import {
     Logger,
     NotFoundException,
     Optional,
+    UnprocessableEntityException,
 } from '@nestjs/common';
 import {
     AGENT_PERMISSIONS_DEFAULT,
@@ -25,6 +26,7 @@ import { Work } from '../entities/work.entity';
 import { Mission } from '../entities/mission.entity';
 import { WorkProposal } from '../entities/work-proposal.entity';
 import { UserUpload } from '../entities/user-upload.entity';
+import { Environment } from '../entities/environment.entity';
 import { AgentRepository, type ListAgentsFilter } from '../database/repositories/agent.repository';
 import { AgentMembershipRepository } from '../database/repositories/agent-membership.repository';
 import { AgentBudgetRepository } from '../database/repositories/agent-budget.repository';
@@ -75,6 +77,12 @@ export interface CreateAgentInput {
     // name + a synthesized email (`<slug>@agents.ever.works`).
     committerName?: string | null;
     committerEmail?: string | null;
+    /**
+     * Environments (Settings → Environments) — assigned runtime
+     * Environment id. Must belong to the same user and be `published`
+     * (draft assignment is a 422); null/unset = platform default.
+     */
+    environmentId?: string | null;
 }
 
 /**
@@ -123,6 +131,13 @@ export interface UpdateAgentInput {
     avatarImageUploadId?: string | null;
     committerName?: string | null;
     committerEmail?: string | null;
+    /**
+     * Environments (Settings → Environments) — assigned runtime
+     * Environment id. Must belong to the same user and be `published`
+     * (draft assignment is a 422); `null` clears back to the platform
+     * default runtime.
+     */
+    environmentId?: string | null;
     /**
      * Agent Scorecards increment 1 — replace the whole scorecard
      * (null clears it). Validated via `validateScorecard`.
@@ -217,6 +232,13 @@ export class AgentsService {
         @Optional()
         @InjectRepository(UserUpload)
         private readonly uploadsRepo?: Repository<UserUpload>,
+        // Environments — assignment validation (same-user + published).
+        // `@Optional()` + raw repo, same posture as the scope-parent
+        // validators above; production + e2e DI provide it via the
+        // `Environment` forFeature entry in AgentsModule.
+        @Optional()
+        @InjectRepository(Environment)
+        private readonly environmentRepo?: Repository<Environment>,
     ) {}
 
     async list(
@@ -277,6 +299,9 @@ export class AgentsService {
             input.avatarImageUploadId ?? null,
         );
         this.validateHeartbeatCadence(input.heartbeatCadence ?? null);
+        if (input.environmentId) {
+            await this.assertAssignableEnvironment(userId, input.environmentId);
+        }
 
         const created = await this.agents
             .create({
@@ -310,6 +335,8 @@ export class AgentsService {
                 // a no-op commit identity.
                 committerName: input.committerName?.trim() ? input.committerName.trim() : null,
                 committerEmail: input.committerEmail?.trim() ? input.committerEmail.trim() : null,
+                // Environments — validated above (same-user + published).
+                environmentId: input.environmentId ?? null,
             })
             .catch((err: unknown) => {
                 // A concurrent same-name create burst can pass the existence
@@ -376,6 +403,17 @@ export class AgentsService {
         if (input.capabilities !== undefined) patch.capabilities = input.capabilities;
         if (input.aiProviderId !== undefined) patch.aiProviderId = input.aiProviderId;
         if (input.modelId !== undefined) patch.modelId = input.modelId;
+
+        // Environments — null clears back to the platform default; a
+        // non-null id must be the caller's own PUBLISHED Environment
+        // (draft → 422, cross-user/unknown → 404; rule is server-side so
+        // tool/import callers can't bypass the UI filter).
+        if (input.environmentId !== undefined) {
+            if (input.environmentId !== null) {
+                await this.assertAssignableEnvironment(userId, input.environmentId);
+            }
+            patch.environmentId = input.environmentId;
+        }
         if (input.maxSkillContextTokens !== undefined)
             patch.maxSkillContextTokens = input.maxSkillContextTokens;
         if (input.memoryRecallEnabled !== undefined)
@@ -1025,6 +1063,35 @@ export class AgentsService {
         if (!computeNextHeartbeat(cadence, new Date())) {
             throw new BadRequestException(
                 `Invalid heartbeatCadence "${cadence}". Use "manual", null, or a supported cron expression.`,
+            );
+        }
+    }
+
+    /**
+     * Environments — an Environment may be assigned only when it belongs
+     * to the same user (cross-user/unknown → 404, no existence leak) and
+     * is `published`. Draft rows are refused with a 422 and a clear
+     * message: publishing is the explicit "this recipe is ready" gate,
+     * and the UI filters its picker to published rows for the same
+     * reason — this server-side check is what makes the rule real for
+     * tool/import callers that bypass the UI.
+     */
+    private async assertAssignableEnvironment(userId: string, environmentId: string): Promise<void> {
+        if (!this.environmentRepo) {
+            // Hand-rolled unit-test surface without the repo wired;
+            // production + e2e DI always provide it (AgentsModule
+            // forFeatures Environment).
+            return;
+        }
+        const environment = await this.environmentRepo.findOne({
+            where: { id: environmentId, userId },
+        });
+        if (!environment) {
+            throw new NotFoundException('Environment not found');
+        }
+        if (environment.status !== 'published') {
+            throw new UnprocessableEntityException(
+                'Only published Environments can be assigned to an Agent. Publish the Environment first.',
             );
         }
     }

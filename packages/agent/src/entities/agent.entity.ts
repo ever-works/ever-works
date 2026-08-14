@@ -276,6 +276,17 @@ export class Agent {
     @Column({ type: 'varchar', length: 100, nullable: true })
     modelId?: string | null;
 
+    /**
+     * Environments (Settings → Environments) — FK to `environments.id`.
+     * NULL = platform default runtime (exactly the pre-Environments
+     * behavior). Assignment is validated in `AgentsService`
+     * (same-user + `published` only); FK ON DELETE SET NULL is added by
+     * migration 1785020000000-AddAgentEnvironmentId. No @ManyToOne per
+     * the EW-654 no-cycle rule.
+     */
+    @Column({ type: 'uuid', nullable: true })
+    environmentId?: string | null;
+
     @Column({ type: 'int', default: 4000 })
     maxSkillContextTokens: number;
 

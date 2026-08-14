@@ -41,6 +41,7 @@ import type {
     AgentMemoryRecord,
     AgentMemorySearchResponse,
     AgentMemoryContext,
+    RuntimeEnvironmentData,
 } from '@ever-works/plugin';
 import type { KbContextBundleData } from '@ever-works/contracts';
 import { AiFacadeService } from '../facades/ai.facade';
@@ -107,6 +108,10 @@ export class PipelineFacadeService {
         kbTools?: IKbToolsFacade,
         memorySessionId?: string,
         memoryRecall?: string,
+        // Environments — resolved runtime Environment carrier (see
+        // `StepExecutionContext.runtimeEnvironment`). Positional-append
+        // like the carriers above so existing call sites are untouched.
+        runtimeEnvironment?: RuntimeEnvironmentData,
     ): StepExecutionContext {
         const stepLogger: StepLogger = {
             log: (msg: string, ...args: unknown[]) =>
@@ -150,6 +155,7 @@ export class PipelineFacadeService {
             kbTools,
             memorySessionId,
             memoryRecall,
+            runtimeEnvironment,
         };
     }
 

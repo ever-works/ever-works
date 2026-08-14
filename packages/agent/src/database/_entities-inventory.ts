@@ -134,6 +134,7 @@ import { FleetJob } from '../entities/fleet-job.entity';
 import { ToolGrant } from '../entities/tool-grant.entity';
 import { Workflow } from '../entities/workflow.entity';
 import { WorkflowRun } from '../entities/workflow-run.entity';
+import { Environment } from '../entities/environment.entity';
 
 import {
     PluginEntity,
@@ -328,4 +329,7 @@ export const ENTITIES = [
     // One execution of a saved graph. The row is created `queued` by the
     // API and finished by the `workflow-run` Trigger.dev task.
     WorkflowRun,
+    // Environments (Settings → Environments) — named, reusable runtime
+    // recipes (packages + networking) assigned per-Agent.
+    Environment,
 ];

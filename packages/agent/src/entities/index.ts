@@ -152,3 +152,6 @@ export * from './workflow.entity';
 // One execution of a saved graph — what makes running a workflow leave a
 // trace instead of vanishing into a chat tool's return value.
 export * from './workflow-run.entity';
+// Environments (Settings → Environments) — named, reusable runtime
+// recipes (packages + networking) assigned per-Agent.
+export * from './environment.entity';

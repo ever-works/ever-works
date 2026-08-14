@@ -175,6 +175,12 @@ export enum ActivityActionType {
     AGENT_BUDGET_EXCEEDED = 'agent_budget_exceeded',
     AGENT_EXPORTED = 'agent_exported',
     AGENT_IMPORTED = 'agent_imported',
+    // Environments (Settings → Environments) — named, reusable runtime
+    // recipes assigned per-Agent. Emitted by the api-side controller.
+    ENVIRONMENT_CREATED = 'environment_created',
+    ENVIRONMENT_UPDATED = 'environment_updated',
+    ENVIRONMENT_PUBLISHED = 'environment_published',
+    ENVIRONMENT_DELETED = 'environment_deleted',
     SKILL_INSTALLED = 'skill_installed',
     SKILL_ATTACHED_TO_AGENT = 'skill_attached_to_agent',
     SKILL_INVOKED = 'skill_invoked',

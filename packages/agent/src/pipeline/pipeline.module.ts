@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 
 import { FacadesModule } from '../facades/facades.module';
 import { KnowledgeBaseModule } from '../services/knowledge-base.module';
+import { EnvironmentsModule } from '../environments/environments.module';
 
 import { PipelineBuilderService } from './pipeline-builder.service';
 import { StepPipelineExecutorService } from './step-pipeline-executor.service';
@@ -42,9 +43,16 @@ const EXPORTS = [
  * receiving class, even when the dep is optional. `KnowledgeBaseModule`
  * is self-sufficient (it imports `DatabaseModule` + `FacadesModule` and
  * locally provides `WorkOwnershipService`), so no cascade is needed.
+ *
+ * Environments — `EnvironmentsModule` is imported for the same reason:
+ * the `@Optional() EnvironmentsService` injection on
+ * `FullPipelineExecutorService` (agentId → runtime Environment
+ * resolution) only resolves when the provider is in THIS module's scope.
+ * `EnvironmentsModule` is a leaf (two forFeature'd entities), so no
+ * cascade is introduced.
  */
 @Module({
-    imports: [FacadesModule, KnowledgeBaseModule],
+    imports: [FacadesModule, KnowledgeBaseModule, EnvironmentsModule],
     providers: PROVIDERS,
     exports: EXPORTS,
 })

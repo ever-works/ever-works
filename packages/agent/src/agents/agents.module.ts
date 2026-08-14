@@ -7,6 +7,7 @@ import { Mission } from '../entities/mission.entity';
 import { WorkProposal } from '../entities/work-proposal.entity';
 import { UserUpload } from '../entities/user-upload.entity';
 import { User } from '../entities/user.entity';
+import { Environment } from '../entities/environment.entity';
 import { Organization } from '../entities/organization.entity';
 import { AgentRun } from '../entities/agent-run.entity';
 import { AgentRunLog } from '../entities/agent-run-log.entity';
@@ -88,6 +89,10 @@ import { FacadesModule } from '../facades/facades.module';
             // active-Org vision lookup for the run-prompt segment.
             User,
             Organization,
+            // Environments — raw repo backing AgentsService's assignment
+            // validation (same-user + published). Also registered in the
+            // DataSource ENTITIES array (`database/_entities-inventory.ts`).
+            Environment,
         ]),
         ActivityLogModule,
         // Wave 4 M6 - the sweeper notifies the owner when a run has been
