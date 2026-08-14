@@ -111,3 +111,65 @@ describe('AnthropicManagedAgentsClient — egress allow-list (H-25)', () => {
 		expect(callArgs.config.networking).toEqual({ type: 'unrestricted' });
 	});
 });
+
+describe('AnthropicManagedAgentsClient — Environments-driven networking', () => {
+	beforeEach(() => {
+		environmentsCreateMock.mockClear();
+		environmentsCreateMock.mockResolvedValue({ id: 'env_test' });
+	});
+
+	afterEach(() => {
+		if (ORIGINAL_ENV_VALUE === undefined) {
+			delete process.env.CLAUDE_MANAGED_AGENT_EGRESS_HOSTS;
+		} else {
+			process.env.CLAUDE_MANAGED_AGENT_EGRESS_HOSTS = ORIGINAL_ENV_VALUE;
+		}
+	});
+
+	it('an explicit `limited` networking config wins over the env-var fallback', async () => {
+		process.env.CLAUDE_MANAGED_AGENT_EGRESS_HOSTS = 'should-not.be-used';
+
+		const client = new AnthropicManagedAgentsClient('test-key');
+		await client.createEnvironment({
+			name: 'env-driven',
+			networking: {
+				type: 'limited',
+				allowed_hosts: ['api.anthropic.com'],
+				allow_package_managers: true
+			}
+		});
+
+		const callArgs = environmentsCreateMock.mock.calls[0][0];
+		expect(callArgs.config).toEqual({
+			type: 'cloud',
+			networking: {
+				type: 'limited',
+				allowed_hosts: ['api.anthropic.com'],
+				allow_package_managers: true
+			}
+		});
+	});
+
+	it('an explicit `unrestricted` config also wins over the env-var fallback', async () => {
+		process.env.CLAUDE_MANAGED_AGENT_EGRESS_HOSTS = 'pinned.example';
+
+		const client = new AnthropicManagedAgentsClient('test-key');
+		await client.createEnvironment({ name: 'env-open', networking: { type: 'unrestricted' } });
+
+		const callArgs = environmentsCreateMock.mock.calls[0][0];
+		expect(callArgs.config.networking).toEqual({ type: 'unrestricted' });
+	});
+
+	it('an undefined networking input preserves the env-var fallback byte-for-byte', async () => {
+		process.env.CLAUDE_MANAGED_AGENT_EGRESS_HOSTS = 'api.anthropic.com,foo.example';
+
+		const client = new AnthropicManagedAgentsClient('test-key');
+		await client.createEnvironment({ name: 'fallback-env', networking: undefined });
+
+		const callArgs = environmentsCreateMock.mock.calls[0][0];
+		expect(callArgs.config.networking).toEqual({
+			type: 'allowlist',
+			hosts: ['api.anthropic.com', 'foo.example']
+		});
+	});
+});

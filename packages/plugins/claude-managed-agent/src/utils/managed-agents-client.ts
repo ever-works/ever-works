@@ -8,6 +8,7 @@ import {
 	type ManagedAgentsSessionResource
 } from '../types.js';
 import { delayWithSignal } from './pipeline-helpers.js';
+import type { ManagedAgentsNetworkingConfig } from './runtime-environment.js';
 
 export class AnthropicManagedAgentsClient {
 	private readonly client: Anthropic;
@@ -44,7 +45,16 @@ export class AnthropicManagedAgentsClient {
 		await this.client.beta.agents.archive(agentId);
 	}
 
-	async createEnvironment(input: { name: string }): Promise<{ id: string }> {
+	async createEnvironment(input: {
+		name: string;
+		/**
+		 * Environments — networking derived from the run's resolved
+		 * platform Environment (`resolveEnvironmentNetworking`). When
+		 * absent, the historical H-25 env-var fallback below applies
+		 * unchanged, byte-for-byte.
+		 */
+		networking?: ManagedAgentsNetworkingConfig;
+	}): Promise<{ id: string }> {
 		// H-25: pin egress to an allow-list when CLAUDE_MANAGED_AGENT_EGRESS_HOSTS
 		// is set. Default stays `unrestricted` to preserve the current
 		// behavior (the env is opt-in until operators verify the agent
@@ -64,7 +74,8 @@ export class AnthropicManagedAgentsClient {
 		// types update, narrow this.
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const networking: any =
-			allowHosts && allowHosts.length > 0 ? { type: 'allowlist', hosts: allowHosts } : { type: 'unrestricted' };
+			input.networking ??
+			(allowHosts && allowHosts.length > 0 ? { type: 'allowlist', hosts: allowHosts } : { type: 'unrestricted' });
 
 		const environment = await this.client.beta.environments.create({
 			name: input.name,

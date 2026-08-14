@@ -62,6 +62,10 @@ import {
 	buildWorkspaceSeedPrompt
 } from './utils/prompt-builder.js';
 import { extractAgentTranscript, normalizeOutputs, parseStructuredOutput } from './utils/result-parser.js';
+import {
+	buildPackageBootstrapPrompt,
+	resolveEnvironmentNetworking
+} from './utils/runtime-environment.js';
 import { captureScreenshots } from './utils/screenshot-capture.js';
 import { buildWorkspaceSeedManifest } from './utils/workspace-seed.js';
 
@@ -305,9 +309,16 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 			).id;
 			runResources.createdAgentId = agentId;
 
+			// Environments — when the platform resolved a runtime
+			// Environment for this run (the Agent's assigned, published
+			// `environments` row), its networking posture shapes the CMA
+			// environment. `undefined` keeps the historical env-var
+			// fallback inside the client byte-for-byte.
+			const runtimeEnvironment = execContext.runtimeEnvironment;
 			const environmentId = (
 				await client.createEnvironment({
-					name: `Ever Works Environment: ${work.slug}`
+					name: `Ever Works Environment: ${work.slug}`,
+					networking: resolveEnvironmentNetworking(runtimeEnvironment)
 				})
 			).id;
 			runResources.createdEnvironmentId = environmentId;
@@ -333,6 +344,23 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 				]
 			});
 			runResources.sessionId = session.id;
+
+			// Environments — install the Environment's pip/npm packages as
+			// the FIRST session step, before the workspace seed and the
+			// main generation prompt. The bootstrap prompt is composed
+			// exclusively from re-validated package specs
+			// (`buildPackageBootstrapPrompt` — see its security note); its
+			// events land before the seed-idle snapshot below, so they are
+			// naturally excluded from generation-output parsing.
+			const bootstrapPrompt = buildPackageBootstrapPrompt(runtimeEnvironment);
+			if (bootstrapPrompt) {
+				await client.sendUserMessage(session.id, bootstrapPrompt);
+				await client.waitForSessionIdle(session.id, {
+					maxPollAttempts: getNumericSetting(settings.maxPollAttempts, DEFAULT_MAX_POLL_ATTEMPTS),
+					pollIntervalMs: getNumericSetting(settings.pollIntervalMs, DEFAULT_POLL_INTERVAL_MS),
+					signal: abortController.signal
+				});
+			}
 
 			await client.sendUserMessage(session.id, buildWorkspaceSeedPrompt(workspaceSeedManifest));
 
