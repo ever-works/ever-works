@@ -996,7 +996,8 @@
                 "allTemplates": "All templates",
                 "yourTemplates": "Your templates",
                 "yourTemplatesEmpty": "Agents you create will appear here as reusable templates.",
-                "openInWizard": "Open in wizard"
+                "openInWizard": "Open in wizard",
+                "browsePage": "Open the full template browser"
             },
             "pageTabs": {
                 "agents": "Agents",
@@ -1114,7 +1115,8 @@
                     "showing": "{total}개 중 {from}-{to} 표시",
                     "previous": "이전",
                     "next": "다음"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "newDialog": {
                 "title": "새 작업 생성",
@@ -1350,7 +1352,8 @@
                 "filter": {
                     "scope": "범위",
                     "all": "전체"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "detail": {
                 "instructions": "지시사항",
@@ -1798,7 +1801,21 @@
                     "empty": "이 아이디어에 연결된 Work가 없습니다."
                 },
                 "agents": {
-                    "empty": "이 아이디어에 연결된 에이전트가 없습니다."
+                    "empty": "이 아이디어에 연결된 에이전트가 없습니다.",
+                    "assignExisting": "기존 에이전트 할당",
+                    "assignTitle": "이 아이디어에 에이전트 할당",
+                    "assignSubtitle": "새로 만드는 대신 이미 있는 에이전트를 이 아이디어에 배치하세요.",
+                    "assignSearchPlaceholder": "에이전트 검색…",
+                    "assignLoading": "에이전트 불러오는 중…",
+                    "assignNoneAvailable": "할당할 다른 에이전트가 없습니다.",
+                    "assignNoMatches": "검색과 일치하는 에이전트가 없습니다.",
+                    "assignLoadFailed": "에이전트를 불러올 수 없습니다",
+                    "assignedToast": "{name}을(를) 이 아이디어에 할당했습니다",
+                    "assignFailed": "에이전트를 할당할 수 없습니다",
+                    "assignCancel": "취소",
+                    "unassign": "이 아이디어에서 제거",
+                    "unassignedToast": "{name}을(를) 이 아이디어에서 제거했습니다",
+                    "unassignFailed": "에이전트를 제거할 수 없습니다"
                 },
                 "meta": {
                     "source": "출처",
@@ -1818,7 +1835,8 @@
                         "idea-agents": "삭제할 수 없습니다: {count}개의 에이전트가 이 아이디어에 연결되어 있습니다. 먼저 삭제하거나 범위를 변경하세요.",
                         "build-in-flight": "빌드 중에는 삭제할 수 없습니다. 완료될 때까지 기다리세요.",
                         "unknown": "지금은 이 아이디어를 삭제할 수 없습니다."
-                    }
+                    },
+                    "unlinksWorks": "이 아이디어는 {count}개의 Work에 연결되어 있습니다. Work는 유지되며 연결만 해제됩니다."
                 },
                 "toasts": {
                     "built": "이 아이디어로 Work를 빌드했습니다",
@@ -2096,7 +2114,10 @@
                 "usageCredits": "Usage & Credits",
                 "fleet": "Fleet",
                 "jobRuntime": "Job Runtime",
-                "digest": "Digest"
+                "digest": "Digest",
+                "notifications": "Notifications",
+                "channels": "Channels",
+                "emails": "Email Addresses"
             },
             "githubApp": {
                 "title": "GitHub 앱 설치",
@@ -6969,7 +6990,6 @@
             "created": "Meeting captured",
             "sections": {
                 "provenance": "Where it came from",
-                "participants": "Participants",
                 "transcript": "Transcript"
             },
             "sources": {
@@ -6992,7 +7012,6 @@
                 "externalId": "Provider meeting ID (optional)",
                 "externalIdHint": "Used to de-duplicate against a later connector sync of the same meeting.",
                 "participants": "Participants",
-                "participantsHint": "One per line. Use \"Name <email>\" to record an address.",
                 "transcript": "Transcript (optional)",
                 "transcriptPlaceholder": "Ada: shipping the gate.\nGrace: reviewing the branch.",
                 "transcriptHint": "Adding a transcript runs the summary, Memory and activity pipeline. You can also attach it later from the meeting page."
@@ -7002,6 +7021,7 @@
                 "startedAtInvalid": "Start time is not a valid date.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
+                "participantEmailInvalid": "유효한 이메일 주소를 입력하거나 비워 두세요.",
                 "createFailed": "Couldn't capture the meeting. Please try again."
             },
             "actions": {
@@ -7010,71 +7030,94 @@
             }
         },
         "meetingDetail": {
-            "backToMeetings": "Back to Meetings",
+            "backToMeetings": "회의 목록으로 돌아가기",
             "actions": {
-                "openRecording": "Open recording",
-                "delete": "Delete",
-                "attachTranscript": "Attach transcript",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
-                "save": "Save changes"
+                "openRecording": "녹화 열기",
+                "edit": "편집",
+                "delete": "삭제",
+                "attachTranscript": "대화록 첨부",
+                "attaching": "첨부하는 중…",
+                "editTranscript": "대화록 편집",
+                "cancelEdit": "편집 취소",
+                "saveTranscript": "대화록 저장",
+                "savingTranscript": "저장하는 중…",
+                "save": "변경사항 저장",
+                "cancel": "취소"
             },
             "sections": {
-                "summary": "Summary",
-                "transcript": "Transcript",
-                "details": "Details",
-                "edit": "Edit meeting"
+                "summary": "요약",
+                "transcript": "대화록",
+                "details": "세부 정보",
+                "edit": "회의 편집"
             },
             "summary": {
-                "notGenerated": "No summary was generated for this transcript. Enable an AI provider and re-attach the transcript to try again.",
-                "noTranscript": "Attach a transcript to generate a summary."
+                "generating": "요약을 생성하는 중…",
+                "generatingHint": "대화록을 읽고 요약을 작성하고 있습니다. 보통 몇 초 정도 걸립니다.",
+                "notGenerated": "이 대화록에 대한 요약이 생성되지 않았습니다. AI 제공자를 활성화한 뒤 대화록을 다시 첨부해 보세요.",
+                "noTranscript": "요약을 생성하려면 대화록을 첨부하세요."
             },
             "transcript": {
-                "composerLabel": "Transcript text",
-                "composerPlaceholder": "Paste the meeting transcript here.",
-                "pipelineHint": "Stored first, then summarized, remembered and posted to your activity feed — best effort.",
-                "storedElsewhere": "The transcript is stored but was not returned with this view."
+                "composerLabel": "대화록 텍스트",
+                "composerPlaceholder": "여기에 회의 대화록을 붙여넣으세요.",
+                "pipelineHint": "먼저 저장한 뒤 요약하고 기억하며 활동 피드에 게시합니다 — 가능한 범위에서 처리됩니다.",
+                "storedElsewhere": "대화록은 저장되어 있지만 이 화면에는 함께 반환되지 않았습니다."
             },
             "details": {
-                "source": "Source",
-                "startedAt": "Started",
-                "endedAt": "Ended",
-                "openEnded": "Still open",
-                "duration": "Duration",
-                "work": "Work",
-                "orgWide": "Org-wide",
-                "externalId": "Provider ID",
-                "createdAt": "Captured",
-                "participants": "Participants",
-                "noParticipants": "No participants recorded."
+                "source": "출처",
+                "startedAt": "시작",
+                "endedAt": "종료",
+                "openEnded": "아직 진행 중",
+                "duration": "소요 시간",
+                "work": "워크",
+                "orgWide": "조직 전체",
+                "externalId": "제공자 ID",
+                "createdAt": "기록됨",
+                "participants": "참석자",
+                "noParticipants": "기록된 참석자가 없습니다."
             },
             "edit": {
-                "hint": "Rename the meeting, close it out, point it at a recording, or re-route it to a Work."
+                "hint": "시간을 수정하고, 회의 이름을 바꾸고, 참석자 목록을 정리하고, 녹화본을 연결하거나 워크로 다시 연결할 수 있습니다."
             },
             "fields": {
-                "title": "Title",
-                "endedAt": "Ended at",
-                "sourceUrl": "Recording link",
-                "work": "Work",
-                "workNone": "Org-wide (no Work)"
+                "title": "제목",
+                "startedAt": "시작 시각",
+                "endedAt": "종료 시각",
+                "sourceUrl": "녹화 링크",
+                "work": "워크",
+                "workNone": "조직 전체(워크 없음)",
+                "participants": "참석자",
+                "participantName": "이름",
+                "participantEmail": "이메일(선택)",
+                "participantAdd": "참가자 추가",
+                "participantRemove": "참가자 제거",
+                "participantsEmpty": "아직 기록된 사람이 없습니다."
             },
             "errors": {
-                "titleRequired": "Title is required.",
-                "endedAtInvalid": "End time is not a valid date.",
-                "endedBeforeStarted": "End time cannot be before the start time.",
-                "transcriptRequired": "Transcript text is required."
+                "titleRequired": "제목을 입력해야 합니다.",
+                "startedAtInvalid": "시작 시각이 올바른 날짜가 아닙니다.",
+                "endedAtInvalid": "종료 시각이 올바른 날짜가 아닙니다.",
+                "endedBeforeStarted": "종료 시각은 시작 시각보다 앞설 수 없습니다.",
+                "participantEmailInvalid": "유효한 이메일 주소를 입력하거나 비워 두세요.",
+                "participantDuplicate": "이미 목록에 있는 사람입니다.",
+                "transcriptRequired": "대화록 텍스트를 입력해야 합니다."
             },
             "toasts": {
-                "transcriptSaved": "Transcript attached",
-                "transcriptSummarized": "Transcript attached and summarized",
-                "transcriptError": "Couldn't attach the transcript.",
-                "saved": "Meeting updated",
-                "saveError": "Couldn't update the meeting.",
-                "deleted": "Meeting deleted",
-                "deleteError": "Couldn't delete the meeting."
+                "transcriptSaved": "대화록을 첨부했습니다",
+                "transcriptSummarized": "대화록을 첨부하고 요약했습니다",
+                "transcriptError": "대화록을 첨부하지 못했습니다.",
+                "saved": "회의를 업데이트했습니다",
+                "participantAdded": "참석자를 추가했습니다",
+                "saveError": "회의를 업데이트하지 못했습니다.",
+                "deleted": "회의를 삭제했습니다",
+                "deleteError": "회의를 삭제하지 못했습니다."
             },
-            "confirm": {
-                "delete": "Delete this meeting? Its transcript and summary will be removed. This cannot be undone."
+            "deleteDialog": {
+                "title": "이 회의를 삭제할까요?",
+                "body": "{title}이(가) 스크립트와 요약과 함께 영구적으로 삭제됩니다. 이 작업은 되돌릴 수 없습니다.",
+                "confirm": "회의 삭제",
+                "cancel": "취소",
+                "deleting": "삭제하는 중…",
+                "error": "회의를 삭제하지 못했습니다"
             }
         },
         "agentsPreview": {

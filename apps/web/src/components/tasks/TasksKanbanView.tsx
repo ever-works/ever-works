@@ -622,7 +622,18 @@ export function TasksKanbanView({ tasks: initialTasks }: { tasks: Task[] }) {
                 // still ends in a running agent.
                 if (to === 'in_progress') {
                     const candidates = await listTaskRunCandidatesAction(taskId).catch(() => []);
-                    if (!candidates.some((agent) => agent.source === 'assignee')) {
+                    // 'assignee' = a task_assignees row; 'task' = the Task's own
+                    // agentId column, which is what the detail page's Agent
+                    // picker writes. Both dispatch server-side (the transition
+                    // falls back to task.agentId when there are no assignee
+                    // rows), so both mean "this Task already has its agent" —
+                    // checking only 'assignee' opened the picker on top of every
+                    // detail-page-assigned Task, asking the user to re-choose an
+                    // agent they had already chosen.
+                    const hasAgent = candidates.some(
+                        (agent) => agent.source === 'assignee' || agent.source === 'task',
+                    );
+                    if (!hasAgent) {
                         setPickerTaskId(taskId);
                     }
                 }

@@ -13,4 +13,6 @@ export {
     formatDuration,
     isoToLocalInput,
     localInputToIso,
+    sourceIconMap,
 } from './meeting-ui';
+export { MeetingSourceIcon } from './meeting-source-icons';

@@ -31,5 +31,8 @@ export async function redirectToAnalytics() {
 
 export async function redirectToNotifications() {
     const locale = await getLocale();
-    redirect({ locale, href: ROUTES.DASHBOARD_NOTIFICATIONS });
+    // EW-058: DASHBOARD_NOTIFICATIONS points at /notifications, which has no
+    // route (it renders the soft-404 catch-all). The notification preferences
+    // page lives under /settings/notifications — send the user there.
+    redirect({ locale, href: ROUTES.DASHBOARD_SETTINGS_NOTIFICATIONS });
 }

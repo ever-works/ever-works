@@ -996,7 +996,8 @@
                 "allTemplates": "All templates",
                 "yourTemplates": "Your templates",
                 "yourTemplatesEmpty": "Agents you create will appear here as reusable templates.",
-                "openInWizard": "Open in wizard"
+                "openInWizard": "Open in wizard",
+                "browsePage": "Open the full template browser"
             },
             "pageTabs": {
                 "agents": "Agents",
@@ -1114,7 +1115,8 @@
                     "showing": "Menampilkan {from}-{to} dari {total}",
                     "previous": "Sebelumnya",
                     "next": "Berikutnya"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "newDialog": {
                 "title": "Buat Tugas baru",
@@ -1350,7 +1352,8 @@
                 "filter": {
                     "scope": "Cakupan",
                     "all": "Semua"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "detail": {
                 "instructions": "Petunjuk",
@@ -1798,7 +1801,21 @@
                     "empty": "Belum ada Work yang terhubung ke Ide ini."
                 },
                 "agents": {
-                    "empty": "Tidak ada Agen untuk Ide ini."
+                    "empty": "Tidak ada Agen untuk Ide ini.",
+                    "assignExisting": "Tetapkan yang ada",
+                    "assignTitle": "Tetapkan Agen ke Ide ini",
+                    "assignSubtitle": "Tempatkan Agen yang sudah Anda miliki pada Ide ini alih-alih membuat yang baru.",
+                    "assignSearchPlaceholder": "Cari Agen…",
+                    "assignLoading": "Memuat Agen…",
+                    "assignNoneAvailable": "Tidak ada Agen lain untuk ditetapkan.",
+                    "assignNoMatches": "Tidak ada Agen yang cocok dengan pencarian itu.",
+                    "assignLoadFailed": "Tidak dapat memuat Agen",
+                    "assignedToast": "{name} ditetapkan ke Ide ini",
+                    "assignFailed": "Tidak dapat menetapkan Agen",
+                    "assignCancel": "Batal",
+                    "unassign": "Hapus dari Ide ini",
+                    "unassignedToast": "{name} dihapus dari Ide ini",
+                    "unassignFailed": "Tidak dapat menghapus Agen"
                 },
                 "meta": {
                     "source": "Sumber",
@@ -1818,7 +1835,8 @@
                         "idea-agents": "Tidak bisa dihapus: {count} Agen terikat pada Ide ini. Hapus atau ubah cakupannya dulu.",
                         "build-in-flight": "Tidak bisa dihapus saat build berjalan. Tunggu hingga selesai.",
                         "unknown": "Ide ini tidak bisa dihapus sekarang."
-                    }
+                    },
+                    "unlinksWorks": "Ide ini tertaut ke {count} Work. Work tersebut akan dipertahankan — hanya tautannya yang dihapus."
                 },
                 "toasts": {
                     "built": "Work dibangun dari Ide ini",
@@ -2096,7 +2114,10 @@
                 "usageCredits": "Usage & Credits",
                 "fleet": "Fleet",
                 "jobRuntime": "Job Runtime",
-                "digest": "Digest"
+                "digest": "Digest",
+                "notifications": "Notifications",
+                "channels": "Channels",
+                "emails": "Email Addresses"
             },
             "githubApp": {
                 "title": "Instalasi GitHub App",
@@ -6969,7 +6990,6 @@
             "created": "Meeting captured",
             "sections": {
                 "provenance": "Where it came from",
-                "participants": "Participants",
                 "transcript": "Transcript"
             },
             "sources": {
@@ -6992,7 +7012,6 @@
                 "externalId": "Provider meeting ID (optional)",
                 "externalIdHint": "Used to de-duplicate against a later connector sync of the same meeting.",
                 "participants": "Participants",
-                "participantsHint": "One per line. Use \"Name <email>\" to record an address.",
                 "transcript": "Transcript (optional)",
                 "transcriptPlaceholder": "Ada: shipping the gate.\nGrace: reviewing the branch.",
                 "transcriptHint": "Adding a transcript runs the summary, Memory and activity pipeline. You can also attach it later from the meeting page."
@@ -7002,6 +7021,7 @@
                 "startedAtInvalid": "Start time is not a valid date.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
+                "participantEmailInvalid": "Masukkan alamat email yang valid, atau biarkan kosong.",
                 "createFailed": "Couldn't capture the meeting. Please try again."
             },
             "actions": {
@@ -7010,71 +7030,94 @@
             }
         },
         "meetingDetail": {
-            "backToMeetings": "Back to Meetings",
+            "backToMeetings": "Kembali ke Rapat",
             "actions": {
-                "openRecording": "Open recording",
-                "delete": "Delete",
-                "attachTranscript": "Attach transcript",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
-                "save": "Save changes"
+                "openRecording": "Buka rekaman",
+                "edit": "Edit",
+                "delete": "Hapus",
+                "attachTranscript": "Lampirkan transkrip",
+                "attaching": "Melampirkan…",
+                "editTranscript": "Edit transkrip",
+                "cancelEdit": "Batalkan pengeditan",
+                "saveTranscript": "Simpan transkrip",
+                "savingTranscript": "Menyimpan…",
+                "save": "Simpan perubahan",
+                "cancel": "Batal"
             },
             "sections": {
-                "summary": "Summary",
-                "transcript": "Transcript",
-                "details": "Details",
-                "edit": "Edit meeting"
+                "summary": "Ringkasan",
+                "transcript": "Transkrip",
+                "details": "Detail",
+                "edit": "Edit rapat"
             },
             "summary": {
-                "notGenerated": "No summary was generated for this transcript. Enable an AI provider and re-attach the transcript to try again.",
-                "noTranscript": "Attach a transcript to generate a summary."
+                "generating": "Membuat ringkasan…",
+                "generatingHint": "Membaca transkrip dan menulis ringkasannya — biasanya perlu beberapa detik.",
+                "notGenerated": "Tidak ada ringkasan yang dibuat untuk transkrip ini. Aktifkan penyedia AI lalu lampirkan ulang transkripnya untuk mencoba lagi.",
+                "noTranscript": "Lampirkan transkrip untuk membuat ringkasan."
             },
             "transcript": {
-                "composerLabel": "Transcript text",
-                "composerPlaceholder": "Paste the meeting transcript here.",
-                "pipelineHint": "Stored first, then summarized, remembered and posted to your activity feed — best effort.",
-                "storedElsewhere": "The transcript is stored but was not returned with this view."
+                "composerLabel": "Teks transkrip",
+                "composerPlaceholder": "Tempelkan transkrip rapat di sini.",
+                "pipelineHint": "Disimpan lebih dulu, lalu diringkas, diingat, dan diposting ke umpan aktivitas Anda — sebisanya.",
+                "storedElsewhere": "Transkrip tersimpan, tetapi tidak disertakan pada tampilan ini."
             },
             "details": {
-                "source": "Source",
-                "startedAt": "Started",
-                "endedAt": "Ended",
-                "openEnded": "Still open",
-                "duration": "Duration",
-                "work": "Work",
-                "orgWide": "Org-wide",
-                "externalId": "Provider ID",
-                "createdAt": "Captured",
-                "participants": "Participants",
-                "noParticipants": "No participants recorded."
+                "source": "Sumber",
+                "startedAt": "Mulai",
+                "endedAt": "Selesai",
+                "openEnded": "Masih berlangsung",
+                "duration": "Durasi",
+                "work": "Karya",
+                "orgWide": "Seluruh organisasi",
+                "externalId": "ID penyedia",
+                "createdAt": "Dicatat",
+                "participants": "Peserta",
+                "noParticipants": "Tidak ada peserta yang dicatat."
             },
             "edit": {
-                "hint": "Rename the meeting, close it out, point it at a recording, or re-route it to a Work."
+                "hint": "Perbaiki waktunya, ganti nama rapat, perbarui daftar peserta, tautkan ke rekaman, atau alihkan ke sebuah Karya."
             },
             "fields": {
-                "title": "Title",
-                "endedAt": "Ended at",
-                "sourceUrl": "Recording link",
-                "work": "Work",
-                "workNone": "Org-wide (no Work)"
+                "title": "Judul",
+                "startedAt": "Mulai",
+                "endedAt": "Selesai",
+                "sourceUrl": "Tautan rekaman",
+                "work": "Karya",
+                "workNone": "Seluruh organisasi (tanpa Karya)",
+                "participants": "Peserta",
+                "participantName": "Nama",
+                "participantEmail": "Email (opsional)",
+                "participantAdd": "Tambah peserta",
+                "participantRemove": "Hapus peserta",
+                "participantsEmpty": "Belum ada yang dicatat."
             },
             "errors": {
-                "titleRequired": "Title is required.",
-                "endedAtInvalid": "End time is not a valid date.",
-                "endedBeforeStarted": "End time cannot be before the start time.",
-                "transcriptRequired": "Transcript text is required."
+                "titleRequired": "Judul wajib diisi.",
+                "startedAtInvalid": "Waktu mulai bukan tanggal yang valid.",
+                "endedAtInvalid": "Waktu selesai bukan tanggal yang valid.",
+                "endedBeforeStarted": "Waktu selesai tidak boleh sebelum waktu mulai.",
+                "participantEmailInvalid": "Masukkan alamat email yang valid, atau biarkan kosong.",
+                "participantDuplicate": "Orang itu sudah ada di daftar.",
+                "transcriptRequired": "Teks transkrip wajib diisi."
             },
             "toasts": {
-                "transcriptSaved": "Transcript attached",
-                "transcriptSummarized": "Transcript attached and summarized",
-                "transcriptError": "Couldn't attach the transcript.",
-                "saved": "Meeting updated",
-                "saveError": "Couldn't update the meeting.",
-                "deleted": "Meeting deleted",
-                "deleteError": "Couldn't delete the meeting."
+                "transcriptSaved": "Transkrip dilampirkan",
+                "transcriptSummarized": "Transkrip dilampirkan dan diringkas",
+                "transcriptError": "Transkrip tidak dapat dilampirkan.",
+                "saved": "Rapat diperbarui",
+                "participantAdded": "Peserta ditambahkan",
+                "saveError": "Rapat tidak dapat diperbarui.",
+                "deleted": "Rapat dihapus",
+                "deleteError": "Rapat tidak dapat dihapus."
             },
-            "confirm": {
-                "delete": "Delete this meeting? Its transcript and summary will be removed. This cannot be undone."
+            "deleteDialog": {
+                "title": "Hapus rapat ini?",
+                "body": "{title} akan dihapus secara permanen, beserta transkrip dan ringkasannya. Tindakan ini tidak dapat dibatalkan.",
+                "confirm": "Hapus rapat",
+                "cancel": "Batal",
+                "deleting": "Menghapus…",
+                "error": "Gagal menghapus rapat"
             }
         },
         "agentsPreview": {
