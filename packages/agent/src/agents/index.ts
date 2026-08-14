@@ -11,6 +11,9 @@ export * from './agent-schedule-dispatcher.service';
 export * from './agent-export.service';
 export * from './prompt-assembler.service';
 export * from './agent-run.service';
+// Session detail (Feature K) — timeline-capture constants + preview
+// helpers, shared with the api-side detail endpoint.
+export * from './run-capture';
 // Judgment layer G15 — the pre-run path as a composable middleware chain.
 // Named exports (not `export *`) so the two QUEUED_REASON_* constants have
 // exactly ONE path out of this barrel: `run-dispatch-gate.service`, which

@@ -908,6 +908,38 @@ export class AgentRunRepository {
     }
 
     /**
+     * Session detail (Feature K) — merge tool-loop-observed file paths
+     * into `workspaceMeta.filesTouched`, preserving whatever provision
+     * audit is already on the row. Deduplicated, order-preserving, and
+     * capped so a pathological loop cannot grow the JSON without bound.
+     *
+     * Best-effort by contract: a missing row is a no-op and the caller
+     * additionally feature-detects + try/catches — capture must never
+     * fail a run.
+     */
+    async mergeFilesTouched(runId: string, paths: string[], cap = 200): Promise<void> {
+        if (!Array.isArray(paths) || paths.length === 0) return;
+        const row = await this.repository.findOne({
+            where: { id: runId },
+            select: { id: true, workspaceMeta: true },
+        });
+        if (!row) return;
+        const existing = row.workspaceMeta?.filesTouched ?? [];
+        const merged = [...existing];
+        const seen = new Set(existing);
+        for (const path of paths) {
+            if (merged.length >= cap) break;
+            if (typeof path !== 'string' || path.length === 0 || seen.has(path)) continue;
+            seen.add(path);
+            merged.push(path);
+        }
+        if (merged.length === existing.length) return;
+        await this.repository.update(runId, {
+            workspaceMeta: { ...(row.workspaceMeta ?? {}), filesTouched: merged },
+        });
+    }
+
+    /**
      * Find an in-flight run for the (taskId, agentId) pair — used by
      * the agent-chat-reply dedup guard (architecture/security §8 — T6
      * mitigation): if a chat-triggered run is already running for the

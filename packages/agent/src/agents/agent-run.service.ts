@@ -42,6 +42,17 @@ import { TOOL_GRANT_ENFORCER, type ToolGrantEnforcer } from '../policy/tool-gran
 import { filterSkillsByToolGrants } from '../policy/skill-activation';
 import { isGenerationCancelledError } from '../utils/generation-cancellation.utils';
 import { redactSecrets } from '../utils/secret-scan';
+// Session detail (Feature K) — timeline capture: redacted, size-capped
+// previews of tool args/results + message rows at turn boundaries.
+import {
+    buildCapturePreview,
+    createRunCaptureState,
+    extractTouchedFiles,
+    CAPTURE_MAX_ENTRIES,
+    CAPTURE_MESSAGE_MAX_CHARS,
+    FILES_TOUCHED_CAP,
+    type RunCaptureState,
+} from './run-capture';
 import { filterToolNamesBySubAgentScope, type SubAgentScope } from '@ever-works/contracts';
 
 export interface AgentRunContext {
@@ -680,6 +691,12 @@ export class AgentRunService {
         // between iterations; the caller finalizes the run `completed`.
         let interrupted = false;
 
+        // Session detail (Feature K) — per-loop capture window. Message
+        // and tool-preview rows count toward CAPTURE_MAX_ENTRIES; every
+        // write is best-effort by contract.
+        const capture = createRunCaptureState();
+        await this.captureMessage(context.runId, capture, 'user', prompt.userMessage);
+
         try {
             while (iterations < TOOL_LOOP_MAX_ITERATIONS) {
                 iterations += 1;
@@ -727,6 +744,10 @@ export class AgentRunService {
                             metadata: { iteration: iterations, bytes: injected.length },
                         })
                         .catch(() => undefined);
+                    // Session detail (Feature K) — the injected steering text
+                    // IS a user turn; capture it so the timeline shows what
+                    // the human actually said, not just that they said it.
+                    await this.captureMessage(context.runId, capture, 'user', injected);
                 }
 
                 const round = await this.aiDispatch!.dispatch({
@@ -789,6 +810,14 @@ export class AgentRunService {
                     })
                     .catch(() => undefined);
 
+                // Session detail (Feature K) — the assistant's text for this
+                // round is a turn boundary (intermediate think-aloud text on
+                // tool rounds AND the final reply both belong on the
+                // timeline).
+                if (round.text && round.text.trim().length > 0) {
+                    await this.captureMessage(context.runId, capture, 'assistant', round.text);
+                }
+
                 if (round.toolCalls.length === 0) {
                     break;
                 }
@@ -804,7 +833,12 @@ export class AgentRunService {
                     // calls, and a DB read per call is not worth it. Anything
                     // the signal misses is caught by the next loop checkpoint.
                     abort.throwIfAborted();
-                    const result = await this.invokeTool(context.runId, descriptorByName, call);
+                    const result = await this.invokeTool(
+                        context.runId,
+                        descriptorByName,
+                        call,
+                        capture,
+                    );
                     // Security (prompt-injection): tool results frequently
                     // carry attacker-controlled text (fetched web pages, repo
                     // READMEs, search hits) that is fed straight back to the
@@ -872,6 +906,13 @@ export class AgentRunService {
                 outcome: { errored: true, errorMessage },
                 iterations,
             };
+        } finally {
+            // Session detail (Feature K) — persist the touched-file list on
+            // EVERY exit path (finished, errored, cancelled, interrupted):
+            // a run that died mid-loop is precisely the one whose detail
+            // page needs to say what it already touched. Best-effort — see
+            // persistFilesTouched.
+            await this.persistFilesTouched(context.runId, capture);
         }
 
         if (interrupted) {
@@ -1041,30 +1082,55 @@ export class AgentRunService {
         runId: string,
         descriptorByName: Map<string, AgentToolDescriptor>,
         call: AgentAiToolCall,
+        capture?: RunCaptureState,
     ): Promise<unknown> {
+        // Session detail (Feature K) — redacted, capped preview of the args
+        // the model sent. Built once and attached to whichever log row this
+        // invocation produces. `undefined` past the volume cap so the JSON
+        // metadata never carries a null-noise key.
+        const argsMeta = this.buildToolPreviewMeta(capture, 'args', call.args);
         const descriptor = descriptorByName.get(call.name);
         if (!descriptor) {
+            this.countCaptureEntry(capture);
             await this.runLogs
                 .append({
                     runId,
                     level: 'WARN',
                     step: 'tool-invocation',
                     message: `Tool "${call.name}" requested by the model is not in the allow-list.`,
-                    metadata: { toolName: call.name, callId: call.id },
+                    metadata: { toolName: call.name, callId: call.id, ...argsMeta },
                 })
                 .catch(() => undefined);
             return { error: `tool "${call.name}" is not available to this Agent.` };
         }
+        const startedAt = Date.now();
         try {
             const result = await descriptor.invoke(call.args as never);
             const isError = result && typeof result === 'object' && 'error' in (result as object);
+            if (capture && !isError) {
+                try {
+                    for (const path of extractTouchedFiles(call.name, call.args)) {
+                        if (capture.filesTouched.size >= FILES_TOUCHED_CAP) break;
+                        capture.filesTouched.add(path);
+                    }
+                } catch {
+                    // Capture must never fail a run.
+                }
+            }
+            this.countCaptureEntry(capture);
             await this.runLogs
                 .append({
                     runId,
                     level: isError ? 'WARN' : 'INFO',
                     step: 'tool-invocation',
                     message: `Invoked tool "${call.name}"${isError ? ' (returned error)' : ''}.`,
-                    metadata: { toolName: call.name, callId: call.id },
+                    metadata: {
+                        toolName: call.name,
+                        callId: call.id,
+                        durationMs: Date.now() - startedAt,
+                        ...argsMeta,
+                        ...this.buildToolPreviewMeta(capture, 'result', result),
+                    },
                 })
                 .catch(() => undefined);
             return result;
@@ -1074,16 +1140,126 @@ export class AgentRunService {
             // credential-bearing output (e.g. an upstream API reflecting a
             // bearer token). Redact before persisting to the tenant-visible
             // `agent_run_logs.message` (security spec §6.3 output-side scan).
+            this.countCaptureEntry(capture);
             await this.runLogs
                 .append({
                     runId,
                     level: 'WARN',
                     step: 'tool-invocation',
                     message: `Tool "${call.name}" threw: ${redactSecrets(errorMessage).cleaned}`,
-                    metadata: { toolName: call.name, callId: call.id },
+                    metadata: {
+                        toolName: call.name,
+                        callId: call.id,
+                        durationMs: Date.now() - startedAt,
+                        ...argsMeta,
+                    },
                 })
                 .catch(() => undefined);
             return { error: errorMessage };
+        }
+    }
+
+    // ── Session detail (Feature K) — timeline capture helpers ─────────
+    // All best-effort BY CONTRACT: every failure is swallowed (and the
+    // preview builders are pure), because capture is an observability
+    // enhancement — the run is the product.
+
+    /**
+     * Build `{argsPreview,argsTruncated}` / `{resultPreview,resultTruncated}`
+     * metadata fragments. Returns `{}` (no keys at all) when the payload is
+     * empty, unserializable-to-nothing, or the capture window is past its
+     * volume cap — so pre-existing consumers of the metadata JSON see the
+     * exact old shape in those cases.
+     */
+    private buildToolPreviewMeta(
+        capture: RunCaptureState | undefined,
+        kind: 'args' | 'result',
+        value: unknown,
+    ): Record<string, unknown> {
+        if (!capture || capture.entries >= CAPTURE_MAX_ENTRIES) return {};
+        try {
+            const built = buildCapturePreview(value);
+            if (!built) return {};
+            const meta: Record<string, unknown> = { [`${kind}Preview`]: built.preview };
+            if (built.truncated) meta[`${kind}Truncated`] = true;
+            return meta;
+        } catch {
+            return {};
+        }
+    }
+
+    private countCaptureEntry(capture: RunCaptureState | undefined): void {
+        if (capture) capture.entries += 1;
+    }
+
+    /**
+     * Append an 'assistant-message' / 'user-message' timeline row. Past
+     * the per-run volume cap the row is skipped and ONE 'capture-truncated'
+     * marker row is written so the detail page can say "older entries
+     * omitted" instead of silently ending.
+     */
+    private async captureMessage(
+        runId: string,
+        capture: RunCaptureState,
+        role: 'assistant' | 'user',
+        text: string | null | undefined,
+    ): Promise<void> {
+        try {
+            if (!text || text.trim().length === 0) return;
+            if (capture.entries >= CAPTURE_MAX_ENTRIES) {
+                if (capture.truncatedMarkerWritten) return;
+                capture.truncatedMarkerWritten = true;
+                await this.runLogs
+                    .append({
+                        runId,
+                        level: 'INFO',
+                        step: 'capture-truncated',
+                        message: `Timeline capture cap reached (${CAPTURE_MAX_ENTRIES} entries) — further message rows omitted.`,
+                        metadata: { cap: CAPTURE_MAX_ENTRIES },
+                    })
+                    .catch(() => undefined);
+                return;
+            }
+            const built = buildCapturePreview(text, CAPTURE_MESSAGE_MAX_CHARS);
+            if (!built) return;
+            capture.entries += 1;
+            await this.runLogs
+                .append({
+                    runId,
+                    level: 'INFO',
+                    step: `${role}-message`,
+                    message: built.preview,
+                    metadata: {
+                        role,
+                        bytes: text.length,
+                        ...(built.truncated ? { truncated: true } : {}),
+                    },
+                })
+                .catch(() => undefined);
+        } catch {
+            // Capture must never fail a run.
+        }
+    }
+
+    /**
+     * Persist the loop's touched-file set onto `workspaceMeta.filesTouched`.
+     * Feature-detected (`mergeFilesTouched` is absent on older RPC proxies
+     * and on the many partial repository doubles in existing specs) and
+     * fully swallowed — a missing method or a failed write degrades to
+     * "no file list", never to a failed run.
+     */
+    private async persistFilesTouched(runId: string, capture: RunCaptureState): Promise<void> {
+        if (capture.filesTouched.size === 0) return;
+        const merge = (this.runs as Partial<AgentRunRepository>).mergeFilesTouched;
+        if (typeof merge !== 'function') return;
+        try {
+            await merge.call(this.runs, runId, [...capture.filesTouched], FILES_TOUCHED_CAP);
+        } catch (err) {
+            this.logger.warn(
+                `Run ${runId}: filesTouched persist failed (ignored): ${
+                    err instanceof Error ? err.message : String(err)
+                }`,
+            );
         }
     }
 
