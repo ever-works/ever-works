@@ -147,6 +147,28 @@ Type-check/build: `npx turbo type-check --filter=@ever-works/contracts --filter=
 - No new DI tokens were bound, so no module-shape pin gained providers; the api-side
   `agents.module.spec.ts` only needed the new controller stubbed.
 
+## Verification (finishing session, 2026-08-14)
+
+The interrupted session's snapshot was verified as-is — no functional repairs
+were needed. Results on this branch:
+
+- `packages/contracts` vitest delegation spec: 34 passed.
+- `packages/agent` jest `agent-tool|workflow-node.runner`: 9 suites / 134 passed
+  (includes the 11 new `agent-tool-delegate` tests and every pre-existing
+  positional-constructor spec of `AgentToolService`).
+- `apps/api` jest `sub-agent-delegation.runner|agent-collaborators.controller|agents.module|CreateAgentCollaborators`:
+  4 suites / 42 passed.
+- `turbo type-check` green for `@ever-works/contracts`, `@ever-works/agent`,
+  `ever-works-api`; `apps/web` `tsc --noEmit` green.
+- `turbo build` green for `@ever-works/contracts`, `@ever-works/plugin`,
+  `@ever-works/agent`, `ever-works-api`, `ever-works-web`.
+- All 21 locale files parse and carry exactly the two new key blocks
+  (`tabs.collaborators` + `collaborators.*` with 7 keys) — no duplicate-key
+  landmine.
+- No pinned e2e validation/authz matrix mentions the new DTO or routes
+  (`UpdateAgentCollaboratorDto` is a brand-new DTO; the e2e "collaborator"
+  hits are the unrelated work-members feature).
+
 ## Known follow-ups
 
 - Activity-log rows for collaborator enable/disable (would need a new additive
