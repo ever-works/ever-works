@@ -137,8 +137,9 @@ failing DI.
 ## Web
 
 - `SkillDetailClient` — new **Invocation Slug** section (input with a literal `/` prefix chip; empty
-  save clears the command; 409s surface the API message) and new **Files** section (upload, kind
-  picker defaulting by extension, kind badge + size, delete).
+  save clears the command; 409s surface the API message) and new **Files** section — the whole card
+  is a drop target (highlight ring while dragging) as well as a picker button, with a kind picker
+  defaulting by extension, kind badge + size per row, and delete.
 - `NewSkillDialog` — Invocation Slug field on create.
 - `SkillsPageClient` — `/slug` chip on the skill card when set.
 - `SlashCommandAutocomplete.tsx` (new) — shared `useSlashCommands` hook + `SlashCommandPopup`.
