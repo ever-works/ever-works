@@ -152,3 +152,6 @@ export * from './workflow.entity';
 // One execution of a saved graph — what makes running a workflow leave a
 // trace instead of vanishing into a chat tool's return value.
 export * from './workflow-run.entity';
+// Repository registry (Feature G) — account-level repo records + agent grants.
+export * from './repo-connection.entity';
+export * from './agent-repo-attachment.entity';

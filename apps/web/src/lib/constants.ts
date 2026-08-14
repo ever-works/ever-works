@@ -193,6 +193,8 @@ export const ROUTES = {
     DASHBOARD_SETTINGS_DANGER_ZONE: '/settings/danger',
     DASHBOARD_SETTINGS_DATA: '/settings/data',
     DASHBOARD_SETTINGS_GITHUB_APP: '/settings/github-app',
+    // Repository registry (Feature G) — Settings → Repositories.
+    DASHBOARD_SETTINGS_REPOSITORIES: '/settings/repositories',
     DASHBOARD_SETTINGS_WORK_AGENT: '/settings/work-agent',
     DASHBOARD_SETTINGS_JOB_RUNTIME: '/settings/job-runtime',
     // Wave 13 — Billing + Usage & Credits pages (billing/usage PRD §2).

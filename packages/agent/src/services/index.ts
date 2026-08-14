@@ -63,3 +63,5 @@ export * from './workflows.module';
 // (the walk). Split so the API cannot reach an executor.
 export * from './workflow-runs.service';
 export * from './workflow-run-executor.service';
+// Repository registry (Feature G) — registry CRUD + agent grants + resolver.
+export * from './repo-registry.service';

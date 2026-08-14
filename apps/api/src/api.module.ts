@@ -50,6 +50,7 @@ import { GoalsModule } from './goals/goals.module';
 import { AgentsModule } from './agents/agents.module';
 import { AgentApprovalsModule } from './agent-approvals/agent-approvals.module';
 import { SkillsModule } from './skills/skills.module';
+import { RepoConnectionsModule } from './repo-connections/repo-connections.module';
 import { TasksModule } from './tasks/tasks.module';
 import { WorkflowsModule } from './workflows/workflows.module';
 import { TerminalModule } from './terminal/terminal.module';
@@ -184,6 +185,9 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // Phase 8 — Skills read-only API + SkillsFacadeService.
         // Write paths + bindings ship with Phase 9.
         SkillsModule,
+        // Repository registry (Feature G) — Settings → Repositories CRUD,
+        // GitHub-App import, and the Agent ↔ repo attachment surface.
+        RepoConnectionsModule,
         // Phase 12 — Tasks API (CRUD + transitions + member CRUD).
         // Chat + attachments + per-task spend land in Phase 13.
         TasksModule,

@@ -2156,6 +2156,7 @@
                 "apiKeys": "API-Schlüssel",
                 "data": "Daten",
                 "githubApp": "GitHub-App",
+                "repositories": "Repositories",
                 "workAgent": "Arbeits-Agent",
                 "gitProviders": "Git-Anbieter",
                 "dangerZone": "Gefahrenzone",
@@ -2986,6 +2987,79 @@
                     "saveError": "Failed to save the digest settings",
                     "noOrg": "No active organization for this session, so there is no organization digest to configure. Create or switch to an organization first.",
                     "noAiProvider": "No AI provider is configured, so digests will arrive without the written summary. Every count is still computed and delivered."
+                }
+            },
+            "repositories": {
+                "title": "Repositories",
+                "subtitle": "A global registry of repositories your agents can be granted access to, independent of Works.",
+                "addRepo": "Add Repo",
+                "editRepo": "Edit {name}",
+                "emptyTitle": "No repositories yet",
+                "emptyDescription": "Add a repository manually or import one from a GitHub App installation to make it attachable to your agents.",
+                "columns": {
+                    "name": "Name",
+                    "url": "URL",
+                    "credential": "Credential",
+                    "source": "Source",
+                    "updated": "Updated"
+                },
+                "source": {
+                    "manual": "Manual",
+                    "work": "Work",
+                    "github-app": "GitHub App"
+                },
+                "credential": {
+                    "inherit": "Inherited",
+                    "github-app": "GitHub App",
+                    "secret-ref": "Secret reference"
+                },
+                "tabs": {
+                    "general": "General",
+                    "environment": "Environment"
+                },
+                "fields": {
+                    "url": "Repository URL",
+                    "name": "Name",
+                    "mountPath": "Mount Path",
+                    "mountPathHint": "Mounted at /workspace/{path}",
+                    "defaultBranch": "Default Branch",
+                    "credentialKey": "Credential Key",
+                    "credentialInstallation": "Select installation",
+                    "description": "Description",
+                    "availableInAllProjects": "Available in all projects",
+                    "availableInAllProjectsHint": "Offer this repository everywhere without an explicit attachment."
+                },
+                "save": "Save",
+                "cancel": "Cancel",
+                "edit": "Edit",
+                "delete": "Delete",
+                "created": "Repository added",
+                "updated": "Repository updated",
+                "deleted": "Repository deleted",
+                "saveError": "Failed to save repository",
+                "deleteError": "Failed to delete repository",
+                "importTitle": "Import from GitHub App",
+                "importSubtitle": "Repositories available through your GitHub App installations can be imported with one click.",
+                "import": "Import",
+                "imported": "Repository imported",
+                "importError": "Failed to import repository",
+                "envFiles": {
+                    "masked": "{count} env file(s) stored. Contents are hidden until revealed.",
+                    "reveal": "Reveal",
+                    "revealError": "Failed to load env files",
+                    "add": "Add .env file",
+                    "remove": "Remove file",
+                    "saveAll": "Save All",
+                    "saved": "Env files saved",
+                    "saveError": "Failed to save env files",
+                    "savedWithRepo": "Env files are saved together with the repository."
+                },
+                "agentCard": {
+                    "title": "Repositories",
+                    "subtitle": "Grant this agent access to repositories from your registry.",
+                    "empty": "No repositories in your registry yet.",
+                    "manageLink": "Manage repositories",
+                    "toggleError": "Failed to update repository attachment"
                 }
             }
         },

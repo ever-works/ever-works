@@ -78,3 +78,6 @@ export * from './repositories/organization-onboarding-profile.repository';
 export * from './database-init.service';
 export * from './repositories/workflow.repository';
 export * from './repositories/workflow-run.repository';
+// Repository registry (Feature G) — repo connections + agent grants.
+export * from './repositories/repo-connection.repository';
+export * from './repositories/agent-repo-attachment.repository';

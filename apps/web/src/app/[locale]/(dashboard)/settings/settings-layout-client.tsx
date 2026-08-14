@@ -16,6 +16,7 @@ import {
     BarChart3,
     Server,
     Newspaper,
+    FolderGit2,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
@@ -81,6 +82,14 @@ export function SettingsLayoutClient({ children, settingsMenu }: SettingsLayoutC
                 label: t('tabs.githubApp'),
                 icon: Github,
                 href: `${baseSettingsPath}/github-app`,
+            },
+            // Repository registry (Feature G) — account-level repos agents
+            // can be granted; sits beside GitHub App, its import source.
+            {
+                id: 'repositories',
+                label: t('tabs.repositories'),
+                icon: FolderGit2,
+                href: `${baseSettingsPath}/repositories`,
             },
             {
                 id: 'work-agent',
