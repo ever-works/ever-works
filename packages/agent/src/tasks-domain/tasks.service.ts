@@ -11,6 +11,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import type { Repository } from 'typeorm';
 import type { GateStatus, TaskAcceptanceCheck } from '@ever-works/contracts';
 import { Task, TaskPriority, TaskStatus, type TaskActorType } from '../entities/task.entity';
+import type { TaskApprover } from '../entities/task-approver.entity';
 import { Mission } from '../entities/mission.entity';
 import { Team } from '../entities/team.entity';
 import { Goal } from '../entities/goal.entity';
@@ -95,6 +96,13 @@ export interface UpdateTaskInput {
     acceptanceChecks?: TaskAcceptanceCheck[] | null;
     /** Quality gates: `null` reverts to inheriting the Work's budget. */
     maxGateAttempts?: number | null;
+    /**
+     * Schedule mode "Scheduled": run once at this instant (must be in the
+     * future). `null` clears the schedule — the same effect as
+     * {@link TasksService.unscheduleTask}, so a form that edits the whole
+     * Task does not need a second round-trip.
+     */
+    scheduledAt?: Date | null;
 }
 
 /**
@@ -143,6 +151,38 @@ export interface TaskRunEmbed {
 }
 
 export type TaskWithRun = Task & { run?: TaskRunEmbed | null };
+
+// ── Sub-tasks projection (Tasks upgrades) ─────────────────────────
+
+/**
+ * Hard cap on the sub-tasks projection. A workflow template tops out at
+ * `MAX_TEMPLATE_STEPS` (30) sub-tasks; 200 leaves headroom for
+ * hand-built trees while keeping the two batched side-table queries
+ * bounded. Deeper trees are worked from the Tasks list, not the
+ * checklist.
+ */
+export const SUBTASKS_PAGE_SIZE = 200;
+
+/** One row of the Task-detail Subtasks checklist. */
+export type TaskSubtaskRow = Task & {
+    /** Agent assignees on this sub-task — the row's agent chips. */
+    agentAssigneeIds: string[];
+    userAssigneeIds: string[];
+    approverCount: number;
+    approvedCount: number;
+    /** True when the sub-task carries at least one approver row. */
+    requiresApproval: boolean;
+    /** Gate verdict under the row's own `requireAllApprovers` policy. */
+    approvalCleared: boolean;
+};
+
+export interface TaskSubtasksProjection {
+    rows: TaskSubtaskRow[];
+    /** Total matching children (may exceed `rows.length` at the cap). */
+    total: number;
+    /** Checklist numerator — children already in `done`. */
+    doneCount: number;
+}
 
 // ── Board dispatch (kanban M3 / M4) ───────────────────────────────
 
@@ -332,6 +372,78 @@ export class TasksService {
         return task;
     }
 
+    /**
+     * Tasks upgrades — the Subtasks section projection.
+     *
+     * The sub-task checklist needs three things per row that the plain
+     * Task row does not carry: which Agents are on it, whether it is
+     * approval-gated, and whether that gate has cleared. Fetching those
+     * per row would be a 3N query storm on a template-instantiated tree
+     * (nine steps = 27 queries), so both side tables are batched into ONE
+     * `IN` query each and grouped in memory.
+     *
+     * Owner-scoped: the parent id is resolved through {@link getOne}
+     * first, so a foreign parent 404s before any side row is read, and
+     * the child rows come from the user-scoped list query.
+     */
+    async listSubtasks(userId: string, parentTaskId: string): Promise<TaskSubtasksProjection> {
+        await this.getOne(userId, parentTaskId);
+        const { rows, total } = await this.tasks.findByUserIdFiltered(userId, {
+            parentTaskId,
+            limit: SUBTASKS_PAGE_SIZE,
+        });
+
+        const ids = rows.map((row) => row.id);
+        const [assigneeRows, approverRows] = await Promise.all([
+            this.assignees.findByTaskIds(ids).catch(() => []),
+            this.approvers.findByTaskIds(ids).catch(() => []),
+        ]);
+
+        const agentsByTask = new Map<string, string[]>();
+        const usersByTask = new Map<string, string[]>();
+        for (const row of assigneeRows) {
+            const bucket = row.assigneeType === 'agent' ? agentsByTask : usersByTask;
+            const list = bucket.get(row.taskId) ?? [];
+            list.push(row.assigneeId);
+            bucket.set(row.taskId, list);
+        }
+
+        const approversByTask = new Map<string, TaskApprover[]>();
+        for (const row of approverRows) {
+            const list = approversByTask.get(row.taskId) ?? [];
+            list.push(row);
+            approversByTask.set(row.taskId, list);
+        }
+
+        const subtasks: TaskSubtaskRow[] = rows.map((row) => {
+            const rowApprovers = approversByTask.get(row.id) ?? [];
+            const approved = rowApprovers.filter((a) => a.approvalState === 'approved').length;
+            return {
+                ...row,
+                agentAssigneeIds: agentsByTask.get(row.id) ?? [],
+                userAssigneeIds: usersByTask.get(row.id) ?? [],
+                approverCount: rowApprovers.length,
+                approvedCount: approved,
+                // The badge the checklist renders: gated at all, and
+                // whether the gate has cleared under the Task's own
+                // all-vs-any approver policy.
+                requiresApproval: rowApprovers.length > 0,
+                approvalCleared:
+                    rowApprovers.length === 0
+                        ? true
+                        : row.requireAllApprovers
+                          ? approved === rowApprovers.length
+                          : approved > 0,
+            };
+        });
+
+        return {
+            rows: subtasks,
+            total,
+            doneCount: subtasks.filter((row) => row.status === TaskStatus.DONE).length,
+        };
+    }
+
     async create(userId: string, input: CreateTaskInput): Promise<Task> {
         // Ownership is deliberately NOT exclusive. A Task may belong to a
         // Work and a Team and have been raised by a Mission at the same
@@ -450,6 +562,24 @@ export class TasksService {
         if (input.maxGateAttempts !== undefined) patch.maxGateAttempts = input.maxGateAttempts;
         if (input.requireAllApprovers !== undefined)
             patch.requireAllApprovers = input.requireAllApprovers;
+        // Schedule mode "Scheduled" via the generic PATCH. Same rules as
+        // the dedicated `scheduleTask` endpoint: future-only, never on a
+        // recurring template, and any stale dispatcher claim is cleared so
+        // the new slot actually fires.
+        if (input.scheduledAt !== undefined) {
+            if (input.scheduledAt === null) {
+                patch.scheduledAt = null;
+            } else {
+                this.assertFutureSchedule(input.scheduledAt);
+                if (task.isRecurring) {
+                    throw new BadRequestException(
+                        'This Task is a recurring template — stop the recurrence before scheduling a one-shot run.',
+                    );
+                }
+                patch.scheduledAt = input.scheduledAt;
+            }
+            patch.scheduleClaimedAt = null;
+        }
 
         // Re-filing a Task under different owners. Each owner is set
         // independently — passing `null` detaches just that one. Any newly
