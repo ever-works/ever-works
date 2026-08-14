@@ -1153,6 +1153,7 @@
                     "resetToInherited": "Reset to inherited",
                     "inheritedDeny": "Denied by {scope}",
                     "permissionOff": "Permission off",
+                    "patternDeny": "Denied by a pattern on this agent",
                     "permissionHint": "Requires the \"{permission}\" permission — enable it in Settings.",
                     "empty": "No tools available."
                 },

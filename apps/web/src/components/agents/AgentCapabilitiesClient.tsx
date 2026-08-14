@@ -12,6 +12,7 @@ import { SearchableSelect, type SearchableSelectOption } from '@/components/ui/s
 import { ROUTES } from '@/lib/constants';
 import type { Agent, AgentPermissions } from '@/lib/api/agents';
 import { listAgentSkillsAction } from '@/app/actions/agents';
+import { composeGrantForToggle, toolToggleState } from './agent-capabilities.shared';
 import {
     bindSkillToAgentAction,
     installAndBindSkillAction,
@@ -33,12 +34,12 @@ import {
  *
  * ## Tool-toggle semantics (narrowing only)
  *
- * A switch writes the AGENT-scope grant row's `deny` list: OFF adds the
- * exact tool name, ON removes it. The agent scope can only NARROW what
- * its ancestors allow — a tool denied by tenant / organization / Work
- * renders disabled with a "denied by <scope>" badge; re-enabling it
- * belongs to that scope's surface. The PUT replaces the whole row, so
- * the stored `allow` list (if any) is always re-sent unchanged.
+ * A switch rewrites the AGENT-scope grant row, which the agent scope may
+ * only ever use to NARROW what its ancestors allow. Which switches are
+ * usable and what each one writes is decided by the pure functions in
+ * `agent-capabilities.shared.ts` (`toolToggleState` /
+ * `composeGrantForToggle`) — that is the policy half, unit-tested on its
+ * own; everything below is layout.
  */
 
 interface BoundSkill {
@@ -121,19 +122,8 @@ export function AgentCapabilitiesClient({
             .filter((group) => group.tools.length > 0);
     }, [caps.tools, t]);
 
-    /** Denied by a layer ABOVE the agent scope — this page cannot undo it. */
-    const isParentDenied = (tool: AgentCapabilityToolRow) =>
-        !tool.decision.allowed && tool.decision.source !== 'agent';
-
     const toggleTool = (tool: AgentCapabilityToolRow, next: boolean) => {
-        const currentDeny = caps.agentGrantRow?.deny ?? [];
-        const lower = tool.name.toLowerCase();
-        const deny = next
-            ? currentDeny.filter((pattern) => pattern.toLowerCase() !== lower)
-            : Array.from(new Set([...currentDeny, tool.name]));
-        // PUT replaces the row — re-send a stored allow list unchanged.
-        const grant: { allow?: string[]; deny: string[] } = { deny };
-        if (caps.agentGrantRow?.allow) grant.allow = caps.agentGrantRow.allow;
+        const grant = composeGrantForToggle(tool, caps.agentGrantRow, next);
 
         setBusyTool(tool.name);
         startTransition(() => {
@@ -311,7 +301,11 @@ export function AgentCapabilitiesClient({
                         </div>
                         <div className="divide-y divide-border/40 dark:divide-border-dark/40">
                             {group.tools.map((tool) => {
-                                const parentDenied = isParentDenied(tool);
+                                const state = toolToggleState(
+                                    tool,
+                                    caps.agentGrantRow,
+                                    caps.grants.chain,
+                                );
                                 const busy = pending && busyTool === tool.name;
                                 return (
                                     <article
@@ -324,38 +318,39 @@ export function AgentCapabilitiesClient({
                                                 <span className="text-sm font-mono text-text dark:text-text-dark">
                                                     {tool.name}
                                                 </span>
-                                                {parentDenied && (
+                                                {state.kind === 'upstream-denied' && (
                                                     <span className="inline-flex items-center rounded-full bg-danger/10 text-danger px-2 py-0.5 text-[11px]">
                                                         {t('tools.inheritedDeny', {
-                                                            scope: tool.decision.source,
+                                                            scope: state.scope,
                                                         })}
                                                     </span>
                                                 )}
-                                                {tool.gatedByPermission &&
-                                                    !tool.permissionEnabled && (
-                                                        <span
-                                                            className="inline-flex items-center rounded-full bg-warning/10 text-warning px-2 py-0.5 text-[11px]"
-                                                            title={t('tools.permissionHint', {
-                                                                permission: tool.gatedByPermission,
-                                                            })}
-                                                        >
-                                                            {t('tools.permissionOff')}
-                                                        </span>
-                                                    )}
+                                                {state.kind === 'pattern-denied' && (
+                                                    <span className="inline-flex items-center rounded-full bg-danger/10 text-danger px-2 py-0.5 text-[11px]">
+                                                        {t('tools.patternDeny')}
+                                                    </span>
+                                                )}
+                                                {state.kind === 'permission-off' && (
+                                                    <span
+                                                        className="inline-flex items-center rounded-full bg-warning/10 text-warning px-2 py-0.5 text-[11px]"
+                                                        title={t('tools.permissionHint', {
+                                                            permission: state.permission,
+                                                        })}
+                                                    >
+                                                        {t('tools.permissionOff')}
+                                                    </span>
+                                                )}
                                             </div>
                                             <p className="text-xs text-text-muted dark:text-text-muted-dark mt-0.5 line-clamp-2">
                                                 {tool.description}
                                             </p>
                                         </div>
                                         <Switch
-                                            checked={tool.effective}
-                                            onChange={(next) => toggleTool(tool, next)}
-                                            disabled={
-                                                busy ||
-                                                parentDenied ||
-                                                (tool.gatedByPermission !== null &&
-                                                    !tool.permissionEnabled)
+                                            checked={
+                                                state.kind === 'editable' ? state.checked : false
                                             }
+                                            onChange={(next) => toggleTool(tool, next)}
+                                            disabled={busy || state.kind !== 'editable'}
                                             className="mt-0 shrink-0"
                                             data-testid={`capabilities-tool-switch-${tool.name}`}
                                         />
