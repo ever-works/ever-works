@@ -468,6 +468,31 @@ describe('ClaudeManagedAgentPlugin — runSessions fan-out service', () => {
 		expect(sdkMocks.agentsArchive).toHaveBeenCalledWith('agent_eph');
 	});
 
+	it('caps a caller-supplied per-session budget at the plugin ceiling', async () => {
+		sdkMocks.agentsCreate.mockResolvedValue({ id: 'agent_1' });
+		sdkMocks.environmentsCreate.mockResolvedValue({ id: 'env_1' });
+		sdkMocks.sessionsArchive.mockResolvedValue({});
+		sdkMocks.sessionsCreate.mockResolvedValue({ id: 'session_1', status: 'running' });
+		sdkMocks.sessionsRetrieve.mockResolvedValue({ id: 'session_1', status: 'idle' });
+		sdkMocks.eventsList.mockImplementation(() => asyncIterableOf([agentMessage('m1', 'done')]));
+
+		const plugin = new ClaudeManagedAgentPlugin();
+		const { context } = createContextStub({ apiKey: 'sk-test' });
+		await plugin.onLoad(context);
+
+		await plugin.runSessions({
+			userId: 'user-1',
+			prompts: [{ id: 'a', prompt: 'x' }],
+			perSessionBudgetUsd: 100000
+		});
+
+		// MAX_PER_SESSION_BUDGET_USD (500) in integer minor units.
+		expect(sdkMocks.sessionsCreate.mock.calls[0][0].budget).toEqual({
+			type: 'limit',
+			max_list_cost: { amount: '50000', currency: 'USD' }
+		});
+	});
+
 	it('throws without a userId and returns [] for empty prompt lists', async () => {
 		const plugin = new ClaudeManagedAgentPlugin();
 		const { context } = createContextStub({ apiKey: 'sk-test' });

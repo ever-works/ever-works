@@ -6,6 +6,21 @@ export const DEFAULT_TARGET_ITEMS = 50;
 export const DEFAULT_VARIANT_SESSIONS = 1;
 export const MAX_PER_SESSION_BUDGET_USD = 500;
 
+/**
+ * Runtime ceiling for the per-session spend cap. Applied on every path that
+ * can reach `sessions.create` — the generation form (validated), a raw
+ * `GenerationRequest` hitting `execute()` directly, and the programmatic
+ * `runSessions()` fan-out entry point — so no caller can request an unbounded
+ * budget. Non-numeric / non-positive values mean "no cap configured".
+ */
+export function clampPerSessionBudgetUsd(value: unknown): number | undefined {
+	if (typeof value !== 'number' || !Number.isFinite(value) || value <= 0) {
+		return undefined;
+	}
+
+	return Math.min(value, MAX_PER_SESSION_BUDGET_USD);
+}
+
 export function getFormFields(): FormFieldDefinition[] {
 	return [
 		{

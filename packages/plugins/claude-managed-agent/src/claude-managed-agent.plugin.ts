@@ -21,12 +21,12 @@ import type {
 import { buildSuccessPipelineResult } from '@ever-works/plugin';
 
 import {
+	clampPerSessionBudgetUsd,
 	getDefaultValues,
 	getFormFields,
 	getFormGroups,
 	validateFormInput,
-	DEFAULT_TARGET_ITEMS,
-	MAX_PER_SESSION_BUDGET_USD
+	DEFAULT_TARGET_ITEMS
 } from './form-schema.js';
 import { README } from './readme.js';
 import { STEP_DEFINITIONS } from './steps.js';
@@ -328,7 +328,10 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 				agentId: controlPlane.agentId,
 				environmentId: controlPlane.environmentId,
 				concurrency: options.concurrency,
-				perSessionBudgetUsd: options.perSessionBudgetUsd,
+				// The programmatic entry point bypasses the generation form, so
+				// the budget ceiling is re-applied here rather than trusting the
+				// caller — a runaway value would otherwise fan out unbounded spend.
+				perSessionBudgetUsd: clampPerSessionBudgetUsd(options.perSessionBudgetUsd),
 				timeoutMs: options.timeoutMs,
 				resources: options.resources,
 				pollIntervalMs: getNumericSetting(settings.pollIntervalMs, DEFAULT_POLL_INTERVAL_MS),
@@ -984,12 +987,7 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 	}
 
 	private getPerSessionBudgetUsd(config: Record<string, unknown>): number | undefined {
-		const value = config.per_session_budget_usd;
-		if (typeof value === 'number' && Number.isFinite(value) && value > 0) {
-			return Math.min(value, MAX_PER_SESSION_BUDGET_USD);
-		}
-
-		return undefined;
+		return clampPerSessionBudgetUsd(config.per_session_budget_usd);
 	}
 
 	/**
