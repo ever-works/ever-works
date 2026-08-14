@@ -80,7 +80,9 @@ describe('SkillsService — invocation slugs', () => {
         });
 
         it('409s on a per-user conflict, naming the conflicting skill', async () => {
-            skills.findByUserAndInvocationSlug.mockResolvedValueOnce(
+            // Both create attempts must see the conflict (not Once — the
+            // first create consumes a Once-mock before the second runs).
+            skills.findByUserAndInvocationSlug.mockResolvedValue(
                 makeSkill({ id: 'other', title: 'Planning Guide', invocationSlug: 'plan' }),
             );
             await expect(svc.create('u1', createInput('plan'))).rejects.toThrow(

@@ -119,7 +119,10 @@ describe('createGetSkillFileTool', () => {
     });
 
     it('degrades politely when no content reader is bound', async () => {
-        const result = await build(undefined).invoke({
+        // NOT build(undefined): an explicit undefined argument triggers the
+        // default parameter (`r = reader`) and builds WITH the reader.
+        const tool = createGetSkillFileTool(skills, bindings, skillFiles, undefined, CONTEXT);
+        const result = await tool.invoke({
             skillSlug: 'deploy-helper',
             filename: 'run.sh',
         });

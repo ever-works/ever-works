@@ -69,6 +69,12 @@ describe('AddSkillInvocationSlugAndSkillFiles1785010000000', () => {
         await migration.up(runner);
         await runner.release();
 
+        // Seed the FK parents — skill_files carries real FKs to users/skills.
+        await dataSource.query(`INSERT INTO "users" ("id") VALUES ('u1')`);
+        await dataSource.query(
+            `INSERT INTO "skills" ("id", "userId", "slug") VALUES ('sk1', 'u1', 'cron')`,
+        );
+
         const insert = (id: string, filename: string) =>
             dataSource.query(
                 `INSERT INTO "skill_files" ("id", "skillId", "userId", "uploadId", "filename", "kind", "sizeBytes", "mime", "createdAt", "updatedAt")
