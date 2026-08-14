@@ -665,6 +665,57 @@ export class NotificationService {
     }
 
     /**
+     * Inbox (operator message center) — bell row + channel fanout for a
+     * freshly-created inbox item, so the message reaches the human on
+     * every channel they enabled (quiet hours / mutes are applied by the
+     * fanout listener downstream, like every other producer here).
+     *
+     * One notification per item (`inbox_item_<id>` dedup key), so a
+     * retried producer cannot ring twice. `question` items are urgent by
+     * definition: a run is parked until the reply.
+     */
+    async notifyInboxItem(args: {
+        userId: string;
+        itemId: string;
+        kind: 'question' | 'approval' | 'escalation' | 'notice';
+        title: string;
+        message: string;
+    }): Promise<void> {
+        const eventKeyByKind: Record<typeof args.kind, string> = {
+            question: 'inbox_question',
+            approval: 'inbox_approval_requested',
+            escalation: 'inbox_escalation',
+            notice: 'inbox_notice',
+        };
+        const urgent = args.kind === 'question';
+        // Title/body originate from agents and system producers, but an
+        // askHuman question is MODEL-authored — same sanitizer posture as
+        // every other interpolated value in this file.
+        const safeTitle = this.sanitizeLabel(args.title);
+        const safeMessage = sanitizeDescription(args.message, 500);
+        await this.create({
+            userId: args.userId,
+            type: urgent ? NotificationType.WARNING : NotificationType.INFO,
+            category: NotificationCategory.AGENT,
+            title: safeTitle,
+            message: safeMessage,
+            actionUrl: '/inbox',
+            actionLabel: 'Open inbox',
+            metadata: { inboxItemId: args.itemId, kind: args.kind },
+            deduplicationKey: `inbox_item_${args.itemId}`,
+        });
+        await this.dispatchFanout({
+            userId: args.userId,
+            eventKey: eventKeyByKind[args.kind],
+            title: safeTitle,
+            message: safeMessage,
+            actionUrl: '/inbox',
+            actionLabel: 'Open inbox',
+            urgent,
+        });
+    }
+
+    /**
      * Delete expired and old notifications
      * Should be called periodically by a cleanup job
      */

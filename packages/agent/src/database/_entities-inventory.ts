@@ -121,6 +121,7 @@ import { InboundTrigger } from '../entities/inbound-trigger.entity';
 import { IngestedEvent } from '../entities/ingested-event.entity';
 import { IngestCursor } from '../entities/ingest-cursor.entity';
 import { IngestInstallBinding } from '../entities/ingest-install-binding.entity';
+import { InboxItem } from '../entities/inbox-item.entity';
 import { ExternalIssueLink } from '../entities/external-issue-link.entity';
 import { Meeting } from '../entities/meeting.entity';
 import { CreditLedgerEntry } from '../entities/credit-ledger-entry.entity';
@@ -319,6 +320,9 @@ export const ENTITIES = [
     // Fleet job runtime (Desktop PRD M4) — the lease-able work queue
     // whose workers are the enrolled nodes above.
     FleetJob,
+    // Inbox (operator message center) — messages addressed to the human:
+    // blocking questions, approval requests, escalation mirrors, notices.
+    InboxItem,
     // Tool-grant matrix (audit item G4) — one row per (owner, scope)
     // carrying that scope's tool allow/deny contribution.
     ToolGrant,

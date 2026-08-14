@@ -108,6 +108,44 @@ const CORE_EVENTS: readonly CoreEventRow[] = [
         urgent: false,
         defaultChannels: ['in-app'],
     },
+    // Inbox (operator message center). Seeded on Postgres by
+    // `1785100000000-CreateInboxItems` too; this list is what makes
+    // them exist on SQLite / CI, where migrations do not run.
+    {
+        key: 'inbox_question',
+        category: 'agent',
+        title: 'Agent asked a question',
+        description:
+            'An agent paused its run on a blocking question and is waiting for your reply in the Inbox.',
+        urgent: true,
+        defaultChannels: ['in-app'],
+    },
+    {
+        key: 'inbox_approval_requested',
+        category: 'agent',
+        title: 'Approval requested',
+        description:
+            'An agent proposed a side-effectful action and is waiting for your approval in the Inbox.',
+        urgent: false,
+        defaultChannels: ['in-app'],
+    },
+    {
+        key: 'inbox_escalation',
+        category: 'agent',
+        title: 'Agent escalation in your Inbox',
+        description:
+            'An agent stopped without finishing and the escalation is waiting in your Inbox.',
+        urgent: false,
+        defaultChannels: ['in-app'],
+    },
+    {
+        key: 'inbox_notice',
+        category: 'system',
+        title: 'Inbox notice',
+        description: 'The platform filed a notice in your Inbox.',
+        urgent: false,
+        defaultChannels: ['in-app'],
+    },
 ];
 
 /**

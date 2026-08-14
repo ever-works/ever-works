@@ -114,7 +114,9 @@ describe('activity-log.types', () => {
             //    ingestion, audit item j) -> 121.
             // +1 idea_deleted (Idea delete, #1997) -> 122.
             // +1 agent_unarchived (Agent archive/restore, #1994) -> 123.
-            expect(literals).toHaveLength(123);
+            // +2 inbox_item_created / inbox_item_answered (Inbox operator
+            //    message center) -> 125.
+            expect(literals).toHaveLength(125);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

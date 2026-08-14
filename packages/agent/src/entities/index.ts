@@ -128,6 +128,8 @@ export * from './ingested-event.entity';
 export * from './ingest-cursor.entity';
 // Inbound receivers — external workspace/installation → platform user binding
 export * from './ingest-install-binding.entity';
+// Inbox (operator message center) — messages addressed to the human
+export * from './inbox-item.entity';
 // Event-ingest spine — external tracker issue → platform Task mapping
 export * from './external-issue-link.entity';
 // Meetings v1 (Wave 8, feature a) — captured meetings with transcripts

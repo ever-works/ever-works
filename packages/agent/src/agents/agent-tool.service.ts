@@ -48,6 +48,7 @@ import { buildMeetingTools } from '../meetings/agent-meeting-tools';
 import { buildFleetTools } from '../fleet/agent-fleet-tools';
 import { buildBrowserTools } from '../facades/agent-browser-tools';
 import { buildEscalationTools } from './agent-escalation-tools';
+import { buildInboxTools } from '../inbox/agent-inbox-tools';
 import { buildWorkflowTools } from './agent-workflow-tools';
 import { buildPrReviewTools } from '../pr-review/agent-pr-review-tools';
 import { buildMergePolicyTools } from '../policy/agent-merge-policy-tools';
@@ -424,6 +425,29 @@ export class AgentToolService {
             const browser = sources.browser;
             add('browser', () =>
                 buildBrowserTools({ userId: agent.userId, facade: browser.facade }),
+            );
+        }
+
+        // Inbox (operator message center) — the `ask_human` blocking
+        // question. Ungated by agent permissions on purpose: asking the
+        // owner is always safe (it grants nothing and touches nothing),
+        // so EVERY agent may raise its hand. The run/agent links are
+        // bound here from the run context — never model-supplied.
+        if (sources.inbox) {
+            const inbox = sources.inbox;
+            add('inbox', () =>
+                buildInboxTools({
+                    userId: agent.userId,
+                    agentId: agent.id,
+                    // `'no-run'` is the sentinel the default runContext
+                    // uses; passing it through would park a run that
+                    // cannot exist.
+                    agentRunId:
+                        runContext?.runId && runContext.runId !== 'no-run'
+                            ? runContext.runId
+                            : null,
+                    service: inbox.service,
+                }),
             );
         }
 
