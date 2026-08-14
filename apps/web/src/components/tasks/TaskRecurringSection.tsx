@@ -209,8 +209,10 @@ function InactivePanel({ task }: { task: Task }) {
         if (!isValidRule) {
             setError(
                 frequency === 'WEEKLY' && daysOfWeek.length === 0
-                    ? 'Pick at least one weekday.'
-                    : 'A valid recurrence rule is required.',
+                    ? t('errorPickWeekday')
+                    : frequency === 'CRON'
+                      ? t('errorInvalidCron')
+                      : t('errorInvalidRule'),
             );
             return;
         }
@@ -218,9 +220,17 @@ function InactivePanel({ task }: { task: Task }) {
         startTransition(() => {
             void (async () => {
                 try {
+                    // XOR on the wire: the cron dialect goes in
+                    // `recurrenceCron`, everything else is an RRULE.
+                    // Sending both is a 400 by service validation.
                     await setTaskRecurringAction(task.id, {
-                        recurrenceRule: ruleString,
-                        recurrenceTimezone: timezone || undefined,
+                        recurrenceRule: frequency === 'CRON' ? undefined : ruleString,
+                        recurrenceCron: frequency === 'CRON' ? ruleString : undefined,
+                        // Cron expressions are evaluated in UTC by
+                        // `computeNextCronFire`; stamping the browser zone
+                        // would render a next-fire time in a zone the
+                        // dispatcher never used.
+                        recurrenceTimezone: frequency === 'CRON' ? 'UTC' : timezone || undefined,
                         recurrenceEndsAt: endsAt ? new Date(endsAt).toISOString() : undefined,
                         recurrenceMaxOccurrences:
                             maxOccurrences.trim().length > 0
@@ -241,6 +251,7 @@ function InactivePanel({ task }: { task: Task }) {
         WEEKLY: t('weekly'),
         MONTHLY: t('monthly'),
         CUSTOM: t('custom'),
+        CRON: t('cron'),
     };
 
     if (!open) {
@@ -296,7 +307,25 @@ function InactivePanel({ task }: { task: Task }) {
                         />
                     </div>
                 )}
-                {frequency !== 'CUSTOM' && (
+                {frequency === 'CRON' && (
+                    <div className="@md/main:col-span-2">
+                        <label className="block text-[10px] text-text-muted mb-1">
+                            {t('cron')}
+                        </label>
+                        <input
+                            type="text"
+                            value={cronExpr}
+                            onChange={(e) => setCronExpr(e.target.value)}
+                            placeholder="0 9 * * 1"
+                            data-testid="task-recurring-cron"
+                            className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark px-2 h-8 text-xs font-mono"
+                        />
+                        <p className="mt-1 text-[10px] leading-relaxed text-text-muted dark:text-text-muted-dark">
+                            {t('cronHint')}
+                        </p>
+                    </div>
+                )}
+                {frequency !== 'CUSTOM' && frequency !== 'CRON' && (
                     <div>
                         <label className="block text-[10px] text-text-muted mb-1">
                             {t('timeOfDay')}
@@ -350,7 +379,7 @@ function InactivePanel({ task }: { task: Task }) {
                         />
                     </div>
                 )}
-                {frequency !== 'CUSTOM' && (
+                {frequency !== 'CUSTOM' && frequency !== 'CRON' && (
                     <div>
                         <label className="block text-[10px] text-text-muted mb-1">
                             {t('timezone')}
