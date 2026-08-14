@@ -151,6 +151,11 @@ function ToolCallRow({ entry }: { entry: AgentRunTimelineEntry }) {
                     <p className="text-text-muted">{t('noPreview')}</p>
                 )}
                 {entry.truncated && <p className="text-text-muted">{t('previewTruncated')}</p>}
+                {entry.callId && (
+                    <p className="text-[10px] text-text-muted break-all">
+                        {t('callId')}: {entry.callId}
+                    </p>
+                )}
             </div>
         </details>
     );
@@ -220,25 +225,35 @@ export function SessionDetailClient({
     // otherwise fresh tail rows would visually skip the unloaded middle.
     const atTail = nextCursor === null;
 
-    const applyDetail = useCallback(
+    /** Header/chips/files always track the freshest read. */
+    const applyRunState = useCallback((detail: AgentRunSessionDetail) => {
+        setRun(detail.run);
+        setCounts(detail.counts);
+        setFilesTouched(detail.filesTouched);
+    }, []);
+
+    /**
+     * Live-follow sink. The poll asks for everything after the last row
+     * on screen, so its page is APPENDED (deduped on id — the cursor edge
+     * can legitimately re-return its own row).
+     *
+     * When the caller is mid-pagination (`afterCursor` undefined because
+     * older pages are still unwalked) the poll deliberately leaves the
+     * timeline ALONE: replacing it with page one would throw away every
+     * "Load more" the reader just clicked through, every 5 seconds.
+     */
+    const applyPolled = useCallback(
         (detail: AgentRunSessionDetail, afterCursor: string | undefined) => {
-            setRun(detail.run);
-            setCounts(detail.counts);
-            setFilesTouched(detail.filesTouched);
-            if (afterCursor !== undefined) {
-                // Tail-follow append (dedupe on id defends the cursor edge).
-                setEntries((prev) => {
-                    const known = new Set(prev.map((e) => e.id));
-                    const fresh = detail.timeline.entries.filter((e) => !known.has(e.id));
-                    return fresh.length > 0 ? [...prev, ...fresh] : prev;
-                });
-                if (detail.timeline.nextCursor) setNextCursor(detail.timeline.nextCursor);
-            } else {
-                setEntries(detail.timeline.entries);
-                setNextCursor(detail.timeline.nextCursor);
-            }
+            applyRunState(detail);
+            if (afterCursor === undefined) return;
+            setEntries((prev) => {
+                const known = new Set(prev.map((e) => e.id));
+                const fresh = detail.timeline.entries.filter((e) => !known.has(e.id));
+                return fresh.length > 0 ? [...prev, ...fresh] : prev;
+            });
+            if (detail.timeline.nextCursor) setNextCursor(detail.timeline.nextCursor);
         },
-        [],
+        [applyRunState],
     );
 
     // 5s live-follow while the run is open (terminal runs cost zero requests).
@@ -247,18 +262,21 @@ export function SessionDetailClient({
         if (!atTail || !lastEntry) return undefined;
         return timelineEntryCursor(lastEntry);
     }, [atTail, lastEntry]);
-    useSessionDetailPolling(run.id, live || run.awaitingInput, getPollCursor, applyDetail);
+    useSessionDetailPolling(run.id, live || run.awaitingInput, getPollCursor, applyPolled);
 
+    /** Explicit user action — a full reset back to the first page. */
     const refresh = useCallback(() => {
         startRefresh(async () => {
             try {
                 const detail = await getRunSessionDetailAction(run.id);
-                applyDetail(detail, undefined);
+                applyRunState(detail);
+                setEntries(detail.timeline.entries);
+                setNextCursor(detail.timeline.nextCursor);
             } catch {
                 // Keep last-known state; the poll (if live) retries.
             }
         });
-    }, [run.id, applyDetail]);
+    }, [run.id, applyRunState]);
 
     const loadMore = useCallback(() => {
         if (!nextCursor) return;
@@ -605,9 +623,13 @@ export function SessionDetailClient({
                 </div>
             )}
 
-            {/* Screen-reader / metadata footer: which agent this was. */}
-            <p className="text-[11px] text-text-muted">
+            {/* Metadata footer — the ids support needs to correlate this
+                session with a chat thread or a memory session. Same
+                projection the Agent activity rail already shows. */}
+            <p className="text-[11px] text-text-muted break-all" data-testid="session-detail-meta">
                 {td('runBy', { agent: agentName })} · {run.id}
+                {run.chatMessageId && ` · ${td('chatMessage')}: ${run.chatMessageId}`}
+                {run.memorySessionId && ` · ${td('memorySession')}: ${run.memorySessionId}`}
             </p>
         </div>
     );
