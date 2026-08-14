@@ -1,4 +1,13 @@
-import type { AiModel, Brand, Category, Collection, FacadeOptions, ItemData, Tag } from '@ever-works/plugin';
+import type {
+	AiModel,
+	Brand,
+	Category,
+	Collection,
+	FacadeOptions,
+	ItemData,
+	PipelineMetrics,
+	Tag
+} from '@ever-works/plugin';
 
 export type ClaudeManagedAgentStepId =
 	| 'configure-managed-agent'
@@ -301,6 +310,37 @@ export interface ManagedSessionRunResult {
 	tokens?: ManagedSessionTokenUsage;
 	costUsd?: number;
 	error?: string;
+}
+
+/** Per-session usage summary carried in the pipeline metrics `custom` bag. */
+export interface ManagedSessionUsageSummary {
+	id: string;
+	status: ManagedSessionRunResult['status'];
+	sessionId?: string;
+	tokens?: ManagedSessionTokenUsage;
+	costUsd?: number;
+	error?: string;
+}
+
+/**
+ * Pipeline metrics extended with the two keys the platform's usage seam
+ * actually reads (`extractPipelineUsageMetrics` in
+ * `packages/agent/src/utils/metrics.util.ts`): `tokenUsage.total.totalTokens`
+ * and `totalCost`.
+ *
+ * Both MUST sit at the metrics ROOT. The plugin runtime helper
+ * `buildMetrics()` nests whatever it is given under `metrics.custom`, which
+ * the seam never looks at — so token/cost figures placed there are silently
+ * dropped from every usage rollup. `custom` stays reserved for the
+ * human/debug-facing per-session breakdown.
+ */
+export interface ManagedAgentPipelineMetrics extends PipelineMetrics {
+	tokenUsage?: { total: { totalTokens: number } };
+	totalCost?: number;
+	custom?: {
+		usage: { inputTokens: number; outputTokens: number };
+		sessions: ManagedSessionUsageSummary[];
+	};
 }
 
 /** Options accepted by the plugin-level `runSessions` fan-out entry point. */

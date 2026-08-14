@@ -59,6 +59,38 @@ vi.mock('@anthropic-ai/sdk', () => {
 });
 
 import { ClaudeManagedAgentPlugin } from './claude-managed-agent.plugin.js';
+import { type ManagedAgentPipelineMetrics } from './types.js';
+
+/**
+ * Faithful replica of the platform's `extractPipelineUsageMetrics`
+ * (`packages/agent/src/utils/metrics.util.ts`) — plugin packages cannot import
+ * `@ever-works/agent`, so the consumer contract is asserted here instead.
+ * Tokens come from `tokenUsage.total.totalTokens` or the per-step
+ * `custom.totalTokens` sum; cost from `totalCost` (only when > 0) or the
+ * per-step `custom.totalCost` sum. Nothing else is read.
+ */
+function extractUsageLikePlatform(metrics: ManagedAgentPipelineMetrics | undefined) {
+	if (!metrics) {
+		return {};
+	}
+
+	const steps = Object.values(metrics.steps ?? {}) as Array<{ custom?: Record<string, unknown> }>;
+	const stepNumber = (key: 'totalTokens' | 'totalCost') =>
+		steps.reduce(
+			(sum, step) => sum + (typeof step.custom?.[key] === 'number' ? (step.custom[key] as number) : 0),
+			0
+		);
+
+	const explicitTokens = metrics.tokenUsage?.total?.totalTokens;
+	const explicitCost = metrics.totalCost;
+	const totalTokens = typeof explicitTokens === 'number' ? explicitTokens : stepNumber('totalTokens');
+	const totalCost = typeof explicitCost === 'number' && explicitCost > 0 ? explicitCost : stepNumber('totalCost');
+
+	return {
+		...(totalTokens > 0 ? { total_tokens_used: totalTokens } : {}),
+		...(totalCost > 0 ? { total_cost: totalCost } : {})
+	};
+}
 
 const FINAL_JSON = (itemName: string, sourceUrl = 'https://example.com') =>
 	JSON.stringify({
@@ -201,6 +233,12 @@ describe('ClaudeManagedAgentPlugin — persistent control plane (default)', () =
 		expect(sdkMocks.filesDelete).toHaveBeenCalled();
 		expect(sdkMocks.environmentsDelete).not.toHaveBeenCalled();
 		expect(sdkMocks.agentsArchive).not.toHaveBeenCalled();
+
+		// Single-session usage reaches the platform seam too (list_cost "250" = $2.50).
+		expect(extractUsageLikePlatform(result.metrics as ManagedAgentPipelineMetrics)).toEqual({
+			total_tokens_used: 200,
+			total_cost: 2.5
+		});
 	});
 
 	it('splices memory recall into the session system override, not the persistent agent', async () => {
@@ -310,10 +348,17 @@ describe('ClaudeManagedAgentPlugin — variant fan-out', () => {
 		// Every fan-out session is archived.
 		expect(sdkMocks.sessionsArchive).toHaveBeenCalledTimes(3);
 
-		// Aggregated usage lands in the metrics custom bag for the platform seam.
-		const custom = result.metrics?.custom as Record<string, unknown>;
-		expect(custom.tokenUsage).toEqual({ total: { totalTokens: 3 * 140 } });
-		expect(custom.totalCost).toBeCloseTo(4.5);
+		// Aggregated usage lands at the METRICS ROOT, where the platform's
+		// extractPipelineUsageMetrics() reads it. Nesting it under `custom`
+		// (as an earlier revision did) makes it invisible to every rollup.
+		const metrics = result.metrics as ManagedAgentPipelineMetrics;
+		expect(metrics.tokenUsage).toEqual({ total: { totalTokens: 3 * 140 } });
+		expect(metrics.totalCost).toBeCloseTo(4.5);
+		expect(metrics.custom?.sessions).toHaveLength(3);
+		expect(extractUsageLikePlatform(metrics)).toEqual({
+			total_tokens_used: 420,
+			total_cost: 4.5
+		});
 	});
 
 	it('keeps the run green when one variant fails and surfaces the failure as a warning', async () => {

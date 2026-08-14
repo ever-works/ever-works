@@ -11,10 +11,12 @@
 export { ClaudeManagedAgentPlugin } from './claude-managed-agent.plugin.js';
 export type {
 	ClaudeManagedAgentStepId,
+	ManagedAgentPipelineMetrics,
 	ManagedRuntimeEnvironment,
 	ManagedSessionPromptInput,
 	ManagedSessionRunResult,
 	ManagedSessionTokenUsage,
+	ManagedSessionUsageSummary,
 	PluginRunSessionsOptions,
 	RunManagedSessionsOptions
 } from './types.js';
@@ -28,4 +30,5 @@ export {
 	resolveNetworking
 } from './utils/control-plane.js';
 export { AnthropicManagedAgentsClient } from './utils/managed-agents-client.js';
+export { buildManagedAgentMetrics } from './utils/usage-metrics.js';
 export { default } from './claude-managed-agent.plugin.js';

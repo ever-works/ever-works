@@ -60,7 +60,6 @@ import { AnthropicManagedAgentsClient } from './utils/managed-agents-client.js';
 import {
 	buildCancelledResult,
 	buildErrorResult,
-	buildMetrics,
 	finalizeCompletedState,
 	getNumericSetting,
 	getStepProgressContext,
@@ -79,6 +78,7 @@ import {
 } from './utils/prompt-builder.js';
 import { extractAgentTranscript, normalizeOutputs, parseStructuredOutput } from './utils/result-parser.js';
 import { captureScreenshots } from './utils/screenshot-capture.js';
+import { buildManagedAgentMetrics } from './utils/usage-metrics.js';
 import { buildWorkspaceSeedManifest } from './utils/workspace-seed.js';
 
 // Security: runtime bounds for `target_items`, mirroring the form-level
@@ -623,11 +623,11 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 				totalSteps: STEP_DEFINITIONS.length,
 				state: this.state,
 				metrics: finalSession.usage
-					? buildMetrics(
+					? buildManagedAgentMetrics({
 							startTime,
-							Date.now() - startTime,
-							normalizedOutputs.items.length,
-							this.buildUsageMetricsCustom([
+							duration: Date.now() - startTime,
+							itemCount: normalizedOutputs.items.length,
+							sessions: [
 								{
 									id: 'session-1',
 									status: 'completed',
@@ -641,8 +641,8 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 									},
 									costUsd: finalSession.usage.list_cost_usd
 								}
-							])
-						)
+							]
+						})
 					: undefined,
 				warnings
 			});
@@ -824,57 +824,14 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 			stepsCompleted: this.state.completedSteps.length,
 			totalSteps: STEP_DEFINITIONS.length,
 			state: this.state,
-			metrics: buildMetrics(
+			metrics: buildManagedAgentMetrics({
 				startTime,
-				Date.now() - startTime,
-				normalizedOutputs.items.length,
-				this.buildUsageMetricsCustom(sessionResults)
-			),
+				duration: Date.now() - startTime,
+				itemCount: normalizedOutputs.items.length,
+				sessions: sessionResults
+			}),
 			warnings
 		});
-	}
-
-	/**
-	 * Usage accounting (feat-cma-scale): roll per-session token/cost figures
-	 * into the pipeline metrics `custom` bag. `tokenUsage.total.totalTokens`
-	 * and `totalCost` are the keys the agent-side
-	 * `extractPipelineUsageMetrics` reads, so totals flow into the platform's
-	 * existing usage seam without the plugin reaching into the ledger.
-	 */
-	private buildUsageMetricsCustom(sessionResults: ManagedSessionRunResult[]): Record<string, unknown> {
-		let inputTokens = 0;
-		let outputTokens = 0;
-		let costUsd = 0;
-
-		const sessions = sessionResults.map((result) => {
-			inputTokens += result.tokens?.inputTokens ?? 0;
-			outputTokens += result.tokens?.outputTokens ?? 0;
-			costUsd += result.costUsd ?? 0;
-
-			return {
-				id: result.id,
-				status: result.status,
-				sessionId: result.sessionId,
-				tokens: result.tokens,
-				costUsd: result.costUsd,
-				error: result.error
-			};
-		});
-
-		const custom: Record<string, unknown> = {
-			usage: {
-				input_tokens: inputTokens,
-				output_tokens: outputTokens
-			},
-			tokenUsage: { total: { totalTokens: inputTokens + outputTokens } },
-			sessions
-		};
-
-		if (costUsd > 0) {
-			custom.totalCost = costUsd;
-		}
-
-		return custom;
 	}
 
 	/** Merge variant outputs, de-duplicating items and taxonomy entries. */
