@@ -2215,7 +2215,10 @@
                 "dangerZone": "Danger Zone",
                 "billing": "Billing",
                 "usageCredits": "Usage & Credits",
-                "digest": "Digest"
+                "digest": "Digest",
+                "notifications": "Notifications",
+                "channels": "Channels",
+                "emails": "Email Addresses"
             },
             "githubApp": {
                 "title": "GitHub App Installations",
