@@ -1036,7 +1036,8 @@
                 "allTemplates": "All templates",
                 "yourTemplates": "Your templates",
                 "yourTemplatesEmpty": "Agents you create will appear here as reusable templates.",
-                "openInWizard": "Open in wizard"
+                "openInWizard": "Open in wizard",
+                "browsePage": "Open the full template browser"
             },
             "settings": {
                 "identity": {
@@ -1205,7 +1206,8 @@
                     "showing": "Showing {from}-{to} of {total}",
                     "previous": "Previous",
                     "next": "Next"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "newDialog": {
                 "title": "Create a new Task",
@@ -1480,7 +1482,8 @@
                 "filter": {
                     "scope": "Scope",
                     "all": "All"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "detail": {
                 "backToSkills": "Back to Skills",

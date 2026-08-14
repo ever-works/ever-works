@@ -951,7 +951,8 @@
                 "allTemplates": "كل القوالب",
                 "yourTemplates": "قوالبك",
                 "yourTemplatesEmpty": "الوكلاء الذي تنشئهم ستظهر هنا كقوابل لإعادة الاستخدام.",
-                "openInWizard": "افتح في المعالج"
+                "openInWizard": "افتح في المعالج",
+                "browsePage": "Open the full template browser"
             },
             "settings": {
                 "identity": {
@@ -1145,7 +1146,8 @@
                     "showing": "عرض {from}-{to} من {total}",
                     "previous": "السابق",
                     "next": "التالي"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "newDialog": {
                 "title": "إنشاء مهمة جديدة",
@@ -1428,7 +1430,8 @@
                 "filter": {
                     "scope": "النطاق",
                     "all": "الكل"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "detail": {
                 "instructions": "التعليمات",

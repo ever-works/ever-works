@@ -951,7 +951,8 @@
                 "allTemplates": "Alle Vorlagen",
                 "yourTemplates": "Ihre Vorlagen",
                 "yourTemplatesEmpty": "Von Ihnen erstellte Agenten erscheinen hier als wiederverwendbare Vorlagen.",
-                "openInWizard": "Assistent öffnen"
+                "openInWizard": "Assistent öffnen",
+                "browsePage": "Open the full template browser"
             },
             "settings": {
                 "identity": {
@@ -1145,7 +1146,8 @@
                     "showing": "{from}–{to} von {total} angezeigt",
                     "previous": "Zurück",
                     "next": "Weiter"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "newDialog": {
                 "title": "Neue Aufgabe erstellen",
@@ -1428,7 +1430,8 @@
                 "filter": {
                     "scope": "Bereich",
                     "all": "Alle"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "detail": {
                 "instructions": "Anweisungen",
