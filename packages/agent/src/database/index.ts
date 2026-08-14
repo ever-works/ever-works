@@ -58,6 +58,9 @@ export * from './repositories/agent-membership.repository';
 // Agents/Skills/Tasks PR #1017 — Phase 8. Skill catalog repositories.
 export * from './repositories/skill.repository';
 export * from './repositories/skill-binding.repository';
+// Agent Plugins MCP slice — feature-owned repositories, wired by McpModule.
+export * from './repositories/mcp-server-connection.repository';
+export * from './repositories/agent-mcp-server-binding.repository';
 // Tenants & Organizations (EW-651 epic) — Phase 1 / EW-653.
 export * from './repositories/tenant.repository';
 export * from './repositories/organization.repository';

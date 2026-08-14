@@ -874,7 +874,8 @@
                 "skills": "Yetenekler",
                 "budgets": "Bütçeler",
                 "settings": "Ayarlar",
-                "terminal": "Terminal"
+                "terminal": "Terminal",
+                "mcpServers": "MCP Servers"
             },
             "newDialog": {
                 "title": "Yeni Ajan",
@@ -1056,6 +1057,16 @@
                 "confirm": "Kalıcı olarak sil",
                 "success": "{name} silindi",
                 "error": "Ajan silinemedi"
+            },
+            "mcpServers": {
+                "title": "MCP Servers",
+                "subtitle": "Choose which MCP connections this agent can use. Tenant-wide connections are inherited unless overridden here.",
+                "activeCount": "{count} active",
+                "empty": "No MCP connections configured. Add one under Settings → Connections.",
+                "inherited": "Inherited",
+                "overridden": "Override",
+                "connectionDisabled": "Connection disabled",
+                "revert": "Revert"
             }
         },
         "tasksPage": {
@@ -2095,7 +2106,8 @@
                 "usageCredits": "Usage & Credits",
                 "fleet": "Fleet",
                 "jobRuntime": "Job Runtime",
-                "digest": "Digest"
+                "digest": "Digest",
+                "connections": "Connections"
             },
             "githubApp": {
                 "title": "GitHub App Kurulumları",
@@ -2918,6 +2930,31 @@
                     "saveError": "Failed to save the digest settings",
                     "noOrg": "No active organization for this session, so there is no organization digest to configure. Create or switch to an organization first.",
                     "noAiProvider": "No AI provider is configured, so digests will arrive without the written summary. Every count is still computed and delivered."
+                }
+            },
+            "connections": {
+                "title": "Connections",
+                "subtitle": "External MCP servers your agents can use as tools. Auth header values are encrypted and never shown again.",
+                "addConnection": "Add Connection",
+                "empty": "No connections yet. Add an MCP server URL to give your agents external tools.",
+                "authHeaders": "Auth headers",
+                "lastConnected": "Connected {date}",
+                "test": "Test",
+                "testOk": "OK — {count} tools ({tools})",
+                "testFailed": "Connection test failed.",
+                "delete": "Delete",
+                "form": {
+                    "name": "Name",
+                    "nameHelp": "Lowercase letters, digits, hyphens. Becomes the mcp__<name>__<tool> prefix.",
+                    "transport": "Transport",
+                    "streamableHttp": "Streamable HTTP",
+                    "sse": "SSE (legacy)",
+                    "url": "Server URL",
+                    "headerName": "Auth header name",
+                    "headerValue": "Auth header value",
+                    "headerValueHelp": "Stored encrypted. Never shown again.",
+                    "cancel": "Cancel",
+                    "save": "Save"
                 }
             }
         },

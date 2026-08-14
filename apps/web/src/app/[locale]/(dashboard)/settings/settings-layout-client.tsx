@@ -16,6 +16,7 @@ import {
     BarChart3,
     Server,
     Newspaper,
+    Plug,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
@@ -101,6 +102,14 @@ export function SettingsLayoutClient({ children, settingsMenu }: SettingsLayoutC
                 label: t('tabs.jobRuntime'),
                 icon: Cpu,
                 href: `${baseSettingsPath}/job-runtime`,
+            },
+            // MCP Connections — external MCP servers agents can consume
+            // (agent-plugins spec §2.3; manual connections in v1).
+            {
+                id: 'connections',
+                label: t('tabs.connections'),
+                icon: Plug,
+                href: `${baseSettingsPath}/connections`,
             },
             // Digest briefings — the personal cadence AND the org-scoped
             // one live on one page, since they are two records of the

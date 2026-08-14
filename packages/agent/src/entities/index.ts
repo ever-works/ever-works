@@ -148,6 +148,10 @@ export * from './terminal-transcript-chunk.entity';
 export * from './fleet-job.entity';
 // Tool-grant matrix (audit item G4) — per-scope tool allow/deny rows.
 export * from './tool-grant.entity';
+// Agent Plugins MCP slice — external MCP server connections + per-agent
+// bindings (docs/specs/features/agent-plugins plan §2.4/§2.5).
+export * from './mcp-server-connection.entity';
+export * from './agent-mcp-server-binding.entity';
 export * from './workflow.entity';
 // One execution of a saved graph — what makes running a workflow leave a
 // trace instead of vanishing into a chat tool's return value.

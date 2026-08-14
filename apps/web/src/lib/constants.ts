@@ -163,6 +163,7 @@ export const ROUTES = {
     DASHBOARD_AGENT_TERMINAL: (id: string) => `/agents/${id}/terminal`,
     DASHBOARD_AGENT_INSTRUCTIONS: (id: string) => `/agents/${id}/instructions`,
     DASHBOARD_AGENT_SKILLS: (id: string) => `/agents/${id}/skills`,
+    DASHBOARD_AGENT_MCP_SERVERS: (id: string) => `/agents/${id}/mcp-servers`,
     DASHBOARD_AGENT_BUDGETS: (id: string) => `/agents/${id}/budgets`,
     DASHBOARD_AGENT_SETTINGS: (id: string) => `/agents/${id}/settings`,
     // Phase 18.6 — Agents templates browser (ADR-010 scaffold).
