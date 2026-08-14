@@ -97,6 +97,7 @@ const sidebars: SidebarsConfig = {
 				'features/works-config',
 				'features/work-import',
 				'features/work-members',
+				'features/teams',
 				'features/comparisons',
 				'features/advanced-prompts',
 				'features/git-operations',
