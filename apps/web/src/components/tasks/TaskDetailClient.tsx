@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { ArrowLeft, Loader2, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -25,6 +25,14 @@ import { TaskDecisionConflicts } from './TaskDecisionConflicts';
 import { TaskDeleteButton } from './TaskDeleteButton';
 import { WorkSelect } from './WorkSelect';
 import { AgentSelect } from './AgentSelect';
+// Skills feature — invocation slugs. Task chat is the surface whose
+// messages run through `AgentRunService` with kind='chat', which is
+// where a leading `/<invocation-slug>` is resolved server-side; the
+// popup is the discovery affordance for it.
+import {
+    SlashCommandPopup,
+    useSlashCommands,
+} from '@/components/skills/SlashCommandAutocomplete';
 
 // Status tones + dots mirror /tasks (TasksList) so colours stay
 // consistent across the list filter and the detail workflow buttons.
@@ -123,6 +131,7 @@ export function TaskDetailClient({
     const [messages, setMessages] = useState(initialChat);
     const [currentStatus, setCurrentStatus] = useState<TaskStatus>(task.status);
     const [draft, setDraft] = useState('');
+    const draftRef = useRef<HTMLTextAreaElement | null>(null);
     const [pendingPost, startPost] = useTransition();
     const [pendingTransition, startTransition] = useTransition();
     const [postError, setPostError] = useState<string | null>(null);
@@ -145,6 +154,14 @@ export function TaskDetailClient({
     // description save so the conflict check re-runs against the new
     // intent — "created OR its description is edited".
     const [conflictKey, setConflictKey] = useState(0);
+
+    // Skills feature — `/slug` completions for the chat draft.
+    const slash = useSlashCommands({
+        value: draft,
+        onChange: setDraft,
+        disabled: pendingPost,
+        inputRef: draftRef,
+    });
 
     const handlePost = (e: React.FormEvent) => {
         e.preventDefault();
@@ -484,11 +501,14 @@ export function TaskDetailClient({
 
                         <form
                             onSubmit={handlePost}
-                            className="mt-5 pt-4 border-t border-border/40 dark:border-border-dark/40 space-y-2"
+                            className="relative mt-5 pt-4 border-t border-border/40 dark:border-border-dark/40 space-y-2"
                         >
+                            <SlashCommandPopup state={slash} />
                             <textarea
+                                ref={draftRef}
                                 value={draft}
                                 onChange={(e) => setDraft(e.target.value)}
+                                onKeyDown={(e) => slash.handleKeyDown(e)}
                                 rows={3}
                                 placeholder={t('draftPlaceholder')}
                                 className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-3 text-sm text-text dark:text-text-dark"
