@@ -6537,6 +6537,7 @@
             "disableWarning": "Disabling this plugin will also disable it in all your works",
             "cannotDisableSystem": "System plugins cannot be disabled",
             "disableFailed": "Failed to disable plugin",
+            "enableFailed": "Failed to enable plugin",
             "autoEnableForWorks": "Also enable for all works",
             "autoEnableForWorksDescription": "This plugin will be automatically active in all your works. You can still disable it per Work.",
             "confirmDisable": "Confirm Disable",
