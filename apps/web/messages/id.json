@@ -143,9 +143,9 @@
                 "password": {
                     "label": "Kata sandi baru",
                     "placeholder": "Masukkan kata sandi baru Anda",
-                    "helperText": "Harus minimal 6 karakter dengan huruf kecil dan angka/karakter khusus",
+                    "helperText": "Harus minimal 8 karakter dengan huruf kecil dan angka/karakter khusus",
                     "errors": {
-                        "minLength": "Kata sandi harus minimal 6 karakter",
+                        "minLength": "Kata sandi harus minimal 8 karakter",
                         "lowercase": "Kata sandi harus mengandung setidaknya satu huruf kecil",
                         "numberOrSpecial": "Kata sandi harus mengandung setidaknya satu angka atau karakter khusus",
                         "cannotStartWith": "Kata sandi tidak boleh dimulai dengan titik atau baris baru"

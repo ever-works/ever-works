@@ -143,9 +143,9 @@
                 "password": {
                     "label": "Nouveau mot de passe",
                     "placeholder": "Saisissez votre nouveau mot de passe",
-                    "helperText": "Doit comporter au moins 6 caractères avec une minuscule et un chiffre/caractère spécial",
+                    "helperText": "Doit comporter au moins 8 caractères avec une minuscule et un chiffre/caractère spécial",
                     "errors": {
-                        "minLength": "Le mot de passe doit comporter au moins 6 caractères",
+                        "minLength": "Le mot de passe doit comporter au moins 8 caractères",
                         "lowercase": "Le mot de passe doit contenir au moins une lettre minuscule",
                         "numberOrSpecial": "Le mot de passe doit contenir au moins un chiffre ou un caractère spécial",
                         "cannotStartWith": "Le mot de passe ne peut pas commencer par un point ou une nouvelle ligne"

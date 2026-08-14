@@ -143,9 +143,9 @@
                 "password": {
                     "label": "Nowe hasło",
                     "placeholder": "Wprowadź nowe hasło",
-                    "helperText": "Musi mieć co najmniej 6 znaków, w tym małą literę i cyfrę/znak specjalny",
+                    "helperText": "Musi mieć co najmniej 8 znaków, w tym małą literę i cyfrę/znak specjalny",
                     "errors": {
-                        "minLength": "Hasło musi mieć co najmniej 6 znaków",
+                        "minLength": "Hasło musi mieć co najmniej 8 znaków",
                         "lowercase": "Hasło musi zawierać co najmniej jedną małą literę",
                         "numberOrSpecial": "Hasło musi zawierać co najmniej jedną cyfrę lub znak specjalny",
                         "cannotStartWith": "Hasło nie może zaczynać się od kropki lub nowego wiersza"

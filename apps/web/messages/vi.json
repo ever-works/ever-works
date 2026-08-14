@@ -143,9 +143,9 @@
                 "password": {
                     "label": "Mật khẩu mới",
                     "placeholder": "Nhập mật khẩu mới của bạn",
-                    "helperText": "Phải có ít nhất 6 ký tự với chữ thường và số/ký tự đặc biệt",
+                    "helperText": "Phải có ít nhất 8 ký tự với chữ thường và số/ký tự đặc biệt",
                     "errors": {
-                        "minLength": "Mật khẩu phải có ít nhất 6 ký tự",
+                        "minLength": "Mật khẩu phải có ít nhất 8 ký tự",
                         "lowercase": "Mật khẩu phải chứa ít nhất một chữ cái thường",
                         "numberOrSpecial": "Mật khẩu phải chứa ít nhất một số hoặc ký tự đặc biệt",
                         "cannotStartWith": "Mật khẩu không thể bắt đầu bằng dấu chấm hoặc xuống dòng"

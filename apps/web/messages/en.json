@@ -143,9 +143,9 @@
                 "password": {
                     "label": "New password",
                     "placeholder": "Enter your new password",
-                    "helperText": "Must be at least 6 characters with lowercase and number/special character",
+                    "helperText": "Must be at least 8 characters with lowercase and number/special character",
                     "errors": {
-                        "minLength": "Password must be at least 6 characters",
+                        "minLength": "Password must be at least 8 characters",
                         "lowercase": "Password must contain at least one lowercase letter",
                         "numberOrSpecial": "Password must contain at least one number or special character",
                         "cannotStartWith": "Password cannot start with a dot or newline"

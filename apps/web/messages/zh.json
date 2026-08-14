@@ -143,9 +143,9 @@
                 "password": {
                     "label": "新密码",
                     "placeholder": "输入您的新密码",
-                    "helperText": "至少 6 个字符，包含小写字母、数字/特殊字符",
+                    "helperText": "至少 8 个字符，包含小写字母、数字/特殊字符",
                     "errors": {
-                        "minLength": "密码至少 6 个字符",
+                        "minLength": "密码至少 8 个字符",
                         "lowercase": "密码必须包含至少一个小写字母",
                         "numberOrSpecial": "密码必须包含至少一个数字或特殊字符",
                         "cannotStartWith": "密码不能以点或换行符开头"

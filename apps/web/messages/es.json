@@ -143,9 +143,9 @@
                 "password": {
                     "label": "Nueva contraseña",
                     "placeholder": "Ingresa tu nueva contraseña",
-                    "helperText": "Debe tener al menos 6 caracteres con minúscula y número/carácter especial",
+                    "helperText": "Debe tener al menos 8 caracteres con minúscula y número/carácter especial",
                     "errors": {
-                        "minLength": "La contraseña debe tener al menos 6 caracteres",
+                        "minLength": "La contraseña debe tener al menos 8 caracteres",
                         "lowercase": "La contraseña debe contener al menos una letra minúscula",
                         "numberOrSpecial": "La contraseña debe contener al menos un número o carácter especial",
                         "cannotStartWith": "La contraseña no puede comenzar con un punto o nueva línea"
