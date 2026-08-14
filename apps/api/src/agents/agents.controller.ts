@@ -243,6 +243,9 @@ export class AgentsController {
             capabilities: body.capabilities ?? null,
             aiProviderId: body.aiProviderId ?? null,
             modelId: body.modelId ?? null,
+            // Environments — service validates same-user + published
+            // (draft → 422, cross-user/unknown → 404).
+            environmentId: body.environmentId ?? null,
             maxSkillContextTokens: body.maxSkillContextTokens,
             heartbeatCadence: body.heartbeatCadence ?? null,
             idleBehavior: body.idleBehavior,
@@ -448,6 +451,9 @@ export class AgentsController {
             capabilities: body.capabilities,
             aiProviderId: body.aiProviderId,
             modelId: body.modelId,
+            // Environments — `undefined` leaves the assignment alone,
+            // `null` clears it, an id is validated by the service.
+            environmentId: body.environmentId,
             maxSkillContextTokens: body.maxSkillContextTokens,
             memoryRecallEnabled: body.memoryRecallEnabled,
             heartbeatCadence: body.heartbeatCadence,
