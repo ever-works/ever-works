@@ -6935,61 +6935,61 @@
             }
         },
         "meetingDetail": {
-            "backToMeetings": "Back to Meetings",
+            "backToMeetings": "Назад до зустрічей",
             "actions": {
-                "openRecording": "Open recording",
+                "openRecording": "Відкрити запис",
                 "edit": "Редагувати",
-                "delete": "Delete",
-                "attachTranscript": "Attach transcript",
+                "delete": "Видалити",
+                "attachTranscript": "Прикріпити транскрипцію",
                 "attaching": "Прикріплюємо…",
                 "editTranscript": "Редагувати транскрипцію",
                 "cancelEdit": "Скасувати редагування",
                 "saveTranscript": "Зберегти транскрипцію",
                 "savingTranscript": "Зберігаємо…",
-                "save": "Save changes",
+                "save": "Зберегти зміни",
                 "cancel": "Скасувати"
             },
             "sections": {
-                "summary": "Summary",
-                "transcript": "Transcript",
-                "details": "Details",
-                "edit": "Edit meeting"
+                "summary": "Стислий виклад",
+                "transcript": "Транскрипція",
+                "details": "Подробиці",
+                "edit": "Редагування зустрічі"
             },
             "summary": {
                 "generating": "Створюємо стислий виклад…",
                 "generatingHint": "Читаємо транскрипцію та пишемо стислий виклад — зазвичай це триває кілька секунд.",
-                "notGenerated": "No summary was generated for this transcript. Enable an AI provider and re-attach the transcript to try again.",
-                "noTranscript": "Attach a transcript to generate a summary."
+                "notGenerated": "Для цієї транскрипції стислий виклад не створено. Увімкніть постачальника ШІ та прикріпіть транскрипцію ще раз, щоб спробувати знову.",
+                "noTranscript": "Прикріпіть транскрипцію, щоб створити стислий виклад."
             },
             "transcript": {
-                "composerLabel": "Transcript text",
-                "composerPlaceholder": "Paste the meeting transcript here.",
-                "pipelineHint": "Stored first, then summarized, remembered and posted to your activity feed — best effort.",
-                "storedElsewhere": "The transcript is stored but was not returned with this view."
+                "composerLabel": "Текст транскрипції",
+                "composerPlaceholder": "Вставте сюди транскрипцію зустрічі.",
+                "pipelineHint": "Спершу зберігаємо, потім стисло переказуємо, запам’ятовуємо та публікуємо у вашій стрічці активності — за можливості.",
+                "storedElsewhere": "Транскрипція збережена, але не була повернута в цьому поданні."
             },
             "details": {
-                "source": "Source",
-                "startedAt": "Started",
-                "endedAt": "Ended",
-                "openEnded": "Still open",
-                "duration": "Duration",
-                "work": "Work",
-                "orgWide": "Org-wide",
-                "externalId": "Provider ID",
-                "createdAt": "Captured",
-                "participants": "Participants",
-                "noParticipants": "No participants recorded."
+                "source": "Джерело",
+                "startedAt": "Початок",
+                "endedAt": "Завершення",
+                "openEnded": "Ще триває",
+                "duration": "Тривалість",
+                "work": "Робота",
+                "orgWide": "Уся організація",
+                "externalId": "ID у постачальника",
+                "createdAt": "Зафіксовано",
+                "participants": "Учасники",
+                "noParticipants": "Учасників не записано."
             },
             "edit": {
                 "hint": "Виправте час, перейменуйте зустріч, відредагуйте список учасників, вкажіть запис або перепризначте її до Роботи."
             },
             "fields": {
-                "title": "Title",
+                "title": "Назва",
                 "startedAt": "Початок",
-                "endedAt": "Ended at",
-                "sourceUrl": "Recording link",
-                "work": "Work",
-                "workNone": "Org-wide (no Work)",
+                "endedAt": "Завершення",
+                "sourceUrl": "Посилання на запис",
+                "work": "Робота",
+                "workNone": "Уся організація (без Роботи)",
                 "participants": "Учасники",
                 "participantName": "Ім’я",
                 "participantEmail": "Ел. пошта (необов’язково)",
@@ -6998,23 +6998,23 @@
                 "participantsEmpty": "Поки нікого не записано."
             },
             "errors": {
-                "titleRequired": "Title is required.",
+                "titleRequired": "Назва обов’язкова.",
                 "startedAtInvalid": "Час початку не є дійсною датою.",
-                "endedAtInvalid": "End time is not a valid date.",
-                "endedBeforeStarted": "End time cannot be before the start time.",
+                "endedAtInvalid": "Час завершення не є дійсною датою.",
+                "endedBeforeStarted": "Час завершення не може бути раніше за час початку.",
                 "participantEmailInvalid": "Введіть коректну адресу ел. пошти або залиште поле порожнім.",
                 "participantDuplicate": "Ця людина вже є у списку.",
-                "transcriptRequired": "Transcript text is required."
+                "transcriptRequired": "Текст транскрипції обов’язковий."
             },
             "toasts": {
-                "transcriptSaved": "Transcript attached",
-                "transcriptSummarized": "Transcript attached and summarized",
-                "transcriptError": "Couldn't attach the transcript.",
-                "saved": "Meeting updated",
+                "transcriptSaved": "Транскрипцію прикріплено",
+                "transcriptSummarized": "Транскрипцію прикріплено та стисло переказано",
+                "transcriptError": "Не вдалося прикріпити транскрипцію.",
+                "saved": "Зустріч оновлено",
                 "participantAdded": "Учасника додано",
-                "saveError": "Couldn't update the meeting.",
-                "deleted": "Meeting deleted",
-                "deleteError": "Couldn't delete the meeting."
+                "saveError": "Не вдалося оновити зустріч.",
+                "deleted": "Зустріч видалено",
+                "deleteError": "Не вдалося видалити зустріч."
             },
             "deleteDialog": {
                 "title": "Видалити цю зустріч?",

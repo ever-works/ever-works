@@ -6935,61 +6935,61 @@
             }
         },
         "meetingDetail": {
-            "backToMeetings": "Back to Meetings",
+            "backToMeetings": "Powrót do spotkań",
             "actions": {
-                "openRecording": "Open recording",
+                "openRecording": "Otwórz nagranie",
                 "edit": "Edytuj",
-                "delete": "Delete",
-                "attachTranscript": "Attach transcript",
+                "delete": "Usuń",
+                "attachTranscript": "Dołącz transkrypcję",
                 "attaching": "Dołączanie…",
                 "editTranscript": "Edytuj transkrypcję",
                 "cancelEdit": "Anuluj edycję",
                 "saveTranscript": "Zapisz transkrypcję",
                 "savingTranscript": "Zapisywanie…",
-                "save": "Save changes",
+                "save": "Zapisz zmiany",
                 "cancel": "Anuluj"
             },
             "sections": {
-                "summary": "Summary",
-                "transcript": "Transcript",
-                "details": "Details",
-                "edit": "Edit meeting"
+                "summary": "Podsumowanie",
+                "transcript": "Transkrypcja",
+                "details": "Szczegóły",
+                "edit": "Edytuj spotkanie"
             },
             "summary": {
                 "generating": "Generowanie podsumowania…",
                 "generatingHint": "Czytamy transkrypcję i piszemy podsumowanie — zwykle trwa to kilka sekund.",
-                "notGenerated": "No summary was generated for this transcript. Enable an AI provider and re-attach the transcript to try again.",
-                "noTranscript": "Attach a transcript to generate a summary."
+                "notGenerated": "Dla tej transkrypcji nie wygenerowano podsumowania. Włącz dostawcę AI i dołącz transkrypcję ponownie, aby spróbować jeszcze raz.",
+                "noTranscript": "Dołącz transkrypcję, aby wygenerować podsumowanie."
             },
             "transcript": {
-                "composerLabel": "Transcript text",
-                "composerPlaceholder": "Paste the meeting transcript here.",
-                "pipelineHint": "Stored first, then summarized, remembered and posted to your activity feed — best effort.",
-                "storedElsewhere": "The transcript is stored but was not returned with this view."
+                "composerLabel": "Tekst transkrypcji",
+                "composerPlaceholder": "Wklej tutaj transkrypcję spotkania.",
+                "pipelineHint": "Najpierw zapisujemy, potem podsumowujemy, zapamiętujemy i publikujemy w Twoim strumieniu aktywności — w miarę możliwości.",
+                "storedElsewhere": "Transkrypcja jest zapisana, ale nie została zwrócona w tym widoku."
             },
             "details": {
-                "source": "Source",
-                "startedAt": "Started",
-                "endedAt": "Ended",
-                "openEnded": "Still open",
-                "duration": "Duration",
-                "work": "Work",
-                "orgWide": "Org-wide",
-                "externalId": "Provider ID",
-                "createdAt": "Captured",
-                "participants": "Participants",
-                "noParticipants": "No participants recorded."
+                "source": "Źródło",
+                "startedAt": "Początek",
+                "endedAt": "Koniec",
+                "openEnded": "Wciąż trwa",
+                "duration": "Czas trwania",
+                "work": "Praca",
+                "orgWide": "Cała organizacja",
+                "externalId": "Identyfikator u dostawcy",
+                "createdAt": "Zarejestrowano",
+                "participants": "Uczestnicy",
+                "noParticipants": "Nie zapisano żadnych uczestników."
             },
             "edit": {
                 "hint": "Popraw godziny, zmień nazwę spotkania, popraw listę uczestników, wskaż nagranie lub przypisz je do Pracy."
             },
             "fields": {
-                "title": "Title",
+                "title": "Tytuł",
                 "startedAt": "Początek",
-                "endedAt": "Ended at",
-                "sourceUrl": "Recording link",
-                "work": "Work",
-                "workNone": "Org-wide (no Work)",
+                "endedAt": "Koniec",
+                "sourceUrl": "Link do nagrania",
+                "work": "Praca",
+                "workNone": "Cała organizacja (bez Pracy)",
                 "participants": "Uczestnicy",
                 "participantName": "Imię i nazwisko",
                 "participantEmail": "E-mail (opcjonalnie)",
@@ -6998,23 +6998,23 @@
                 "participantsEmpty": "Nikogo jeszcze nie zapisano."
             },
             "errors": {
-                "titleRequired": "Title is required.",
+                "titleRequired": "Tytuł jest wymagany.",
                 "startedAtInvalid": "Godzina rozpoczęcia nie jest prawidłową datą.",
-                "endedAtInvalid": "End time is not a valid date.",
-                "endedBeforeStarted": "End time cannot be before the start time.",
+                "endedAtInvalid": "Godzina zakończenia nie jest prawidłową datą.",
+                "endedBeforeStarted": "Godzina zakończenia nie może być wcześniejsza niż godzina rozpoczęcia.",
                 "participantEmailInvalid": "Wpisz prawidłowy adres e-mail lub pozostaw pole puste.",
                 "participantDuplicate": "Ta osoba jest już na liście.",
-                "transcriptRequired": "Transcript text is required."
+                "transcriptRequired": "Tekst transkrypcji jest wymagany."
             },
             "toasts": {
-                "transcriptSaved": "Transcript attached",
-                "transcriptSummarized": "Transcript attached and summarized",
-                "transcriptError": "Couldn't attach the transcript.",
-                "saved": "Meeting updated",
+                "transcriptSaved": "Dołączono transkrypcję",
+                "transcriptSummarized": "Dołączono i podsumowano transkrypcję",
+                "transcriptError": "Nie udało się dołączyć transkrypcji.",
+                "saved": "Zaktualizowano spotkanie",
                 "participantAdded": "Dodano uczestnika",
-                "saveError": "Couldn't update the meeting.",
-                "deleted": "Meeting deleted",
-                "deleteError": "Couldn't delete the meeting."
+                "saveError": "Nie udało się zaktualizować spotkania.",
+                "deleted": "Usunięto spotkanie",
+                "deleteError": "Nie udało się usunąć spotkania."
             },
             "deleteDialog": {
                 "title": "Usunąć to spotkanie?",

@@ -6965,61 +6965,61 @@
             }
         },
         "meetingDetail": {
-            "backToMeetings": "Back to Meetings",
+            "backToMeetings": "Retour aux réunions",
             "actions": {
-                "openRecording": "Open recording",
+                "openRecording": "Ouvrir l’enregistrement",
                 "edit": "Modifier",
-                "delete": "Delete",
-                "attachTranscript": "Attach transcript",
+                "delete": "Supprimer",
+                "attachTranscript": "Joindre une transcription",
                 "attaching": "Ajout en cours…",
                 "editTranscript": "Modifier la transcription",
                 "cancelEdit": "Annuler la modification",
                 "saveTranscript": "Enregistrer la transcription",
                 "savingTranscript": "Enregistrement…",
-                "save": "Save changes",
+                "save": "Enregistrer les modifications",
                 "cancel": "Annuler"
             },
             "sections": {
-                "summary": "Summary",
-                "transcript": "Transcript",
-                "details": "Details",
-                "edit": "Edit meeting"
+                "summary": "Résumé",
+                "transcript": "Transcription",
+                "details": "Détails",
+                "edit": "Modifier la réunion"
             },
             "summary": {
                 "generating": "Génération du résumé…",
                 "generatingHint": "Nous lisons la transcription et rédigeons le résumé — cela prend généralement quelques secondes.",
-                "notGenerated": "No summary was generated for this transcript. Enable an AI provider and re-attach the transcript to try again.",
-                "noTranscript": "Attach a transcript to generate a summary."
+                "notGenerated": "Aucun résumé n’a été généré pour cette transcription. Activez un fournisseur d’IA et joignez de nouveau la transcription pour réessayer.",
+                "noTranscript": "Joignez une transcription pour générer un résumé."
             },
             "transcript": {
-                "composerLabel": "Transcript text",
-                "composerPlaceholder": "Paste the meeting transcript here.",
-                "pipelineHint": "Stored first, then summarized, remembered and posted to your activity feed — best effort.",
-                "storedElsewhere": "The transcript is stored but was not returned with this view."
+                "composerLabel": "Texte de la transcription",
+                "composerPlaceholder": "Collez ici la transcription de la réunion.",
+                "pipelineHint": "D’abord enregistrée, puis résumée, mémorisée et publiée dans votre fil d’activité — au mieux.",
+                "storedElsewhere": "La transcription est enregistrée mais n’a pas été renvoyée avec cette vue."
             },
             "details": {
                 "source": "Source",
-                "startedAt": "Started",
-                "endedAt": "Ended",
-                "openEnded": "Still open",
-                "duration": "Duration",
-                "work": "Work",
-                "orgWide": "Org-wide",
-                "externalId": "Provider ID",
-                "createdAt": "Captured",
+                "startedAt": "Début",
+                "endedAt": "Fin",
+                "openEnded": "Toujours en cours",
+                "duration": "Durée",
+                "work": "Travail",
+                "orgWide": "Toute l’organisation",
+                "externalId": "ID du fournisseur",
+                "createdAt": "Enregistrée",
                 "participants": "Participants",
-                "noParticipants": "No participants recorded."
+                "noParticipants": "Aucun participant enregistré."
             },
             "edit": {
                 "hint": "Corrigez les horaires, renommez la réunion, ajustez la liste des participants, pointez vers un enregistrement ou réaffectez-la à un Travail."
             },
             "fields": {
-                "title": "Title",
+                "title": "Titre",
                 "startedAt": "Début",
-                "endedAt": "Ended at",
-                "sourceUrl": "Recording link",
-                "work": "Work",
-                "workNone": "Org-wide (no Work)",
+                "endedAt": "Fin",
+                "sourceUrl": "Lien de l’enregistrement",
+                "work": "Travail",
+                "workNone": "Toute l’organisation (aucun Travail)",
                 "participants": "Participants",
                 "participantName": "Nom",
                 "participantEmail": "E-mail (facultatif)",
@@ -7028,23 +7028,23 @@
                 "participantsEmpty": "Personne n’est encore enregistré."
             },
             "errors": {
-                "titleRequired": "Title is required.",
+                "titleRequired": "Le titre est obligatoire.",
                 "startedAtInvalid": "L'heure de début n'est pas une date valide.",
-                "endedAtInvalid": "End time is not a valid date.",
-                "endedBeforeStarted": "End time cannot be before the start time.",
+                "endedAtInvalid": "L’heure de fin n’est pas une date valide.",
+                "endedBeforeStarted": "L’heure de fin ne peut pas précéder l’heure de début.",
                 "participantEmailInvalid": "Saisissez une adresse e-mail valide ou laissez le champ vide.",
                 "participantDuplicate": "Cette personne est déjà dans la liste.",
-                "transcriptRequired": "Transcript text is required."
+                "transcriptRequired": "Le texte de la transcription est obligatoire."
             },
             "toasts": {
-                "transcriptSaved": "Transcript attached",
-                "transcriptSummarized": "Transcript attached and summarized",
-                "transcriptError": "Couldn't attach the transcript.",
-                "saved": "Meeting updated",
+                "transcriptSaved": "Transcription jointe",
+                "transcriptSummarized": "Transcription jointe et résumée",
+                "transcriptError": "Impossible de joindre la transcription.",
+                "saved": "Réunion mise à jour",
                 "participantAdded": "Participant ajouté",
-                "saveError": "Couldn't update the meeting.",
-                "deleted": "Meeting deleted",
-                "deleteError": "Couldn't delete the meeting."
+                "saveError": "Impossible de mettre à jour la réunion.",
+                "deleted": "Réunion supprimée",
+                "deleteError": "Impossible de supprimer la réunion."
             },
             "deleteDialog": {
                 "title": "Supprimer cette réunion ?",

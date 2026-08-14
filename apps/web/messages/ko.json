@@ -6935,61 +6935,61 @@
             }
         },
         "meetingDetail": {
-            "backToMeetings": "Back to Meetings",
+            "backToMeetings": "회의 목록으로 돌아가기",
             "actions": {
-                "openRecording": "Open recording",
+                "openRecording": "녹화 열기",
                 "edit": "편집",
-                "delete": "Delete",
-                "attachTranscript": "Attach transcript",
+                "delete": "삭제",
+                "attachTranscript": "대화록 첨부",
                 "attaching": "첨부하는 중…",
                 "editTranscript": "대화록 편집",
                 "cancelEdit": "편집 취소",
                 "saveTranscript": "대화록 저장",
                 "savingTranscript": "저장하는 중…",
-                "save": "Save changes",
+                "save": "변경사항 저장",
                 "cancel": "취소"
             },
             "sections": {
-                "summary": "Summary",
-                "transcript": "Transcript",
-                "details": "Details",
-                "edit": "Edit meeting"
+                "summary": "요약",
+                "transcript": "대화록",
+                "details": "세부 정보",
+                "edit": "회의 편집"
             },
             "summary": {
                 "generating": "요약을 생성하는 중…",
                 "generatingHint": "대화록을 읽고 요약을 작성하고 있습니다. 보통 몇 초 정도 걸립니다.",
-                "notGenerated": "No summary was generated for this transcript. Enable an AI provider and re-attach the transcript to try again.",
-                "noTranscript": "Attach a transcript to generate a summary."
+                "notGenerated": "이 대화록에 대한 요약이 생성되지 않았습니다. AI 제공자를 활성화한 뒤 대화록을 다시 첨부해 보세요.",
+                "noTranscript": "요약을 생성하려면 대화록을 첨부하세요."
             },
             "transcript": {
-                "composerLabel": "Transcript text",
-                "composerPlaceholder": "Paste the meeting transcript here.",
-                "pipelineHint": "Stored first, then summarized, remembered and posted to your activity feed — best effort.",
-                "storedElsewhere": "The transcript is stored but was not returned with this view."
+                "composerLabel": "대화록 텍스트",
+                "composerPlaceholder": "여기에 회의 대화록을 붙여넣으세요.",
+                "pipelineHint": "먼저 저장한 뒤 요약하고 기억하며 활동 피드에 게시합니다 — 가능한 범위에서 처리됩니다.",
+                "storedElsewhere": "대화록은 저장되어 있지만 이 화면에는 함께 반환되지 않았습니다."
             },
             "details": {
-                "source": "Source",
-                "startedAt": "Started",
-                "endedAt": "Ended",
-                "openEnded": "Still open",
-                "duration": "Duration",
-                "work": "Work",
-                "orgWide": "Org-wide",
-                "externalId": "Provider ID",
-                "createdAt": "Captured",
-                "participants": "Participants",
-                "noParticipants": "No participants recorded."
+                "source": "출처",
+                "startedAt": "시작",
+                "endedAt": "종료",
+                "openEnded": "아직 진행 중",
+                "duration": "소요 시간",
+                "work": "워크",
+                "orgWide": "조직 전체",
+                "externalId": "제공자 ID",
+                "createdAt": "기록됨",
+                "participants": "참석자",
+                "noParticipants": "기록된 참석자가 없습니다."
             },
             "edit": {
                 "hint": "시간을 수정하고, 회의 이름을 바꾸고, 참석자 목록을 정리하고, 녹화본을 연결하거나 워크로 다시 연결할 수 있습니다."
             },
             "fields": {
-                "title": "Title",
+                "title": "제목",
                 "startedAt": "시작 시각",
-                "endedAt": "Ended at",
-                "sourceUrl": "Recording link",
-                "work": "Work",
-                "workNone": "Org-wide (no Work)",
+                "endedAt": "종료 시각",
+                "sourceUrl": "녹화 링크",
+                "work": "워크",
+                "workNone": "조직 전체(워크 없음)",
                 "participants": "참석자",
                 "participantName": "이름",
                 "participantEmail": "이메일(선택)",
@@ -6998,23 +6998,23 @@
                 "participantsEmpty": "아직 기록된 사람이 없습니다."
             },
             "errors": {
-                "titleRequired": "Title is required.",
+                "titleRequired": "제목을 입력해야 합니다.",
                 "startedAtInvalid": "시작 시각이 올바른 날짜가 아닙니다.",
-                "endedAtInvalid": "End time is not a valid date.",
-                "endedBeforeStarted": "End time cannot be before the start time.",
+                "endedAtInvalid": "종료 시각이 올바른 날짜가 아닙니다.",
+                "endedBeforeStarted": "종료 시각은 시작 시각보다 앞설 수 없습니다.",
                 "participantEmailInvalid": "유효한 이메일 주소를 입력하거나 비워 두세요.",
                 "participantDuplicate": "이미 목록에 있는 사람입니다.",
-                "transcriptRequired": "Transcript text is required."
+                "transcriptRequired": "대화록 텍스트를 입력해야 합니다."
             },
             "toasts": {
-                "transcriptSaved": "Transcript attached",
-                "transcriptSummarized": "Transcript attached and summarized",
-                "transcriptError": "Couldn't attach the transcript.",
-                "saved": "Meeting updated",
+                "transcriptSaved": "대화록을 첨부했습니다",
+                "transcriptSummarized": "대화록을 첨부하고 요약했습니다",
+                "transcriptError": "대화록을 첨부하지 못했습니다.",
+                "saved": "회의를 업데이트했습니다",
                 "participantAdded": "참석자를 추가했습니다",
-                "saveError": "Couldn't update the meeting.",
-                "deleted": "Meeting deleted",
-                "deleteError": "Couldn't delete the meeting."
+                "saveError": "회의를 업데이트하지 못했습니다.",
+                "deleted": "회의를 삭제했습니다",
+                "deleteError": "회의를 삭제하지 못했습니다."
             },
             "deleteDialog": {
                 "title": "이 회의를 삭제할까요?",
