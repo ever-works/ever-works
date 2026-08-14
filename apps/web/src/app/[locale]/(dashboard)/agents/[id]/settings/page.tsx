@@ -2,6 +2,7 @@ import { notFound } from 'next/navigation';
 import { agentsAPI } from '@/lib/api/agents';
 import { teamsAPI } from '@/lib/api/teams';
 import { pluginsAPI } from '@/lib/api/plugins';
+import { environmentsAPI } from '@/lib/api/environments';
 import {
     AgentSettingsClient,
     type AgentSettingsOrganization,
@@ -34,6 +35,13 @@ export default async function AgentSettingsPage({ params }: { params: Promise<{ 
         .map((plugin) => ({ id: plugin.id, name: plugin.name ?? plugin.id }))
         .sort((a, b) => a.name.localeCompare(b.name));
 
+    // Environments — published rows only for the Runtime "Environment"
+    // picker (server refuses draft assignment with a 422; this filter is
+    // the matching UI rule). Failure degrades to an empty list.
+    const environments = (await environmentsAPI.list('published').catch(() => [])).map(
+        (environment) => ({ id: environment.id, name: environment.name }),
+    );
+
     const orgs = await teamsAPI.listOrganizations().catch(() => []);
     const activeOrg = orgs[0];
     let organization: AgentSettingsOrganization | undefined;
@@ -57,6 +65,11 @@ export default async function AgentSettingsPage({ params }: { params: Promise<{ 
     }
 
     return (
-        <AgentSettingsClient agent={agent} organization={organization} aiProviders={aiProviders} />
+        <AgentSettingsClient
+            agent={agent}
+            organization={organization}
+            aiProviders={aiProviders}
+            environments={environments}
+        />
     );
 }
