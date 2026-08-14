@@ -106,8 +106,4 @@ export class MemoryFolderRepository {
             .andWhere('id IN (:...ids)', { ids })
             .execute();
     }
-
-    async countChildren(userId: string, parentId: string): Promise<number> {
-        return this.repo.count({ where: { userId, parentId } });
-    }
 }
