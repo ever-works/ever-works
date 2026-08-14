@@ -816,7 +816,22 @@
                 "provenanceIdea": "Idea",
                 "provenanceAgent": "Agent",
                 "provenanceWork": "Work",
-                "provenanceChat": "Chat"
+                "provenanceChat": "Chat",
+                "searchPlaceholder": "Search all files",
+                "emptySearch": "No files match your search.",
+                "preview": "Preview",
+                "previewTitle": "File preview",
+                "previewClose": "Close preview",
+                "previewUnsupported": "No inline preview for this file type — download it to view.",
+                "previewFailed": "Couldn't load the preview.",
+                "configureSync": "Configure git sync",
+                "syncOwnerPlaceholder": "Repository owner",
+                "syncRepoPlaceholder": "Repository name",
+                "syncBranchPlaceholder": "Branch (optional)",
+                "syncDirPrefixPlaceholder": "Folder in repo (optional)",
+                "save": "Save",
+                "removeSync": "Remove sync target",
+                "syncSaveFailed": "Couldn't save the sync target — try again."
             },
             "consolidation": {
                 "action": "Consolider",
