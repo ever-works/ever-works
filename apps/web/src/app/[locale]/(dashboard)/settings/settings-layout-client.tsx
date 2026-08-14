@@ -45,115 +45,130 @@ interface StaticTab {
     href: string;
 }
 
-export function SettingsLayoutClient({ children, settingsMenu }: SettingsLayoutClientProps) {
+export function SettingsLayoutClient({
+    children,
+    settingsMenu,
+    // Default true per the prop's contract above: the flag exists to turn
+    // Fleet OFF, never to require callers to opt in. (This prop was declared
+    // and passed by the server layout but never destructured, so FLEET_ENABLED
+    // had no effect on the nav — the tab rendered unconditionally.)
+    fleetEnabled = true,
+}: SettingsLayoutClientProps) {
     const pathname = usePathname();
     const t = useTranslations('dashboard.settings');
 
     const baseSettingsPath = '/settings';
 
-    // Static tabs that are always visible
+    // Static tabs — always visible except `fleet`, which honours FLEET_ENABLED
+    // (filtered at the end of this memo).
     const staticTabs: StaticTab[] = useMemo(
-        () => [
-            { id: 'profile', label: t('tabs.profile'), icon: User, href: baseSettingsPath },
-            {
-                id: 'organization',
-                label: t('tabs.organization'),
-                icon: Building2,
-                href: `${baseSettingsPath}/organization`,
-            },
-            {
-                id: 'security',
-                label: t('tabs.security'),
-                icon: Lock,
-                href: `${baseSettingsPath}/security`,
-            },
-            {
-                id: 'api-keys',
-                label: t('tabs.apiKeys'),
-                icon: Key,
-                href: `${baseSettingsPath}/api-keys`,
-            },
-            {
-                id: 'data',
-                label: t('tabs.data'),
-                icon: HardDrive,
-                href: `${baseSettingsPath}/data`,
-            },
-            {
-                id: 'github-app',
-                label: t('tabs.githubApp'),
-                icon: Github,
-                href: `${baseSettingsPath}/github-app`,
-            },
-            {
-                id: 'work-agent',
-                label: t('tabs.workAgent'),
-                icon: Bot,
-                href: `${baseSettingsPath}/work-agent`,
-            },
-            // Fleet sits directly ABOVE Job Runtime by design: Fleet is
-            // WHERE work can run; Job Runtime stays HOW work is dispatched.
-            {
-                id: 'fleet',
-                label: t('tabs.fleet'),
-                icon: Server,
-                href: `${baseSettingsPath}/fleet`,
-            },
-            {
-                id: 'job-runtime',
-                label: t('tabs.jobRuntime'),
-                icon: Cpu,
-                href: `${baseSettingsPath}/job-runtime`,
-            },
-            // Digest briefings — the personal cadence AND the org-scoped
-            // one live on one page, since they are two records of the
-            // same thing rather than two features.
-            {
-                id: 'digest',
-                label: t('tabs.digest'),
-                icon: Newspaper,
-                href: `${baseSettingsPath}/digest`,
-            },
-            // EW-058 — these three pages shipped (notification preferences +
-            // Novu inbox, channel CRUD, tenant email addresses) with ZERO
-            // inbound links anywhere in the product: reachable only by typing
-            // the URL. The nav entries below are their first entry points.
-            // NOTE deliberately NO bare /settings/integrations tab — that path
-            // has no index page and would soft-404.
-            {
-                id: 'notifications',
-                label: t('tabs.notifications'),
-                icon: Bell,
-                href: `${baseSettingsPath}/notifications`,
-            },
-            {
-                id: 'channels',
-                label: t('tabs.channels'),
-                icon: MessagesSquare,
-                href: `${baseSettingsPath}/integrations/channels`,
-            },
-            {
-                id: 'emails',
-                label: t('tabs.emails'),
-                icon: Mail,
-                href: `${baseSettingsPath}/integrations/emails`,
-            },
-            // Wave 13 — Billing + Usage & Credits (billing/usage PRD §2):
-            // also reachable from the settings shell like api-keys/security.
-            {
-                id: 'billing',
-                label: t('tabs.billing'),
-                icon: CreditCard,
-                href: `${baseSettingsPath}/billing`,
-            },
-            {
-                id: 'usage',
-                label: t('tabs.usageCredits'),
-                icon: BarChart3,
-                href: `${baseSettingsPath}/usage`,
-            },
-        ],
-        [t],
+        () =>
+            [
+                { id: 'profile', label: t('tabs.profile'), icon: User, href: baseSettingsPath },
+                {
+                    id: 'organization',
+                    label: t('tabs.organization'),
+                    icon: Building2,
+                    href: `${baseSettingsPath}/organization`,
+                },
+                {
+                    id: 'security',
+                    label: t('tabs.security'),
+                    icon: Lock,
+                    href: `${baseSettingsPath}/security`,
+                },
+                {
+                    id: 'api-keys',
+                    label: t('tabs.apiKeys'),
+                    icon: Key,
+                    href: `${baseSettingsPath}/api-keys`,
+                },
+                {
+                    id: 'data',
+                    label: t('tabs.data'),
+                    icon: HardDrive,
+                    href: `${baseSettingsPath}/data`,
+                },
+                {
+                    id: 'github-app',
+                    label: t('tabs.githubApp'),
+                    icon: Github,
+                    href: `${baseSettingsPath}/github-app`,
+                },
+                {
+                    id: 'work-agent',
+                    label: t('tabs.workAgent'),
+                    icon: Bot,
+                    href: `${baseSettingsPath}/work-agent`,
+                },
+                // Fleet sits directly ABOVE Job Runtime by design: Fleet is
+                // WHERE work can run; Job Runtime stays HOW work is dispatched.
+                {
+                    id: 'fleet',
+                    label: t('tabs.fleet'),
+                    icon: Server,
+                    href: `${baseSettingsPath}/fleet`,
+                },
+                {
+                    id: 'job-runtime',
+                    label: t('tabs.jobRuntime'),
+                    icon: Cpu,
+                    href: `${baseSettingsPath}/job-runtime`,
+                },
+                // Digest briefings — the personal cadence AND the org-scoped
+                // one live on one page, since they are two records of the
+                // same thing rather than two features.
+                {
+                    id: 'digest',
+                    label: t('tabs.digest'),
+                    icon: Newspaper,
+                    href: `${baseSettingsPath}/digest`,
+                },
+                // EW-058 — these three pages shipped (notification preferences +
+                // Novu inbox, channel CRUD, tenant email addresses) with ZERO
+                // inbound links anywhere in the product: reachable only by
+                // typing the URL. The entries below are their first entry
+                // points. NOTE deliberately NO bare /settings/integrations tab —
+                // that path has no index page and would soft-404.
+                {
+                    id: 'notifications',
+                    label: t('tabs.notifications'),
+                    icon: Bell,
+                    href: `${baseSettingsPath}/notifications`,
+                },
+                {
+                    id: 'channels',
+                    label: t('tabs.channels'),
+                    icon: MessagesSquare,
+                    href: `${baseSettingsPath}/integrations/channels`,
+                },
+                {
+                    id: 'emails',
+                    label: t('tabs.emails'),
+                    icon: Mail,
+                    href: `${baseSettingsPath}/integrations/emails`,
+                },
+                // Wave 13 — Billing + Usage & Credits (billing/usage PRD §2):
+                // also reachable from the settings shell like api-keys/security.
+                {
+                    id: 'billing',
+                    label: t('tabs.billing'),
+                    icon: CreditCard,
+                    href: `${baseSettingsPath}/billing`,
+                },
+                {
+                    id: 'usage',
+                    label: t('tabs.usageCredits'),
+                    icon: BarChart3,
+                    href: `${baseSettingsPath}/usage`,
+                },
+                // The fleet tab is declared unconditionally above (keeping the
+                // "Fleet sits directly ABOVE Job Runtime" ordering comment true)
+                // and filtered here when the operator has turned Fleet off — the
+                // same FLEET_ENABLED switch the API and the Fleet page enforce, so
+                // a disabled deployment has no entry point and no route.
+            ].filter((tab) => tab.id !== 'fleet' || fleetEnabled),
+        [t, fleetEnabled],
     );
 
     // Danger zone tab (always at bottom)

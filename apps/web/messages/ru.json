@@ -996,7 +996,8 @@
                 "allTemplates": "All templates",
                 "yourTemplates": "Your templates",
                 "yourTemplatesEmpty": "Agents you create will appear here as reusable templates.",
-                "openInWizard": "Open in wizard"
+                "openInWizard": "Open in wizard",
+                "browsePage": "Open the full template browser"
             },
             "pageTabs": {
                 "agents": "Agents",
@@ -1114,7 +1115,8 @@
                     "showing": "Показано {from}–{to} из {total}",
                     "previous": "Назад",
                     "next": "Вперёд"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "newDialog": {
                 "title": "Создать новую задачу",
@@ -1350,7 +1352,8 @@
                 "filter": {
                     "scope": "Область действия",
                     "all": "Все"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "detail": {
                 "instructions": "Инструкции",
@@ -1798,7 +1801,21 @@
                     "empty": "С этой Идеей пока не связано ни одного Work."
                 },
                 "agents": {
-                    "empty": "Нет Агентов, привязанных к этой Идее."
+                    "empty": "Нет Агентов, привязанных к этой Идее.",
+                    "assignExisting": "Назначить существующего",
+                    "assignTitle": "Назначить агента этой Идее",
+                    "assignSubtitle": "Назначьте на эту Идею агента, который у вас уже есть, вместо создания нового.",
+                    "assignSearchPlaceholder": "Поиск агентов…",
+                    "assignLoading": "Загрузка агентов…",
+                    "assignNoneAvailable": "Больше нет агентов для назначения.",
+                    "assignNoMatches": "Нет агентов по этому запросу.",
+                    "assignLoadFailed": "Не удалось загрузить агентов",
+                    "assignedToast": "{name} назначен этой Идее",
+                    "assignFailed": "Не удалось назначить агента",
+                    "assignCancel": "Отмена",
+                    "unassign": "Убрать из этой Идеи",
+                    "unassignedToast": "{name} убран из этой Идеи",
+                    "unassignFailed": "Не удалось убрать агента"
                 },
                 "meta": {
                     "source": "Источник",
@@ -1818,7 +1835,8 @@
                         "idea-agents": "Удаление невозможно: к Идее привязано {count} Агент(ов). Удалите их или измените область.",
                         "build-in-flight": "Нельзя удалить во время сборки. Дождитесь её завершения.",
                         "unknown": "Сейчас удалить эту Идею нельзя."
-                    }
+                    },
+                    "unlinksWorks": "{count, plural, one {Эта Идея связана с # Work. Он сохранится — удаляется только связь.} few {Эта Идея связана с # Works. Они сохранятся — удаляется только связь.} many {Эта Идея связана с # Works. Они сохранятся — удаляется только связь.} other {Эта Идея связана с # Works. Они сохранятся — удаляется только связь.}}"
                 },
                 "toasts": {
                     "built": "Work собран из этой Идеи",
@@ -6898,7 +6916,6 @@
             "created": "Meeting captured",
             "sections": {
                 "provenance": "Where it came from",
-                "participants": "Participants",
                 "transcript": "Transcript"
             },
             "sources": {
@@ -6921,7 +6938,6 @@
                 "externalId": "Provider meeting ID (optional)",
                 "externalIdHint": "Used to de-duplicate against a later connector sync of the same meeting.",
                 "participants": "Participants",
-                "participantsHint": "One per line. Use \"Name <email>\" to record an address.",
                 "transcript": "Transcript (optional)",
                 "transcriptPlaceholder": "Ada: shipping the gate.\nGrace: reviewing the branch.",
                 "transcriptHint": "Adding a transcript runs the summary, Memory and activity pipeline. You can also attach it later from the meeting page."
@@ -6931,6 +6947,7 @@
                 "startedAtInvalid": "Start time is not a valid date.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
+                "participantEmailInvalid": "Введите корректный адрес эл. почты или оставьте поле пустым.",
                 "createFailed": "Couldn't capture the meeting. Please try again."
             },
             "actions": {
@@ -6939,71 +6956,94 @@
             }
         },
         "meetingDetail": {
-            "backToMeetings": "Back to Meetings",
+            "backToMeetings": "Назад к встречам",
             "actions": {
-                "openRecording": "Open recording",
-                "delete": "Delete",
-                "attachTranscript": "Attach transcript",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
-                "save": "Save changes"
+                "openRecording": "Открыть запись",
+                "edit": "Изменить",
+                "delete": "Удалить",
+                "attachTranscript": "Прикрепить расшифровку",
+                "attaching": "Прикрепляем…",
+                "editTranscript": "Редактировать расшифровку",
+                "cancelEdit": "Отменить редактирование",
+                "saveTranscript": "Сохранить расшифровку",
+                "savingTranscript": "Сохраняем…",
+                "save": "Сохранить изменения",
+                "cancel": "Отмена"
             },
             "sections": {
-                "summary": "Summary",
-                "transcript": "Transcript",
-                "details": "Details",
-                "edit": "Edit meeting"
+                "summary": "Краткое содержание",
+                "transcript": "Расшифровка",
+                "details": "Подробности",
+                "edit": "Редактирование встречи"
             },
             "summary": {
-                "notGenerated": "No summary was generated for this transcript. Enable an AI provider and re-attach the transcript to try again.",
-                "noTranscript": "Attach a transcript to generate a summary."
+                "generating": "Создаём краткое содержание…",
+                "generatingHint": "Читаем расшифровку и пишем краткое содержание — обычно это занимает несколько секунд.",
+                "notGenerated": "Для этой расшифровки краткое содержание не создано. Включите провайдера ИИ и прикрепите расшифровку заново, чтобы попробовать ещё раз.",
+                "noTranscript": "Прикрепите расшифровку, чтобы создать краткое содержание."
             },
             "transcript": {
-                "composerLabel": "Transcript text",
-                "composerPlaceholder": "Paste the meeting transcript here.",
-                "pipelineHint": "Stored first, then summarized, remembered and posted to your activity feed — best effort.",
-                "storedElsewhere": "The transcript is stored but was not returned with this view."
+                "composerLabel": "Текст расшифровки",
+                "composerPlaceholder": "Вставьте сюда расшифровку встречи.",
+                "pipelineHint": "Сначала сохраняем, затем кратко пересказываем, запоминаем и публикуем в вашей ленте активности — по мере возможности.",
+                "storedElsewhere": "Расшифровка сохранена, но не была возвращена в этом представлении."
             },
             "details": {
-                "source": "Source",
-                "startedAt": "Started",
-                "endedAt": "Ended",
-                "openEnded": "Still open",
-                "duration": "Duration",
-                "work": "Work",
-                "orgWide": "Org-wide",
-                "externalId": "Provider ID",
-                "createdAt": "Captured",
-                "participants": "Participants",
-                "noParticipants": "No participants recorded."
+                "source": "Источник",
+                "startedAt": "Начало",
+                "endedAt": "Окончание",
+                "openEnded": "Ещё идёт",
+                "duration": "Длительность",
+                "work": "Работа",
+                "orgWide": "Вся организация",
+                "externalId": "ID у провайдера",
+                "createdAt": "Зафиксирована",
+                "participants": "Участники",
+                "noParticipants": "Участники не записаны."
             },
             "edit": {
-                "hint": "Rename the meeting, close it out, point it at a recording, or re-route it to a Work."
+                "hint": "Исправьте время, переименуйте встречу, поправьте список участников, укажите запись или перепривяжите её к Работе."
             },
             "fields": {
-                "title": "Title",
-                "endedAt": "Ended at",
-                "sourceUrl": "Recording link",
-                "work": "Work",
-                "workNone": "Org-wide (no Work)"
+                "title": "Название",
+                "startedAt": "Начало",
+                "endedAt": "Окончание",
+                "sourceUrl": "Ссылка на запись",
+                "work": "Работа",
+                "workNone": "Вся организация (без Работы)",
+                "participants": "Участники",
+                "participantName": "Имя",
+                "participantEmail": "Эл. почта (необязательно)",
+                "participantAdd": "Добавить участника",
+                "participantRemove": "Удалить участника",
+                "participantsEmpty": "Пока никто не записан."
             },
             "errors": {
-                "titleRequired": "Title is required.",
-                "endedAtInvalid": "End time is not a valid date.",
-                "endedBeforeStarted": "End time cannot be before the start time.",
-                "transcriptRequired": "Transcript text is required."
+                "titleRequired": "Название обязательно.",
+                "startedAtInvalid": "Время начала не является допустимой датой.",
+                "endedAtInvalid": "Время окончания не является допустимой датой.",
+                "endedBeforeStarted": "Время окончания не может быть раньше времени начала.",
+                "participantEmailInvalid": "Введите корректный адрес эл. почты или оставьте поле пустым.",
+                "participantDuplicate": "Этот человек уже есть в списке.",
+                "transcriptRequired": "Текст расшифровки обязателен."
             },
             "toasts": {
-                "transcriptSaved": "Transcript attached",
-                "transcriptSummarized": "Transcript attached and summarized",
-                "transcriptError": "Couldn't attach the transcript.",
-                "saved": "Meeting updated",
-                "saveError": "Couldn't update the meeting.",
-                "deleted": "Meeting deleted",
-                "deleteError": "Couldn't delete the meeting."
+                "transcriptSaved": "Расшифровка прикреплена",
+                "transcriptSummarized": "Расшифровка прикреплена, краткое содержание создано",
+                "transcriptError": "Не удалось прикрепить расшифровку.",
+                "saved": "Встреча обновлена",
+                "participantAdded": "Участник добавлен",
+                "saveError": "Не удалось обновить встречу.",
+                "deleted": "Встреча удалена",
+                "deleteError": "Не удалось удалить встречу."
             },
-            "confirm": {
-                "delete": "Delete this meeting? Its transcript and summary will be removed. This cannot be undone."
+            "deleteDialog": {
+                "title": "Удалить эту встречу?",
+                "body": "{title} будет удалена безвозвратно вместе с расшифровкой и сводкой. Это действие нельзя отменить.",
+                "confirm": "Удалить встречу",
+                "cancel": "Отмена",
+                "deleting": "Удаление…",
+                "error": "Не удалось удалить встречу"
             }
         },
         "agentsPreview": {
