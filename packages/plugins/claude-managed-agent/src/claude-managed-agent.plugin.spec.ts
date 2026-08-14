@@ -59,7 +59,7 @@ vi.mock('@anthropic-ai/sdk', () => {
 });
 
 import { ClaudeManagedAgentPlugin } from './claude-managed-agent.plugin.js';
-import { type ManagedAgentPipelineMetrics } from './types.js';
+import { CMA_FAN_OUT_CAPABILITY, type ManagedAgentPipelineMetrics } from './types.js';
 
 /**
  * Faithful replica of the platform's `extractPipelineUsageMetrics`
@@ -135,14 +135,28 @@ const EXISTING = { items: [], categories: [], tags: [], collections: [], brands:
 function createContextStub(userSettings: Record<string, unknown>) {
 	const updateSettings = vi.fn().mockResolvedValue(undefined);
 	const logger = { log: vi.fn(), warn: vi.fn(), error: vi.fn(), debug: vi.fn() };
+	const registry = new Map<string, unknown>();
+	const registerCustomCapability = vi.fn((definition: { name: string }, implementation: unknown) => {
+		if (registry.has(definition.name)) {
+			throw new Error(`Capability "${definition.name}" is already registered`);
+		}
+		registry.set(definition.name, implementation);
+	});
+	const hasCustomCapability = vi.fn((name: string) => registry.has(name));
+
 	return {
 		context: {
 			pluginId: 'claude-managed-agent',
 			logger,
 			getSettings: vi.fn(async (scope: string) => (scope === 'user' ? userSettings : {})),
-			updateSettings
+			updateSettings,
+			registerCustomCapability,
+			hasCustomCapability,
+			getCustomCapability: vi.fn((name: string) => registry.get(name))
 		} as never,
 		updateSettings,
+		registerCustomCapability,
+		registry,
 		logger
 	};
 }
@@ -239,6 +253,30 @@ describe('ClaudeManagedAgentPlugin — persistent control plane (default)', () =
 			total_tokens_used: 200,
 			total_cost: 2.5
 		});
+	});
+
+	it('registers the fan-out service as a custom capability on load', async () => {
+		const plugin = new ClaudeManagedAgentPlugin();
+		const { context, registerCustomCapability, registry } = createContextStub({ apiKey: 'sk-test' });
+
+		await plugin.onLoad(context);
+
+		expect(registerCustomCapability).toHaveBeenCalledTimes(1);
+		expect(registerCustomCapability.mock.calls[0][0]).toEqual(
+			expect.objectContaining({ name: CMA_FAN_OUT_CAPABILITY, methods: ['runSessions'] })
+		);
+		expect(typeof (registry.get(CMA_FAN_OUT_CAPABILITY) as { runSessions: unknown }).runSessions).toBe('function');
+	});
+
+	it('does not re-register (or throw) when the plugin is loaded twice', async () => {
+		const plugin = new ClaudeManagedAgentPlugin();
+		const { context, registerCustomCapability, logger } = createContextStub({ apiKey: 'sk-test' });
+
+		await plugin.onLoad(context);
+		await expect(plugin.onLoad(context)).resolves.toBeUndefined();
+
+		expect(registerCustomCapability).toHaveBeenCalledTimes(1);
+		expect(logger.warn).not.toHaveBeenCalled();
 	});
 
 	it('splices memory recall into the session system override, not the persistent agent', async () => {

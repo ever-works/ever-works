@@ -9,8 +9,10 @@
  */
 
 export { ClaudeManagedAgentPlugin } from './claude-managed-agent.plugin.js';
+export { CMA_FAN_OUT_CAPABILITY } from './types.js';
 export type {
 	ClaudeManagedAgentStepId,
+	ManagedAgentFanOutCapability,
 	ManagedAgentPipelineMetrics,
 	ManagedRuntimeEnvironment,
 	ManagedSessionPromptInput,

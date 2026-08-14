@@ -343,6 +343,19 @@ export interface ManagedAgentPipelineMetrics extends PipelineMetrics {
 	};
 }
 
+/**
+ * Name under which the fan-out service is published on the platform's custom
+ * capability registry (`context.registerCustomCapability`), so API-side and
+ * Trigger.dev callers can reach `runSessions` without holding the plugin
+ * instance: `customCapabilityRegistry.getImplementation(CMA_FAN_OUT_CAPABILITY)`.
+ */
+export const CMA_FAN_OUT_CAPABILITY = 'claude-managed-agent.fan-out';
+
+/** Implementation shape registered under {@link CMA_FAN_OUT_CAPABILITY}. */
+export interface ManagedAgentFanOutCapability {
+	runSessions(options: PluginRunSessionsOptions): Promise<ManagedSessionRunResult[]>;
+}
+
 /** Options accepted by the plugin-level `runSessions` fan-out entry point. */
 export interface PluginRunSessionsOptions {
 	prompts: ManagedSessionPromptInput[];

@@ -33,11 +33,13 @@ import { STEP_DEFINITIONS } from './steps.js';
 import {
 	CLAUDE_MANAGED_AGENT_SUPPORTED_MODELS,
 	type ClaudeManagedAgentStepId,
+	CMA_FAN_OUT_CAPABILITY,
 	DEFAULT_BASE_URL,
 	DEFAULT_MAX_POLL_ATTEMPTS,
 	DEFAULT_MODEL,
 	DEFAULT_POLL_INTERVAL_MS,
 	DEFAULT_WORKSPACE_PATH,
+	type ManagedAgentFanOutCapability,
 	type ManagedAgentRunResources,
 	type ManagedRuntimeEnvironment,
 	type ManagedSessionRunResult,
@@ -210,7 +212,51 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 
 	async onLoad(context: PluginContext): Promise<void> {
 		this.context = context;
+		this.registerFanOutCapability(context);
 		context.logger.log('Claude Managed Agent plugin loaded');
+	}
+
+	/**
+	 * Publish the fan-out service on the platform's custom capability registry
+	 * so API-side services and Trigger.dev tasks can call it without resolving
+	 * the plugin instance themselves.
+	 *
+	 * Guarded on every axis because a failure here must never stop the plugin
+	 * from loading: hosts may hand over a partial context (the capability
+	 * methods are optional in practice even though the interface requires
+	 * them), and the registry THROWS on a duplicate name — which happens when
+	 * a plugin is re-loaded before its previous registration is torn down.
+	 */
+	private registerFanOutCapability(context: PluginContext): void {
+		if (typeof context.registerCustomCapability !== 'function') {
+			return;
+		}
+
+		if (context.hasCustomCapability?.(CMA_FAN_OUT_CAPABILITY)) {
+			return;
+		}
+
+		const implementation: ManagedAgentFanOutCapability = {
+			runSessions: (options) => this.runSessions(options)
+		};
+
+		try {
+			context.registerCustomCapability(
+				{
+					name: CMA_FAN_OUT_CAPABILITY,
+					description: 'Run N Claude Managed Agent sessions in parallel with bounded concurrency.',
+					version: this.version,
+					methods: ['runSessions']
+				},
+				implementation
+			);
+		} catch (error) {
+			context.logger.warn(
+				`Claude Managed Agent: fan-out capability not registered: ${
+					error instanceof Error ? error.message : String(error)
+				}`
+			);
+		}
 	}
 
 	async onUnload(): Promise<void> {
