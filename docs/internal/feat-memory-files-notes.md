@@ -15,33 +15,29 @@ pipeline and KB lifecycle are untouched.
 - **New entity `memory_folders`**
   (`packages/agent/src/entities/memory-folder.entity.ts`):
   `id, userId, tenantId?, organizationId?, name varchar(120),
-  parentId uuid NULL, path varchar(512), ownerAgentId uuid NULL,
-  syncRepo simple-json NULL, timestamps`.
-  - `path` is the materialized absolute path (`/a/b`), **unique per
-    userId** (`uq_memory_folders_user_path`), maintained by
-    `MemoryFoldersService` with a portable subtree rewrite
-    (`'…' || substr(path, n)` works on postgres AND better-sqlite3).
-  - `ownerAgentId NULL` = Global folder; set = private to that agent.
-  - `syncRepo` holds repo **coordinates only**
-    (`{repoUrl?, owner?, repo?, branch?, dirPrefix?}`) — never
-    credentials; the git facade resolves tokens at sync time.
-  - Registered in `_entities-inventory.ts`, `_entity-names.ts`,
-    `entities/index.ts`; repository in `_repository-inventory.ts`
-    (DatabaseModule-owned, so the module-shape drift spec counts it
-    automatically).
+parentId uuid NULL, path varchar(512), ownerAgentId uuid NULL,
+syncRepo simple-json NULL, timestamps`. - `path` is the materialized absolute path (`/a/b`), **unique per
+  userId** (`uq_memory_folders_user_path`), maintained by
+  `MemoryFoldersService` with a portable subtree rewrite
+  (`'…' || substr(path, n)` works on postgres AND better-sqlite3). - `ownerAgentId NULL` = Global folder; set = private to that agent. - `syncRepo` holds repo **coordinates only**
+  (`{repoUrl?, owner?, repo?, branch?, dirPrefix?}`) — never
+  credentials; the git facade resolves tokens at sync time. - Registered in `_entities-inventory.ts`, `_entity-names.ts`,
+  `entities/index.ts`; repository in `_repository-inventory.ts`
+  (DatabaseModule-owned, so the module-shape drift spec counts it
+  automatically).
 - **Folder membership columns** — `user_uploads.folderId` and
   `work_knowledge_uploads.folderId` (nullable uuid; NULL = unfiled ⇒
   root). Membership only; deleting a folder unlinks (`SET NULL` FK on
   postgres + service-level unlink), never touches bytes.
 - **Migrations** (`apps/api/src/migrations/`):
-  - `1786600000000-CreateMemoryFolders.ts` — portable Table API; FK to
-    users (CASCADE); deliberately **no scope XOR CHECK** (the
-    ScopeStampingSubscriber lesson from `CreateWorkflows`) and **no
-    self-FK on parentId** (subtree deletes are one statement).
-  - `1786600001000-AddMemoryFolderIdToUploads.ts` — adds `folderId` +
-    index to both upload tables; FK (`ON DELETE SET NULL`) postgres-only
-    (sqlite cannot add an FK without a table rebuild; service re-checks
-    ownership on every write anyway).
+    - `1786600000000-CreateMemoryFolders.ts` — portable Table API; FK to
+      users (CASCADE); deliberately **no scope XOR CHECK** (the
+      ScopeStampingSubscriber lesson from `CreateWorkflows`) and **no
+      self-FK on parentId** (subtree deletes are one statement).
+    - `1786600001000-AddMemoryFolderIdToUploads.ts` — adds `folderId` +
+      index to both upload tables; FK (`ON DELETE SET NULL`) postgres-only
+      (sqlite cannot add an FK without a table rebuild; service re-checks
+      ownership on every write anyway).
 
 ### Services (`packages/agent/src/services/`, wired by `MemoryFilesModule`)
 
@@ -51,46 +47,45 @@ pipeline and KB lifecycle are untouched.
   subtree (422), delete refuses non-empty without `recursive` (422),
   recursive delete unlinks files across BOTH spines then drops the
   subtree; cross-user folder ids are 404.
-- **`MemoryFilesService`** — the unified list + move:
-  - merges `user_uploads` (owner = caller) and `work_knowledge_uploads`
-    (org rows of the active org via `workId IS NULL` +
-    `organizationId`, PLUS Work rows of Works the caller owns via a
-    join on `works.userId`) into one
-    `{id, source, filename, mime, size, folderId, ownerAgentId,
-    provenance, updatedAt, sha256?}` row shape;
-  - **provenance** is batch-mapped (one query per edge table, no N+1):
-    mission / work-proposal (idea) / agent attachment edges key on the
-    upload **sha256**; task attachment edges key on the KB upload
-    **row id**; an edge-less plain upload is `chat: true`;
-  - `moveFiles` validates the whole batch first (cross-user ⇒ 404,
-    nothing written), then files/unfiles rows on both spines.
+- **`MemoryFilesService`** — the unified list + move. Merges
+  `user_uploads` (owner = caller) and `work_knowledge_uploads` (org rows
+  of the active org via `workId IS NULL` + `organizationId`, PLUS Work
+  rows of Works the caller owns via a join on `works.userId`) into one
+  `{id, source, filename, mime, size, folderId, ownerAgentId,
+provenance, updatedAt, sha256?}` row shape. **Provenance** is
+  batch-mapped (one query per edge table, no N+1): mission /
+  work-proposal (idea) / agent attachment edges key on the upload
+  **sha256**; task attachment edges key on the KB upload **row id**; an
+  edge-less plain upload is `chat: true`. `moveFiles` validates the
+  whole batch first (cross-user ⇒ 404, nothing written), then
+  files/unfiles rows on both spines.
 - **`MemoryFolderSyncService`** — manual "Sync now" (v1 GitHub via
   `GitFacadeService`, same clone→write→addAll→status→commit→push shape
-  as the KB git mirror): walks the folder **subtree**, skips files
-  > 5 MB into a reported skip list, per-file read failures mark that
-  file `failed` and continue, filenames sanitized to one path segment
-  and resolved-inside-clone checked, 422 unless `syncRepo` resolves
-  owner/repo (explicit fields or parsed from a github `repoUrl`).
-  Byte reading is a caller-injected delegate because the two spines
-  read through different storage stacks that live in apps/api.
+  as the KB git mirror): walks the folder **subtree**, skips files over
+  5 MB into a reported skip list, per-file read failures mark that file
+  `failed` and continue, filenames sanitized to one path segment and
+  resolved-inside-clone checked, 422 unless `syncRepo` resolves
+  owner/repo (explicit fields or parsed from a github `repoUrl`). Byte
+  reading is a caller-injected delegate because the two spines read
+  through different storage stacks that live in apps/api.
 
 ### API (`apps/api/src/memory-files/`, registered in `api.module.ts`)
 
 `@Controller('api/memory/files')`, global JWT guard, active org from
 `ScopeContextService` (never a param):
 
-| Route | What |
-| --- | --- |
-| `GET /api/memory/files/tree` | folder tree + per-folder file counts |
-| `GET /api/memory/files?folderId=&source=&q=` | unified rows; no `folderId` = unfiled root; `q` searches everywhere |
-| `POST /api/memory/files/upload` (multipart, `folderId?`) | UploadsService.saveFile (full validation pipeline) + folder link by sha256 |
-| `POST /api/memory/files/folders` | create (name, parentId?, ownerAgentId?) |
-| `PATCH /api/memory/files/folders/:id` | rename / move (`parentId` or `moveToRoot`) / configure `syncRepo` (`clearSyncRepo` to remove) |
-| `DELETE /api/memory/files/folders/:id?recursive=` | 422 unless empty or recursive; unlink-only for files |
-| `POST /api/memory/files/folders/:id/sync` | manual sync; `{folderId, commitSha, results[]}` incl. skip list |
-| `PATCH /api/memory/files/move` | batch move `{files:[{source,id}], folderId\|null}` |
-| `DELETE /api/memory/files/:id?source=` | unlink only — **bytes are never destroyed in v1** |
-| `GET /api/memory/files/:id/download?source=` | bytes via the owning spine; CSP + nosniff + active-MIME collapse, same posture as `/api/uploads` serve |
+| Route                                                    | What                                                                                                   |
+| -------------------------------------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `GET /api/memory/files/tree`                             | folder tree + per-folder file counts                                                                   |
+| `GET /api/memory/files?folderId=&source=&q=`             | unified rows; no `folderId` = unfiled root; `q` searches everywhere                                    |
+| `POST /api/memory/files/upload` (multipart, `folderId?`) | UploadsService.saveFile (full validation pipeline) + folder link by sha256                             |
+| `POST /api/memory/files/folders`                         | create (name, parentId?, ownerAgentId?)                                                                |
+| `PATCH /api/memory/files/folders/:id`                    | rename / move (`parentId` or `moveToRoot`) / configure `syncRepo` (`clearSyncRepo` to remove)          |
+| `DELETE /api/memory/files/folders/:id?recursive=`        | 422 unless empty or recursive; unlink-only for files                                                   |
+| `POST /api/memory/files/folders/:id/sync`                | manual sync; `{folderId, commitSha, results[]}` incl. skip list                                        |
+| `PATCH /api/memory/files/move`                           | batch move `{files:[{source,id}], folderId\|null}`                                                     |
+| `DELETE /api/memory/files/:id?source=`                   | unlink only — **bytes are never destroyed in v1**                                                      |
+| `GET /api/memory/files/:id/download?source=`             | bytes via the owning spine; CSP + nosniff + active-MIME collapse, same posture as `/api/uploads` serve |
 
 Download delegation: `upload` rows → `UploadsService.readFile`
 (owner-scoped storage key); KB Work rows → `KnowledgeBaseService.
@@ -146,13 +141,23 @@ bare repositories — to inherit the privacy rule.
   repo paths under dirPrefix (real temp-dir fs), commit/push wiring,
   skip list without reading bytes, per-file failure continues, empty
   folder touches no git, repoUrl parsing, 422 unconfigured. (7 tests)
+- `apps/api/src/migrations/__tests__/CreateMemoryFolders.spec.ts` —
+  better-sqlite3 harness (house pattern): all columns, idempotent up(),
+  per-user path uniqueness (same path two users OK / same user rejected),
+  both-scope-columns row accepted (no XOR CHECK), dangling parentId
+  accepted (no self-FK), down() drops. (6 tests)
+- `…/AddMemoryFolderIdToUploads.spec.ts` — nullable folderId + index on
+  both spines, existing rows backfill NULL, idempotent, no-op when the
+  upload tables are absent, down() removes. (5 tests)
 
 Commands:
 
 ```bash
 cd packages/agent && npx jest --testPathPattern='__tests__.memory-folder|__tests__.memory-files'
+cd apps/api && npx jest --testPathPattern='migrations.__tests__.(CreateMemoryFolders|AddMemoryFolderIdToUploads)'
 cd packages/agent && pnpm type-check
-npx turbo build --filter=@ever-works/agent --filter=ever-works-api
+cd apps/api && pnpm type-check
+npx turbo build --filter=@ever-works/agent --filter=ever-works-api --filter=ever-works-web
 cd apps/web && pnpm type-check
 ```
 
@@ -173,3 +178,9 @@ worktree name matches `memory-files`, so the pattern ran everything).
 - The Files list caps at 200 rows per source with no pagination UI yet.
 - `DELETE /api/memory/files/:id` is unlink-only by design (v1 additive
   rule); real byte deletion is explicitly out of scope.
+- **Account export/import** does not cover uploads today, so the new
+  `folderId` columns cannot be silently dropped by a transfer whitelist
+  (verified: no upload table appears in
+  `packages/agent/src/account-transfer/`). If uploads ever join the
+  export surface, `memory_folders` + both `folderId` columns must be
+  added to the whitelist in the same PR (3-place-whitelist bug class).
