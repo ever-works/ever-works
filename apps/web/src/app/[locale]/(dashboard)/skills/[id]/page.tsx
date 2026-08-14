@@ -1,6 +1,6 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
-import { skillsAPI, type SkillBinding } from '@/lib/api/skills';
+import { skillsAPI, type SkillBinding, type SkillFile } from '@/lib/api/skills';
 import { SkillDetailClient } from '@/components/skills/SkillDetailClient';
 
 export async function generateMetadata({
@@ -27,11 +27,12 @@ export async function generateMetadata({
  */
 export default async function SkillDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = await params;
-    const [skill, bindings] = await Promise.all([
+    const [skill, bindings, files] = await Promise.all([
         skillsAPI.get(id),
         skillsAPI.listBindings(id).catch(() => [] as SkillBinding[]),
+        skillsAPI.listFiles(id).catch(() => [] as SkillFile[]),
     ]);
     if (!skill) notFound();
 
-    return <SkillDetailClient skill={skill} initialBindings={bindings} />;
+    return <SkillDetailClient skill={skill} initialBindings={bindings} initialFiles={files} />;
 }

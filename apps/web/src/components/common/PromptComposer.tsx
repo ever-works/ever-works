@@ -79,6 +79,18 @@ const HOLD_ERASED_MS = 350;
 const GITHUB_REPO_RE =
     /^https?:\/\/github\.com\/([^/\s]+)\/([^/\s?#]+?)(?:\.git)?\/?(?:[/?#].*)?$/i;
 
+/**
+ * One entry of `GET /api/skills/invocable` — the composer's slash-command
+ * autocomplete. Declared locally (not imported from `@/lib/api/skills`)
+ * because that module is `server-only` and this is a client component.
+ */
+interface InvocableSkillOption {
+    id: string;
+    title: string;
+    invocationSlug: string;
+    description: string;
+}
+
 let idSeq = 0;
 function nextLocalId(prefix: string): string {
     idSeq += 1;
@@ -718,6 +730,73 @@ export function PromptComposer({
     }, [attachments]);
 
     /* ---------------------------------------------------------------- */
+    /* Slash commands (skill invocation slugs)                          */
+    /* ---------------------------------------------------------------- */
+
+    // Typing `/` as the FIRST token surfaces the user's invocation-slugged
+    // skills (GET /api/skills/invocable through the cookie→Bearer proxy).
+    // Selecting one completes the token; the server resolves it when the
+    // message is submitted. Unknown `/foo` stays plain text.
+    const slashListRef = useRef<InvocableSkillOption[] | null>(null);
+    const [slashOptions, setSlashOptions] = useState<InvocableSkillOption[] | null>(null);
+    const [slashDismissed, setSlashDismissed] = useState(false);
+    const [slashActiveIndex, setSlashActiveIndex] = useState(0);
+
+    const slashQuery = useMemo(() => {
+        const match = /^\/([a-z0-9-]*)$/i.exec(value);
+        return match ? match[1].toLowerCase() : null;
+    }, [value]);
+
+    useEffect(() => {
+        if (slashQuery === null) {
+            setSlashDismissed(false);
+            return;
+        }
+        if (slashListRef.current !== null || slashDismissed) return;
+        let cancelled = false;
+        void (async () => {
+            try {
+                const res = await fetch('/api/skills/invocable', { cache: 'no-store' });
+                if (!res.ok) throw new Error(`status ${res.status}`);
+                const body = (await res.json()) as { data?: InvocableSkillOption[] };
+                if (!cancelled) {
+                    slashListRef.current = body.data ?? [];
+                    setSlashOptions(slashListRef.current);
+                }
+            } catch {
+                // Autocomplete is best-effort — a failed fetch just means
+                // no popup; the slash text still submits as typed.
+                if (!cancelled) {
+                    slashListRef.current = [];
+                    setSlashOptions([]);
+                }
+            }
+        })();
+        return () => {
+            cancelled = true;
+        };
+    }, [slashQuery, slashDismissed]);
+
+    const slashMatches = useMemo(() => {
+        if (slashQuery === null || slashDismissed || !slashOptions) return [];
+        return slashOptions.filter((o) => o.invocationSlug.startsWith(slashQuery));
+    }, [slashQuery, slashDismissed, slashOptions]);
+    const slashOpen = slashMatches.length > 0 && !inputDisabled;
+
+    useEffect(() => {
+        setSlashActiveIndex(0);
+    }, [slashQuery]);
+
+    const pickSlashOption = useCallback(
+        (option: InvocableSkillOption) => {
+            onChange(`/${option.invocationSlug} `);
+            setSlashDismissed(true);
+            textareaRef.current?.focus();
+        },
+        [onChange],
+    );
+
+    /* ---------------------------------------------------------------- */
     /* Text input                                                       */
     /* ---------------------------------------------------------------- */
 
@@ -744,6 +823,32 @@ export function PromptComposer({
     }, [value, autoGrow]);
 
     function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
+        // Slash-command popup owns the navigation keys while open.
+        if (slashOpen) {
+            if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                setSlashActiveIndex((i) => Math.min(i + 1, slashMatches.length - 1));
+                return;
+            }
+            if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                setSlashActiveIndex((i) => Math.max(i - 1, 0));
+                return;
+            }
+            if (e.key === 'Tab' || e.key === 'Enter') {
+                const option = slashMatches[slashActiveIndex];
+                if (option) {
+                    e.preventDefault();
+                    pickSlashOption(option);
+                    return;
+                }
+            }
+            if (e.key === 'Escape') {
+                e.preventDefault();
+                setSlashDismissed(true);
+                return;
+            }
+        }
         if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
             e.preventDefault();
             if (canSubmit) onSubmit();
@@ -998,7 +1103,44 @@ export function PromptComposer({
     );
 
     return (
-        <div className={cn('w-full space-y-3', className)}>
+        <div className={cn('relative w-full space-y-3', className)}>
+            {slashOpen && (
+                <div
+                    role="listbox"
+                    aria-label="Skill slash commands"
+                    data-testid="composer-slash-popup"
+                    className={cn(
+                        'absolute bottom-full left-0 right-0 z-50 mb-2 max-h-56 overflow-auto',
+                        'rounded-xl border border-border dark:border-border-dark',
+                        'bg-surface dark:bg-surface-dark shadow-lg p-1',
+                    )}
+                >
+                    {slashMatches.map((option, i) => (
+                        <button
+                            key={option.id}
+                            type="button"
+                            role="option"
+                            aria-selected={i === slashActiveIndex}
+                            onMouseDown={(e) => e.preventDefault()}
+                            onClick={() => pickSlashOption(option)}
+                            onMouseEnter={() => setSlashActiveIndex(i)}
+                            className={cn(
+                                'flex w-full items-baseline gap-2 rounded-lg px-2 py-1.5 text-left text-[13px] transition-colors',
+                                i === slashActiveIndex
+                                    ? 'bg-surface-secondary dark:bg-surface-secondary-dark text-text dark:text-text-dark'
+                                    : 'text-text-secondary dark:text-text-secondary-dark',
+                            )}
+                        >
+                            <span className="font-mono text-primary shrink-0">
+                                /{option.invocationSlug}
+                            </span>
+                            <span className="truncate text-text-muted dark:text-text-muted-dark text-xs">
+                                {option.title}
+                            </span>
+                        </button>
+                    ))}
+                </div>
+            )}
             <div
                 onDragEnter={onDragEnter}
                 onDragOver={onDragOver}

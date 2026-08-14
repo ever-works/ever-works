@@ -19,6 +19,15 @@ import type { SkillBindingTargetType, SkillOwnerType } from '@ever-works/agent/s
 
 export const SKILL_OWNER_TYPES = ['tenant', 'mission', 'idea', 'work', 'agent'] as const;
 export const SKILL_BINDING_TARGET_TYPES = ['tenant', 'mission', 'idea', 'work', 'agent'] as const;
+export const SKILL_FILE_KINDS = ['script', 'reference', 'asset', 'config'] as const;
+
+/**
+ * Invocation slug (`/plan` slash command). The service normalizes
+ * (trims, drops a leading `/`, lowercases) before the uniqueness
+ * check, so the DTO accepts the as-typed shape including an optional
+ * leading slash and uppercase.
+ */
+const INVOCATION_SLUG_DTO_PATTERN = /^\/?[a-z0-9][a-z0-9-]{0,63}$/i;
 
 export class ListSkillsQueryDto {
     @ApiPropertyOptional({ enum: SKILL_OWNER_TYPES })
@@ -132,6 +141,16 @@ export class CreateSkillDto {
     @IsString()
     @MaxLength(40)
     version?: string;
+
+    @ApiPropertyOptional({
+        description: 'Slash command that invokes this skill (e.g. "plan" or "/plan"). Unique per account.',
+        nullable: true,
+    })
+    @IsOptional()
+    @ValidateIf((o) => o.invocationSlug !== null)
+    @IsString()
+    @Matches(INVOCATION_SLUG_DTO_PATTERN)
+    invocationSlug?: string | null;
 }
 
 export class UpdateSkillDto {
@@ -168,6 +187,28 @@ export class UpdateSkillDto {
     @IsString()
     @MaxLength(40)
     version?: string;
+
+    @ApiPropertyOptional({
+        description:
+            'Slash command that invokes this skill. Pass null to clear the command; a string (re)assigns it.',
+        nullable: true,
+    })
+    @IsOptional()
+    @ValidateIf((o) => o.invocationSlug !== null)
+    @IsString()
+    @Matches(INVOCATION_SLUG_DTO_PATTERN)
+    invocationSlug?: string | null;
+}
+
+/**
+ * Multipart companion of `POST /api/skills/:id/files` — the file rides in
+ * the `file` field; this DTO covers the optional text fields beside it.
+ */
+export class UploadSkillFileDto {
+    @ApiPropertyOptional({ enum: SKILL_FILE_KINDS })
+    @IsOptional()
+    @IsEnum(SKILL_FILE_KINDS)
+    kind?: (typeof SKILL_FILE_KINDS)[number];
 }
 
 export class InstallCatalogSkillDto {

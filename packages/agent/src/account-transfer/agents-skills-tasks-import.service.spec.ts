@@ -167,3 +167,139 @@ describe('AgentsSkillsTasksImportService — Task settings round-trip', () => {
         expect('maxGateAttempts' in input).toBe(false);
     });
 });
+
+/**
+ * Skill files feature — the skills side of the round-trip. Whitelist
+ * places covered: `ExportedSkill.invocationSlug` + `.files` restore.
+ */
+describe('AgentsSkillsTasksImportService — skill invocationSlug + files round-trip', () => {
+    function makeSvc(opts: { withFileDeps?: boolean } = { withFileDeps: true }) {
+        const agentExport = { importOne: jest.fn().mockResolvedValue({}) };
+        const skillsService = {
+            create: jest.fn().mockResolvedValue({ id: 'sk-new' }),
+            update: jest.fn().mockResolvedValue({ id: 'sk-new' }),
+        };
+        const tasksService = { create: jest.fn().mockResolvedValue({ id: 't-new' }) };
+        const skillFilesService = { add: jest.fn().mockResolvedValue({ id: 'f-new' }) };
+        const userUploads = {
+            findOwnedByUser: jest.fn().mockResolvedValue({ id: 'up1', storagePath: 'k' }),
+        };
+        const svc = new AgentsSkillsTasksImportService(
+            agentExport as any,
+            skillsService as any,
+            tasksService as any,
+            opts.withFileDeps ? (skillFilesService as any) : undefined,
+            opts.withFileDeps ? (userUploads as any) : undefined,
+        );
+        return { svc, skillsService, skillFilesService, userUploads };
+    }
+
+    const skillEntry = (over: any = {}) => ({
+        __kind: 'skill' as const,
+        ownerType: 'tenant' as const,
+        ownerSourceId: null,
+        slug: 'cron',
+        title: 'Cron',
+        description: 'd',
+        frontmatter: {},
+        instructionsMd: '# UTC',
+        sourceCatalogSlug: null,
+        sourceCatalogVersion: null,
+        version: '1.0.0',
+        bindings: [],
+        ...over,
+    });
+
+    it('re-applies invocationSlug AFTER create so a conflict degrades to a warning', async () => {
+        const { svc, skillsService } = makeSvc();
+        const summary = await svc.importTail(
+            'u1',
+            { skills: [skillEntry({ invocationSlug: 'cron' })] },
+            { importSkills: true },
+        );
+        expect(summary.skills.imported).toBe(1);
+        expect(skillsService.update).toHaveBeenCalledWith('u1', 'sk-new', {
+            invocationSlug: 'cron',
+        });
+        expect(summary.skills.errors).toHaveLength(0);
+    });
+
+    it('keeps the skill and records a warning when the invocationSlug is taken', async () => {
+        const { svc, skillsService } = makeSvc();
+        skillsService.update.mockRejectedValueOnce(new Error('already used by skill "Other"'));
+        const summary = await svc.importTail(
+            'u1',
+            { skills: [skillEntry({ invocationSlug: 'cron' })] },
+            { importSkills: true },
+        );
+        expect(summary.skills.imported).toBe(1);
+        expect(summary.skills.errors[0]).toContain('invocationSlug "/cron" not restored');
+    });
+
+    it('restores file rows ONLY for uploads the importing account owns', async () => {
+        const { svc, skillFilesService, userUploads } = makeSvc();
+        userUploads.findOwnedByUser
+            .mockResolvedValueOnce({ id: 'up1' }) // owned.md
+            .mockResolvedValueOnce(null); // foreign.md
+        const files = [
+            {
+                uploadId: 'a'.repeat(64),
+                filename: 'owned.md',
+                kind: 'reference' as const,
+                sizeBytes: 10,
+                mime: 'text/markdown',
+            },
+            {
+                uploadId: 'b'.repeat(64),
+                filename: 'foreign.md',
+                kind: 'reference' as const,
+                sizeBytes: 10,
+                mime: 'text/markdown',
+            },
+        ];
+        const summary = await svc.importTail(
+            'u1',
+            { skills: [skillEntry({ files })] },
+            { importSkills: true },
+        );
+        expect(skillFilesService.add).toHaveBeenCalledTimes(1);
+        expect(skillFilesService.add).toHaveBeenCalledWith(
+            'u1',
+            expect.objectContaining({ skillId: 'sk-new', filename: 'owned.md' }),
+        );
+        expect(summary.skills.errors[0]).toContain('"foreign.md" not restored');
+    });
+
+    it('reports (not throws) when file restore is unavailable in this runtime', async () => {
+        const { svc } = makeSvc({ withFileDeps: false });
+        const summary = await svc.importTail(
+            'u1',
+            {
+                skills: [
+                    skillEntry({
+                        files: [
+                            {
+                                uploadId: 'a'.repeat(64),
+                                filename: 'x.md',
+                                kind: 'reference' as const,
+                                sizeBytes: 1,
+                                mime: 'text/markdown',
+                            },
+                        ],
+                    }),
+                ],
+            },
+            { importSkills: true },
+        );
+        expect(summary.skills.imported).toBe(1);
+        expect(summary.skills.errors[0]).toContain('file import is unavailable');
+    });
+
+    it('pre-feature payloads (no invocationSlug, no files) import untouched', async () => {
+        const { svc, skillsService, skillFilesService } = makeSvc();
+        const summary = await svc.importTail('u1', { skills: [skillEntry()] }, { importSkills: true });
+        expect(summary.skills.imported).toBe(1);
+        expect(skillsService.update).not.toHaveBeenCalled();
+        expect(skillFilesService.add).not.toHaveBeenCalled();
+    });
+});

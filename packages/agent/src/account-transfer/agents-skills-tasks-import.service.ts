@@ -1,11 +1,14 @@
-import { Injectable, Logger } from '@nestjs/common';
+import { Injectable, Logger, Optional } from '@nestjs/common';
 import { AgentExportService } from '../agents/agent-export.service';
 import { SkillsService } from '../skills/skills.service';
+import { SkillFilesService } from '../skills/skill-files.service';
 import { TasksService } from '../tasks-domain/tasks.service';
+import { UserUploadRepository } from '../database/repositories/user-upload.repository';
 import type { TaskAcceptanceCheck } from '@ever-works/contracts';
 import {
     type AccountExportV2Tail,
     type AgentsSkillsTasksImportOptions,
+    type ExportedSkillFile,
 } from './agents-skills-tasks-types';
 
 /** Per-Task isolation override values (drop-if-unrecognized on import). */
@@ -72,6 +75,15 @@ export class AgentsSkillsTasksImportService {
         private readonly agentExport: AgentExportService,
         private readonly skillsService: SkillsService,
         private readonly tasksService: TasksService,
+        // Skill files feature — companion-file metadata restore. Trailing
+        // + @Optional() so existing positional constructor calls keep
+        // working; unbound → skills import exactly as before (files
+        // reported as skipped). The upload-ownership repo gates restore:
+        // a row is recreated ONLY when the importing account owns the
+        // referenced bytes (same sha256 in user_uploads) — anything else
+        // would create a dangling reference into someone else's storage.
+        @Optional() private readonly skillFilesService?: SkillFilesService,
+        @Optional() private readonly userUploads?: UserUploadRepository,
     ) {}
 
     async importTail(
@@ -114,7 +126,7 @@ export class AgentsSkillsTasksImportService {
                         summary.skills.skipped += 1;
                         continue;
                     }
-                    await this.skillsService.create(userId, {
+                    const created = await this.skillsService.create(userId, {
                         ownerType: 'tenant',
                         ownerId: userId,
                         title: skill.title,
@@ -125,6 +137,29 @@ export class AgentsSkillsTasksImportService {
                         version: skill.version,
                     });
                     summary.skills.imported += 1;
+
+                    // Skill files feature — the second/third whitelist places
+                    // (see the export service note): invocationSlug is
+                    // re-applied AFTER create so a per-user slug conflict
+                    // degrades to a warning instead of skipping the whole
+                    // skill; file rows restore only for uploads the
+                    // importing account already owns (sha256 match).
+                    if (skill.invocationSlug) {
+                        try {
+                            await this.skillsService.update(userId, created.id, {
+                                invocationSlug: skill.invocationSlug,
+                            });
+                        } catch (err) {
+                            summary.skills.errors.push(
+                                `${skill.slug}: invocationSlug "/${skill.invocationSlug}" not restored — ${
+                                    err instanceof Error ? err.message : String(err)
+                                }`,
+                            );
+                        }
+                    }
+                    if (skill.files?.length) {
+                        await this.restoreSkillFiles(userId, created.id, skill.slug, skill.files, summary);
+                    }
                 } catch (err) {
                     const msg = err instanceof Error ? err.message : String(err);
                     if (msg.toLowerCase().includes('already exists')) {
@@ -180,5 +215,51 @@ export class AgentsSkillsTasksImportService {
         }
 
         return summary;
+    }
+
+    /**
+     * Restore companion-file rows for an imported skill. Ownership-gated:
+     * a row is recreated only when the importing account owns the bytes
+     * (`user_uploads` has the same sha256 for this user) — otherwise the
+     * entry is reported, not silently dropped and not danglingly linked.
+     */
+    private async restoreSkillFiles(
+        userId: string,
+        skillId: string,
+        skillSlug: string,
+        files: ExportedSkillFile[],
+        summary: AgentsSkillsTasksImportSummary,
+    ): Promise<void> {
+        if (!this.skillFilesService || !this.userUploads) {
+            summary.skills.errors.push(
+                `${skillSlug}: ${files.length} file(s) not restored — file import is unavailable in this runtime.`,
+            );
+            return;
+        }
+        for (const file of files) {
+            try {
+                const owned = await this.userUploads.findOwnedByUser(file.uploadId, userId);
+                if (!owned) {
+                    summary.skills.errors.push(
+                        `${skillSlug}: file "${file.filename}" not restored — upload ${file.uploadId.slice(0, 12)}… is not present in this account.`,
+                    );
+                    continue;
+                }
+                await this.skillFilesService.add(userId, {
+                    skillId,
+                    uploadId: file.uploadId,
+                    filename: file.filename,
+                    kind: file.kind,
+                    sizeBytes: file.sizeBytes,
+                    mime: file.mime,
+                });
+            } catch (err) {
+                summary.skills.errors.push(
+                    `${skillSlug}: file "${file.filename}" not restored — ${
+                        err instanceof Error ? err.message : String(err)
+                    }`,
+                );
+            }
+        }
     }
 }
