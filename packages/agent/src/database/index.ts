@@ -78,3 +78,5 @@ export * from './repositories/organization-onboarding-profile.repository';
 export * from './database-init.service';
 export * from './repositories/workflow.repository';
 export * from './repositories/workflow-run.repository';
+// Memory Files — user-defined folders organizing uploads on /memory.
+export * from './repositories/memory-folder.repository';
