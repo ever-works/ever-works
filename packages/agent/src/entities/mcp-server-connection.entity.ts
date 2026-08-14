@@ -10,6 +10,7 @@ import {
 } from 'typeorm';
 import { User } from './user.entity';
 import { EncryptedJsonColumn } from './_secret-json-column';
+import { PortableDateColumn } from './_types';
 
 /**
  * Agent Plugins MCP slice (docs/specs/features/agent-plugins, plan §2.4/§2.5)
@@ -73,7 +74,11 @@ export class McpServerConnection {
     @Column({ type: 'varchar', length: 16, default: 'manual' })
     source: McpConnectionSource;
 
-    @Column({ type: 'timestamp', nullable: true })
+    // MUST be @PortableDateColumn, not a raw `type: 'timestamp'` column: the
+    // e2e stack and CI run better-sqlite3, which has no `timestamp` type
+    // (see portable-date-columns.spec.ts boot guard). Postgres still gets
+    // `timestamp` via TypeORM's per-dialect mapping of `type: Date`.
+    @PortableDateColumn({ nullable: true })
     lastConnectedAt?: Date | null;
 
     /** Classified message of the last failed connect/list/call — never carries header values. */

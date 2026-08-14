@@ -83,11 +83,14 @@ Entities registered in `entities/index.ts`, `_entities-inventory.ts`, and
 
 - `packages/agent` (Jest):
   `cd packages/agent && npx jest --testPathPattern='mcp/__tests__'`
-  — 31 tests: client cache TTL/timeout/size-cap/error-classification/секret
+  — client cache TTL/timeout/size-cap/error-classification/secret
   masking; binding resolution matrix (tenant-inherit / agent-disable /
   agent-only / disabled-connection); descriptor naming + sanitization +
   executor proxy + dead-server isolation; connections CRUD + masking +
   SSRF + cross-user 404 + test endpoint + per-agent state.
+  Updated pin specs: `entities/__tests__/activity-log.types.spec.ts`
+  (+5 MCP action types → 128) and the sqlite boot guard
+  `entities/__tests__/portable-date-columns.spec.ts` (see below).
 - `apps/api` (Jest):
   `cd apps/api && npx jest --testPathPattern='(agents.module|mcp-connections)'`
   — pin spec asserts McpModule import + AGENT_MCP_TOOL_SOURCE binding/export;
@@ -109,6 +112,12 @@ Entities registered in `entities/index.ts`, `_entities-inventory.ts`, and
 - `skill-binding`-style `@ManyToOne` to the connection/user rows (the
   no-`@ManyToOne` rule applies to SCOPE entities only; tenant/org stay raw
   uuid columns).
+- `lastConnectedAt` is `@PortableDateColumn` (NOT raw `type: 'timestamp'`):
+  the e2e/CI driver is better-sqlite3, which has no `timestamp` type — a raw
+  timestamp fails TypeORM metadata validation at boot (the
+  `portable-date-columns.spec.ts` guard caught this). The MIGRATION still
+  uses `timestamp` (house pattern — migrations run on Postgres only);
+  TypeORM maps `type: Date` to `timestamp` there, so entity and schema agree.
 
 ## Known follow-ups
 

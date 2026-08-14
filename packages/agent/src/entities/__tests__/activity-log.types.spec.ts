@@ -73,6 +73,13 @@ describe('activity-log.types', () => {
             ['GIT_PUSHED', 'git_pushed'],
             ['GIT_COMMITTED', 'git_committed'],
             ['GIT_MERGED', 'git_merged'],
+            // MCP connections (agent-plugins MCP slice, plan §2.4) — manual
+            // connection lifecycle + per-agent binding changes.
+            ['MCP_CONNECTION_CREATED', 'mcp_connection_created'],
+            ['MCP_CONNECTION_UPDATED', 'mcp_connection_updated'],
+            ['MCP_CONNECTION_DELETED', 'mcp_connection_deleted'],
+            ['MCP_CONNECTION_TESTED', 'mcp_connection_tested'],
+            ['MCP_BINDING_UPDATED', 'mcp_binding_updated'],
         ];
 
         it.each(cases)('%s → %s', (key, value) => {
@@ -114,7 +121,10 @@ describe('activity-log.types', () => {
             //    ingestion, audit item j) -> 121.
             // +1 idea_deleted (Idea delete, #1997) -> 122.
             // +1 agent_unarchived (Agent archive/restore, #1994) -> 123.
-            expect(literals).toHaveLength(123);
+            // +5 mcp_connection_created / mcp_connection_updated /
+            //    mcp_connection_deleted / mcp_connection_tested /
+            //    mcp_binding_updated (agent-plugins MCP slice) -> 128.
+            expect(literals).toHaveLength(128);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {
