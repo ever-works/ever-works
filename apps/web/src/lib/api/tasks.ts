@@ -528,6 +528,18 @@ export const tasksAPI = {
         });
     },
 
+    /**
+     * Sub-tasks of a Task with their agent assignees + approval-gate
+     * state — ONE call for the whole checklist (the API batches the two
+     * side tables), so the section never fans out per row.
+     */
+    async listSubtasks(id: string) {
+        return serverFetch<{ data: TaskSubtaskRow[]; meta: TaskSubtasksMeta }>(
+            `/tasks/${id}/subtasks`,
+            { method: 'GET' },
+        );
+    },
+
     /** Per-Task activity feed (rows stamped resourceType='task'). */
     async listActivity(id: string, opts: { limit?: number; offset?: number } = {}) {
         const params = new URLSearchParams();
@@ -576,6 +588,26 @@ export const tasksAPI = {
  */
 /** Attachment role — input material vs worked output. */
 export type TaskAttachmentRole = 'initial' | 'result';
+
+/**
+ * One row of the Task-detail Subtasks checklist
+ * (`GET /api/tasks/:id/subtasks`) — the Task row plus the side-table
+ * facts the checklist renders (agent chips + approval badge).
+ */
+export interface TaskSubtaskRow extends Task {
+    agentAssigneeIds: string[];
+    userAssigneeIds: string[];
+    approverCount: number;
+    approvedCount: number;
+    requiresApproval: boolean;
+    approvalCleared: boolean;
+}
+
+export interface TaskSubtasksMeta {
+    total: number;
+    /** Checklist numerator — children already in `done`. */
+    doneCount: number;
+}
 
 /** One row of the per-Task activity feed (`GET /api/tasks/:id/activity`). */
 export interface TaskActivityRow {
