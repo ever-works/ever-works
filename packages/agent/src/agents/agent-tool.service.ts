@@ -575,7 +575,12 @@ export class AgentToolService {
                         continue;
                     }
                     existing.add(descriptor.name);
-                    tools.push(descriptor);
+                    // Same `{{cred.key}}` wrapper the built-ins get in
+                    // `resolveAllowedTools`. MCP tools are the outbound
+                    // calls credentials exist FOR, so skipping the wrapper
+                    // here would send the literal `{{cred.x}}` text to a
+                    // third-party server and scrub nothing on the way back.
+                    tools.push(this.withCredentialInterpolation(agent, descriptor));
                 }
             } catch (err) {
                 this.logger.warn(
