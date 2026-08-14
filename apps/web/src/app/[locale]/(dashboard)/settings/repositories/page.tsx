@@ -12,8 +12,10 @@ export async function generateMetadata(): Promise<Metadata> {
 export default async function RepositoriesSettingsPage() {
     // Installations are optional context (credential picker + import
     // list); a flaky GitHub-App API must never 500 the registry page.
+    // includeDerived surfaces the Work repos as read-only entries with
+    // the "Work" source badge alongside manual + imported rows.
     const [repos, installations] = await Promise.all([
-        repoConnectionsAPI.list(),
+        repoConnectionsAPI.list(true),
         githubAppAPI.listInstallations().catch(() => []),
     ]);
 

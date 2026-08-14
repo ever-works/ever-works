@@ -179,6 +179,14 @@ export enum ActivityActionType {
     SKILL_ATTACHED_TO_AGENT = 'skill_attached_to_agent',
     SKILL_INVOKED = 'skill_invoked',
     SKILL_FILE_EDITED = 'skill_file_edited',
+    // Repository registry (Feature G) — Settings → Repositories rows +
+    // the Agent ↔ repo grant edge. Additive entries only (NN #20).
+    REPO_CONNECTION_CREATED = 'repo_connection_created',
+    REPO_CONNECTION_UPDATED = 'repo_connection_updated',
+    REPO_CONNECTION_DELETED = 'repo_connection_deleted',
+    REPO_CONNECTION_IMPORTED = 'repo_connection_imported',
+    REPO_ATTACHED_TO_AGENT = 'repo_attached_to_agent',
+    REPO_DETACHED_FROM_AGENT = 'repo_detached_from_agent',
     TASK_CREATED = 'task_created',
     TASK_UPDATED = 'task_updated',
     TASK_DELETED = 'task_deleted',

@@ -71,6 +71,9 @@ function makeMocks() {
     const ghInstallationRepos = {
         findById: jest.fn().mockResolvedValue(null),
     };
+    const activityLog = {
+        log: jest.fn().mockResolvedValue(undefined),
+    };
     const service = new RepoRegistryService(
         repoConnections as never,
         attachments as never,
@@ -78,6 +81,7 @@ function makeMocks() {
         works as never,
         ghInstallations as never,
         ghInstallationRepos as never,
+        activityLog as never,
     );
     return {
         service,
@@ -87,6 +91,7 @@ function makeMocks() {
         works,
         ghInstallations,
         ghInstallationRepos,
+        activityLog,
     };
 }
 
@@ -210,6 +215,28 @@ describe('registry CRUD', () => {
         expect(result.files).toEqual([{ path: '.env.local', size: 5 }]);
         const saved = repoConnections.save.mock.calls[0][0];
         expect(saved.envFiles).toEqual({ '.env.local': 'NEW=1' });
+    });
+
+    it('mutations leave best-effort activity rows that never carry env contents', async () => {
+        const { service, repoConnections, activityLog } = makeMocks();
+        await service.create(USER, {
+            name: 'my-service',
+            url: 'https://github.com/acme/my-service',
+            envFiles: [{ path: '.env', content: 'SECRET=value' }],
+        });
+        expect(activityLog.log).toHaveBeenCalledWith(
+            expect.objectContaining({
+                userId: USER,
+                actionType: 'repo_connection_created',
+                details: expect.objectContaining({ resourceType: 'repo_connection' }),
+            }),
+        );
+        expect(JSON.stringify(activityLog.log.mock.calls)).not.toContain('SECRET=value');
+
+        // A failed feed write must not fail the mutation itself.
+        activityLog.log.mockRejectedValue(new Error('feed down'));
+        repoConnections.findByIdAndUser.mockResolvedValue(makeRow());
+        await expect(service.remove(USER, 'rc-1')).resolves.toEqual({ deleted: true });
     });
 });
 

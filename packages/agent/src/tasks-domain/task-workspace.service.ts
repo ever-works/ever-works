@@ -9,6 +9,7 @@ import { TaskStatus, type Task } from '../entities/task.entity';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { TaskRepository } from '../database/repositories/task.repository';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
+import { AgentRepoAttachmentRepository } from '../database/repositories/agent-repo-attachment.repository';
 import { WorkspaceFacadeService } from '../facades/workspace.facade';
 import { GitFacadeService, MergePolicyRefusedError } from '../facades/git.facade';
 import { TaskTransitionService } from './task-transition.service';
@@ -106,6 +107,12 @@ export class TaskWorkspaceService {
         // RECORDED, never swallowed. Appended after `mergePolicy` so every
         // existing positional construction keeps working.
         @Optional() private readonly activityLog?: ActivityLogService,
+        // Repository registry (Feature G) — resolves the run agent's
+        // enabled repo attachments into the ADVISORY `attachedRepos`
+        // field on the provision spec. Appended LAST + @Optional() per
+        // the positional-spec arity rule; absent (or failing) resolves
+        // to "no extra repos", never a failed provision.
+        @Optional() private readonly agentRepoAttachments?: AgentRepoAttachmentRepository,
     ) {}
 
     /**
@@ -119,6 +126,14 @@ export class TaskWorkspaceService {
         runId: string;
         /** From `agent.permissions.canCommitToRepo` (default true). */
         agentCanCommit: boolean;
+        /**
+         * Repository registry (Feature G) — the run's Agent. When set,
+         * the agent's enabled repo attachments ride the provision spec
+         * as the advisory `attachedRepos` list (v1 providers ignore it;
+         * multi-mount is a follow-up). Optional so every existing caller
+         * and test keeps working unchanged.
+         */
+        agentId?: string;
     }): Promise<ProvisionedTaskWorkspace | null> {
         const { task, userId, runId } = input;
         if (!task.workId) return null;
@@ -158,6 +173,11 @@ export class TaskWorkspaceService {
         // re-runs; never recompute from a (possibly edited) slug.
         const branch = task.branchRef || taskBranchName({ id: task.id, slug: task.slug });
 
+        // Repository registry (Feature G) — advisory only: today's
+        // providers mount the primary repo and ignore this list; it rides
+        // the spec so future multi-mount executors need no contract churn.
+        const attachedRepos = await this.resolveAttachedRepos(input.agentId, userId);
+
         const handle = await this.workspaceFacade.provision(
             {
                 repoUrl: repository.cloneUrl,
@@ -165,6 +185,7 @@ export class TaskWorkspaceService {
                 branch,
                 bindingKey: task.id,
                 auth: { token },
+                ...(attachedRepos.length > 0 ? { attachedRepos } : {}),
             },
             { userId, workId: work.id },
         );
@@ -206,6 +227,45 @@ export class TaskWorkspaceService {
             reused: handle.reused,
             provider: 'workspace',
         };
+    }
+
+    /**
+     * Repository registry (Feature G) — the run agent's ENABLED
+     * attachments whose repo rows are themselves enabled, as advisory
+     * mount specs (url / branch / mountDir; token-free, mirroring
+     * `repoUrl`). Best-effort BY CONTRACT: no agent, no repository
+     * binding, or a failed read all resolve to an empty list — an
+     * advisory field must never fail a provision.
+     */
+    private async resolveAttachedRepos(
+        agentId: string | undefined,
+        userId: string,
+    ): Promise<{ url: string; branch?: string; mountDir: string }[]> {
+        if (!agentId || !this.agentRepoAttachments) return [];
+        try {
+            const edges = await this.agentRepoAttachments.listEnabledForAgentWithRepos(
+                agentId,
+                userId,
+            );
+            const specs: { url: string; branch?: string; mountDir: string }[] = [];
+            for (const edge of edges) {
+                const repo = edge.repoConnection;
+                if (!repo || !repo.enabled) continue;
+                specs.push({
+                    url: repo.url,
+                    ...(repo.defaultBranch ? { branch: repo.defaultBranch } : {}),
+                    mountDir: (repo.mountPath && repo.mountPath.trim()) || repo.name,
+                });
+            }
+            return specs;
+        } catch (error) {
+            this.logger.warn(
+                `attached-repo resolution failed for agent ${agentId} (continuing without): ${
+                    error instanceof Error ? error.message : String(error)
+                }`,
+            );
+            return [];
+        }
     }
 
     /**

@@ -2,7 +2,9 @@ import {
     BadRequestException,
     ConflictException,
     Injectable,
+    Logger,
     NotFoundException,
+    Optional,
 } from '@nestjs/common';
 import {
     REPO_CONNECTION_ENV_FILE_MAX_CONTENT_BYTES,
@@ -19,6 +21,8 @@ import { WorkRepository } from '../database/repositories/work.repository';
 import { GitHubAppInstallationRepository } from '../database/repositories/github-app-installation.repository';
 import { GitHubAppInstallationRepoRepository } from '../database/repositories/github-app-installation-repository.repository';
 import { WORK_REPO_ROLES, getWorkRepoFullName, type WorkRepoRole } from '../works/work-repo-match';
+import { ActivityLogService } from '../activity-log/activity-log.service';
+import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 
 /** One seed env file as carried on the wire (API DTO shape). */
 export interface RepoConnectionEnvFile {
@@ -198,6 +202,8 @@ function envFilesFromRecord(record: Record<string, string> | null | undefined): 
  */
 @Injectable()
 export class RepoRegistryService {
+    private readonly logger = new Logger(RepoRegistryService.name);
+
     constructor(
         private readonly repoConnections: RepoConnectionRepository,
         private readonly attachments: AgentRepoAttachmentRepository,
@@ -205,6 +211,10 @@ export class RepoRegistryService {
         private readonly works: WorkRepository,
         private readonly ghInstallations: GitHubAppInstallationRepository,
         private readonly ghInstallationRepos: GitHubAppInstallationRepoRepository,
+        // Appended LAST + @Optional() per the positional-spec arity rule:
+        // every existing construction keeps working. Activity rows are
+        // best-effort by contract (skills.service precedent).
+        @Optional() private readonly activityLog?: ActivityLogService,
     ) {}
 
     // ── Registry CRUD ────────────────────────────────────────────────
@@ -254,6 +264,7 @@ export class RepoRegistryService {
             sourceType: 'manual',
             enabled: input.enabled ?? true,
         });
+        await this.logActivity(userId, ActivityActionType.REPO_CONNECTION_CREATED, row.id, row.name);
         return this.toView(row);
     }
 
@@ -298,14 +309,22 @@ export class RepoRegistryService {
         }
 
         const saved = await this.repoConnections.save(row);
+        await this.logActivity(
+            userId,
+            ActivityActionType.REPO_CONNECTION_UPDATED,
+            saved.id,
+            saved.name,
+        );
         return this.toView(saved);
     }
 
     async remove(userId: string, id: string): Promise<{ deleted: true }> {
+        const row = await this.requireOwned(userId, id);
         const deleted = await this.repoConnections.deleteByIdAndUser(id, userId);
         if (!deleted) {
             throw new NotFoundException('Repository not found.');
         }
+        await this.logActivity(userId, ActivityActionType.REPO_CONNECTION_DELETED, id, row.name);
         return { deleted: true };
     }
 
@@ -389,6 +408,12 @@ export class RepoRegistryService {
             availableInAllProjects: true,
             enabled: true,
         });
+        await this.logActivity(
+            userId,
+            ActivityActionType.REPO_CONNECTION_IMPORTED,
+            row.id,
+            row.name,
+        );
         return this.toView(row);
     }
 
@@ -426,6 +451,12 @@ export class RepoRegistryService {
             repoConnectionId,
             enabled,
         });
+        await this.logActivity(
+            userId,
+            ActivityActionType.REPO_ATTACHED_TO_AGENT,
+            repoConnectionId,
+            agentId,
+        );
         return { agentId, repoConnectionId, enabled: edge.enabled };
     }
 
@@ -443,6 +474,12 @@ export class RepoRegistryService {
         if (!deleted) {
             throw new NotFoundException('Repository attachment not found.');
         }
+        await this.logActivity(
+            userId,
+            ActivityActionType.REPO_DETACHED_FROM_AGENT,
+            repoConnectionId,
+            agentId,
+        );
         return { deleted: true };
     }
 
@@ -521,6 +558,34 @@ export class RepoRegistryService {
     }
 
     // ── Internals ────────────────────────────────────────────────────
+
+    /**
+     * Best-effort activity row (conventions rule 9 — user-visible state
+     * changes leave a trace). Never throws; a feed write must not fail
+     * a registry mutation that already happened. `label` is a display
+     * name (repo name, or the agent id for attachment events) — never
+     * secret material.
+     */
+    private async logActivity(
+        userId: string,
+        actionType: ActivityActionType,
+        repoConnectionId: string,
+        label: string,
+    ): Promise<void> {
+        if (!this.activityLog) return;
+        try {
+            await this.activityLog.log({
+                userId,
+                action: actionType,
+                actionType,
+                status: ActivityStatus.COMPLETED,
+                summary: `Repository ${label} — ${actionType}`,
+                details: { resourceType: 'repo_connection', resourceId: repoConnectionId },
+            });
+        } catch (err) {
+            this.logger.warn(`Failed to log activity ${actionType}: ${err}`);
+        }
+    }
 
     private async requireOwned(userId: string, id: string): Promise<RepoConnection> {
         const row = await this.repoConnections.findByIdAndUser(id, userId);

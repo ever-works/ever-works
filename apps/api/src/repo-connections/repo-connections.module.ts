@@ -1,6 +1,7 @@
 import { Module } from '@nestjs/common';
 import { DatabaseModule } from '@ever-works/agent/database';
 import { AgentsModule } from '@ever-works/agent/agents';
+import { ActivityLogModule } from '@ever-works/agent/activity-log';
 import { RepoRegistryService } from '@ever-works/agent/services';
 import { RepoConnectionsController } from './repo-connections.controller';
 import { AgentReposController } from './agent-repos.controller';
@@ -17,7 +18,9 @@ import { AgentReposController } from './agent-repos.controller';
  * a reference, not a second instance).
  */
 @Module({
-    imports: [DatabaseModule, AgentsModule],
+    // ActivityLogModule binds the @Optional() ActivityLogService the
+    // registry service uses for its best-effort activity rows.
+    imports: [DatabaseModule, AgentsModule, ActivityLogModule],
     providers: [RepoRegistryService],
     controllers: [RepoConnectionsController, AgentReposController],
     exports: [RepoRegistryService],
