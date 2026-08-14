@@ -6,6 +6,7 @@ import {
     Get,
     HttpCode,
     HttpStatus,
+    Optional,
     Param,
     ParseUUIDPipe,
     Put,
@@ -13,6 +14,11 @@ import {
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { Throttle } from '@nestjs/throttler';
 import { AgentCollaboratorRepository, AgentsService } from '@ever-works/agent/agents';
+import {
+    ActivityActionType,
+    ActivityLogService,
+    ActivityStatus,
+} from '@ever-works/agent/activity-log';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import { UpdateAgentCollaboratorDto } from './dto/agent.dto';
@@ -58,6 +64,11 @@ export class AgentCollaboratorsController {
     constructor(
         private readonly service: AgentsService,
         private readonly collaborators: AgentCollaboratorRepository,
+        // Same posture as AgentsController: @Optional() so a runtime
+        // without the activity module simply writes no trail rather than
+        // failing the edit. `ActivityLogModule` is imported by the
+        // api-side AgentsModule, so it resolves in production.
+        @Optional() private readonly activityLog?: ActivityLogService,
     ) {}
 
     /**
@@ -129,14 +140,24 @@ export class AgentCollaboratorsController {
         // side 404s with no existence leak.
         await this.service.getOne(auth.userId, id);
         await this.service.getOne(auth.userId, collaboratorAgentId);
-        // tenantId/organizationId are left to `ScopeStampingSubscriber`,
-        // which stamps them on insert for every entity declaring both
-        // Tier C columns (the AgentDto does not carry them).
+        // `tenantId`/`organizationId` stay null here: they are the EW-651
+        // Tier C denorm columns and `AgentDto` does not expose the parent's
+        // scope ids, so there is nothing truthful to copy from this layer.
+        // Every read path is keyed on `agentId` (already owner-checked
+        // above), so a null denorm narrows nothing today.
         const row = await this.collaborators.upsert({
             userId: auth.userId,
             agentId: id,
             collaboratorAgentId,
             enabled: body.enabled,
+        });
+        await this.tryLog({
+            userId: auth.userId,
+            agentId: id,
+            actionType: body.enabled
+                ? ActivityActionType.AGENT_COLLABORATOR_ENABLED
+                : ActivityActionType.AGENT_COLLABORATOR_DISABLED,
+            collaboratorAgentId,
         });
         return {
             agentId: row.agentId,
@@ -158,6 +179,49 @@ export class AgentCollaboratorsController {
     ): Promise<{ removed: boolean }> {
         await this.service.getOne(auth.userId, id);
         const removed = await this.collaborators.remove(id, collaboratorAgentId);
+        // Only a real deletion is an event — the idempotent no-op case
+        // would otherwise write a trail row for a request that changed
+        // nothing.
+        if (removed) {
+            await this.tryLog({
+                userId: auth.userId,
+                agentId: id,
+                actionType: ActivityActionType.AGENT_COLLABORATOR_REMOVED,
+                collaboratorAgentId,
+            });
+        }
         return { removed };
+    }
+
+    /**
+     * Best-effort activity row for one allow-list edit. Mirrors
+     * `AgentsController.tryLog`: `details.resourceId` is the PARENT
+     * agent, which is what the per-Agent events feed matches on, and the
+     * collaborator id rides in `details` so the pair is recoverable.
+     * A logging failure must never fail the edit itself.
+     */
+    private async tryLog(args: {
+        userId: string;
+        agentId: string;
+        actionType: ActivityActionType;
+        collaboratorAgentId: string;
+    }): Promise<void> {
+        if (!this.activityLog) return;
+        try {
+            await this.activityLog.log({
+                userId: args.userId,
+                action: args.actionType,
+                actionType: args.actionType,
+                status: ActivityStatus.COMPLETED,
+                summary: `agent ${args.agentId} — ${args.actionType}`,
+                details: {
+                    collaboratorAgentId: args.collaboratorAgentId,
+                    resourceType: 'agent',
+                    resourceId: args.agentId,
+                },
+            });
+        } catch {
+            // best-effort — never break the request on a trail write.
+        }
     }
 }

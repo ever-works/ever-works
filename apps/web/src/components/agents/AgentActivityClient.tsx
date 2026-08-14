@@ -159,6 +159,19 @@ const EVENT_PRESENTATION: Record<string, { label: string; className: string }> =
         label: 'budget exceeded',
         className: 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300',
     },
+    // Agent Collaborators — allow-list edits (Collaborators tab).
+    agent_collaborator_enabled: {
+        label: 'collaborator enabled',
+        className: 'bg-emerald-50 text-emerald-700 dark:bg-emerald-900/20 dark:text-emerald-300',
+    },
+    agent_collaborator_disabled: {
+        label: 'collaborator disabled',
+        className: 'bg-amber-50 text-amber-700 dark:bg-amber-900/20 dark:text-amber-300',
+    },
+    agent_collaborator_removed: {
+        label: 'collaborator removed',
+        className: 'bg-gray-50 text-gray-700 dark:bg-gray-900/20 dark:text-gray-300',
+    },
 };
 
 const DEFAULT_TYPE_COLOR = 'bg-gray-50 text-gray-700 dark:bg-gray-900/20 dark:text-gray-300';

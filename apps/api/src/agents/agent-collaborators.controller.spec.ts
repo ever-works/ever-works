@@ -21,6 +21,7 @@ const auth = { userId: OWNER } as never;
 describe('AgentCollaboratorsController', () => {
     let service: { getOne: jest.Mock; list: jest.Mock };
     let repo: { listForAgent: jest.Mock; upsert: jest.Mock; remove: jest.Mock };
+    let activityLog: { log: jest.Mock };
     let controller: AgentCollaboratorsController;
 
     beforeEach(() => {
@@ -58,7 +59,12 @@ describe('AgentCollaboratorsController', () => {
             upsert: jest.fn(async (input) => ({ ...input, id: 'row-1' })),
             remove: jest.fn().mockResolvedValue(true),
         };
-        controller = new AgentCollaboratorsController(service as never, repo as never);
+        activityLog = { log: jest.fn().mockResolvedValue(undefined) };
+        controller = new AgentCollaboratorsController(
+            service as never,
+            repo as never,
+            activityLog as never,
+        );
     });
 
     describe('GET list', () => {
@@ -151,6 +157,64 @@ describe('AgentCollaboratorsController', () => {
             await expect(controller.remove(auth, AGENT, OTHER)).resolves.toEqual({
                 removed: false,
             });
+        });
+    });
+
+    describe('activity trail', () => {
+        it('records an ENABLED row carrying both ends of the edge', async () => {
+            await controller.upsert(auth, AGENT, OTHER, { enabled: true });
+
+            expect(activityLog.log).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    userId: OWNER,
+                    actionType: 'agent_collaborator_enabled',
+                    details: expect.objectContaining({
+                        // The feed matches on the PARENT agent; the
+                        // collaborator rides along so the pair is recoverable.
+                        resourceType: 'agent',
+                        resourceId: AGENT,
+                        collaboratorAgentId: OTHER,
+                    }),
+                }),
+            );
+        });
+
+        it('records a DISABLED row when the toggle goes off', async () => {
+            await controller.upsert(auth, AGENT, OTHER, { enabled: false });
+
+            expect(activityLog.log).toHaveBeenCalledWith(
+                expect.objectContaining({ actionType: 'agent_collaborator_disabled' }),
+            );
+        });
+
+        it('records a REMOVED row only when a rule actually existed', async () => {
+            await controller.remove(auth, AGENT, OTHER);
+            expect(activityLog.log).toHaveBeenCalledWith(
+                expect.objectContaining({ actionType: 'agent_collaborator_removed' }),
+            );
+
+            activityLog.log.mockClear();
+            repo.remove.mockResolvedValue(false);
+            await controller.remove(auth, AGENT, OTHER);
+            expect(activityLog.log).not.toHaveBeenCalled();
+        });
+
+        it('a trail write that throws never fails the edit', async () => {
+            activityLog.log.mockRejectedValue(new Error('activity db down'));
+
+            await expect(controller.upsert(auth, AGENT, OTHER, { enabled: true })).resolves.toEqual(
+                { agentId: AGENT, collaboratorAgentId: OTHER, enabled: true },
+            );
+        });
+
+        it('works with the activity service unbound (optional injection)', async () => {
+            const bare = new AgentCollaboratorsController(service as never, repo as never);
+
+            await expect(bare.upsert(auth, AGENT, OTHER, { enabled: true })).resolves.toMatchObject(
+                {
+                    enabled: true,
+                },
+            );
         });
     });
 

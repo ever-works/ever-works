@@ -175,6 +175,15 @@ export enum ActivityActionType {
     AGENT_BUDGET_EXCEEDED = 'agent_budget_exceeded',
     AGENT_EXPORTED = 'agent_exported',
     AGENT_IMPORTED = 'agent_imported',
+    // Agent Collaborators — edits to the per-agent sub-agent delegation
+    // allow-list. These are security-relevant: enabling a collaborator
+    // widens which agents this one may spawn, so the trail records the
+    // pair (details.collaboratorAgentId) alongside the parent agent.
+    // Additive members only — `activity_log.actionType` is a plain
+    // varchar, so no migration.
+    AGENT_COLLABORATOR_ENABLED = 'agent_collaborator_enabled',
+    AGENT_COLLABORATOR_DISABLED = 'agent_collaborator_disabled',
+    AGENT_COLLABORATOR_REMOVED = 'agent_collaborator_removed',
     SKILL_INSTALLED = 'skill_installed',
     SKILL_ATTACHED_TO_AGENT = 'skill_attached_to_agent',
     SKILL_INVOKED = 'skill_invoked',
