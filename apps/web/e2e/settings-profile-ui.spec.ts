@@ -14,7 +14,7 @@ test.describe('Settings — profile UI update', () => {
     test('username field is pre-populated', async ({ page }) => {
         await page.goto('/en/settings', { waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(2_500);
-        const usernameInput = page.locator('input').first();
+        const usernameInput = page.locator('#main-content input').first();
         await expect(usernameInput).toBeVisible({ timeout: 15_000 });
         const value = await usernameInput.inputValue();
         expect(value.length).toBeGreaterThan(0);
@@ -26,7 +26,7 @@ test.describe('Settings — profile UI update', () => {
         await page.goto('/en/settings', { waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(2_500);
 
-        const usernameInput = page.locator('input').first();
+        const usernameInput = page.locator('#main-content input').first();
         if (!(await usernameInput.isVisible({ timeout: 5_000 }).catch(() => false))) {
             test.skip(true, 'username input not visible on /settings');
         }
@@ -47,7 +47,7 @@ test.describe('Settings — profile UI update', () => {
         await page.waitForTimeout(2_500);
         await page.reload({ waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(2_500);
-        const reloaded = page.locator('input').first();
+        const reloaded = page.locator('#main-content input').first();
         const persistedValue = await reloaded.inputValue();
         // The save may have failed (e.g. validation, rate-limit). We
         // accept either: (a) the new value persists, or (b) the old

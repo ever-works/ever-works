@@ -440,13 +440,26 @@ test.describe('build-executor trigger — QUEUED commit + provenance divergence'
         expect(BUILD_OK_OR_DISABLED).toContain(build.status());
         expect((await getIdea(request, token, idea.id)).status).toBe('queued');
 
-        // accept is PENDING/ACCEPTED-only → a QUEUED Idea is "already finalized".
+        // PR #1997 (3e98d5bf): accept RECORDS THE PROVENANCE LINK regardless of
+        // status and reports success — the link, not the status, is what "this
+        // Idea produced a Work" means. The STATUS transition stays governed by
+        // fromStatuses exactly as before, so a QUEUED Idea remains queued (the
+        // build pipeline still owns QUEUED → ACCEPTED). This assertion used to
+        // expect the pre-#1997 404 and was red from 2026-08-09 until now.
         const accept = await request.post(`${API_BASE}/api/me/work-proposals/${idea.id}/accept`, {
             headers: authedHeaders(token),
             data: { workId: work.id },
         });
-        expect(accept.status()).toBe(404);
-        expect(msgOf(await accept.json())).toMatch(/not found or already finalized/i);
+        expect(accept.status()).toBe(200);
+        expect(((await accept.json()) as { ok: boolean }).ok).toBe(true);
+        // Status untouched by the accept — still owned by the build pipeline.
+        expect((await getIdea(request, token, idea.id)).status).toBe('queued');
+        // The provenance link is the observable outcome.
+        const links = await request.get(`${API_BASE}/api/me/work-proposals/${idea.id}/works`, {
+            headers: authedHeaders(token),
+        });
+        expect(links.status()).toBe(200);
+        expect(JSON.stringify(await links.json())).toContain(work.id);
 
         // dismiss is PENDING-only → a QUEUED Idea is "not pending".
         const dismiss = await request.patch(

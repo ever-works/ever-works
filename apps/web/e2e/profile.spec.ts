@@ -13,7 +13,7 @@ test.describe('Profile — UI', () => {
         await page.goto('/en/settings', { waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(1_500);
 
-        const usernameInput = page.locator('input').first();
+        const usernameInput = page.locator('#main-content input').first();
         await expect(usernameInput).toBeVisible({ timeout: 10_000 });
         const value = await usernameInput.inputValue();
         expect(value.length, 'username should be pre-populated').toBeGreaterThan(0);
