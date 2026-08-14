@@ -100,6 +100,14 @@ The user's message is left byte-identical, command text included.
   template markers, and the block header states it must not override identity/tools/output contract.
 - Emits an `AgentRunLog` row (`step: 'skill-invocation'`) and a `SKILL_INVOKED` activity row.
 
+### Activity
+
+`SkillFilesService` writes `SKILL_FILE_EDITED` on add and on remove. That enum entry already
+existed with no producer anywhere in the codebase; adding/removing a companion file changes what the
+model can read for a skill, which is what it names. No enum change was needed, so no new activity
+labels. Logging is best-effort — a failing or unbound `ActivityLogService` degrades to no row, never
+a failed write.
+
 The chat surface that reaches this path is **task chat**: `postTaskChat` → `agent-chat-reply` task →
 `AgentRunService.execute({ kind: 'chat', immediateInput: <message body> })`.
 
