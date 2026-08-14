@@ -135,22 +135,10 @@ describe('SkillsService — invocation slugs', () => {
         });
     });
 
-    describe('resolveInvocation', () => {
-        it('resolves a leading /slug through the user-scoped lookup', async () => {
-            const match = makeSkill({ invocationSlug: 'plan' });
-            skills.findByUserAndInvocationSlug.mockResolvedValueOnce(match);
-            await expect(svc.resolveInvocation('u1', '/plan do the thing')).resolves.toBe(match);
-            expect(skills.findByUserAndInvocationSlug).toHaveBeenCalledWith('u1', 'plan');
-        });
-
-        it('returns null for plain text and for unknown slugs (no error)', async () => {
-            await expect(svc.resolveInvocation('u1', 'no slash here')).resolves.toBeNull();
-            expect(skills.findByUserAndInvocationSlug).not.toHaveBeenCalled();
-
-            skills.findByUserAndInvocationSlug.mockResolvedValueOnce(null);
-            await expect(svc.resolveInvocation('u1', '/ghost')).resolves.toBeNull();
-        });
-    });
+    // Run-time `/slug` resolution is covered where it lives:
+    // `agents/__tests__/agent-run-slash-invocation.spec.ts` (parser +
+    // user-scoped lookup + injection) and `skill-invocation.spec.ts`
+    // (the pure parser).
 
     it('listInvocable delegates to the user-scoped repository lookup', async () => {
         const rows = [makeSkill({ invocationSlug: 'plan' })];

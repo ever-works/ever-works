@@ -23,7 +23,7 @@ import { ActivityActionType, ActivityStatus } from '../entities/activity-log.typ
 import { assertNoSecrets } from '../utils/secret-scan';
 import { assertNoInjectionTokens } from '../utils/content-policy';
 import { slugifyText } from '../utils/text.utils';
-import { normalizeInvocationSlug, parseSlashInvocation } from './skill-invocation';
+import { normalizeInvocationSlug } from './skill-invocation';
 import { AgentRepository } from '../database/repositories/agent.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { WorkProposalRepository } from '../user-research/work-proposal.repository';
@@ -345,16 +345,11 @@ export class SkillsService {
         return this.skills.findInvocableByUser(userId);
     }
 
-    /**
-     * Resolve a chat/task message's leading `/slug` to the user's
-     * skill. Unknown slugs (or messages without a leading slash
-     * command) resolve to `null` — plain text, never an error.
-     */
-    async resolveInvocation(userId: string, message: string): Promise<Skill | null> {
-        const slug = parseSlashInvocation(message);
-        if (!slug) return null;
-        return this.skills.findByUserAndInvocationSlug(userId, slug);
-    }
+    // NOTE: resolving a message's leading `/slug` at RUN time lives in
+    // `AgentRunService` (parseSlashInvocation + the user-scoped
+    // `SkillRepository.findByUserAndInvocationSlug`), not here — one
+    // resolution path, so the popup, the parser and the injection
+    // cannot drift apart.
 
     /**
      * Normalize + validate an invocation slug and enforce per-user
