@@ -405,6 +405,23 @@ export class UpdateAgentDto {
     @ValidateNested()
     @Type(() => MergePolicyDto)
     mergePolicy?: MergePolicyDto | null;
+
+    /**
+     * Capabilities tab — per-Agent init script (advisory v1: stored now,
+     * consumed at session/workspace bootstrap where the runtime supports
+     * it). `null` clears it. The service re-enforces a 16 KB BYTE cap +
+     * hard-reject secret scan behind this character-length check.
+     */
+    @ApiProperty({
+        required: false,
+        nullable: true,
+        maxLength: 16384,
+        description: 'Init script run at session/workspace bootstrap where supported; null clears',
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(16384)
+    initScript?: string | null;
 }
 
 /**
