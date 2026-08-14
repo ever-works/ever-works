@@ -2,13 +2,17 @@ import {
     BadRequestException,
     ConflictException,
     Injectable,
+    Logger,
     NotFoundException,
+    Optional,
     UnprocessableEntityException,
 } from '@nestjs/common';
 import { MemoryFolder, MemoryFolderSyncRepo } from '../entities/memory-folder.entity';
 import { MemoryFolderRepository } from '../database/repositories/memory-folder.repository';
 import { UserUploadRepository } from '../database/repositories/user-upload.repository';
 import { WorkKnowledgeUploadRepository } from '../database/repositories/work-knowledge-upload.repository';
+import { ActivityLogService } from '../activity-log/activity-log.service';
+import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 
 /** One node of the /memory Files tree, with its per-folder file count. */
 export interface MemoryFolderTreeNode {
@@ -58,10 +62,16 @@ function hasIllegalNameChars(name: string): boolean {
  */
 @Injectable()
 export class MemoryFoldersService {
+    private readonly logger = new Logger(MemoryFoldersService.name);
+
     constructor(
         private readonly folders: MemoryFolderRepository,
         private readonly userUploads: UserUploadRepository,
         private readonly kbUploads: WorkKnowledgeUploadRepository,
+        // Optional so unit specs (and any consumer that wires the service
+        // without the activity module) still construct — same posture as
+        // KnowledgeBaseService.
+        @Optional() private readonly activityLog?: ActivityLogService,
     ) {}
 
     /** All folders of the user, parents-first, with per-folder file counts. */
@@ -106,7 +116,7 @@ export class MemoryFoldersService {
         const parent = input.parentId ? await this.requireOwned(userId, input.parentId) : null;
         const path = this.childPath(parent?.path ?? '', name);
         await this.assertPathFree(userId, path);
-        return this.folders.create({
+        const folder = await this.folders.create({
             userId,
             name,
             parentId: parent?.id ?? null,
@@ -114,6 +124,17 @@ export class MemoryFoldersService {
             ownerAgentId: input.ownerAgentId ?? null,
             syncRepo: input.syncRepo ?? null,
         });
+        await this.recordActivity(
+            userId,
+            ActivityActionType.MEMORY_FOLDER_CREATED,
+            `Created memory folder ${folder.path}`,
+            {
+                folderId: folder.id,
+                path: folder.path,
+                ownerAgentId: folder.ownerAgentId ?? null,
+            },
+        );
+        return folder;
     }
 
     async renameFolder(userId: string, folderId: string, newName: string): Promise<MemoryFolder> {
@@ -212,7 +233,45 @@ export class MemoryFoldersService {
             this.kbUploads.clearFolders(subtreeIds),
         ]);
         await this.folders.deleteByIds(userId, subtreeIds);
+        await this.recordActivity(
+            userId,
+            ActivityActionType.MEMORY_FOLDER_DELETED,
+            `Deleted memory folder ${folder.path}`,
+            {
+                folderId: folder.id,
+                path: folder.path,
+                deletedFolders: subtree.length,
+                unlinkedFiles: fileCount,
+            },
+        );
         return { deletedFolders: subtree.length, unlinkedFiles: fileCount };
+    }
+
+    /**
+     * Activity is best-effort telemetry: a logging failure must never
+     * fail the folder operation the user just completed.
+     */
+    async recordActivity(
+        userId: string,
+        actionType: ActivityActionType,
+        summary: string,
+        details: Record<string, unknown>,
+    ): Promise<void> {
+        if (!this.activityLog) return;
+        try {
+            await this.activityLog.log({
+                userId,
+                actionType,
+                action: actionType,
+                status: ActivityStatus.COMPLETED,
+                summary,
+                details,
+            });
+        } catch (error) {
+            this.logger.warn(
+                `Failed to record activity ${actionType}: ${(error as Error).message}`,
+            );
+        }
     }
 
     /** The folder, or 404. Cross-user ids are indistinguishable from absent. */

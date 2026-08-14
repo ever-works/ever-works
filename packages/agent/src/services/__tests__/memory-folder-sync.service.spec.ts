@@ -48,7 +48,7 @@ describe('MemoryFolderSyncService', () => {
         getCommitter: jest.Mock;
     };
     let folderRepo: { listSubtree: jest.Mock };
-    let foldersService: { requireOwned: jest.Mock };
+    let foldersService: { requireOwned: jest.Mock; recordActivity: jest.Mock };
     let filesService: { list: jest.Mock };
     let service: MemoryFolderSyncService;
 
@@ -63,7 +63,10 @@ describe('MemoryFolderSyncService', () => {
             getCommitter: jest.fn(async () => ({ name: 'Tester', email: 't@example.com' })),
         };
         folderRepo = { listSubtree: jest.fn(async () => [folder()]) };
-        foldersService = { requireOwned: jest.fn(async () => folder()) };
+        foldersService = {
+            requireOwned: jest.fn(async () => folder()),
+            recordActivity: jest.fn(async () => undefined),
+        };
         filesService = { list: jest.fn(async () => []) };
         service = new MemoryFolderSyncService(
             gitFacade as never,
@@ -187,6 +190,27 @@ describe('MemoryFolderSyncService', () => {
         expect(report.commitSha).toBeNull();
         expect(report.results).toEqual([]);
         expect(gitFacade.cloneOrPull).not.toHaveBeenCalled();
+    });
+
+    it('records a sync activity row with the per-status counts', async () => {
+        filesService.list.mockResolvedValue([fileRow()]);
+
+        await service.syncFolder(USER, 'f1', { readBytes: async () => Buffer.from('x') });
+
+        expect(foldersService.recordActivity).toHaveBeenCalledWith(
+            USER,
+            'memory_folder_synced',
+            expect.any(String),
+            expect.objectContaining({ committed: 1, skipped: 0, failed: 0, commitSha: 'sha-123' }),
+        );
+    });
+
+    it('records nothing when the folder had nothing to sync', async () => {
+        filesService.list.mockResolvedValue([]);
+
+        await service.syncFolder(USER, 'f1', { readBytes: async () => Buffer.from('') });
+
+        expect(foldersService.recordActivity).not.toHaveBeenCalled();
     });
 
     it('resolves owner/repo from a github repoUrl when not given explicitly', async () => {

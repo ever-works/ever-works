@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { DatabaseModule } from '../database/database.module';
 import { FacadesModule } from '../facades/facades.module';
+import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { WorkKnowledgeUpload } from '../entities/work-knowledge-upload.entity';
 import { TaskAttachment } from '../entities/task-attachment.entity';
 import { MissionAttachment } from '../entities/mission-attachment.entity';
@@ -31,11 +32,17 @@ import { MemoryFolderSyncService } from './memory-folder-sync.service';
  * `forFeature(ENTITIES)`, exactly the pattern MissionsModule uses.
  *
  * `FacadesModule` supplies `GitFacadeService` for the sync path.
+ *
+ * `ActivityLogModule` is imported so the `@Optional()`-injected
+ * `ActivityLogService` actually resolves here — without it folder
+ * create/delete/sync would silently record nothing (same lesson as
+ * KnowledgeBaseModule's post-cascade fix).
  */
 @Module({
     imports: [
         DatabaseModule,
         FacadesModule,
+        ActivityLogModule,
         // House pattern (mirrors MissionsModule): a module that provides
         // feature-owned repositories registers their entities itself so
         // the @InjectRepository tokens resolve within THIS module.

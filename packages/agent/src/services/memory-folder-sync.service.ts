@@ -2,6 +2,7 @@ import * as fs from 'node:fs/promises';
 import * as path from 'node:path';
 import { Injectable, Logger, UnprocessableEntityException } from '@nestjs/common';
 import { GitFacadeService } from '../facades/git.facade';
+import { ActivityActionType } from '../entities/activity-log.types';
 import { MemoryFolder, MemoryFolderSyncRepo } from '../entities/memory-folder.entity';
 import { MemoryFolderRepository } from '../database/repositories/memory-folder.repository';
 import { MemoryFilesService, MemoryFileRow } from './memory-files.service';
@@ -186,6 +187,22 @@ export class MemoryFolderSyncService {
                 }
             }
         }
+
+        await this.foldersService.recordActivity(
+            userId,
+            ActivityActionType.MEMORY_FOLDER_SYNCED,
+            `Synced memory folder ${folder.path} to ${target.owner}/${target.repo}`,
+            {
+                folderId: folder.id,
+                path: folder.path,
+                owner: target.owner,
+                repo: target.repo,
+                commitSha,
+                committed: results.filter((r) => r.status === 'committed').length,
+                skipped: results.filter((r) => r.status === 'skipped-too-large').length,
+                failed: results.filter((r) => r.status === 'failed').length,
+            },
+        );
 
         // A no-op commit (identical content already in the repo) leaves the
         // staged files as 'committed' in the report — the repo IS in sync.

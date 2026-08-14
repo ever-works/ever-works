@@ -34,10 +34,10 @@ describe('MemoryFoldersService', () => {
         update: jest.Mock;
         updateSubtreePaths: jest.Mock;
         deleteByIds: jest.Mock;
-        countChildren: jest.Mock;
     };
     let userUploads: { countByFolderIds: jest.Mock; clearFolders: jest.Mock };
     let kbUploads: { countByFolderIds: jest.Mock; clearFolders: jest.Mock };
+    let activityLog: { log: jest.Mock };
     let service: MemoryFoldersService;
 
     beforeEach(() => {
@@ -50,7 +50,6 @@ describe('MemoryFoldersService', () => {
             update: jest.fn(async () => undefined),
             updateSubtreePaths: jest.fn(async () => undefined),
             deleteByIds: jest.fn(async () => undefined),
-            countChildren: jest.fn(async () => 0),
         };
         userUploads = {
             countByFolderIds: jest.fn(async () => new Map<string, number>()),
@@ -60,10 +59,12 @@ describe('MemoryFoldersService', () => {
             countByFolderIds: jest.fn(async () => new Map<string, number>()),
             clearFolders: jest.fn(async () => undefined),
         };
+        activityLog = { log: jest.fn(async () => undefined) };
         service = new MemoryFoldersService(
             folders as never,
             userUploads as never,
             kbUploads as never,
+            activityLog as never,
         );
     });
 
@@ -222,6 +223,46 @@ describe('MemoryFoldersService', () => {
             await expect(service.requireOwned(USER, 'foreign')).rejects.toBeInstanceOf(
                 NotFoundException,
             );
+        });
+    });
+
+    describe('activity', () => {
+        it('records a create row with the folder path and owner agent', async () => {
+            await service.createFolder(USER, { name: 'Docs', ownerAgentId: 'agent-1' });
+
+            expect(activityLog.log).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    userId: USER,
+                    actionType: 'memory_folder_created',
+                    details: expect.objectContaining({
+                        path: '/Docs',
+                        ownerAgentId: 'agent-1',
+                    }),
+                }),
+            );
+        });
+
+        it('records a delete row carrying what was dropped and unfiled', async () => {
+            folders.findById.mockResolvedValue(folder({ id: 'f1', path: '/Docs' }));
+            folders.listSubtree.mockResolvedValue([folder({ id: 'f1', path: '/Docs' })]);
+            userUploads.countByFolderIds.mockResolvedValue(new Map([['f1', 2]]));
+
+            await service.deleteFolder(USER, 'f1', { recursive: true });
+
+            expect(activityLog.log).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    actionType: 'memory_folder_deleted',
+                    details: expect.objectContaining({ deletedFolders: 1, unlinkedFiles: 2 }),
+                }),
+            );
+        });
+
+        it('never fails the operation when the activity write throws', async () => {
+            activityLog.log.mockRejectedValue(new Error('activity down'));
+
+            await expect(service.createFolder(USER, { name: 'Docs' })).resolves.toMatchObject({
+                path: '/Docs',
+            });
         });
     });
 });
