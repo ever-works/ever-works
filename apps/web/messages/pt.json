@@ -996,7 +996,8 @@
                 "allTemplates": "All templates",
                 "yourTemplates": "Your templates",
                 "yourTemplatesEmpty": "Agents you create will appear here as reusable templates.",
-                "openInWizard": "Open in wizard"
+                "openInWizard": "Open in wizard",
+                "browsePage": "Open the full template browser"
             },
             "pageTabs": {
                 "agents": "Agents",
@@ -1114,7 +1115,8 @@
                     "showing": "Exibindo {from}-{to} de {total}",
                     "previous": "Anterior",
                     "next": "Próximo"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "newDialog": {
                 "title": "Criar uma nova Tarefa",
@@ -1350,7 +1352,8 @@
                 "filter": {
                     "scope": "Escopo",
                     "all": "Todos"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "detail": {
                 "instructions": "Instruções",

@@ -951,7 +951,8 @@
                 "allTemplates": "כל התבניות",
                 "yourTemplates": "התבניות שלך",
                 "yourTemplatesEmpty": "הסוכנים שאתה יוצר יופיעו כאן כתבניות חוזרות.",
-                "openInWizard": "פתח באשף"
+                "openInWizard": "פתח באשף",
+                "browsePage": "Open the full template browser"
             },
             "settings": {
                 "identity": {
@@ -1145,7 +1146,8 @@
                     "showing": "מציג {from}-{to} מתוך {total}",
                     "previous": "הקודם",
                     "next": "הבא"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "newDialog": {
                 "title": "צור משימה חדשה",
@@ -1428,7 +1430,8 @@
                 "filter": {
                     "scope": "היקף",
                     "all": "הכל"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "detail": {
                 "instructions": "הוראות",

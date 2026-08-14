@@ -996,7 +996,8 @@
                 "allTemplates": "All templates",
                 "yourTemplates": "Your templates",
                 "yourTemplatesEmpty": "Agents you create will appear here as reusable templates.",
-                "openInWizard": "Open in wizard"
+                "openInWizard": "Open in wizard",
+                "browsePage": "Open the full template browser"
             },
             "pageTabs": {
                 "agents": "Agents",
@@ -1114,7 +1115,8 @@
                     "showing": "{from}〜{to} / {total}件を表示",
                     "previous": "前へ",
                     "next": "次へ"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "newDialog": {
                 "title": "新しいタスクを作成",
@@ -1350,7 +1352,8 @@
                 "filter": {
                     "scope": "スコープ",
                     "all": "すべて"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "detail": {
                 "instructions": "指示",

@@ -951,7 +951,8 @@
                 "allTemplates": "Todas las plantillas",
                 "yourTemplates": "Tus plantillas",
                 "yourTemplatesEmpty": "Los Agentes que creas aparecerán aquí como plantillas reutilizables.",
-                "openInWizard": "Abrir en el asistente"
+                "openInWizard": "Abrir en el asistente",
+                "browsePage": "Open the full template browser"
             },
             "settings": {
                 "identity": {
@@ -1145,7 +1146,8 @@
                     "showing": "Mostrando {from}-{to} de {total}",
                     "previous": "Anterior",
                     "next": "Siguiente"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "newDialog": {
                 "title": "Crear una nueva Tarea",
@@ -1428,7 +1430,8 @@
                 "filter": {
                     "scope": "Ámbito",
                     "all": "Todos"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "detail": {
                 "instructions": "Instrucciones",

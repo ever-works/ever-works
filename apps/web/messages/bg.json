@@ -951,7 +951,8 @@
                 "allTemplates": "Всички шаблони",
                 "yourTemplates": "Твоите шаблони",
                 "yourTemplatesEmpty": "Агентите, които създадеш, ще се появят тук като шаблони за многократна употреба.",
-                "openInWizard": "Отвори в помощник"
+                "openInWizard": "Отвори в помощник",
+                "browsePage": "Open the full template browser"
             },
             "settings": {
                 "identity": {
@@ -1145,7 +1146,8 @@
                     "showing": "Показване на {from}-{to} от {total}",
                     "previous": "Предишна",
                     "next": "Следваща"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "newDialog": {
                 "title": "Създай нова Задача",
@@ -1428,7 +1430,8 @@
                 "filter": {
                     "scope": "Обхват",
                     "all": "Всички"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "detail": {
                 "instructions": "Инструкции",

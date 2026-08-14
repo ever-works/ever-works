@@ -996,7 +996,8 @@
                 "allTemplates": "All templates",
                 "yourTemplates": "Your templates",
                 "yourTemplatesEmpty": "Agents you create will appear here as reusable templates.",
-                "openInWizard": "Open in wizard"
+                "openInWizard": "Open in wizard",
+                "browsePage": "Open the full template browser"
             },
             "pageTabs": {
                 "agents": "Agents",
@@ -1114,7 +1115,8 @@
                     "showing": "{from}-{to} / {total} दिखाए जा रहे हैं",
                     "previous": "पिछला",
                     "next": "अगला"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "newDialog": {
                 "title": "एक नया कार्य बनाएं",
@@ -1350,7 +1352,8 @@
                 "filter": {
                     "scope": "स्कोप",
                     "all": "सभी"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "detail": {
                 "instructions": "निर्देश",

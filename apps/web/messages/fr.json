@@ -951,7 +951,8 @@
                 "allTemplates": "Tous les modèles",
                 "yourTemplates": "Vos modèles",
                 "yourTemplatesEmpty": "Les Agents que vous créez apparaîtront ici comme modèles réutilisables.",
-                "openInWizard": "Ouvrir dans l'assistant"
+                "openInWizard": "Ouvrir dans l'assistant",
+                "browsePage": "Open the full template browser"
             },
             "settings": {
                 "identity": {
@@ -1145,7 +1146,8 @@
                     "showing": "Affichage de {from}-{to} sur {total}",
                     "previous": "Précédent",
                     "next": "Suivant"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "newDialog": {
                 "title": "Créer une nouvelle Tâche",
@@ -1428,7 +1430,8 @@
                 "filter": {
                     "scope": "Étendue",
                     "all": "Tous"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "detail": {
                 "instructions": "Instructions",

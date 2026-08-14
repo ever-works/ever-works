@@ -996,7 +996,8 @@
                 "allTemplates": "All templates",
                 "yourTemplates": "Your templates",
                 "yourTemplatesEmpty": "Agents you create will appear here as reusable templates.",
-                "openInWizard": "Open in wizard"
+                "openInWizard": "Open in wizard",
+                "browsePage": "Open the full template browser"
             },
             "pageTabs": {
                 "agents": "Agents",
@@ -1114,7 +1115,8 @@
                     "showing": "Hiển thị {from}-{to} trong {total}",
                     "previous": "Trước",
                     "next": "Tiếp theo"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "newDialog": {
                 "title": "Tạo Task mới",
@@ -1350,7 +1352,8 @@
                 "filter": {
                     "scope": "Phạm vi",
                     "all": "Tất cả"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "detail": {
                 "instructions": "Hướng dẫn",

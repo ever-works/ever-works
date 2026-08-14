@@ -996,7 +996,8 @@
                 "allTemplates": "All templates",
                 "yourTemplates": "Your templates",
                 "yourTemplatesEmpty": "Agents you create will appear here as reusable templates.",
-                "openInWizard": "Open in wizard"
+                "openInWizard": "Open in wizard",
+                "browsePage": "Open the full template browser"
             },
             "pageTabs": {
                 "agents": "Agents",
@@ -1114,7 +1115,8 @@
                     "showing": "{from}-{to} van {total} weergegeven",
                     "previous": "Vorige",
                     "next": "Volgende"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "newDialog": {
                 "title": "Maak een nieuwe Taak",
@@ -1350,7 +1352,8 @@
                 "filter": {
                     "scope": "Scope",
                     "all": "Alle"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "detail": {
                 "instructions": "Instructies",
