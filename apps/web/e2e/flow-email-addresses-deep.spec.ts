@@ -28,9 +28,9 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *     from the OWNER, distinct from sec-pin's cross-user 404);
  *   · providerSettings rotation persists and leaves the verification state
  *     untouched; an empty `{}` PATCH is a safe no-op;
- *   · DISABLE does NOT invalidate the verification token (the sharp contrast
- *     with DELETE, which sec-pin proves DOES kill the token) — and a confirm
- *     can still flip `verified` while the row is disabled;
+ *   · DISABLE drops the row from the active pool (its non-revocation of the
+ *     outstanding token is no longer assertable — EW-025 removed the token from
+ *     every response, so the confirm link cannot be followed from a test);
  *   · the disable→enable round-trip restores the active pool + clears
  *     `disabledAt`;
  *   · `defaultForReplies` is NON-exclusive (two coexisting defaults — no
@@ -46,8 +46,9 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *
  * ── PROBED CONTRACTS (live sqlite stack, http://127.0.0.1:3100, keyless) ──
  *   POST /api/email/addresses → 201 { address:{ … 15 fields incl.
- *     verified:false, verificationToken, verificationTokenExpiresAt(~now+24h),
- *     defaultForReplies, disabledAt:null } }.
+ *     verified:false, defaultForReplies, disabledAt:null }. NOTE: EW-025 strips
+ *     `verificationToken` AND `verificationTokenExpiresAt` from every response —
+ *     returning them let a caller verify an address they do not own.
  *     · address local-part >320 chars → 400 ['address must be shorter than or
  *       equal to 320 characters', …]; pluginId >128 → 400 ['pluginId must be
  *       shorter than or equal to 128 characters'].
@@ -56,14 +57,17 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *       should not exist']; { disabled:'yes' } → 400 ['disabled must be a
  *       boolean value']; { defaultForReplies:'x' } → 400.
  *     · own non-existent id (zero-UUID) → 404 'Email address not found'.
- *     · { providerSettings:{…} } rotates settings, leaves verified/token
- *       intact; {} is a 200 no-op (no field changes).
+ *     · { providerSettings:{…} } rotates settings and leaves `verified` false;
+ *       {} is a 200 no-op (no field changes). The token survives too, but that
+ *       is a server-side invariant — EW-025 makes it unobservable here.
  *     · { defaultForReplies:true } on two rows → BOTH stay true (non-exclusive).
  *     · { disabled:true } stamps disabledAt + drops the row from the active
  *       list; { disabled:false } clears disabledAt + restores it.
- *   GET /api/email/verify/:token (PUBLIC) → always 200 { verified:bool }:
- *     · a DISABLED address's still-issued token confirms verified:true (disable
- *       ≠ token revocation), even though the row stays out of the active list.
+ *   GET /api/email/verify/:token (PUBLIC) → always 200 { verified:bool }.
+ *     ⚠️ EW-025: the token is no longer returned by any API response, so the
+ *     POSITIVE confirm path is not reachable from e2e — verification mail goes
+ *     via the provider plugin, not the MailHog sink either. Disable-≠-revocation
+ *     is therefore recorded as a coverage gap in the test body, not asserted.
  *   GET /api/email/addresses?direction=<x> → 200 always; an unknown value
  *     (`both`, `sideways`) returns a filtered/empty list, NOT a 400 — the
  *     query filter is permissive (contrast the strict create-body enum).
@@ -84,8 +88,10 @@ interface EmailAddress {
     pluginId: string;
     providerSettings: Record<string, unknown>;
     verified: boolean;
-    verificationToken: string | null;
-    verificationTokenExpiresAt: string | null;
+    /** EW-025: never sent over the API — optional so tests can assert ABSENCE. */
+    verificationToken?: never;
+    /** EW-025: stripped too — publishing it reveals how long a guess stays useful. */
+    verificationTokenExpiresAt?: never;
     defaultForReplies: boolean;
     disabledAt: string | null;
 }
@@ -232,7 +238,10 @@ test.describe('Email addresses — deep PATCH + lifecycle-edge contracts', () =>
     }) => {
         const user = await registerUserViaAPI(request);
         const addr = await createAddress(request, user.access_token);
-        expect(addr.verificationToken).toBeTruthy();
+        // EW-025: the verification token no longer crosses the API boundary —
+        // returning it let a caller verify an address they do not own. Assert
+        // its ABSENCE, which is the security contract, instead of its presence.
+        expect(addr.verificationToken).toBeUndefined();
 
         const res = await patch(request, user.access_token, addr.id, {
             providerSettings: { apiKey: 'rotated-key', region: 'eu' },
@@ -240,10 +249,11 @@ test.describe('Email addresses — deep PATCH + lifecycle-edge contracts', () =>
         expect(res.status()).toBe(200);
         const updated = ((await res.json()) as { address: EmailAddress }).address;
         expect(updated.providerSettings).toEqual({ apiKey: 'rotated-key', region: 'eu' });
-        // Rotating credentials is orthogonal to verification — the outstanding
-        // confirmation token and the unverified flag both survive untouched.
+        // Rotating credentials is orthogonal to verification: the unverified
+        // flag survives untouched. (The token survives too, but that is now a
+        // server-side invariant — it is deliberately not observable here.)
         expect(updated.verified).toBe(false);
-        expect(updated.verificationToken).toBe(addr.verificationToken);
+        expect(updated.verificationToken).toBeUndefined();
     });
 
     test('an empty PATCH body is a safe 200 no-op', async ({ request }) => {
@@ -269,8 +279,9 @@ test.describe('Email addresses — deep PATCH + lifecycle-edge contracts', () =>
     }) => {
         const user = await registerUserViaAPI(request);
         const addr = await createAddress(request, user.access_token);
-        const token = addr.verificationToken as string;
-        expect(token).toBeTruthy();
+        // EW-025 — the token is no longer returned by the API, so this test can
+        // no longer follow the confirmation link itself. See the note below.
+        expect(addr.verificationToken).toBeUndefined();
 
         // Retire the row. sec-pin proves DELETE kills the outstanding token;
         // disable is a softer state — the confirmation link must STILL work.
@@ -285,11 +296,22 @@ test.describe('Email addresses — deep PATCH + lifecycle-edge contracts', () =>
             (await listAddresses(request, user.access_token)).some((x) => x.id === addr.id),
         ).toBe(false);
 
-        // …yet its still-issued confirmation link confirms it (disable is not
-        // token revocation; verified is set even while the row is disabled).
-        const confirm = await request.get(`${API_BASE}/api/email/verify/${token}`);
-        expect(confirm.status()).toBe(200);
-        expect(((await confirm.json()) as { verified: boolean }).verified).toBe(true);
+        // ── COVERAGE GAP, deliberate and recorded ────────────────────────────
+        // The claim in this test's NAME — that disabling does not revoke the
+        // outstanding token, so the emailed link still works — is no longer
+        // checkable from here, and both reasons are by design:
+        //
+        //   1. EW-025 removed the token from every API response, so the test
+        //      cannot read it back and follow the link. That is the fix.
+        //   2. Verification mail goes out through the PROVIDER PLUGIN
+        //      (`triggerVerification` -> `emailFacade.verifyAddress`), not
+        //      SMTP, so it never reaches the MailHog sink the e2e stack runs
+        //      and cannot be read from there either.
+        //
+        // What survives here is the observable half: the row leaves the active
+        // pool and stays unverified. Restoring the rest needs a loopback email
+        // provider for CI or a test-only token hook — see the same note in
+        // flow-agent-inbox-messaging.spec.ts.
     });
 
     test('disable→enable round-trip restores the address to the active pool', async ({
@@ -462,20 +484,27 @@ test.describe('Email addresses — deep PATCH + lifecycle-edge contracts', () =>
         const user = await registerUserViaAPI(request);
         const addr = await createAddress(request, user.access_token);
 
-        // The TTL stamp is the precondition the confirm flow checks: a token
-        // whose expiry is already past returns { verified:false } (service
-        // email.service.ts L211). On this build the expiry is always future,
-        // so a same-build confirm succeeds — proving the non-expired branch.
-        expect(addr.verificationTokenExpiresAt).toBeTruthy();
-        const expiresAt = new Date(addr.verificationTokenExpiresAt as string).getTime();
-        const DAY = 24 * 60 * 60 * 1000;
-        expect(expiresAt).toBeGreaterThan(before);
-        expect(expiresAt).toBeLessThanOrEqual(before + DAY + 5 * 60 * 1000);
+        // EW-025 strips BOTH the token and its expiry at the API boundary. The
+        // expiry goes too on purpose: publishing it tells an attacker exactly
+        // how long a guessed token stays useful.
+        //
+        // So the TTL is now a server-side invariant. What this test can still
+        // pin is that neither field leaks — which is the security half, and the
+        // half a regression would most plausibly break by adding a field back
+        // to the projection.
+        expect(addr.verificationTokenExpiresAt).toBeUndefined();
+        expect(addr.verificationToken).toBeUndefined();
+        // `before` is kept deliberately: it documents that this test used to
+        // bound the stamp within ~24h, so anyone restoring that coverage knows
+        // what it asserted.
+        expect(before).toBeLessThanOrEqual(Date.now());
 
-        // A not-yet-expired token confirms — the live, exercisable half of the
-        // TTL contract (the expired half needs a past stamp no API will accept).
-        const confirm = await request.get(`${API_BASE}/api/email/verify/${addr.verificationToken}`);
-        expect(confirm.status()).toBe(200);
-        expect(((await confirm.json()) as { verified: boolean }).verified).toBe(true);
+        // ── COVERAGE GAP, deliberate and recorded ────────────────────────────
+        // The 24h TTL and the not-yet-expired confirm branch (email.service.ts
+        // rejects a past `verificationTokenExpiresAt`) are no longer reachable
+        // from an e2e test: the stamp is not readable and the token needed to
+        // exercise the confirm path is not either. Covering it again needs a
+        // unit test over `confirmVerification`, or a loopback email provider
+        // for CI. Recorded rather than silently dropped.
     });
 });
