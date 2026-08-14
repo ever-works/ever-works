@@ -84,8 +84,19 @@ export function GoalForm() {
             toast.error(t('errors.metricSourceRequired'));
             return;
         }
-        const target = Number(targetValue);
-        if (!Number.isFinite(target)) {
+        // `Number('')` is 0, NOT NaN — so checking only `Number.isFinite` let an
+        // EMPTY Target value through as a real target of 0. Combined with the
+        // default comparator `gte`, that creates a Goal meaning "reach at least
+        // 0", which every possible metric value already satisfies: the Goal is
+        // vacuous and reports success on its first evaluation. Verified on
+        // production — submitting the form with Target value blank produced
+        // `targetValue = 0, comparator = gte` with no error shown.
+        //
+        // The empty case must be rejected explicitly, before the conversion.
+        // `Number(' ')` is 0 too, hence the trim.
+        const rawTarget = targetValue.trim();
+        const target = Number(rawTarget);
+        if (rawTarget.length === 0 || !Number.isFinite(target)) {
             toast.error(t('errors.targetInvalid'));
             return;
         }

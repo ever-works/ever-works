@@ -61,6 +61,7 @@ const sidebars: SidebarsConfig = {
 				'features/settings-map',
 				'features/missions',
 				'features/ideas',
+				'features/goals',
 				'features/agents',
 				'features/agents-catalog',
 				'features/skills-catalog',
