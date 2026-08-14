@@ -6834,6 +6834,101 @@
             },
             "confirmDelete": "Hapus pemicu ini? URL webhook-nya langsung berhenti berfungsi dan ini tidak dapat dibatalkan."
         },
+        "taskTriggers": {
+            "title": "Task Triggers",
+            "subtitle": "Rules that fire on webhooks or platform events and create Tasks.",
+            "lead": "Triggers create Tasks automatically when a signed webhook arrives or an ingested platform event matches.",
+            "new": "New Trigger",
+            "empty": "No triggers yet. Create one to spawn Tasks from webhooks or platform events.",
+            "neverFired": "Never",
+            "confirmDelete": "Delete this trigger? Its webhook URL stops working immediately and this can't be undone.",
+            "createTitle": "New Trigger",
+            "createDescription": "Choose what fires the trigger and what Task it creates.",
+            "editTitle": "Edit Trigger",
+            "editDescription": "Update the trigger's rule and the Task it creates.",
+            "tabs": {
+                "tasks": "Tasks",
+                "triggers": "Triggers"
+            },
+            "columns": {
+                "name": "Name",
+                "mode": "Mode",
+                "target": "Target",
+                "status": "Enabled",
+                "lastFired": "Last Fired",
+                "fires": "Fires"
+            },
+            "mode": {
+                "template": "Template",
+                "task": "Task"
+            },
+            "target": {
+                "default": "Default task title"
+            },
+            "source": {
+                "webhook": "Webhook (signed URL)",
+                "event": "Platform event"
+            },
+            "form": {
+                "name": "Name",
+                "namePlaceholder": "Deploy notifications",
+                "description": "Description",
+                "descriptionPlaceholder": "What fires this trigger?",
+                "source": "Source",
+                "sourceImmutable": "The source can't be changed after creation.",
+                "webhookHint": "You'll get a signed webhook URL and secret after creating.",
+                "matcherTitle": "Event matcher (at least one field)",
+                "matcherSourcePlaceholder": "Source, e.g. slack-connector or github*",
+                "matcherKindPlaceholder": "Kind, e.g. github.push or github.*",
+                "matcherWorkIdPlaceholder": "Work ID (optional, exact match)",
+                "matcherHint": "source and kind allow a trailing * wildcard; all filled fields must match.",
+                "taskTitle": "Task title template",
+                "taskTitlePlaceholder": "Trigger: {name}",
+                "templateHint": "Placeholders: {{trigger.name}}, {{event.kind}}, {{event.title}}, {{event.payload.<key>}} …",
+                "taskDescription": "Task description template",
+                "taskDescriptionPlaceholder": "Optional. Same placeholders as the title; empty keeps the payload dump.",
+                "templateSlug": "Task template slug",
+                "templateSlugPlaceholder": "e.g. bug-triage (optional)",
+                "templateSlugHint": "Links a task template by slug once templates are available; resolved when the trigger fires.",
+                "agent": "Assign agent",
+                "agentNone": "No agent",
+                "agentUnknown": "This agent is not in your current list — it may have been removed.",
+                "enabled": "Enabled",
+                "enabledHint": "Disabled triggers ignore events and reject webhook calls."
+            },
+            "actions": {
+                "menu": "Trigger actions",
+                "testFire": "Test fire",
+                "edit": "Edit",
+                "rotate": "Rotate secret",
+                "delete": "Delete",
+                "cancel": "Cancel",
+                "create": "Create",
+                "save": "Save"
+            },
+            "reveal": {
+                "title": "Trigger secret",
+                "warning": "Copy the secret now — you won't be able to see it again.",
+                "url": "Webhook URL",
+                "secret": "Signing secret",
+                "copy": "Copy",
+                "copyFailed": "Could not copy to clipboard",
+                "done": "Done"
+            },
+            "toast": {
+                "created": "Trigger created",
+                "createFailed": "Could not create the trigger",
+                "updated": "Trigger updated",
+                "updateFailed": "Could not update the trigger",
+                "toggleFailed": "Could not update the trigger",
+                "deleted": "Trigger deleted",
+                "deleteFailed": "Could not delete the trigger",
+                "rotated": "Secret rotated",
+                "rotateFailed": "Could not rotate the secret",
+                "testFired": "Test task created: {title}",
+                "testFireFailed": "Could not test-fire the trigger"
+            }
+        },
         "workKind": {
             "label": "Tipe",
             "website": "Website",

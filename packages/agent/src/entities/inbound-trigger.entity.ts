@@ -14,6 +14,34 @@ export type InboundTriggerKind = 'webhook' | 'api';
 export type InboundTriggerStatus = 'active' | 'paused';
 
 /**
+ * What fires the trigger:
+ *  - `'webhook'` — the signed `POST /api/inbound-triggers/:id/fire`
+ *    endpoint (the original delivery path; still the default).
+ *  - `'event'`  — the ingest spine: every `ingested_events` row drained
+ *    by `EventIngestService.processBatch` is offered to the owner's
+ *    active event triggers and fires the ones whose `eventMatcher`
+ *    matches.
+ */
+export type InboundTriggerSourceType = 'webhook' | 'event';
+
+/**
+ * Matcher an `'event'`-sourced trigger applies to each ingested event.
+ * Keys are whitelisted (nothing else is ever consulted): `source` and
+ * `kind` support a trailing-`*` wildcard (`github.*`) or a lone `*`;
+ * `workId` is an exact uuid match. An omitted key matches anything; a
+ * matcher with NO keys matches nothing (defensive — an event trigger
+ * must say what it listens for).
+ */
+export interface InboundTriggerEventMatcher {
+    /** Producing plugin id, e.g. `slack-connector`; trailing `*` wildcard allowed. */
+    source?: string;
+    /** Source-namespaced kind, e.g. `github.push`; trailing `*` wildcard allowed. */
+    kind?: string;
+    /** Exact Work uuid the event was routed to. */
+    workId?: string;
+}
+
+/**
  * Inbound Triggers ("Trigger Schedules") — event-driven ops without polling.
  *
  * One row per named trigger an org member creates. The platform hands the
@@ -78,6 +106,21 @@ export class InboundTrigger {
     @TimestampColumn({ nullable: true })
     rotatedAt: Date | null;
 
+    /**
+     * What fires this trigger — `'webhook'` (signed endpoint, default)
+     * or `'event'` (ingest-spine matching via `eventMatcher`).
+     * Immutable after create, like `kind`.
+     */
+    @Column({ type: 'varchar', length: 16, default: 'webhook' })
+    sourceType: InboundTriggerSourceType;
+
+    /**
+     * Ingest-event matcher for `'event'`-sourced triggers; null for
+     * webhook triggers. See {@link InboundTriggerEventMatcher}.
+     */
+    @Column({ type: 'simple-json', nullable: true })
+    eventMatcher: InboundTriggerEventMatcher | null;
+
     /** Optional Agent assigned to spawned Tasks (raw uuid — FK in the migration). */
     @Column({ type: 'uuid', nullable: true })
     targetAgentId: string | null;
@@ -85,6 +128,25 @@ export class InboundTrigger {
     /** Title template for spawned Tasks; `{name}` → trigger name. Defaults to 'Trigger: {name}'. */
     @Column({ type: 'varchar', length: 200, nullable: true })
     taskTitleTemplate: string | null;
+
+    /**
+     * Description template for spawned Tasks. Supports the same safe
+     * `{{event.*}}` placeholder set as the title (see
+     * `triggers/trigger-template.ts`); null keeps the built-in
+     * payload-dump description.
+     */
+    @Column({ type: 'text', nullable: true })
+    taskDescriptionTemplate: string | null;
+
+    /**
+     * RESERVED linkage to `task_templates` (feature I, parallel branch)
+     * — a string slug on purpose, resolved lazily at fire time through
+     * the optional `TASK_TEMPLATE_LOOKUP` port so this column works
+     * standalone today and lights up when the templates table merges.
+     * Never a FK.
+     */
+    @Column({ type: 'varchar', length: 80, nullable: true })
+    taskTemplateSlug: string | null;
 
     @TimestampColumn({ nullable: true })
     lastFiredAt: Date | null;

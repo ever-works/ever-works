@@ -7,6 +7,8 @@ import {
     type CreateInboundTriggerInput,
     type InboundTriggerView,
     type InboundTriggerWithSecret,
+    type TestFireInboundTriggerResult,
+    type UpdateInboundTriggerInput,
 } from '@/lib/api/inbound-triggers';
 // Security: defense-in-depth authn guard, mirroring actions/dashboard/schedules.ts.
 // serverFetch only attaches the bearer token when an auth cookie is present, so
@@ -22,9 +24,13 @@ async function requireAuth() {
     }
 }
 
-/** The Schedules view lives on the Activity page — bust its cache after a mutation. */
+/**
+ * Trigger views live on the Activity page (Schedules tab) AND the Tasks
+ * page's Triggers tab — bust both caches after a mutation.
+ */
 function revalidateTriggerSurfaces() {
     revalidatePath('/[locale]/(dashboard)/activity', 'page');
+    revalidatePath('/[locale]/(dashboard)/tasks/triggers', 'page');
 }
 
 type ActionResult<T> = { success: true; data: T } | { success: false; error: string };
@@ -53,6 +59,32 @@ export async function createInboundTriggerAction(
         return { success: true, data };
     } catch (error) {
         return toError(error, 'Failed to create trigger');
+    }
+}
+
+export async function updateInboundTriggerAction(
+    id: string,
+    input: UpdateInboundTriggerInput,
+): Promise<ActionResult<InboundTriggerView>> {
+    await requireAuth();
+    try {
+        const data = await inboundTriggersAPI.update(id, input);
+        revalidateTriggerSurfaces();
+        return { success: true, data };
+    } catch (error) {
+        return toError(error, 'Failed to update trigger');
+    }
+}
+
+export async function testFireInboundTriggerAction(
+    id: string,
+): Promise<ActionResult<TestFireInboundTriggerResult>> {
+    await requireAuth();
+    try {
+        const data = await inboundTriggersAPI.testFire(id);
+        return { success: true, data };
+    } catch (error) {
+        return toError(error, 'Failed to test-fire trigger');
     }
 }
 

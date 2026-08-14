@@ -23,6 +23,7 @@ import type {
     FireInboundTriggerResult,
     InboundTriggerScope,
     InboundTriggerView,
+    TestFireInboundTriggerResult,
 } from '@ever-works/agent/triggers';
 import { CreateInboundTriggerDto, UpdateInboundTriggerDto } from './dto/inbound-trigger.dto';
 
@@ -177,6 +178,25 @@ export class InboundTriggersController {
         @Param('id', ParseUUIDPipe) id: string,
     ): Promise<InboundTriggerView> {
         return this.triggers.resume(this.scope(auth), id);
+    }
+
+    @Post(':id/test-fire')
+    @ApiBearerAuth('JWT-auth')
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    @ApiOperation({
+        summary: 'Test-fire a trigger (auth-guarded rehearsal)',
+        description:
+            "Synthesizes a sample event shaped like what the trigger listens for and creates a REAL Task from the trigger's templates, labelled 'trigger-test'. Does not require a signature, does not dispatch an agent run, and does not bump lastFiredAt/fireCount.",
+    })
+    @ApiParam({ name: 'id', description: 'Trigger ID' })
+    @ApiResponse({ status: 200, description: 'Task created from the rendered templates' })
+    @ApiResponse({ status: 404, description: 'Not found (or not yours)' })
+    async testFire(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<TestFireInboundTriggerResult> {
+        return this.triggers.testFire(this.scope(auth), id);
     }
 
     @Delete(':id')
