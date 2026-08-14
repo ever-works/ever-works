@@ -1798,7 +1798,21 @@
                     "empty": "Belum ada Work yang terhubung ke Ide ini."
                 },
                 "agents": {
-                    "empty": "Tidak ada Agen untuk Ide ini."
+                    "empty": "Tidak ada Agen untuk Ide ini.",
+                    "assignExisting": "Tetapkan yang ada",
+                    "assignTitle": "Tetapkan Agen ke Ide ini",
+                    "assignSubtitle": "Tempatkan Agen yang sudah Anda miliki pada Ide ini alih-alih membuat yang baru.",
+                    "assignSearchPlaceholder": "Cari Agen…",
+                    "assignLoading": "Memuat Agen…",
+                    "assignNoneAvailable": "Tidak ada Agen lain untuk ditetapkan.",
+                    "assignNoMatches": "Tidak ada Agen yang cocok dengan pencarian itu.",
+                    "assignLoadFailed": "Tidak dapat memuat Agen",
+                    "assignedToast": "{name} ditetapkan ke Ide ini",
+                    "assignFailed": "Tidak dapat menetapkan Agen",
+                    "assignCancel": "Batal",
+                    "unassign": "Hapus dari Ide ini",
+                    "unassignedToast": "{name} dihapus dari Ide ini",
+                    "unassignFailed": "Tidak dapat menghapus Agen"
                 },
                 "meta": {
                     "source": "Sumber",
@@ -1818,7 +1832,8 @@
                         "idea-agents": "Tidak bisa dihapus: {count} Agen terikat pada Ide ini. Hapus atau ubah cakupannya dulu.",
                         "build-in-flight": "Tidak bisa dihapus saat build berjalan. Tunggu hingga selesai.",
                         "unknown": "Ide ini tidak bisa dihapus sekarang."
-                    }
+                    },
+                    "unlinksWorks": "Ide ini tertaut ke {count} Work. Work tersebut akan dipertahankan — hanya tautannya yang dihapus."
                 },
                 "toasts": {
                     "built": "Work dibangun dari Ide ini",

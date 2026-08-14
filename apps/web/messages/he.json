@@ -1829,7 +1829,21 @@
                     "empty": "אין Works מקושרים לרעיון הזה."
                 },
                 "agents": {
-                    "empty": "אין סוכנים המשויכים לרעיון הזה."
+                    "empty": "אין סוכנים המשויכים לרעיון הזה.",
+                    "assignExisting": "שיוך סוכן קיים",
+                    "assignTitle": "שיוך סוכן לרעיון זה",
+                    "assignSubtitle": "שייכו לרעיון זה סוכן שכבר יש לכם במקום ליצור סוכן נוסף.",
+                    "assignSearchPlaceholder": "חיפוש סוכנים…",
+                    "assignLoading": "טוען סוכנים…",
+                    "assignNoneAvailable": "אין סוכנים נוספים לשיוך.",
+                    "assignNoMatches": "אין סוכנים התואמים לחיפוש זה.",
+                    "assignLoadFailed": "לא ניתן לטעון סוכנים",
+                    "assignedToast": "{name} שויך לרעיון זה",
+                    "assignFailed": "לא ניתן לשייך את הסוכן",
+                    "assignCancel": "ביטול",
+                    "unassign": "הסרה מרעיון זה",
+                    "unassignedToast": "{name} הוסר מרעיון זה",
+                    "unassignFailed": "לא ניתן להסיר את הסוכן"
                 },
                 "meta": {
                     "source": "מקור",
@@ -1849,7 +1863,8 @@
                         "idea-agents": "לא ניתן למחוק: {count} סוכנים משויכים לרעיון. מחק אותם או שנה את ההיקף.",
                         "build-in-flight": "לא ניתן למחוק בזמן בנייה. המתן לסיום.",
                         "unknown": "לא ניתן למחוק את הרעיון כרגע."
-                    }
+                    },
+                    "unlinksWorks": "{count, plural, one {הרעיון הזה מקושר ל-Work אחד. ה-Work יישמר — רק הקישור יוסר.} two {הרעיון הזה מקושר לשני Works. ה-Works יישמרו — רק הקישור יוסר.} other {הרעיון הזה מקושר ל-# Works. ה-Works יישמרו — רק הקישור יוסר.}}"
                 },
                 "toasts": {
                     "built": "נבנה Work מהרעיון הזה",

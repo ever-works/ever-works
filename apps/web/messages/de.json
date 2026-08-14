@@ -1829,7 +1829,21 @@
                     "empty": "Noch keine Works mit dieser Idee verknüpft."
                 },
                 "agents": {
-                    "empty": "Keine Agenten dieser Idee zugeordnet."
+                    "empty": "Keine Agenten dieser Idee zugeordnet.",
+                    "assignExisting": "Vorhandenen zuweisen",
+                    "assignTitle": "Einen Agenten dieser Idee zuweisen",
+                    "assignSubtitle": "Weisen Sie dieser Idee einen Agenten zu, den Sie bereits haben, statt einen neuen zu erstellen.",
+                    "assignSearchPlaceholder": "Agenten suchen…",
+                    "assignLoading": "Agenten werden geladen…",
+                    "assignNoneAvailable": "Keine weiteren Agenten zum Zuweisen vorhanden.",
+                    "assignNoMatches": "Keine Agenten passen zu dieser Suche.",
+                    "assignLoadFailed": "Agenten konnten nicht geladen werden",
+                    "assignedToast": "{name} dieser Idee zugewiesen",
+                    "assignFailed": "Agent konnte nicht zugewiesen werden",
+                    "assignCancel": "Abbrechen",
+                    "unassign": "Von dieser Idee entfernen",
+                    "unassignedToast": "{name} von dieser Idee entfernt",
+                    "unassignFailed": "Agent konnte nicht entfernt werden"
                 },
                 "meta": {
                     "source": "Quelle",
@@ -1849,7 +1863,8 @@
                         "idea-agents": "Löschen nicht möglich: {count} Agent(en) sind dieser Idee zugeordnet. Zuerst löschen oder umhängen.",
                         "build-in-flight": "Löschen während eines laufenden Builds nicht möglich. Bitte warten.",
                         "unknown": "Diese Idee kann derzeit nicht gelöscht werden."
-                    }
+                    },
+                    "unlinksWorks": "{count, plural, one {Diese Idee ist mit # Work verknüpft. Das Work bleibt erhalten — nur die Verknüpfung wird entfernt.} other {Diese Idee ist mit # Works verknüpft. Die Works bleiben erhalten — nur die Verknüpfung wird entfernt.}}"
                 },
                 "toasts": {
                     "built": "Work aus dieser Idee gebaut",

@@ -1798,7 +1798,21 @@
                     "empty": "Chưa có Work nào liên kết với Ý tưởng này."
                 },
                 "agents": {
-                    "empty": "Không có Tác nhân nào gắn với Ý tưởng này."
+                    "empty": "Không có Tác nhân nào gắn với Ý tưởng này.",
+                    "assignExisting": "Gán Tác nhân có sẵn",
+                    "assignTitle": "Gán một Tác nhân cho Ý tưởng này",
+                    "assignSubtitle": "Đưa một Tác nhân bạn đã có vào Ý tưởng này thay vì tạo thêm một Tác nhân mới.",
+                    "assignSearchPlaceholder": "Tìm Tác nhân…",
+                    "assignLoading": "Đang tải Tác nhân…",
+                    "assignNoneAvailable": "Không còn Tác nhân nào khác để gán.",
+                    "assignNoMatches": "Không có Tác nhân nào khớp với tìm kiếm đó.",
+                    "assignLoadFailed": "Không thể tải Tác nhân",
+                    "assignedToast": "Đã gán {name} cho Ý tưởng này",
+                    "assignFailed": "Không thể gán Tác nhân",
+                    "assignCancel": "Hủy",
+                    "unassign": "Gỡ khỏi Ý tưởng này",
+                    "unassignedToast": "Đã gỡ {name} khỏi Ý tưởng này",
+                    "unassignFailed": "Không thể gỡ Tác nhân"
                 },
                 "meta": {
                     "source": "Nguồn",
@@ -1818,7 +1832,8 @@
                         "idea-agents": "Không thể xóa: {count} Tác nhân đang gắn với Ý tưởng này. Hãy xóa hoặc đổi phạm vi trước.",
                         "build-in-flight": "Không thể xóa khi đang dựng. Hãy đợi hoàn tất.",
                         "unknown": "Hiện không thể xóa Ý tưởng này."
-                    }
+                    },
+                    "unlinksWorks": "Ý tưởng này liên kết với {count} Work. Work sẽ được giữ lại — chỉ liên kết bị xóa."
                 },
                 "toasts": {
                     "built": "Đã dựng Work từ Ý tưởng này",

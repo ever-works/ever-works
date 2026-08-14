@@ -1798,7 +1798,21 @@
                     "empty": "このアイデアに紐づく Work はまだありません。"
                 },
                 "agents": {
-                    "empty": "このアイデアに紐づくエージェントはありません。"
+                    "empty": "このアイデアに紐づくエージェントはありません。",
+                    "assignExisting": "既存を割り当て",
+                    "assignTitle": "このアイデアにエージェントを割り当て",
+                    "assignSubtitle": "新しく作成する代わりに、すでにあるエージェントをこのアイデアに割り当てます。",
+                    "assignSearchPlaceholder": "エージェントを検索…",
+                    "assignLoading": "エージェントを読み込み中…",
+                    "assignNoneAvailable": "割り当てできるエージェントは他にありません。",
+                    "assignNoMatches": "検索に一致するエージェントはありません。",
+                    "assignLoadFailed": "エージェントを読み込めませんでした",
+                    "assignedToast": "{name} をこのアイデアに割り当てました",
+                    "assignFailed": "エージェントを割り当てられませんでした",
+                    "assignCancel": "キャンセル",
+                    "unassign": "このアイデアから外す",
+                    "unassignedToast": "{name} をこのアイデアから外しました",
+                    "unassignFailed": "エージェントを外せませんでした"
                 },
                 "meta": {
                     "source": "ソース",
@@ -1818,7 +1832,8 @@
                         "idea-agents": "削除できません: {count} 件のエージェントがこのアイデアに紐づいています。先に削除またはスコープを変更してください。",
                         "build-in-flight": "ビルド実行中は削除できません。完了までお待ちください。",
                         "unknown": "現在このアイデアは削除できません。"
-                    }
+                    },
+                    "unlinksWorks": "このアイデアは {count} 件の Work に紐づいています。Work は保持され、紐づけのみが解除されます。"
                 },
                 "toasts": {
                     "built": "このアイデアから Work をビルドしました",

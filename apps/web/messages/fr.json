@@ -1829,7 +1829,21 @@
                     "empty": "Aucun Work lié à cette Idée pour le moment."
                 },
                 "agents": {
-                    "empty": "Aucun Agent rattaché à cette Idée."
+                    "empty": "Aucun Agent rattaché à cette Idée.",
+                    "assignExisting": "Agent existant",
+                    "assignTitle": "Assigner un Agent à cette Idée",
+                    "assignSubtitle": "Placez sur cette Idée un Agent que vous avez déjà au lieu d'en créer un autre.",
+                    "assignSearchPlaceholder": "Rechercher des Agents…",
+                    "assignLoading": "Chargement des Agents…",
+                    "assignNoneAvailable": "Aucun autre Agent à assigner.",
+                    "assignNoMatches": "Aucun Agent ne correspond à cette recherche.",
+                    "assignLoadFailed": "Impossible de charger les Agents",
+                    "assignedToast": "{name} assigné à cette Idée",
+                    "assignFailed": "Impossible d'assigner l'Agent",
+                    "assignCancel": "Annuler",
+                    "unassign": "Retirer de cette Idée",
+                    "unassignedToast": "{name} retiré de cette Idée",
+                    "unassignFailed": "Impossible de retirer l'Agent"
                 },
                 "meta": {
                     "source": "Source",
@@ -1849,7 +1863,8 @@
                         "idea-agents": "Suppression impossible : {count} Agent(s) sont rattachés à cette Idée. Supprimez-les ou changez leur portée.",
                         "build-in-flight": "Suppression impossible pendant une construction. Attendez la fin.",
                         "unknown": "Impossible de supprimer cette Idée pour le moment."
-                    }
+                    },
+                    "unlinksWorks": "{count, plural, one {Cette Idée est liée à # Work. Ce Work sera conservé — seul le lien est supprimé.} other {Cette Idée est liée à # Works. Ces Works seront conservés — seul le lien est supprimé.}}"
                 },
                 "toasts": {
                     "built": "Work construit à partir de cette Idée",

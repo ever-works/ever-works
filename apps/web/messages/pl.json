@@ -1798,7 +1798,21 @@
                     "empty": "Brak Works powiązanych z tym Pomysłem."
                 },
                 "agents": {
-                    "empty": "Brak Agentów przypisanych do tego Pomysłu."
+                    "empty": "Brak Agentów przypisanych do tego Pomysłu.",
+                    "assignExisting": "Przypisz istniejącego",
+                    "assignTitle": "Przypisz Agenta do tego Pomysłu",
+                    "assignSubtitle": "Przypisz do tego Pomysłu Agenta, którego już masz, zamiast tworzyć nowego.",
+                    "assignSearchPlaceholder": "Szukaj Agentów…",
+                    "assignLoading": "Ładowanie Agentów…",
+                    "assignNoneAvailable": "Brak innych Agentów do przypisania.",
+                    "assignNoMatches": "Żaden Agent nie pasuje do tego wyszukiwania.",
+                    "assignLoadFailed": "Nie udało się załadować Agentów",
+                    "assignedToast": "{name} przypisany do tego Pomysłu",
+                    "assignFailed": "Nie udało się przypisać Agenta",
+                    "assignCancel": "Anuluj",
+                    "unassign": "Usuń z tego Pomysłu",
+                    "unassignedToast": "{name} usunięty z tego Pomysłu",
+                    "unassignFailed": "Nie udało się usunąć Agenta"
                 },
                 "meta": {
                     "source": "Źródło",
@@ -1818,7 +1832,8 @@
                         "idea-agents": "Nie można usunąć: {count} Agent(ów) jest przypisanych do tego Pomysłu. Usuń ich lub zmień zakres.",
                         "build-in-flight": "Nie można usunąć podczas budowy. Poczekaj na jej zakończenie.",
                         "unknown": "Nie można teraz usunąć tego Pomysłu."
-                    }
+                    },
+                    "unlinksWorks": "{count, plural, one {Ten Pomysł jest powiązany z # Work. Ten Work zostanie zachowany — usuwane jest tylko powiązanie.} few {Ten Pomysł jest powiązany z # Works. Te Works zostaną zachowane — usuwane jest tylko powiązanie.} many {Ten Pomysł jest powiązany z # Works. Te Works zostaną zachowane — usuwane jest tylko powiązanie.} other {Ten Pomysł jest powiązany z # Works. Te Works zostaną zachowane — usuwane jest tylko powiązanie.}}"
                 },
                 "toasts": {
                     "built": "Work zbudowany z tego Pomysłu",

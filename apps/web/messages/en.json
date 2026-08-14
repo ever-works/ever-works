@@ -1881,7 +1881,21 @@
                     "empty": "No Works linked to this Idea yet."
                 },
                 "agents": {
-                    "empty": "No Agents scoped to this Idea."
+                    "empty": "No Agents on this Idea yet.",
+                    "assignExisting": "Assign existing",
+                    "assignTitle": "Assign an Agent to this Idea",
+                    "assignSubtitle": "Put an Agent you already have on this Idea instead of creating another one.",
+                    "assignSearchPlaceholder": "Search Agents…",
+                    "assignLoading": "Loading Agents…",
+                    "assignNoneAvailable": "No other Agents left to assign.",
+                    "assignNoMatches": "No Agents match that search.",
+                    "assignLoadFailed": "Could not load Agents",
+                    "assignedToast": "{name} assigned to this Idea",
+                    "assignFailed": "Could not assign Agent",
+                    "assignCancel": "Cancel",
+                    "unassign": "Remove from this Idea",
+                    "unassignedToast": "{name} removed from this Idea",
+                    "unassignFailed": "Could not remove Agent"
                 },
                 "meta": {
                     "source": "Source",
@@ -1901,7 +1915,8 @@
                         "idea-agents": "Can't delete: {count} Agent(s) are scoped to this Idea. Delete or re-scope them first.",
                         "build-in-flight": "Can't delete while a build is running. Wait for it to finish.",
                         "unknown": "Can't delete this Idea right now."
-                    }
+                    },
+                    "unlinksWorks": "{count, plural, one {This Idea is linked to # Work. It will be kept — only the link is removed.} other {This Idea is linked to # Works. They will be kept — only the link is removed.}}"
                 },
                 "toasts": {
                     "built": "Work built from this Idea",
