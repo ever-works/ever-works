@@ -104,6 +104,27 @@ mirroring `OrgMemoryController`).
   delete (confirm-then-recursive on 422) + "Sync now" (shown when a
   syncRepo is configured), agent-owner badge on agent folders,
   All/Global/Agents scope toggle, empty state.
+- **Drag-and-drop upload** reuses the workbench `UploadDropZone`
+  verbatim (its `targetClass` argument is meaningless here and ignored)
+  — dropping OS files on the table uploads them into the browsed folder.
+- **Preview** — `MemoryFilePreview.tsx` mounts the SAME KB viewers the
+  workbench uses, dispatched through the shared
+  `works/detail/kb/viewers/pick-viewer.ts` helper (pdf / docx / xlsx /
+  image / video / audio). `pickKbViewer` answers `'text'` for
+  markdown/plain/unknown MIMEs; unlike the KB (which has a rendered body
+  to show) Files only has bytes, so the overlay fetches text payloads up
+  to 256 KB itself and renders them, and shows a download card for
+  anything else. Viewers receive the Files download URL — the route's
+  `Content-Disposition: attachment` only steers top-level navigations,
+  not the viewers' own fetches / `<img>` / `<source>` loads.
+- **Search** — a debounced (300 ms) `q` box. A non-empty query hits the
+  API's search mode, which spans EVERY folder, so the breadcrumb and
+  folder rows step aside while it is active.
+- **Sync target editor** — the gear on a folder row opens an inline
+  `owner / repo / branch / dirPrefix` form (`PATCH …/folders/:id`).
+  Without it "Sync now" could never appear, since the API only offers
+  sync once `syncRepo` is configured. Repo COORDINATES only — no
+  credentials are ever entered here; the git facade resolves tokens.
 - **BFF proxies** under `src/app/api/memory/files/…` (shared
   `proxy.ts`, streams multipart upstream and relays binary downloads
   with Content-Type/Disposition intact).
@@ -111,6 +132,19 @@ mirroring `OrgMemoryController`).
 - i18n: `dashboard.memoryPage.files.*` added to **all 21** locale files
   (English values copied verbatim, per convention; inserted textually so
   no locale file was reformatted).
+
+### Activity (convention #9)
+
+Folder-tree state changes emit activity rows through the existing
+`ActivityLogService`, via three **additive** `ActivityActionType`
+entries (`memory_folder_created` / `_deleted` / `_synced`) — the
+`activity-log.types.spec.ts` "catch silent additions" count pin moved
+123 → 126 in the same commit. `MemoryFoldersService.recordActivity` is
+best-effort: a logging failure is warned and swallowed, never failing
+the folder operation. `ActivityLogModule` is imported by
+`MemoryFilesModule` so the `@Optional()` injection actually resolves
+(the KnowledgeBaseModule post-cascade lesson). No feed category work was
+needed — `categoryForActivityLog` falls through to `settings`.
 
 ## Agent access rule (brief item 4)
 
@@ -149,20 +183,39 @@ bare repositories — to inherit the privacy rule.
 - `…/AddMemoryFolderIdToUploads.spec.ts` — nullable folderId + index on
   both spines, existing rows backfill NULL, idempotent, no-op when the
   upload tables are absent, down() removes. (5 tests)
+- `apps/api/src/memory-files/memory-files.controller.spec.ts` — the
+  contracts that live in the controller, not the services: org comes
+  from the scope context only, `q` widens the list past the browsed
+  folder, upload validates the folder BEFORE storing bytes, DELETE is
+  unlink-only, download collapses active MIMEs / sanitizes the
+  Content-Disposition filename / routes per spine (Work rows through the
+  KB view gate, org rows behind `ensureMember`, no active org ⇒ 404).
+  (18 tests)
+- `apps/web/src/components/memory/MemoryFilePreview.unit.spec.tsx` —
+  viewer dispatch per MIME, `source`-carrying download URL, inline text
+  fetch + its size cap, unsupported fallback, close/Escape. (7 tests)
+- `…/MemoryFilesPanel.unit.spec.tsx` — folder-rows-first listing, search
+  issues a folder-less `q` list and hides folder rows, drop-to-upload,
+  preview overlay opens, sync-target editor PATCHes the folder.
+  (5 tests)
 
 Commands:
 
 ```bash
-cd packages/agent && npx jest --testPathPattern='__tests__.memory-folder|__tests__.memory-files'
-cd apps/api && npx jest --testPathPattern='migrations.__tests__.(CreateMemoryFolders|AddMemoryFolderIdToUploads)'
+# NOTE: `--testPathPattern` matches the FULL path, and this worktree is
+# named `wt-feat-memory-files` — a `memory-files` pattern therefore runs
+# the entire suite. Pass spec paths instead.
+cd packages/agent && npx jest src/services/__tests__/memory-folders.service.spec.ts src/services/__tests__/memory-files.service.spec.ts src/services/__tests__/memory-folder-sync.service.spec.ts src/entities/__tests__/activity-log.types.spec.ts
+cd apps/api && npx jest src/memory-files src/migrations/__tests__/CreateMemoryFolders.spec.ts src/migrations/__tests__/AddMemoryFolderIdToUploads.spec.ts
+cd apps/web && npx vitest run src/components/memory/
 cd packages/agent && pnpm type-check
 cd apps/api && pnpm type-check
-npx turbo build --filter=@ever-works/agent --filter=ever-works-api --filter=ever-works-web
 cd apps/web && pnpm type-check
+npx turbo build --filter=@ever-works/agent --filter=ever-works-api --filter=ever-works-web
 ```
 
-Full agent suite also run green (478 suites / 8627 tests — the
-worktree name matches `memory-files`, so the pattern ran everything).
+Full agent suite also run green during the second session (478 suites /
+8627 tests — the worktree-name effect above ran everything).
 
 ## Known follow-ups
 
@@ -170,9 +223,12 @@ worktree name matches `memory-files`, so the pattern ran everything).
 - **Sync**: no scheduled sync (manual only, per brief); sync currently
   targets the branch as-checked-out (`branch` passed to cloneOrPull);
   deletions in the repo are not mirrored (additive writes only).
-- **Controller-level spec** for MemoryFilesController (service layer is
-  fully covered; org-memory-style direct-instantiation spec would be a
-  cheap add).
+- **Agent-owned folders cannot be CREATED from the UI** — the API takes
+  `ownerAgentId` on folder create and the panel renders the badge and
+  the Agents scope filter, but there is no agents-list BFF proxy under
+  `apps/web/src/app/api/agents/` to populate a picker (only `[id]`).
+  Add the list proxy and an owner select in the New Folder form when the
+  agent runtime starts creating/consuming these folders.
 - **Downloads for very large files** buffer in memory (same as the
   existing `/api/uploads` serve route); streaming is a shared follow-up.
 - The Files list caps at 200 rows per source with no pagination UI yet.
