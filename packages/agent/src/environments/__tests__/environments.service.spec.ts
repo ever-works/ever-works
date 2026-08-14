@@ -1,8 +1,4 @@
-import {
-    BadRequestException,
-    ConflictException,
-    NotFoundException,
-} from '@nestjs/common';
+import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
 import { QueryFailedError } from 'typeorm';
 import { EnvironmentsService, toRuntimeEnvironmentData } from '../environments.service';
 import type { EnvironmentRepository } from '../environment.repository';
@@ -70,10 +66,7 @@ function makeAgentRepo(count = 0) {
 }
 
 function makeService(repo: RepoMock, agentRepo?: ReturnType<typeof makeAgentRepo>) {
-    return new EnvironmentsService(
-        repo as unknown as EnvironmentRepository,
-        agentRepo as never,
-    );
+    return new EnvironmentsService(repo as unknown as EnvironmentRepository, agentRepo as never);
 }
 
 describe('EnvironmentsService — create', () => {
@@ -104,9 +97,7 @@ describe('EnvironmentsService — create', () => {
 
     it('rejects a name without any alphanumeric character', async () => {
         const svc = makeService(makeRepo());
-        await expect(svc.create(USER, { name: '---' })).rejects.toBeInstanceOf(
-            BadRequestException,
-        );
+        await expect(svc.create(USER, { name: '---' })).rejects.toBeInstanceOf(BadRequestException);
     });
 
     it('409s on a duplicate slug for the same user', async () => {
@@ -162,9 +153,7 @@ describe('EnvironmentsService — create', () => {
             // Hosts on an unrestricted row are normalised away, not errors.
             allowedHosts: ['api.anthropic.com'],
         });
-        expect(repo.create).toHaveBeenCalledWith(
-            expect.objectContaining({ allowedHosts: null }),
-        );
+        expect(repo.create).toHaveBeenCalledWith(expect.objectContaining({ allowedHosts: null }));
     });
 });
 

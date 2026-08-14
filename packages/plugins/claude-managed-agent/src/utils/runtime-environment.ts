@@ -68,9 +68,7 @@ export function resolveEnvironmentNetworking(
  * comparison operators (`>=`, `<`) that are legitimate version syntax
  * but would read as shell redirects unquoted.
  */
-export function buildPackageBootstrapPrompt(
-	runtimeEnvironment: RuntimeEnvironmentData | undefined
-): string | null {
+export function buildPackageBootstrapPrompt(runtimeEnvironment: RuntimeEnvironmentData | undefined): string | null {
 	if (!runtimeEnvironment) {
 		return null;
 	}

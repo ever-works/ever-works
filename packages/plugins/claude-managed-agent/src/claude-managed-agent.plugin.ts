@@ -62,10 +62,7 @@ import {
 	buildWorkspaceSeedPrompt
 } from './utils/prompt-builder.js';
 import { extractAgentTranscript, normalizeOutputs, parseStructuredOutput } from './utils/result-parser.js';
-import {
-	buildPackageBootstrapPrompt,
-	resolveEnvironmentNetworking
-} from './utils/runtime-environment.js';
+import { buildPackageBootstrapPrompt, resolveEnvironmentNetworking } from './utils/runtime-environment.js';
 import { captureScreenshots } from './utils/screenshot-capture.js';
 import { buildWorkspaceSeedManifest } from './utils/workspace-seed.js';
 

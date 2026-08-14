@@ -194,7 +194,11 @@ export class EnvironmentsService {
         return toEnvironmentDto(created);
     }
 
-    async update(userId: string, id: string, input: UpdateEnvironmentInput): Promise<EnvironmentDto> {
+    async update(
+        userId: string,
+        id: string,
+        input: UpdateEnvironmentInput,
+    ): Promise<EnvironmentDto> {
         const row = await this.requireOwned(userId, id);
 
         if (input.name !== undefined && input.name !== row.name) {
@@ -330,9 +334,7 @@ export class EnvironmentsService {
     }): { pipPackages: string[]; npmPackages: string[]; allowedHosts: string[] | null } {
         const pip = normalizeRuntimePackageList(input.pipPackages, 'pip');
         if (pip.invalid.length > 0) {
-            throw new BadRequestException(
-                `Invalid pip package spec(s): ${pip.invalid.join(', ')}`,
-            );
+            throw new BadRequestException(`Invalid pip package spec(s): ${pip.invalid.join(', ')}`);
         }
         if (pip.valid.length > RUNTIME_ENVIRONMENT_MAX_PACKAGES) {
             throw new BadRequestException(
@@ -342,9 +344,7 @@ export class EnvironmentsService {
 
         const npm = normalizeRuntimePackageList(input.npmPackages, 'npm');
         if (npm.invalid.length > 0) {
-            throw new BadRequestException(
-                `Invalid npm package spec(s): ${npm.invalid.join(', ')}`,
-            );
+            throw new BadRequestException(`Invalid npm package spec(s): ${npm.invalid.join(', ')}`);
         }
         if (npm.valid.length > RUNTIME_ENVIRONMENT_MAX_PACKAGES) {
             throw new BadRequestException(

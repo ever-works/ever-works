@@ -88,9 +88,7 @@ describe('buildPackageBootstrapPrompt', () => {
 
 	it('returns null when every spec fails re-validation', () => {
 		expect(
-			buildPackageBootstrapPrompt(
-				makeEnvironment({ pipPackages: ['bad;spec'], npmPackages: ['also bad'] })
-			)
+			buildPackageBootstrapPrompt(makeEnvironment({ pipPackages: ['bad;spec'], npmPackages: ['also bad'] }))
 		).toBeNull();
 	});
 });

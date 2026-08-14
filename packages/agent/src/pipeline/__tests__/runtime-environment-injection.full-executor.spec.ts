@@ -101,36 +101,34 @@ async function buildHarness(resolveForAgent: jest.Mock | undefined): Promise<{
     service: FullPipelineExecutorService;
 }> {
     const facadeServiceStub = {
-        createStepExecutionContext: jest
-            .fn()
-            .mockImplementation(
-                (
-                    work: WorkReference,
-                    _providers: unknown,
-                    _aiModel: string | undefined,
-                    _signal: AbortSignal | undefined,
-                    _kbContext: unknown,
-                    _kbTools: unknown,
-                    _memorySessionId: string | undefined,
-                    _memoryRecall: string | undefined,
-                    runtimeEnvironment: RuntimeEnvironmentData | undefined,
-                ): StepExecutionContext =>
-                    ({
-                        aiFacade: {} as any,
-                        searchFacade: {} as any,
-                        screenshotFacade: {} as any,
-                        contentExtractorFacade: {} as any,
-                        logger: {
-                            log: () => undefined,
-                            debug: () => undefined,
-                            warn: () => undefined,
-                            error: () => undefined,
-                        },
-                        work,
-                        user: work.user,
-                        runtimeEnvironment,
-                    }) as StepExecutionContext,
-            ),
+        createStepExecutionContext: jest.fn().mockImplementation(
+            (
+                work: WorkReference,
+                _providers: unknown,
+                _aiModel: string | undefined,
+                _signal: AbortSignal | undefined,
+                _kbContext: unknown,
+                _kbTools: unknown,
+                _memorySessionId: string | undefined,
+                _memoryRecall: string | undefined,
+                runtimeEnvironment: RuntimeEnvironmentData | undefined,
+            ): StepExecutionContext =>
+                ({
+                    aiFacade: {} as any,
+                    searchFacade: {} as any,
+                    screenshotFacade: {} as any,
+                    contentExtractorFacade: {} as any,
+                    logger: {
+                        log: () => undefined,
+                        debug: () => undefined,
+                        warn: () => undefined,
+                        error: () => undefined,
+                    },
+                    work,
+                    user: work.user,
+                    runtimeEnvironment,
+                }) as StepExecutionContext,
+        ),
     };
 
     const providers: any[] = [

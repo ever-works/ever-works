@@ -43,14 +43,7 @@ describe('isValidPipPackageSpec', () => {
 		expect(isValidPipPackageSpec(spec)).toBe(true);
 	});
 
-	const invalid = [
-		'',
-		'.hidden',
-		'-flag',
-		'name==',
-		'a'.repeat(129),
-		...SHELL_INJECTION_SAMPLES
-	];
+	const invalid = ['', '.hidden', '-flag', 'name==', 'a'.repeat(129), ...SHELL_INJECTION_SAMPLES];
 	it.each(invalid)('rejects %j', (spec) => {
 		expect(isValidPipPackageSpec(spec)).toBe(false);
 	});

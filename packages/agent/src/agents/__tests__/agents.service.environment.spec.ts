@@ -96,7 +96,11 @@ describe('AgentsService — environment assignment (update)', () => {
     });
 
     it('404s on a cross-user or unknown environment (no existence leak)', async () => {
-        const { service } = makeService({ id: 'env-1', userId: 'someone-else', status: 'published' });
+        const { service } = makeService({
+            id: 'env-1',
+            userId: 'someone-else',
+            status: 'published',
+        });
 
         await expect(
             service.update(USER, 'agent-1', { environmentId: 'env-1' }),

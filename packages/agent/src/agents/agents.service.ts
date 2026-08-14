@@ -1076,7 +1076,10 @@ export class AgentsService {
      * reason — this server-side check is what makes the rule real for
      * tool/import callers that bypass the UI.
      */
-    private async assertAssignableEnvironment(userId: string, environmentId: string): Promise<void> {
+    private async assertAssignableEnvironment(
+        userId: string,
+        environmentId: string,
+    ): Promise<void> {
         if (!this.environmentRepo) {
             // Hand-rolled unit-test surface without the repo wired;
             // production + e2e DI always provide it (AgentsModule

@@ -27,7 +27,5 @@ export default async function EnvironmentsSettingsPage() {
         loadError = error instanceof Error ? error.message : 'Failed to load environments';
     }
 
-    return (
-        <EnvironmentsSettings initialEnvironments={initialEnvironments} loadError={loadError} />
-    );
+    return <EnvironmentsSettings initialEnvironments={initialEnvironments} loadError={loadError} />;
 }
