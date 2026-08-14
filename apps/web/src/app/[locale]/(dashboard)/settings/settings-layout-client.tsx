@@ -16,6 +16,9 @@ import {
     BarChart3,
     Server,
     Newspaper,
+    Bell,
+    MessagesSquare,
+    Mail,
 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import Link from 'next/link';
@@ -120,6 +123,30 @@ export function SettingsLayoutClient({
                     label: t('tabs.digest'),
                     icon: Newspaper,
                     href: `${baseSettingsPath}/digest`,
+                },
+                // EW-058 — these three pages shipped (notification preferences +
+                // Novu inbox, channel CRUD, tenant email addresses) with ZERO
+                // inbound links anywhere in the product: reachable only by
+                // typing the URL. The entries below are their first entry
+                // points. NOTE deliberately NO bare /settings/integrations tab —
+                // that path has no index page and would soft-404.
+                {
+                    id: 'notifications',
+                    label: t('tabs.notifications'),
+                    icon: Bell,
+                    href: `${baseSettingsPath}/notifications`,
+                },
+                {
+                    id: 'channels',
+                    label: t('tabs.channels'),
+                    icon: MessagesSquare,
+                    href: `${baseSettingsPath}/integrations/channels`,
+                },
+                {
+                    id: 'emails',
+                    label: t('tabs.emails'),
+                    icon: Mail,
+                    href: `${baseSettingsPath}/integrations/emails`,
                 },
                 // Wave 13 — Billing + Usage & Credits (billing/usage PRD §2):
                 // also reachable from the settings shell like api-keys/security.
