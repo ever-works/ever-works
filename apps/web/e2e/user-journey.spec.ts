@@ -102,11 +102,15 @@ test.describe('Complete user journey', () => {
         }
 
         // The previously separate "Create Manually" flow was merged into
-        // the unified WorkAICreator (new-work-client.tsx:405-426). The shared
-        // ui/Input wrapper drops the `name` prop between JSX and the rendered
-        // `<input>` (verified against the failing-run aria-snapshot — the
-        // textbox is present but `input[name="name"]` returns 0). Target by
-        // accessible role + label instead.
+        // the unified WorkAICreator (new-work-client.tsx:405-426). Target by
+        // accessible role + label — robust against the shell's chat composer,
+        // which mounts BEFORE page content and owns the page's first bare
+        // input/textarea.
+        //
+        // (An earlier version of this comment claimed ui/Input drops the
+        // `name` prop; that is STALE — input.tsx spreads {...props} onto the
+        // real <input>, so name comes through. The 0-match aria-snapshot that
+        // suggested it came from the wrong element being inspected.)
         const dirSlug = `journey-${suffix}`;
         const nameInput = page.getByRole('textbox', { name: /Work Name/i });
         await expect(nameInput).toBeVisible({ timeout: 30_000 });
@@ -137,7 +141,7 @@ test.describe('Complete user journey', () => {
         await expect(page).toHaveURL(/\/settings/);
 
         // Verify username is shown
-        const usernameInput = page.locator('input').first();
+        const usernameInput = page.locator('#main-content input').first();
         await expect(usernameInput).toBeVisible({ timeout: 10_000 });
 
         // ---- Step 5: Visit security settings ----

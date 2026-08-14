@@ -98,7 +98,13 @@ test.describe('Work create — full UI wizard', () => {
         await nameInput.fill(name);
 
         // AI prompt (<Textarea name="prompt">) — required by the submit handler.
-        const promptField = page.locator('textarea[name="prompt"], textarea').first();
+        // The bare-`textarea` fallback resolved to the AI chat composer's
+        // unnamed <textarea> (mounted before page content in the shell), so the
+        // wizard's prompt stayed empty and handleGenerate exited at its
+        // promptRequired guard. The wizard's field DOES carry name="prompt"
+        // (WorkAICreator passes it through ui/textarea's {...props} spread), so
+        // select it alone.
+        const promptField = page.locator('textarea[name="prompt"]');
         if (await promptField.isVisible({ timeout: 5_000 }).catch(() => false)) {
             await promptField.fill(`e2e ui description ${name}`);
         }
@@ -126,7 +132,13 @@ test.describe('Work create — full UI wizard', () => {
             await expect(
                 page,
                 'a failed git-less submit must NOT bounce the user to the empty composer',
-            ).not.toHaveURL(/\/new(\?|$)/);
+                // (?<!works) — the wizard's own URL is /en/works/new?mode=manual,
+                // which the bare /\/new(\?|$)/ ALSO matched, so the assertion could
+                // never pass even when the product correctly stayed put. The
+                // lookbehind keeps catching the real bounce target (/en/new) while
+                // letting the stay-put URL through. Verified:
+                //   old: stay-put=true  bounce=true   new: stay-put=false bounce=true
+            ).not.toHaveURL(/(?<!works)\/new(\?|$)/);
 
             await expect(
                 page.locator('input[name="name"]'),

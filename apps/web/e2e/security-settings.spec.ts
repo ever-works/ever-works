@@ -17,7 +17,14 @@ test.describe('Security — UI', () => {
         const count = await pwInputs.count();
         expect(count, 'expect at least 3 password inputs').toBeGreaterThanOrEqual(3);
 
-        const submit = page.locator('button[type="submit"]').first();
+        // The page's ONLY button[type="submit"] is the AI chat composer's send
+        // button (mounted before page content in the shell, disabled while the
+        // composer is empty since 8d251a90) — the real update control renders
+        // type="button". Target it by its accessible name, scoped to the page
+        // content, so the chat panel can never be the match.
+        const submit = page
+            .locator('#main-content')
+            .getByRole('button', { name: /update password/i });
         await expect(submit).toBeVisible({ timeout: 10_000 });
     });
 
@@ -27,7 +34,14 @@ test.describe('Security — UI', () => {
         await page.goto('/en/settings/security', { waitUntil: 'domcontentloaded' });
         await page.waitForTimeout(1_500);
 
-        const submit = page.locator('button[type="submit"]').first();
+        // The page's ONLY button[type="submit"] is the AI chat composer's send
+        // button (mounted before page content in the shell, disabled while the
+        // composer is empty since 8d251a90) — the real update control renders
+        // type="button". Target it by its accessible name, scoped to the page
+        // content, so the chat panel can never be the match.
+        const submit = page
+            .locator('#main-content')
+            .getByRole('button', { name: /update password/i });
         await submit.click();
         await page.waitForTimeout(800);
 
