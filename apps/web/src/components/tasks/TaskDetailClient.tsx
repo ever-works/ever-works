@@ -25,6 +25,8 @@ import { TaskDecisionConflicts } from './TaskDecisionConflicts';
 import { TaskDeleteButton } from './TaskDeleteButton';
 import { WorkSelect } from './WorkSelect';
 import { AgentSelect } from './AgentSelect';
+import { MissionSelect } from './MissionSelect';
+import { IdeaSelect } from './IdeaSelect';
 
 // Status tones + dots mirror /tasks (TasksList) so colours stay
 // consistent across the list filter and the detail workflow buttons.
@@ -140,6 +142,14 @@ export function TaskDetailClient({
     const [agentId, setAgentId] = useState<string | null>(task.agentId ?? null);
     const [pendingAgent, startAgent] = useTransition();
     const [agentError, setAgentError] = useState<string | null>(null);
+    // Same `?? null` reason as `agentId`: the API omits owner columns it
+    // never set, so an unscoped Task arrives with these absent, not null.
+    const [missionId, setMissionId] = useState<string | null>(task.missionId ?? null);
+    const [pendingMission, startMission] = useTransition();
+    const [missionError, setMissionError] = useState<string | null>(null);
+    const [ideaId, setIdeaId] = useState<string | null>(task.ideaId ?? null);
+    const [pendingIdea, startIdea] = useTransition();
+    const [ideaError, setIdeaError] = useState<string | null>(null);
     const router = useRouter();
     // Re-litigation guard (memory upgrades M6). Bumped after a
     // description save so the conflict check re-runs against the new
@@ -233,18 +243,49 @@ export function TaskDetailClient({
         });
     };
 
+    // Mission and Idea are re-filed exactly like Work: one owner column
+    // each, `null` to detach. Ownership is NON-exclusive on the API side
+    // (`TASK_OWNER_KEYS`), so setting one never clears the others — which
+    // is why these are three independent rows and not one "scope" picker.
+    const handleMissionChange = (next: string) => {
+        const nextMissionId = next || null;
+        if (nextMissionId === missionId) return;
+        setMissionError(null);
+        startMission(() => {
+            void (async () => {
+                try {
+                    const updated = await updateTaskAction(task.id, { missionId: nextMissionId });
+                    setMissionId(updated.missionId ?? null);
+                    router.refresh();
+                } catch (err) {
+                    setMissionError(err instanceof Error ? err.message : t('missionUpdateError'));
+                }
+            })();
+        });
+    };
+
+    const handleIdeaChange = (next: string) => {
+        const nextIdeaId = next || null;
+        if (nextIdeaId === ideaId) return;
+        setIdeaError(null);
+        startIdea(() => {
+            void (async () => {
+                try {
+                    const updated = await updateTaskAction(task.id, { ideaId: nextIdeaId });
+                    setIdeaId(updated.ideaId ?? null);
+                    router.refresh();
+                } catch (err) {
+                    setIdeaError(err instanceof Error ? err.message : t('ideaUpdateError'));
+                }
+            })();
+        });
+    };
+
     // Statuses reachable from the current one — drives which workflow
     // buttons are clickable vs. shown disabled.
     const allowedNext = new Set(NEXT_STATUS[currentStatus] ?? []);
     const labels = task.labels ?? [];
     const priority = TASK_PRIORITY_PRESENTATION[task.priority];
-    // Work is no longer folded in here — it has its own editable row
-    // below. This stays as the read-only Mission/Idea association.
-    const scope = task.missionId
-        ? { label: t('scopeMission'), id: task.missionId }
-        : task.ideaId
-          ? { label: t('scopeIdea'), id: task.ideaId }
-          : null;
 
     return (
         <div className="max-w-screen-xl mx-auto p-6">
@@ -567,6 +608,46 @@ export function TaskDetailClient({
                                     )}
                                 </div>
                             </DetailRow>
+                            {/* Work / Mission / Idea are the three SCOPE owners and
+                                sit together; Agent (who works it) follows. All
+                                four are independent columns — picking one never
+                                clears another. */}
+                            <DetailRow label={t('scopeMission')}>
+                                <div className="space-y-1">
+                                    <MissionSelect
+                                        value={missionId ?? ''}
+                                        onValueChange={handleMissionChange}
+                                        disabled={pendingMission}
+                                        size="xs"
+                                        noneLabel={t('missionNone')}
+                                        placeholder={t('missionPlaceholder')}
+                                        testId="task-detail-mission"
+                                    />
+                                    {missionError && (
+                                        <p className="text-[11px] text-danger" role="alert">
+                                            {missionError}
+                                        </p>
+                                    )}
+                                </div>
+                            </DetailRow>
+                            <DetailRow label={t('scopeIdea')}>
+                                <div className="space-y-1">
+                                    <IdeaSelect
+                                        value={ideaId ?? ''}
+                                        onValueChange={handleIdeaChange}
+                                        disabled={pendingIdea}
+                                        size="xs"
+                                        noneLabel={t('ideaNone')}
+                                        placeholder={t('ideaPlaceholder')}
+                                        testId="task-detail-idea"
+                                    />
+                                    {ideaError && (
+                                        <p className="text-[11px] text-danger" role="alert">
+                                            {ideaError}
+                                        </p>
+                                    )}
+                                </div>
+                            </DetailRow>
                             <DetailRow label={t('agent')}>
                                 <div className="space-y-1">
                                     <AgentSelect
@@ -585,16 +666,6 @@ export function TaskDetailClient({
                                     )}
                                 </div>
                             </DetailRow>
-                            {scope && (
-                                <DetailRow label={t('scope')}>
-                                    <span className="inline-flex items-center gap-1.5 text-xs text-text-secondary">
-                                        {scope.label}
-                                        <span className="font-mono text-text-muted">
-                                            {scope.id.slice(0, 8)}…
-                                        </span>
-                                    </span>
-                                </DetailRow>
-                            )}
                             <DetailRow label={t('created')}>
                                 <span className="text-xs text-text-secondary">
                                     {formatDate(task.createdAt)}
