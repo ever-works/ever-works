@@ -281,20 +281,29 @@ test.describe('Idea → Work accept flow (fresh API user)', () => {
         //      completion) owns the QUEUED → ACCEPTED finalization, not the
         //      user-facing endpoint ──
         const work = await createWorkViaAPI(request, token, { name: `AfterBuild Work ${s}` });
+        // PR #1997 (3e98d5bf): accept on a QUEUED Idea now returns 200 — the
+        // provenance link is recorded regardless of status. The STATUS stays
+        // build-pipeline-owned: it remains `queued` and `acceptedWorkId` stays
+        // null, because the PENDING/ACCEPTED-gated transition no-ops. (The
+        // pre-#1997 assertion here expected 404 and was red from 2026-08-09.)
         const acceptQueued = await request.post(
             `${API_BASE}/api/me/work-proposals/${queuedIdeaId}/accept`,
             { headers: authedHeaders(token), data: { workId: work.id } },
         );
-        expect(acceptQueued.status()).toBe(404);
-        expect(String((await acceptQueued.json()).message)).toMatch(
-            /not found or already finalized/i,
-        );
+        expect(acceptQueued.status()).toBe(200);
+        expect(((await acceptQueued.json()) as { ok: boolean }).ok).toBe(true);
 
-        // ── 3. The QUEUED Idea still has NO acceptedWorkId (the rejected
-        //      accept didn't leak a half-finalized state) ───────────────────
+        // ── 3. The QUEUED Idea's lifecycle state is untouched: still queued,
+        //      still NO acceptedWorkId — only the provenance link was added ──
         const afterReject = await readIdea(request, token, queuedIdeaId);
         expect(afterReject.status).toBe('queued');
         expect(afterReject.acceptedWorkId).toBeNull();
+        const queuedLinks = await request.get(
+            `${API_BASE}/api/me/work-proposals/${queuedIdeaId}/works`,
+            { headers: authedHeaders(token) },
+        );
+        expect(queuedLinks.status()).toBe(200);
+        expect(JSON.stringify(await queuedLinks.json())).toContain(work.id);
 
         // ── 4. Cross-check the inverse guard: an ACCEPTED Idea cannot be
         //      re-queued via /build (allowed: pending, failed) ───────────────
@@ -362,19 +371,30 @@ test.describe('Idea → Work accept flow (fresh API user)', () => {
         );
         expect(reDismiss.status()).toBe(404);
 
-        // ── 3. Accept a DISMISSED Idea → 404 (DISMISSED is terminal — accept
-        //      is valid only from PENDING / ACCEPTED) ─────────────────────────
+        // ── 3. Accept a DISMISSED Idea → 200, provenance recorded, STATUS
+        //      untouched. PR #1997 (3e98d5bf): the accept endpoint records the
+        //      Idea↔Work link regardless of status and reports success — the
+        //      link, not the status, is what "this Idea produced a Work"
+        //      means. The status transition is still PENDING/ACCEPTED-gated,
+        //      so DISMISSED stays terminal. (Pre-#1997 this was a 404; the
+        //      old assertion was red from 2026-08-09 until now.) ─────────────
         const work = await createWorkViaAPI(request, token, { name: `Dismiss Work ${s}` });
         const acceptDismissed = await request.post(
             `${API_BASE}/api/me/work-proposals/${dismissId}/accept`,
             { headers: authedHeaders(token), data: { workId: work.id } },
         );
-        expect(acceptDismissed.status()).toBe(404);
-        expect(String((await acceptDismissed.json()).message)).toMatch(
-            /not found or already finalized/i,
-        );
-        // Still dismissed — the rejected accept didn't mutate it.
+        expect(acceptDismissed.status()).toBe(200);
+        expect(((await acceptDismissed.json()) as { ok: boolean }).ok).toBe(true);
+        // Still dismissed — the accept records provenance without resurrecting
+        // the Idea's lifecycle state.
         expect((await readIdea(request, token, dismissId)).status).toBe('dismissed');
+        // And the link is observable.
+        const dismissedLinks = await request.get(
+            `${API_BASE}/api/me/work-proposals/${dismissId}/works`,
+            { headers: authedHeaders(token) },
+        );
+        expect(dismissedLinks.status()).toBe(200);
+        expect(JSON.stringify(await dismissedLinks.json())).toContain(work.id);
 
         // ── 4. The inverse: dismiss an ACCEPTED Idea → 404 (not pending) ────
         const acceptFirstId = await createIdea(

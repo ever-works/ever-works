@@ -47,19 +47,21 @@ import { createAgentViaAPI } from './helpers/agents-tasks';
  *     · ?direction=inbound|outbound returns only matching-direction rows;
  *       the unfiltered list is the superset.
  *   POST /api/email/addresses
- *     · 201 {address:{ verificationToken: 32-char base64url,
- *       verificationTokenExpiresAt: ~now+24h, verified:false }}.
+ *     · 201 {address:{ verified:false }}. EW-025: `verificationToken` and
+ *       `verificationTokenExpiresAt` are STRIPPED from every response — the
+ *       token is 32-char base64url with a ~24h TTL server-side, but neither is
+ *       observable, so the pins here assert their ABSENCE.
  *     · invalid email → 400 'address must be an email'; bad direction →
  *       400 'direction must be one of the following values: outbound,
  *       inbound, both'; unknown property → 400; missing providerSettings
  *       → 400 'providerSettings must be an object'.
- *   DELETE /api/email/addresses/:id → 204; afterwards the row's
- *     verification token confirms {verified:false} (deleting an address
- *     invalidates its outstanding confirmation link).
- *   GET /api/email/verify/:token (PUBLIC, throttled 10/min/IP — this
- *     file spends ≤4 hits/run) → always 200 with EXACTLY {verified:bool}:
- *     first click of a good token → true, the SAME token again → false
- *     (single-use), bogus → false. No address data in either body.
+ *   DELETE /api/email/addresses/:id → 204. (That deleting an address also
+ *     invalidates its outstanding confirmation link is still true server-side
+ *     but no longer assertable here — EW-025 removed the token.)
+ *   GET /api/email/verify/:token (PUBLIC, throttled 10/min/IP) → always 200
+ *     with EXACTLY {verified:bool} and no address data. A token matching
+ *     nothing → false. The good-token and single-use branches need a real
+ *     token, which EW-025 no longer exposes — recorded as gaps in the bodies.
  *   Anon (no bearer): POST/PATCH/DELETE /api/email/addresses[...] and
  *     POST /api/email/addresses/:id/verify → 401.
  *
@@ -78,8 +80,10 @@ interface EmailAddress {
     direction: 'outbound' | 'inbound' | 'both';
     pluginId: string;
     verified: boolean;
-    verificationToken: string | null;
-    verificationTokenExpiresAt: string | null;
+    /** EW-025: never sent over the API — optional so tests can assert ABSENCE. */
+    verificationToken?: never;
+    /** EW-025: stripped too — its value reveals how long a guess stays useful. */
+    verificationTokenExpiresAt?: never;
     defaultForReplies: boolean;
     disabledAt: string | null;
 }
@@ -330,22 +334,31 @@ test.describe('Email security pins — agent ownership, address scoping, verific
     }) => {
         const user = await registerUserViaAPI(request);
         const addr = await createAddress(request, user.access_token);
-        expect(addr.verificationToken).toBeTruthy();
 
-        // First click-through confirms…
-        const first = await request.get(`${API_BASE}/api/email/verify/${addr.verificationToken}`);
-        expect(first.status()).toBe(200);
-        const firstBody = (await first.json()) as Record<string, unknown>;
-        expect(firstBody.verified).toBe(true);
-        // …and the public response leaks nothing beyond the boolean.
-        expect(Object.keys(firstBody)).toEqual(['verified']);
+        // EW-025 — the STRONGER pin, and the one this file should lead with:
+        // the token never crosses the API boundary at all. A single-use token
+        // that an attacker can read from a 201 body is not much of a defence;
+        // the fix removed the exposure, so assert the exposure is gone.
+        expect(addr.verificationToken).toBeUndefined();
 
-        // The SAME link replayed must be dead (token consumed on confirm).
-        const replay = await request.get(`${API_BASE}/api/email/verify/${addr.verificationToken}`);
-        expect(replay.status()).toBe(200);
-        const replayBody = (await replay.json()) as Record<string, unknown>;
-        expect(replayBody.verified).toBe(false);
-        expect(Object.keys(replayBody)).toEqual(['verified']);
+        // Still assertable without a real token: the PUBLIC confirm endpoint is
+        // not an existence oracle. An unknown token answers 200 with exactly
+        // one key and no detail — the property that stops it being used to
+        // enumerate addresses or distinguish "wrong" from "already used".
+        const bogus = await request.get(`${API_BASE}/api/email/verify/${'z'.repeat(32)}`);
+        expect(bogus.status()).toBe(200);
+        const bogusBody = (await bogus.json()) as Record<string, unknown>;
+        expect(bogusBody.verified).toBe(false);
+        expect(Object.keys(bogusBody)).toEqual(['verified']);
+
+        // ── COVERAGE GAP, deliberate and recorded ────────────────────────────
+        // Single-use (a confirmed link cannot be replayed) is a real invariant
+        // and is NO LONGER reachable from an e2e test: reaching it requires a
+        // valid token, which EW-025 removed from every response, and the
+        // emailed copy goes via the provider plugin rather than the MailHog
+        // sink the e2e stack runs. It needs unit coverage over
+        // `EmailService.confirmVerification` (which nulls the token on success)
+        // — not deletion. Recorded so the property is not quietly lost.
     });
 
     test('fresh addresses carry a time-boxed, high-entropy verification token', async ({
@@ -358,17 +371,30 @@ test.describe('Email security pins — agent ownership, address scoping, verific
 
         for (const addr of [addr1, addr2]) {
             expect(addr.verified).toBe(false);
-            // 24 bytes of randomness, base64url → exactly 32 url-safe chars.
-            expect(addr.verificationToken).toMatch(/^[A-Za-z0-9_-]{32}$/);
-            // EW-711 #44: the token is stamped with a TTL at issuance —
-            // present, in the future, and no further out than ~24h.
-            expect(addr.verificationTokenExpiresAt).toBeTruthy();
-            const expiresAt = new Date(addr.verificationTokenExpiresAt as string).getTime();
-            expect(expiresAt).toBeGreaterThan(before);
-            expect(expiresAt).toBeLessThanOrEqual(before + DAY_MS + TTL_SLACK_MS);
+            // EW-025 — neither the token NOR its expiry may cross the API
+            // boundary. The expiry is stripped too, on purpose: publishing it
+            // tells an attacker exactly how long a guessed token stays useful.
+            expect(addr.verificationToken).toBeUndefined();
+            expect(addr.verificationTokenExpiresAt).toBeUndefined();
         }
-        // Tokens are unique per address — no shared/global confirmation link.
-        expect(addr1.verificationToken).not.toBe(addr2.verificationToken);
+        // `before` is retained deliberately — it documents that this test used
+        // to bound the TTL stamp, so whoever restores that coverage knows what
+        // was asserted.
+        expect(before).toBeLessThanOrEqual(Date.now());
+
+        // ── COVERAGE GAP, deliberate and recorded ────────────────────────────
+        // Three invariants were pinned here and are now unobservable, because
+        // the values they inspect are no longer returned:
+        //   · 24 bytes of randomness → exactly 32 url-safe base64 chars,
+        //     i.e. /^[A-Za-z0-9_-]{32}$/
+        //   · a TTL stamped at issuance, in the future and no further out than
+        //     DAY_MS + TTL_SLACK_MS (EW-711 #44) — the constants are kept below
+        //     so the exact bound survives for whoever rewrites this as a unit test
+        //   · tokens unique per address — no shared/global confirmation link
+        // All three are properties of the ISSUER, so they belong in a unit test
+        // over the token-minting path rather than in an API-contract spec. They
+        // are listed here rather than dropped so the loss is visible.
+        expect(DAY_MS + TTL_SLACK_MS).toBe(24 * 60 * 60 * 1000 + 5 * 60 * 1000);
     });
 
     test('deleting an address invalidates its outstanding verification link', async ({
@@ -376,8 +402,9 @@ test.describe('Email security pins — agent ownership, address scoping, verific
     }) => {
         const user = await registerUserViaAPI(request);
         const addr = await createAddress(request, user.access_token);
-        const token = addr.verificationToken as string;
-        expect(token).toBeTruthy();
+        // EW-025 — the token is not returned, so this test can no longer hold
+        // the link it wants to prove dead. See the recorded gap below.
+        expect(addr.verificationToken).toBeUndefined();
 
         const del = await request.delete(`${API_BASE}/api/email/addresses/${addr.id}`, {
             headers: authedHeaders(user.access_token),
@@ -386,9 +413,16 @@ test.describe('Email security pins — agent ownership, address scoping, verific
         const remaining = await listAddresses(request, user.access_token);
         expect(remaining.some((x) => x.id === addr.id)).toBe(false);
 
-        // The already-issued confirmation link must now be dead — a leaked
-        // email for a retired address can never flip anything to verified.
-        const verify = await request.get(`${API_BASE}/api/email/verify/${token}`);
+        // ── COVERAGE GAP, deliberate and recorded ────────────────────────────
+        // The property this test is named for — a leaked email for a RETIRED
+        // address can never flip anything to verified — needs the deleted row's
+        // token, which EW-025 no longer returns. It belongs in a unit test over
+        // `EmailAddressRepository.delete` / `confirmVerification` now.
+        //
+        // What remains assertable is the half that does not need the token: the
+        // row is gone from the caller's list, and the public confirm endpoint
+        // stays a non-oracle for a token that matches nothing.
+        const verify = await request.get(`${API_BASE}/api/email/verify/${'y'.repeat(32)}`);
         expect(verify.status()).toBe(200);
         expect(((await verify.json()) as { verified: boolean }).verified).toBe(false);
     });

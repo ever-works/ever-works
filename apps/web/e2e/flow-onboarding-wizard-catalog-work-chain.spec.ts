@@ -223,6 +223,11 @@ function expectDefaultState(env: StateEnvelope): void {
         storage: { choice: 'ever-works-git' },
         db: { choice: 'ever-works-db' },
         deploy: { choice: 'ever-works' },
+        // A8 (786b7157, 2026-07-28) added the desktop bucket to the canonical
+        // default. This exact `toEqual` was red from that commit until now —
+        // an exact-equality pin on a growing object needs updating whenever
+        // the canonical default grows.
+        desktop: { choice: 'cloud' },
         skippedSteps: [],
         pluginsReviewed: false,
     });
