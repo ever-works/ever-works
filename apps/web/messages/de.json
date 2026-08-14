@@ -952,7 +952,8 @@
                 "allTemplates": "Alle Vorlagen",
                 "yourTemplates": "Ihre Vorlagen",
                 "yourTemplatesEmpty": "Von Ihnen erstellte Agenten erscheinen hier als wiederverwendbare Vorlagen.",
-                "openInWizard": "Assistent öffnen"
+                "openInWizard": "Assistent öffnen",
+                "browsePage": "Open the full template browser"
             },
             "settings": {
                 "identity": {
@@ -1156,7 +1157,8 @@
                     "showing": "{from}–{to} von {total} angezeigt",
                     "previous": "Zurück",
                     "next": "Weiter"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "newDialog": {
                 "title": "Neue Aufgabe erstellen",
@@ -1439,7 +1441,8 @@
                 "filter": {
                     "scope": "Bereich",
                     "all": "Alle"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "detail": {
                 "instructions": "Anweisungen",
@@ -1840,7 +1843,21 @@
                     "empty": "Noch keine Works mit dieser Idee verknüpft."
                 },
                 "agents": {
-                    "empty": "Keine Agenten dieser Idee zugeordnet."
+                    "empty": "Keine Agenten dieser Idee zugeordnet.",
+                    "assignExisting": "Vorhandenen zuweisen",
+                    "assignTitle": "Einen Agenten dieser Idee zuweisen",
+                    "assignSubtitle": "Weisen Sie dieser Idee einen Agenten zu, den Sie bereits haben, statt einen neuen zu erstellen.",
+                    "assignSearchPlaceholder": "Agenten suchen…",
+                    "assignLoading": "Agenten werden geladen…",
+                    "assignNoneAvailable": "Keine weiteren Agenten zum Zuweisen vorhanden.",
+                    "assignNoMatches": "Keine Agenten passen zu dieser Suche.",
+                    "assignLoadFailed": "Agenten konnten nicht geladen werden",
+                    "assignedToast": "{name} dieser Idee zugewiesen",
+                    "assignFailed": "Agent konnte nicht zugewiesen werden",
+                    "assignCancel": "Abbrechen",
+                    "unassign": "Von dieser Idee entfernen",
+                    "unassignedToast": "{name} von dieser Idee entfernt",
+                    "unassignFailed": "Agent konnte nicht entfernt werden"
                 },
                 "meta": {
                     "source": "Quelle",
@@ -1860,7 +1877,8 @@
                         "idea-agents": "Löschen nicht möglich: {count} Agent(en) sind dieser Idee zugeordnet. Zuerst löschen oder umhängen.",
                         "build-in-flight": "Löschen während eines laufenden Builds nicht möglich. Bitte warten.",
                         "unknown": "Diese Idee kann derzeit nicht gelöscht werden."
-                    }
+                    },
+                    "unlinksWorks": "{count, plural, one {Diese Idee ist mit # Work verknüpft. Das Work bleibt erhalten — nur die Verknüpfung wird entfernt.} other {Diese Idee ist mit # Works verknüpft. Die Works bleiben erhalten — nur die Verknüpfung wird entfernt.}}"
                 },
                 "toasts": {
                     "built": "Work aus dieser Idee gebaut",
@@ -2174,7 +2192,10 @@
                 "usageCredits": "Usage & Credits",
                 "fleet": "Fleet",
                 "jobRuntime": "Job Runtime",
-                "digest": "Digest"
+                "digest": "Digest",
+                "notifications": "Notifications",
+                "channels": "Channels",
+                "emails": "Email Addresses"
             },
             "githubApp": {
                 "title": "GitHub-App-Installationen",
@@ -6936,7 +6957,6 @@
             "created": "Meeting captured",
             "sections": {
                 "provenance": "Where it came from",
-                "participants": "Participants",
                 "transcript": "Transcript"
             },
             "sources": {
@@ -6959,7 +6979,6 @@
                 "externalId": "Provider meeting ID (optional)",
                 "externalIdHint": "Used to de-duplicate against a later connector sync of the same meeting.",
                 "participants": "Participants",
-                "participantsHint": "One per line. Use \"Name <email>\" to record an address.",
                 "transcript": "Transcript (optional)",
                 "transcriptPlaceholder": "Ada: shipping the gate.\nGrace: reviewing the branch.",
                 "transcriptHint": "Adding a transcript runs the summary, Memory and activity pipeline. You can also attach it later from the meeting page."
@@ -6969,6 +6988,7 @@
                 "startedAtInvalid": "Start time is not a valid date.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
+                "participantEmailInvalid": "Geben Sie eine gültige E-Mail-Adresse ein oder lassen Sie das Feld leer.",
                 "createFailed": "Couldn't capture the meeting. Please try again."
             },
             "actions": {
@@ -6977,71 +6997,94 @@
             }
         },
         "meetingDetail": {
-            "backToMeetings": "Back to Meetings",
+            "backToMeetings": "Zurück zu Meetings",
             "actions": {
-                "openRecording": "Open recording",
-                "delete": "Delete",
-                "attachTranscript": "Attach transcript",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
-                "save": "Save changes"
+                "openRecording": "Aufzeichnung öffnen",
+                "edit": "Bearbeiten",
+                "delete": "Löschen",
+                "attachTranscript": "Transkript anhängen",
+                "attaching": "Wird angehängt…",
+                "editTranscript": "Transkript bearbeiten",
+                "cancelEdit": "Bearbeitung abbrechen",
+                "saveTranscript": "Transkript speichern",
+                "savingTranscript": "Wird gespeichert…",
+                "save": "Änderungen speichern",
+                "cancel": "Abbrechen"
             },
             "sections": {
-                "summary": "Summary",
-                "transcript": "Transcript",
+                "summary": "Zusammenfassung",
+                "transcript": "Transkript",
                 "details": "Details",
-                "edit": "Edit meeting"
+                "edit": "Meeting bearbeiten"
             },
             "summary": {
-                "notGenerated": "No summary was generated for this transcript. Enable an AI provider and re-attach the transcript to try again.",
-                "noTranscript": "Attach a transcript to generate a summary."
+                "generating": "Zusammenfassung wird erstellt…",
+                "generatingHint": "Das Transkript wird gelesen und die Zusammenfassung geschrieben – das dauert meist ein paar Sekunden.",
+                "notGenerated": "Für dieses Transkript wurde keine Zusammenfassung erstellt. Aktivieren Sie einen KI-Anbieter und hängen Sie das Transkript erneut an, um es noch einmal zu versuchen.",
+                "noTranscript": "Hängen Sie ein Transkript an, um eine Zusammenfassung zu erstellen."
             },
             "transcript": {
-                "composerLabel": "Transcript text",
-                "composerPlaceholder": "Paste the meeting transcript here.",
-                "pipelineHint": "Stored first, then summarized, remembered and posted to your activity feed — best effort.",
-                "storedElsewhere": "The transcript is stored but was not returned with this view."
+                "composerLabel": "Transkripttext",
+                "composerPlaceholder": "Fügen Sie hier das Meeting-Transkript ein.",
+                "pipelineHint": "Wird zuerst gespeichert, dann zusammengefasst, gemerkt und in Ihrem Aktivitäts-Feed veröffentlicht – nach bestem Bemühen.",
+                "storedElsewhere": "Das Transkript ist gespeichert, wurde aber mit dieser Ansicht nicht zurückgegeben."
             },
             "details": {
-                "source": "Source",
-                "startedAt": "Started",
-                "endedAt": "Ended",
-                "openEnded": "Still open",
-                "duration": "Duration",
-                "work": "Work",
-                "orgWide": "Org-wide",
-                "externalId": "Provider ID",
-                "createdAt": "Captured",
-                "participants": "Participants",
-                "noParticipants": "No participants recorded."
+                "source": "Quelle",
+                "startedAt": "Beginn",
+                "endedAt": "Ende",
+                "openEnded": "Noch offen",
+                "duration": "Dauer",
+                "work": "Werk",
+                "orgWide": "Organisationsweit",
+                "externalId": "Anbieter-ID",
+                "createdAt": "Erfasst",
+                "participants": "Teilnehmende",
+                "noParticipants": "Keine Teilnehmenden erfasst."
             },
             "edit": {
-                "hint": "Rename the meeting, close it out, point it at a recording, or re-route it to a Work."
+                "hint": "Zeiten korrigieren, Meeting umbenennen, Teilnehmendenliste anpassen, auf eine Aufzeichnung verweisen oder es einem Werk zuordnen."
             },
             "fields": {
-                "title": "Title",
-                "endedAt": "Ended at",
-                "sourceUrl": "Recording link",
-                "work": "Work",
-                "workNone": "Org-wide (no Work)"
+                "title": "Titel",
+                "startedAt": "Beginn",
+                "endedAt": "Ende",
+                "sourceUrl": "Aufzeichnungslink",
+                "work": "Werk",
+                "workNone": "Organisationsweit (kein Werk)",
+                "participants": "Teilnehmende",
+                "participantName": "Name",
+                "participantEmail": "E-Mail (optional)",
+                "participantAdd": "Teilnehmer hinzufügen",
+                "participantRemove": "Teilnehmer entfernen",
+                "participantsEmpty": "Noch niemand erfasst."
             },
             "errors": {
-                "titleRequired": "Title is required.",
-                "endedAtInvalid": "End time is not a valid date.",
-                "endedBeforeStarted": "End time cannot be before the start time.",
-                "transcriptRequired": "Transcript text is required."
+                "titleRequired": "Ein Titel ist erforderlich.",
+                "startedAtInvalid": "Die Startzeit ist kein gültiges Datum.",
+                "endedAtInvalid": "Die Endzeit ist kein gültiges Datum.",
+                "endedBeforeStarted": "Die Endzeit darf nicht vor der Startzeit liegen.",
+                "participantEmailInvalid": "Geben Sie eine gültige E-Mail-Adresse ein oder lassen Sie das Feld leer.",
+                "participantDuplicate": "Diese Person steht bereits auf der Liste.",
+                "transcriptRequired": "Der Transkripttext ist erforderlich."
             },
             "toasts": {
-                "transcriptSaved": "Transcript attached",
-                "transcriptSummarized": "Transcript attached and summarized",
-                "transcriptError": "Couldn't attach the transcript.",
-                "saved": "Meeting updated",
-                "saveError": "Couldn't update the meeting.",
-                "deleted": "Meeting deleted",
-                "deleteError": "Couldn't delete the meeting."
+                "transcriptSaved": "Transkript angehängt",
+                "transcriptSummarized": "Transkript angehängt und zusammengefasst",
+                "transcriptError": "Das Transkript konnte nicht angehängt werden.",
+                "saved": "Meeting aktualisiert",
+                "participantAdded": "Teilnehmer hinzugefügt",
+                "saveError": "Das Meeting konnte nicht aktualisiert werden.",
+                "deleted": "Meeting gelöscht",
+                "deleteError": "Das Meeting konnte nicht gelöscht werden."
             },
-            "confirm": {
-                "delete": "Delete this meeting? Its transcript and summary will be removed. This cannot be undone."
+            "deleteDialog": {
+                "title": "Dieses Meeting löschen?",
+                "body": "{title} wird dauerhaft gelöscht – zusammen mit Transkript und Zusammenfassung. Dies kann nicht rückgängig gemacht werden.",
+                "confirm": "Meeting löschen",
+                "cancel": "Abbrechen",
+                "deleting": "Wird gelöscht…",
+                "error": "Meeting konnte nicht gelöscht werden"
             }
         },
         "adminTenantRuntimeAllowlist": {

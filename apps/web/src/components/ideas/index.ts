@@ -4,6 +4,7 @@
 // PR N adds the dedicated /ideas page client; PR O + PR P will
 // expand this with the Dashboard preview block + the Done filter
 // chip.
+export { AssignIdeaAgentDialog } from './AssignIdeaAgentDialog';
 export { IdeaCard } from './IdeaCard';
 export { IdeaDetailClient } from './IdeaDetailClient';
 export { IdeasPageClient, ACTIONABLE_STATUSES } from './IdeasPageClient';

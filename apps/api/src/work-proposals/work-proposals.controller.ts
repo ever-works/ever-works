@@ -271,6 +271,31 @@ export class WorkProposalsController {
     }
 
     /**
+     * Hard-delete an Idea. Mirrors the Mission delete contract
+     * (`MissionsController.remove`), but the service refuses with 409 +
+     * `{ reason, count }` when a build is in flight or Idea-scoped Agents
+     * still point at it — the web confirm dialog reads `reason` to say
+     * exactly what blocks the delete. Linked Works do NOT block it: the
+     * provenance rows cascade away and the built Works survive.
+     */
+    @Delete(':id')
+    @ApiOperation({ summary: 'Hard-delete an Idea' })
+    @ApiResponse({ status: 200, description: 'Deleted' })
+    @ApiResponse({ status: 404, description: 'Not found (or not yours)' })
+    @ApiResponse({
+        status: 409,
+        description: 'Blocked — body carries `{ reason, count }`',
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    async remove(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<{ deleted: true }> {
+        return this.service.delete(auth.userId, id);
+    }
+
+    /**
      * Phase 1 PR B — `POST /me/work-proposals/:id/build` queue
      * an Idea for build. Transitions to QUEUED + creates a
      * WorkBuildRequest (`maxWorksPerRun=1`, `ideaId` set) so the

@@ -40,9 +40,13 @@ import { loadSeededTestUser } from './helpers/seeded-test-user';
  *         Mission-scoped Agent SURVIVES — its missionId/scope are intact and
  *         it stays listable via ?scope=mission&missionId=<deleted>. There is
  *         NO cascade from parent deletion to the agents table.
- *       • Works + Ideas (user-manual work-proposals) expose NO delete route
- *         (DELETE → 404), so their scoped agents are trivially undeletable
- *         via the parent — assert the 404 + agent-intact, never a cascade.
+ *       • Works expose NO delete route (DELETE → 404), so a Work-scoped agent
+ *         is trivially undeletable via its parent — assert the 404 +
+ *         agent-intact, never a cascade.
+ *       • Ideas DO have a delete route, but it is GUARDED the other way
+ *         round: an Idea with Idea-scoped Agents refuses with 409
+ *         {reason:'idea-agents', count} rather than orphaning them (the
+ *         `agents.ideaId` uuid carries no FK). Assert the 409 + agent-intact.
  *
  *   POST /api/agents/:id/assign-task — without TRIGGER_SECRET_KEY (the e2e
  *     default) the enqueue 500s, but a `failed` AgentRun row IS persisted
@@ -467,14 +471,19 @@ test.describe('Agent scoping matrix — deep cascade rules', () => {
         );
         expect(stillListed.data.map((a) => a.id)).toEqual([missionAgent.id]);
 
-        // ── Work + Idea parents expose NO delete route — assert the 404
-        //    and that the scoped agents are wholly intact. ────────────────
+        // ── The Work parent exposes NO delete route — assert the 404 and
+        //    that the scoped agent is wholly intact. ─────────────────────
         const delWork = await request.delete(`${API_BASE}/api/works/${workId}`, { headers });
         expect(delWork.status(), `work delete status`).toBe(404);
+
+        // ── The Idea parent DOES have a delete route, but it refuses while
+        //    Idea-scoped Agents point at it: 409 {reason:'idea-agents'}
+        //    instead of the Mission's silent orphaning. ──────────────────
         const delIdea = await request.delete(`${API_BASE}/api/me/work-proposals/${ideaId}`, {
             headers,
         });
-        expect(delIdea.status(), `idea delete status`).toBe(404);
+        expect(delIdea.status(), `idea delete body=${await delIdea.text()}`).toBe(409);
+        expect(await delIdea.json()).toMatchObject({ reason: 'idea-agents', count: 1 });
 
         const workIntact = await request.get(`${API_BASE}/api/agents/${workAgent.id}`, { headers });
         expect(workIntact.status()).toBe(200);

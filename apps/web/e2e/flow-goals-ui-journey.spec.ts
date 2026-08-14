@@ -485,8 +485,13 @@ test.describe('Goals — /goals/:id detail (UI)', () => {
         await expect(page.getByRole('heading', { name: goal.title, level: 1 })).toBeVisible({
             timeout: 30_000,
         });
-        // The only listbox trigger on the detail page is the outcome override.
-        const trigger = page.locator('button[aria-haspopup="listbox"]');
+        // The only listbox trigger INSIDE the page content is the outcome
+        // override. Scoped to #main-content because since a350801a the chat
+        // composer carries a second listbox trigger (the voice-provider
+        // picker, data-testid="chat-dictation-provider") which mounts outside
+        // #main-content but stays in the DOM while the panel is closed — the
+        // unscoped locator resolved to 2+ buttons and strict mode threw.
+        const trigger = page.locator('#main-content button[aria-haspopup="listbox"]');
         const achieved = page.getByRole('option', { name: 'Achieved' });
         // Post-condition of OPENING: the option row is on screen. The dropdown
         // is rendered by client state, so a trigger click before hydration is

@@ -144,6 +144,13 @@ export interface ListAgentsQuery {
      * Work by scope. The Work header's Agents dropdown unions the two.
      */
     assignedWorkId?: string;
+    /**
+     * The Idea counterpart of `assignedWorkId` — Agents ASSIGNED to this
+     * Idea through their `targets`, as opposed to `ideaId`, which matches
+     * Agents pinned to the Idea by scope. The Idea detail rail unions the
+     * two.
+     */
+    assignedIdeaId?: string;
     search?: string;
     limit?: number;
     offset?: number;
@@ -305,6 +312,7 @@ function buildQuery(q: ListAgentsQuery = {}): string {
     if (q.ideaId) params.set('ideaId', q.ideaId);
     if (q.workId) params.set('workId', q.workId);
     if (q.assignedWorkId) params.set('assignedWorkId', q.assignedWorkId);
+    if (q.assignedIdeaId) params.set('assignedIdeaId', q.assignedIdeaId);
     if (q.search) params.set('search', q.search);
     if (q.limit !== undefined) params.set('limit', String(q.limit));
     if (q.offset !== undefined) params.set('offset', String(q.offset));

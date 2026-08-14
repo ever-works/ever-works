@@ -128,6 +128,35 @@ silently cap future upgrades and accumulate maintenance debt.
   via direct version bumps in their `package.json`, not via the
   root override block.
 
+### When there is no patched version at all
+
+An override can only move a dependency to a version that exists. Some
+advisories are published with `"patched_versions": "<0.0.0"` — upstream
+has shipped **no** fix. No override can clear those, and the CI
+`dependency-audit` gate (`pnpm audit --prod --audit-level=high`) hard-fails
+on them like any other high.
+
+For that case only, list the advisory in `pnpm.auditConfig.ignoreGhsas` in
+the root `package.json`. The bar is both of:
+
+1. `patched_versions` is `<0.0.0` (or the only "fix" is a major bump that
+   breaks the consumer — see "When NOT to use overrides"), **and**
+2. The vulnerable code path is not reachable with attacker-controlled
+   input in our usage.
+
+Current entries — both `image-size`, reached via
+`apps/docs > @docusaurus/core > @docusaurus/mdx-loader`:
+
+| GHSA                  | Issue                                          | Why it's ignored                                                               |
+| --------------------- | ---------------------------------------------- | ------------------------------------------------------------------------------ |
+| `GHSA-w3rx-r6r6-pgpr` | ICNS parser infinite loop (event-loop DoS)     | Runs only while **building** the docs site, over images committed to this repo |
+| `GHSA-5p2g-fcmc-qvqq` | JXL/HEIF parser infinite loop (event-loop DoS) | Same path — no request-time, attacker-supplied image ever reaches it           |
+
+Ignores are a bigger hammer than overrides: they silence the advisory
+everywhere in the workspace, including a future path where the package
+_is_ reachable. Re-check them on every sweep and drop each entry the
+moment upstream publishes a fix (then patch it with a normal override).
+
 ## Implementation
 
 The whole mechanism is a single block in the root `package.json` —

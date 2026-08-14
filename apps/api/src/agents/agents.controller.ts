@@ -224,6 +224,7 @@ export class AgentsController {
             ideaId: query.ideaId,
             workId: query.workId,
             assignedWorkId: query.assignedWorkId,
+            assignedIdeaId: query.assignedIdeaId,
             search: query.search,
             limit,
             offset,
