@@ -1,7 +1,16 @@
-import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
+import {
+    BadRequestException,
+    ConflictException,
+    Injectable,
+    Logger,
+    NotFoundException,
+    Optional,
+} from '@nestjs/common';
 import { SkillRepository } from '../database/repositories/skill.repository';
 import { SkillFileRepository } from '../database/repositories/skill-file.repository';
 import { SkillFile, SKILL_FILE_KINDS, type SkillFileKind } from '../entities/skill-file.entity';
+import { ActivityLogService } from '../activity-log/activity-log.service';
+import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import { assertNoSecrets } from '../utils/secret-scan';
 import { assertNoInjectionTokens } from '../utils/content-policy';
 
@@ -59,9 +68,14 @@ export function defaultKindForFilename(filename: string): SkillFileKind {
  */
 @Injectable()
 export class SkillFilesService {
+    private readonly logger = new Logger(SkillFilesService.name);
+
     constructor(
         private readonly skills: SkillRepository,
         private readonly files: SkillFileRepository,
+        // Trailing + @Optional() so existing positional constructor calls
+        // keep working; unbound → no activity rows, never a failed write.
+        @Optional() private readonly activityLog?: ActivityLogService,
     ) {}
 
     async list(userId: string, skillId: string): Promise<SkillFile[]> {
@@ -125,7 +139,7 @@ export class SkillFilesService {
             assertNoInjectionTokens(input.textContent, `skill file ${filename}`);
         }
 
-        return this.files.create({
+        const created = await this.files.create({
             skillId: input.skillId,
             userId,
             uploadId: input.uploadId,
@@ -134,14 +148,44 @@ export class SkillFilesService {
             sizeBytes: Math.floor(input.sizeBytes),
             mime: input.mime,
         });
+        await this.logActivity(userId, input.skillId, filename, 'added');
+        return created;
     }
 
     async remove(userId: string, skillId: string, fileId: string): Promise<{ deleted: true }> {
-        await this.getOne(userId, skillId, fileId);
+        const file = await this.getOne(userId, skillId, fileId);
         // Row only — the bytes stay in the uploads spine (they are
         // content-addressed and possibly shared with other references).
         await this.files.deleteByIdAndUser(fileId, userId);
+        await this.logActivity(userId, skillId, file.filename, 'removed');
         return { deleted: true };
+    }
+
+    /**
+     * A companion file changes what the model can read for a skill, so
+     * add/remove are user-visible state changes. `SKILL_FILE_EDITED` is
+     * the existing enum entry for exactly this; it had no producer until
+     * now. Never throws — activity is telemetry, not the write path.
+     */
+    private async logActivity(
+        userId: string,
+        skillId: string,
+        filename: string,
+        verb: 'added' | 'removed',
+    ): Promise<void> {
+        if (!this.activityLog) return;
+        try {
+            await this.activityLog.log({
+                userId,
+                action: ActivityActionType.SKILL_FILE_EDITED,
+                actionType: ActivityActionType.SKILL_FILE_EDITED,
+                status: ActivityStatus.COMPLETED,
+                summary: `Skill ${skillId} — file "${filename}" ${verb}`,
+                details: { resourceType: 'skill', resourceId: skillId, filename, change: verb },
+            });
+        } catch (err) {
+            this.logger.warn(`Failed to log skill-file activity (${verb} ${filename}): ${err}`);
+        }
     }
 
     private async assertOwnedSkill(userId: string, skillId: string): Promise<void> {

@@ -37,6 +37,7 @@ describe('defaultKindForFilename', () => {
 describe('SkillFilesService', () => {
     let skills: any;
     let files: any;
+    let activity: any;
     let svc: SkillFilesService;
 
     beforeEach(() => {
@@ -52,7 +53,8 @@ describe('SkillFilesService', () => {
             create: jest.fn(async (data: any) => makeFile(data)),
             deleteByIdAndUser: jest.fn(),
         };
-        svc = new SkillFilesService(skills, files);
+        activity = { log: jest.fn().mockResolvedValue(undefined) };
+        svc = new SkillFilesService(skills, files, activity);
     });
 
     const addInput = (over: any = {}) => ({
@@ -144,6 +146,53 @@ describe('SkillFilesService', () => {
             files.findByIdAndUser.mockResolvedValueOnce(makeFile());
             await expect(svc.remove('u1', 'sk1', 'f1')).resolves.toEqual({ deleted: true });
             expect(files.deleteByIdAndUser).toHaveBeenCalledWith('f1', 'u1');
+        });
+    });
+
+    /**
+     * Adding or removing a companion file changes what the model can
+     * read for that skill, so both emit the existing SKILL_FILE_EDITED
+     * activity type. Activity is telemetry: a failing logger must never
+     * fail the write.
+     */
+    describe('activity', () => {
+        it('logs SKILL_FILE_EDITED on add and on remove', async () => {
+            await svc.add('u1', addInput({ filename: 'guide.md' }));
+            expect(activity.log).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    userId: 'u1',
+                    actionType: 'skill_file_edited',
+                    details: expect.objectContaining({
+                        resourceId: 'sk1',
+                        filename: 'guide.md',
+                        change: 'added',
+                    }),
+                }),
+            );
+
+            activity.log.mockClear();
+            files.findByIdAndUser.mockResolvedValueOnce(makeFile({ filename: 'gone.md' }));
+            await svc.remove('u1', 'sk1', 'f1');
+            expect(activity.log).toHaveBeenCalledWith(
+                expect.objectContaining({
+                    details: expect.objectContaining({ filename: 'gone.md', change: 'removed' }),
+                }),
+            );
+        });
+
+        it('does not log for a rejected add', async () => {
+            await expect(svc.add('u1', addInput({ filename: '../escape.md' }))).rejects.toThrow(
+                BadRequestException,
+            );
+            expect(activity.log).not.toHaveBeenCalled();
+        });
+
+        it('survives a throwing activity logger and an unbound one', async () => {
+            activity.log.mockRejectedValueOnce(new Error('activity down'));
+            await expect(svc.add('u1', addInput())).resolves.toBeDefined();
+
+            const bare = new SkillFilesService(skills, files);
+            await expect(bare.add('u1', addInput())).resolves.toBeDefined();
         });
     });
 });
