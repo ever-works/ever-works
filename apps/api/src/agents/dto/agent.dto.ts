@@ -32,6 +32,9 @@ import {
     AGENT_ACTION_PROPOSAL_ACTION_TYPES,
     type AgentActionProposalActionType,
 } from '@ever-works/agent/agent-approvals';
+// Capabilities tab — the one init-script size cap, shared with the
+// service-side byte check.
+import { AGENT_INIT_SCRIPT_MAX_BYTES } from '@ever-works/contracts';
 // Entity-free validation subpath on purpose — see the docstring on
 // `@ever-works/agent/validation`.
 import { MergePolicyDto } from '@ever-works/agent/validation';
@@ -409,18 +412,23 @@ export class UpdateAgentDto {
     /**
      * Capabilities tab — per-Agent init script (advisory v1: stored now,
      * consumed at session/workspace bootstrap where the runtime supports
-     * it). `null` clears it. The service re-enforces a 16 KB BYTE cap +
-     * hard-reject secret scan behind this character-length check.
+     * it). `null` clears it.
+     *
+     * The cap here counts CHARACTERS (class-validator's only length rule)
+     * and is a cheap front gate; `AgentsService.update` re-enforces the
+     * same number as BYTES — the authoritative check, since that is what
+     * the column stores — plus a hard-reject secret scan. Sharing the one
+     * constant keeps the two from drifting apart.
      */
     @ApiProperty({
         required: false,
         nullable: true,
-        maxLength: 16384,
+        maxLength: AGENT_INIT_SCRIPT_MAX_BYTES,
         description: 'Init script run at session/workspace bootstrap where supported; null clears',
     })
     @IsOptional()
     @IsString()
-    @MaxLength(16384)
+    @MaxLength(AGENT_INIT_SCRIPT_MAX_BYTES)
     initScript?: string | null;
 }
 
