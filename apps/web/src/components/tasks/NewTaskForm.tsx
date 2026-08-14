@@ -56,12 +56,40 @@ const PRIORITY_OPTIONS: ReadonlyArray<{
  * non-alphanumerics) collapse to a single hyphen, with no leading or
  * trailing hyphens. So "Redesign onboarding flow" → "redesign-onboarding-flow".
  */
+/**
+ * The API caps each label at 80 characters (`@MaxLength(80, { each: true })`
+ * on both the create and update DTOs), while the Title input allows 200. Since
+ * the Labels field mirrors the slugified title until the user edits it, ANY
+ * title longer than 80 characters derived an over-length label and made the
+ * Task uncreatable — with no hint that the *label* was the problem, because the
+ * server action surfaces the rejection as a generic
+ * "An error occurred in the Server Components render" alert.
+ *
+ * Verified on production before the fix: an 88-character title produced an
+ * 88-character label, Create stayed on /tasks/new, and no row was written.
+ *
+ * Truncating on a hyphen boundary keeps the label readable rather than cutting
+ * mid-word, and the trailing-hyphen strip runs afterwards so a boundary cut
+ * cannot leave "foo-bar-" behind.
+ */
+const MAX_LABEL_LENGTH = 80;
+
 function slugifyTitle(title: string): string {
-    return title
+    const slug = title
         .toLowerCase()
         .trim()
         .replace(/[^a-z0-9]+/g, '-')
         .replace(/^-+|-+$/g, '');
+
+    if (slug.length <= MAX_LABEL_LENGTH) return slug;
+
+    const cut = slug.slice(0, MAX_LABEL_LENGTH);
+    const lastBoundary = cut.lastIndexOf('-');
+    // Only prefer the hyphen boundary when it does not throw most of the label
+    // away — a title whose first "word" is itself longer than the cap should
+    // still yield a usable label rather than an empty string.
+    const trimmed = lastBoundary > MAX_LABEL_LENGTH / 2 ? cut.slice(0, lastBoundary) : cut;
+    return trimmed.replace(/-+$/g, '');
 }
 
 export function NewTaskForm({ createTask }: { createTask: CreateTaskFn }) {

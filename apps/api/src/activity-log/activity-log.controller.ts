@@ -164,6 +164,7 @@ export class ActivityLogController {
     @ApiQuery({ name: 'status', required: false })
     @ApiQuery({ name: 'dateFrom', required: false })
     @ApiQuery({ name: 'dateTo', required: false })
+    @ApiQuery({ name: 'search', required: false })
     @ApiResponse({ status: 200, description: 'CSV file download' })
     async exportCsv(
         @CurrentUser() auth: AuthenticatedUser,
@@ -173,6 +174,17 @@ export class ActivityLogController {
         @Query('status') status?: string,
         @Query('dateFrom') dateFrom?: string,
         @Query('dateTo') dateTo?: string,
+        // The Activity page sends `search` alongside the other filters, but this
+        // handler never declared it, so Nest dropped it and the export returned
+        // the user's ENTIRE log while the screen showed a filtered view. Verified
+        // on production: `?search=deployment` and `?search=zzz-cannot-match-zzz`
+        // both returned byte-identical CSV to the unfiltered request.
+        //
+        // Nothing below the controller needed changing — `ActivityLogQueryOptions`
+        // already declares `search`, and `findByUserIdForExport` shares
+        // `findByUserIdWithLimit` with the list query, which applies it. The
+        // filter existed on every layer except the one that reads the URL.
+        @Query('search') search?: string,
     ) {
         await this.reconcileActivities(auth.userId);
 
@@ -183,6 +195,7 @@ export class ActivityLogController {
             status: status as ActivityStatus,
             dateFrom: dateFrom ? new Date(dateFrom) : undefined,
             dateTo: dateTo ? new Date(dateTo) : undefined,
+            search,
         });
 
         res.setHeader('Content-Type', 'text/csv');
