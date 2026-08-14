@@ -118,14 +118,15 @@ export function EnvironmentsSettings({
 
     const buildPayload = (state: EditorState) => ({
         name: state.name.trim(),
-        description: state.description.trim() || undefined,
+        // Explicit `null`, not `undefined`: an omitted key leaves the
+        // stored description alone, so emptying the field would silently
+        // fail to clear it.
+        description: state.description.trim() || null,
         pipPackages: splitList(state.pipPackages, /[,\n]/),
         npmPackages: splitList(state.npmPackages, /[,\n]/),
         networkingMode: state.networkingMode,
         allowedHosts:
-            state.networkingMode === 'limited'
-                ? splitList(state.allowedHosts, /[,\n]/)
-                : undefined,
+            state.networkingMode === 'limited' ? splitList(state.allowedHosts, /[,\n]/) : undefined,
         allowPackageManagers: state.allowPackageManagers,
         availableInAllProjects: state.availableInAllProjects,
     });
@@ -289,7 +290,9 @@ export function EnvironmentsSettings({
                                                 size="sm"
                                                 className="gap-1.5 px-2.5 py-1 text-xs"
                                                 disabled={isPending}
-                                                onClick={() => setEditor(toEditorState(environment))}
+                                                onClick={() =>
+                                                    setEditor(toEditorState(environment))
+                                                }
                                                 data-testid={`environment-edit-${environment.slug}`}
                                             >
                                                 <Pencil className="w-3.5 h-3.5" />

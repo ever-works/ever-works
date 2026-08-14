@@ -43,11 +43,14 @@ export class CreateEnvironmentDto {
     @IsNotEmpty()
     name: string;
 
-    @ApiProperty({ required: false, maxLength: 2000 })
+    // `@IsOptional()` skips validation for BOTH `undefined` and `null`, so
+    // an explicit `null` clears the column (the web editor sends null when
+    // the field is emptied) while an omitted key leaves it untouched.
+    @ApiProperty({ required: false, nullable: true, maxLength: 2000 })
     @IsOptional()
     @IsString()
     @MaxLength(2000)
-    description?: string;
+    description?: string | null;
 
     @ApiProperty({
         required: false,

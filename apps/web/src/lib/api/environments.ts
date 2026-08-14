@@ -30,7 +30,8 @@ export interface Environment {
 
 export interface CreateEnvironmentPayload {
     name: string;
-    description?: string;
+    /** `null` clears a stored description; omitted leaves it untouched. */
+    description?: string | null;
     pipPackages?: string[];
     npmPackages?: string[];
     networkingMode?: EnvironmentNetworkingMode;
