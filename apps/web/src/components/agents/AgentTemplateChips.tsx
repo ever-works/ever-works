@@ -164,6 +164,19 @@ export function AgentTemplateChips({
                         emptyHint={t('catalog.yourTemplatesEmpty')}
                         onPick={pickAndCollapse}
                     />
+                    {/* EW-058: /agents/templates was an orphan route — defined
+                        in ROUTES, linked from nowhere in the product. This is
+                        its first inbound link; the inline catalog above stays
+                        the quick path, the dedicated page is the full browser. */}
+                    <div className="pt-1">
+                        <Button
+                            href={ROUTES.DASHBOARD_AGENT_TEMPLATES}
+                            variant="secondary"
+                            size="sm"
+                        >
+                            {t('catalog.browsePage')}
+                        </Button>
+                    </div>
                 </div>
             )}
         </div>

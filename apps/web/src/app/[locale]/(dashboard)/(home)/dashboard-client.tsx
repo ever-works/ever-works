@@ -40,6 +40,15 @@ interface DashboardClientProps {
     /** Phase 6 PR S - Missions preview block. */
     initialMissions: Mission[];
     initialAllIdeas: WorkProposal[];
+    /**
+     * `{ [ideaId]: workId }` for Ideas whose title + description match an
+     * existing Work — the same backstop `/ideas` uses, resolved server-side
+     * in `page.tsx`. Without it the preview can only call an Idea "Built"
+     * when `acceptedWorkId` is set, so Ideas built through
+     * `/works/new?proposal=…` read "Not built yet" here while showing
+     * Built on `/ideas`.
+     */
+    matchedWorkIds?: Record<string, string>;
     /** Phase 7 PR II - account-wide spend for the 6th dashboard tile. */
     monthSpendCents?: number;
     monthSpendCurrency?: string;
@@ -99,6 +108,7 @@ export default function DashboardClient({
     autoStartProposals,
     initialMissions,
     initialAllIdeas,
+    matchedWorkIds,
     monthSpendCents = 0,
     monthSpendCurrency = 'usd',
     agentsTotal = 0,
@@ -185,6 +195,7 @@ export default function DashboardClient({
                         autoStart={autoStartProposals}
                         totalIdeas={totalIdeas}
                         showAllStatuses
+                        matchedWorkIds={matchedWorkIds}
                     />
                 </div>
 

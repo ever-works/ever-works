@@ -951,7 +951,8 @@
                 "allTemplates": "كل القوالب",
                 "yourTemplates": "قوالبك",
                 "yourTemplatesEmpty": "الوكلاء الذي تنشئهم ستظهر هنا كقوابل لإعادة الاستخدام.",
-                "openInWizard": "افتح في المعالج"
+                "openInWizard": "افتح في المعالج",
+                "browsePage": "Open the full template browser"
             },
             "settings": {
                 "identity": {
@@ -1145,7 +1146,8 @@
                     "showing": "عرض {from}-{to} من {total}",
                     "previous": "السابق",
                     "next": "التالي"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "newDialog": {
                 "title": "إنشاء مهمة جديدة",
@@ -1428,7 +1430,8 @@
                 "filter": {
                     "scope": "النطاق",
                     "all": "الكل"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "detail": {
                 "instructions": "التعليمات",
@@ -1829,7 +1832,21 @@
                     "empty": "لا توجد Works مرتبطة بهذه الفكرة بعد."
                 },
                 "agents": {
-                    "empty": "لا يوجد وكلاء مرتبطون بهذه الفكرة."
+                    "empty": "لا يوجد وكلاء مرتبطون بهذه الفكرة.",
+                    "assignExisting": "تعيين وكيل موجود",
+                    "assignTitle": "تعيين وكيل لهذه الفكرة",
+                    "assignSubtitle": "عيّن لهذه الفكرة وكيلاً لديك بالفعل بدلاً من إنشاء وكيل آخر.",
+                    "assignSearchPlaceholder": "البحث عن وكلاء…",
+                    "assignLoading": "جارٍ تحميل الوكلاء…",
+                    "assignNoneAvailable": "لا يوجد وكلاء آخرون للتعيين.",
+                    "assignNoMatches": "لا يوجد وكلاء مطابقون لهذا البحث.",
+                    "assignLoadFailed": "تعذر تحميل الوكلاء",
+                    "assignedToast": "تم تعيين {name} لهذه الفكرة",
+                    "assignFailed": "تعذر تعيين الوكيل",
+                    "assignCancel": "إلغاء",
+                    "unassign": "إزالة من هذه الفكرة",
+                    "unassignedToast": "تمت إزالة {name} من هذه الفكرة",
+                    "unassignFailed": "تعذرت إزالة الوكيل"
                 },
                 "meta": {
                     "source": "المصدر",
@@ -1849,7 +1866,8 @@
                         "idea-agents": "تعذّر الحذف: {count} من الوكلاء مرتبطون بهذه الفكرة. احذفهم أو غيّر نطاقهم.",
                         "build-in-flight": "لا يمكن الحذف أثناء البناء. انتظر حتى ينتهي.",
                         "unknown": "لا يمكن حذف هذه الفكرة الآن."
-                    }
+                    },
+                    "unlinksWorks": "{count, plural, one {هذه الفكرة مرتبطة بـ Work واحد. سيتم الاحتفاظ به — تتم إزالة الرابط فقط.} two {هذه الفكرة مرتبطة بـ Work اثنين. سيتم الاحتفاظ بهما — تتم إزالة الرابط فقط.} few {هذه الفكرة مرتبطة بـ # من Works. سيتم الاحتفاظ بها — تتم إزالة الرابط فقط.} many {هذه الفكرة مرتبطة بـ # من Works. سيتم الاحتفاظ بها — تتم إزالة الرابط فقط.} other {هذه الفكرة مرتبطة بـ # من Works. سيتم الاحتفاظ بها — تتم إزالة الرابط فقط.}}"
                 },
                 "toasts": {
                     "built": "تم بناء Work من هذه الفكرة",
@@ -2164,7 +2182,10 @@
                 "fleet": "Fleet",
                 "jobRuntime": "Job Runtime",
                 "environments": "Environments",
-                "digest": "Digest"
+                "digest": "Digest",
+                "notifications": "Notifications",
+                "channels": "Channels",
+                "emails": "Email Addresses"
             },
             "githubApp": {
                 "title": "تثبيتات تطبيق GitHub",
@@ -7023,7 +7044,8 @@
                 "startedAtInvalid": "Start time is not a valid date.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
-                "createFailed": "Couldn't capture the meeting. Please try again."
+                "createFailed": "Couldn't capture the meeting. Please try again.",
+                "participantEmailInvalid": "أدخل بريدًا إلكترونيًا صالحًا أو اتركه فارغًا."
             },
             "actions": {
                 "create": "Capture meeting",
@@ -7031,71 +7053,99 @@
             }
         },
         "meetingDetail": {
-            "backToMeetings": "Back to Meetings",
+            "backToMeetings": "العودة إلى الاجتماعات",
             "actions": {
-                "openRecording": "Open recording",
-                "delete": "Delete",
-                "attachTranscript": "Attach transcript",
+                "openRecording": "فتح التسجيل",
+                "delete": "حذف",
+                "attachTranscript": "إرفاق النص",
                 "replaceTranscript": "Replace transcript",
                 "cancelReplace": "Cancel replace",
-                "save": "Save changes"
+                "save": "حفظ التغييرات",
+                "edit": "تعديل",
+                "attaching": "جارٍ الإرفاق…",
+                "editTranscript": "تعديل النص",
+                "cancelEdit": "إلغاء التعديل",
+                "saveTranscript": "حفظ النص",
+                "savingTranscript": "جارٍ الحفظ…",
+                "cancel": "إلغاء"
             },
             "sections": {
-                "summary": "Summary",
-                "transcript": "Transcript",
-                "details": "Details",
-                "edit": "Edit meeting"
+                "summary": "الملخص",
+                "transcript": "النص المدوّن",
+                "details": "التفاصيل",
+                "edit": "تعديل الاجتماع"
             },
             "summary": {
-                "notGenerated": "No summary was generated for this transcript. Enable an AI provider and re-attach the transcript to try again.",
-                "noTranscript": "Attach a transcript to generate a summary."
+                "notGenerated": "لم يتم إنشاء ملخص لهذا النص. فعّل مزوّد ذكاء اصطناعي وأعد إرفاق النص للمحاولة مرة أخرى.",
+                "noTranscript": "أرفق نصًا مدوّنًا لإنشاء ملخص.",
+                "generating": "جارٍ إنشاء الملخص…",
+                "generatingHint": "نقرأ النص ونكتب الملخص — يستغرق ذلك عادةً بضع ثوانٍ."
             },
             "transcript": {
-                "composerLabel": "Transcript text",
-                "composerPlaceholder": "Paste the meeting transcript here.",
-                "pipelineHint": "Stored first, then summarized, remembered and posted to your activity feed — best effort.",
-                "storedElsewhere": "The transcript is stored but was not returned with this view."
+                "composerLabel": "نص الاجتماع المدوّن",
+                "composerPlaceholder": "الصق هنا النص المدوّن للاجتماع.",
+                "pipelineHint": "يُحفَظ أولًا، ثم يُلخَّص ويُخزَّن في الذاكرة ويُنشر في سجل نشاطك — بأفضل جهد ممكن.",
+                "storedElsewhere": "النص المدوّن محفوظ لكنه لم يُعَد مع هذا العرض."
             },
             "details": {
-                "source": "Source",
-                "startedAt": "Started",
-                "endedAt": "Ended",
-                "openEnded": "Still open",
-                "duration": "Duration",
-                "work": "Work",
-                "orgWide": "Org-wide",
-                "externalId": "Provider ID",
-                "createdAt": "Captured",
-                "participants": "Participants",
-                "noParticipants": "No participants recorded."
+                "source": "المصدر",
+                "startedAt": "بدأ",
+                "endedAt": "انتهى",
+                "openEnded": "ما زال مفتوحًا",
+                "duration": "المدة",
+                "work": "العمل",
+                "orgWide": "على مستوى المؤسسة",
+                "externalId": "معرّف المزوّد",
+                "createdAt": "تم الالتقاط",
+                "participants": "المشاركون",
+                "noParticipants": "لم يُسجَّل أي مشارك."
             },
             "edit": {
-                "hint": "Rename the meeting, close it out, point it at a recording, or re-route it to a Work."
+                "hint": "صحّح الأوقات، أو أعد تسمية الاجتماع، أو عدّل قائمة المشاركين، أو اربطه بتسجيل، أو أعد توجيهه إلى عمل."
             },
             "fields": {
-                "title": "Title",
-                "endedAt": "Ended at",
-                "sourceUrl": "Recording link",
-                "work": "Work",
-                "workNone": "Org-wide (no Work)"
+                "title": "العنوان",
+                "endedAt": "وقت الانتهاء",
+                "sourceUrl": "رابط التسجيل",
+                "work": "العمل",
+                "workNone": "على مستوى المؤسسة (بدون عمل)",
+                "startedAt": "وقت البدء",
+                "participants": "المشاركون",
+                "participantName": "الاسم",
+                "participantEmail": "البريد الإلكتروني (اختياري)",
+                "participantAdd": "إضافة مشارك",
+                "participantRemove": "إزالة المشارك",
+                "participantsEmpty": "لم يُسجَّل أي مشارك بعد."
             },
             "errors": {
-                "titleRequired": "Title is required.",
-                "endedAtInvalid": "End time is not a valid date.",
-                "endedBeforeStarted": "End time cannot be before the start time.",
-                "transcriptRequired": "Transcript text is required."
+                "titleRequired": "العنوان مطلوب.",
+                "endedAtInvalid": "وقت الانتهاء ليس تاريخًا صالحًا.",
+                "endedBeforeStarted": "لا يمكن أن يسبق وقت الانتهاء وقت البدء.",
+                "transcriptRequired": "النص المدوّن مطلوب.",
+                "startedAtInvalid": "وقت البدء ليس تاريخًا صالحًا.",
+                "participantEmailInvalid": "أدخل بريدًا إلكترونيًا صالحًا أو اتركه فارغًا.",
+                "participantDuplicate": "هذا الشخص موجود بالفعل في القائمة."
             },
             "toasts": {
-                "transcriptSaved": "Transcript attached",
-                "transcriptSummarized": "Transcript attached and summarized",
-                "transcriptError": "Couldn't attach the transcript.",
-                "saved": "Meeting updated",
-                "saveError": "Couldn't update the meeting.",
-                "deleted": "Meeting deleted",
-                "deleteError": "Couldn't delete the meeting."
+                "transcriptSaved": "تم إرفاق النص المدوّن",
+                "transcriptSummarized": "تم إرفاق النص المدوّن وتلخيصه",
+                "transcriptError": "تعذّر إرفاق النص المدوّن.",
+                "saved": "تم تحديث الاجتماع",
+                "saveError": "تعذّر تحديث الاجتماع.",
+                "deleted": "تم حذف الاجتماع",
+                "deleteError": "تعذّر حذف الاجتماع.",
+                "participantAdded": "تمت إضافة المشارك"
             },
             "confirm": {
                 "delete": "Delete this meeting? Its transcript and summary will be removed. This cannot be undone."
+            },
+            "deleteDialog": {
+                "title": "حذف هذا الاجتماع؟",
+                "body": "سيتم حذف {title} نهائيًا، مع نصه المدوّن وملخصه. لا يمكن التراجع عن هذا الإجراء.",
+                "confirm": "حذف الاجتماع",
+                "cancel": "إلغاء",
+                "deleting": "جارٍ الحذف…",
+                "error": "فشل حذف الاجتماع"
             }
         },
         "adminTenantRuntimeAllowlist": {

@@ -15,6 +15,7 @@ import {
     Hammer,
     Info,
     Lightbulb,
+    Link2,
     Loader2,
     Radio,
     RefreshCw,
@@ -22,6 +23,7 @@ import {
     Target,
     Trash2,
     TriangleAlertIcon,
+    Unlink,
 } from 'lucide-react';
 import { Link, useRouter } from '@/i18n/navigation';
 import { toast } from 'sonner';
@@ -40,6 +42,7 @@ import {
     rebuildIdeaAction,
     retryIdeaAction,
 } from '@/app/actions/dashboard/work-proposals';
+import { unassignAgentFromIdeaAction } from '@/app/actions/agents';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
 import { EntityAttachmentsSection } from '@/components/common/EntityAttachmentsSection';
@@ -54,8 +57,9 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { ShowDateTime } from '@/components/ui/show-datetime';
-import { STATUS_STYLES } from './idea-status';
+import { BUILT_BADGE_STYLE, STATUS_STYLES, deriveIdeaBadge } from './idea-status';
 import { deriveIdeaBuiltState } from './idea-built';
+import { AssignIdeaAgentDialog } from './AssignIdeaAgentDialog';
 
 /**
  * Live poll cadence + safety deadline. Mirrors `WorkProposalsSection`
@@ -300,8 +304,14 @@ interface IdeaDetailClientProps {
      * must be listed there, not just linked from the build tracker.
      */
     matchedWork?: MatchedWork | null;
-    /** Idea-scoped Agents (`GET /agents?ideaId=`). */
+    /**
+     * Agents on this Idea — the merged roster of the ones PINNED here by
+     * scope (`GET /agents?ideaId=`) and the ones ASSIGNED here through
+     * their `targets` (`GET /agents?assignedIdeaId=`).
+     */
     agents?: Agent[];
+    /** Which of `agents` are ASSIGNED (detachable) rather than pinned by scope. */
+    assignedAgentIds?: string[];
     /** Uploads attached to this Idea (`GET :id/attachments`). */
     attachments?: WorkProposalAttachmentRow[];
     /** Parent Mission title, when this Idea was spawned by one. */
@@ -310,9 +320,14 @@ interface IdeaDetailClientProps {
 
 /**
  * `/ideas/[id]` detail body — a two-column entity page matching the
- * Mission detail layout: actions on the breadcrumb line, the Idea's
- * own content in the main column, and a context rail carrying the
- * build tracker, Agents and metadata.
+ * Mission detail layout: actions on the breadcrumb line, the Idea's own
+ * content in the main column, and a context rail carrying the build
+ * tracker and metadata.
+ *
+ * Agents sit in the MAIN column, directly under Linked Works: both
+ * answer "what does this Idea have attached to it", and both carry
+ * actions (assign / detach), which the narrow rail — a read-mostly
+ * summary strip — is the wrong place for.
  *
  * It stays a client island because a `queued`/`building` Idea updates
  * in place: the tracker advances, the status badge animates, and the
@@ -324,6 +339,7 @@ export function IdeaDetailClient({
     initialLinks = [],
     matchedWork = null,
     agents = [],
+    assignedAgentIds = [],
     attachments = [],
     missionTitle = null,
 }: IdeaDetailClientProps) {
@@ -343,8 +359,35 @@ export function IdeaDetailClient({
     const [deleteError, setDeleteError] = useState<string | null>(null);
     const [pendingBuild, startBuild] = useTransition();
     const [pendingDelete, startDelete] = useTransition();
+    const [assignOpen, setAssignOpen] = useState(false);
+    // The Agent whose unassign is in flight, so only its own row spins.
+    const [unassigningId, setUnassigningId] = useState<string | null>(null);
+    const [, startUnassign] = useTransition();
+    const assignedIds = new Set(assignedAgentIds);
 
     const isLive = IN_PROGRESS.has(idea.status);
+
+    /**
+     * Take an ASSIGNED Agent back off this Idea. Pinned Agents get no
+     * such action — their placement IS their scope, so it is changed by
+     * editing the Agent, not from here.
+     */
+    const unassignAgent = (agent: Agent) => {
+        setUnassigningId(agent.id);
+        startUnassign(async () => {
+            try {
+                await unassignAgentFromIdeaAction(agent.id, idea.id);
+                toast.success(tDetail('agents.unassignedToast', { name: agent.name }));
+                router.refresh();
+            } catch (error) {
+                toast.error(
+                    error instanceof Error ? error.message : tDetail('agents.unassignFailed'),
+                );
+            } finally {
+                setUnassigningId(null);
+            }
+        });
+    };
 
     // Announce the terminal transition once. Keyed off the previous
     // status via a ref so a re-render can't fire the toast twice.
@@ -517,6 +560,7 @@ export function IdeaDetailClient({
     };
 
     const statusStyle = STATUS_STYLES[idea.status] ?? STATUS_STYLES.pending;
+    const badge = deriveIdeaBadge(idea.status, { isBuilt, workCount });
 
     return (
         <div className="w-full p-6 max-w-screen-2xl mx-auto space-y-6">
@@ -629,42 +673,53 @@ export function IdeaDetailClient({
                             {idea.title}
                         </h1>
                         <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                            <span
-                                data-testid="idea-status-badge"
-                                className={cn(
-                                    'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset capitalize',
-                                    statusStyle.badge,
-                                )}
-                            >
+                            {/* Exactly ONE pill (see `deriveIdeaBadge`).
+                                A Work that exists outranks the Idea's own
+                                lifecycle status, so a built Idea reads
+                                "Built (1)" instead of "Dismissed" — the
+                                two used to render side by side and read as
+                                a contradiction. A live build is the sole
+                                exception and keeps its status. */}
+                            {badge.kind === 'built' ? (
                                 <span
-                                    aria-hidden="true"
-                                    className={cn('h-1.5 w-1.5 rounded-full', statusStyle.dot)}
-                                />
-                                {tPage(`filters.${idea.status}`)}
-                            </span>
-
-                            {/* The answer to "is it built?", stated rather
-                                than implied — a green Built pill with the
-                                number of Works produced, or a neutral
-                                "Not built yet". */}
-                            <span
-                                data-testid="idea-built-badge"
-                                className={cn(
-                                    'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset',
-                                    isBuilt
-                                        ? 'bg-success/10 text-success ring-success/20'
-                                        : 'bg-surface-secondary dark:bg-surface-secondary-dark text-text-muted dark:text-text-muted-dark ring-border/60 dark:ring-border-dark/60',
-                                )}
-                            >
-                                {isBuilt ? (
+                                    data-testid="idea-built-badge"
+                                    className={cn(
+                                        'inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset',
+                                        BUILT_BADGE_STYLE,
+                                    )}
+                                >
                                     <CheckCircle2 className="w-3 h-3" />
-                                ) : (
+                                    {tDetail('built.badge', { count: badge.count })}
+                                </span>
+                            ) : (
+                                <span
+                                    data-testid="idea-status-badge"
+                                    className={cn(
+                                        'inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset capitalize',
+                                        statusStyle.badge,
+                                    )}
+                                >
+                                    <span
+                                        aria-hidden="true"
+                                        className={cn('h-1.5 w-1.5 rounded-full', statusStyle.dot)}
+                                    />
+                                    {tPage(`filters.${badge.status}`)}
+                                </span>
+                            )}
+
+                            {/* Detail-page-only: state the negative
+                                explicitly. It can never sit next to a
+                                Built pill, so there is no contradiction to
+                                reintroduce here. */}
+                            {!isBuilt && (
+                                <span
+                                    data-testid="idea-not-built-badge"
+                                    className="inline-flex items-center gap-1 rounded-full bg-surface-secondary dark:bg-surface-secondary-dark px-2 py-0.5 text-[11px] font-medium text-text-muted dark:text-text-muted-dark ring-1 ring-inset ring-border/60 dark:ring-border-dark/60"
+                                >
                                     <CircleDashed className="w-3 h-3" />
-                                )}
-                                {isBuilt
-                                    ? tDetail('built.badge', { count: workCount })
-                                    : tDetail('built.none')}
-                            </span>
+                                    {tDetail('built.none')}
+                                </span>
+                            )}
 
                             {isLive && (
                                 <span
@@ -822,6 +877,83 @@ export function IdeaDetailClient({
                         )}
                     </section>
 
+                    {/* ── Agents ───────────────────────────────────────── */}
+                    <section className={sectionCard} data-testid="idea-agents">
+                        <SectionHeader
+                            icon={Bot}
+                            title={tDetail('sections.agents')}
+                            count={agents.length}
+                            action={
+                                <button
+                                    type="button"
+                                    data-testid="idea-assign-agent-button"
+                                    onClick={() => setAssignOpen(true)}
+                                    className={cn(btn, 'shrink-0 px-2 py-1')}
+                                >
+                                    <Link2 className="w-3.5 h-3.5" />
+                                    {tDetail('agents.assignExisting')}
+                                </button>
+                            }
+                        />
+                        {agents.length === 0 ? (
+                            <p className={emptyText}>{tDetail('agents.empty')}</p>
+                        ) : (
+                            <ul className="space-y-2">
+                                {agents.map((agent) => {
+                                    const isAssigned = assignedIds.has(agent.id);
+                                    const isUnassigning = unassigningId === agent.id;
+                                    return (
+                                        // The unassign control is a SIBLING of the row
+                                        // Link, never a child: nesting a button inside an
+                                        // anchor is invalid markup and would make the
+                                        // click navigate as well as detach.
+                                        <li key={agent.id} className="group/agent relative">
+                                            <Link
+                                                href={ROUTES.DASHBOARD_AGENT(agent.id)}
+                                                className={cn(
+                                                    'group flex items-center gap-3 rounded-lg border border-border/60 dark:border-border-dark/60 bg-surface/30 dark:bg-surface-dark/30 px-3 py-2.5 hover:border-border dark:hover:border-border-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors',
+                                                    isAssigned && 'pr-11',
+                                                )}
+                                            >
+                                                <span className="min-w-0 flex-1 truncate text-sm font-medium text-text dark:text-text-dark group-hover:text-primary transition-colors">
+                                                    {agent.name}
+                                                </span>
+                                                <span className="shrink-0 rounded-full border border-border dark:border-border-dark px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-text-muted dark:text-text-muted-dark">
+                                                    {agent.status}
+                                                </span>
+                                            </Link>
+                                            {/* Only ASSIGNED Agents can be taken off the
+                                                Idea here — a pinned Agent's placement is
+                                                its scope, changed on the Agent itself. */}
+                                            {isAssigned && (
+                                                <button
+                                                    type="button"
+                                                    aria-label={tDetail('agents.unassign')}
+                                                    title={tDetail('agents.unassign')}
+                                                    disabled={unassigningId !== null}
+                                                    onClick={() => unassignAgent(agent)}
+                                                    className={cn(
+                                                        'absolute right-2 top-1/2 z-10 flex h-7 w-7 -translate-y-1/2 items-center justify-center rounded-md border border-transparent text-text-muted dark:text-text-muted-dark transition-all',
+                                                        'opacity-0 group-hover/agent:opacity-100 focus-visible:opacity-100',
+                                                        'hover:border-border dark:hover:border-border-dark hover:text-danger hover:bg-surface-hover dark:hover:bg-surface-hover-dark',
+                                                        'disabled:cursor-not-allowed',
+                                                        isUnassigning && 'opacity-100',
+                                                    )}
+                                                >
+                                                    {isUnassigning ? (
+                                                        <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                                    ) : (
+                                                        <Unlink className="w-3.5 h-3.5" />
+                                                    )}
+                                                </button>
+                                            )}
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        )}
+                    </section>
+
                     {/* ── Attachments ──────────────────────────────────── */}
                     <EntityAttachmentsSection
                         initial={attachments}
@@ -930,36 +1062,6 @@ export function IdeaDetailClient({
                         )}
                     </section>
 
-                    {/* ── Agents ───────────────────────────────────────── */}
-                    <section className={sectionCard}>
-                        <SectionHeader
-                            icon={Bot}
-                            title={tDetail('sections.agents')}
-                            count={agents.length}
-                        />
-                        {agents.length === 0 ? (
-                            <p className={emptyText}>{tDetail('agents.empty')}</p>
-                        ) : (
-                            <ul className="space-y-2">
-                                {agents.map((agent) => (
-                                    <li key={agent.id}>
-                                        <Link
-                                            href={ROUTES.DASHBOARD_AGENT(agent.id)}
-                                            className="group flex items-center gap-3 rounded-lg border border-border/60 dark:border-border-dark/60 bg-surface/30 dark:bg-surface-dark/30 px-3 py-2.5 hover:border-border dark:hover:border-border-dark hover:bg-surface-secondary dark:hover:bg-surface-secondary-dark transition-colors"
-                                        >
-                                            <span className="min-w-0 flex-1 truncate text-sm font-medium text-text dark:text-text-dark group-hover:text-primary transition-colors">
-                                                {agent.name}
-                                            </span>
-                                            <span className="shrink-0 rounded-full border border-border dark:border-border-dark px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-text-muted dark:text-text-muted-dark">
-                                                {agent.status}
-                                            </span>
-                                        </Link>
-                                    </li>
-                                ))}
-                            </ul>
-                        )}
-                    </section>
-
                     {/* ── Details ──────────────────────────────────────── */}
                     <section className={sectionCard}>
                         <SectionHeader icon={Info} title={tDetail('sections.details')} />
@@ -1026,6 +1128,21 @@ export function IdeaDetailClient({
                         </DialogDescription>
                     </DialogHeader>
 
+                    {/* Linked Works no longer block the delete, so say what
+                        the delete costs before it happens: the `idea_works`
+                        rows cascade away, but the Works themselves are kept
+                        (`works.acceptedFromIdeaId` is ON DELETE SET NULL).
+                        Counted off `links`, not `linkedWorkRows` — a
+                        content-matched Work has no row to lose. */}
+                    {links.length > 0 && (
+                        <p
+                            data-testid="idea-delete-unlinks-works"
+                            className="mt-4 rounded-md border border-border/60 dark:border-border-dark/60 bg-surface-secondary/60 dark:bg-surface-secondary-dark/60 p-2.5 text-xs text-text-secondary dark:text-text-secondary-dark"
+                        >
+                            {tDetail('deleteDialog.unlinksWorks', { count: links.length })}
+                        </p>
+                    )}
+
                     {deleteError && (
                         <p
                             role="alert"
@@ -1062,6 +1179,12 @@ export function IdeaDetailClient({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            <AssignIdeaAgentDialog
+                ideaId={idea.id}
+                open={assignOpen}
+                onOpenChange={setAssignOpen}
+            />
         </div>
     );
 }

@@ -996,7 +996,8 @@
                 "allTemplates": "All templates",
                 "yourTemplates": "Your templates",
                 "yourTemplatesEmpty": "Agents you create will appear here as reusable templates.",
-                "openInWizard": "Open in wizard"
+                "openInWizard": "Open in wizard",
+                "browsePage": "Open the full template browser"
             },
             "pageTabs": {
                 "agents": "Agents",
@@ -1114,7 +1115,8 @@
                     "showing": "Показано {from}–{to} з {total}",
                     "previous": "Назад",
                     "next": "Вперед"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "newDialog": {
                 "title": "Створити нове завдання",
@@ -1350,7 +1352,8 @@
                 "filter": {
                     "scope": "Обсяг дій",
                     "all": "Усі"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "detail": {
                 "instructions": "Інструкції",
@@ -1798,7 +1801,21 @@
                     "empty": "З цією Ідеєю ще не пов’язано жодного Work."
                 },
                 "agents": {
-                    "empty": "Немає Агентів, прив’язаних до цієї Ідеї."
+                    "empty": "Немає Агентів, прив’язаних до цієї Ідеї.",
+                    "assignExisting": "Призначити наявного",
+                    "assignTitle": "Призначити агента цій Ідеї",
+                    "assignSubtitle": "Призначте на цю Ідею агента, який у вас уже є, замість створювати нового.",
+                    "assignSearchPlaceholder": "Пошук агентів…",
+                    "assignLoading": "Завантаження агентів…",
+                    "assignNoneAvailable": "Більше немає агентів для призначення.",
+                    "assignNoMatches": "Немає агентів за цим запитом.",
+                    "assignLoadFailed": "Не вдалося завантажити агентів",
+                    "assignedToast": "{name} призначено цій Ідеї",
+                    "assignFailed": "Не вдалося призначити агента",
+                    "assignCancel": "Скасувати",
+                    "unassign": "Прибрати з цієї Ідеї",
+                    "unassignedToast": "{name} прибрано з цієї Ідеї",
+                    "unassignFailed": "Не вдалося прибрати агента"
                 },
                 "meta": {
                     "source": "Джерело",
@@ -1818,7 +1835,8 @@
                         "idea-agents": "Видалення неможливе: до Ідеї прив’язано {count} Агент(ів). Видаліть їх або змініть область.",
                         "build-in-flight": "Не можна видалити під час збірки. Дочекайтеся завершення.",
                         "unknown": "Зараз видалити цю Ідею неможливо."
-                    }
+                    },
+                    "unlinksWorks": "{count, plural, one {Ця Ідея пов'язана з # Work. Він збережеться — видаляється лише зв'язок.} few {Ця Ідея пов'язана з # Works. Вони збережуться — видаляється лише зв'язок.} many {Ця Ідея пов'язана з # Works. Вони збережуться — видаляється лише зв'язок.} other {Ця Ідея пов'язана з # Works. Вони збережуться — видаляється лише зв'язок.}}"
                 },
                 "toasts": {
                     "built": "Work зібрано з цієї Ідеї",
@@ -2096,7 +2114,10 @@
                 "fleet": "Fleet",
                 "jobRuntime": "Job Runtime",
                 "environments": "Environments",
-                "digest": "Digest"
+                "digest": "Digest",
+                "notifications": "Notifications",
+                "channels": "Channels",
+                "emails": "Email Addresses"
             },
             "githubApp": {
                 "title": "Інсталяції GitHub App",
@@ -6993,7 +7014,8 @@
                 "startedAtInvalid": "Start time is not a valid date.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
-                "createFailed": "Couldn't capture the meeting. Please try again."
+                "createFailed": "Couldn't capture the meeting. Please try again.",
+                "participantEmailInvalid": "Введіть коректну адресу ел. пошти або залиште поле порожнім."
             },
             "actions": {
                 "create": "Capture meeting",
@@ -7001,71 +7023,99 @@
             }
         },
         "meetingDetail": {
-            "backToMeetings": "Back to Meetings",
+            "backToMeetings": "Назад до зустрічей",
             "actions": {
-                "openRecording": "Open recording",
-                "delete": "Delete",
-                "attachTranscript": "Attach transcript",
+                "openRecording": "Відкрити запис",
+                "delete": "Видалити",
+                "attachTranscript": "Прикріпити транскрипцію",
                 "replaceTranscript": "Replace transcript",
                 "cancelReplace": "Cancel replace",
-                "save": "Save changes"
+                "save": "Зберегти зміни",
+                "edit": "Редагувати",
+                "attaching": "Прикріплюємо…",
+                "editTranscript": "Редагувати транскрипцію",
+                "cancelEdit": "Скасувати редагування",
+                "saveTranscript": "Зберегти транскрипцію",
+                "savingTranscript": "Зберігаємо…",
+                "cancel": "Скасувати"
             },
             "sections": {
-                "summary": "Summary",
-                "transcript": "Transcript",
-                "details": "Details",
-                "edit": "Edit meeting"
+                "summary": "Стислий виклад",
+                "transcript": "Транскрипція",
+                "details": "Подробиці",
+                "edit": "Редагування зустрічі"
             },
             "summary": {
-                "notGenerated": "No summary was generated for this transcript. Enable an AI provider and re-attach the transcript to try again.",
-                "noTranscript": "Attach a transcript to generate a summary."
+                "notGenerated": "Для цієї транскрипції стислий виклад не створено. Увімкніть постачальника ШІ та прикріпіть транскрипцію ще раз, щоб спробувати знову.",
+                "noTranscript": "Прикріпіть транскрипцію, щоб створити стислий виклад.",
+                "generating": "Створюємо стислий виклад…",
+                "generatingHint": "Читаємо транскрипцію та пишемо стислий виклад — зазвичай це триває кілька секунд."
             },
             "transcript": {
-                "composerLabel": "Transcript text",
-                "composerPlaceholder": "Paste the meeting transcript here.",
-                "pipelineHint": "Stored first, then summarized, remembered and posted to your activity feed — best effort.",
-                "storedElsewhere": "The transcript is stored but was not returned with this view."
+                "composerLabel": "Текст транскрипції",
+                "composerPlaceholder": "Вставте сюди транскрипцію зустрічі.",
+                "pipelineHint": "Спершу зберігаємо, потім стисло переказуємо, запам’ятовуємо та публікуємо у вашій стрічці активності — за можливості.",
+                "storedElsewhere": "Транскрипція збережена, але не була повернута в цьому поданні."
             },
             "details": {
-                "source": "Source",
-                "startedAt": "Started",
-                "endedAt": "Ended",
-                "openEnded": "Still open",
-                "duration": "Duration",
-                "work": "Work",
-                "orgWide": "Org-wide",
-                "externalId": "Provider ID",
-                "createdAt": "Captured",
-                "participants": "Participants",
-                "noParticipants": "No participants recorded."
+                "source": "Джерело",
+                "startedAt": "Початок",
+                "endedAt": "Завершення",
+                "openEnded": "Ще триває",
+                "duration": "Тривалість",
+                "work": "Робота",
+                "orgWide": "Уся організація",
+                "externalId": "ID у постачальника",
+                "createdAt": "Зафіксовано",
+                "participants": "Учасники",
+                "noParticipants": "Учасників не записано."
             },
             "edit": {
-                "hint": "Rename the meeting, close it out, point it at a recording, or re-route it to a Work."
+                "hint": "Виправте час, перейменуйте зустріч, відредагуйте список учасників, вкажіть запис або перепризначте її до Роботи."
             },
             "fields": {
-                "title": "Title",
-                "endedAt": "Ended at",
-                "sourceUrl": "Recording link",
-                "work": "Work",
-                "workNone": "Org-wide (no Work)"
+                "title": "Назва",
+                "endedAt": "Завершення",
+                "sourceUrl": "Посилання на запис",
+                "work": "Робота",
+                "workNone": "Уся організація (без Роботи)",
+                "startedAt": "Початок",
+                "participants": "Учасники",
+                "participantName": "Ім’я",
+                "participantEmail": "Ел. пошта (необов’язково)",
+                "participantAdd": "Додати учасника",
+                "participantRemove": "Видалити учасника",
+                "participantsEmpty": "Поки нікого не записано."
             },
             "errors": {
-                "titleRequired": "Title is required.",
-                "endedAtInvalid": "End time is not a valid date.",
-                "endedBeforeStarted": "End time cannot be before the start time.",
-                "transcriptRequired": "Transcript text is required."
+                "titleRequired": "Назва обов’язкова.",
+                "endedAtInvalid": "Час завершення не є дійсною датою.",
+                "endedBeforeStarted": "Час завершення не може бути раніше за час початку.",
+                "transcriptRequired": "Текст транскрипції обов’язковий.",
+                "startedAtInvalid": "Час початку не є дійсною датою.",
+                "participantEmailInvalid": "Введіть коректну адресу ел. пошти або залиште поле порожнім.",
+                "participantDuplicate": "Ця людина вже є у списку."
             },
             "toasts": {
-                "transcriptSaved": "Transcript attached",
-                "transcriptSummarized": "Transcript attached and summarized",
-                "transcriptError": "Couldn't attach the transcript.",
-                "saved": "Meeting updated",
-                "saveError": "Couldn't update the meeting.",
-                "deleted": "Meeting deleted",
-                "deleteError": "Couldn't delete the meeting."
+                "transcriptSaved": "Транскрипцію прикріплено",
+                "transcriptSummarized": "Транскрипцію прикріплено та стисло переказано",
+                "transcriptError": "Не вдалося прикріпити транскрипцію.",
+                "saved": "Зустріч оновлено",
+                "saveError": "Не вдалося оновити зустріч.",
+                "deleted": "Зустріч видалено",
+                "deleteError": "Не вдалося видалити зустріч.",
+                "participantAdded": "Учасника додано"
             },
             "confirm": {
                 "delete": "Delete this meeting? Its transcript and summary will be removed. This cannot be undone."
+            },
+            "deleteDialog": {
+                "title": "Видалити цю зустріч?",
+                "body": "{title} буде видалено назавжди разом із розшифровкою та підсумком. Цю дію неможливо скасувати.",
+                "confirm": "Видалити зустріч",
+                "cancel": "Скасувати",
+                "deleting": "Видалення…",
+                "error": "Не вдалося видалити зустріч"
             }
         },
         "agentsPreview": {
