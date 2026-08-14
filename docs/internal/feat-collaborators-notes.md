@@ -96,7 +96,26 @@ the list, cross-owner precedence).
   `{removed: boolean}`, idempotent.
 
 Spec: `agent-collaborators.controller.spec.ts` (list shape/state merge, self-400,
-foreign-404, delete idempotency, DTO ValidationPipe cases incl. forbidNonWhitelisted).
+foreign-404, delete idempotency, DTO ValidationPipe cases incl. forbidNonWhitelisted,
+activity-trail rows incl. the unbound-service and throwing-logger paths).
+
+`tenantId`/`organizationId` are written as NULL: they are the EW-651 Tier C denorm
+columns, `AgentDto` does not expose the parent's scope ids, and no stamping
+subscriber exists in this repo despite the comments in sibling entities. Every read
+path is keyed on `agentId`, which the controller owner-checks first, so nothing
+depends on them today.
+
+## Activity trail
+
+Three additive `ActivityActionType` members (the column is a plain varchar — no
+migration): `agent_collaborator_enabled` / `_disabled` / `_removed`. Emitted by
+`AgentCollaboratorsController.tryLog` (best-effort, `@Optional() ActivityLogService`,
+same posture as `AgentsController`), with `details.resourceId` = the PARENT agent and
+`details.collaboratorAgentId` = the other end. A DELETE that removed nothing writes no
+row. Added to `AGENT_LIFECYCLE_EVENT_TYPES` so `GET /api/agents/:id/events` returns
+them, and to `AgentActivityClient`'s presentation map so they render as labelled pills.
+The literal-count pin in `packages/agent/src/entities/__tests__/activity-log.types.spec.ts`
+went 123 → 126.
 
 ## Web UI
 
@@ -107,7 +126,8 @@ foreign-404, delete idempotency, DTO ValidationPipe cases incl. forbidNonWhiteli
 - `apps/web/src/components/agents/AgentCollaboratorsClient.tsx` — roster of the
   owner's other agents (avatar initials, name, slug, role line) each with a `Switch`;
   optimistic toggle through server actions with rollback + toast; explanatory copy +
-  legacy-default note.
+  legacy-default note. Rows that already have a rule also get a **Clear rule** button
+  (DELETE) — disabling keeps the row, clearing returns the pair to UNCONFIGURED.
 - API wrappers `agentsAPI.listCollaborators/setCollaborator/removeCollaborator`
   (`lib/api/agents.ts`), client-safe `AgentCollaboratorCandidate` in
   `lib/api/agents.shared.ts`, server actions
@@ -121,9 +141,14 @@ foreign-404, delete idempotency, DTO ValidationPipe cases incl. forbidNonWhiteli
 
 ```bash
 cd packages/contracts && npx vitest run src/delegation/__tests__/sub-agent-delegation.spec.ts
-cd packages/agent   && npx jest --testPathPattern='agent-tool-delegate'
-cd apps/api         && npx jest --testPathPattern='sub-agent-delegation.runner|agent-collaborators.controller|agents.module|CreateAgentCollaborators'
+cd packages/agent   && npx jest --testPathPattern='agent-tool-delegate|agent-collaborator.repository|activity-log.types'
+cd apps/api         && npx jest --testPathPattern='sub-agent-delegation.runner|agent-collaborators.controller|agents.controller.runtime|agents.module|CreateAgentCollaborators'
 ```
+
+Gotcha: `apps/api` resolves `@ever-works/agent/*` through the package's BUILT types, so
+after touching `activity-log.types.ts` (or any exported agent type) run
+`npx turbo build --filter=@ever-works/agent` before the api Jest run — otherwise the
+new enum members surface as `TS2339` inside ts-jest only.
 
 Type-check/build: `npx turbo type-check --filter=@ever-works/contracts --filter=@ever-works/agent --filter=ever-works-api --filter=ever-works-web`
 (shared packages must be built first: `npx turbo build --filter=ever-works-api^...`).
@@ -147,32 +172,45 @@ Type-check/build: `npx turbo type-check --filter=@ever-works/contracts --filter=
 - No new DI tokens were bound, so no module-shape pin gained providers; the api-side
   `agents.module.spec.ts` only needed the new controller stubbed.
 
-## Verification (finishing session, 2026-08-14)
+## Verification (finishing session, 2026-08-15)
 
-The interrupted session's snapshot was verified as-is — no functional repairs
-were needed. Results on this branch:
+The two interrupted sessions' snapshot was re-verified from scratch, then
+completed with the activity trail, the repository spec, the Clear-rule
+affordance and the catalog doc. Results on this branch:
 
 - `packages/contracts` vitest delegation spec: 34 passed.
-- `packages/agent` jest `agent-tool|workflow-node.runner`: 9 suites / 134 passed
-  (includes the 11 new `agent-tool-delegate` tests and every pre-existing
-  positional-constructor spec of `AgentToolService`).
-- `apps/api` jest `sub-agent-delegation.runner|agent-collaborators.controller|agents.module|CreateAgentCollaborators`:
-  4 suites / 42 passed.
+- `packages/agent` jest `agent-tool|workflow-node.runner|sub-agent-delegation`:
+  10 suites / 151 passed (includes the 11 `agent-tool-delegate` tests and every
+  pre-existing positional-constructor spec of `AgentToolService`).
+- `packages/agent` jest `activity-log.types|agent-collaborator.repository`:
+  2 suites / 67 passed; `--testPathPattern='activity'`: 6 suites / 109 passed.
+- `apps/api` jest `sub-agent-delegation|agent-collaborators|agents.module|CreateAgentCollaborators`:
+  5 suites / 52 passed; `agent-collaborators.controller|agents.controller.runtime|agents.module`:
+  3 suites / 83 passed; `--testPathPattern='activity'`: 8 suites / 118 passed.
 - `turbo type-check` green for `@ever-works/contracts`, `@ever-works/agent`,
   `ever-works-api`; `apps/web` `tsc --noEmit` green.
 - `turbo build` green for `@ever-works/contracts`, `@ever-works/plugin`,
   `@ever-works/agent`, `ever-works-api`, `ever-works-web`.
 - All 21 locale files parse and carry exactly the two new key blocks
-  (`tabs.collaborators` + `collaborators.*` with 7 keys) — no duplicate-key
-  landmine.
+  (`tabs.collaborators` + `collaborators.*` with 8 keys) — no duplicate-key
+  landmine (`"collaborators"` appears exactly twice per file).
 - No pinned e2e validation/authz matrix mentions the new DTO or routes
   (`UpdateAgentCollaboratorDto` is a brand-new DTO; the e2e "collaborator"
-  hits are the unrelated work-members feature).
+  hits are the unrelated work-members feature). `flow-agent-permissions-matrix`
+  documents the tool catalog in prose only and pins no tool-name list.
+- DI checked by hand (unit tests cannot catch a boot-time resolution failure):
+  the api-side `AgentsModule` imports the agent-side `AgentsModule`, which
+  provides AND exports `AgentCollaboratorRepository` (+ `TypeOrmModule.forFeature`
+  for the entity), so both the new controller and — via `TasksModule`'s import of
+  the same module — the runner's non-optional constructor arg resolve.
+
+Branch base is `43de25a41`; `origin/develop` has since moved on (8 commits). A
+`git diff origin/develop..HEAD` therefore also shows develop-side additions
+(e.g. `assignedIdeaId` on `AgentRepository`) as if they were deletions — diff
+against the merge base instead.
 
 ## Known follow-ups
 
-- Activity-log rows for collaborator enable/disable (would need a new additive
-  `ActivityActionType`; skipped to keep the enum untouched in this slice).
 - Surface the `collaborator-not-allowed` refusal in the Sessions/Task UI with a
   deep link to the Collaborators tab.
 - Playwright e2e for the tab (toggle → refusal path) — cheap once a seeded

@@ -33,9 +33,10 @@ import { MigrationInterface, QueryRunner, Table, TableForeignKey, TableIndex } f
  *   better-sqlite3 (the CI driver). The unique index still makes the
  *   worst case one inert row, and the runner treats a self edge as
  *   allowed anyway.
- * - `tenantId`/`organizationId` are the EW-651 Tier C denorm columns;
- *   `ScopeStampingSubscriber` stamps them on insert. NO scope XOR CHECK
- *   (see 1784820000000-CreateWorkflows for why that pattern aborts).
+ * - `tenantId`/`organizationId` are the EW-651 Tier C denorm columns,
+ *   nullable and unwritten for now (every read path is keyed on
+ *   `agentId`, which the API owner-checks). NO scope XOR CHECK (see
+ *   1784820000000-CreateWorkflows for why that pattern aborts).
  *
  * Built with TypeORM's portable `Table` API because CI and the e2e
  * stack run better-sqlite3 while production runs Postgres. Forward-only

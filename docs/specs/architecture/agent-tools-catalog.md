@@ -12,24 +12,25 @@
 
 ## 1. Tool surface
 
-| Tool name         | Purpose                                                        | Permission gate                                         | Cost                                                         |
-| ----------------- | -------------------------------------------------------------- | ------------------------------------------------------- | ------------------------------------------------------------ |
-| `createTask`      | Create a task scoped to the Agent's scope                      | `permissions.canAssignTasks`                            | 1 DB write + 1 activity row                                  |
-| `commentOnTask`   | Append a chat message on a Task the Agent participates in      | (none — Agent must be assignee/reviewer/approver)       | 1 DB write + 1 activity row + maybe AI dispatch (if mention) |
-| `transitionTask`  | Move a Task's status                                           | `permissions.canAssignTasks`                            | 1 DB write + 1 activity row                                  |
-| `editAgentFile`   | Edit one of the Agent's own MD files                           | `permissions.canEditAgentFiles`                         | 1 Git commit OR 1 DB row + 1 activity row                    |
-| `commitToRepo`    | Write arbitrary file(s) to the scope's repo                    | `permissions.canCommitToRepo`                           | N Git commits + N activity rows                              |
-| `openPullRequest` | Open a PR against the scope's repo (escalation over commit)    | `permissions.canCommitToRepo` AND `canOpenPullRequests` | 1 PR + 1 activity row                                        |
-| `createSubAgent`  | Create a new Agent within the parent's scope                   | `permissions.canCreateAgents` AND scope cascade rules   | 1 DB write + 1 Git commit (if Git-mode) + 1 activity row     |
-| `getActivity`     | Read recent activity log rows for this Agent's scope           | (none — always allowed)                                 | 1 DB read; capped output                                     |
-| `getMissionState` | Read state summary of a Mission the Agent has access to        | (none — must be in Agent's scope)                       | 1 DB read                                                    |
-| `getKbDocument`   | Read a KB document body by slug                                | (none — must be in Agent's scope)                       | 1 DB read                                                    |
-| `getSkillBody`    | Fetch the full body of a Skill (progressive disclosure)        | (none — must be in active set for this Agent)           | 1 DB or Git read                                             |
-| `searchWeb`       | Web search via the active search plugin                        | `permissions.canCallExternalTools` AND plugin enabled   | 1 plugin call + 1 PluginUsageEvent                           |
-| `screenshot`      | Capture a screenshot of a URL via the active screenshot plugin | same                                                    | same                                                         |
-| `extractContent`  | Extract content from a URL via the content-extractor plugin    | same                                                    | same                                                         |
+| Tool name         | Purpose                                                        | Permission gate                                          | Cost                                                         |
+| ----------------- | -------------------------------------------------------------- | -------------------------------------------------------- | ------------------------------------------------------------ |
+| `createTask`      | Create a task scoped to the Agent's scope                      | `permissions.canAssignTasks`                             | 1 DB write + 1 activity row                                  |
+| `commentOnTask`   | Append a chat message on a Task the Agent participates in      | (none — Agent must be assignee/reviewer/approver)        | 1 DB write + 1 activity row + maybe AI dispatch (if mention) |
+| `transitionTask`  | Move a Task's status                                           | `permissions.canAssignTasks`                             | 1 DB write + 1 activity row                                  |
+| `editAgentFile`   | Edit one of the Agent's own MD files                           | `permissions.canEditAgentFiles`                          | 1 Git commit OR 1 DB row + 1 activity row                    |
+| `commitToRepo`    | Write arbitrary file(s) to the scope's repo                    | `permissions.canCommitToRepo`                            | N Git commits + N activity rows                              |
+| `openPullRequest` | Open a PR against the scope's repo (escalation over commit)    | `permissions.canCommitToRepo` AND `canOpenPullRequests`  | 1 PR + 1 activity row                                        |
+| `createSubAgent`  | Create a new Agent within the parent's scope                   | `permissions.canCreateAgents` AND scope cascade rules    | 1 DB write + 1 Git commit (if Git-mode) + 1 activity row     |
+| `delegateToAgent` | Hand an objective to an ENABLED collaborator and await result  | `permissions.canAssignTasks` AND collaborator allow-list | 1 child Task + 1 child AgentRun (child cost is the child's)  |
+| `getActivity`     | Read recent activity log rows for this Agent's scope           | (none — always allowed)                                  | 1 DB read; capped output                                     |
+| `getMissionState` | Read state summary of a Mission the Agent has access to        | (none — must be in Agent's scope)                        | 1 DB read                                                    |
+| `getKbDocument`   | Read a KB document body by slug                                | (none — must be in Agent's scope)                        | 1 DB read                                                    |
+| `getSkillBody`    | Fetch the full body of a Skill (progressive disclosure)        | (none — must be in active set for this Agent)            | 1 DB or Git read                                             |
+| `searchWeb`       | Web search via the active search plugin                        | `permissions.canCallExternalTools` AND plugin enabled    | 1 plugin call + 1 PluginUsageEvent                           |
+| `screenshot`      | Capture a screenshot of a URL via the active screenshot plugin | same                                                     | same                                                         |
+| `extractContent`  | Extract content from a URL via the content-extractor plugin    | same                                                     | same                                                         |
 
-The first eight are **platform tools** — implemented in `AgentToolService` and don't go through the plugin facade. The last three are **plugin tools** — proxied to existing facade services (Search, Screenshot, Content-Extractor) and inherit those plugins' rate limits and errors.
+Everything above `searchWeb` is a **platform tool** — implemented in `AgentToolService` and doesn't go through the plugin facade. The last three are **plugin tools** — proxied to existing facade services (Search, Screenshot, Content-Extractor) and inherit those plugins' rate limits and errors.
 
 ## 2. Error envelope (shared by all tools)
 
@@ -268,6 +269,24 @@ These pass through to the existing facade services (`SearchFacadeService`, `Scre
 
 **Permission gate**: `canCallExternalTools = true` + the plugin must be enabled at the Agent's scope.
 
+### 3.13 `delegateToAgent` (Agent Collaborators)
+
+```typescript
+input: {
+    targetAgentId?: string;                  // one of the two is required
+    targetAgentSlug?: string;
+    objective: string;
+    context?: Record<string, unknown>;       // structured inputs for the child
+}
+output: SubAgentDelegationResult;            // status completed|failed|refused|escalated
+```
+
+**Side-effects**: one child Task (`createdByType='agent'`, `parentTaskId` recovered from the parent run) + one child `AgentRun` dispatched through `TaskTransitionService.dispatchAgentRun`, then the call WAITS for a terminal state (5-minute budget).
+
+**Permission gate**: `canAssignTasks = true` — delegating raises a Task and a run, the same capability class as `createTask` / `run_workflow_graph`. On top of that, the target must be an **enabled collaborator** of the parent (`agent_collaborators`, Agents → Collaborators tab). Targets are resolved against SELF + the enabled collaborators only, so an unknown id is never probed against the agent table; the error names the current enabled roster so the model can self-correct.
+
+**Enforcement**: the allow-list is checked server-side in `SubAgentDelegationRunnerService` — the one choke point every delegation path funnels through — via the pure `evaluateCollaboratorDelegation` helper in `@ever-works/contracts`. A disallowed child is a REFUSAL with code `collaborator-not-allowed`, not a failure. With no rows configured an agent may delegate only to itself (the legacy default).
+
 ## 4. Tool list assembly at run time
 
 The set of tools registered with the AI call for a given run is computed by `AgentToolService.resolveAllowedTools(agent)`:
@@ -287,6 +306,9 @@ if (agent.permissions.canCommitToRepo) {
 	if (agent.permissions.canOpenPullRequests) tools.push(openPullRequest);
 }
 if (agent.permissions.canCreateAgents) tools.push(createSubAgent);
+// Agent Collaborators — also requires the delegation service + collaborator
+// repository to be bound in this runtime (both are @Optional()).
+if (agent.permissions.canAssignTasks) tools.push(delegateToAgent);
 
 // 3. Plugin tools (only when external calls allowed AND plugin enabled in scope)
 if (agent.permissions.canCallExternalTools) {
