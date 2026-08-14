@@ -665,9 +665,19 @@ test.describe('Agent inbox + messaging', () => {
             // settle enabled (CI-grade timeout, matching the rest of this
             // file) before clicking — never weaken the "Send is clickable"
             // contract, just give hydration room to land.
-            const sendBtn = page
+            // Scoped to #main-content: the global AI chat drawer's submit
+            // button ALSO has accessible name exactly "Send"
+            // (ChatInput aria-label = dashboard.aiChat.sendButton), mounts
+            // BEFORE page content in DOM order, stays in the ARIA tree while
+            // visually closed (opacity-0, not display:none), and is
+            // disabled={!canSend} — permanently disabled with an empty chat
+            // composer. The page-wide `.first()` therefore resolved to THAT
+            // button and `toBeEnabled` timed out on every run since this test
+            // was written. The inbox composer's real Send is fine.
+            const main = page.locator('#main-content');
+            const sendBtn = main
                 .getByRole('button', { name: 'Send', exact: true })
-                .or(page.getByRole('button', { name: /Send/i }))
+                .or(main.getByRole('button', { name: /Send/i }))
                 .first();
             await expect(sendBtn).toBeEnabled({ timeout: 30_000 });
             await sendBtn.click();
@@ -680,10 +690,13 @@ test.describe('Agent inbox + messaging', () => {
             // forwards raw backend error messages (e.g. the 404 "no outbound email
             // address" text) to the client — its catch block now returns the static
             // "Send failed — please try again." string, so match that too.
-            const errorBanner = page.getByText(
+            // Same #main-content scoping: the /error/i alternation is broad
+            // enough to match chat-drawer text, which sits outside the page
+            // content but inside the page-wide locator's reach.
+            const errorBanner = main.getByText(
                 /no outbound email address|From address not found|requires bodyText|Send failed|error/i,
             );
-            const successBanner = page.getByText(/Sent ✓/i);
+            const successBanner = main.getByText(/Sent ✓/i);
             const banner = errorBanner.or(successBanner).first();
             // The outcome banner is the ideal proof, but under CI hydration the server-
             // action result can fail to paint a banner even though the composer rendered
