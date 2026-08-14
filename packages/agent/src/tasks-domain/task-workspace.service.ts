@@ -18,6 +18,11 @@ import { MergePolicyService } from '../policy/merge-policy.service';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 import { resolveTaskIsolation, taskBranchName } from './task-isolation';
+import {
+    resolveAttachedReposForAgent,
+    toAdvisoryRepoSpecs,
+    type AdvisoryAttachedRepoSpec,
+} from '../services/repo-registry.service';
 
 export interface ProvisionedTaskWorkspace {
     /** Filesystem path of the checkout — the run's working directory. */
@@ -240,24 +245,15 @@ export class TaskWorkspaceService {
     private async resolveAttachedRepos(
         agentId: string | undefined,
         userId: string,
-    ): Promise<{ url: string; branch?: string; mountDir: string }[]> {
+    ): Promise<AdvisoryAttachedRepoSpec[]> {
         if (!agentId || !this.agentRepoAttachments) return [];
         try {
-            const edges = await this.agentRepoAttachments.listEnabledForAgentWithRepos(
-                agentId,
-                userId,
+            // Shared resolver (registry-side); `toAdvisoryRepoSpecs` drops the
+            // env-file contents — the provision spec crosses the plugin
+            // boundary, so nothing secret may ride on it.
+            return toAdvisoryRepoSpecs(
+                await resolveAttachedReposForAgent(this.agentRepoAttachments, agentId, userId),
             );
-            const specs: { url: string; branch?: string; mountDir: string }[] = [];
-            for (const edge of edges) {
-                const repo = edge.repoConnection;
-                if (!repo || !repo.enabled) continue;
-                specs.push({
-                    url: repo.url,
-                    ...(repo.defaultBranch ? { branch: repo.defaultBranch } : {}),
-                    mountDir: (repo.mountPath && repo.mountPath.trim()) || repo.name,
-                });
-            }
-            return specs;
         } catch (error) {
             this.logger.warn(
                 `attached-repo resolution failed for agent ${agentId} (continuing without): ${

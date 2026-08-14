@@ -26,14 +26,6 @@ export class RepoConnectionRepository {
         return this.repository.findOne({ where: { id, userId } });
     }
 
-    async findByIds(ids: string[]): Promise<RepoConnection[]> {
-        if (ids.length === 0) return [];
-        return this.repository
-            .createQueryBuilder('rc')
-            .where('rc.id IN (:...ids)', { ids })
-            .getMany();
-    }
-
     async findByUserAndName(userId: string, name: string): Promise<RepoConnection | null> {
         return this.repository.findOne({ where: { userId, name } });
     }

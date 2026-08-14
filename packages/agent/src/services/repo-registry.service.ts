@@ -20,6 +20,7 @@ import { AgentRepository } from '../database/repositories/agent.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { GitHubAppInstallationRepository } from '../database/repositories/github-app-installation.repository';
 import { GitHubAppInstallationRepoRepository } from '../database/repositories/github-app-installation-repository.repository';
+import type { AgentRepoAttachment } from '../entities/agent-repo-attachment.entity';
 import { WORK_REPO_ROLES, getWorkRepoFullName, type WorkRepoRole } from '../works/work-repo-match';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
@@ -191,6 +192,77 @@ function envFilesFromRecord(record: Record<string, string> | null | undefined): 
 }
 
 /**
+ * Advisory mount spec carried on `WorkspaceProvisionSpec.attachedRepos`.
+ * Token-free (mirrors `repoUrl`) and env-file-free: the provision spec
+ * crosses the plugin boundary, so secrets never ride on it.
+ */
+export interface AdvisoryAttachedRepoSpec {
+    url: string;
+    branch?: string;
+    mountDir: string;
+}
+
+/**
+ * Minimal read surface the provisioning resolver needs.
+ * `AgentRepoAttachmentRepository` satisfies it structurally — declared
+ * here so consumers (e.g. `TaskWorkspaceService`) depend on the
+ * function, not on this module's Nest provider graph.
+ */
+export interface AgentRepoAttachmentReader {
+    listEnabledForAgentWithRepos(agentId: string, userId: string): Promise<AgentRepoAttachment[]>;
+}
+
+/**
+ * Pure edge → mount-spec mapping. Drops edges whose repo row is missing
+ * (relation not loaded / row deleted) or itself disabled: the attachment
+ * flag and the row flag must BOTH be on for a repo to mount.
+ */
+export function mapAttachmentEdgesToRepos(
+    edges: readonly AgentRepoAttachment[],
+): ResolvedAgentRepo[] {
+    const resolved: ResolvedAgentRepo[] = [];
+    for (const edge of edges) {
+        const repo = edge.repoConnection;
+        if (!repo || !repo.enabled) continue;
+        resolved.push({
+            repoConnectionId: repo.id,
+            url: repo.url,
+            branch: repo.defaultBranch ?? null,
+            mountDir: (repo.mountPath && repo.mountPath.trim()) || repo.name,
+            envFiles: envFilesFromRecord(repo.envFiles).files,
+        });
+    }
+    return resolved;
+}
+
+/**
+ * Provisioning read: an agent's ENABLED attachments whose repo rows are
+ * themselves enabled, resolved to mountable specs WITH full env-file
+ * contents. Server-side only — never serialize the result to an API
+ * response (see `RepoRegistryService.toView` for the masked shape).
+ */
+export async function resolveAttachedReposForAgent(
+    attachments: AgentRepoAttachmentReader,
+    agentId: string,
+    userId: string,
+): Promise<ResolvedAgentRepo[]> {
+    return mapAttachmentEdgesToRepos(
+        await attachments.listEnabledForAgentWithRepos(agentId, userId),
+    );
+}
+
+/** Strip env files (and the row id) for the advisory provision-spec field. */
+export function toAdvisoryRepoSpecs(
+    repos: readonly ResolvedAgentRepo[],
+): AdvisoryAttachedRepoSpec[] {
+    return repos.map((repo) => ({
+        url: repo.url,
+        ...(repo.branch ? { branch: repo.branch } : {}),
+        mountDir: repo.mountDir,
+    }));
+}
+
+/**
  * Repository registry (Feature G). One service owns the whole surface:
  * registry CRUD (with env-file masking), the derived Work-repo listing
  * union, one-click GitHub-App import, and the Agent → repo attachment
@@ -264,7 +336,12 @@ export class RepoRegistryService {
             sourceType: 'manual',
             enabled: input.enabled ?? true,
         });
-        await this.logActivity(userId, ActivityActionType.REPO_CONNECTION_CREATED, row.id, row.name);
+        await this.logActivity(
+            userId,
+            ActivityActionType.REPO_CONNECTION_CREATED,
+            row.id,
+            row.name,
+        );
         return this.toView(row);
     }
 
@@ -481,31 +558,6 @@ export class RepoRegistryService {
             agentId,
         );
         return { deleted: true };
-    }
-
-    /**
-     * Provisioning read: the agent's ENABLED attachments whose repo rows
-     * are themselves enabled, resolved to mountable specs (with full env
-     * file contents — this is a server-side path, never an API response).
-     */
-    async resolveAttachedReposForAgent(
-        userId: string,
-        agentId: string,
-    ): Promise<ResolvedAgentRepo[]> {
-        const edges = await this.attachments.listEnabledForAgentWithRepos(agentId, userId);
-        const resolved: ResolvedAgentRepo[] = [];
-        for (const edge of edges) {
-            const repo = edge.repoConnection;
-            if (!repo || !repo.enabled) continue;
-            resolved.push({
-                repoConnectionId: repo.id,
-                url: repo.url,
-                branch: repo.defaultBranch ?? null,
-                mountDir: (repo.mountPath && repo.mountPath.trim()) || repo.name,
-                envFiles: envFilesFromRecord(repo.envFiles).files,
-            });
-        }
-        return resolved;
     }
 
     // ── Derived Work entries ─────────────────────────────────────────

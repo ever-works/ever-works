@@ -4,6 +4,9 @@ import {
     assertValidEnvFiles,
     isValidMountPath,
     isValidRepoUrl,
+    mapAttachmentEdgesToRepos,
+    resolveAttachedReposForAgent,
+    toAdvisoryRepoSpecs,
 } from '../repo-registry.service';
 import type { RepoConnection } from '../../entities/repo-connection.entity';
 
@@ -45,7 +48,6 @@ function makeMocks() {
     const repoConnections = {
         listByUser: jest.fn().mockResolvedValue([]),
         findByIdAndUser: jest.fn().mockResolvedValue(null),
-        findByIds: jest.fn().mockResolvedValue([]),
         findByUserAndName: jest.fn().mockResolvedValue(null),
         findByUserAndSourceInstallationRepoId: jest.fn().mockResolvedValue(null),
         create: jest.fn().mockImplementation(async (data) => makeRow(data)),
@@ -426,29 +428,32 @@ describe('agent attachments authz matrix', () => {
 });
 
 describe('provisioning resolver', () => {
-    it('resolves enabled attachments of enabled repos with env contents and mountDir fallback', async () => {
-        const mocks = makeMocks();
-        mocks.attachments.listEnabledForAgentWithRepos.mockResolvedValue([
-            {
-                repoConnectionId: 'rc-1',
-                enabled: true,
-                repoConnection: makeRow({
-                    id: 'rc-1',
-                    name: 'api',
-                    mountPath: null,
-                    defaultBranch: 'develop',
-                    envFiles: { '.env': 'A=1' },
-                }),
-            },
-            {
-                repoConnectionId: 'rc-2',
-                enabled: true,
-                repoConnection: makeRow({ id: 'rc-2', name: 'web', enabled: false }),
-            },
-            { repoConnectionId: 'rc-3', enabled: true, repoConnection: undefined },
-        ]);
+    const edges = [
+        {
+            repoConnectionId: 'rc-1',
+            enabled: true,
+            repoConnection: makeRow({
+                id: 'rc-1',
+                name: 'api',
+                mountPath: null,
+                defaultBranch: 'develop',
+                envFiles: { '.env': 'A=1' },
+            }),
+        },
+        {
+            repoConnectionId: 'rc-2',
+            enabled: true,
+            repoConnection: makeRow({ id: 'rc-2', name: 'web', enabled: false }),
+        },
+        { repoConnectionId: 'rc-3', enabled: true, repoConnection: undefined },
+    ];
 
-        const resolved = await mocks.service.resolveAttachedReposForAgent(USER, 'agent-1');
+    it('resolves enabled attachments of enabled repos with env contents and mountDir fallback', async () => {
+        const attachments = {
+            listEnabledForAgentWithRepos: jest.fn().mockResolvedValue(edges),
+        };
+        const resolved = await resolveAttachedReposForAgent(attachments as never, 'agent-1', USER);
+        expect(attachments.listEnabledForAgentWithRepos).toHaveBeenCalledWith('agent-1', USER);
         expect(resolved).toEqual([
             {
                 repoConnectionId: 'rc-1',
@@ -458,5 +463,27 @@ describe('provisioning resolver', () => {
                 envFiles: [{ path: '.env', content: 'A=1' }],
             },
         ]);
+    });
+
+    it('advisory specs drop env contents (they cross the plugin boundary)', () => {
+        const specs = toAdvisoryRepoSpecs(mapAttachmentEdgesToRepos(edges as never));
+        expect(specs).toEqual([
+            { url: 'https://github.com/acme/my-service', branch: 'develop', mountDir: 'api' },
+        ]);
+        expect(JSON.stringify(specs)).not.toContain('A=1');
+    });
+
+    it('a branch-less repo omits `branch` instead of emitting null', () => {
+        const specs = toAdvisoryRepoSpecs(
+            mapAttachmentEdgesToRepos([
+                {
+                    repoConnectionId: 'rc-9',
+                    enabled: true,
+                    repoConnection: makeRow({ id: 'rc-9', name: 'web', defaultBranch: null }),
+                },
+            ] as never),
+        );
+        expect(specs).toEqual([{ url: 'https://github.com/acme/my-service', mountDir: 'web' }]);
+        expect(specs[0]).not.toHaveProperty('branch');
     });
 });
