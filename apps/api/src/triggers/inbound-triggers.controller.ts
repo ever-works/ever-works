@@ -21,6 +21,8 @@ import { ScopeContextService } from '../scope';
 import { InboundTriggersService } from '@ever-works/agent/triggers';
 import type {
     FireInboundTriggerResult,
+    FireNowInboundTriggerResult,
+    InboundTriggerFireView,
     InboundTriggerScope,
     InboundTriggerView,
     TestFireInboundTriggerResult,
@@ -199,6 +201,47 @@ export class InboundTriggersController {
         return this.triggers.testFire(this.scope(auth), id);
     }
 
+    @Post(':id/fire-now')
+    @ApiBearerAuth('JWT-auth')
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 30, ttl: 60_000 } })
+    @ApiOperation({
+        summary: 'Fire a trigger now (owner-initiated REAL fire)',
+        description:
+            "Runs the production fire path with a sample payload built from the trigger's own declared variables: a real Task, the target agent dispatched when autoStart is 'always', counters bumped, and a row in the fire log. Unlike test-fire this counts as a fire.",
+    })
+    @ApiParam({ name: 'id', description: 'Trigger ID' })
+    @ApiResponse({
+        status: 200,
+        description: 'Task created (and dispatched when autoStart=always)',
+    })
+    @ApiResponse({ status: 404, description: 'Not found (or not yours)' })
+    @ApiResponse({ status: 409, description: 'Trigger is paused' })
+    async fireNow(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<FireNowInboundTriggerResult> {
+        return this.triggers.fireNow(this.scope(auth), id);
+    }
+
+    @Get(':id/fires')
+    @ApiBearerAuth('JWT-auth')
+    @ApiOperation({
+        summary: 'Recent fires for one trigger',
+        description:
+            'Newest first, capped at 50. Each row carries the delivery origin, the outcome (running / done / failed / refused), the reason a refused fire produced nothing, and the spawned Task id when there is one.',
+    })
+    @ApiParam({ name: 'id', description: 'Trigger ID' })
+    @ApiResponse({ status: 200, description: 'Array of fire-log rows' })
+    @ApiResponse({ status: 404, description: 'Not found (or not yours)' })
+    async listFires(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Param('id', ParseUUIDPipe) id: string,
+    ): Promise<{ fires: InboundTriggerFireView[] }> {
+        const fires = await this.triggers.listFires(this.scope(auth), id);
+        return { fires };
+    }
+
     @Delete(':id')
     @ApiBearerAuth('JWT-auth')
     @HttpCode(HttpStatus.NO_CONTENT)
@@ -221,7 +264,7 @@ export class InboundTriggersController {
     @ApiOperation({
         summary: 'Fire an inbound trigger (public, HMAC-signed)',
         description:
-            "External delivery endpoint — no session auth. Send the JSON payload with headers 'x-everworks-timestamp' (unix epoch seconds) and 'x-everworks-signature' (hex HMAC-SHA256 over `${timestamp}.${rawBody}` keyed with the trigger secret; optional 'sha256=' prefix). A verified call spawns a Task from the trigger's title template, assigned to its target Agent when set. 401 on any signature/timestamp failure, 404 for unknown ids, 409 while paused, 400 for oversized (>64 KB) or non-JSON payloads.",
+            "External delivery endpoint — no session auth. Send the JSON payload with headers 'x-everworks-timestamp' (unix epoch seconds) and 'x-everworks-signature' (hex HMAC-SHA256 over `${timestamp}.${rawBody}` keyed with the trigger secret; optional 'sha256=' prefix), plus an optional 'x-everworks-delivery' id. A verified call spawns a Task from the trigger's mode (prompt + <webhook_body>, or the linked template), assigned to its target Agent when set and dispatched when autoStart is 'always'. A repeat of the same delivery inside the trigger's replay window answers 200 { duplicate: true } with the original Task instead of firing twice. 401 on any signature/timestamp failure, 404 for unknown ids, 409 while paused, 400 for oversized (>64 KB) or non-JSON payloads and for a payload missing a required variable.",
     })
     @ApiParam({ name: 'id', description: 'Trigger ID (from the webhook URL)' })
     @ApiResponse({ status: 200, description: 'Payload accepted; Task spawned' })
@@ -234,12 +277,14 @@ export class InboundTriggersController {
         @Headers('x-everworks-signature') signature: string | undefined,
         @Headers('x-everworks-timestamp') timestamp: string | undefined,
         @Headers('content-type') contentType: string | undefined,
+        @Headers('x-everworks-delivery') delivery: string | undefined,
     ): Promise<FireInboundTriggerResult> {
         return this.triggers.fire(id, {
             rawBody: req.rawBody ?? '',
             signatureHeader: signature,
             timestampHeader: timestamp,
             contentType,
+            deliveryHeader: delivery,
         });
     }
 }
