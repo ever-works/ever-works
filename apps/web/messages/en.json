@@ -2626,7 +2626,10 @@
                     "platform": "Platform",
                     "capabilities": "Capabilities",
                     "lastSeen": "Last seen",
-                    "load": "Load"
+                    "load": "Load",
+                    "cliVersion": "Agent CLI",
+                    "diskFree": "Disk free",
+                    "cliNotInstalled": "Not installed"
                 },
                 "empty": {
                     "title": "No nodes enrolled yet",
@@ -2750,6 +2753,35 @@
                     "attempts": "{count} attempts",
                     "loading": "Loading history…",
                     "unavailable": "Job history is unavailable right now. The node itself is fine."
+                },
+                "routing": {
+                    "title": "Execution routing",
+                    "description": "Choose where runs execute when you have local runners enrolled. A Work or Goal can override this; the narrowest setting wins.",
+                    "accountLabel": "Default for this account",
+                    "saved": "Execution routing saved",
+                    "cleared": "Override cleared",
+                    "clear": "Clear override",
+                    "overridesTitle": "Overrides",
+                    "overridesEmpty": "No Work or Goal overrides the account default.",
+                    "scopes": {
+                        "work": "Work",
+                        "goal": "Goal",
+                        "user": "Account"
+                    },
+                    "modes": {
+                        "local-wait": {
+                            "label": "Local runner (wait for a free slot)",
+                            "helper": "Always runs on your fleet. If every runner is busy or offline the run waits in the queue instead of moving to the cloud."
+                        },
+                        "local-fallback": {
+                            "label": "Local runner (cloud fallback allowed)",
+                            "helper": "Prefers your fleet, but runs in the cloud when no runner can take the work. You get a notification when that happens."
+                        },
+                        "cloud": {
+                            "label": "Cloud",
+                            "helper": "Always uses the platform runtime, even when a local runner is free."
+                        }
+                    }
                 }
             },
             "jobRuntime": {
@@ -7124,6 +7156,44 @@
             "message": "Agent runs cannot execute on this install until a job runtime (e.g. Trigger.dev credentials) is set up.",
             "docsLink": "Setup guide",
             "dismiss": "Dismiss"
+        },
+        "runner": {
+            "label": "Runner",
+            "ariaLabel": "Local runners: {online} of {total} online",
+            "count": "{online} of {total} online",
+            "popoverTitle": "Local runners",
+            "refreshNow": "Refresh now",
+            "refreshCaption": "Refreshes every {seconds}s",
+            "manage": "Manage runners",
+            "staleWarning": "Could not refresh — showing the last known status.",
+            "loadUnavailable": "Job activity is temporarily unavailable.",
+            "summary": {
+                "online": "Running",
+                "busy": "Busy",
+                "offline": "Offline",
+                "none": "None"
+            },
+            "nodeState": {
+                "online": "Online",
+                "busy": "Busy",
+                "offline": "Offline",
+                "paused": "Paused",
+                "disabled": "Disabled",
+                "enrolling": "Enrolling"
+            },
+            "fields": {
+                "lastSeen": "Last heartbeat",
+                "daemonVersion": "Daemon",
+                "cliVersion": "Agent CLI",
+                "diskFree": "Disk free",
+                "notInstalled": "Not installed"
+            },
+            "relative": {
+                "second": "{value}s ago",
+                "minute": "{value}m ago",
+                "hour": "{value}h ago",
+                "day": "{value}d ago"
+            }
         }
     },
     "layout": {
