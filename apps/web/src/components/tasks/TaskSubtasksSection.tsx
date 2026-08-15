@@ -88,12 +88,19 @@ export function TaskSubtasksSection({
                     await createTaskAction({
                         title: value,
                         parentTaskId: task.id,
-                        // A sub-task must agree with its parent on every
-                        // owner (API rule), so the parent's scope is the
-                        // only valid one to create it under.
+                        // A sub-task must agree with its parent on EVERY
+                        // owner (API rule — `assertParentScopeMatches`
+                        // compares the whole tuple, not just the three
+                        // scope owners), so all six ride along. Dropping
+                        // `agentId` here made "Add" fail with a
+                        // scope-mismatch 400 on any Task that had an Agent
+                        // picked on this same page.
                         workId: task.workId,
                         missionId: task.missionId,
                         ideaId: task.ideaId,
+                        teamId: task.teamId ?? null,
+                        agentId: task.agentId ?? null,
+                        goalId: task.goalId ?? null,
                         priority: task.priority,
                     });
                     setTitle('');

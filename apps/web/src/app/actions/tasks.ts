@@ -30,6 +30,15 @@ export async function createTaskAction(input: {
     missionId?: string | null;
     ideaId?: string | null;
     workId?: string | null;
+    /**
+     * The remaining non-exclusive owners. Needed by the sub-task add
+     * path: the API requires a child to agree with its parent on the
+     * WHOLE owner tuple, so omitting these on a parent that carries an
+     * Agent / Team / Goal is a guaranteed scope-mismatch 400.
+     */
+    teamId?: string | null;
+    agentId?: string | null;
+    goalId?: string | null;
     parentTaskId?: string | null;
     /** Quality gates (Wave 3 M6) — acceptance checks declared at create. */
     acceptanceChecks?: TaskAcceptanceCheck[] | null;

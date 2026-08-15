@@ -1235,6 +1235,8 @@
                     "resumeQueued": "Resume queued — it starts as soon as a concurrency slot frees up.",
                     "genericError": "That run control could not be applied."
                 },
+                "attachmentAttachAs": "Attach as",
+                "attachmentRoleInitial": "Input",
                 "attachmentRoleResult": "Result"
             },
             "recurring": {

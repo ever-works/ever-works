@@ -6,8 +6,10 @@ import {
     NotFoundException,
     Optional,
 } from '@nestjs/common';
-import type { EntityManager } from 'typeorm';
+import { InjectRepository } from '@nestjs/typeorm';
+import type { EntityManager, Repository } from 'typeorm';
 import { Task, TaskPriority, TaskStatus } from '../entities/task.entity';
+import { Mission } from '../entities/mission.entity';
 import { TaskAssignee } from '../entities/task-assignee.entity';
 import { TaskApprover } from '../entities/task-approver.entity';
 import { TaskBlock } from '../entities/task-block.entity';
@@ -17,6 +19,7 @@ import { TaskTemplateRepository } from '../database/repositories/task-template.r
 import { UserTaskCounterRepository } from '../database/repositories/task-side.repositories';
 import { AgentRepository } from '../database/repositories/agent.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
+import { WorkProposalRepository } from '../user-research/work-proposal.repository';
 import { ActivityLogService } from '../activity-log/activity-log.service';
 import { ActivityActionType, ActivityStatus } from '../entities/activity-log.types';
 
@@ -151,6 +154,15 @@ export class TaskTemplatesService {
         @Optional() private readonly agents?: AgentRepository,
         @Optional() private readonly works?: WorkRepository,
         @Optional() private readonly activityLog?: ActivityLogService,
+        // Security: the instantiate path stamps `missionId` / `ideaId`
+        // onto the parent Task AND every sub-task, so they need the same
+        // ownership check `TasksService.assertScopeReachable` applies on
+        // the ordinary create path. Appended LAST + @Optional() so every
+        // positional construction in the specs keeps compiling.
+        @Optional()
+        @InjectRepository(Mission)
+        private readonly missions?: Repository<Mission>,
+        @Optional() private readonly ideas?: WorkProposalRepository,
     ) {}
 
     /**
@@ -245,12 +257,7 @@ export class TaskTemplatesService {
         if (template.steps.length === 0) {
             throw new BadRequestException('Template has no steps to instantiate.');
         }
-        if (input.workId && this.works) {
-            const work = await this.works.findById(input.workId);
-            if (!work || work.userId !== userId) {
-                throw new BadRequestException(`Work ${input.workId} not found.`);
-            }
-        }
+        await this.assertOwnersReachable(userId, input);
         // Validate agent bindings BEFORE allocating slugs / opening the
         // transaction, and remember which are assignable.
         const reachableAgentIds = new Set<string>();
@@ -453,6 +460,52 @@ export class TaskTemplatesService {
         }
         if (visited !== steps.length) {
             throw new BadRequestException('Template steps contain a dependency cycle.');
+        }
+    }
+
+    /**
+     * Security: every owner id the caller supplies is written onto the
+     * parent Task and onto EVERY sub-task, so each one must belong to the
+     * acting user. Without this a caller could file a whole task tree
+     * against another user's Mission / Idea, which both pollutes the
+     * victim's scoped rows and turns the endpoint into an existence
+     * oracle (a real foreign id instantiates, a bogus one blows up on the
+     * FK). Mirrors `TasksService.assertScopeReachable`, which is the
+     * ordinary create path's guard — the two must not drift.
+     */
+    private async assertOwnersReachable(
+        userId: string,
+        input: InstantiateTemplateInput,
+    ): Promise<void> {
+        if (input.workId) {
+            if (!this.works) {
+                throw new BadRequestException('Work repository not wired in this context.');
+            }
+            const work = await this.works.findById(input.workId);
+            if (!work || work.userId !== userId) {
+                throw new BadRequestException(`Work ${input.workId} not found.`);
+            }
+        }
+        if (input.missionId) {
+            if (!this.missions) {
+                throw new BadRequestException('Mission repository not wired in this context.');
+            }
+            const mission = await this.missions.findOne({
+                where: { id: input.missionId, userId },
+                select: ['id', 'userId'],
+            });
+            if (!mission) {
+                throw new BadRequestException(`Mission ${input.missionId} not found.`);
+            }
+        }
+        if (input.ideaId) {
+            if (!this.ideas) {
+                throw new BadRequestException('Idea repository not wired in this context.');
+            }
+            const idea = await this.ideas.findByIdForUser(input.ideaId, userId);
+            if (!idea) {
+                throw new BadRequestException(`Idea ${input.ideaId} not found.`);
+            }
         }
     }
 

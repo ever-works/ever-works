@@ -1,12 +1,14 @@
 'use client';
 
+import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import {
     EntityAttachmentsSection,
     type EntityAttachmentRow,
 } from '@/components/common/EntityAttachmentsSection';
+import { cn } from '@/lib/utils/cn';
 import { attachUploadAction, detachAttachmentAction } from '@/app/actions/tasks';
-import type { TaskAttachmentRow } from '@/lib/api/tasks';
+import type { TaskAttachmentRole, TaskAttachmentRow } from '@/lib/api/tasks';
 
 interface Props {
     taskId: string;
@@ -39,6 +41,12 @@ interface Props {
  */
 export function TaskAttachmentsSection({ taskId, workId, initial, initialError = null }: Props) {
     const t = useTranslations('dashboard.tasksPage.detail');
+    // Which side of the Task the NEXT attachment lands on. `initial` is
+    // the default (input material the requester brings); `result` marks a
+    // worked output and is what puts the corner chip on the tile. Without
+    // this control nothing in the product could ever produce a `result`
+    // row, so the chip below could never render.
+    const [role, setRole] = useState<TaskAttachmentRole>('initial');
 
     const downloadUrl = (uploadId: string): string | null =>
         workId ? `/api/works/${workId}/kb/uploads/${uploadId}/download` : null;
@@ -80,16 +88,54 @@ export function TaskAttachmentsSection({ taskId, workId, initial, initialError =
         return { id: uploadId, url: downloadUrl(uploadId) ?? undefined };
     };
 
+    const ROLE_LABEL: Record<TaskAttachmentRole, string> = {
+        initial: t('attachmentRoleInitial'),
+        result: t('attachmentRoleResult'),
+    };
+
     return (
-        <EntityAttachmentsSection<EntityAttachmentRow>
-            initial={initial.map(toTile)}
-            initialError={initialError}
-            onAttach={async (uploadId) => toTile(await attachUploadAction(taskId, uploadId))}
-            onDetach={(attachmentId) => detachAttachmentAction(taskId, attachmentId)}
-            uploader={uploader}
-            disabled={!workId}
-            disabledMessage={t('attachmentsWorkOnly')}
-            testId="task-attachments"
-        />
+        <div className="space-y-2">
+            {workId && (
+                <div
+                    role="radiogroup"
+                    aria-label={t('attachmentAttachAs')}
+                    className="flex items-center gap-1.5"
+                >
+                    <span className="text-[10px] uppercase tracking-wide text-text-muted dark:text-text-muted-dark">
+                        {t('attachmentAttachAs')}
+                    </span>
+                    {(Object.keys(ROLE_LABEL) as TaskAttachmentRole[]).map((value) => (
+                        <button
+                            key={value}
+                            type="button"
+                            role="radio"
+                            aria-checked={role === value}
+                            onClick={() => setRole(value)}
+                            data-testid={`task-attachment-role-${value}`}
+                            className={cn(
+                                'px-2 py-0.5 text-[11px] font-medium rounded border transition-colors',
+                                role === value
+                                    ? 'border-primary bg-primary/10 text-primary'
+                                    : 'border-border/60 dark:border-border-dark/60 text-text-secondary hover:text-text dark:hover:text-text-dark',
+                            )}
+                        >
+                            {ROLE_LABEL[value]}
+                        </button>
+                    ))}
+                </div>
+            )}
+            <EntityAttachmentsSection<EntityAttachmentRow>
+                initial={initial.map(toTile)}
+                initialError={initialError}
+                onAttach={async (uploadId) =>
+                    toTile(await attachUploadAction(taskId, uploadId, role))
+                }
+                onDetach={(attachmentId) => detachAttachmentAction(taskId, attachmentId)}
+                uploader={uploader}
+                disabled={!workId}
+                disabledMessage={t('attachmentsWorkOnly')}
+                testId="task-attachments"
+            />
+        </div>
     );
 }

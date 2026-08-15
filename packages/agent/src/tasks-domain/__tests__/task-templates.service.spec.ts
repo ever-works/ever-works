@@ -48,6 +48,8 @@ describe('TaskTemplatesService', () => {
     let counter: any;
     let agents: any;
     let works: any;
+    let missions: any;
+    let ideas: any;
     let svc: TaskTemplatesService;
 
     beforeEach(() => {
@@ -56,7 +58,19 @@ describe('TaskTemplatesService', () => {
         counter = { nextSlug: jest.fn().mockImplementation(async () => ++slug) };
         agents = { findByIdAndUser: jest.fn().mockResolvedValue({ id: 'agent-1' }) };
         works = { findById: jest.fn().mockResolvedValue({ id: 'work-1', userId: 'u1' }) };
-        svc = new TaskTemplatesService(templates as never, counter, agents, works, undefined);
+        // Owner repositories resolve only rows the acting user owns —
+        // the real ones filter on `userId`, so a foreign id comes back null.
+        missions = { findOne: jest.fn().mockResolvedValue({ id: 'mission-1', userId: 'u1' }) };
+        ideas = { findByIdForUser: jest.fn().mockResolvedValue({ id: 'idea-1' }) };
+        svc = new TaskTemplatesService(
+            templates as never,
+            counter,
+            agents,
+            works,
+            undefined,
+            missions,
+            ideas,
+        );
     });
 
     describe('seeding', () => {
@@ -304,6 +318,53 @@ describe('TaskTemplatesService', () => {
                 svc.instantiateTemplate('u1', 'tpl-1', { title: 'T', workId: 'work-2' }),
             ).rejects.toBeInstanceOf(BadRequestException);
             expect(templates.withTransaction).not.toHaveBeenCalled();
+        });
+
+        // Security regression: every owner id lands on the parent AND on
+        // every sub-task, so each needs the same ownership check the
+        // ordinary create path (`TasksService.assertScopeReachable`)
+        // applies. Without it a caller could file a whole task tree
+        // against another user's Mission / Idea, and the endpoint became
+        // an existence oracle for those ids.
+        it('rejects a Mission the caller does not own before writing anything', async () => {
+            arm();
+            missions.findOne.mockResolvedValueOnce(null);
+            await expect(
+                svc.instantiateTemplate('u1', 'tpl-1', { title: 'T', missionId: 'mission-x' }),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            expect(missions.findOne).toHaveBeenCalledWith(
+                expect.objectContaining({ where: { id: 'mission-x', userId: 'u1' } }),
+            );
+            expect(templates.withTransaction).not.toHaveBeenCalled();
+            expect(counter.nextSlug).not.toHaveBeenCalled();
+        });
+
+        it('rejects an Idea the caller does not own before writing anything', async () => {
+            arm();
+            ideas.findByIdForUser.mockResolvedValueOnce(null);
+            await expect(
+                svc.instantiateTemplate('u1', 'tpl-1', { title: 'T', ideaId: 'idea-x' }),
+            ).rejects.toBeInstanceOf(BadRequestException);
+            expect(ideas.findByIdForUser).toHaveBeenCalledWith('idea-x', 'u1');
+            expect(templates.withTransaction).not.toHaveBeenCalled();
+            expect(counter.nextSlug).not.toHaveBeenCalled();
+        });
+
+        it('stamps owner ids the caller DOES own onto the parent and every sub-task', async () => {
+            const { saved } = arm();
+            await svc.instantiateTemplate('u1', 'tpl-1', {
+                title: 'T',
+                workId: 'work-1',
+                missionId: 'mission-1',
+                ideaId: 'idea-1',
+            });
+            const tasks = saved.filter((s) => s.entity === Task).map((s) => s.row);
+            expect(tasks).toHaveLength(3);
+            for (const row of tasks) {
+                expect(row.workId).toBe('work-1');
+                expect(row.missionId).toBe('mission-1');
+                expect(row.ideaId).toBe('idea-1');
+            }
         });
 
         it('a mid-transaction failure surfaces (nothing partially applied by contract)', async () => {

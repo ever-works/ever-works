@@ -165,6 +165,14 @@ export interface Task {
      * dispatch without asking which Agent to use.
      */
     agentId: string | null;
+    /**
+     * The remaining two owner columns. Present on every API response and
+     * part of the tuple a sub-task must agree with its parent on, so the
+     * client type must carry them — a create that silently omits an owner
+     * the parent has is rejected with a scope-mismatch 400.
+     */
+    teamId: string | null;
+    goalId: string | null;
     parentTaskId: string | null;
     createdByType: TaskActorType;
     createdById: string;
@@ -275,6 +283,15 @@ export const tasksAPI = {
         missionId?: string | null;
         ideaId?: string | null;
         workId?: string | null;
+        /**
+         * The non-exclusive owners the API also accepts. A sub-task must
+         * agree with its parent on the WHOLE owner tuple, so a caller
+         * creating a child under an Agent/Team/Goal-owned parent has to be
+         * able to send these three too.
+         */
+        teamId?: string | null;
+        agentId?: string | null;
+        goalId?: string | null;
         parentTaskId?: string | null;
         requireAllApprovers?: boolean;
         isolationMode?: TaskIsolationMode | null;

@@ -46,6 +46,9 @@ function makeParent(overrides: Partial<Task> = {}): Task {
         workId: 'work-1',
         missionId: null,
         ideaId: null,
+        teamId: null,
+        agentId: null,
+        goalId: null,
         ...overrides,
     } as Task;
 }
@@ -102,6 +105,47 @@ describe('TaskSubtasksSection', () => {
                 missionId: null,
                 ideaId: null,
             }),
+        );
+    });
+
+    // Regression: `assertParentScopeMatches` compares the WHOLE owner
+    // tuple (work/mission/idea/team/agent/goal), so omitting the three
+    // newer owners made "Add" fail with a scope-mismatch 400 on any Task
+    // that had an Agent picked — the picker sits on this same page.
+    it('forwards the parent`s agent/team/goal owners, not just the scope trio', async () => {
+        render(
+            <TaskSubtasksSection
+                task={makeParent({ agentId: 'agent-9', teamId: 'team-3', goalId: 'goal-7' })}
+                initial={[]}
+            />,
+        );
+        fireEvent.change(screen.getByTestId('task-subtask-input'), {
+            target: { value: 'Child under an agent-owned parent' },
+        });
+        fireEvent.submit(screen.getByTestId('task-subtask-input').closest('form')!);
+
+        await waitFor(() => expect(createTaskAction).toHaveBeenCalledTimes(1));
+        expect(createTaskAction).toHaveBeenCalledWith(
+            expect.objectContaining({
+                parentTaskId: 'parent-1',
+                workId: 'work-1',
+                agentId: 'agent-9',
+                teamId: 'team-3',
+                goalId: 'goal-7',
+            }),
+        );
+    });
+
+    it('sends explicit nulls for owners the parent does not carry', async () => {
+        render(<TaskSubtasksSection task={makeParent()} initial={[]} />);
+        fireEvent.change(screen.getByTestId('task-subtask-input'), {
+            target: { value: 'Child' },
+        });
+        fireEvent.submit(screen.getByTestId('task-subtask-input').closest('form')!);
+
+        await waitFor(() => expect(createTaskAction).toHaveBeenCalledTimes(1));
+        expect(createTaskAction).toHaveBeenCalledWith(
+            expect.objectContaining({ agentId: null, teamId: null, goalId: null }),
         );
     });
 
