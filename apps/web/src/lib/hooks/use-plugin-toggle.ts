@@ -2,6 +2,8 @@
 
 import { useState, useTransition } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
+import { toast } from 'sonner';
 import { enablePlugin, disablePlugin } from '@/app/actions/plugins';
 
 interface UsePluginToggleOptions {
@@ -12,6 +14,7 @@ interface UsePluginToggleOptions {
 
 export function usePluginToggle({ pluginId, enabled, visibility }: UsePluginToggleOptions) {
     const router = useRouter();
+    const t = useTranslations('dashboard.plugins');
     const [isPending, startTransition] = useTransition();
     const [optimisticEnabled, setOptimisticEnabled] = useState(enabled);
     const [showDisableWarning, setShowDisableWarning] = useState(false);
@@ -41,7 +44,12 @@ export function usePluginToggle({ pluginId, enabled, visibility }: UsePluginTogg
                         throw new Error(result.error);
                     }
                 } catch (error) {
+                    // A failed enable used to roll the switch back with NO message —
+                    // to the user, indistinguishable from the switch never moving.
                     setOptimisticEnabled(false);
+                    toast.error(
+                        error instanceof Error && error.message ? error.message : t('enableFailed'),
+                    );
                 }
             });
             return;
@@ -65,14 +73,22 @@ export function usePluginToggle({ pluginId, enabled, visibility }: UsePluginTogg
                     throw new Error(result.error);
                 }
             } catch (error) {
+                // Same silent rollback on the disable path.
                 setOptimisticEnabled(true);
+                toast.error(
+                    error instanceof Error && error.message ? error.message : t('disableFailed'),
+                );
             }
         });
     };
 
     const handleCancelEnable = () => {
         setShowEnablePanel(false);
-        setAutoEnableForDirs(false);
+        // Cancelling is declining THIS enable, not unsetting the default for
+        // every future one: this used to set false and nothing ever reset it,
+        // so one dismissed dialog silently flipped every later enable to
+        // works-disabled for the rest of the session. Restore the default.
+        setAutoEnableForDirs(true);
     };
 
     const handleCancelDisable = () => {

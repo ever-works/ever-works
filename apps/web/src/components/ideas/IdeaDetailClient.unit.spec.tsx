@@ -47,8 +47,19 @@ vi.mock('@/app/actions/dashboard/work-proposals', () => ({
     detachIdeaAttachmentAction: vi.fn(),
 }));
 
+// Both the rail's unassign action and the assign dialog it mounts reach
+// for the `server-only` agents actions module.
+const unassignAgentMock = vi.fn();
+const listAssignableAgentsMock = vi.fn();
+vi.mock('@/app/actions/agents', () => ({
+    unassignAgentFromIdeaAction: (...a: unknown[]) => unassignAgentMock(...a),
+    assignAgentToIdeaAction: vi.fn(),
+    listAssignableIdeaAgentsAction: (...a: unknown[]) => listAssignableAgentsMock(...a),
+}));
+
 import { IdeaDetailClient } from './IdeaDetailClient';
 import type { IdeaWorkLink, WorkProposal } from '@/lib/api/work-proposals';
+import type { Agent } from '@/lib/api/agents';
 
 /**
  * `/ideas/[id]` detail — covers the two things the redesign added on
@@ -95,15 +106,35 @@ const builtLink: IdeaWorkLink = {
 describe('IdeaDetailClient', () => {
     beforeEach(() => {
         vi.clearAllMocks();
+        listAssignableAgentsMock.mockResolvedValue([]);
     });
 
     it('reads as not built, and offers Build, when no Work was produced', () => {
         render(<IdeaDetailClient idea={baseIdea} />);
 
-        expect(screen.getByTestId('idea-built-badge')).toHaveTextContent('built.none');
+        // Not built ⇒ the lifecycle status stands, alongside an explicit
+        // "Not built yet". No Built pill exists to contradict it.
+        expect(screen.getByTestId('idea-status-badge')).toHaveTextContent('filters.pending');
+        expect(screen.getByTestId('idea-not-built-badge')).toHaveTextContent('built.none');
+        expect(screen.queryByTestId('idea-built-badge')).not.toBeInTheDocument();
         expect(screen.getByTestId('idea-build-button')).toBeInTheDocument();
         expect(screen.queryByTestId('idea-rebuild-button')).not.toBeInTheDocument();
         expect(screen.queryByTestId('idea-built-work-link')).not.toBeInTheDocument();
+    });
+
+    it('replaces the lifecycle status with Built once a Work exists', () => {
+        // The reported bug, on the detail page: a dismissed Idea that had
+        // produced a Work rendered "Dismissed" beside "Built (1)".
+        render(
+            <IdeaDetailClient
+                idea={{ ...baseIdea, status: 'dismissed' }}
+                initialLinks={[{ ...builtLink, kind: 'linked' }]}
+            />,
+        );
+
+        expect(screen.getByTestId('idea-built-badge')).toHaveTextContent('built.badge');
+        expect(screen.queryByTestId('idea-status-badge')).not.toBeInTheDocument();
+        expect(screen.queryByTestId('idea-not-built-badge')).not.toBeInTheDocument();
     });
 
     it('Build opens the same /works/new flow the Idea card uses', () => {
@@ -343,18 +374,151 @@ describe('IdeaDetailClient', () => {
     });
 
     it('names the blocker in the dialog when the API refuses the delete', async () => {
-        deleteIdeaMock.mockResolvedValue({ deleted: false, reason: 'linked-works', count: 2 });
-        render(<IdeaDetailClient idea={baseIdea} initialLinks={[builtLink]} />);
+        // `idea-agents` rather than `linked-works`: linked Works no longer
+        // block the delete, so that reason is no longer produced.
+        deleteIdeaMock.mockResolvedValue({ deleted: false, reason: 'idea-agents', count: 3 });
+        render(<IdeaDetailClient idea={baseIdea} />);
 
         fireEvent.click(screen.getByTestId('idea-delete-button'));
         fireEvent.click(screen.getByTestId('idea-delete-confirm'));
 
         await waitFor(() =>
             expect(screen.getByTestId('idea-delete-error')).toHaveTextContent(
-                'deleteDialog.blocked.linked-works',
+                'deleteDialog.blocked.idea-agents',
             ),
         );
         // A refused delete must NOT navigate away.
         expect(routerPushMock).not.toHaveBeenCalled();
+    });
+
+    describe('deleting an Idea that has linked Works', () => {
+        it('warns that the links go but the Works are kept', () => {
+            render(<IdeaDetailClient idea={baseIdea} initialLinks={[builtLink]} />);
+
+            fireEvent.click(screen.getByTestId('idea-delete-button'));
+
+            expect(screen.getByTestId('idea-delete-unlinks-works')).toHaveTextContent(
+                'deleteDialog.unlinksWorks',
+            );
+        });
+
+        it('omits the warning when only a content match points at a Work', () => {
+            // A matched Work has no `idea_works` row, so a delete takes
+            // nothing away from it — warning about it would be a lie.
+            render(<IdeaDetailClient idea={baseIdea} matchedWork={matchedWork} />);
+
+            fireEvent.click(screen.getByTestId('idea-delete-button'));
+
+            expect(screen.queryByTestId('idea-delete-unlinks-works')).not.toBeInTheDocument();
+        });
+
+        it('goes through, rather than being refused as it used to be', async () => {
+            deleteIdeaMock.mockResolvedValue({ deleted: true });
+            render(<IdeaDetailClient idea={baseIdea} initialLinks={[builtLink]} />);
+
+            fireEvent.click(screen.getByTestId('idea-delete-button'));
+            fireEvent.click(screen.getByTestId('idea-delete-confirm'));
+
+            await waitFor(() => expect(deleteIdeaMock).toHaveBeenCalledWith('idea-1'));
+            await waitFor(() => expect(routerPushMock).toHaveBeenCalledWith('/ideas'));
+        });
+    });
+
+    /**
+     * The Agents rail mirrors the Work header's dropdown: one merged list
+     * of Agents PINNED here by scope and Agents ASSIGNED here through
+     * their `targets`, with detach offered only on the latter.
+     */
+    describe('Agents rail', () => {
+        const pinnedAgent = {
+            id: 'agent-pinned',
+            name: 'Idea Scout',
+            slug: 'idea-scout',
+            title: null,
+            status: 'active',
+        } as unknown as Agent;
+
+        const assignedAgent = {
+            id: 'agent-assigned',
+            name: 'Release Manager',
+            slug: 'release-manager',
+            title: 'Ships',
+            status: 'active',
+        } as unknown as Agent;
+
+        it('sits in the main column directly under Linked Works', () => {
+            render(<IdeaDetailClient idea={baseIdea} agents={[pinnedAgent]} />);
+
+            const linkedWorks = screen.getByTestId('idea-linked-works');
+            const agentsCard = screen.getByTestId('idea-agents');
+
+            // Same parent as Linked Works — i.e. the main column, not the
+            // read-mostly rail the Build tracker lives in.
+            expect(agentsCard.parentElement).toBe(linkedWorks.parentElement);
+            expect(screen.getByTestId('idea-build-tracker').parentElement).not.toBe(
+                agentsCard.parentElement,
+            );
+            // Directly under it: adjacent siblings, in that order.
+            expect(linkedWorks.nextElementSibling).toBe(agentsCard);
+        });
+
+        it('opens the picker from the section header', async () => {
+            render(<IdeaDetailClient idea={baseIdea} />);
+
+            fireEvent.click(screen.getByTestId('idea-assign-agent-button'));
+
+            await waitFor(() =>
+                expect(listAssignableAgentsMock).toHaveBeenCalledWith('idea-1', ''),
+            );
+        });
+
+        it('offers detach on assigned Agents only — a pinned one is placed by its scope', () => {
+            render(
+                <IdeaDetailClient
+                    idea={baseIdea}
+                    agents={[pinnedAgent, assignedAgent]}
+                    assignedAgentIds={[assignedAgent.id]}
+                />,
+            );
+
+            expect(screen.getByText('Idea Scout')).toBeTruthy();
+            expect(screen.getByText('Release Manager')).toBeTruthy();
+            // One row is detachable, so exactly one unassign control exists.
+            expect(screen.getAllByLabelText('agents.unassign')).toHaveLength(1);
+        });
+
+        it('detaches the assigned Agent and refreshes', async () => {
+            unassignAgentMock.mockResolvedValue({ id: assignedAgent.id });
+            render(
+                <IdeaDetailClient
+                    idea={baseIdea}
+                    agents={[assignedAgent]}
+                    assignedAgentIds={[assignedAgent.id]}
+                />,
+            );
+
+            fireEvent.click(screen.getByLabelText('agents.unassign'));
+
+            await waitFor(() =>
+                expect(unassignAgentMock).toHaveBeenCalledWith('agent-assigned', 'idea-1'),
+            );
+            await waitFor(() => expect(routerRefreshMock).toHaveBeenCalled());
+            expect(toastSuccessMock).toHaveBeenCalledWith('agents.unassignedToast');
+        });
+
+        it('surfaces a failed detach', async () => {
+            unassignAgentMock.mockRejectedValue(new Error('still running'));
+            render(
+                <IdeaDetailClient
+                    idea={baseIdea}
+                    agents={[assignedAgent]}
+                    assignedAgentIds={[assignedAgent.id]}
+                />,
+            );
+
+            fireEvent.click(screen.getByLabelText('agents.unassign'));
+
+            await waitFor(() => expect(toastErrorMock).toHaveBeenCalledWith('still running'));
+        });
     });
 });

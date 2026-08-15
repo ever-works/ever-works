@@ -996,7 +996,8 @@
                 "allTemplates": "All templates",
                 "yourTemplates": "Your templates",
                 "yourTemplatesEmpty": "Agents you create will appear here as reusable templates.",
-                "openInWizard": "Open in wizard"
+                "openInWizard": "Open in wizard",
+                "browsePage": "Open the full template browser"
             },
             "pageTabs": {
                 "agents": "Agents",
@@ -1114,7 +1115,8 @@
                     "showing": "{from}-{to} van {total} weergegeven",
                     "previous": "Vorige",
                     "next": "Volgende"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "newDialog": {
                 "title": "Maak een nieuwe Taak",
@@ -1417,7 +1419,8 @@
                 "filter": {
                     "scope": "Scope",
                     "all": "Alle"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "detail": {
                 "instructions": "Instructies",
@@ -1865,7 +1868,21 @@
                     "empty": "Nog geen Works gekoppeld aan dit Idee."
                 },
                 "agents": {
-                    "empty": "Geen Agents gekoppeld aan dit Idee."
+                    "empty": "Geen Agents gekoppeld aan dit Idee.",
+                    "assignExisting": "Bestaande toewijzen",
+                    "assignTitle": "Een Agent aan dit Idee toewijzen",
+                    "assignSubtitle": "Zet een Agent die je al hebt op dit Idee in plaats van een nieuwe te maken.",
+                    "assignSearchPlaceholder": "Agenten zoeken…",
+                    "assignLoading": "Agenten laden…",
+                    "assignNoneAvailable": "Geen andere Agenten meer om toe te wijzen.",
+                    "assignNoMatches": "Geen Agenten gevonden voor die zoekopdracht.",
+                    "assignLoadFailed": "Kon Agenten niet laden",
+                    "assignedToast": "{name} toegewezen aan dit Idee",
+                    "assignFailed": "Kon Agent niet toewijzen",
+                    "assignCancel": "Annuleren",
+                    "unassign": "Loskoppelen van dit Idee",
+                    "unassignedToast": "{name} losgekoppeld van dit Idee",
+                    "unassignFailed": "Kon Agent niet loskoppelen"
                 },
                 "meta": {
                     "source": "Bron",
@@ -1885,7 +1902,8 @@
                         "idea-agents": "Verwijderen niet mogelijk: {count} Agent(s) horen bij dit Idee. Verwijder ze of wijzig hun scope.",
                         "build-in-flight": "Verwijderen kan niet tijdens een build. Wacht tot die klaar is.",
                         "unknown": "Dit Idee kan nu niet worden verwijderd."
-                    }
+                    },
+                    "unlinksWorks": "{count, plural, one {Dit Idee is gekoppeld aan # Work. Dat Work blijft behouden — alleen de koppeling wordt verwijderd.} other {Dit Idee is gekoppeld aan # Works. Die Works blijven behouden — alleen de koppeling wordt verwijderd.}}"
                 },
                 "toasts": {
                     "built": "Work gebouwd uit dit Idee",
@@ -2162,7 +2180,10 @@
                 "usageCredits": "Usage & Credits",
                 "fleet": "Fleet",
                 "jobRuntime": "Job Runtime",
-                "digest": "Digest"
+                "digest": "Digest",
+                "notifications": "Notifications",
+                "channels": "Channels",
+                "emails": "Email Addresses"
             },
             "githubApp": {
                 "title": "GitHub App-installaties",
@@ -6962,7 +6983,6 @@
             "created": "Meeting captured",
             "sections": {
                 "provenance": "Where it came from",
-                "participants": "Participants",
                 "transcript": "Transcript"
             },
             "sources": {
@@ -6985,7 +7005,6 @@
                 "externalId": "Provider meeting ID (optional)",
                 "externalIdHint": "Used to de-duplicate against a later connector sync of the same meeting.",
                 "participants": "Participants",
-                "participantsHint": "One per line. Use \"Name <email>\" to record an address.",
                 "transcript": "Transcript (optional)",
                 "transcriptPlaceholder": "Ada: shipping the gate.\nGrace: reviewing the branch.",
                 "transcriptHint": "Adding a transcript runs the summary, Memory and activity pipeline. You can also attach it later from the meeting page."
@@ -6995,6 +7014,7 @@
                 "startedAtInvalid": "Start time is not a valid date.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
+                "participantEmailInvalid": "Voer een geldig e-mailadres in of laat het leeg.",
                 "createFailed": "Couldn't capture the meeting. Please try again."
             },
             "actions": {
@@ -7003,71 +7023,94 @@
             }
         },
         "meetingDetail": {
-            "backToMeetings": "Back to Meetings",
+            "backToMeetings": "Terug naar Vergaderingen",
             "actions": {
-                "openRecording": "Open recording",
-                "delete": "Delete",
-                "attachTranscript": "Attach transcript",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
-                "save": "Save changes"
+                "openRecording": "Opname openen",
+                "edit": "Bewerken",
+                "delete": "Verwijderen",
+                "attachTranscript": "Transcript toevoegen",
+                "attaching": "Bijvoegen…",
+                "editTranscript": "Transcript bewerken",
+                "cancelEdit": "Bewerken annuleren",
+                "saveTranscript": "Transcript opslaan",
+                "savingTranscript": "Opslaan…",
+                "save": "Wijzigingen opslaan",
+                "cancel": "Annuleren"
             },
             "sections": {
-                "summary": "Summary",
+                "summary": "Samenvatting",
                 "transcript": "Transcript",
                 "details": "Details",
-                "edit": "Edit meeting"
+                "edit": "Vergadering bewerken"
             },
             "summary": {
-                "notGenerated": "No summary was generated for this transcript. Enable an AI provider and re-attach the transcript to try again.",
-                "noTranscript": "Attach a transcript to generate a summary."
+                "generating": "Samenvatting genereren…",
+                "generatingHint": "We lezen het transcript en schrijven de samenvatting — dit duurt meestal een paar seconden.",
+                "notGenerated": "Voor dit transcript is geen samenvatting gemaakt. Schakel een AI-provider in en voeg het transcript opnieuw toe om het nogmaals te proberen.",
+                "noTranscript": "Voeg een transcript toe om een samenvatting te maken."
             },
             "transcript": {
-                "composerLabel": "Transcript text",
-                "composerPlaceholder": "Paste the meeting transcript here.",
-                "pipelineHint": "Stored first, then summarized, remembered and posted to your activity feed — best effort.",
-                "storedElsewhere": "The transcript is stored but was not returned with this view."
+                "composerLabel": "Transcripttekst",
+                "composerPlaceholder": "Plak hier het transcript van de vergadering.",
+                "pipelineHint": "Wordt eerst opgeslagen en daarna samengevat, onthouden en in je activiteitenfeed geplaatst — naar beste vermogen.",
+                "storedElsewhere": "Het transcript is opgeslagen, maar werd niet met deze weergave meegestuurd."
             },
             "details": {
-                "source": "Source",
-                "startedAt": "Started",
-                "endedAt": "Ended",
-                "openEnded": "Still open",
-                "duration": "Duration",
-                "work": "Work",
-                "orgWide": "Org-wide",
-                "externalId": "Provider ID",
-                "createdAt": "Captured",
-                "participants": "Participants",
-                "noParticipants": "No participants recorded."
+                "source": "Bron",
+                "startedAt": "Begin",
+                "endedAt": "Einde",
+                "openEnded": "Nog bezig",
+                "duration": "Duur",
+                "work": "Werk",
+                "orgWide": "Organisatiebreed",
+                "externalId": "Provider-ID",
+                "createdAt": "Vastgelegd",
+                "participants": "Deelnemers",
+                "noParticipants": "Geen deelnemers vastgelegd."
             },
             "edit": {
-                "hint": "Rename the meeting, close it out, point it at a recording, or re-route it to a Work."
+                "hint": "Corrigeer de tijden, hernoem de vergadering, werk de deelnemerslijst bij, koppel een opname of wijs haar toe aan een Werk."
             },
             "fields": {
-                "title": "Title",
-                "endedAt": "Ended at",
-                "sourceUrl": "Recording link",
-                "work": "Work",
-                "workNone": "Org-wide (no Work)"
+                "title": "Titel",
+                "startedAt": "Begin",
+                "endedAt": "Einde",
+                "sourceUrl": "Link naar opname",
+                "work": "Werk",
+                "workNone": "Organisatiebreed (geen Werk)",
+                "participants": "Deelnemers",
+                "participantName": "Naam",
+                "participantEmail": "E-mail (optioneel)",
+                "participantAdd": "Deelnemer toevoegen",
+                "participantRemove": "Deelnemer verwijderen",
+                "participantsEmpty": "Nog niemand vastgelegd."
             },
             "errors": {
-                "titleRequired": "Title is required.",
-                "endedAtInvalid": "End time is not a valid date.",
-                "endedBeforeStarted": "End time cannot be before the start time.",
-                "transcriptRequired": "Transcript text is required."
+                "titleRequired": "Een titel is verplicht.",
+                "startedAtInvalid": "De starttijd is geen geldige datum.",
+                "endedAtInvalid": "De eindtijd is geen geldige datum.",
+                "endedBeforeStarted": "De eindtijd kan niet vóór de starttijd liggen.",
+                "participantEmailInvalid": "Voer een geldig e-mailadres in of laat het leeg.",
+                "participantDuplicate": "Deze persoon staat al op de lijst.",
+                "transcriptRequired": "De transcripttekst is verplicht."
             },
             "toasts": {
-                "transcriptSaved": "Transcript attached",
-                "transcriptSummarized": "Transcript attached and summarized",
-                "transcriptError": "Couldn't attach the transcript.",
-                "saved": "Meeting updated",
-                "saveError": "Couldn't update the meeting.",
-                "deleted": "Meeting deleted",
-                "deleteError": "Couldn't delete the meeting."
+                "transcriptSaved": "Transcript toegevoegd",
+                "transcriptSummarized": "Transcript toegevoegd en samengevat",
+                "transcriptError": "Het transcript kon niet worden toegevoegd.",
+                "saved": "Vergadering bijgewerkt",
+                "participantAdded": "Deelnemer toegevoegd",
+                "saveError": "De vergadering kon niet worden bijgewerkt.",
+                "deleted": "Vergadering verwijderd",
+                "deleteError": "De vergadering kon niet worden verwijderd."
             },
-            "confirm": {
-                "delete": "Delete this meeting? Its transcript and summary will be removed. This cannot be undone."
+            "deleteDialog": {
+                "title": "Deze vergadering verwijderen?",
+                "body": "{title} wordt permanent verwijderd, samen met het transcript en de samenvatting. Dit kan niet ongedaan worden gemaakt.",
+                "confirm": "Vergadering verwijderen",
+                "cancel": "Annuleren",
+                "deleting": "Verwijderen…",
+                "error": "Verwijderen van vergadering mislukt"
             }
         },
         "agentsPreview": {

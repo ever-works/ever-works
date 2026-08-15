@@ -775,3 +775,112 @@ select:-webkit-autofill:focus {
         transform: translateX(400%);
     }
 }
+
+/* ─── Meeting detail (`/meetings/[id]`) — summary generation ──────────────────
+   The transcript ingest is ONE opaque round trip (store → summarize →
+   remember → post), so there is no percentage to report. Everything below
+   says "still working" rather than claiming progress: a breathing halo on
+   the section icon, skeleton lines standing in for the paragraph that is
+   coming, and an indeterminate bar. */
+
+@keyframes ms-summary-halo {
+    0%,
+    100% {
+        transform: scale(0.92);
+        opacity: 0.35;
+    }
+    50% {
+        transform: scale(1.12);
+        opacity: 0.8;
+    }
+}
+
+.ms-summary-halo {
+    animation: ms-summary-halo 2.2s ease-in-out infinite;
+}
+
+/* Skeleton lines breathe out of phase with each other; the per-line
+   delay is set inline so the stagger stays next to the widths. */
+@keyframes ms-summary-line {
+    0%,
+    100% {
+        opacity: 0.5;
+    }
+    50% {
+        opacity: 0.95;
+    }
+}
+
+.ms-summary-line {
+    position: relative;
+    overflow: hidden;
+    border-radius: 9999px;
+    background: var(--gp-bar-track);
+    animation: ms-summary-line 2s ease-in-out infinite;
+}
+
+/* Indeterminate bar: a short segment that crosses the track, easing in
+   and out so it reads as activity rather than as a measured percentage. */
+@keyframes ms-summary-slide {
+    0% {
+        transform: translateX(-110%) scaleX(0.55);
+    }
+    50% {
+        transform: translateX(120%) scaleX(1);
+    }
+    100% {
+        transform: translateX(340%) scaleX(0.55);
+    }
+}
+
+.ms-summary-slide {
+    transform-origin: left center;
+    animation: ms-summary-slide 2s cubic-bezier(0.65, 0, 0.35, 1) infinite;
+}
+
+/* The landing: the finished summary resolves into place instead of
+   snapping in where the skeleton was. */
+@keyframes ms-summary-reveal {
+    from {
+        opacity: 0;
+        transform: translateY(6px);
+        filter: blur(3px);
+    }
+    to {
+        opacity: 1;
+        transform: none;
+        filter: blur(0);
+    }
+}
+
+.ms-summary-reveal {
+    animation: ms-summary-reveal 0.5s ease-out both;
+}
+
+/* Reduced motion: keep the state legible, drop the movement. Scoped to
+   this panel so the shared `.gp-shimmer` / `.shiny-letter` rules stay
+   untouched on the surfaces that already ship them. */
+@media (prefers-reduced-motion: reduce) {
+    .ms-summary-halo,
+    .ms-summary-line,
+    .ms-summary-slide,
+    .ms-summary-reveal,
+    .ms-summary-generating .gp-shimmer,
+    .ms-summary-generating .shiny-letter {
+        animation: none;
+    }
+
+    .ms-summary-slide {
+        transform: none;
+        width: 100%;
+    }
+
+    .ms-summary-generating .gp-shimmer {
+        opacity: 0;
+    }
+
+    .ms-summary-generating .shiny-letter {
+        color: var(--color-text);
+        opacity: 1;
+    }
+}

@@ -292,8 +292,23 @@ export class TaskTransitionService {
     private async fanOutAgentExecutions(task: Task): Promise<void> {
         if (!this.dispatcher || !this.assignees) return;
         const agentAssignees = await this.assignees.findAgentAssignees(task.id);
-        if (agentAssignees.length === 0) return;
         const generation = (task.recurrenceOccurredCount ?? 0) + 1;
+
+        // No task_assignees rows does NOT mean no agent. The Task detail page
+        // assigns an Agent by writing `task.agentId` (the owner column, indexed
+        // as idx_tasks_agent) without creating an assignee row — and the
+        // run-candidates API already models it as its own source ('task',
+        // tasks.service.ts). This fan-out only iterated assignee rows, so the
+        // PRIMARY human flow — pick an Agent on the detail page, move the Task
+        // to In Progress — dispatched nothing, silently: the card moved and no
+        // run ever started. Fall back to the Task's own agent, mirroring the
+        // candidates API's precedence (assignee rows first, owner column next).
+        if (agentAssignees.length === 0) {
+            if (task.agentId) {
+                await this.dispatchAgentRun(task, task.agentId, { generation });
+            }
+            return;
+        }
         for (const assignee of agentAssignees) {
             await this.dispatchAgentRun(task, assignee.assigneeId, { generation });
         }
