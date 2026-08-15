@@ -208,6 +208,8 @@ export const ROUTES = {
     DASHBOARD_PROFILE: '/settings',
     DASHBOARD_ANALYTICS: '/analytics',
     DASHBOARD_NOTIFICATIONS: '/notifications',
+    // The page that actually exists — /notifications has no route and soft-404s.
+    DASHBOARD_SETTINGS_NOTIFICATIONS: '/settings/notifications',
 
     // Auth routes (these are under (auth) route group)
     AUTH_LOGIN: '/login',

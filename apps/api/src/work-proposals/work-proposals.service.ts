@@ -109,6 +109,15 @@ export class WorkProposalsApiService {
     }
 
     /**
+     * Hard-delete an Idea. Thin forwarder — every guard (ownership,
+     * build-in-flight, Idea-scoped Agents) and the 404/409 shape the web
+     * confirm dialog decodes live in `WorkProposalService.delete`.
+     */
+    async delete(userId: string, proposalId: string): Promise<{ deleted: true }> {
+        return this.proposals.delete(userId, proposalId);
+    }
+
+    /**
      * Idea (WorkProposal) attachment surface — thin forwarders to the
      * agent-side service. The controller maps these to
      * `POST/GET/DELETE /api/me/work-proposals/:id/attachments[/:attachmentId]`.

@@ -504,6 +504,15 @@ export class ListAgentsQueryDto {
     @IsUUID()
     assignedWorkId?: string;
 
+    @ApiProperty({
+        required: false,
+        description:
+            'Agents ASSIGNED to this Idea (their `targets` include it), as opposed to `ideaId`, which matches Agents pinned to the Idea by scope.',
+    })
+    @IsOptional()
+    @IsUUID()
+    assignedIdeaId?: string;
+
     @ApiProperty({ required: false, maxLength: 80 })
     @IsOptional()
     @IsString()

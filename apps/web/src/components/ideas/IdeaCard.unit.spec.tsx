@@ -224,7 +224,9 @@ describe('IdeaCard (Phase 5 PR M)', () => {
             expect(screen.queryByTestId('idea-card-built-badge')).toBeNull();
         });
 
-        it('suppresses the Built badge on an accepted Idea (the status already says Done)', () => {
+        it('replaces the lifecycle status with Built once a Work exists', () => {
+            // One pill, not two. The status and the Built marker used to
+            // render side by side and contradict each other.
             render(
                 <IdeaCard
                     proposal={{
@@ -238,8 +240,54 @@ describe('IdeaCard (Phase 5 PR M)', () => {
             );
 
             expect(screen.getByText('actions.viewWork')).toBeTruthy();
-            expect(screen.queryByTestId('idea-card-built-badge')).toBeNull();
+            expect(screen.getByTestId('idea-card-built-badge')).toBeTruthy();
+            expect(screen.queryByTestId('idea-card-status-badge')).toBeNull();
         });
+
+        it.each(['dismissed', 'pending', 'failed'] as const)(
+            'reads Built, not "%s", when that status produced a Work',
+            (status) => {
+                // The reported bug: a dismissed Idea that had produced a
+                // Work still read "Dismissed", next to a green Built pill.
+                render(
+                    <IdeaCard
+                        proposal={{
+                            ...minimalProposal,
+                            status,
+                            linkedWorksCount: 1,
+                            latestLinkedWorkId: 'work-3',
+                        }}
+                    />,
+                );
+
+                expect(screen.getByTestId('idea-card-built-badge')).toBeTruthy();
+                expect(screen.queryByTestId('idea-card-status-badge')).toBeNull();
+            },
+        );
+
+        it.each(['queued', 'building'] as const)(
+            'keeps the live "%s" status even when an earlier Work exists',
+            (status) => {
+                // A build running RIGHT NOW is what the user is watching
+                // for; an older Work cannot convey it, so live outranks
+                // built-ness. It falls back to Built once settled.
+                render(
+                    <IdeaCard
+                        proposal={{
+                            ...minimalProposal,
+                            status,
+                            linkedWorksCount: 1,
+                            latestLinkedWorkId: 'work-3',
+                        }}
+                    />,
+                );
+
+                expect(screen.getByTestId('idea-card-status-badge')).toHaveTextContent(
+                    `filters.${status}`,
+                );
+                expect(screen.queryByTestId('idea-card-built-badge')).toBeNull();
+            },
+        );
 
         it('prefers acceptedWorkId over the latest link as the View Work target', () => {
             routerPushMock.mockClear();
@@ -402,6 +450,7 @@ describe('IdeaCard (Phase 5 PR M)', () => {
             >
               <span
                 class="inline-flex items-center gap-1.5 rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ring-inset capitalize bg-slate-500/10 text-slate-600 dark:text-slate-300 ring-slate-500/20"
+                data-testid="idea-card-status-badge"
               >
                 <span
                   aria-hidden="true"
@@ -453,7 +502,7 @@ describe('IdeaCard (Phase 5 PR M)', () => {
               class="relative z-10 mt-auto flex items-center gap-2"
             >
               <button
-                class="flex-1 inline-flex items-center justify-center gap-1.5 rounded-md px-3 py-2 text-sm font-medium text-white transition-colors active:scale-[0.98] cursor-pointer bg-black hover:bg-black/80 dark:bg-white/6 dark:hover:bg-white/10"
+                class="inline-flex items-center gap-1.5 font-medium transition-colors active:scale-[0.98] cursor-pointer flex-1 justify-center rounded-md px-3 py-2 text-sm text-white bg-black hover:bg-black/80 dark:bg-white/6 dark:hover:bg-white/10"
                 type="button"
               >
                 actions.accept
