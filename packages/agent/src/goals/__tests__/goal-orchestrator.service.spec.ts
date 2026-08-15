@@ -153,16 +153,37 @@ function build(overrides: { goal?: Partial<Goal> } = {}) {
     // seeing that. A mock that only recorded the call would make the
     // restart path look broken (or, worse, hide a real regression), so it
     // mutates the store the way the repository does.
+    //
+    // It also returns the `triggerRunId` + `workId` the real repository
+    // returns, because those are precisely what the remote-cancel and
+    // gate-drain halves key off: a mock that dropped them would let a
+    // DB-only cancel pass as a full one.
     const agentRuns = {
         cancel: jest.fn(async (runId: string) => {
             const row = runs._rows.find((r) => r.id === runId);
             if (!row) return { found: false };
+            const previousStatus = row.status as string;
+            if (previousStatus !== 'queued' && previousStatus !== 'running') {
+                return {
+                    found: true,
+                    previousStatus,
+                    triggerRunId: (row.triggerRunId as string | null) ?? null,
+                    workId: (row.workId as string | null) ?? null,
+                };
+            }
             row.status = 'cancelled';
-            return { found: true, previousStatus: 'running' };
+            return {
+                found: true,
+                previousStatus,
+                triggerRunId: (row.triggerRunId as string | null) ?? null,
+                workId: (row.workId as string | null) ?? null,
+            };
         }),
     };
     const activityLog = { log: jest.fn(async () => undefined) };
     const notifications = { create: jest.fn(async () => undefined) };
+    const runCanceller = { cancel: jest.fn(async () => 'cancelled' as const) };
+    const dispatchGate = { drainForWork: jest.fn(async () => undefined) };
 
     const service = new GoalOrchestratorService(
         goals as unknown as Repository<Goal>,
@@ -176,6 +197,8 @@ function build(overrides: { goal?: Partial<Goal> } = {}) {
         agentRuns as never,
         activityLog as never,
         notifications as never,
+        runCanceller as never,
+        dispatchGate as never,
     );
 
     return {
@@ -191,7 +214,35 @@ function build(overrides: { goal?: Partial<Goal> } = {}) {
         agentRuns,
         activityLog,
         notifications,
+        runCanceller,
+        dispatchGate,
     };
+}
+
+/** An iteration Task + its live run, the shape both cancel paths need. */
+function seedLiveIteration(
+    tasks: ReturnType<typeof makeRepo>,
+    runs: ReturnType<typeof makeRepo>,
+    run: Record<string, unknown> = {},
+) {
+    tasks._rows.push({
+        id: 'task-1',
+        goalId: 'g1',
+        slug: 'T-1',
+        title: '[Goal] x — iteration 1',
+        status: 'in_progress',
+        createdAt: new Date(1),
+    });
+    runs._rows.push({
+        id: 'r1',
+        taskId: 'task-1',
+        status: 'running',
+        costCents: 10,
+        startedAt: new Date(1),
+        triggerRunId: 'run_abc123',
+        workId: 'work-1',
+        ...run,
+    });
 }
 
 const eventKinds = (events: ReturnType<typeof makeRepo>) => events._rows.map((r) => r.kind);
@@ -730,6 +781,94 @@ describe('GoalOrchestratorService — loop control', () => {
         expect(result.action).toBe('dispatch');
         expect(result.iteration).toBe(3);
         expect(transitions.dispatchAgentRun).toHaveBeenCalled();
+    });
+
+    /**
+     * Regression: cancelling used to be DB-ONLY. The row read `cancelled`
+     * while the Trigger.dev job kept executing to completion — burning
+     * tokens that the CAS-guarded `markCompleted` could no longer record, so
+     * the very spend `spendCapCents` bounds went unmeasured — and the
+     * concurrency slot the cancel freed was never drained, leaving any
+     * parked run for the same Work parked with nothing to release it.
+     */
+    it('cancelLoop also cancels the REMOTE run and drains the freed slot', async () => {
+        const { service, tasks, runs, runCanceller, dispatchGate } = build({
+            goal: { loopStatus: 'running' },
+        });
+        seedLiveIteration(tasks, runs);
+
+        await service.cancelLoop('u1', 'g1');
+
+        expect(runCanceller.cancel).toHaveBeenCalledWith('run_abc123');
+        expect(dispatchGate.drainForWork).toHaveBeenCalledWith('work-1');
+    });
+
+    it('restartSession cancels the remote run before routing the next iteration', async () => {
+        const { service, tasks, runs, runCanceller, dispatchGate } = build({
+            goal: { loopStatus: 'running', assignedAgentId: 'agent-7' },
+        });
+        seedLiveIteration(tasks, runs);
+
+        await service.restartSession('u1', 'g1');
+
+        expect(runCanceller.cancel).toHaveBeenCalledWith('run_abc123');
+        expect(dispatchGate.drainForWork).toHaveBeenCalledWith('work-1');
+    });
+
+    it('reports no cancellation — and touches nothing remote — for an already-terminal run', async () => {
+        const { service, tasks, runs, runCanceller, dispatchGate, events } = build({
+            goal: { loopStatus: 'running' },
+        });
+        // `completed` is not an ACTIVE_RUN_STATUS, so `findActiveRun` skips
+        // it: nothing is in flight and the log line must not claim otherwise.
+        seedLiveIteration(tasks, runs, { status: 'completed' });
+
+        await service.cancelLoop('u1', 'g1');
+
+        expect(runCanceller.cancel).not.toHaveBeenCalled();
+        expect(dispatchGate.drainForWork).not.toHaveBeenCalled();
+        expect(eventMessages(events).at(-1)).not.toContain('in-flight session was cancelled');
+    });
+
+    it('still cancels the row when no remote canceller is wired', async () => {
+        const { service, tasks, runs, agentRuns, goals } = build({
+            goal: { loopStatus: 'running' },
+        });
+        seedLiveIteration(tasks, runs);
+        // Rebuild without the last two @Optional() collaborators — a slim
+        // install must degrade to the DB cancel, not throw.
+        const slim = new GoalOrchestratorService(
+            goals as never,
+            makeRepo('e') as never,
+            tasks as never,
+            runs as never,
+            undefined,
+            undefined,
+            undefined,
+            undefined,
+            agentRuns as never,
+        );
+        await expect(slim.cancelLoop('u1', 'g1')).resolves.toMatchObject({
+            loopStatus: 'cancelled',
+        });
+        expect(runs._rows[0].status).toBe('cancelled');
+    });
+
+    /**
+     * Regression: `startLoop` refused an archived Goal and `advanceDue`
+     * skipped one, but `restartSession` did neither — so
+     * `POST /me/goals/:id/loop/restart` could resurrect a retired Goal's
+     * loop to `running` and dispatch a paid iteration.
+     */
+    it('refuses to restart the session on an archived Goal', async () => {
+        const { service, transitions, goals } = build({
+            goal: { loopStatus: 'paused', assignedAgentId: 'agent-7', archivedAt: new Date() },
+        });
+        await expect(service.restartSession('u1', 'g1')).rejects.toBeInstanceOf(
+            BadRequestException,
+        );
+        expect(transitions.dispatchAgentRun).not.toHaveBeenCalled();
+        expect(goals._rows[0].loopStatus).toBe('paused');
     });
 });
 

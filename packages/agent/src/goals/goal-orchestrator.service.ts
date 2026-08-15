@@ -1,5 +1,6 @@
 import {
     BadRequestException,
+    Inject,
     Injectable,
     Logger,
     NotFoundException,
@@ -24,6 +25,8 @@ import { NotificationService } from '../notifications/notification.service';
 import { AgentRepository } from '../database/repositories/agent.repository';
 import { AgentRunRepository } from '../database/repositories/agent-run.repository';
 import { RunSteeringService } from '../agents/run-steering.service';
+import { RunDispatchGateService } from '../agents/run-dispatch-gate.service';
+import { AGENT_RUN_CANCELLER, type AgentRunCanceller } from '../agents/agent-run-canceller';
 import { TasksService } from '../tasks-domain/tasks.service';
 import { TaskTransitionService } from '../tasks-domain/task-transition.service';
 import {
@@ -126,6 +129,16 @@ export class GoalOrchestratorService {
         @Optional() private readonly agentRuns?: AgentRunRepository,
         @Optional() private readonly activityLog?: ActivityLogService,
         @Optional() private readonly notifications?: NotificationService,
+        // Cancelling a run is THREE things, not one: the CAS on the row, the
+        // remote Trigger.dev cancel, and draining the concurrency slot the
+        // cancel just freed. `RunSteeringService`'s docblock says as much
+        // ("Duplicating it would fork the CAS + remote-cancel + drain
+        // semantics"), so the loop's cancel/restart uses the same three.
+        // Both appended LAST + @Optional() per the arity rule above.
+        @Optional()
+        @Inject(AGENT_RUN_CANCELLER)
+        private readonly runCanceller?: AgentRunCanceller,
+        @Optional() private readonly dispatchGate?: RunDispatchGateService,
     ) {}
 
     // ─── limits ─────────────────────────────────────────────────────
@@ -462,6 +475,14 @@ export class GoalOrchestratorService {
      */
     async restartSession(userId: string, goalId: string): Promise<GoalAdvanceResult> {
         const goal = await this.findOrThrow(userId, goalId);
+        // Same guard as `startLoop`: restart RESURRECTS the loop to
+        // `running` and dispatches a paid iteration, so without this an
+        // archived Goal — which `advanceDue` deliberately skips and
+        // `startLoop` refuses — could still be made to spend money through
+        // the restart endpoint.
+        if (goal.archivedAt) {
+            throw new BadRequestException('Archived Goals cannot run an execution loop.');
+        }
         const cancelled = await this.cancelActiveRun(goal, userId);
         goal.loopStatus = 'running';
         if (!goal.loopStartedAt) goal.loopStartedAt = new Date();
@@ -928,6 +949,28 @@ export class GoalOrchestratorService {
         return runs.find((run) => ACTIVE_RUN_STATUSES.includes(run.status)) ?? null;
     }
 
+    /**
+     * Cancel the Goal's in-flight run the SAME way `POST
+     * /api/agents/:id/runs/:runId/cancel` does — all three halves, in the
+     * same order:
+     *
+     *  1. the repository CAS (authoritative; `found` alone is not enough,
+     *     because an already-terminal run also reports `found`),
+     *  2. the REMOTE cancel through `AGENT_RUN_CANCELLER`. Without it the
+     *     Trigger.dev job keeps executing to completion after the row says
+     *     `cancelled` — burning tokens the CAS-guarded `markCompleted` can
+     *     no longer record, so the very spend `spendCapCents` bounds goes
+     *     unmeasured. DB first, then remote, for the reason the agents
+     *     controller documents: the reverse order can leave a cancelled
+     *     remote run behind a row still reading `running`, and there is no
+     *     agent_runs sweeper to reap it.
+     *  3. draining the concurrency gate for the Work whose slot just freed,
+     *     or a parked run for that Work stays parked with nothing left to
+     *     release it.
+     *
+     * @returns the cancelled run id, or `null` when nothing was in flight
+     *          (or the run had already gone terminal).
+     */
     private async cancelActiveRun(goal: Goal, userId: string): Promise<string | null> {
         const active = await this.findActiveRun(goal.id);
         if (!active) return null;
@@ -937,7 +980,30 @@ export class GoalOrchestratorService {
             );
         }
         const result = await this.agentRuns.cancel(active.id, userId);
-        return result.found ? active.id : null;
+        const wasOpen =
+            result.found && ACTIVE_RUN_STATUSES.includes(result.previousStatus as string);
+        if (!wasOpen) return null;
+
+        if (result.triggerRunId && this.runCanceller) {
+            // Best-effort by contract (the port must not throw), but awaited
+            // so a cancel that reports success has actually asked the runtime
+            // to stop. A non-'cancelled' outcome is logged with both ids so a
+            // wall of 'not-configured' is distinguishable from the benign
+            // already-terminal race.
+            const outcome = await this.runCanceller
+                .cancel(result.triggerRunId)
+                .catch(() => 'failed' as const);
+            if (outcome !== 'cancelled') {
+                this.logger.warn(
+                    `Goal ${goal.id}: run ${active.id} cancelled in the database, but the remote ` +
+                        `cancel of ${result.triggerRunId} returned '${outcome}'.`,
+                );
+            }
+        }
+        if (result.workId && this.dispatchGate) {
+            void this.dispatchGate.drainForWork(result.workId).catch(() => undefined);
+        }
+        return active.id;
     }
 
     /**
