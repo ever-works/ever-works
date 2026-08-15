@@ -238,8 +238,12 @@ export class InboxService implements InboxProducer {
             kind: 'approval',
             title: input.title,
             body: `An agent proposed the action "${input.title}" (${input.actionType}) and is waiting for your approval.${risks}`,
+            // Neither branch is `recommended`: the guardrail layer already
+            // auto-decided everything it had an opinion about, so a
+            // proposal that reaches a human is one the platform will not
+            // nudge either way.
             options: [
-                { id: 'approve', label: 'Approve', recommended: false },
+                { id: 'approve', label: 'Approve' },
                 { id: 'reject', label: 'Reject' },
             ],
             sourceType: 'proposal',
@@ -266,9 +270,7 @@ export class InboxService implements InboxProducer {
             workId: input.workId ?? null,
             organizationId: input.organizationId ?? null,
         });
-        if (!input.skipNotification) {
-            await this.notifyCreated(row);
-        }
+        await this.notifyCreated(row);
         this.logCreated(row);
     }
 

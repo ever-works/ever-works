@@ -51,12 +51,6 @@ export interface InboxNoticeInput {
     taskId?: string | null;
     workId?: string | null;
     organizationId?: string | null;
-    /**
-     * Skip the bell row + channel fanout for this notice — set by
-     * producers that already notified through their own channel (e.g.
-     * budget alerts), so one event never rings twice.
-     */
-    skipNotification?: boolean;
 }
 
 export interface InboxProducer {

@@ -5,6 +5,7 @@ export * from './inbox.module';
 export * from './inbox.service';
 export * from './inbox.types';
 export * from './inbox-producer.port';
+export * from './inbox-budget-alert.listener';
 export * from './agent-inbox-tools';
 export { InboxItemRepository } from '../database/repositories/inbox-item.repository';
 export type {

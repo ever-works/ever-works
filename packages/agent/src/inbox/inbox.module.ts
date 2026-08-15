@@ -7,6 +7,7 @@ import { AgentApprovalsModule } from '../agent-approvals/agent-approvals.module'
 import { NotificationsModule } from '../notifications/notifications.module';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { InboxService } from './inbox.service';
+import { InboxBudgetAlertListener } from './inbox-budget-alert.listener';
 
 /**
  * Inbox (operator message center) — the agent-side module owning the
@@ -15,6 +16,12 @@ import { InboxService } from './inbox.service';
  * `INBOX_PRODUCER` token (so the escalation / approval / budget
  * producers — all `@Optional()` consumers of that token — actually
  * fire in production).
+ *
+ * `InboxBudgetAlertListener` is provided here rather than in
+ * `BudgetsModule`: the listener depends on `InboxService`, and the
+ * budgets layer must stay unaware of the inbox (the guard sits on the
+ * hot capability path). Nest instantiates it as soon as this module is
+ * imported anywhere, which is what registers the `@OnEvent` handler.
  *
  * `InboxItem` MUST also stay registered in the DataSource ENTITIES
  * array (`database/_entities-inventory.ts`) — this repo has no
@@ -40,7 +47,7 @@ import { InboxService } from './inbox.service';
         // INBOX_ITEM_CREATED / INBOX_ITEM_ANSWERED activity rows.
         ActivityLogModule,
     ],
-    providers: [InboxItemRepository, InboxService],
+    providers: [InboxItemRepository, InboxService, InboxBudgetAlertListener],
     exports: [InboxItemRepository, InboxService],
 })
 export class InboxModule {}

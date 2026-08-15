@@ -16,12 +16,7 @@
 
 export type InboxItemKind = 'question' | 'approval' | 'escalation' | 'notice';
 
-export const INBOX_ITEM_KINDS: readonly InboxItemKind[] = [
-	'question',
-	'approval',
-	'escalation',
-	'notice'
-];
+export const INBOX_ITEM_KINDS: readonly InboxItemKind[] = ['question', 'approval', 'escalation', 'notice'];
 
 export type InboxItemStatus = 'open' | 'answered' | 'archived';
 
@@ -122,11 +117,4 @@ export function normalizeInboxOptions(value: unknown): InboxItemOption[] | null 
 		out.push(option);
 	}
 	return out.length > 0 ? out : null;
-}
-
-/** Narrow an untrusted query value to a status, or `undefined`. */
-export function parseInboxItemStatus(value: unknown): InboxItemStatus | undefined {
-	return typeof value === 'string' && (INBOX_ITEM_STATUSES as readonly string[]).includes(value)
-		? (value as InboxItemStatus)
-		: undefined;
 }

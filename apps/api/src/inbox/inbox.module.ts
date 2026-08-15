@@ -1,5 +1,9 @@
 import { Global, Module } from '@nestjs/common';
-import { InboxModule as AgentInboxModule, InboxService, INBOX_PRODUCER } from '@ever-works/agent/inbox';
+import {
+    InboxModule as AgentInboxModule,
+    InboxService,
+    INBOX_PRODUCER,
+} from '@ever-works/agent/inbox';
 import { AuthModule } from '../auth/auth.module';
 import { InboxController } from './inbox.controller';
 
