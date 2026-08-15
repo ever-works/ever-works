@@ -79,7 +79,7 @@ describe('isValidNpmPackageSpec', () => {
 });
 
 describe('isValidAllowedHost', () => {
-	const valid = ['api.anthropic.com', 'registry.npmjs.org', '*.example.com', 'localhost', 'a-b.c'];
+	const valid = ['api.anthropic.com', 'registry.npmjs.org', '*.example.com', 'a-b.c'];
 	it.each(valid)('accepts %s', (host) => {
 		expect(isValidAllowedHost(host)).toBe(true);
 	});
@@ -92,7 +92,21 @@ describe('isValidAllowedHost', () => {
 		'*.*.example.com',
 		'-leading.example.com',
 		'exa mple.com',
-		'evil.com;rm'
+		'evil.com;rm',
+		// Loopback / link-local / IP literals: allow-listing one of these
+		// would authorize egress INSIDE the sandbox's own network.
+		'localhost',
+		'LOCALHOST',
+		'db.localhost',
+		'service.local',
+		'metadata.internal',
+		'127.0.0.1',
+		'169.254.169.254',
+		'10.0.0.1',
+		'0.0.0.0',
+		'::1',
+		'[::1]',
+		'fd00::1'
 	];
 	it.each(invalid)('rejects %j', (host) => {
 		expect(isValidAllowedHost(host)).toBe(false);

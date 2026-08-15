@@ -77,6 +77,26 @@ const NPM_PACKAGE_SPEC_RE =
 const ALLOWED_HOST_RE =
 	/^(?:\*\.)?[A-Za-z0-9](?:[A-Za-z0-9-]{0,62}[A-Za-z0-9])?(?:\.[A-Za-z0-9](?:[A-Za-z0-9-]{0,62}[A-Za-z0-9])?)*$/;
 
+/**
+ * An egress allow-list entry names a PUBLIC service the sandbox may
+ * reach. IP literals and loopback/link-local names are rejected outright:
+ * the hostname grammar above happily matches `localhost` and dotted-quad
+ * literals like `169.254.169.254`, and allow-listing one of those would
+ * authorize a limited Environment to reach services inside the runtime's
+ * own network — cloud instance-metadata endpoints first among them.
+ */
+const IPV4_LITERAL_RE = /^\d{1,3}(?:\.\d{1,3}){3}$/;
+
+/** Bare `localhost` plus anything under a loopback/internal-only suffix. */
+const LOCAL_HOST_NAME_RE = /(^|\.)(?:localhost|local|internal|localdomain)$/i;
+
+function isIpLiteralHost(host: string): boolean {
+	// IPv6 literals contain a colon, which the hostname grammar already
+	// rejects; the explicit check keeps the intent readable and covers
+	// bracketed forms should the grammar ever widen.
+	return IPV4_LITERAL_RE.test(host) || host.includes(':') || host.startsWith('[');
+}
+
 export function isValidPipPackageSpec(spec: string): boolean {
 	return (
 		typeof spec === 'string' &&
@@ -96,7 +116,14 @@ export function isValidNpmPackageSpec(spec: string): boolean {
 }
 
 export function isValidAllowedHost(host: string): boolean {
-	return typeof host === 'string' && host.length > 0 && host.length <= 253 && ALLOWED_HOST_RE.test(host);
+	return (
+		typeof host === 'string' &&
+		host.length > 0 &&
+		host.length <= 253 &&
+		ALLOWED_HOST_RE.test(host) &&
+		!isIpLiteralHost(host) &&
+		!LOCAL_HOST_NAME_RE.test(host)
+	);
 }
 
 export interface RuntimePackageListNormalization {

@@ -73,6 +73,14 @@ export function buildPackageBootstrapPrompt(runtimeEnvironment: RuntimeEnvironme
 		return null;
 	}
 
+	// Limited networking with package managers switched off makes the
+	// registries unreachable, so an install prompt could only ever burn a
+	// session turn and fail. Skip the bootstrap entirely rather than ask
+	// the agent to run commands the environment forbids.
+	if (runtimeEnvironment.networkingMode === 'limited' && runtimeEnvironment.allowPackageManagers === false) {
+		return null;
+	}
+
 	const pip = normalizeRuntimePackageList(runtimeEnvironment.pipPackages, 'pip').valid;
 	const npm = normalizeRuntimePackageList(runtimeEnvironment.npmPackages, 'npm').valid;
 

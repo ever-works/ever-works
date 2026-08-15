@@ -86,6 +86,39 @@ describe('buildPackageBootstrapPrompt', () => {
 		expect(prompt).not.toContain('npm install');
 	});
 
+	it('returns null when limited networking forbids the package managers', () => {
+		expect(
+			buildPackageBootstrapPrompt(
+				makeEnvironment({
+					networkingMode: 'limited',
+					allowedHosts: ['api.anthropic.com'],
+					allowPackageManagers: false,
+					pipPackages: ['requests'],
+					npmPackages: ['typescript']
+				})
+			)
+		).toBeNull();
+	});
+
+	it('still installs under limited networking when package managers are allowed', () => {
+		const prompt = buildPackageBootstrapPrompt(
+			makeEnvironment({
+				networkingMode: 'limited',
+				allowedHosts: ['api.anthropic.com'],
+				allowPackageManagers: true,
+				pipPackages: ['requests']
+			})
+		);
+		expect(prompt).toContain("- `pip install 'requests'`");
+	});
+
+	it('keeps installing under unrestricted networking regardless of the flag', () => {
+		const prompt = buildPackageBootstrapPrompt(
+			makeEnvironment({ allowPackageManagers: false, pipPackages: ['requests'] })
+		);
+		expect(prompt).toContain("- `pip install 'requests'`");
+	});
+
 	it('returns null when every spec fails re-validation', () => {
 		expect(
 			buildPackageBootstrapPrompt(makeEnvironment({ pipPackages: ['bad;spec'], npmPackages: ['also bad'] }))
