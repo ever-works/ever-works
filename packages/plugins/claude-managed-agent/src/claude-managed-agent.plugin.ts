@@ -16,7 +16,8 @@ import type {
 	PluginContext,
 	PluginHealthCheck,
 	PluginManifest,
-	ValidationResult
+	ValidationResult,
+	RuntimeEnvironmentData
 } from '@ever-works/plugin';
 import { buildSuccessPipelineResult } from '@ever-works/plugin';
 
@@ -41,7 +42,6 @@ import {
 	DEFAULT_WORKSPACE_PATH,
 	type ManagedAgentFanOutCapability,
 	type ManagedAgentRunResources,
-	type ManagedRuntimeEnvironment,
 	type ManagedSessionRunResult,
 	MAX_VARIANT_SESSIONS,
 	MIN_VARIANT_SESSIONS,
@@ -80,7 +80,7 @@ import {
 	buildWorkspaceSeedPrompt
 } from './utils/prompt-builder.js';
 import { extractAgentTranscript, normalizeOutputs, parseStructuredOutput } from './utils/result-parser.js';
-import { buildPackageBootstrapPrompt, resolveEnvironmentNetworking } from './utils/runtime-environment.js';
+import { buildPackageBootstrapPrompt } from './utils/runtime-environment.js';
 import { captureScreenshots } from './utils/screenshot-capture.js';
 import { buildManagedAgentMetrics, toManagedSessionTokenUsage } from './utils/usage-metrics.js';
 import { buildWorkspaceSeedManifest } from './utils/workspace-seed.js';
@@ -469,19 +469,6 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 			// recall ride on the session so agent versions never churn per run.
 			let sessionAgentOverrides: { system?: string; model?: string } | undefined;
 
-			// Environments — when the platform resolved a runtime
-			// Environment for this run (the Agent's assigned, published
-			// `environments` row), its networking posture shapes the CMA
-			// environment. `undefined` keeps the historical env-var
-			// fallback inside the client byte-for-byte.
-			const runtimeEnvironment = execContext.runtimeEnvironment;
-			const environmentId = (
-				await client.createEnvironment({
-					name: `Ever Works Environment: ${work.slug}`,
-					networking: resolveEnvironmentNetworking(runtimeEnvironment)
-				})
-			).id;
-			runResources.createdEnvironmentId = environmentId;
 			// Resolved for BOTH modes: the networking policy is a security
 			// control, so an ephemeral (reuseControlPlane === false) run must
 			// honor it exactly like the persistent one.
@@ -596,14 +583,7 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 					},
 					attachedRepos,
 					uploadedEnvFiles
-				})
-				resources: [
-					{
-						type: 'file',
-						file_id: uploadedSeedManifest.id,
-						mount_path: WORKSPACE_SEED_MANIFEST_MOUNT_PATH
-					}
-				],
+				}),
 				budgetUsd: perSessionBudgetUsd,
 				agentOverrides: sessionAgentOverrides
 			});
@@ -616,7 +596,10 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 			// (`buildPackageBootstrapPrompt` — see its security note); its
 			// events land before the seed-idle snapshot below, so they are
 			// naturally excluded from generation-output parsing.
-			const bootstrapPrompt = buildPackageBootstrapPrompt(runtimeEnvironment);
+			// getRuntimeEnvironment() returns `| null` (this plugin's local shape);
+			// the shared contract helper takes `| undefined`. Same object either
+			// way — only the absent-value convention differs between branches.
+			const bootstrapPrompt = buildPackageBootstrapPrompt(runtimeEnvironment ?? undefined);
 			if (bootstrapPrompt) {
 				await client.sendUserMessage(session.id, bootstrapPrompt);
 				await client.waitForSessionIdle(session.id, {
@@ -1110,7 +1093,7 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 	 * (parallel branch). Read defensively — absent or malformed values fall
 	 * back to the env-var driven networking policy.
 	 */
-	private getRuntimeEnvironment(execContext: unknown): ManagedRuntimeEnvironment | null {
+	private getRuntimeEnvironment(execContext: unknown): RuntimeEnvironmentData | null {
 		if (!execContext || typeof execContext !== 'object') {
 			return null;
 		}
@@ -1120,7 +1103,7 @@ export class ClaudeManagedAgentPlugin implements IPipelinePlugin<ClaudeManagedAg
 			return null;
 		}
 
-		return candidate as ManagedRuntimeEnvironment;
+		return candidate as RuntimeEnvironmentData;
 	}
 }
 

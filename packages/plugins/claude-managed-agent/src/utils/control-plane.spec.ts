@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import type { RuntimeEnvironmentData } from '@ever-works/plugin';
 
 import {
 	SETTING_MANAGED_AGENT_CONFIG_HASH,
@@ -26,6 +27,26 @@ const DESIRED: ManagedAgentDesiredConfig = {
 };
 
 const LOGGER = { log: vi.fn(), warn: vi.fn() };
+
+/**
+ * A resolved runtime Environment as the platform actually ships it — the FLAT
+ * `RuntimeEnvironmentData` contract. These assertions previously built a
+ * NESTED `{ networking: { … } }` object, which was this plugin's local guess
+ * and never matched real data; they are re-pointed, not weakened.
+ */
+function makeRuntimeEnvironment(overrides: Partial<RuntimeEnvironmentData> = {}): RuntimeEnvironmentData {
+	return {
+		id: 'env-1',
+		name: 'Ever Works Environment',
+		slug: 'ever-works-environment',
+		pipPackages: [],
+		npmPackages: [],
+		networkingMode: 'unrestricted',
+		allowedHosts: null,
+		allowPackageManagers: true,
+		...overrides
+	};
+}
 
 function createClientStub() {
 	return {
@@ -93,14 +114,13 @@ describe('computeConfigHash', () => {
 describe('resolveNetworking', () => {
 	it('maps a limited runtime environment to the limited networking policy', () => {
 		expect(
-			resolveNetworking({
-				networking: {
-					type: 'limited',
+			resolveNetworking(
+				makeRuntimeEnvironment({
+					networkingMode: 'limited',
 					allowedHosts: ['api.example.com', ' '],
-					allowPackageManagers: true,
-					allowMcpServers: false
-				}
-			})
+					allowPackageManagers: true
+				})
+			)
 		).toEqual({
 			type: 'limited',
 			allowed_hosts: ['api.example.com'],
@@ -110,7 +130,7 @@ describe('resolveNetworking', () => {
 	});
 
 	it('maps an unrestricted runtime environment', () => {
-		expect(resolveNetworking({ networking: { type: 'unrestricted' } })).toEqual({ type: 'unrestricted' });
+		expect(resolveNetworking(makeRuntimeEnvironment())).toEqual({ type: 'unrestricted' });
 	});
 
 	it('falls back to the env-var policy when no runtime environment is present', () => {
@@ -123,8 +143,10 @@ describe('resolveNetworking', () => {
 		});
 	});
 
-	it('falls back to unrestricted for unknown networking types', () => {
-		expect(resolveNetworking({ networking: { type: 'mystery' } })).toEqual({ type: 'unrestricted' });
+	it('treats any non-limited networking mode as unrestricted', () => {
+		expect(resolveNetworking(makeRuntimeEnvironment({ networkingMode: 'mystery' as 'unrestricted' }))).toEqual({
+			type: 'unrestricted'
+		});
 	});
 });
 
@@ -289,10 +311,12 @@ describe('ensureManagedEnvironment', () => {
 			context,
 			'user-1',
 			{},
-			{
+			makeRuntimeEnvironment({
 				name: 'Custom Env',
-				networking: { type: 'limited', allowedHosts: ['api.example.com'] }
-			},
+				networkingMode: 'limited',
+				allowedHosts: ['api.example.com'],
+				allowPackageManagers: false
+			}),
 			LOGGER
 		);
 
@@ -347,7 +371,11 @@ describe('ensureManagedEnvironment', () => {
 				[SETTING_MANAGED_ENVIRONMENT_ID]: 'env_stored',
 				[SETTING_MANAGED_ENVIRONMENT_CONFIG_HASH]: 'stale-hash'
 			},
-			{ networking: { type: 'limited', allowedHosts: ['api.example.com'] } },
+			makeRuntimeEnvironment({
+				networkingMode: 'limited',
+				allowedHosts: ['api.example.com'],
+				allowPackageManagers: false
+			}),
 			LOGGER
 		);
 

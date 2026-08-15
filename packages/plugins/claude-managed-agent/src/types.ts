@@ -252,21 +252,16 @@ export interface ManagedAgentRunResources {
 // --- Cloud Managed Agents at scale (feat-cma-scale) ---
 
 /**
- * Serializable runtime-environment descriptor optionally carried on the
- * pipeline execution context by the platform (Environments feature, parallel
- * branch). The plugin reads it defensively — it must NOT import the entity —
- * so every field is optional and unknown shapes degrade to the env-var
- * fallback.
+ * Runtime Environments — the descriptor carried on the pipeline execution
+ * context is the platform's shipped contract, `RuntimeEnvironmentData` from
+ * `@ever-works/plugin` (FLAT: `networkingMode`, `allowedHosts`,
+ * `allowPackageManagers`). This plugin once declared a local
+ * `ManagedRuntimeEnvironment` with a NESTED `networking` object, written
+ * defensively before that contract landed; it never matched real data, so
+ * every configured Environment silently fell back to env-var networking.
+ * The contract is now the single input type — do not reintroduce a local
+ * guess.
  */
-export interface ManagedRuntimeEnvironment {
-	name?: string;
-	networking?: {
-		type?: 'unrestricted' | 'limited' | string;
-		allowedHosts?: string[];
-		allowPackageManagers?: boolean;
-		allowMcpServers?: boolean;
-	};
-}
 
 /** Desired persistent-agent configuration used for drift detection. */
 export interface ManagedAgentDesiredConfig {

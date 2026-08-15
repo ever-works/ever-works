@@ -9,7 +9,6 @@ import {
 	type ManagedEnvironmentNetworking
 } from '../types.js';
 import { delayWithSignal } from './pipeline-helpers.js';
-import type { ManagedAgentsNetworkingConfig } from './runtime-environment.js';
 
 export class AnthropicManagedAgentsClient {
 	private readonly client: Anthropic;
@@ -74,38 +73,6 @@ export class AnthropicManagedAgentsClient {
 		await this.client.beta.agents.archive(agentId);
 	}
 
-	async createEnvironment(input: {
-		name: string;
-		/**
-		 * Environments — networking derived from the run's resolved
-		 * platform Environment (`resolveEnvironmentNetworking`). When
-		 * absent, the historical H-25 env-var fallback below applies
-		 * unchanged, byte-for-byte.
-		 */
-		networking?: ManagedAgentsNetworkingConfig;
-	}): Promise<{ id: string }> {
-		// H-25: pin egress to an allow-list when CLAUDE_MANAGED_AGENT_EGRESS_HOSTS
-		// is set. Default stays `unrestricted` to preserve the current
-		// behavior (the env is opt-in until operators verify the agent
-		// tooling works with the constrained list). Comma-separated hosts;
-		// supports plain hostnames or `*.example.com` wildcards depending on
-		// what the upstream SDK accepts at runtime.
-		const allowHostsRaw = process.env.CLAUDE_MANAGED_AGENT_EGRESS_HOSTS?.trim();
-		const allowHosts = allowHostsRaw
-			? allowHostsRaw
-					.split(',')
-					.map((s) => s.trim())
-					.filter(Boolean)
-			: null;
-
-		// Use `any` because the SDK's `NetworkingConfig` type does not yet
-		// expose the allow-list shape in our pinned version. Once the SDK
-		// types update, narrow this.
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const networking: any =
-			input.networking ??
-			(allowHosts && allowHosts.length > 0 ? { type: 'allowlist', hosts: allowHosts } : { type: 'unrestricted' });
-
 	async createEnvironment(input: { name: string; networking?: ManagedEnvironmentNetworking }): Promise<{
 		id: string;
 	}> {
@@ -167,7 +134,7 @@ export class AnthropicManagedAgentsClient {
 		// `github_repository` variant, Feature G). Narrow once the SDK
 		// types catch up.
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const resources: any = input.resources;
+		const sessionResources: any = input.resources;
 		const hasOverrides =
 			input.agentOverrides &&
 			(input.agentOverrides.system !== undefined || input.agentOverrides.model !== undefined);
@@ -183,8 +150,7 @@ export class AnthropicManagedAgentsClient {
 				: input.agentId,
 			environment_id: input.environmentId,
 			title: input.title,
-			...(input.resources?.length ? { resources } : {})
-			...(input.resources?.length ? { resources: input.resources } : {}),
+			...(input.resources?.length ? { resources: sessionResources } : {}),
 			...(typeof input.budgetUsd === 'number' && input.budgetUsd > 0
 				? { budget: buildBudgetLimit(input.budgetUsd) }
 				: {}),

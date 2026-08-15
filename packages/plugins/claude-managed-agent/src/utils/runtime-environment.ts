@@ -1,6 +1,8 @@
 import type { RuntimeEnvironmentData } from '@ever-works/plugin';
 import { normalizeRuntimePackageList, isValidAllowedHost } from '@ever-works/plugin';
 
+import type { ManagedEnvironmentNetworking } from '../types.js';
+
 /**
  * Environments — how a platform-resolved runtime Environment
  * (`execContext.runtimeEnvironment`) maps onto Anthropic Managed Agents
@@ -8,7 +10,7 @@ import { normalizeRuntimePackageList, isValidAllowedHost } from '@ever-works/plu
  *
  *  - networking → the CMA environment's `config.networking` block
  *    (`{type:'unrestricted'}` or
- *    `{type:'limited', allowed_hosts, allow_package_managers}`);
+ *    `{type:'limited', allowed_hosts, allow_package_managers, allow_mcp_servers}`);
  *  - pip/npm package lists → an initial session bootstrap message that
  *    installs them BEFORE the workspace seed / main prompts.
  *
@@ -22,23 +24,20 @@ import { normalizeRuntimePackageList, isValidAllowedHost } from '@ever-works/plu
  */
 
 /**
- * Networking config union for `environments.create`. `allowlist` is the
- * H-25 env-var fallback shape the plugin has always sent; `limited` is
- * the Environments-driven shape.
- */
-export type ManagedAgentsNetworkingConfig =
-	| { type: 'unrestricted' }
-	| { type: 'limited'; allowed_hosts: string[]; allow_package_managers: boolean }
-	| { type: 'allowlist'; hosts: string[] };
-
-/**
  * Map a resolved Environment's networking posture onto the CMA config
- * block. Returns `undefined` when no Environment is present, which tells
- * the client to keep its historical env-var fallback path byte-for-byte.
+ * block ({@link ManagedEnvironmentNetworking} — the shape the pinned SDK
+ * documents for `environments.create` / `environments.update`). Returns
+ * `undefined` when no Environment is present, which tells the client to
+ * keep its historical env-var fallback path byte-for-byte.
+ *
+ * `allow_mcp_servers` is pinned to `false`: an Environment models egress
+ * for the sandbox itself, and the platform has no UI for authorising MCP
+ * servers inside a managed session, so the restrictive value is the only
+ * one an Environment can honestly claim.
  */
 export function resolveEnvironmentNetworking(
 	runtimeEnvironment: RuntimeEnvironmentData | undefined
-): ManagedAgentsNetworkingConfig | undefined {
+): ManagedEnvironmentNetworking | undefined {
 	if (!runtimeEnvironment) {
 		return undefined;
 	}
@@ -48,7 +47,8 @@ export function resolveEnvironmentNetworking(
 		return {
 			type: 'limited',
 			allowed_hosts: hosts,
-			allow_package_managers: runtimeEnvironment.allowPackageManagers !== false
+			allow_package_managers: runtimeEnvironment.allowPackageManagers !== false,
+			allow_mcp_servers: false
 		};
 	}
 

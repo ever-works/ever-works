@@ -1,6 +1,6 @@
 import { createHash } from 'node:crypto';
 
-import type { PluginContext, PluginSettings } from '@ever-works/plugin';
+import type { PluginContext, PluginSettings, RuntimeEnvironmentData } from '@ever-works/plugin';
 
 import {
 	PERSISTENT_ENVIRONMENT_NAME,
@@ -9,10 +9,10 @@ import {
 	SETTING_MANAGED_ENVIRONMENT_CONFIG_HASH,
 	SETTING_MANAGED_ENVIRONMENT_ID,
 	type ManagedAgentDesiredConfig,
-	type ManagedEnvironmentNetworking,
-	type ManagedRuntimeEnvironment
+	type ManagedEnvironmentNetworking
 } from '../types.js';
 import { AnthropicManagedAgentsClient, resolveEnvVarNetworking } from './managed-agents-client.js';
+import { resolveEnvironmentNetworking } from './runtime-environment.js';
 
 export interface ControlPlaneLogger {
 	log(message: string): void;
@@ -54,34 +54,19 @@ function stableStringify(value: unknown): string {
 }
 
 /**
- * Map the optional serializable runtime-environment descriptor carried on the
- * pipeline context to the sessions API networking policy. Unknown or absent
- * shapes fall back to the env-var driven policy (today's behavior).
+ * Map the runtime Environment carried on the pipeline context to the sessions
+ * API networking policy. Absent or malformed values fall back to the env-var
+ * driven policy (today's behavior).
+ *
+ * Integration note: this originally read a NESTED `runtimeEnvironment.networking`
+ * object, written defensively before the Environments feature landed. The
+ * shipped contract (`RuntimeEnvironmentData`) is FLAT — `networkingMode`,
+ * `allowedHosts`, `allowPackageManagers` — so the old shape never matched and
+ * every configured Environment silently fell through to the env-var policy.
+ * It now delegates to the contract's own resolver.
  */
-export function resolveNetworking(runtimeEnvironment?: ManagedRuntimeEnvironment | null): ManagedEnvironmentNetworking {
-	const networking = runtimeEnvironment?.networking;
-	if (!networking || typeof networking !== 'object') {
-		return resolveEnvVarNetworking();
-	}
-
-	if (networking.type === 'unrestricted') {
-		return { type: 'unrestricted' };
-	}
-
-	if (networking.type === 'limited') {
-		const allowedHosts = Array.isArray(networking.allowedHosts)
-			? networking.allowedHosts.filter((host): host is string => typeof host === 'string' && host.trim() !== '')
-			: [];
-
-		return {
-			type: 'limited',
-			allowed_hosts: allowedHosts,
-			allow_package_managers: networking.allowPackageManagers === true,
-			allow_mcp_servers: networking.allowMcpServers === true
-		};
-	}
-
-	return resolveEnvVarNetworking();
+export function resolveNetworking(runtimeEnvironment?: RuntimeEnvironmentData | null): ManagedEnvironmentNetworking {
+	return resolveEnvironmentNetworking(runtimeEnvironment ?? undefined) ?? resolveEnvVarNetworking();
 }
 
 /** Read a persisted non-empty string setting; anything else is "unset". */
@@ -205,7 +190,7 @@ export async function ensureManagedEnvironment(
 	context: PluginContext | null,
 	userId: string,
 	settings: PluginSettings,
-	runtimeEnvironment: ManagedRuntimeEnvironment | null | undefined,
+	runtimeEnvironment: RuntimeEnvironmentData | null | undefined,
 	logger: ControlPlaneLogger
 ): Promise<{ environmentId: string }> {
 	const networking = resolveNetworking(runtimeEnvironment);
@@ -270,7 +255,7 @@ export async function ensureControlPlane(
 	userId: string,
 	settings: PluginSettings,
 	desiredAgent: ManagedAgentDesiredConfig,
-	runtimeEnvironment: ManagedRuntimeEnvironment | null | undefined,
+	runtimeEnvironment: RuntimeEnvironmentData | null | undefined,
 	logger: ControlPlaneLogger
 ): Promise<EnsureControlPlaneResult> {
 	const reuse = settings.reuseControlPlane !== false;

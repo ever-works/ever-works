@@ -14,7 +14,7 @@ export type {
 	ClaudeManagedAgentStepId,
 	ManagedAgentFanOutCapability,
 	ManagedAgentPipelineMetrics,
-	ManagedRuntimeEnvironment,
+	ManagedEnvironmentNetworking,
 	ManagedSessionPromptInput,
 	ManagedSessionRunResult,
 	ManagedSessionTokenUsage,
