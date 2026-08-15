@@ -29,10 +29,23 @@ import { createTriggerViaAPI, TRIGGERS_BASE } from './helpers/triggers';
  *                       valid foreign/unknown uuid → 400 SERVICE "Agent <id> is not reachable…"
  *                       null / owned agent  → 201
  *   taskTitleTemplate optional · @IsString @MaxLength(200); null(create N/A) "" accepted; 201-char → 400
+ *   sourceType        optional · @IsIn(['webhook','event']); 'event' REQUIRES a non-empty eventMatcher
+ *   eventMatcher      optional · nested {source?,kind?,workId?} — any other key 400s
+ *   mode              optional · @IsIn(['single-task','template']); 'template' without
+ *                       taskTemplateSlug → 400 SERVICE msg (the mode is LOCKED after create)
+ *   agentPrompt       optional · @IsString @MaxLength(8000)
+ *   showOnBoard       optional · @IsBoolean
+ *   replayWindowSec   optional · @IsInt @Min(10) @Max(86400)
+ *   autoStart         optional · @IsIn(['always','manual'])
+ *   defaultVariables  optional · array (max 20) of {key,label?,required?}; key must match
+ *                       /^[A-Za-z0-9_-]{1,64}$/
+ *   taskTemplateSlug  optional · kebab-case slug, max 80
  *   unknown field     → 400 ["property <x> should not exist"]  (forbidNonWhitelisted)
  *
  * UpdateInboundTriggerDto  (PATCH /api/inbound-triggers/:id → 200 view):
  *   NO `kind` field → {"kind":…} → 400 ["property kind should not exist"].
+ *   NO `mode` field either — it is locked at create time, so {"mode":…} → 400
+ *   ["property mode should not exist"]. Everything else create accepts is patchable.
  *   name/description/targetAgentId/taskTitleTemplate mirror create's constraints, BUT
  *   description/targetAgentId/taskTitleTemplate use @ValidateIf(v !== null) so an explicit
  *   `null` is accepted and CLEARS the field (200). Empty body {} → 200 no-op.
@@ -678,6 +691,74 @@ test.describe('Inbound Triggers — lifecycle-state ops are idempotent', () => {
         const view = await got.json();
         expect(view).not.toHaveProperty('secret');
         expect(view).not.toHaveProperty('secretEncrypted');
+    });
+
+    test('mode: invalid value → 400; template without a slug → 400 (service, locked mode)', async ({
+        request,
+    }) => {
+        const token = await freshToken(request);
+        const bad = await rawCreate(request, token, { name: `M-${suffix()}`, mode: 'bogus' });
+        expect(bad.status).toBe(400);
+        expectValidatorMessage(bad.body, 'mode must be one of the following values');
+
+        const stranded = await rawCreate(request, token, {
+            name: `M-${suffix()}`,
+            mode: 'template',
+        });
+        expect(stranded.status).toBe(400);
+        // Service-layer guard, not class-validator: a template-mode trigger
+        // with no slug could never build a Task, and mode cannot be fixed later.
+        expect(String(stranded.body.message)).toContain('taskTemplateSlug');
+    });
+
+    test('replayWindowSec bounds: 9 → 400, 10 → 201, 86401 → 400', async ({ request }) => {
+        const token = await freshToken(request);
+        const low = await rawCreate(request, token, {
+            name: `R-${suffix()}`,
+            replayWindowSec: 9,
+        });
+        expect(low.status).toBe(400);
+        expectValidatorMessage(low.body, 'replayWindowSec must not be less than 10');
+
+        const ok = await createTriggerViaAPI(request, token, {
+            name: `R-${suffix()}`,
+            replayWindowSec: 10,
+        });
+        expect(ok.trigger.replayWindowSec).toBe(10);
+
+        const high = await rawCreate(request, token, {
+            name: `R-${suffix()}`,
+            replayWindowSec: 86_401,
+        });
+        expect(high.status).toBe(400);
+    });
+
+    test('defaultVariables: malformed key → 400; a valid contract round-trips', async ({
+        request,
+    }) => {
+        const token = await freshToken(request);
+        const bad = await rawCreate(request, token, {
+            name: `V-${suffix()}`,
+            defaultVariables: [{ key: 'not a key', required: true }],
+        });
+        expect(bad.status).toBe(400);
+
+        const ok = await createTriggerViaAPI(request, token, {
+            name: `V-${suffix()}`,
+            defaultVariables: [{ key: 'repo', required: true }, { key: 'branch' }],
+        });
+        expect(ok.trigger.defaultVariables).toEqual([
+            { key: 'repo', required: true },
+            { key: 'branch', required: false },
+        ]);
+    });
+
+    test('PATCH rejects `mode` — it is locked at create time', async ({ request }) => {
+        const token = await freshToken(request);
+        const { trigger } = await createTriggerViaAPI(request, token, { name: `L-${suffix()}` });
+        const patched = await rawPatch(request, token, trigger.id, { mode: 'template' });
+        expect(patched.status).toBe(400);
+        expectValidatorMessage(patched.body, 'property mode should not exist');
     });
 
     test('DELETE → 204, then GET the same id → 404', async ({ request }) => {

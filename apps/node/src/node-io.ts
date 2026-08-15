@@ -11,6 +11,7 @@ import type { FetchLike } from './core/fleet-client';
 import type { Logger } from './core/logger';
 import { keychainDisabledByEnv, resolveSecretStore, type SecretStore } from './core/secret-store';
 import type { ResourceProbe, ResourceSample } from './core/resource-limits';
+import type { DiskProbeIo } from './core/telemetry-probe';
 
 /**
  * Real IO adapters for the headless node.
@@ -247,6 +248,36 @@ export function createResourceProbe(options: { sampleWindowMs?: number } = {}): 
 				usedMemoryMb: Math.max(totalMemoryMb - freeMemoryMb, 0),
 				totalMemoryMb
 			};
+		}
+	};
+}
+
+/**
+ * Real free-disk probe for the runner-status telemetry.
+ *
+ * `fs.statfs` is the only cross-platform way to ask this from Node
+ * without a native dependency, and it is not available on every runtime
+ * / filesystem combination — so an unavailable API, an unmounted path or
+ * a permission error all resolve to null rather than throwing. The
+ * caller treats null as "unknown", and the platform treats an absent
+ * field as "leave the stored reading alone", so a transient failure
+ * never wipes a good one.
+ *
+ * `bavail` (blocks available to an UNPRIVILEGED process), not `bfree`:
+ * the reserved-blocks difference is exactly the space a node's jobs
+ * cannot actually use, and reporting it would overstate headroom on
+ * every ext4 volume.
+ */
+export function createDiskProbe(): DiskProbeIo {
+	return {
+		freeBytes: async (targetPath: string): Promise<number | null> => {
+			try {
+				const stats = await fsp.statfs(targetPath);
+				const available = Number(stats.bavail) * Number(stats.bsize);
+				return Number.isFinite(available) && available >= 0 ? available : null;
+			} catch {
+				return null;
+			}
 		}
 	};
 }

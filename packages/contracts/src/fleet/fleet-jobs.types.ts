@@ -200,6 +200,16 @@ export interface FleetJobView {
 	createdAt: string | null;
 	startedAt: string | null;
 	completedAt: string | null;
+	/**
+	 * Why a `queued` job has not started — today only
+	 * `waiting-for-runner` (see `QUEUED_REASON_WAITING_FOR_RUNNER`),
+	 * stamped at enqueue when no runner could take the job and cleared
+	 * by the lease CAS. Null on every other status by construction.
+	 *
+	 * Optional on the wire so an older API build that does not send it
+	 * still satisfies this type on a newer client.
+	 */
+	queuedReason?: string | null;
 }
 
 /**

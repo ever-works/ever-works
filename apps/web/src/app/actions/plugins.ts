@@ -236,6 +236,23 @@ export async function setGlobalPipelineDefault(
     }
 }
 
+/**
+ * Set or clear the account's voice (speech-to-text) provider.
+ */
+export async function setGlobalVoiceDefault(pluginId: string | null): Promise<ActionResult> {
+    try {
+        await pluginsAPI.setGlobalVoiceDefault(pluginId);
+        revalidatePath('/settings/plugins/ai-provider');
+        return { success: true };
+    } catch (error) {
+        console.error('Failed to set voice provider default:', error);
+        return {
+            success: false,
+            error: error instanceof Error ? error.message : 'Failed to set voice provider default',
+        };
+    }
+}
+
 export async function getPluginDeviceAuthStatus(
     pluginId: string,
 ): Promise<ActionResult<PluginDeviceAuthStatus>> {

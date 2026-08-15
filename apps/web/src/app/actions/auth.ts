@@ -64,6 +64,20 @@ function isEmailNotVerifiedError(error: unknown): boolean {
     return statusCode === undefined || statusCode === 403;
 }
 
+/**
+ * Does this rejection mean "the account is in a lockout window"?
+ *
+ * Matched on the wording the API actually emits (auth-provider.service.ts
+ * `buildLockoutMessage`: "Account temporarily locked due to too many failed
+ * login attempts, try again in N minutes"). Kept narrow, on the words that
+ * carry the meaning, so an unrelated future rejection cannot start claiming a
+ * lockout — the same discipline as the sibling above.
+ */
+function isAccountLockedError(error: unknown): boolean {
+    const message = error instanceof Error ? error.message : String(error ?? '');
+    return /account .*lock|temporarily locked/i.test(message);
+}
+
 export async function login(identifier: string, password: string, redirectUrl: string | null) {
     const t = await getTranslations('validation.auth');
     // `validation.auth` has no key for an unverified email; the message already
@@ -109,6 +123,19 @@ export async function login(identifier: string, password: string, redirectUrl: s
             message = t('account.suspended');
         } else if (isEmailNotVerifiedError(error)) {
             message = tAuthError('emailNotVerified');
+        } else if (isAccountLockedError(error)) {
+            // Same defect the comment above describes, still open for the
+            // lockout case: the API sends a precise, actionable message —
+            // "Account temporarily locked …, try again in N minutes" — and it
+            // fell through to "Invalid email or password". The credentials may
+            // well be RIGHT, and the suggested fix ("Forgot password?") cannot
+            // clear a time-based lock. Pass the server's own wording through so
+            // the countdown survives; the generic locked string is the fallback
+            // if the API ever stops including it.
+            message =
+                error instanceof Error && error.message
+                    ? error.message
+                    : tAuthError('accountLocked');
         }
 
         return {

@@ -112,6 +112,22 @@ export class FleetJob {
     @Column({ type: 'text', nullable: true })
     error?: string | null;
 
+    /**
+     * Why a `queued` row has not started yet — today only
+     * `waiting-for-runner`, stamped by the fleet run router when the job
+     * was accepted with no runner able to take it.
+     *
+     * It lives on the JOB, not on the `agent_runs` row, because the fact
+     * is a property of the queue: the lease CAS is the moment it stops
+     * being true, and that CAS already writes this row. Anywhere else it
+     * would need a second writer to remember to clear it, which is the
+     * shape of every stale-status bug.
+     *
+     * Short machine token, never free text.
+     */
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    queuedReason?: string | null;
+
     /** First transition into `running` (the node acknowledged the claim). */
     @PortableDateColumn({ nullable: true })
     startedAt?: Date | null;

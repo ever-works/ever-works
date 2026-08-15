@@ -40,6 +40,16 @@ describe('FleetController', () => {
     let jobs: { loadByNodeForUser: jest.Mock };
     let controller: FleetController;
 
+    // Appended constructor deps (runner status + execution preferences).
+    // Stubbed rather than omitted so this suite keeps asserting ONLY the
+    // behaviour it was written for; the new routes have their own spec.
+    const runnerStub = { snapshot: jest.fn(async () => null) };
+    const preferenceStub = {
+        listForUser: jest.fn(async () => []),
+        setForUser: jest.fn(async () => null),
+        clearForUser: jest.fn(async () => undefined),
+    };
+
     beforeEach(() => {
         service = {
             listForUser: jest.fn(async () => [nodeView]),
@@ -55,7 +65,12 @@ describe('FleetController', () => {
             heartbeat: jest.fn(async () => null),
         };
         jobs = { loadByNodeForUser: jest.fn(async () => ({})) };
-        controller = new FleetController(service as never, jobs as never);
+        controller = new FleetController(
+            service as never,
+            jobs as never,
+            runnerStub as never,
+            preferenceStub as never,
+        );
     });
 
     it('list is owner-scoped to the authenticated user', async () => {

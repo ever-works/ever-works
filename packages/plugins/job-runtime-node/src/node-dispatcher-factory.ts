@@ -53,6 +53,12 @@ export interface NodeEnqueueRequest {
 	maxAttempts?: number;
 	/** Extra capability requirements beyond the `cap:` tags in the options. */
 	requiredCapabilities?: readonly string[];
+	/**
+	 * Why the job is queued with nothing able to run it yet (today only
+	 * `waiting-for-runner`). Forwarded verbatim to the store; omitted
+	 * means "queued normally".
+	 */
+	queuedReason?: string | null;
 }
 
 export class NodeDispatcherFactory {
@@ -97,6 +103,7 @@ export class NodeDispatcherFactory {
 			payload,
 			requiredCapabilities,
 			...(request.maxAttempts !== undefined ? { maxAttempts: request.maxAttempts } : {}),
+			...(request.queuedReason !== undefined ? { queuedReason: request.queuedReason } : {}),
 			idempotencyKey: mapped.idempotencyKey
 		});
 		return created.id;

@@ -4,19 +4,12 @@ import { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
 import { ChevronDown, Search, Loader2 } from 'lucide-react';
-import { fetchModels } from '@/app/actions/plugins';
-
-interface AiModel {
-    id: string;
-    name: string;
-    description?: string;
-    capabilities: {
-        maxContextLength: number;
-        maxOutputTokens?: number;
-    };
-    inputCostPer1k?: number;
-    outputCostPer1k?: number;
-}
+import {
+    cachedModels,
+    formatContextLength,
+    loadPluginModels,
+    type AiModel,
+} from '@/lib/ai/model-catalog';
 
 interface PluginModelSelectProps {
     pluginId: string;
@@ -24,53 +17,6 @@ interface PluginModelSelectProps {
     onChange: (value: string) => void;
     disabled?: boolean;
     allowCustom?: boolean;
-}
-
-type ModelLoadResult = {
-    models: AiModel[];
-    error: string | null;
-};
-
-const modelCache = new Map<string, AiModel[]>();
-const inFlightModelRequests = new Map<string, Promise<ModelLoadResult>>();
-
-async function loadPluginModels(
-    pluginId: string,
-    loadErrorMessage: string,
-): Promise<ModelLoadResult> {
-    const cached = modelCache.get(pluginId);
-    if (cached) {
-        return { models: cached, error: null };
-    }
-
-    const existingRequest = inFlightModelRequests.get(pluginId);
-    if (existingRequest) {
-        return existingRequest;
-    }
-
-    const request = fetchModels(pluginId)
-        .then((response) => {
-            if (response.success && Array.isArray(response.data)) {
-                const models = response.data as AiModel[];
-                modelCache.set(pluginId, models);
-                return { models, error: null };
-            }
-
-            return {
-                models: [],
-                error: response.error || loadErrorMessage,
-            };
-        })
-        .catch(() => ({
-            models: [],
-            error: loadErrorMessage,
-        }))
-        .finally(() => {
-            inFlightModelRequests.delete(pluginId);
-        });
-
-    inFlightModelRequests.set(pluginId, request);
-    return request;
 }
 
 export function PluginModelSelect({
@@ -89,7 +35,7 @@ export function PluginModelSelect({
     const [customModel, setCustomModel] = useState('');
     const [showCustomInput, setShowCustomInput] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
-    const cachedModels = pluginId ? (modelCache.get(pluginId) ?? null) : null;
+    const cached = cachedModels(pluginId);
 
     // Click-outside detection via document listener (replaces fragile z-index overlay)
     const handleClickOutside = useCallback((e: MouseEvent) => {
@@ -108,7 +54,7 @@ export function PluginModelSelect({
 
     useEffect(() => {
         if (!pluginId) return;
-        if (cachedModels) return;
+        if (cached) return;
 
         let cancelled = false;
 
@@ -125,14 +71,14 @@ export function PluginModelSelect({
         return () => {
             cancelled = true;
         };
-    }, [cachedModels, pluginId, t]);
+    }, [cached, pluginId, t]);
 
     const activeModels = useMemo(
-        () => cachedModels ?? (loadedPluginId === pluginId ? models : []),
-        [cachedModels, loadedPluginId, models, pluginId],
+        () => cached ?? (loadedPluginId === pluginId ? models : []),
+        [cached, loadedPluginId, models, pluginId],
     );
-    const loading = Boolean(pluginId) && !cachedModels && loadedPluginId !== pluginId;
-    const activeError = cachedModels ? null : loadedPluginId === pluginId ? error : null;
+    const loading = Boolean(pluginId) && !cached && loadedPluginId !== pluginId;
+    const activeError = cached ? null : loadedPluginId === pluginId ? error : null;
 
     const filteredModels = useMemo(() => {
         if (!search) return activeModels;
@@ -146,12 +92,6 @@ export function PluginModelSelect({
 
     const selectedModel = activeModels.find((m) => m.id === value);
     const displayValue = selectedModel?.name || selectedModel?.id || value || t('placeholder');
-
-    const formatContext = (tokens: number) => {
-        if (tokens >= 1000000) return `${(tokens / 1000000).toFixed(0)}M`;
-        if (tokens >= 1000) return `${(tokens / 1000).toFixed(0)}K`;
-        return String(tokens);
-    };
 
     const handleSelect = (modelId: string) => {
         onChange(modelId);
@@ -248,7 +188,7 @@ export function PluginModelSelect({
                                     {model.capabilities?.maxContextLength && (
                                         <span className="text-xs text-text-muted dark:text-text-muted-dark ml-2 shrink-0">
                                             {t('context', {
-                                                value: formatContext(
+                                                value: formatContextLength(
                                                     model.capabilities.maxContextLength,
                                                 ),
                                             })}
