@@ -10,6 +10,8 @@ import {
     ParseUUIDPipe,
     Patch,
     Post,
+    Put,
+    Query,
     UnauthorizedException,
     UseGuards,
 } from '@nestjs/common';
@@ -19,23 +21,32 @@ import type {
     CreateEnrollmentTokenResult,
     FleetEnrollmentTokenView,
 } from '@ever-works/agent/fleet';
-import { FleetJobService, FleetService } from '@ever-works/agent/fleet';
+import {
+    FleetExecutionPreferenceService,
+    FleetJobService,
+    FleetService,
+} from '@ever-works/agent/fleet';
 import type {
     FleetEnrollResponse,
+    FleetExecutionPreferenceView,
     FleetHeartbeatResponse,
     FleetNodeView,
+    FleetRunnerStatusView,
 } from '@ever-works/contracts';
+import { FleetRunnerStatusService } from './fleet-runner-status.service';
 import { Public } from '../auth/decorators/public.decorator';
 import { CurrentUser } from '../auth/decorators/user.decorator';
 import type { AuthenticatedUser } from '../auth/types/auth.types';
 import type { FleetNodeDetailView, FleetNodeDrainResult } from './fleet-admin.types';
 import {
+    ClearFleetExecutionPreferenceDto,
     CreateFleetEnrollmentTokenDto,
     DrainFleetNodeDto,
     EnrollFleetNodeDto,
     FleetHeartbeatDto,
     FleetNodePauseDto,
     FleetUnenrollDto,
+    SetFleetExecutionPreferenceDto,
     UpdateFleetNodeDto,
 } from './dto/fleet.dto';
 import { FleetEnabledGuard } from './guards/fleet-enabled.guard';
@@ -63,6 +74,11 @@ const NODE_HISTORY_LIMIT = 25;
  *   DELETE /api/fleet/nodes/:id               remove registration
  *   GET    /api/fleet/enrollment-tokens       outstanding (unused) tokens
  *   DELETE /api/fleet/enrollment-tokens/:id   revoke one BEFORE it is used
+ *   GET    /api/fleet/runner-status           compact N-of-M runner status
+ *                                             behind the sidebar pill
+ *   GET    /api/fleet/execution-preferences   local-vs-cloud routing rows
+ *   PUT    /api/fleet/execution-preference    set one scope's routing
+ *   DELETE /api/fleet/execution-preference    clear one scope's routing
  *
  * Public, self-authenticating (called by the node apps — throttled,
  * fail-closed: any invalid credential path is one undifferentiated
@@ -90,7 +106,70 @@ export class FleetController {
     constructor(
         private readonly service: FleetService,
         private readonly jobs: FleetJobService,
+        private readonly runners: FleetRunnerStatusService,
+        private readonly preferences: FleetExecutionPreferenceService,
     ) {}
+
+    @Get('runner-status')
+    @ApiOperation({
+        summary:
+            'Compact runner status for the always-visible runner indicator: N of M online, plus a per-node row (status, last heartbeat, daemon + agent-CLI version, free disk, busy). Owner-scoped; cluster-sourced nodes are excluded because the platform never leases work onto them.',
+    })
+    @HttpCode(HttpStatus.OK)
+    // The pill polls this from every dashboard page. The throttle is
+    // sized well above the 30s cadence the payload itself advertises, so
+    // a couple of open tabs plus a manual refresh cannot trip it.
+    @Throttle({ long: { limit: 120, ttl: 60_000 } })
+    async runnerStatus(@CurrentUser() auth: AuthenticatedUser): Promise<FleetRunnerStatusView> {
+        return this.runners.snapshot(auth.userId);
+    }
+
+    @Get('execution-preferences')
+    @ApiOperation({
+        summary:
+            'Every execution routing preference this owner has configured (account-wide, per Work, per Goal). Narrowest wins at dispatch time.',
+    })
+    @HttpCode(HttpStatus.OK)
+    async listExecutionPreferences(
+        @CurrentUser() auth: AuthenticatedUser,
+    ): Promise<FleetExecutionPreferenceView[]> {
+        return this.preferences.listForUser(auth.userId);
+    }
+
+    @Put('execution-preference')
+    @ApiOperation({
+        summary:
+            "Set where runs in one scope execute: 'local-wait' (fleet, waiting for a free runner slot), 'local-fallback' (fleet, falling back to the cloud with a notification) or 'cloud'.",
+    })
+    @HttpCode(HttpStatus.OK)
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
+    async setExecutionPreference(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() body: SetFleetExecutionPreferenceDto,
+    ): Promise<FleetExecutionPreferenceView> {
+        // Every field the DTO accepts is forwarded — a body-mapping
+        // whitelist that quietly drops one is how a shipped setting ends
+        // up doing nothing.
+        return this.preferences.setForUser(auth.userId, {
+            scopeType: body.scopeType,
+            scopeId: body.scopeId ?? null,
+            mode: body.mode,
+        });
+    }
+
+    @Delete('execution-preference')
+    @ApiOperation({
+        summary:
+            'Clear one scope’s execution preference so it inherits from the next scope out. Idempotent — clearing an unset scope is a no-op, because "inherit" is already true when there is no row.',
+    })
+    @HttpCode(HttpStatus.NO_CONTENT)
+    @Throttle({ long: { limit: 60, ttl: 60_000 } })
+    async clearExecutionPreference(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Query() query: ClearFleetExecutionPreferenceDto,
+    ): Promise<void> {
+        await this.preferences.clearForUser(auth.userId, query.scopeType, query.scopeId ?? null);
+    }
 
     @Get('nodes')
     @ApiOperation({
@@ -294,10 +373,16 @@ export class FleetController {
     @HttpCode(HttpStatus.CREATED)
     @Throttle({ long: { limit: 30, ttl: 60_000 } })
     async enroll(@Body() body: EnrollFleetNodeDto): Promise<FleetEnrollResponse> {
+        // Every self-description field the DTO accepts is forwarded.
+        // This mapping is explicit rather than a spread, so a field
+        // added to the DTO and forgotten here would be silently dropped
+        // — the exact failure mode this comment exists to prevent.
         const result = await this.service.enroll(body.token, {
             platform: body.platform,
             version: body.version,
             capabilities: body.capabilities,
+            cliVersion: body.cliVersion,
+            diskFreeBytes: body.diskFreeBytes,
         });
         if (!result) {
             // One undifferentiated message — never say WHICH check failed.
@@ -315,10 +400,13 @@ export class FleetController {
     @HttpCode(HttpStatus.OK)
     @Throttle({ long: { limit: 240, ttl: 60_000 } })
     async heartbeat(@Body() body: FleetHeartbeatDto): Promise<FleetHeartbeatResponse> {
+        // Same explicit mapping as `enroll` — and the same warning.
         const result = await this.service.heartbeat(body.nodeId, body.secret, {
             platform: body.platform,
             version: body.version,
             capabilities: body.capabilities,
+            cliVersion: body.cliVersion,
+            diskFreeBytes: body.diskFreeBytes,
         });
         if (!result) {
             throw new UnauthorizedException('Invalid node credential');

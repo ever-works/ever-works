@@ -108,6 +108,18 @@ const CORE_EVENTS: readonly CoreEventRow[] = [
         urgent: false,
         defaultChannels: ['in-app'],
     },
+    // Fleet local-runner routing. Seeded on Postgres by
+    // `1785100000000-FleetRunnerTelemetryAndRouting` too; this entry is
+    // what makes it exist on SQLite / CI, where migrations do not run.
+    {
+        key: 'fleet_runner_fallback',
+        category: 'agent',
+        title: 'Local runner fallback',
+        description:
+            'A run that preferred your local runner was executed in the cloud instead, because no runner could take it.',
+        urgent: false,
+        defaultChannels: ['in-app'],
+    },
 ];
 
 /**
