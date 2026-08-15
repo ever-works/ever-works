@@ -156,3 +156,5 @@ export * from './workflow-run.entity';
 // Environments (Settings → Environments) — named, reusable runtime
 // recipes (packages + networking) assigned per-Agent.
 export * from './environment.entity';
+// Memory Files — user-defined folders organizing uploads on /memory.
+export * from './memory-folder.entity';

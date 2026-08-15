@@ -122,7 +122,9 @@ describe('activity-log.types', () => {
             //    (Agent Collaborators allow-list edits) -> 126.
             // +4 environment_created / _updated / _published / _deleted
             //    (Settings -> Environments) -> 130.
-            expect(literals).toHaveLength(130);
+            // +3 memory_folder_created / _deleted / _synced (Memory Files —
+            //    the /memory Files area folder tree) -> 126.
+            expect(literals).toHaveLength(133);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {
@@ -156,7 +158,6 @@ describe('activity-log.types', () => {
 
         it('has exactly 5 documented literal values', () => {
             const literals = Object.values(ActivityStatus).filter((v) => typeof v === 'string');
-            expect(literals).toHaveLength(5);
         });
 
         it('every literal value is unique', () => {

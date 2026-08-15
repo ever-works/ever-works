@@ -73,6 +73,7 @@ import { SessionScopeGuard } from './scope/session-scope.guard';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { FunnelAnalyticsBindingModule } from './telemetry/funnel-analytics-binding.module';
 import { UploadsModule } from './uploads/uploads.module';
+import { MemoryFilesApiModule } from './memory-files/memory-files.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import {
     PluginsModule as AgentPluginsModule,
@@ -259,6 +260,9 @@ import { DatabaseModule } from '@ever-works/agent/database';
         TelemetryModule,
         FunnelAnalyticsBindingModule,
         UploadsModule,
+        // Memory Files — /api/memory/files: the unified Files area of
+        // /memory (folder tree + both upload spines + manual git sync).
+        MemoryFilesApiModule,
         WebhooksModule,
         // EW-652 (Tenants & Organizations Phase 0) — UsersModule provides
         // `UsernameAllocatorService` (consumed by AuthModule callers,

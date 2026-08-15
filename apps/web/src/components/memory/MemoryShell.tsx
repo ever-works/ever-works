@@ -16,6 +16,7 @@ import { Link } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
 import { cn } from '@/lib/utils/cn';
 import { MemoryUploadsPanel } from './MemoryUploadsPanel';
+import { MemoryFilesPanel } from './MemoryFilesPanel';
 import { AgentMemoryPanel } from './AgentMemoryPanel';
 import { MemoryReviewPanel } from './MemoryReviewPanel';
 import { MemoryConsolidationSettings } from './MemoryConsolidationSettings';
@@ -258,6 +259,9 @@ export function MemoryShell({ initial }: MemoryShellProps) {
 
             {/* Review queue — proposed docs awaiting a human (hidden when empty) */}
             <MemoryReviewPanel />
+
+            {/* Files — browse ALL files (chat uploads + KB originals) in folders */}
+            <MemoryFilesPanel />
 
             {/* Originals — upload files into org-wide Memory */}
             <MemoryUploadsPanel />

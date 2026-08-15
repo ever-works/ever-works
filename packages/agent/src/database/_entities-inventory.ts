@@ -136,6 +136,7 @@ import { ToolGrant } from '../entities/tool-grant.entity';
 import { Workflow } from '../entities/workflow.entity';
 import { WorkflowRun } from '../entities/workflow-run.entity';
 import { Environment } from '../entities/environment.entity';
+import { MemoryFolder } from '../entities/memory-folder.entity';
 
 import {
     PluginEntity,
@@ -335,4 +336,6 @@ export const ENTITIES = [
     // Environments (Settings → Environments) — named, reusable runtime
     // recipes (packages + networking) assigned per-Agent.
     Environment,
+    // Memory Files — user-defined folders organizing uploads on /memory.
+    MemoryFolder,
 ];

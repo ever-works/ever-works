@@ -98,6 +98,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'Invoice',
     // Meetings v1 (Wave 8, feature a) — captured meetings w/ transcripts
     'Meeting',
+    // Memory Files — user-defined folders organizing uploads on /memory
+    'MemoryFolder',
     'Mission',
     // Domain-model evolution PR-8 — Goals + measurement
     'Goal',
