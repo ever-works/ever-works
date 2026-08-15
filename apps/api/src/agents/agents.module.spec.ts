@@ -36,6 +36,12 @@ jest.mock('@ever-works/agent/agents', () => ({
     AGENT_EMAIL_FACADE: 'AGENT_EMAIL_FACADE',
     AGENT_NOTIFY_CHANNEL_FACADE: 'AGENT_NOTIFY_CHANNEL_FACADE',
     AGENT_DOMAIN_TOOL_SOURCES: 'AGENT_DOMAIN_TOOL_SOURCES',
+    // Agent Plugins MCP slice (T26) — the MCP tool-source seam.
+    AGENT_MCP_TOOL_SOURCE: 'AGENT_MCP_TOOL_SOURCE',
+}));
+jest.mock('@ever-works/agent/mcp', () => ({
+    McpModule: class McpModule {},
+    McpToolSource: class McpToolSource {},
 }));
 jest.mock('@ever-works/agent/database', () => ({
     DatabaseModule: class DatabaseModule {},
@@ -145,8 +151,10 @@ import {
     AgentEscalationService,
     WorkflowGraphExecutorService,
     AGENT_DOMAIN_TOOL_SOURCES,
+    AGENT_MCP_TOOL_SOURCE,
     AGENT_GIT_FACADE,
 } from '@ever-works/agent/agents';
+import { McpModule, McpToolSource } from '@ever-works/agent/mcp';
 import { BrowserAutomationFacadeService, GitFacadeService } from '@ever-works/agent/facades';
 import { PullRequestGateService } from '@ever-works/agent/policy';
 import { WorkRepository } from '@ever-works/agent/database';
@@ -213,6 +221,20 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
 
     it('exports the token so the agent-side @Optional() injection resolves', () => {
         expect(meta('exports')).toContain(AGENT_DOMAIN_TOOL_SOURCES);
+    });
+
+    it('imports McpModule and binds AGENT_MCP_TOOL_SOURCE to the shared McpToolSource', () => {
+        // Agent Plugins MCP slice (T26). Without this binding the
+        // @Optional() injection in AgentToolService resolves to undefined
+        // and no run ever sees an mcp__<server>__<tool> descriptor —
+        // exactly the dead-seam failure mode this pin exists to catch.
+        expect(meta('imports')).toContain(McpModule);
+        const provider = (meta('providers') as { provide?: unknown; useExisting?: unknown }[]).find(
+            (p) => p && typeof p === 'object' && p.provide === AGENT_MCP_TOOL_SOURCE,
+        );
+        expect(provider).toBeDefined();
+        expect(provider?.useExisting).toBe(McpToolSource);
+        expect(meta('exports')).toContain(AGENT_MCP_TOOL_SOURCE);
     });
 
     it('binds all three Task membership repositories (the commentOnTask gate is fail-closed)', () => {

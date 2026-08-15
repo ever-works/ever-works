@@ -133,6 +133,8 @@ import { TerminalTranscriptChunk } from '../entities/terminal-transcript-chunk.e
 
 import { FleetJob } from '../entities/fleet-job.entity';
 import { ToolGrant } from '../entities/tool-grant.entity';
+import { McpServerConnection } from '../entities/mcp-server-connection.entity';
+import { AgentMcpServerBinding } from '../entities/agent-mcp-server-binding.entity';
 import { Workflow } from '../entities/workflow.entity';
 import { WorkflowRun } from '../entities/workflow-run.entity';
 import { Environment } from '../entities/environment.entity';
@@ -327,6 +329,10 @@ export const ENTITIES = [
     // Tool-grant matrix (audit item G4) — one row per (owner, scope)
     // carrying that scope's tool allow/deny contribution.
     ToolGrant,
+    // Agent Plugins MCP slice — manual external MCP server registry +
+    // per-agent/tenant bindings (plan §2.4/§2.5).
+    McpServerConnection,
+    AgentMcpServerBinding,
     // Workflows (judgment layer G5) — saved graphs. Until this row
     // existed a graph could be executed but never KEPT.
     Workflow,

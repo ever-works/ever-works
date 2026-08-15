@@ -43,6 +43,7 @@ import {
     AGENT_DOMAIN_TOOL_SOURCES,
     type AgentDomainToolSources,
 } from './agent-domain-tool-sources';
+import { AGENT_MCP_TOOL_SOURCE, type AgentMcpToolSource } from './agent-mcp-tool-source';
 // Domain chat-tool factories. VALUE imports on purpose — every one of
 // these modules imports its own domain only with `import type`, so
 // pulling the factory functions in here adds ZERO runtime graph to the
@@ -211,6 +212,14 @@ export class AgentToolService {
         // exposes the tool (the model sees nothing that would fail).
         @Optional() private readonly delegation?: SubAgentDelegationService,
         @Optional() private readonly collaborators?: AgentCollaboratorRepository,
+        // Agent Plugins MCP slice (T26). APPENDED LAST + @Optional() so
+        // every existing positional constructor call keeps working, and
+        // so a runtime without the MCP module behaves exactly as before.
+        // Consumed in `resolveGrantedTools` (async — descriptor assembly
+        // needs I/O), never in the sync `resolveAllowedTools`.
+        @Optional()
+        @Inject(AGENT_MCP_TOOL_SOURCE)
+        private readonly mcpTools?: AgentMcpToolSource,
     ) {}
 
     /**
@@ -587,6 +596,43 @@ export class AgentToolService {
         },
     ): Promise<{ tools: AgentToolDescriptor[]; refused: ToolGrantDecision[] }> {
         const tools = this.resolveAllowedTools(agent, runContext);
+
+        // Agent Plugins MCP slice (T26): append the MCP descriptors BEFORE
+        // the grant partition so `mcp__<server>__<tool>` names flow through
+        // the tool-grant matrix like every other tool. Failure-isolated on
+        // BOTH levels: the source itself already skips dead servers, and a
+        // broken source contributes zero tools — never a failed run.
+        if (this.mcpTools) {
+            try {
+                const mcpDescriptors = await this.mcpTools.buildTools(agent);
+                const existing = new Set(tools.map((tool) => tool.name));
+                for (const descriptor of mcpDescriptors) {
+                    // A server-supplied name must never shadow a built-in —
+                    // the run loop's descriptorByName map is last-write-wins,
+                    // so a collision is dropped HERE with a WARN.
+                    if (existing.has(descriptor.name)) {
+                        this.logger.warn(
+                            `Agent ${agent.id}: MCP tool "${descriptor.name}" collides with an existing tool and was dropped.`,
+                        );
+                        continue;
+                    }
+                    existing.add(descriptor.name);
+                    // Same `{{cred.key}}` wrapper the built-ins get in
+                    // `resolveAllowedTools`. MCP tools are the outbound
+                    // calls credentials exist FOR, so skipping the wrapper
+                    // here would send the literal `{{cred.x}}` text to a
+                    // third-party server and scrub nothing on the way back.
+                    tools.push(this.withCredentialInterpolation(agent, descriptor));
+                }
+            } catch (err) {
+                this.logger.warn(
+                    `Agent ${agent.id}: MCP tool source failed (no MCP tools this run): ${
+                        err instanceof Error ? err.message : String(err)
+                    }`,
+                );
+            }
+        }
+
         if (!this.toolGrants) return { tools, refused: [] };
 
         try {

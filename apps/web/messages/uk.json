@@ -932,7 +932,8 @@
                 "budgets": "Бюджети",
                 "settings": "Налаштування",
                 "terminal": "Terminal",
-                "collaborators": "Collaborators"
+                "collaborators": "Collaborators",
+                "mcpServers": "MCP Servers"
             },
             "newDialog": {
                 "title": "Новий Агент",
@@ -1125,6 +1126,16 @@
                 "toggleFailed": "Could not update collaborator",
                 "reset": "Clear rule",
                 "legacyNote": "With no collaborators enabled, this agent can only delegate subtasks to itself."
+            },
+            "mcpServers": {
+                "title": "MCP Servers",
+                "subtitle": "Choose which MCP connections this agent can use. Tenant-wide connections are inherited unless overridden here.",
+                "activeCount": "{count} active",
+                "empty": "No MCP connections configured. Add one under Settings → Connections.",
+                "inherited": "Inherited",
+                "overridden": "Override",
+                "connectionDisabled": "Connection disabled",
+                "revert": "Revert"
             }
         },
         "tasksPage": {
@@ -2185,7 +2196,8 @@
                 "notifications": "Notifications",
                 "channels": "Channels",
                 "emails": "Email Addresses",
-                "environments": "Environments"
+                "environments": "Environments",
+                "connections": "Connections"
             },
             "githubApp": {
                 "title": "Інсталяції GitHub App",
@@ -3072,6 +3084,31 @@
                     "description": "Delete \"{name}\"? Agents must be unassigned from it first — deletion is refused while any Agent still uses it.",
                     "cancel": "Cancel",
                     "confirm": "Delete"
+                }
+            },
+            "connections": {
+                "title": "Connections",
+                "subtitle": "External MCP servers your agents can use as tools. Auth header values are encrypted and never shown again.",
+                "addConnection": "Add Connection",
+                "empty": "No connections yet. Add an MCP server URL to give your agents external tools.",
+                "authHeaders": "Auth headers",
+                "lastConnected": "Connected {date}",
+                "test": "Test",
+                "testOk": "OK — {count} tools ({tools})",
+                "testFailed": "Connection test failed.",
+                "delete": "Delete",
+                "form": {
+                    "name": "Name",
+                    "nameHelp": "Lowercase letters, digits, hyphens. Becomes the mcp__<name>__<tool> prefix.",
+                    "transport": "Transport",
+                    "streamableHttp": "Streamable HTTP",
+                    "sse": "SSE (legacy)",
+                    "url": "Server URL",
+                    "headerName": "Auth header name",
+                    "headerValue": "Auth header value",
+                    "headerValueHelp": "Stored encrypted. Never shown again.",
+                    "cancel": "Cancel",
+                    "save": "Save"
                 }
             }
         },

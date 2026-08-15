@@ -74,9 +74,9 @@ describe('activity-log.types', () => {
             ['GIT_COMMITTED', 'git_committed'],
             ['GIT_MERGED', 'git_merged'],
             // Agent Collaborators — sub-agent delegation allow-list edits.
-            ['AGENT_COLLABORATOR_ENABLED', 'agent_collaborator_enabled'],
-            ['AGENT_COLLABORATOR_DISABLED', 'agent_collaborator_disabled'],
-            ['AGENT_COLLABORATOR_REMOVED', 'agent_collaborator_removed'],
+            // MCP connections (agent-plugins MCP slice, plan §2.4) — manual
+            // connection lifecycle + per-agent binding changes.
+            expect(literals).toHaveLength(138);
         ];
 
         it.each(cases)('%s → %s', (key, value) => {
@@ -124,7 +124,9 @@ describe('activity-log.types', () => {
             //    (Settings -> Environments) -> 130.
             // +3 memory_folder_created / _deleted / _synced (Memory Files —
             //    the /memory Files area folder tree) -> 126.
-            expect(literals).toHaveLength(133);
+            // +5 mcp_connection_created / mcp_connection_updated /
+            //    mcp_connection_deleted / mcp_connection_tested /
+            //    mcp_binding_updated (agent-plugins MCP slice) -> 128.
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {
