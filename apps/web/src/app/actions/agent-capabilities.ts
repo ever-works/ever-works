@@ -72,9 +72,7 @@ export async function resetAgentToolGrantAction(
  * API's real message must be captured HERE (mirrors
  * `writeAgentFileAction`).
  */
-export type SaveInitScriptResult =
-    | { ok: true; agent: Agent }
-    | { ok: false; message: string };
+export type SaveInitScriptResult = { ok: true; agent: Agent } | { ok: false; message: string };
 
 export async function updateAgentInitScriptAction(
     agentId: string,

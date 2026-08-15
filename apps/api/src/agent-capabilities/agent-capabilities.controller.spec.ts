@@ -22,7 +22,12 @@ import { buildAgentToolCatalog } from '@ever-works/agent/agents';
 import { AgentCapabilitiesController } from './agent-capabilities.controller';
 
 const CATALOG: AgentToolCatalogEntry[] = [
-    { name: 'getSkillBody', description: 'Read a bound skill body.', gatedByPermission: null, source: 'builtin' },
+    {
+        name: 'getSkillBody',
+        description: 'Read a bound skill body.',
+        gatedByPermission: null,
+        source: 'builtin',
+    },
     {
         name: 'searchWeb',
         description: 'Web search via the active search plugin.',
