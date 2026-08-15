@@ -50,14 +50,31 @@ Wire types + the option normalizer live in
 | approvals              | `AgentApprovalsService.createProposal` (**pending only**) → `proposalPending`        | pre-check on `proposalId`                                    |
 | system notices         | `InboxBudgetAlertListener` on `BudgetThresholdCrossedEvent` → `InboxService.notice`  | upstream, by `WorkBudgetAlertStateRepository`'s unique index |
 
+The budget listener files its notice with `notify: false`: the api-side
+`BudgetAlertHandler` already subscribes to the SAME event and writes the in-app
+notification plus the templated email, so ringing again here would give every
+threshold crossing two bell rows and two channel fanouts for one event. The
+unread sidebar badge still counts the row.
+
 The upstream services reach the inbox through `INBOX_PRODUCER`, a token in the
 leaf file `packages/agent/src/inbox/inbox-producer.port.ts` with zero runtime
 imports, injected `@Optional()`. The api-side `@Global()` `InboxApiModule` binds
-it to `InboxService`. That keeps file-import direction one-way (inbox → agents /
-approvals for reply routing, never back) while the runtime call goes the other
-way. **The `@Global()` matters**: without it those injections resolve to
-`undefined` in production and nothing ever mirrors, while every unit test still
-passes.
+it to a LAZY factory that resolves `InboxService` through `ModuleRef` at CALL
+time. That keeps file-import direction one-way (inbox → agents / approvals for
+reply routing, never back) while the runtime call goes the other way.
+
+Two things about that binding are load-bearing:
+
+- **`@Global()` matters**: without it those injections resolve to `undefined`
+  in production and nothing ever mirrors, while every unit test still passes.
+- **The laziness matters even more.** `InboxService` injects
+  `AgentApprovalsService` + `AgentEscalationService`, and both inject
+  `INBOX_PRODUCER` — a real provider cycle. Bound as
+  `{ provide: INBOX_PRODUCER, useExisting: InboxService }`, Nest's instance
+  loader never settles: `apps/api` HANGS before it listens, with no exception
+  and no log line, so the pod simply never turns ready. `@Optional()` covers a
+  missing provider, not a pending one. Pinned by
+  `apps/api/src/inbox/__tests__/inbox.module.spec.ts`.
 
 ### How `ask_human` parks the run
 
@@ -94,10 +111,17 @@ links.
 | `notice`     | marked answered, nothing routed                                                                                                                                                             |
 
 The composed message is `"<option label> — <free text>"` (either half may be
-absent). The CAS claim (`markAnswered`, `WHERE status='open'`) runs **last** —
-routing is what the reply exists to do, and each downstream is its own
-idempotency boundary. A concurrent reply that loses the CAS reports
-`already-decided` with the winner's row.
+absent). The CAS claim (`markAnswered`, `WHERE status='open'`) runs **first**,
+before any routing: routing is NOT idempotent — `RunSteeringService.resume`
+creates and dispatches a brand-new `AgentRun` on every call, so two replies
+racing on one open item (two tabs, a double submit, a retried API client) would
+resume the same question twice and pay for both runs. A concurrent reply that
+loses the CAS routes nothing and reports `already-decided` with the winner's
+row. If routing then throws, the claim is RELEASED
+(`InboxItemRepository.reopen`, CAS'd on `status='answered'`) so a downstream
+hiccup still leaves the human an answerable item. Shape errors that cannot
+depend on a downstream (an approval reply that names neither `approve` nor
+`reject`) are raised before the claim.
 
 Every downstream router is `@Optional()` in the constructor, so unit tests and
 partial runtimes degrade to "recorded but not routed" instead of failing the
@@ -122,7 +146,9 @@ same 404, with no existence oracle. Replying to an already-answered item is 409.
 ## Fan-out
 
 `NotificationService.notifyInboxItem` creates the in-app bell row (dedup key
-`inbox_item_<id>`, action URL `/inbox`) and dispatches
+`inbox_item_<id>`, action URL `/inbox?id=<itemId>` — the DEEP link, because a
+bare `/inbox` opens whatever is newest and lands the human on the wrong message)
+and dispatches
 `NOTIFICATION_FANOUT_EVENT` so the enabled channel plugins deliver, with quiet
 hours / mutes applied downstream as for every other producer. Event keys
 `inbox_question` (urgent), `inbox_approval_requested`, `inbox_escalation`,
