@@ -106,7 +106,11 @@ export function createFleetAwareAgentTaskExecuteDispatcher(
                         userId: payload.userId,
                         taskId: payload.taskId,
                         reason: decision.fallbackReason,
-                        runnerCount: decision.fallbackReason === 'no-runners' ? 0 : 1,
+                        // The real count from the availability snapshot,
+                        // not a stand-in derived from the reason: an
+                        // owner with four busy runners must not read
+                        // "1" in a stored notification.
+                        runnerCount: decision.runnerCount ?? 0,
                     });
                 } catch (err) {
                     // Best-effort by contract: the run is what matters,

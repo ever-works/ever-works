@@ -106,16 +106,29 @@ export class FleetRunnerStatusService {
      * runners, which sends a `local-fallback` run to the cloud and
      * leaves a `local-wait` run queued. Both are safe; claiming
      * capacity we could not verify is not.
+     *
+     * `loadUnavailable` is part of "could not verify", and it is the
+     * subtle half. The pill can honestly degrade to registry-only —
+     * showing every node with `busy: false` and a caption saying job
+     * activity is unknown is better than hiding live machines. ROUTING
+     * cannot: `busy: false` on an unread load table is not "idle", it is
+     * "unknown", and treating it as idle sends a `local-fallback` run to
+     * a fleet whose runners may all be saturated, where it sits in the
+     * queue instead of taking the cloud path the mode exists to
+     * guarantee. So the same snapshot answers the two questions
+     * differently, on purpose.
      */
     async availability(userId: string): Promise<FleetRunnerAvailability> {
         try {
             const status = await this.snapshot(userId);
-            const free = status.nodes.filter(
-                (node) =>
-                    node.status === 'online' &&
-                    !FLEET_NODE_NON_LEASABLE_STATUSES.includes(node.status) &&
-                    !node.busy,
-            );
+            const free = status.loadUnavailable
+                ? []
+                : status.nodes.filter(
+                      (node) =>
+                          node.status === 'online' &&
+                          !FLEET_NODE_NON_LEASABLE_STATUSES.includes(node.status) &&
+                          !node.busy,
+                  );
             return {
                 total: status.total,
                 online: status.online,

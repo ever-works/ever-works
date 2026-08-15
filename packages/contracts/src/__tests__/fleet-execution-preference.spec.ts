@@ -100,18 +100,38 @@ describe('decideFleetRouting', () => {
 		expect(decideFleetRouting('local-fallback', ALL_BUSY)).toEqual({
 			target: 'cloud',
 			mode: 'local-fallback',
-			fallbackReason: 'runners-busy'
+			fallbackReason: 'runners-busy',
+			runnerCount: 2
 		});
 		expect(decideFleetRouting('local-fallback', ALL_OFFLINE)).toEqual({
 			target: 'cloud',
 			mode: 'local-fallback',
-			fallbackReason: 'runners-offline'
+			fallbackReason: 'runners-offline',
+			runnerCount: 2
 		});
 		expect(decideFleetRouting('local-fallback', NONE)).toEqual({
 			target: 'cloud',
 			mode: 'local-fallback',
-			fallbackReason: 'no-runners'
+			fallbackReason: 'no-runners',
+			runnerCount: 0
 		});
+	});
+
+	it('carries the REAL enrolled-runner count on a fallback', () => {
+		// The fallback notification stores this number. The decision is
+		// the only place that saw the availability snapshot, so a caller
+		// downstream could only guess — and a guess ("busy, so call it
+		// 1") is what an owner with four runners would have read.
+		const decision = decideFleetRouting('local-fallback', { total: 4, online: 4, free: 0 });
+
+		expect(decision.runnerCount).toBe(4);
+	});
+
+	it('carries no count when nothing was taken away', () => {
+		// `cloud` and a placed `fleet` run are not fallbacks; there is no
+		// notification, so there is nothing to count.
+		expect(decideFleetRouting('cloud', FREE).runnerCount).toBeUndefined();
+		expect(decideFleetRouting('local-wait', ALL_BUSY).runnerCount).toBeUndefined();
 	});
 });
 

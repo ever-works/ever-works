@@ -162,6 +162,14 @@ export interface FleetRunRoutingDecision {
 	mode: FleetExecutionMode;
 	/** Set only when `target === 'cloud'` after a local preference. */
 	fallbackReason?: FleetFallbackReason;
+	/**
+	 * Enrolled runners the owner had when this decision was taken. Set
+	 * alongside {@link fallbackReason}, because the fallback notice
+	 * reports it and the decision is the only place that saw the
+	 * availability snapshot — a caller downstream can only guess, and a
+	 * guessed count in a stored notification is worse than none.
+	 */
+	runnerCount?: number;
 	/** Set only when `target === 'fleet-waiting'`. */
 	queuedReason?: typeof QUEUED_REASON_WAITING_FOR_RUNNER;
 }
@@ -202,5 +210,5 @@ export function decideFleetRouting(
 		// executes.
 		return { target: 'fleet-waiting', mode, queuedReason: QUEUED_REASON_WAITING_FOR_RUNNER };
 	}
-	return { target: 'cloud', mode, fallbackReason };
+	return { target: 'cloud', mode, fallbackReason, runnerCount: availability.total };
 }

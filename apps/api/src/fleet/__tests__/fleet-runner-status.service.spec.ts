@@ -150,6 +150,29 @@ describe('FleetRunnerStatusService', () => {
             });
         });
 
+        it('reports ZERO free when the job load could not be read at all', async () => {
+            // REGRESSION: `snapshot` degrades to `busy: false` for every
+            // node when `fleet_jobs` cannot be read — right for the pill,
+            // wrong for routing. Counting those as free made a
+            // `local-fallback` run enqueue onto a fleet whose runners may
+            // all be saturated, so it waited in the queue instead of
+            // taking the cloud path that mode exists to guarantee.
+            fleet.listEnrolledForUser.mockResolvedValue([
+                node({ id: 'a', status: 'online' }),
+                node({ id: 'b', status: 'online' }),
+            ]);
+            jobs.loadByNodeForUser.mockRejectedValue(new Error('fleet_jobs unreachable'));
+
+            await expect(build().availability('user-1')).resolves.toEqual({
+                total: 2,
+                // The registry half IS verified, so it is still reported —
+                // that is what keeps the fallback reason `runners-busy`
+                // rather than the misleading `no-runners`.
+                online: 2,
+                free: 0,
+            });
+        });
+
         it('reports the fleet as unavailable when the registry read throws', async () => {
             fleet.listEnrolledForUser.mockRejectedValue(new Error('db down'));
 

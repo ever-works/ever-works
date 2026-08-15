@@ -175,6 +175,20 @@ describe('fleet run routing (local-runner preference matrix)', () => {
             );
         });
 
+        it('reports the OWNER’S REAL runner count in the notice', async () => {
+            // REGRESSION: the count used to be derived from the reason
+            // ("not no-runners, so say 1"), which stored a fabricated
+            // figure on a durable notification row for every owner with
+            // more than one machine.
+            runners.availability.mockResolvedValue(availability({ total: 4, online: 4, free: 0 }));
+
+            await buildDispatcher().enqueue(payload());
+
+            expect(notifications.notifyFleetRunnerFallback).toHaveBeenCalledWith(
+                expect.objectContaining({ reason: 'runners-busy', runnerCount: 4 }),
+            );
+        });
+
         it('distinguishes "no runners enrolled" from "runners busy"', async () => {
             runners.availability.mockResolvedValue(availability({ total: 0, online: 0, free: 0 }));
 
