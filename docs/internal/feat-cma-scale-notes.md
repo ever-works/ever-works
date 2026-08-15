@@ -112,6 +112,13 @@ applied on **all three** paths that can reach `sessions.create`: form validation
 Per-session cost comes from `usage.list_cost` (integer minor units, USD-only; non-USD or
 malformed amounts yield `undefined` rather than a wrong number).
 
+Token counting goes through one seam, `toManagedSessionTokenUsage()`, shared by the
+fan-out and single-session paths. `totalTokens` counts **every billed token class**:
+`input_tokens + output_tokens + cache_creation_input_tokens + cache_read_input_tokens`.
+The two cache counters are reported by the sessions API _outside_ `input_tokens`, and
+managed-agent sessions re-read a large cached prefix on every turn, so omitting them
+under-reported the rollup by orders of magnitude (see review findings below).
+
 **No `plugin_usage_events` ledger row is emitted.** That was checked, not assumed:
 `PluginUsageService` is an API/agent-side Nest provider reached only through the
 `*.facade.ts` seams (ai / search / screenshot / extractor / email / notification /
@@ -147,6 +154,32 @@ concurrency ceiling, budget pass-through, failure isolation, archive behavior, t
 derivation and cancellation; ephemeral-mode fallback end to end; capability registration
 (including double-load); budget clamping on the programmatic path; and the usage-metrics
 shape against a replica of the platform consumer.
+
+## Pre-merge review findings (fixed on this branch)
+
+1. **Cached input tokens were dropped from the usage rollup.** `mapSession()` mapped
+   `cache_creation_input_tokens` / `cache_read_input_tokens` onto `ManagedAgentsUsage`,
+   but nothing read them: both the fan-out `toTokenUsage()` and the single-session
+   metrics block computed `totalTokens = input_tokens + output_tokens`. Anthropic
+   reports both cache counters _outside_ `input_tokens`, so a session using
+   `{input 1200, output 800, cache_creation 24000, cache_read 640000}` reported
+   `total_tokens_used: 2000` instead of 666,000. The `custom.usage` bag was also a
+   regression against `develop`, which at least carried the raw usage object. Fixed by
+   a single shared mapper (`toManagedSessionTokenUsage`) used by both paths, with the
+   cache counters summed into `totalTokens` and broken out in `custom.usage`.
+2. **Ephemeral runs ignored the runtime environment's networking policy.** The
+   `reuseControlPlane === false` branch of `execute()` built its environment inline with
+   `createEnvironment({ name })` and never consulted `execContext.runtimeEnvironment`, so
+   `resolveNetworking()` never ran on that path — an explicit `limited` egress allow-list
+   was silently downgraded to the env-var default (`unrestricted`). The reuse path and
+   `ensureControlPlane`'s own ephemeral branch both honored it; only this duplicated
+   inline copy did not. Networking is a security control, so both modes now resolve it.
+3. **The fan-out concurrency test asserted nothing.** `expect(peakActive)
+.toBeLessThanOrEqual(2)` also passes for a fully serial pool, so a regression to
+   one-session-at-a-time would have stayed green. Tightened to `toBe(2)`.
+
+Regression coverage added for all three, plus the previously unasserted per-session
+budget cap on the single-session path.
 
 ## Known follow-ups
 
