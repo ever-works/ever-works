@@ -76,6 +76,15 @@ export interface CreateTaskInput {
      * itself shallow and recurse past the cap.
      */
     delegationDepth?: number | null;
+    /**
+     * Keep the Task off the Kanban board and default lists.
+     *
+     * SERVER-WRITTEN ONLY, like `delegationDepth`: inbound triggers with
+     * `showOnBoard: false` set it on the Tasks their fires produce, and
+     * it is deliberately absent from `CreateTaskDto` so a client cannot
+     * file work that is invisible to the humans who own the board.
+     */
+    hiddenFromBoard?: boolean;
 }
 
 export interface UpdateTaskInput {
@@ -532,6 +541,7 @@ export class TasksService {
             delegationDepth: input.delegationDepth ?? null,
             scheduledAt: input.scheduledAt ?? null,
             scheduleClaimedAt: null,
+            hiddenFromBoard: input.hiddenFromBoard ?? false,
         });
 
         await this.logActivity({

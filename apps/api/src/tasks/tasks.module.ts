@@ -34,6 +34,10 @@ import { KnowledgeBaseModule } from '@ever-works/agent/services';
 // ActivityLogService, which TasksDomainModule imports but does not
 // re-export; the controller resolves it against THIS module's imports.
 import { ActivityLogModule as AgentActivityLogModule } from '@ever-works/agent/activity-log';
+// The producer behind the "local runner fallback → cloud" inbox entry.
+// `NotificationsModule` is re-exported by FleetApiModule (imported
+// below), so the token resolves without a second import here.
+import { NotificationService } from '@ever-works/agent/notifications';
 import {
     agentTaskExecuteTriggerAdapter,
     agentChatReplyTriggerAdapter,
@@ -46,6 +50,7 @@ import {
 import { FleetApiModule } from '../fleet/fleet.module';
 import { FleetRunRouterService } from '../fleet/fleet-run-router.service';
 import { createFleetAwareAgentTaskExecuteDispatcher } from '../fleet/fleet-agent-task.dispatcher';
+import { FleetTaskScopeResolverService } from '../fleet/fleet-task-scope.resolver';
 import { TasksController } from './tasks.controller';
 import { TaskChatController } from './task-chat.controller';
 
@@ -86,14 +91,24 @@ import { TaskChatController } from './task-chat.controller';
         // that has not selected the fleet runtime. Only a run whose
         // resolved runtime is `node` diverts onto the owner's Fleet,
         // where it becomes a lease-able `agent-task` job.
+        // Provided HERE rather than in FleetApiModule because it reads
+        // `TaskRepository`, which TasksDomainModule exports and the fleet
+        // module does not import — the same split
+        // `SubAgentDelegationDepthResolverService` already uses.
+        FleetTaskScopeResolverService,
         {
             provide: AGENT_TASK_EXECUTE_DISPATCHER,
-            useFactory: (fleetRouter: FleetRunRouterService) =>
+            useFactory: (
+                fleetRouter: FleetRunRouterService,
+                scopeResolver: FleetTaskScopeResolverService,
+                notifications: NotificationService,
+            ) =>
                 createFleetAwareAgentTaskExecuteDispatcher(
                     agentTaskExecuteTriggerAdapter,
                     fleetRouter,
+                    { scopeResolver, notifications },
                 ),
-            inject: [FleetRunRouterService],
+            inject: [FleetRunRouterService, FleetTaskScopeResolverService, NotificationService],
         },
         { provide: AGENT_CHAT_REPLY_DISPATCHER, useValue: agentChatReplyTriggerAdapter },
         // Judgment layers G5 + G9 — the two runner seams the agents module

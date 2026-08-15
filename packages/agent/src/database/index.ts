@@ -58,6 +58,7 @@ export * from './repositories/agent-membership.repository';
 // Agents/Skills/Tasks PR #1017 — Phase 8. Skill catalog repositories.
 export * from './repositories/skill.repository';
 export * from './repositories/skill-binding.repository';
+export * from './repositories/skill-file.repository';
 // Tenants & Organizations (EW-651 epic) — Phase 1 / EW-653.
 export * from './repositories/tenant.repository';
 export * from './repositories/organization.repository';
@@ -78,3 +79,5 @@ export * from './repositories/organization-onboarding-profile.repository';
 export * from './database-init.service';
 export * from './repositories/workflow.repository';
 export * from './repositories/workflow-run.repository';
+// Memory Files — user-defined folders organizing uploads on /memory.
+export * from './repositories/memory-folder.repository';

@@ -184,6 +184,9 @@ export class TasksController {
         // batch is keyed on the owner-scoped rows' `latestRunId` pointers
         // server-side; this flag only toggles the embed, it carries no ids.
         @Query('includeRun') includeRun?: string,
+        // Task Triggers — reveal Tasks a trigger with `showOnBoard: false`
+        // kept off the board. Off by default so the Kanban stays human-sized.
+        @Query('includeHidden') includeHidden?: string,
     ) {
         const filter: ListTasksFilter = {
             status: this.parseStatusList(status),
@@ -197,6 +200,7 @@ export class TasksController {
             parentTaskId,
             label,
             search,
+            includeHidden: includeHidden === 'true',
             limit: limit ? Math.min(200, Math.max(1, parseInt(limit, 10) || 50)) : 50,
             offset: offset ? Math.max(0, parseInt(offset, 10) || 0) : 0,
         };

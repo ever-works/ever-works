@@ -12,6 +12,7 @@ import {
     AGENT_EMAIL_FACADE,
     AGENT_NOTIFY_CHANNEL_FACADE,
     AGENT_DOMAIN_TOOL_SOURCES,
+    SKILL_FILE_CONTENT_READER,
     AgentEscalationService,
     RunSteeringService,
     WorkflowGraphExecutorService,
@@ -110,6 +111,13 @@ import { DatabaseModule } from '@ever-works/agent/database';
 // and every tryLog() was a no-op — same wiring as works/plugins/auth.
 import { ActivityLogModule } from '@ever-works/agent/activity-log';
 import { AuthModule } from '../auth/auth.module';
+// Skill files feature — the uploads-spine content reader behind the
+// agent-side `getSkillFile` tool. The class lives in (and is exported
+// by) the api-side SkillsModule; the token binding lives HERE because
+// this module is @Global(), so the agent-side AgentToolService's
+// @Optional() @Inject(SKILL_FILE_CONTENT_READER) resolves in production.
+import { SkillsModule as ApiSkillsModule } from '../skills/skills.module';
+import { SkillFileContentReaderService } from '../skills/skill-file-content-reader.service';
 import { AgentsController } from './agents.controller';
 import { AgentTemplatesController } from './agent-templates.controller';
 import { AgentTemplateCatalogService } from './agent-template-catalog.service';
@@ -170,6 +178,11 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
         FleetModule,
         PrReviewModule,
         PolicyModule,
+        // Skill files — supplies SkillFileContentReaderService for the
+        // SKILL_FILE_CONTENT_READER binding below. api SkillsModule
+        // imports nothing api-side beyond UploadsModule/AuthModule, so
+        // no cycle is introduced.
+        ApiSkillsModule,
     ],
     controllers: [AgentsController, AgentTemplatesController],
     providers: [
@@ -856,8 +869,13 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                 workflow: { executor: workflowExecutor },
             }),
         },
+        // Skill files — expose the uploads-spine reader to the agent-side
+        // AgentToolService (@Optional() @Inject(SKILL_FILE_CONTENT_READER)).
+        // Unbound, `getSkillFile` would list files but refuse every read.
+        { provide: SKILL_FILE_CONTENT_READER, useExisting: SkillFileContentReaderService },
     ],
     exports: [
+        SKILL_FILE_CONTENT_READER,
         AGENT_HEARTBEAT_TRIGGER,
         AGENT_RUN_CHAT_BACK_POSTER,
         AGENT_RUN_TASK_FINISHER,

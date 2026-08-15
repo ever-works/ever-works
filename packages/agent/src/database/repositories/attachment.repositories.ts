@@ -31,6 +31,17 @@ export class MissionAttachmentRepository {
     async findByMissionId(missionId: string): Promise<MissionAttachment[]> {
         return this.repo.find({ where: { missionId }, order: { createdAt: 'DESC' } });
     }
+    /**
+     * Memory Files provenance — every Mission edge referencing any of the
+     * given upload content hashes, in ONE query (no N+1).
+     */
+    async findByUploadIds(uploadIds: string[]): Promise<MissionAttachment[]> {
+        if (uploadIds.length === 0) return [];
+        return this.repo
+            .createQueryBuilder('attachment')
+            .where('attachment.uploadId IN (:...uploadIds)', { uploadIds })
+            .getMany();
+    }
     async findOne(id: string): Promise<MissionAttachment | null> {
         return this.repo.findOne({ where: { id } });
     }
@@ -53,6 +64,14 @@ export class WorkProposalAttachmentRepository {
     async findByWorkProposalId(workProposalId: string): Promise<WorkProposalAttachment[]> {
         return this.repo.find({ where: { workProposalId }, order: { createdAt: 'DESC' } });
     }
+    /** Memory Files provenance — batch lookup by upload content hashes. */
+    async findByUploadIds(uploadIds: string[]): Promise<WorkProposalAttachment[]> {
+        if (uploadIds.length === 0) return [];
+        return this.repo
+            .createQueryBuilder('attachment')
+            .where('attachment.uploadId IN (:...uploadIds)', { uploadIds })
+            .getMany();
+    }
     async findOne(id: string): Promise<WorkProposalAttachment | null> {
         return this.repo.findOne({ where: { id } });
     }
@@ -73,6 +92,14 @@ export class AgentAttachmentRepository {
 
     async findByAgentId(agentId: string): Promise<AgentAttachment[]> {
         return this.repo.find({ where: { agentId }, order: { createdAt: 'DESC' } });
+    }
+    /** Memory Files provenance — batch lookup by upload content hashes. */
+    async findByUploadIds(uploadIds: string[]): Promise<AgentAttachment[]> {
+        if (uploadIds.length === 0) return [];
+        return this.repo
+            .createQueryBuilder('attachment')
+            .where('attachment.uploadId IN (:...uploadIds)', { uploadIds })
+            .getMany();
     }
     async findOne(id: string): Promise<AgentAttachment | null> {
         return this.repo.findOne({ where: { id } });

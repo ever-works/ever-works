@@ -4,9 +4,11 @@ jest.mock('../../auth', () => ({
 }));
 
 import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
+import { Test, TestingModule } from '@nestjs/testing';
 import { TranscriptionController } from './transcription.controller';
-import { TranscriptionNotConfiguredError } from '@ever-works/agent/facades';
-import type { AiFacadeService } from '@ever-works/agent/facades';
+import { AiFacadeService, TranscriptionNotConfiguredError } from '@ever-works/agent/facades';
+import { PluginOperationsService } from '@ever-works/agent/plugins';
+import { AuthSessionGuard } from '../../auth';
 import type { AuthenticatedUser } from '../../auth/types/auth.types';
 
 /**
@@ -36,9 +38,10 @@ describe('TranscriptionController', () => {
         }) as Express.Multer.File;
 
     let aiFacade: { transcribe: jest.Mock; listTranscriptionProviders: jest.Mock };
+    let pluginOperations: { getGlobalVoiceDefault: jest.Mock };
     let controller: TranscriptionController;
 
-    beforeEach(() => {
+    beforeEach(async () => {
         aiFacade = {
             transcribe: jest.fn().mockResolvedValue({ text: 'hello world', model: 'whisper-1' }),
             listTranscriptionProviders: jest.fn().mockResolvedValue([
@@ -46,9 +49,26 @@ describe('TranscriptionController', () => {
                 { id: 'groq', name: 'Groq', isActive: false },
             ]),
         };
+        // Default: the account has expressed no voice preference, which is the
+        // state every pre-existing assertion below was written against.
+        pluginOperations = { getGlobalVoiceDefault: jest.fn().mockResolvedValue(null) };
         delete process.env.TRANSCRIPTION_PROVIDER_ID;
         delete process.env.KB_TRANSCRIPTION_PROVIDER_ID;
-        controller = new TranscriptionController(aiFacade as unknown as AiFacadeService);
+        // Resolve the controller through Nest rather than `new`-ing it, so the
+        // DI wiring itself is under test: a constructor parameter that loses
+        // its decorator, or a provider token that stops matching, fails here
+        // instead of at boot.
+        const moduleRef: TestingModule = await Test.createTestingModule({
+            controllers: [TranscriptionController],
+            providers: [
+                { provide: AiFacadeService, useValue: aiFacade },
+                { provide: PluginOperationsService, useValue: pluginOperations },
+            ],
+        })
+            .overrideGuard(AuthSessionGuard)
+            .useValue({ canActivate: () => true })
+            .compile();
+        controller = moduleRef.get(TranscriptionController);
     });
 
     afterEach(() => jest.restoreAllMocks());
@@ -181,6 +201,65 @@ describe('TranscriptionController', () => {
 
             expect(res.providers.map((p: { id: string }) => p.id)).toEqual(['openai', 'groq']);
             expect(res.providers.find((p: { isActive: boolean }) => p.isActive)?.id).toBe('openai');
+        });
+    });
+
+    /**
+     * The account-level voice provider (Settings → Plugins → AI Providers).
+     *
+     * It replaces the picker that used to sit in the chat composer, so it has
+     * to behave like the per-request pick it replaced — a PIN, not a hint —
+     * while still yielding to an explicit `providerId` on the request so API
+     * clients keep the narrower lever.
+     */
+    describe('provider resolution — the account voice setting', () => {
+        it('pins the account default when the request names no provider', async () => {
+            pluginOperations.getGlobalVoiceDefault.mockResolvedValue('groq');
+
+            await controller.transcribe(auth, clip('audio/webm'), {});
+
+            expect(aiFacade.transcribe.mock.calls[0][1].providerOverride).toBe('groq');
+        });
+
+        it('lets an explicit per-request pick outrank the account default', async () => {
+            pluginOperations.getGlobalVoiceDefault.mockResolvedValue('groq');
+
+            await controller.transcribe(auth, clip('audio/webm'), { providerId: 'openai' });
+
+            expect(aiFacade.transcribe.mock.calls[0][1].providerOverride).toBe('openai');
+        });
+
+        // The account setting is a per-USER choice; the env var is a
+        // deployment-wide floor. Keeping the env value in `fallbackProviderId`
+        // preserves the ordering the facade already documents (user > scope >
+        // env) even now that a user-level value exists.
+        it('still passes the env value as a fallback, not a pin', async () => {
+            process.env.TRANSCRIPTION_PROVIDER_ID = 'kb-pinned';
+            pluginOperations.getGlobalVoiceDefault.mockResolvedValue('groq');
+
+            await controller.transcribe(auth, clip('audio/webm'), {});
+
+            const [, facadeOptions, selection] = aiFacade.transcribe.mock.calls[0];
+            expect(facadeOptions.providerOverride).toBe('groq');
+            expect(selection).toEqual({ fallbackProviderId: 'kb-pinned' });
+            delete process.env.TRANSCRIPTION_PROVIDER_ID;
+        });
+
+        it('reports the account pick alongside the operator fallback', async () => {
+            process.env.TRANSCRIPTION_PROVIDER_ID = 'kb-pinned';
+            pluginOperations.getGlobalVoiceDefault.mockResolvedValue('groq');
+
+            const res = await controller.listProviders(auth);
+
+            expect(res.selectedDefault).toBe('groq');
+            expect(res.configuredDefault).toBe('kb-pinned');
+            delete process.env.TRANSCRIPTION_PROVIDER_ID;
+        });
+
+        it('reports a null account pick when nothing is saved', async () => {
+            const res = await controller.listProviders(auth);
+
+            expect(res.selectedDefault).toBeNull();
         });
     });
 });

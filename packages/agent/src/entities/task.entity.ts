@@ -302,6 +302,18 @@ export class Task {
     @PortableDateColumn({ nullable: true })
     scheduleClaimedAt?: Date | null;
 
+    /**
+     * Keep this Task off the Kanban board and the default Task lists.
+     *
+     * SERVER-WRITTEN, never a create-DTO field: an inbound trigger whose
+     * `showOnBoard` is false stamps it on the Tasks its fires produce so
+     * automated work does not flood the human board. The rows stay fully
+     * addressable (detail page, the trigger's fire log, and any list
+     * asking for `includeHidden`) — this hides, it never deletes.
+     */
+    @Column({ type: 'boolean', default: false })
+    hiddenFromBoard: boolean;
+
     // ── Recurring (F5 override) ────────────────────────────────────
     @Column({ type: 'boolean', default: false })
     isRecurring: boolean;
