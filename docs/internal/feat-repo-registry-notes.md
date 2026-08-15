@@ -16,7 +16,7 @@ computed, read-only entries rather than copied into the new table.
 
 ## Data model
 
-Two new tables, migration `apps/api/src/migrations/1785010000000-CreateRepoConnections.ts`
+Two new tables, migration `apps/api/src/migrations/1786850000000-CreateRepoConnections.ts`
 (portable Table API, idempotent `hasTable` guards, both `up` and `down`).
 
 ### `repo_connections` (`packages/agent/src/entities/repo-connection.entity.ts`)

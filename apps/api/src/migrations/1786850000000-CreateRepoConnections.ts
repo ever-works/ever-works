@@ -39,8 +39,8 @@ import { MigrationInterface, QueryRunner, Table, TableForeignKey, TableIndex } f
  * forward-only with an idempotent guard (house pattern, mirrors
  * 1785000000000-CreateTermsAcceptance).
  */
-export class CreateRepoConnections1785010000000 implements MigrationInterface {
-    name = 'CreateRepoConnections1785010000000';
+export class CreateRepoConnections1786850000000 implements MigrationInterface {
+    name = 'CreateRepoConnections1786850000000';
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         if (!(await queryRunner.hasTable('repo_connections'))) {
