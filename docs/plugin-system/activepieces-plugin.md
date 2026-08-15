@@ -33,14 +33,14 @@ In the work edit screen, set **Generation Pipeline** to `Activepieces Automation
 
 Configure these under **Settings > Plugins > Activepieces Automation**:
 
-| Setting                   | Key             | Required | Notes                                                                                                                                              |
-| ------------------------- | --------------- | -------- | -------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Activepieces API Key      | `apiKey`        | Yes      | Generated from the Activepieces Platform Dashboard (Platform or Enterprise edition). Stored as a secret; also settable via `ACTIVEPIECES_API_KEY`. |
-| Activepieces API Base URL | `baseUrl`       | No       | Defaults to `https://cloud.activepieces.com/api/v1`. Set this to your own instance when self-hosting.                                              |
-| Default Project ID        | `projectId`     | No       | Needed to list flows and inspect runs — and **required** for async mode.                                                                           |
-| Default Flow ID           | `defaultFlowId` | No       | Flow invoked when the generator form doesn't override it.                                                                                          |
+| Setting                   | Key             | Required | Notes                                                                                                                                                           |
+| ------------------------- | --------------- | -------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Activepieces API Key      | `apiKey`        | Yes      | Generated from the Activepieces Platform Dashboard (Platform or Enterprise edition). Stored as a secret; also settable via `ACTIVEPIECES_API_KEY`.              |
+| Activepieces API Base URL | `baseUrl`       | No       | Defaults to `https://cloud.activepieces.com/api/v1`. Set this to your own instance when self-hosting.                                                           |
+| Default Project ID        | `projectId`     | No       | **Required** for async mode, and for the connection check when no Default Flow ID is set (Activepieces requires it on `GET /flows`). Also used to inspect runs. |
+| Default Flow ID           | `defaultFlowId` | No       | Flow invoked when the generator form doesn't override it.                                                                                                       |
 
-Saving runs a connection check: with a default flow ID set it validates that flow, otherwise it pings the flows endpoint.
+Saving runs a connection check. With a Default Flow ID set it validates that flow through `GET /flows/{id}`, which needs no project ID. Without one it falls back to listing flows (`GET /flows?limit=1`) — and the Activepieces API requires `projectId` on that endpoint, so set a **Default Project ID**, a **Default Flow ID**, or both. With neither, the check can fail even though the API key is valid.
 
 The base URL is passed through a lexical SSRF guard before any request carries your API key to it: non-HTTP(S) schemes, private/loopback/link-local/cloud-metadata IP literals, and the known metadata hostnames are rejected outright. See [Security](#security) for what that guard does and does not cover.
 
@@ -116,7 +116,7 @@ The parser is deliberately forgiving about wrapping: a bare array of items works
 - **Activepieces Flow ID** — overrides `defaultFlowId` for this run. Generation fails early if neither is set.
 - **Webhook Execution Mode** — `sync` (default) or `async`; see [Sync vs Async](#sync-vs-async).
 - **Target Items** — new items to aim for (default 50, max 500). Passed through as `metadata.targetItems`.
-- **Flow Timeout (minutes)** — how long to wait for the flow (default 60, clamped to 1–120).
+- **Flow Timeout (minutes)** — how long **Ever Works** waits for the flow (default 60, clamped to 1–120). This is a client-side deadline only; it cannot extend the limits Activepieces enforces on its own side — see [Activepieces' own limits](#activepieces-own-limits).
 
 ### Data Passing
 
@@ -157,13 +157,24 @@ The plugin talks to the Activepieces REST API directly — no SDK. It uses `GET 
 
 ## Sync vs Async
 
-**Sync** (recommended) posts to `/webhooks/{flowId}/sync`; Activepieces holds the connection open until your Return Response action fires, and that response body is the flow output.
+**Sync** posts to `/webhooks/{flowId}/sync`; Activepieces holds the connection open until your Return Response action fires, and that response body is the flow output.
 
 If that body includes a top-level `runId` or `flowRunId`, the plugin also makes a best-effort fetch of the matching run record for auditing — a bare `id` is deliberately ignored, since flows commonly emit their own `id` fields and looking one up would 404 or audit the wrong run. When a run record is fetched and reports that the run didn't succeed, you get a warning but the returned body is still used, since HTTP 200 already proves Return Response ran. Without one of those two keys — including for the plain `{ "items": [...] }` shape above — no run record is fetched and no run status appears in the pipeline metrics. Emit `runId` alongside your items if you want that audit trail.
 
 **Async** posts to `/webhooks/{flowId}`, which returns immediately, then polls `GET /flow-runs` every 2 seconds until the run reaches a terminal status and reads the run's steps as the output. It **requires a Default Project ID** — that is validated before the webhook fires, so a misconfigured run doesn't burn Activepieces quota. A non-`SUCCEEDED` run fails the generation, naming the failed step. `PAUSED` is not treated as terminal, so `Delay` and `Wait for Approval` steps resume normally.
 
-Prefer sync. Async depends on the run's step output rather than a response body you control, so the shape is far less predictable.
+Prefer sync whenever the flow fits inside the synchronous webhook window — it gives you a response body you control, whereas async reads the run's step output, so its shape is far less predictable. Past that window, async is the only option.
+
+### Activepieces' own limits
+
+**Flow Timeout** only bounds how long Ever Works waits. Activepieces applies its own, shorter limits, and raising Flow Timeout past them just makes Ever Works keep waiting for a run Activepieces has already cut off:
+
+| Limit                        | Activepieces Cloud                                | Self-hosted                               |
+| ---------------------------- | ------------------------------------------------- | ----------------------------------------- |
+| Synchronous webhook response | 30 seconds, then the connection closes (HTTP 408) | `AP_WEBHOOK_TIMEOUT_SECONDS` (default 30) |
+| Active flow run              | 10 minutes                                        | `AP_FLOW_TIMEOUT_SECONDS` (default 600)   |
+
+On Cloud that means: use **sync** only for flows that return within 30 seconds, switch to **async** for anything longer, and split the flow — or self-host with a raised `AP_FLOW_TIMEOUT_SECONDS` — when a run can exceed 10 minutes. Time parked in `Delay` or `Wait for Approval` steps does not count against the run limit.
 
 ## Security
 
@@ -186,21 +197,22 @@ The plugin defends the rest of the path as well: the tenant-supplied base URL an
 
 ## Troubleshooting
 
-| Problem                                                    | What to check                                                                                                                    |
-| ---------------------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| "Invalid Activepieces API key"                             | Regenerate the key in the Platform Dashboard and re-save plugin settings. Requires Platform or Enterprise edition.               |
-| "API key does not have permission to access this resource" | The key belongs to a different project — check Default Project ID.                                                               |
-| "Activepieces resource not found"                          | Verify the flow ID and project ID, and that the flow is published.                                                               |
-| "Flow is not enabled"                                      | Enable the flow in the Activepieces dashboard.                                                                                   |
-| "No Activepieces flow ID provided"                         | Set **Default Flow ID** in plugin settings or **Activepieces Flow ID** on the generator form.                                    |
-| "Async mode requires a Default Project ID"                 | Add the project ID, or switch to sync mode.                                                                                      |
-| "Flow did not finish within Ns"                            | Raise **Flow Timeout** (up to 120 minutes) or make the flow faster.                                                              |
-| "Output does not contain an 'items' array"                 | Your Return Response isn't emitting `{ items: [...] }`. The error lists the keys actually received.                              |
-| "Returned a valid response but with no usable items"       | Items came back without a `name`, or the array was empty. Inspect the run in the Activepieces dashboard.                         |
-| "Returned a string that is not valid JSON"                 | The Return Response action is sending text. Emit a JSON object.                                                                  |
-| "Rate limit exceeded"                                      | Wait for the Activepieces limit to reset.                                                                                        |
-| "Base URL is not safe to call"                             | The base URL is a private/loopback/metadata IP literal or metadata hostname, or isn't HTTP(S). Use a routable HTTPS URL.         |
-| Items missing images                                       | Enable **Capture Screenshots** and configure a screenshot plugin; item `source_url` values that fail the SSRF guard are skipped. |
+| Problem                                                    | What to check                                                                                                                                                                                                                                                       |
+| ---------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| "Invalid Activepieces API key"                             | Regenerate the key in the Platform Dashboard and re-save plugin settings. Requires Platform or Enterprise edition.                                                                                                                                                  |
+| "API key does not have permission to access this resource" | The key belongs to a different project — check Default Project ID.                                                                                                                                                                                                  |
+| "Activepieces resource not found"                          | Verify the flow ID and project ID, and that the flow is published.                                                                                                                                                                                                  |
+| Connection check fails with a key you know is valid        | With no **Default Flow ID**, the check lists flows, which Activepieces requires a `projectId` for. Set **Default Project ID** or **Default Flow ID**.                                                                                                               |
+| "Flow is not enabled"                                      | Enable the flow in the Activepieces dashboard.                                                                                                                                                                                                                      |
+| "No Activepieces flow ID provided"                         | Set **Default Flow ID** in plugin settings or **Activepieces Flow ID** on the generator form.                                                                                                                                                                       |
+| "Async mode requires a Default Project ID"                 | Add the project ID, or switch to sync mode.                                                                                                                                                                                                                         |
+| "Flow did not finish within Ns"                            | Ever Works hit its own deadline: raise **Flow Timeout** (up to 120 minutes) or make the flow faster. On sync, check first that the flow returns inside the 30-second webhook window — past that, Activepieces closes the connection regardless, and you need async. |
+| "Output does not contain an 'items' array"                 | Your Return Response isn't emitting `{ items: [...] }`. The error lists the keys actually received.                                                                                                                                                                 |
+| "Returned a valid response but with no usable items"       | Items came back without a `name`, or the array was empty. Inspect the run in the Activepieces dashboard.                                                                                                                                                            |
+| "Returned a string that is not valid JSON"                 | The Return Response action is sending text. Emit a JSON object.                                                                                                                                                                                                     |
+| "Rate limit exceeded"                                      | Wait for the Activepieces limit to reset.                                                                                                                                                                                                                           |
+| "Base URL is not safe to call"                             | The base URL is a private/loopback/metadata IP literal or metadata hostname, or isn't HTTP(S). Use a routable HTTPS URL.                                                                                                                                            |
+| Items missing images                                       | Enable **Capture Screenshots** and configure a screenshot plugin; item `source_url` values that fail the SSRF guard are skipped.                                                                                                                                    |
 
 Every run is visible in the Activepieces dashboard with step-by-step output — check there first when a generation fails inside the flow.
 

@@ -20,7 +20,7 @@ Instead of hardcoding providers, the platform asks "give me a plugin that can do
 
 ## Built-in Plugins
 
-The platform ships with **39 plugins** across multiple categories:
+The platform ships with **102 plugins** across multiple categories. The table below names the most commonly used ones:
 
 | Category          | Plugins                                                                                                                                                   | Capability             |
 | ----------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- | ---------------------- |
@@ -96,5 +96,5 @@ This is managed through the [Settings System](./settings) and the work-level plu
 | [Architecture](./architecture)           | Plugin SDK, interfaces, lifecycle, bootstrap, facades   |
 | [Settings](./settings)                   | Three-tier settings, JSON Schema extensions, resolution |
 | [Creating a Plugin](./creating-a-plugin) | Step-by-step guide for building a new plugin            |
-| [Built-in Plugins](./built-in-plugins)   | All 39 plugins with configuration details               |
+| [Built-in Plugins](./built-in-plugins)   | Built-in plugins with configuration details             |
 | [API Reference](./api-reference)         | REST endpoints for plugin management                    |
