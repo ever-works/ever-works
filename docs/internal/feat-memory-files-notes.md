@@ -232,6 +232,10 @@ Full agent suite also run green during the second session (478 suites /
 - **Downloads for very large files** buffer in memory (same as the
   existing `/api/uploads` serve route); streaming is a shared follow-up.
 - The Files list caps at 200 rows per source with no pagination UI yet.
+  The same cap applies **per folder inside a manual sync walk**, so a
+  folder holding more than 200 files of one spine mirrors only the 200
+  most recently updated, and the report counts only those. Lifting it
+  needs a paginated list first.
 - `DELETE /api/memory/files/:id` is unlink-only by design (v1 additive
   rule); real byte deletion is explicitly out of scope.
 - **Account export/import** does not cover uploads today, so the new
@@ -240,3 +244,43 @@ Full agent suite also run green during the second session (478 suites /
   `packages/agent/src/account-transfer/`). If uploads ever join the
   export surface, `memory_folders` + both `folderId` columns must be
   added to the whitelist in the same PR (3-place-whitelist bug class).
+
+## Pre-merge review fixes (final gate)
+
+Four defects found by reading the branch adversarially, each fixed with
+a regression test that fails on the code as it was:
+
+1. **`%` / `_` in a folder name were LIKE wildcards** in the two
+   materialized-path subtree statements
+   (`MemoryFolderRepository.listSubtree` / `updateSubtreePaths`). With
+   folders `/Q1_2026` and `/Q1x2026/Receipts`, the pattern
+   `'/Q1_2026/%'` matched the neighbour, so a recursive delete of the
+   (empty) `_` folder dropped `/Q1x2026/Receipts` and unfiled its files,
+   and a rename rewrote the neighbour's paths. Both predicates are now
+   `substr(path, 1, <len>) = '<path>/'` prefix EQUALITY — no wildcards,
+   and no sqlite-vs-postgres `LIKE` case-folding split either.
+2. **`newPath` was inlined into the UPDATE as a SQL literal.** TypeORM
+   expands `:name` placeholders over the whole statement text, string
+   literals included, so a folder named `:userId` turned the SET clause
+   into a placeholder and shifted the parameter list (hard SQL error at
+   best). It is a bound parameter now.
+3. **The subtree suffix offset came from `String.length`.** SQL `substr`
+   counts characters, JS counts UTF-16 units, so one emoji in an
+   ancestor folder name shifted every descendant path by a character
+   (`/📁Docs/Q3` → `/PlainQ3`). Offsets are code-point counts now.
+4. **The Global/Agents scope toggle only filtered folder rows.** Files
+   carry the ownership of the folder they are filed under
+   (`row.ownerAgentId`), so "Global" still listed agent-private files
+   and "Agents" still listed every Global file. Both row kinds go
+   through one predicate now.
+
+Also tightened: `POST /api/memory/files/upload` no longer echoes the
+requested `folderId` when the folder link matched no row (the
+`user_uploads` ownership write is best-effort inside `UploadsService`) —
+it reports the file as unfiled and warns, instead of returning a success
+shape for a file that is not in that folder.
+
+New spec:
+`packages/agent/src/database/repositories/memory-folder.subtree-sql.integration.spec.ts`
+runs the two subtree statements against a real better-sqlite3 engine —
+mocked query builders cannot see any of defects 1–3.
