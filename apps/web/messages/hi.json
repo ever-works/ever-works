@@ -143,9 +143,9 @@
                 "password": {
                     "label": "नया पासवर्ड",
                     "placeholder": "अपना नया पासवर्ड दर्ज करें",
-                    "helperText": "कम से कम 6 अक्षरों का होना चाहिए जिसमें लोअरकेस और संख्या/विशेष चिह्न शामिल हो",
+                    "helperText": "कम से कम 8 अक्षरों का होना चाहिए जिसमें लोअरकेस और संख्या/विशेष चिह्न शामिल हो",
                     "errors": {
-                        "minLength": "पासवर्ड कम से कम 6 अक्षरों का होना चाहिए",
+                        "minLength": "पासवर्ड कम से कम 8 अक्षरों का होना चाहिए",
                         "lowercase": "पासवर्ड में कम से कम एक लोअरकेस अक्षर होना चाहिए",
                         "numberOrSpecial": "पासवर्ड में कम से कम एक संख्या या विशेष चिह्न होना चाहिए",
                         "cannotStartWith": "पासवर्ड डॉट या न्यूलाइन से शुरू नहीं हो सकता"
@@ -200,7 +200,8 @@
                     "text": "मैं सहमत हूं",
                     "termsLink": "सेवा की शर्तें",
                     "and": "और",
-                    "privacyLink": "गोपनीयता नीति"
+                    "privacyLink": "गोपनीयता नीति",
+                    "required": "Please accept the Terms of Service and Privacy Policy first"
                 },
                 "submit": "खाता बनाएं",
                 "submitting": "खाता बनाया जा रहा है..."
@@ -996,7 +997,8 @@
                 "allTemplates": "All templates",
                 "yourTemplates": "Your templates",
                 "yourTemplatesEmpty": "Agents you create will appear here as reusable templates.",
-                "openInWizard": "Open in wizard"
+                "openInWizard": "Open in wizard",
+                "browsePage": "Open the full template browser"
             },
             "pageTabs": {
                 "agents": "Agents",
@@ -1114,7 +1116,8 @@
                     "showing": "{from}-{to} / {total} दिखाए जा रहे हैं",
                     "previous": "पिछला",
                     "next": "अगला"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "newDialog": {
                 "title": "एक नया कार्य बनाएं",
@@ -1350,7 +1353,8 @@
                 "filter": {
                     "scope": "स्कोप",
                     "all": "सभी"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "detail": {
                 "instructions": "निर्देश",
@@ -1798,7 +1802,21 @@
                     "empty": "इस आइडिया से कोई Work जुड़ा नहीं है।"
                 },
                 "agents": {
-                    "empty": "इस आइडिया से कोई एजेंट जुड़ा नहीं है।"
+                    "empty": "इस आइडिया से कोई एजेंट जुड़ा नहीं है।",
+                    "assignExisting": "मौजूदा असाइन करें",
+                    "assignTitle": "इस आइडिया को एक एजेंट असाइन करें",
+                    "assignSubtitle": "नया बनाने के बजाय अपने पास पहले से मौजूद एजेंट को इस आइडिया पर लगाएं।",
+                    "assignSearchPlaceholder": "एजेंट खोजें…",
+                    "assignLoading": "एजेंट लोड हो रहे हैं…",
+                    "assignNoneAvailable": "असाइन करने के लिए कोई और एजेंट नहीं है।",
+                    "assignNoMatches": "इस खोज से कोई एजेंट मेल नहीं खाता।",
+                    "assignLoadFailed": "एजेंट लोड नहीं हो सके",
+                    "assignedToast": "{name} इस आइडिया को असाइन किया गया",
+                    "assignFailed": "एजेंट असाइन नहीं हो सका",
+                    "assignCancel": "रद्द करें",
+                    "unassign": "इस आइडिया से हटाएं",
+                    "unassignedToast": "{name} इस आइडिया से हटाया गया",
+                    "unassignFailed": "एजेंट हटाया नहीं जा सका"
                 },
                 "meta": {
                     "source": "स्रोत",
@@ -1818,7 +1836,8 @@
                         "idea-agents": "हटाया नहीं जा सकता: {count} एजेंट इस आइडिया से जुड़े हैं। पहले उन्हें हटाएं या स्कोप बदलें।",
                         "build-in-flight": "बिल्ड चलते समय नहीं हटा सकते। इसके पूरा होने की प्रतीक्षा करें।",
                         "unknown": "अभी इस आइडिया को नहीं हटाया जा सकता।"
-                    }
+                    },
+                    "unlinksWorks": "{count, plural, one {यह आइडिया # Work से जुड़ा है। वह Work बना रहेगा — केवल लिंक हटाया जाएगा।} other {यह आइडिया # Works से जुड़ा है। वे Works बने रहेंगे — केवल लिंक हटाया जाएगा।}}"
                 },
                 "toasts": {
                     "built": "इस आइडिया से Work बनाया गया",
@@ -2095,7 +2114,10 @@
                 "usageCredits": "Usage & Credits",
                 "fleet": "Fleet",
                 "jobRuntime": "Job Runtime",
-                "digest": "Digest"
+                "digest": "Digest",
+                "notifications": "Notifications",
+                "channels": "Channels",
+                "emails": "Email Addresses"
             },
             "githubApp": {
                 "title": "GitHub ऐप इंस्टॉलेशन",
@@ -6895,7 +6917,6 @@
             "created": "Meeting captured",
             "sections": {
                 "provenance": "Where it came from",
-                "participants": "Participants",
                 "transcript": "Transcript"
             },
             "sources": {
@@ -6918,7 +6939,6 @@
                 "externalId": "Provider meeting ID (optional)",
                 "externalIdHint": "Used to de-duplicate against a later connector sync of the same meeting.",
                 "participants": "Participants",
-                "participantsHint": "One per line. Use \"Name <email>\" to record an address.",
                 "transcript": "Transcript (optional)",
                 "transcriptPlaceholder": "Ada: shipping the gate.\nGrace: reviewing the branch.",
                 "transcriptHint": "Adding a transcript runs the summary, Memory and activity pipeline. You can also attach it later from the meeting page."
@@ -6928,6 +6948,7 @@
                 "startedAtInvalid": "Start time is not a valid date.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
+                "participantEmailInvalid": "मान्य ईमेल पता दर्ज करें, या इसे खाली छोड़ें।",
                 "createFailed": "Couldn't capture the meeting. Please try again."
             },
             "actions": {
@@ -6936,71 +6957,94 @@
             }
         },
         "meetingDetail": {
-            "backToMeetings": "Back to Meetings",
+            "backToMeetings": "मीटिंग पर वापस जाएँ",
             "actions": {
-                "openRecording": "Open recording",
-                "delete": "Delete",
-                "attachTranscript": "Attach transcript",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
-                "save": "Save changes"
+                "openRecording": "रिकॉर्डिंग खोलें",
+                "edit": "संपादित करें",
+                "delete": "हटाएँ",
+                "attachTranscript": "ट्रांसक्रिप्ट जोड़ें",
+                "attaching": "जोड़ा जा रहा है…",
+                "editTranscript": "ट्रांसक्रिप्ट संपादित करें",
+                "cancelEdit": "संपादन रद्द करें",
+                "saveTranscript": "ट्रांसक्रिप्ट सहेजें",
+                "savingTranscript": "सहेजा जा रहा है…",
+                "save": "बदलाव सहेजें",
+                "cancel": "रद्द करें"
             },
             "sections": {
-                "summary": "Summary",
-                "transcript": "Transcript",
-                "details": "Details",
-                "edit": "Edit meeting"
+                "summary": "सारांश",
+                "transcript": "ट्रांसक्रिप्ट",
+                "details": "विवरण",
+                "edit": "मीटिंग संपादित करें"
             },
             "summary": {
-                "notGenerated": "No summary was generated for this transcript. Enable an AI provider and re-attach the transcript to try again.",
-                "noTranscript": "Attach a transcript to generate a summary."
+                "generating": "सारांश तैयार किया जा रहा है…",
+                "generatingHint": "ट्रांसक्रिप्ट पढ़ा जा रहा है और सारांश लिखा जा रहा है — इसमें आम तौर पर कुछ सेकंड लगते हैं।",
+                "notGenerated": "इस ट्रांसक्रिप्ट के लिए कोई सारांश तैयार नहीं हुआ। कोई AI प्रदाता सक्षम करें और दोबारा कोशिश करने के लिए ट्रांसक्रिप्ट फिर से जोड़ें।",
+                "noTranscript": "सारांश तैयार करने के लिए ट्रांसक्रिप्ट जोड़ें।"
             },
             "transcript": {
-                "composerLabel": "Transcript text",
-                "composerPlaceholder": "Paste the meeting transcript here.",
-                "pipelineHint": "Stored first, then summarized, remembered and posted to your activity feed — best effort.",
-                "storedElsewhere": "The transcript is stored but was not returned with this view."
+                "composerLabel": "ट्रांसक्रिप्ट का पाठ",
+                "composerPlaceholder": "मीटिंग का ट्रांसक्रिप्ट यहाँ चिपकाएँ।",
+                "pipelineHint": "पहले सहेजा जाता है, फिर उसका सारांश बनता है, याद रखा जाता है और आपकी गतिविधि फ़ीड में पोस्ट किया जाता है — यथासंभव।",
+                "storedElsewhere": "ट्रांसक्रिप्ट सहेजा गया है, लेकिन इस दृश्य के साथ नहीं लौटाया गया।"
             },
             "details": {
-                "source": "Source",
-                "startedAt": "Started",
-                "endedAt": "Ended",
-                "openEnded": "Still open",
-                "duration": "Duration",
-                "work": "Work",
-                "orgWide": "Org-wide",
-                "externalId": "Provider ID",
-                "createdAt": "Captured",
-                "participants": "Participants",
-                "noParticipants": "No participants recorded."
+                "source": "स्रोत",
+                "startedAt": "शुरू हुई",
+                "endedAt": "समाप्त हुई",
+                "openEnded": "अभी भी चल रही है",
+                "duration": "अवधि",
+                "work": "कार्य",
+                "orgWide": "पूरे संगठन में",
+                "externalId": "प्रदाता आईडी",
+                "createdAt": "दर्ज की गई",
+                "participants": "प्रतिभागी",
+                "noParticipants": "कोई प्रतिभागी दर्ज नहीं है।"
             },
             "edit": {
-                "hint": "Rename the meeting, close it out, point it at a recording, or re-route it to a Work."
+                "hint": "समय ठीक करें, मीटिंग का नाम बदलें, प्रतिभागी सूची सुधारें, रिकॉर्डिंग से जोड़ें, या इसे किसी कार्य पर पुनर्निर्देशित करें।"
             },
             "fields": {
-                "title": "Title",
-                "endedAt": "Ended at",
-                "sourceUrl": "Recording link",
-                "work": "Work",
-                "workNone": "Org-wide (no Work)"
+                "title": "शीर्षक",
+                "startedAt": "प्रारंभ समय",
+                "endedAt": "समाप्ति समय",
+                "sourceUrl": "रिकॉर्डिंग लिंक",
+                "work": "कार्य",
+                "workNone": "पूरे संगठन में (कोई कार्य नहीं)",
+                "participants": "प्रतिभागी",
+                "participantName": "नाम",
+                "participantEmail": "ईमेल (वैकल्पिक)",
+                "participantAdd": "प्रतिभागी जोड़ें",
+                "participantRemove": "प्रतिभागी हटाएँ",
+                "participantsEmpty": "अभी तक कोई दर्ज नहीं किया गया।"
             },
             "errors": {
-                "titleRequired": "Title is required.",
-                "endedAtInvalid": "End time is not a valid date.",
-                "endedBeforeStarted": "End time cannot be before the start time.",
-                "transcriptRequired": "Transcript text is required."
+                "titleRequired": "शीर्षक आवश्यक है।",
+                "startedAtInvalid": "प्रारंभ समय एक मान्य दिनांक नहीं है।",
+                "endedAtInvalid": "समाप्ति समय एक मान्य दिनांक नहीं है।",
+                "endedBeforeStarted": "समाप्ति समय प्रारंभ समय से पहले नहीं हो सकता।",
+                "participantEmailInvalid": "मान्य ईमेल पता दर्ज करें, या इसे खाली छोड़ें।",
+                "participantDuplicate": "यह व्यक्ति पहले से सूची में है।",
+                "transcriptRequired": "ट्रांसक्रिप्ट का पाठ आवश्यक है।"
             },
             "toasts": {
-                "transcriptSaved": "Transcript attached",
-                "transcriptSummarized": "Transcript attached and summarized",
-                "transcriptError": "Couldn't attach the transcript.",
-                "saved": "Meeting updated",
-                "saveError": "Couldn't update the meeting.",
-                "deleted": "Meeting deleted",
-                "deleteError": "Couldn't delete the meeting."
+                "transcriptSaved": "ट्रांसक्रिप्ट जोड़ा गया",
+                "transcriptSummarized": "ट्रांसक्रिप्ट जोड़ा गया और सारांश बनाया गया",
+                "transcriptError": "ट्रांसक्रिप्ट नहीं जोड़ा जा सका।",
+                "saved": "मीटिंग अपडेट हुई",
+                "participantAdded": "प्रतिभागी जोड़ा गया",
+                "saveError": "मीटिंग अपडेट नहीं हो सकी।",
+                "deleted": "मीटिंग हटाई गई",
+                "deleteError": "मीटिंग हटाई नहीं जा सकी।"
             },
-            "confirm": {
-                "delete": "Delete this meeting? Its transcript and summary will be removed. This cannot be undone."
+            "deleteDialog": {
+                "title": "इस मीटिंग को हटाएँ?",
+                "body": "{title} को उसके ट्रांसक्रिप्ट और सारांश सहित स्थायी रूप से हटा दिया जाएगा। इसे पूर्ववत नहीं किया जा सकता।",
+                "confirm": "मीटिंग हटाएँ",
+                "cancel": "रद्द करें",
+                "deleting": "हटाया जा रहा है…",
+                "error": "मीटिंग हटाई नहीं जा सकी"
             }
         },
         "agentsPreview": {

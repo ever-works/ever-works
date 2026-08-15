@@ -143,9 +143,9 @@
                 "password": {
                     "label": "Нова парола",
                     "placeholder": "Въведете новата парола",
-                    "helperText": "Трябва да е поне 6 символа с малка буква и число/специален символ",
+                    "helperText": "Трябва да е поне 8 символа с малка буква и число/специален символ",
                     "errors": {
-                        "minLength": "Паролата трябва да е поне 6 символа",
+                        "minLength": "Паролата трябва да е поне 8 символа",
                         "lowercase": "Паролата трябва да съдържа поне една малка буква",
                         "numberOrSpecial": "Паролата трябва да съдържа поне едно число или специален символ",
                         "cannotStartWith": "Паролата не може да започва с точка или нов ред"
@@ -200,7 +200,8 @@
                     "text": "Съгласен съм с",
                     "termsLink": "Условия за ползване",
                     "and": "и",
-                    "privacyLink": "Политика за поверителност"
+                    "privacyLink": "Политика за поверителност",
+                    "required": "Please accept the Terms of Service and Privacy Policy first"
                 },
                 "submit": "Създай акаунт",
                 "submitting": "Създаване на акаунт..."
@@ -951,7 +952,8 @@
                 "allTemplates": "Всички шаблони",
                 "yourTemplates": "Твоите шаблони",
                 "yourTemplatesEmpty": "Агентите, които създадеш, ще се появят тук като шаблони за многократна употреба.",
-                "openInWizard": "Отвори в помощник"
+                "openInWizard": "Отвори в помощник",
+                "browsePage": "Open the full template browser"
             },
             "settings": {
                 "identity": {
@@ -1145,7 +1147,8 @@
                     "showing": "Показване на {from}-{to} от {total}",
                     "previous": "Предишна",
                     "next": "Следваща"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "newDialog": {
                 "title": "Създай нова Задача",
@@ -1428,7 +1431,8 @@
                 "filter": {
                     "scope": "Обхват",
                     "all": "Всички"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "detail": {
                 "instructions": "Инструкции",
@@ -1829,7 +1833,21 @@
                     "empty": "Все още няма Works, свързани с тази Идея."
                 },
                 "agents": {
-                    "empty": "Няма агенти, свързани с тази Идея."
+                    "empty": "Няма агенти, свързани с тази Идея.",
+                    "assignExisting": "Присвои съществуващ",
+                    "assignTitle": "Присвояване на Агент към тази Идея",
+                    "assignSubtitle": "Добавете към тази Идея Агент, който вече имате, вместо да създавате нов.",
+                    "assignSearchPlaceholder": "Търсене на Агенти…",
+                    "assignLoading": "Зареждане на Агенти…",
+                    "assignNoneAvailable": "Няма други Агенти за присвояване.",
+                    "assignNoMatches": "Няма Агенти, отговарящи на това търсене.",
+                    "assignLoadFailed": "Агентите не можаха да бъдат заредени",
+                    "assignedToast": "{name} е присвоен към тази Идея",
+                    "assignFailed": "Агентът не можа да бъде присвоен",
+                    "assignCancel": "Отказ",
+                    "unassign": "Премахване от тази Идея",
+                    "unassignedToast": "{name} е премахнат от тази Идея",
+                    "unassignFailed": "Агентът не можа да бъде премахнат"
                 },
                 "meta": {
                     "source": "Източник",
@@ -1849,7 +1867,8 @@
                         "idea-agents": "Не може да се изтрие: {count} агент(и) са свързани с тази Идея. Изтрийте ги или сменете обхвата.",
                         "build-in-flight": "Не може да се изтрие по време на изграждане. Изчакайте да приключи.",
                         "unknown": "В момента тази Идея не може да бъде изтрита."
-                    }
+                    },
+                    "unlinksWorks": "{count, plural, one {Тази Идея е свързана с # Work. Той ще бъде запазен — премахва се само връзката.} other {Тази Идея е свързана с # Works. Те ще бъдат запазени — премахва се само връзката.}}"
                 },
                 "toasts": {
                     "built": "Изграден е Work от тази Идея",
@@ -2163,7 +2182,10 @@
                 "usageCredits": "Usage & Credits",
                 "fleet": "Fleet",
                 "jobRuntime": "Job Runtime",
-                "digest": "Digest"
+                "digest": "Digest",
+                "notifications": "Notifications",
+                "channels": "Channels",
+                "emails": "Email Addresses"
             },
             "githubApp": {
                 "title": "Инсталации на GitHub App",
@@ -6925,7 +6947,6 @@
             "created": "Meeting captured",
             "sections": {
                 "provenance": "Where it came from",
-                "participants": "Participants",
                 "transcript": "Transcript"
             },
             "sources": {
@@ -6948,7 +6969,6 @@
                 "externalId": "Provider meeting ID (optional)",
                 "externalIdHint": "Used to de-duplicate against a later connector sync of the same meeting.",
                 "participants": "Participants",
-                "participantsHint": "One per line. Use \"Name <email>\" to record an address.",
                 "transcript": "Transcript (optional)",
                 "transcriptPlaceholder": "Ada: shipping the gate.\nGrace: reviewing the branch.",
                 "transcriptHint": "Adding a transcript runs the summary, Memory and activity pipeline. You can also attach it later from the meeting page."
@@ -6958,6 +6978,7 @@
                 "startedAtInvalid": "Start time is not a valid date.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
+                "participantEmailInvalid": "Въведете валиден имейл адрес или оставете полето празно.",
                 "createFailed": "Couldn't capture the meeting. Please try again."
             },
             "actions": {
@@ -6966,71 +6987,94 @@
             }
         },
         "meetingDetail": {
-            "backToMeetings": "Back to Meetings",
+            "backToMeetings": "Обратно към срещите",
             "actions": {
-                "openRecording": "Open recording",
-                "delete": "Delete",
-                "attachTranscript": "Attach transcript",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
-                "save": "Save changes"
+                "openRecording": "Отваряне на записа",
+                "edit": "Редактиране",
+                "delete": "Изтриване",
+                "attachTranscript": "Прикачване на стенограма",
+                "attaching": "Прикачване…",
+                "editTranscript": "Редактиране на стенограмата",
+                "cancelEdit": "Отказ на редакцията",
+                "saveTranscript": "Запазване на стенограмата",
+                "savingTranscript": "Запазване…",
+                "save": "Запазване на промените",
+                "cancel": "Отказ"
             },
             "sections": {
-                "summary": "Summary",
-                "transcript": "Transcript",
-                "details": "Details",
-                "edit": "Edit meeting"
+                "summary": "Обобщение",
+                "transcript": "Стенограма",
+                "details": "Детайли",
+                "edit": "Редактиране на срещата"
             },
             "summary": {
-                "notGenerated": "No summary was generated for this transcript. Enable an AI provider and re-attach the transcript to try again.",
-                "noTranscript": "Attach a transcript to generate a summary."
+                "generating": "Обобщението се генерира…",
+                "generatingHint": "Четем стенограмата и пишем резюмето — обикновено отнема няколко секунди.",
+                "notGenerated": "За тази стенограма не беше генерирано обобщение. Активирайте доставчик на ИИ и прикачете стенограмата отново, за да опитате пак.",
+                "noTranscript": "Прикачете стенограма, за да генерирате обобщение."
             },
             "transcript": {
-                "composerLabel": "Transcript text",
-                "composerPlaceholder": "Paste the meeting transcript here.",
-                "pipelineHint": "Stored first, then summarized, remembered and posted to your activity feed — best effort.",
-                "storedElsewhere": "The transcript is stored but was not returned with this view."
+                "composerLabel": "Текст на стенограмата",
+                "composerPlaceholder": "Поставете стенограмата от срещата тук.",
+                "pipelineHint": "Първо се запазва, след това се обобщава, запомня се и се публикува в потока ви с дейности — по възможност.",
+                "storedElsewhere": "Стенограмата е запазена, но не беше върната с този изглед."
             },
             "details": {
-                "source": "Source",
-                "startedAt": "Started",
-                "endedAt": "Ended",
-                "openEnded": "Still open",
-                "duration": "Duration",
-                "work": "Work",
-                "orgWide": "Org-wide",
-                "externalId": "Provider ID",
-                "createdAt": "Captured",
-                "participants": "Participants",
-                "noParticipants": "No participants recorded."
+                "source": "Източник",
+                "startedAt": "Начало",
+                "endedAt": "Край",
+                "openEnded": "Все още отворена",
+                "duration": "Продължителност",
+                "work": "Работа",
+                "orgWide": "За цялата организация",
+                "externalId": "ID при доставчика",
+                "createdAt": "Записана",
+                "participants": "Участници",
+                "noParticipants": "Няма записани участници."
             },
             "edit": {
-                "hint": "Rename the meeting, close it out, point it at a recording, or re-route it to a Work."
+                "hint": "Коригирайте часовете, преименувайте срещата, поправете списъка с участници, посочете запис или я пренасочете към Работа."
             },
             "fields": {
-                "title": "Title",
-                "endedAt": "Ended at",
-                "sourceUrl": "Recording link",
-                "work": "Work",
-                "workNone": "Org-wide (no Work)"
+                "title": "Заглавие",
+                "startedAt": "Начало",
+                "endedAt": "Край",
+                "sourceUrl": "Връзка към записа",
+                "work": "Работа",
+                "workNone": "За цялата организация (без Работа)",
+                "participants": "Участници",
+                "participantName": "Име",
+                "participantEmail": "Имейл (по избор)",
+                "participantAdd": "Добавяне на участник",
+                "participantRemove": "Премахване на участника",
+                "participantsEmpty": "Още няма записани участници."
             },
             "errors": {
-                "titleRequired": "Title is required.",
-                "endedAtInvalid": "End time is not a valid date.",
-                "endedBeforeStarted": "End time cannot be before the start time.",
-                "transcriptRequired": "Transcript text is required."
+                "titleRequired": "Заглавието е задължително.",
+                "startedAtInvalid": "Началният час не е валидна дата.",
+                "endedAtInvalid": "Крайният час не е валидна дата.",
+                "endedBeforeStarted": "Крайният час не може да е преди началния.",
+                "participantEmailInvalid": "Въведете валиден имейл адрес или оставете полето празно.",
+                "participantDuplicate": "Този човек вече е в списъка.",
+                "transcriptRequired": "Текстът на стенограмата е задължителен."
             },
             "toasts": {
-                "transcriptSaved": "Transcript attached",
-                "transcriptSummarized": "Transcript attached and summarized",
-                "transcriptError": "Couldn't attach the transcript.",
-                "saved": "Meeting updated",
-                "saveError": "Couldn't update the meeting.",
-                "deleted": "Meeting deleted",
-                "deleteError": "Couldn't delete the meeting."
+                "transcriptSaved": "Стенограмата е прикачена",
+                "transcriptSummarized": "Стенограмата е прикачена и обобщена",
+                "transcriptError": "Стенограмата не можа да бъде прикачена.",
+                "saved": "Срещата е актуализирана",
+                "participantAdded": "Участникът е добавен",
+                "saveError": "Срещата не можа да бъде актуализирана.",
+                "deleted": "Срещата е изтрита",
+                "deleteError": "Срещата не можа да бъде изтрита."
             },
-            "confirm": {
-                "delete": "Delete this meeting? Its transcript and summary will be removed. This cannot be undone."
+            "deleteDialog": {
+                "title": "Да се изтрие ли тази среща?",
+                "body": "{title} ще бъде изтрита завинаги заедно с транскрипцията и обобщението ѝ. Това действие е необратимо.",
+                "confirm": "Изтриване на срещата",
+                "cancel": "Отказ",
+                "deleting": "Изтриване…",
+                "error": "Неуспешно изтриване на срещата"
             }
         },
         "adminTenantRuntimeAllowlist": {
