@@ -70,6 +70,7 @@ jest.mock(
     { virtual: true },
 );
 
+import { ConflictException } from '@nestjs/common';
 import { WorkProposalsApiService } from './work-proposals.service';
 
 const flushMicrotasks = () => new Promise((r) => setImmediate(r));
@@ -82,6 +83,7 @@ describe('WorkProposalsApiService', () => {
             generate: jest.fn().mockResolvedValue({ status: 'generated', proposals: [] }),
             list: jest.fn().mockResolvedValue([]),
             dismiss: jest.fn().mockResolvedValue(true),
+            delete: jest.fn().mockResolvedValue({ deleted: true }),
             markAccepted: jest.fn().mockResolvedValue(true),
             getForUser: jest.fn().mockResolvedValue({ id: 'p1' }),
         };
@@ -358,5 +360,18 @@ describe('WorkProposalsApiService', () => {
         users.findById.mockResolvedValue({ inferredInterests: null });
         await svc.ingestWorkCreated('u1', { categories: ['x'] });
         expect(users.update).not.toHaveBeenCalled();
+    });
+
+    it('delete forwards to the agent service with the caller as owner', async () => {
+        const { svc, proposals } = makeDeps();
+        await expect(svc.delete('u1', 'p1')).resolves.toEqual({ deleted: true });
+        expect(proposals.delete).toHaveBeenCalledWith('u1', 'p1');
+    });
+
+    it('delete propagates the blocked 409 instead of swallowing it', async () => {
+        const { svc, proposals } = makeDeps();
+        const blocked = new ConflictException({ reason: 'idea-agents', count: 3 });
+        proposals.delete.mockRejectedValue(blocked);
+        await expect(svc.delete('u1', 'p1')).rejects.toBe(blocked);
     });
 });

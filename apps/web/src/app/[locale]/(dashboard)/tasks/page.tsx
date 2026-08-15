@@ -101,10 +101,27 @@ export default async function TasksPage({ searchParams }: { searchParams: TasksS
                 subtitle={t('subtitle')}
                 tone="task"
                 actions={
-                    <Button href={ROUTES.DASHBOARD_TASK_NEW} size="sm" className="gap-1.5 shrink-0">
-                        <Plus className="w-3.5 h-3.5" />
-                        {t('list.newTask')}
-                    </Button>
+                    <>
+                        {/* EW-058: first inbound link to the orphaned
+                            /tasks/templates browser (route existed, nothing
+                            linked to it). */}
+                        <Button
+                            href={ROUTES.DASHBOARD_TASK_TEMPLATES}
+                            variant="secondary"
+                            size="sm"
+                            className="gap-1.5 shrink-0"
+                        >
+                            {t('list.browseTemplates')}
+                        </Button>
+                        <Button
+                            href={ROUTES.DASHBOARD_TASK_NEW}
+                            size="sm"
+                            className="gap-1.5 shrink-0"
+                        >
+                            <Plus className="w-3.5 h-3.5" />
+                            {t('list.newTask')}
+                        </Button>
+                    </>
                 }
             />
             <TasksTabsNav active="tasks" />

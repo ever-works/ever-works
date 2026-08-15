@@ -94,12 +94,17 @@ describe('WorkProposalService.delete', () => {
         },
     );
 
-    it('refuses when the Idea still has linked Works, reporting the count', async () => {
+    it('deletes an Idea that has linked Works', async () => {
+        // Linked Works used to refuse the delete and tell the user to
+        // "unlink or delete them first" — but no unlink endpoint exists,
+        // so any Idea that had ever produced a Work was permanently
+        // undeletable. The FKs already express the right outcome:
+        // `idea_works` CASCADEs away, `works.acceptedFromIdeaId` is SET
+        // NULL, so the Works themselves survive.
         const { service, repo } = makeService({ linkedWorks: 2 });
 
-        const error = await service.delete('u1', 'p1').catch((e) => e);
-        expect(conflictBody(error)).toMatchObject({ reason: 'linked-works', count: 2 });
-        expect(repo.deleteForUser).not.toHaveBeenCalled();
+        await expect(service.delete('u1', 'p1')).resolves.toEqual({ deleted: true });
+        expect(repo.deleteForUser).toHaveBeenCalledWith('p1', 'u1');
     });
 
     it('refuses when Idea-scoped Agents still point at it', async () => {
