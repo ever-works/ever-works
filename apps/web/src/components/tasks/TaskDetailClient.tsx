@@ -11,10 +11,20 @@ import { cn } from '@/lib/utils/cn';
 // picker cannot drift apart. Labels stay in the `tasksPage.priority`
 // i18n namespace.
 import { TASK_PRIORITY_PRESENTATION } from '@/lib/task-priorities/catalog';
-import type { Task, TaskAttachmentRow, TaskChatMessage, TaskStatus } from '@/lib/api/tasks';
+import type {
+    Task,
+    TaskActivityRow,
+    TaskAttachmentRow,
+    TaskChatMessage,
+    TaskStatus,
+    TaskSubtaskRow,
+    TaskSubtasksMeta,
+} from '@/lib/api/tasks';
 import type { AgentRunSession } from '@/lib/api/agents.shared';
 import { postTaskChatAction, transitionTaskAction, updateTaskAction } from '@/app/actions/tasks';
-import { TaskRecurringSection } from './TaskRecurringSection';
+import { TaskScheduleSection } from './TaskScheduleSection';
+import { TaskSubtasksSection } from './TaskSubtasksSection';
+import { TaskActivitySection } from './TaskActivitySection';
 import { TaskAttachmentsSection } from './TaskAttachmentsSection';
 import { TaskBranchSection } from './TaskBranchSection';
 import { TaskChecksSection } from './TaskChecksSection';
@@ -99,12 +109,26 @@ export function TaskDetailClient({
     initialAttachmentsError = null,
     initialGateRun = null,
     initialRuns = [],
+    initialSubtasks = [],
+    initialSubtasksMeta = { total: 0, doneCount: 0 },
+    initialSubtasksError = null,
+    initialActivity = [],
+    initialActivityTotal = 0,
+    initialActivityError = null,
 }: {
     task: Task;
     initialChat: TaskChatMessage[];
     initialAttachments?: TaskAttachmentRow[];
     initialChatError?: string | null;
     initialAttachmentsError?: string | null;
+    /** Tasks upgrades — Subtasks checklist rows + its n/m counters. */
+    initialSubtasks?: TaskSubtaskRow[];
+    initialSubtasksMeta?: TaskSubtasksMeta;
+    initialSubtasksError?: string | null;
+    /** Tasks upgrades — per-Task activity feed (audit trail, not chat). */
+    initialActivity?: TaskActivityRow[];
+    initialActivityTotal?: number;
+    initialActivityError?: string | null;
     /**
      * Latest run for this Task, server-fetched (`listSessions({ taskId,
      * limit: 1 })`). Feeds BOTH the quality-gate Checks section (Wave 3 M6 —
@@ -420,6 +444,15 @@ export function TaskDetailClient({
                         )}
                     </section>
 
+                    {/* Tasks upgrades — Subtasks checklist (n/m, per-row
+                        agent chip + approval badge, add-subtask input). */}
+                    <TaskSubtasksSection
+                        task={task}
+                        initial={initialSubtasks}
+                        initialMeta={initialSubtasksMeta}
+                        initialError={initialSubtasksError}
+                    />
+
                     {/* Run steering (Wave 4 M5) + attach action (M8) — steer /
                         interrupt / resume the Task's latest run. Renders
                         nothing when there is no actionable run. */}
@@ -439,6 +472,14 @@ export function TaskDetailClient({
                         workId={workId}
                         initial={initialAttachments}
                         initialError={initialAttachmentsError}
+                    />
+
+                    {/* Tasks upgrades — audit trail for this Task (distinct
+                        from the conversation thread below). */}
+                    <TaskActivitySection
+                        rows={initialActivity}
+                        total={initialActivityTotal}
+                        error={initialActivityError}
                     />
 
                     {/* Activity / conversation */}
@@ -628,8 +669,10 @@ export function TaskDetailClient({
                     {/* Wave 2 M7 — isolated-branch cockpit / isolation override. */}
                     <TaskBranchSection task={task} />
 
-                    {/* Phase 17.8 UI — Recurring template controls. */}
-                    <TaskRecurringSection task={task} />
+                    {/* Tasks upgrades — Schedule section: Run once |
+                        Scheduled (one-shot) | Recurring (Phase 17.8 panel,
+                        rendered by the section for the recurring mode). */}
+                    <TaskScheduleSection task={task} />
                 </aside>
             </div>
         </div>

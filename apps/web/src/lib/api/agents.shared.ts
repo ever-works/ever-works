@@ -227,3 +227,28 @@ export interface AgentPickerOption {
 export interface AgentAssignCandidate extends AgentPickerOption {
     title: string | null;
 }
+
+// ── Agent Collaborators ──
+// Client-safe mirror of the `GET /api/agents/:id/collaborators` row
+// (AgentCollaboratorsController.list). Lives here so the `'use client'`
+// Collaborators tab can type its rows without pulling the `server-only`
+// `agents.ts` module into the bundle.
+
+/**
+ * One collaborator candidate: another agent of the same owner, plus the
+ * allow-list state for THIS parent agent. `configured` says a rule row
+ * exists at all; `enabled` says it currently permits delegation — a
+ * configured-but-disabled row renders as an OFF switch just like an
+ * unconfigured one, but deleting vs disabling are different writes.
+ */
+export interface AgentCollaboratorCandidate {
+    agentId: string;
+    name: string;
+    slug: string;
+    title: string | null;
+    status: string;
+    avatarMode: string;
+    avatarIcon: string | null;
+    configured: boolean;
+    enabled: boolean;
+}

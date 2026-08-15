@@ -73,6 +73,10 @@ describe('activity-log.types', () => {
             ['GIT_PUSHED', 'git_pushed'],
             ['GIT_COMMITTED', 'git_committed'],
             ['GIT_MERGED', 'git_merged'],
+            // Agent Collaborators — sub-agent delegation allow-list edits.
+            ['AGENT_COLLABORATOR_ENABLED', 'agent_collaborator_enabled'],
+            ['AGENT_COLLABORATOR_DISABLED', 'agent_collaborator_disabled'],
+            ['AGENT_COLLABORATOR_REMOVED', 'agent_collaborator_removed'],
         ];
 
         it.each(cases)('%s → %s', (key, value) => {
@@ -119,7 +123,10 @@ describe('activity-log.types', () => {
             // +3 memory_folder_created / _deleted / _synced (Memory Files —
             //    the /memory Files area folder tree) -> 128 after the
             //    Inbox and Memory Files trains merged together.
-            expect(literals).toHaveLength(128);
+            // +3 agent_collaborator_enabled / _disabled / _removed
+            //    (Agent Collaborators allow-list edits) -> 131 after the
+            //    Inbox train merged develop's Agent Collaborators work.
+            expect(literals).toHaveLength(131);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {
