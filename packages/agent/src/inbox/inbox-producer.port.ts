@@ -51,6 +51,20 @@ export interface InboxNoticeInput {
     taskId?: string | null;
     workId?: string | null;
     organizationId?: string | null;
+    /**
+     * Ring the bell + fan out to the human's channels for this notice.
+     * Defaults to `true` — omit it and a notice behaves exactly like
+     * every other inbox item.
+     *
+     * Set it to `false` when the SAME event already reaches the human
+     * through another producer: filing the inbox row is the point, a
+     * second bell row for one event is noise. The budget-threshold path
+     * is the live example — `BudgetAlertHandler` already writes an
+     * in-app notification and sends the templated email for the very
+     * event the inbox notice mirrors. The unread sidebar badge still
+     * surfaces the row.
+     */
+    notify?: boolean;
 }
 
 export interface InboxProducer {

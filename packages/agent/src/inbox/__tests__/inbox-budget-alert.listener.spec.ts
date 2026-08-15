@@ -42,6 +42,16 @@ describe('InboxBudgetAlertListener', () => {
         expect(input.body).toContain('openai');
     });
 
+    it('does not ring a second bell — BudgetAlertHandler already notified for this event', async () => {
+        const inbox = { notice: jest.fn(async () => undefined) };
+        const listener = new InboxBudgetAlertListener(inbox as never);
+
+        await listener.handleBudgetThresholdCrossed(makeEvent());
+
+        const [, input] = inbox.notice.mock.calls[0] as unknown as [string, { notify?: boolean }];
+        expect(input.notify).toBe(false);
+    });
+
     it('does not divide by a zero cap', async () => {
         const inbox = { notice: jest.fn(async () => undefined) };
         const listener = new InboxBudgetAlertListener(inbox as never);

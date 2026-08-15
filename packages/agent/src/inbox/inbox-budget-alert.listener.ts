@@ -11,11 +11,16 @@ import { InboxService } from './inbox.service';
  * by the unique index behind `WorkBudgetAlertStateRepository.record`, so
  * this handler may file unconditionally without a dedup key of its own.
  *
- * The event was declared with handlers in mind but shipped with none, so
- * a crossed budget threshold reached the human through no channel at
- * all. Filing it as an inbox notice is the one wired example of
- * `InboxService.notice` and closes that gap: the notice carries the bell
- * row + channel fanout like every other inbox item.
+ * Filing the crossing as an inbox notice is the one wired example of
+ * `InboxService.notice`: a budget that is about to stop the work belongs
+ * on the surface the human checks for "what needs me", not only in the
+ * bell.
+ *
+ * `notify: false` on purpose — the api-side `BudgetAlertHandler` already
+ * subscribes to this SAME event and writes the in-app notification plus
+ * the templated email. Ringing again from here would give every threshold
+ * crossing two bell rows and two channel fanouts for one event. The
+ * unread sidebar badge still counts the row.
  *
  * Best-effort by contract — spend enforcement already happened inside
  * the guard; a failure to TELL the human must never propagate back into
@@ -45,6 +50,8 @@ export class InboxBudgetAlertListener {
                     `${event.pluginId ? `, plugin ${event.pluginId}` : ''}). ` +
                     'Raise the cap, allow overage, or let the period roll over.',
                 workId: event.workId,
+                // BudgetAlertHandler already rang for this event.
+                notify: false,
             });
         } catch (error) {
             this.logger.warn(
