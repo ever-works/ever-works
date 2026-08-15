@@ -173,25 +173,25 @@ export class FullPipelineExecutorService {
      * at dispatch. A pre-resolved `options.runtimeEnvironment` wins (the
      * orchestrator already did the lookup); otherwise `options.agentId`
      * is resolved through `EnvironmentsService` (agent →
-     * `agents.environmentId` → published row). Best-effort + fail-open:
-     * a resolution failure logs a warning and the generation continues
-     * with no Environment (exactly the pre-Environments behavior).
+     * `agents.environmentId` → published row).
+     *
+     * FAILS CLOSED, deliberately. A missing Environment is a legitimate
+     * outcome — no agentId, no wired service, or an Agent with nothing
+     * assigned all return `undefined` without throwing, and the run
+     * proceeds exactly as before Environments existed. But a resolution
+     * that ERRORS tells us nothing about the Agent's assignment, and
+     * continuing would silently hand the run the consuming plugin's
+     * fallback egress posture (`CLAUDE_MANAGED_AGENT_EGRESS_HOSTS`, or
+     * `unrestricted`) in place of the Environment's restrictions. The
+     * error therefore propagates: `execute()` catches it and returns a
+     * failed PipelineResult.
      */
-    private async resolveRuntimeEnvironmentSafe(
+    private async resolveRuntimeEnvironment(
         options?: PipelineExecutionOptions,
     ): Promise<RuntimeEnvironmentData | undefined> {
         if (options?.runtimeEnvironment) return options.runtimeEnvironment;
         if (!options?.agentId || !this.environmentsService) return undefined;
-        try {
-            return await this.environmentsService.resolveRuntimeEnvironmentForAgent(
-                options.agentId,
-            );
-        } catch (err) {
-            this.logger.warn(
-                `Runtime environment resolution failed for agent=${options.agentId}: ${(err as Error).message}. Continuing without an Environment.`,
-            );
-            return undefined;
-        }
+        return this.environmentsService.resolveRuntimeEnvironmentForAgent(options.agentId);
     }
 
     /**
@@ -244,11 +244,14 @@ export class FullPipelineExecutorService {
         const kbContext = await this.resolveKbContextSafe(work, request);
         const kbTools = this.resolveKbToolsFacadeSafe(work);
         const memoryRecall = await this.resolveMemoryRecallSafe(work, request, options);
-        // Environments — resolved after the carriers above; independent
-        // of them and equally fail-open.
-        const runtimeEnvironment = await this.resolveRuntimeEnvironmentSafe(options);
 
         try {
+            // Environments — resolved INSIDE the try, unlike the
+            // fail-open carriers above: a resolution error must surface
+            // as a failed run rather than downgrade the run's egress
+            // posture (see `resolveRuntimeEnvironment`).
+            const runtimeEnvironment = await this.resolveRuntimeEnvironment(options);
+
             // Create execContext for the plugin to use facades
             const execContext = this.facadeService.createStepExecutionContext(
                 work,

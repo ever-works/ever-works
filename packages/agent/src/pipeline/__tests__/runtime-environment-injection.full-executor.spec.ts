@@ -22,9 +22,9 @@ import type {
  * Environments — runtime-Environment injection for self-managed
  * pipelines. Contract under test: `options.runtimeEnvironment` is
  * forwarded verbatim; otherwise `options.agentId` resolves through
- * `EnvironmentsService` (best-effort, fail-open); no agentId or no
- * wired service = carrier stays undefined. Harness mirrors the
- * memory-recall spec one file over.
+ * `EnvironmentsService`; no agentId, no wired service, or no assigned
+ * Environment = carrier stays undefined, but a resolution ERROR fails
+ * the run closed. Harness mirrors the memory-recall spec one file over.
  */
 
 jest.spyOn(Logger.prototype, 'error').mockImplementation(() => undefined);
@@ -187,8 +187,24 @@ describe('Runtime Environment injection — full-executor dispatch', () => {
         expect(captured.execContexts[0].runtimeEnvironment).toEqual(RUNTIME_ENVIRONMENT);
     });
 
-    it('fails open: a resolver error leaves the carrier undefined and the run proceeds', async () => {
+    it('fails closed: a resolver error fails the run instead of downgrading the posture', async () => {
         const resolveForAgent = jest.fn().mockRejectedValue(new Error('db down'));
+        const harness = await buildHarness(resolveForAgent);
+        const { plugin, captured } = makeCapturingPlugin();
+
+        const result = await harness.service.execute(plugin, WORK, REQUEST, EXISTING, {
+            agentId: 'agent-1',
+        });
+
+        expect(result.success).toBe(false);
+        expect(String(result.error)).toContain('db down');
+        // The plugin never ran, so it never saw a fallback egress posture.
+        expect(plugin.execute).not.toHaveBeenCalled();
+        expect(captured.execContexts).toHaveLength(0);
+    });
+
+    it('stays undefined (no throw) when the Agent has no Environment assigned', async () => {
+        const resolveForAgent = jest.fn().mockResolvedValue(undefined);
         const harness = await buildHarness(resolveForAgent);
         const { plugin, captured } = makeCapturingPlugin();
 
