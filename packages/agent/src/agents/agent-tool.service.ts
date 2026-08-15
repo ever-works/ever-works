@@ -1,7 +1,7 @@
 import { Inject, Injectable, Logger, Optional } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 import type { Agent } from '../entities/agent.entity';
-import { AgentScope, AGENT_PERMISSIONS_DEFAULT } from '../entities/agent.entity';
+import { AgentScope, AgentStatus, AGENT_PERMISSIONS_DEFAULT } from '../entities/agent.entity';
 import { AgentRepository } from '../database/repositories/agent.repository';
 import { AgentCollaboratorRepository } from '../database/repositories/agent-collaborator.repository';
 import { AgentFileService } from './agent-file.service';
@@ -887,7 +887,7 @@ export class AgentToolService {
                     context: {
                         type: 'object',
                         description:
-                            'Optional structured inputs handed to the child (already-gathered context).',
+                            "Optional structured inputs handed to the child. Serialized into the child's brief (truncated past ~4000 characters), so put already-gathered context here rather than restating it in the objective.",
                     },
                 },
                 required: ['objective'],
@@ -969,11 +969,7 @@ export class AgentToolService {
         if (wantedId === agent.id || (wantedSlug && wantedSlug === agent.slug)) {
             return { id: agent.id };
         }
-        const enabled = await this.collaborators!.listEnabledForAgent(agent.id);
-        const rows = await Promise.all(
-            enabled.map((rule) => this.loadOwnedAgent(rule.collaboratorAgentId, agent.userId)),
-        );
-        const candidates = rows.filter((row): row is Agent => row !== null);
+        const candidates = await this.loadEnabledCollaboratorAgents(agent);
         const match = wantedId
             ? candidates.find((candidate) => candidate.id === wantedId)
             : candidates.find((candidate) => candidate.slug === wantedSlug);
@@ -995,20 +991,43 @@ export class AgentToolService {
 
     private async describeEnabledCollaborators(agent: Agent): Promise<string> {
         try {
-            const enabled = await this.collaborators!.listEnabledForAgent(agent.id);
-            if (enabled.length === 0) {
+            const candidates = await this.loadEnabledCollaboratorAgents(agent);
+            if (candidates.length === 0) {
                 return 'No collaborators are enabled for this agent.';
             }
-            const rows = await Promise.all(
-                enabled.map((rule) => this.loadOwnedAgent(rule.collaboratorAgentId, agent.userId)),
-            );
-            const names = rows
-                .filter((row): row is Agent => row !== null)
-                .map((row) => `${row.name} (${row.slug})`);
-            return names.length > 0 ? `Enabled collaborators: ${names.join(', ')}.` : '';
+            const names = candidates.map((row) => `${row.name} (${row.slug})`);
+            return `Enabled collaborators: ${names.join(', ')}.`;
         } catch {
             return '';
         }
+    }
+
+    /**
+     * The parent's enabled collaborators, as the agent rows the owner
+     * actually still has.
+     *
+     * Two filters, both load-bearing:
+     *
+     *  - owner-scoped load, so a stale or poisoned rule naming someone
+     *    else's agent resolves to nothing; and
+     *  - ARCHIVED rows dropped, because an archived agent is retired
+     *    (terminal status, and `unarchive` lands on PAUSED precisely so a
+     *    restored agent does not start running by itself). The rule row
+     *    outlives the archive, so without this the model would be offered
+     *    — and would name — an agent the owner has already retired. The
+     *    delegation runner refuses it server-side either way; dropping it
+     *    here keeps the roster honest instead of advertising a target
+     *    every call would bounce off.
+     */
+    private async loadEnabledCollaboratorAgents(agent: Agent): Promise<Agent[]> {
+        const enabled = await this.collaborators!.listEnabledForAgent(agent.id);
+        if (enabled.length === 0) return [];
+        const rows = await Promise.all(
+            enabled.map((rule) => this.loadOwnedAgent(rule.collaboratorAgentId, agent.userId)),
+        );
+        return rows.filter(
+            (row): row is Agent => row !== null && row.status !== AgentStatus.ARCHIVED,
+        );
     }
 
     /**

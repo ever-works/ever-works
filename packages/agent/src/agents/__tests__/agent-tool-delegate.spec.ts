@@ -224,6 +224,42 @@ describe('delegateToAgent tool', () => {
         expect(delegation.delegate).not.toHaveBeenCalled();
     });
 
+    it('forwards `context` as the request `inputs` the child brief is built from', async () => {
+        const svc = build();
+        const tool = getTool(svc, delegator())!;
+
+        await tool.invoke({
+            targetAgentId: RESEARCHER.id,
+            objective: 'Summarise the findings',
+            context: { findings: ['a', 'b'] },
+        });
+
+        // The tool advertises `context` to the model; if it does not land
+        // on `inputs` the child never receives it and the delegation still
+        // reports `completed`.
+        expect(delegation.delegate.mock.calls[0][0].inputs).toEqual({ findings: ['a', 'b'] });
+    });
+
+    it('drops an ARCHIVED collaborator from the roster it offers the model', async () => {
+        // The rule outlives the archive. Offering a retired agent would
+        // name a target the runner refuses on every call.
+        agents.findByIdAndUser.mockResolvedValue({
+            ...RESEARCHER,
+            status: AgentStatus.ARCHIVED,
+        } as Agent);
+        const svc = build();
+        const tool = getTool(svc, delegator())!;
+
+        const result = (await tool.invoke({
+            targetAgentId: RESEARCHER.id,
+            objective: 'x',
+        })) as { error: string };
+
+        expect(result.error).toContain('No collaborators are enabled');
+        expect(result.error).not.toContain('Researcher');
+        expect(delegation.delegate).not.toHaveBeenCalled();
+    });
+
     it('allows self-delegation without any collaborator rows', async () => {
         collaborators.listEnabledForAgent.mockResolvedValue([]);
         const svc = build();

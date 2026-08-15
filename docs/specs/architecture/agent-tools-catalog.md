@@ -283,9 +283,11 @@ output: SubAgentDelegationResult;            // status completed|failed|refused|
 
 **Side-effects**: one child Task (`createdByType='agent'`, `parentTaskId` recovered from the parent run) + one child `AgentRun` dispatched through `TaskTransitionService.dispatchAgentRun`, then the call WAITS for a terminal state (5-minute budget).
 
+**How `context` reaches the child**: the child's Task description IS the delegation's only channel into the child's prompt, so `SubAgentDelegationRunnerService.describe()` inlines `request.inputs` under an `Inputs:` heading, JSON-serialized and truncated past 4000 characters with an explicit marker. Anything omitted from that description never reaches the child at all.
+
 **Permission gate**: `canAssignTasks = true` — delegating raises a Task and a run, the same capability class as `createTask` / `run_workflow_graph`. On top of that, the target must be an **enabled collaborator** of the parent (`agent_collaborators`, Agents → Collaborators tab). Targets are resolved against SELF + the enabled collaborators only, so an unknown id is never probed against the agent table; the error names the current enabled roster so the model can self-correct.
 
-**Enforcement**: the allow-list is checked server-side in `SubAgentDelegationRunnerService` — the one choke point every delegation path funnels through — via the pure `evaluateCollaboratorDelegation` helper in `@ever-works/contracts`. A disallowed child is a REFUSAL with code `collaborator-not-allowed`, not a failure. With no rows configured an agent may delegate only to itself (the legacy default).
+**Enforcement**: the allow-list is checked server-side in `SubAgentDelegationRunnerService` — the one choke point every delegation path funnels through — via the pure `evaluateCollaboratorDelegation` helper in `@ever-works/contracts`. A disallowed child is a REFUSAL with code `collaborator-not-allowed`, not a failure. With no rows configured an agent may delegate only to itself (the legacy default). An **archived** child is refused with the same code even when an enabled rule still names it: `ARCHIVED` is terminal and `unarchive` lands on `PAUSED` precisely so a restored agent does not resume running by itself, and nothing downstream of dispatch re-checks agent status. The tool drops archived agents from the roster it offers the model for the same reason.
 
 ## 4. Tool list assembly at run time
 

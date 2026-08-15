@@ -101,6 +101,65 @@ describe('SubAgentDelegationRunnerService', () => {
         expect(result.childRunId).toBe('run-child');
     });
 
+    describe("inputs reach the child's brief", () => {
+        // The child Task description IS the delegation's only channel into
+        // the child's prompt. When `inputs` was left out of it, every
+        // caller that gathered context up front (the `delegateToAgent`
+        // tool's `context` argument, an `agent.delegate` node's inputs)
+        // had it accepted, validated, narrowed and then dropped — and the
+        // child answered the objective without the data while the
+        // delegation still reported `completed`.
+        const descriptionOf = () => tasks.create.mock.calls[0][1].description as string;
+
+        it('serializes inputs into the description under an Inputs heading', async () => {
+            await runner.run(
+                request({
+                    childAgentId: CHILD_AGENT,
+                    inputs: { ticket: 'EW-1234', urls: ['https://example.test/a'] },
+                }),
+            );
+
+            const description = descriptionOf();
+            expect(description).toContain('Inputs:');
+            expect(description).toContain('EW-1234');
+            expect(description).toContain('https://example.test/a');
+        });
+
+        it('omits the Inputs block entirely when there is nothing to hand over', async () => {
+            await runner.run(request({ childAgentId: CHILD_AGENT }));
+            expect(descriptionOf()).not.toContain('Inputs:');
+
+            tasks.create.mockClear();
+            await runner.run(request({ childAgentId: CHILD_AGENT, inputs: {} }));
+            expect(descriptionOf()).not.toContain('Inputs:');
+        });
+
+        it('truncates oversized inputs with a visible marker instead of dropping them', async () => {
+            await runner.run(
+                request({
+                    childAgentId: CHILD_AGENT,
+                    inputs: { blob: 'x'.repeat(20_000) },
+                }),
+            );
+
+            const description = descriptionOf();
+            expect(description).toContain('Inputs:');
+            expect(description).toContain('[inputs truncated at 4000 characters]');
+            // Bounded: the stored description cannot grow with the payload.
+            expect(description.length).toBeLessThan(4_500);
+        });
+
+        it('survives inputs that cannot be serialized rather than failing the delegation', async () => {
+            const cyclic: Record<string, unknown> = { name: 'loop' };
+            cyclic.self = cyclic;
+
+            const result = await runner.run(request({ childAgentId: CHILD_AGENT, inputs: cyclic }));
+
+            expect(result.status).toBe('completed');
+            expect(descriptionOf()).not.toContain('Inputs:');
+        });
+    });
+
     it('records the PARENT as the author of the delegated work', async () => {
         await runner.run(request({ childAgentId: CHILD_AGENT }));
 
@@ -199,6 +258,46 @@ describe('SubAgentDelegationRunnerService', () => {
     });
 
     it('allows an enabled collaborator child through to dispatch', async () => {
+        collaborators.listForAgent.mockResolvedValue([
+            { collaboratorAgentId: CHILD_AGENT, enabled: true },
+        ]);
+
+        const result = await runner.run(request({ childAgentId: CHILD_AGENT }));
+
+        expect(result.status).toBe('completed');
+        expect(transitions.dispatchAgentRun).toHaveBeenCalled();
+    });
+
+    it('refuses an ARCHIVED child even when an enabled rule still names it', async () => {
+        // The rule row outlives the archive and the Collaborators tab
+        // lists only live agents, so an owner who retires an agent has no
+        // way to see (let alone clear) the rule still pointing at it —
+        // and nothing downstream of dispatch re-checks agent status, so
+        // the archived agent would keep executing delegated work.
+        agents.findById.mockImplementation(async (id: string) =>
+            id === CHILD_AGENT
+                ? { id, userId: OWNER, status: 'archived' }
+                : { id, userId: OWNER, status: 'active' },
+        );
+        collaborators.listForAgent.mockResolvedValue([
+            { collaboratorAgentId: CHILD_AGENT, enabled: true },
+        ]);
+
+        const result = await runner.run(request({ childAgentId: CHILD_AGENT }));
+
+        expect(result.status).toBe('refused');
+        expect(result.refusalCode).toBe('collaborator-not-allowed');
+        expect(result.summary).toMatch(/archived/);
+        expect(tasks.create).not.toHaveBeenCalled();
+        expect(transitions.dispatchAgentRun).not.toHaveBeenCalled();
+    });
+
+    it('still admits a non-archived child (the guard is not a blanket refusal)', async () => {
+        agents.findById.mockImplementation(async (id: string) => ({
+            id,
+            userId: OWNER,
+            status: 'paused',
+        }));
         collaborators.listForAgent.mockResolvedValue([
             { collaboratorAgentId: CHILD_AGENT, enabled: true },
         ]);
