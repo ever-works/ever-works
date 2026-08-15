@@ -55,7 +55,7 @@ the package system (T1–T22 remain out of scope).
 
 ## Data model / migration
 
-`apps/api/src/migrations/1785100000000-CreateMcpServerConnections.ts` —
+`apps/api/src/migrations/1786840000000-CreateMcpServerConnections.ts` —
 portable `Table` API (postgres + better-sqlite3), idempotent guards, both
 tables + unique indexes, FKs to `users` (+ bindings → connections CASCADE).
 Entities registered in `entities/index.ts`, `_entities-inventory.ts`, and

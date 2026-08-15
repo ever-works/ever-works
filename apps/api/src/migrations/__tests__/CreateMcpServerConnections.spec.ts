@@ -1,5 +1,5 @@
 import { DataSource } from 'typeorm';
-import { CreateMcpServerConnections1785100000000 } from '../1785100000000-CreateMcpServerConnections';
+import { CreateMcpServerConnections1786840000000 } from '../1786840000000-CreateMcpServerConnections';
 
 /**
  * Migration test for the Agent Plugins MCP slice tables
@@ -15,9 +15,9 @@ import { CreateMcpServerConnections1785100000000 } from '../1785100000000-Create
  * `foreign_keys` pragma ON — so the harness creates a stub `users`
  * table before inserting rows.
  */
-describe('CreateMcpServerConnections1785100000000', () => {
+describe('CreateMcpServerConnections1786840000000', () => {
     let dataSource: DataSource;
-    const migration = new CreateMcpServerConnections1785100000000();
+    const migration = new CreateMcpServerConnections1786840000000();
 
     beforeEach(async () => {
         dataSource = new DataSource({

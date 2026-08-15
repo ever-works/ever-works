@@ -22,8 +22,8 @@ import { MigrationInterface, QueryRunner, Table, TableIndex } from 'typeorm';
  * Idempotent: every createTable / createIndex gates on the matching
  * `has*` check (house pattern, mirrors 1779978012000-CreateSkillsTables).
  */
-export class CreateMcpServerConnections1785100000000 implements MigrationInterface {
-    name = 'CreateMcpServerConnections1785100000000';
+export class CreateMcpServerConnections1786840000000 implements MigrationInterface {
+    name = 'CreateMcpServerConnections1786840000000';
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         if (!(await queryRunner.hasTable('mcp_server_connections'))) {
