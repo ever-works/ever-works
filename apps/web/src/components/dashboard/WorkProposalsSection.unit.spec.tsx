@@ -273,6 +273,38 @@ describe('WorkProposalsSection — dashboard preview (Phase 5 PR O)', () => {
         expect(listProposalsMock).not.toHaveBeenCalled();
     });
 
+    // Regression: the home preview used to render IdeaCards without
+    // `matchedWorkId`, while /ideas passed it. Since the list endpoint
+    // sends no `idea_works` rollup, that left `acceptedWorkId` as the
+    // preview's only provenance signal — so an Idea built through
+    // `/works/new?proposal=…` (which never stamps it) showed Built on
+    // /ideas and "Not built yet" on home. The two surfaces must agree.
+    it('marks an Idea Built from a content-matched Work, like /ideas does', () => {
+        render(
+            <WorkProposalsSection
+                initialProposals={[mkIdea('a'), mkIdea('b')]}
+                initiallyResearching={false}
+                initiallyCanRefresh={false}
+                matchedWorkIds={{ a: 'work-5' }}
+            />,
+        );
+        // Exactly the matched Idea is Built — the match must not leak
+        // onto its neighbours.
+        expect(screen.getAllByTestId('idea-card-built-badge')).toHaveLength(1);
+        expect(screen.getByText('actions.viewWork')).toBeTruthy();
+    });
+
+    it('leaves every Idea unbuilt when no matches are supplied', () => {
+        render(
+            <WorkProposalsSection
+                initialProposals={[mkIdea('a'), mkIdea('b')]}
+                initiallyResearching={false}
+                initiallyCanRefresh={false}
+            />,
+        );
+        expect(screen.queryByTestId('idea-card-built-badge')).toBeNull();
+    });
+
     it('dismissing an Idea (via the card X) keeps it locally as DISMISSED, hidden by default', () => {
         // The card calls dismissProposalAction internally; the parent's
         // onDismissed flips status to 'dismissed' rather than dropping

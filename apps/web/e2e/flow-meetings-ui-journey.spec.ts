@@ -322,7 +322,11 @@ test.describe('Meetings — /meetings/:id detail (UI)', () => {
         await expect(page.getByRole('heading', { name: 'Summary' })).toBeVisible();
         await expect(page.getByRole('heading', { name: 'Transcript' })).toBeVisible();
         await expect(page.getByRole('heading', { name: 'Details' })).toBeVisible();
-        await expect(page.getByRole('heading', { name: 'Edit meeting' })).toBeVisible();
+        // Editing is an explicit act behind a header button, not a form
+        // parked open in the page body next to the read-only rows.
+        await expect(page.getByTestId('meeting-edit-open')).toBeVisible();
+        await expect(page.getByRole('heading', { name: 'Edit meeting' })).toHaveCount(0);
+        await expect(page.getByTestId('meeting-edit')).toHaveCount(0);
 
         // No transcript yet → the Summary section says so instead of implying a
         // failed summary.
@@ -340,6 +344,113 @@ test.describe('Meetings — /meetings/:id detail (UI)', () => {
         const recording = page.getByTestId('meeting-recording-link');
         await expect(recording).toHaveAttribute('href', 'https://example.com/recording/1');
         await expect(recording).toHaveAttribute('rel', /noopener/);
+
+        // Opening it reveals every field PATCH accepts. `startedAt` and
+        // `participants` are on that list: both were previously write-once in
+        // the UI (settable at capture, uneditable afterwards) even though the
+        // API has always patched them.
+        const editForm = page.getByTestId('meeting-edit');
+        await clickUntil(page.getByTestId('meeting-edit-open'), () =>
+            editForm.isVisible().catch(() => false),
+        );
+        await expect(page.getByRole('heading', { name: 'Edit meeting' })).toBeVisible();
+        await expect(page.getByTestId('meeting-edit-started-at')).toBeVisible();
+        await expect(page.getByTestId('meeting-edit-ended-at')).toBeVisible();
+        await expect(page.getByTestId('meeting-edit-participants')).toBeVisible();
+        await expect(page.getByTestId('meeting-edit-participant-add')).toBeVisible();
+        await expect(page.getByTestId('meeting-edit-cancel')).toBeVisible();
+    });
+
+    test('the edit card rewrites the roster and the change persists', async ({ page, request }) => {
+        const token = await seededToken(request);
+        const meeting = await createMeeting(request, token, {
+            title: `Edit Roster ${suffix()}`,
+            participants: [{ name: 'Ada Lovelace', email: 'ada@example.com' }],
+        });
+
+        await page.goto(`/en/meetings/${meeting.id}`, { waitUntil: 'domcontentloaded' });
+        const editOpen = page.getByTestId('meeting-edit-open');
+        await expect(editOpen).toBeVisible({ timeout: 30_000 });
+
+        const roster = page.getByTestId('meeting-edit-participants');
+        const names = page.getByTestId('meeting-edit-participant-name');
+        const emails = page.getByTestId('meeting-edit-participant-email');
+        const addRow = page.getByTestId('meeting-edit-participant-add');
+
+        await clickUntil(editOpen, () => roster.isVisible().catch(() => false));
+        // One row per stored participant, with the address in its own field
+        // rather than encoded into the name as `Name <email>`.
+        await expect(names).toHaveCount(1);
+        await expect(names.first()).toHaveValue('Ada Lovelace');
+        await expect(emails.first()).toHaveValue('ada@example.com');
+
+        const save = page.getByTestId('meeting-save');
+
+        // Post-condition = the PERSISTED roster (same idiom as the rename test):
+        // re-open the dialog if it closed, re-fill only what actually lost its
+        // value, and stop as soon as the write lands.
+        await expect(async () => {
+            const current = (await readMeeting(request, token, meeting.id).catch(() => null)) as {
+                participants?: Array<{ name: string }>;
+            } | null;
+            if (!(current?.participants ?? []).some((p) => p.name === 'Alan Turing')) {
+                if (!(await roster.isVisible().catch(() => false))) {
+                    await editOpen
+                        .click({ timeout: 5_000, noWaitAfter: true })
+                        .catch(() => undefined);
+                }
+                // Rewrite the existing row in place…
+                if (
+                    (await names
+                        .first()
+                        .inputValue()
+                        .catch(() => '')) !== 'Grace Hopper'
+                ) {
+                    await names
+                        .first()
+                        .fill('Grace Hopper')
+                        .catch(() => undefined);
+                    await emails
+                        .first()
+                        .fill('grace@example.com')
+                        .catch(() => undefined);
+                }
+                // …and add the second person on a row of their own, which is
+                // the whole point of the editor: no retyping the list.
+                if ((await names.count().catch(() => 0)) < 2) {
+                    await addRow
+                        .click({ timeout: 5_000, noWaitAfter: true })
+                        .catch(() => undefined);
+                }
+                if (
+                    (await names
+                        .nth(1)
+                        .inputValue()
+                        .catch(() => '')) !== 'Alan Turing'
+                ) {
+                    await names
+                        .nth(1)
+                        .fill('Alan Turing')
+                        .catch(() => undefined);
+                }
+                await save.click({ timeout: 5_000, noWaitAfter: true }).catch(() => undefined);
+            }
+            const persisted = (await readMeeting(request, token, meeting.id)) as {
+                participants: Array<{ name: string; email?: string }>;
+            };
+            expect(persisted.participants.map((p) => p.name)).toEqual([
+                'Grace Hopper',
+                'Alan Turing',
+            ]);
+            // An untouched email field stores no address; a filled one does.
+            expect(persisted.participants[0].email).toBe('grace@example.com');
+            expect(persisted.participants[1].email).toBeUndefined();
+        }).toPass({ timeout: 60_000 });
+
+        // …and the read-only roster beside the form reflects the new list.
+        await expect(page.getByTestId('meeting-participants')).toContainText('Alan Turing', {
+            timeout: 30_000,
+        });
     });
 
     test('a stored transcript renders in the body and hides the composer behind Replace', async ({
@@ -424,15 +535,24 @@ test.describe('Meetings — /meetings/:id detail (UI)', () => {
         const renamed = `After Rename ${suffix()}`;
 
         await page.goto(`/en/meetings/${meeting.id}`, { waitUntil: 'domcontentloaded' });
+        const editOpen = page.getByTestId('meeting-edit-open');
+        await expect(editOpen).toBeVisible({ timeout: 30_000 });
         const titleInput = page.getByLabel('Title');
-        await expect(titleInput).toBeVisible({ timeout: 30_000 });
         const save = page.getByTestId('meeting-save');
 
-        // Post-condition = the PERSISTED title. Re-fill only the field that
-        // actually lost its value, and stop as soon as the write lands.
+        // Post-condition = the PERSISTED title. The form lives in a dialog now,
+        // so each attempt re-opens it when a pre-hydration click never did,
+        // then re-fills only the field that actually lost its value. A save
+        // that landed closes the dialog and is never repeated, because the
+        // persisted check runs first.
         await expect(async () => {
             const current = await readMeeting(request, token, meeting.id).catch(() => null);
             if (current?.title !== renamed) {
+                if (!(await titleInput.isVisible().catch(() => false))) {
+                    await editOpen
+                        .click({ timeout: 5_000, noWaitAfter: true })
+                        .catch(() => undefined);
+                }
                 if ((await titleInput.inputValue().catch(() => '')) !== renamed) {
                     await titleInput.fill(renamed).catch(() => undefined);
                 }
@@ -446,22 +566,38 @@ test.describe('Meetings — /meetings/:id detail (UI)', () => {
         await expect(cardFor(page, meeting.id)).toContainText(renamed, { timeout: 30_000 });
     });
 
-    test('UI Delete removes the meeting and returns to the catalog', async ({ page, request }) => {
+    test('UI Delete confirms in a dialog, removes the meeting and returns to the catalog', async ({
+        page,
+        request,
+    }) => {
         const token = await seededToken(request);
         const meeting = await createMeeting(request, token, { title: `UI Delete ${suffix()}` });
 
         await page.goto(`/en/meetings/${meeting.id}`, { waitUntil: 'domcontentloaded' });
         const del = page.getByTestId('meeting-delete');
         await expect(del).toBeVisible({ timeout: 30_000 });
-        // The delete flow guards with window.confirm().
-        page.on('dialog', (dialog) => dialog.accept());
-        // Post-condition: the client `router.push('/meetings')` landed us back on
-        // the catalog. A click before hydration never even raises the confirm,
-        // and re-clicking is safe because we stop as soon as the URL matches.
-        await clickAndExpectUrl(page, del, /\/meetings$/);
-        await expect(cardFor(page, meeting.id)).toHaveCount(0);
-        // Cascade confirmed at the API: the row is gone.
+
+        // The delete flow guards with the shared in-page confirmation dialog
+        // (the same component the Mission and Task detail pages use), NOT
+        // window.confirm — so the header button opens a modal rather than
+        // deleting outright. A click landing before hydration never opens it.
+        const confirm = page.getByTestId('meeting-delete-confirm');
+        await clickUntil(del, () => confirm.isVisible().catch(() => false));
+        await expect(page.getByTestId('meeting-delete-cancel')).toBeVisible();
+
+        // Post-condition = the PERSISTED delete, not the URL: the confirm click
+        // is itself swallowable pre-hydration, and because clickUntil re-checks
+        // BEFORE clicking, a delete that already landed is never re-fired into
+        // a 404 that would surface the dialog's error row instead of navigating.
+        await clickUntil(
+            confirm,
+            async () => (await getMeetingStatus(request, token, meeting.id)) === 404,
+        );
         expect(await getMeetingStatus(request, token, meeting.id)).toBe(404);
+
+        // …and the successful delete pushed us back to the catalog.
+        await expect(page).toHaveURL(/\/meetings$/, { timeout: 30_000 });
+        await expect(cardFor(page, meeting.id)).toHaveCount(0);
     });
 
     test('an unknown meeting id renders the not-found surface, not a detail page', async ({

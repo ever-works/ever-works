@@ -170,15 +170,35 @@ export function ActivityClient({ initialActivities, totalActivities }: ActivityC
             const currentRequestId = ++kanbanRequestIdRef.current;
             setKanbanLoading(true);
             try {
-                const response = await getActivityLog({
-                    actionType: filters.actionType || undefined,
-                    status: filters.status || undefined,
-                    search: filters.search || undefined,
-                    limit: KANBAN_LIMIT,
-                    offset: 0,
-                });
-                if (currentRequestId === kanbanRequestIdRef.current && response.success) {
-                    setKanbanActivities(response.activities);
+                // The API clamps `limit` to 100 (`Math.min(limit, 100)`, a
+                // documented two-layer contract) — so a single request for
+                // KANBAN_LIMIT rows silently came back with 100, and the
+                // board's per-column counts contradicted the summary cards
+                // rendered directly above it. Page in API-max chunks instead,
+                // stopping early when the server says there is no more.
+                const PAGE = 100;
+                const collected: typeof kanbanActivities = [];
+                for (let offset = 0; offset < KANBAN_LIMIT; offset += PAGE) {
+                    const response = await getActivityLog({
+                        actionType: filters.actionType || undefined,
+                        status: filters.status || undefined,
+                        search: filters.search || undefined,
+                        limit: PAGE,
+                        offset,
+                    });
+                    // A newer request superseded this one mid-pagination —
+                    // stop fetching AND stop touching state.
+                    if (currentRequestId !== kanbanRequestIdRef.current) return;
+                    if (!response.success) break;
+                    collected.push(...response.activities);
+                    // Server said we have everything (short page, or reached
+                    // the reported total).
+                    if (response.activities.length < PAGE || collected.length >= response.total) {
+                        break;
+                    }
+                }
+                if (currentRequestId === kanbanRequestIdRef.current) {
+                    setKanbanActivities(collected);
                 }
             } catch (error) {
                 if (currentRequestId === kanbanRequestIdRef.current) {

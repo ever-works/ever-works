@@ -996,7 +996,8 @@
                 "allTemplates": "All templates",
                 "yourTemplates": "Your templates",
                 "yourTemplatesEmpty": "Agents you create will appear here as reusable templates.",
-                "openInWizard": "Open in wizard"
+                "openInWizard": "Open in wizard",
+                "browsePage": "Open the full template browser"
             },
             "pageTabs": {
                 "agents": "Agents",
@@ -1114,7 +1115,8 @@
                     "showing": "แสดง {from}-{to} จาก {total}",
                     "previous": "ก่อนหน้า",
                     "next": "ถัดไป"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "newDialog": {
                 "title": "สร้างงานใหม่",
@@ -1350,7 +1352,8 @@
                 "filter": {
                     "scope": "ขอบเขต",
                     "all": "ทั้งหมด"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "detail": {
                 "instructions": "คำแนะนำ",
@@ -1798,7 +1801,21 @@
                     "empty": "ยังไม่มี Work ที่เชื่อมกับไอเดียนี้"
                 },
                 "agents": {
-                    "empty": "ไม่มีเอเจนต์ที่ผูกกับไอเดียนี้"
+                    "empty": "ไม่มีเอเจนต์ที่ผูกกับไอเดียนี้",
+                    "assignExisting": "กำหนดเอเจนต์ที่มีอยู่",
+                    "assignTitle": "กำหนดเอเจนต์ให้ไอเดียนี้",
+                    "assignSubtitle": "นำเอเจนต์ที่คุณมีอยู่แล้วมาใช้กับไอเดียนี้ แทนการสร้างใหม่",
+                    "assignSearchPlaceholder": "ค้นหาเอเจนต์…",
+                    "assignLoading": "กำลังโหลดเอเจนต์…",
+                    "assignNoneAvailable": "ไม่มีเอเจนต์อื่นให้กำหนดแล้ว",
+                    "assignNoMatches": "ไม่พบเอเจนต์ที่ตรงกับการค้นหา",
+                    "assignLoadFailed": "ไม่สามารถโหลดเอเจนต์ได้",
+                    "assignedToast": "กำหนด {name} ให้ไอเดียนี้แล้ว",
+                    "assignFailed": "ไม่สามารถกำหนดเอเจนต์ได้",
+                    "assignCancel": "ยกเลิก",
+                    "unassign": "นำออกจากไอเดียนี้",
+                    "unassignedToast": "นำ {name} ออกจากไอเดียนี้แล้ว",
+                    "unassignFailed": "ไม่สามารถนำเอเจนต์ออกได้"
                 },
                 "meta": {
                     "source": "แหล่งที่มา",
@@ -1818,7 +1835,8 @@
                         "idea-agents": "ลบไม่ได้: มี {count} เอเจนต์ผูกกับไอเดียนี้ กรุณาลบหรือเปลี่ยนขอบเขตก่อน",
                         "build-in-flight": "ลบไม่ได้ขณะกำลังสร้าง กรุณารอให้เสร็จ",
                         "unknown": "ไม่สามารถลบไอเดียนี้ได้ในขณะนี้"
-                    }
+                    },
+                    "unlinksWorks": "ไอเดียนี้เชื่อมกับ {count} Work ระบบจะเก็บ Work ไว้ — ลบเฉพาะการเชื่อมโยงเท่านั้น"
                 },
                 "toasts": {
                     "built": "สร้าง Work จากไอเดียนี้แล้ว",
@@ -2095,7 +2113,10 @@
                 "usageCredits": "Usage & Credits",
                 "fleet": "Fleet",
                 "jobRuntime": "Job Runtime",
-                "digest": "Digest"
+                "digest": "Digest",
+                "notifications": "Notifications",
+                "channels": "Channels",
+                "emails": "Email Addresses"
             },
             "githubApp": {
                 "title": "การติดตั้ง GitHub App",
@@ -6895,7 +6916,6 @@
             "created": "Meeting captured",
             "sections": {
                 "provenance": "Where it came from",
-                "participants": "Participants",
                 "transcript": "Transcript"
             },
             "sources": {
@@ -6918,7 +6938,6 @@
                 "externalId": "Provider meeting ID (optional)",
                 "externalIdHint": "Used to de-duplicate against a later connector sync of the same meeting.",
                 "participants": "Participants",
-                "participantsHint": "One per line. Use \"Name <email>\" to record an address.",
                 "transcript": "Transcript (optional)",
                 "transcriptPlaceholder": "Ada: shipping the gate.\nGrace: reviewing the branch.",
                 "transcriptHint": "Adding a transcript runs the summary, Memory and activity pipeline. You can also attach it later from the meeting page."
@@ -6928,6 +6947,7 @@
                 "startedAtInvalid": "Start time is not a valid date.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
+                "participantEmailInvalid": "กรอกอีเมลที่ถูกต้อง หรือเว้นว่างไว้",
                 "createFailed": "Couldn't capture the meeting. Please try again."
             },
             "actions": {
@@ -6936,71 +6956,94 @@
             }
         },
         "meetingDetail": {
-            "backToMeetings": "Back to Meetings",
+            "backToMeetings": "กลับไปที่การประชุม",
             "actions": {
-                "openRecording": "Open recording",
-                "delete": "Delete",
-                "attachTranscript": "Attach transcript",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
-                "save": "Save changes"
+                "openRecording": "เปิดไฟล์บันทึก",
+                "edit": "แก้ไข",
+                "delete": "ลบ",
+                "attachTranscript": "แนบข้อความถอดเสียง",
+                "attaching": "กำลังแนบ…",
+                "editTranscript": "แก้ไขข้อความถอดเสียง",
+                "cancelEdit": "ยกเลิกการแก้ไข",
+                "saveTranscript": "บันทึกข้อความถอดเสียง",
+                "savingTranscript": "กำลังบันทึก…",
+                "save": "บันทึกการเปลี่ยนแปลง",
+                "cancel": "ยกเลิก"
             },
             "sections": {
-                "summary": "Summary",
-                "transcript": "Transcript",
-                "details": "Details",
-                "edit": "Edit meeting"
+                "summary": "สรุป",
+                "transcript": "ข้อความถอดเสียง",
+                "details": "รายละเอียด",
+                "edit": "แก้ไขการประชุม"
             },
             "summary": {
-                "notGenerated": "No summary was generated for this transcript. Enable an AI provider and re-attach the transcript to try again.",
-                "noTranscript": "Attach a transcript to generate a summary."
+                "generating": "กำลังสร้างสรุป…",
+                "generatingHint": "กำลังอ่านข้อความถอดเสียงและเขียนสรุป โดยปกติใช้เวลาไม่กี่วินาที",
+                "notGenerated": "ไม่มีการสร้างสรุปสำหรับข้อความถอดเสียงนี้ เปิดใช้งานผู้ให้บริการ AI แล้วแนบข้อความถอดเสียงอีกครั้งเพื่อลองใหม่",
+                "noTranscript": "แนบข้อความถอดเสียงเพื่อสร้างสรุป"
             },
             "transcript": {
-                "composerLabel": "Transcript text",
-                "composerPlaceholder": "Paste the meeting transcript here.",
-                "pipelineHint": "Stored first, then summarized, remembered and posted to your activity feed — best effort.",
-                "storedElsewhere": "The transcript is stored but was not returned with this view."
+                "composerLabel": "เนื้อหาข้อความถอดเสียง",
+                "composerPlaceholder": "วางข้อความถอดเสียงของการประชุมที่นี่",
+                "pipelineHint": "ระบบจะจัดเก็บก่อน จากนั้นจึงสรุป จดจำ และโพสต์ลงในฟีดกิจกรรมของคุณ — เท่าที่ทำได้",
+                "storedElsewhere": "ข้อความถอดเสียงถูกจัดเก็บไว้แล้ว แต่ไม่ได้ส่งกลับมาพร้อมมุมมองนี้"
             },
             "details": {
-                "source": "Source",
-                "startedAt": "Started",
-                "endedAt": "Ended",
-                "openEnded": "Still open",
-                "duration": "Duration",
-                "work": "Work",
-                "orgWide": "Org-wide",
-                "externalId": "Provider ID",
-                "createdAt": "Captured",
-                "participants": "Participants",
-                "noParticipants": "No participants recorded."
+                "source": "แหล่งที่มา",
+                "startedAt": "เริ่ม",
+                "endedAt": "สิ้นสุด",
+                "openEnded": "ยังดำเนินอยู่",
+                "duration": "ระยะเวลา",
+                "work": "งาน",
+                "orgWide": "ทั้งองค์กร",
+                "externalId": "รหัสจากผู้ให้บริการ",
+                "createdAt": "บันทึกเมื่อ",
+                "participants": "ผู้เข้าร่วม",
+                "noParticipants": "ไม่มีผู้เข้าร่วมที่บันทึกไว้"
             },
             "edit": {
-                "hint": "Rename the meeting, close it out, point it at a recording, or re-route it to a Work."
+                "hint": "แก้ไขเวลา เปลี่ยนชื่อการประชุม ปรับรายชื่อผู้เข้าร่วม เชื่อมโยงไฟล์บันทึก หรือกำหนดให้กับงาน"
             },
             "fields": {
-                "title": "Title",
-                "endedAt": "Ended at",
-                "sourceUrl": "Recording link",
-                "work": "Work",
-                "workNone": "Org-wide (no Work)"
+                "title": "ชื่อเรื่อง",
+                "startedAt": "เวลาเริ่ม",
+                "endedAt": "เวลาสิ้นสุด",
+                "sourceUrl": "ลิงก์ไฟล์บันทึก",
+                "work": "งาน",
+                "workNone": "ทั้งองค์กร (ไม่มีงาน)",
+                "participants": "ผู้เข้าร่วม",
+                "participantName": "ชื่อ",
+                "participantEmail": "อีเมล (ไม่บังคับ)",
+                "participantAdd": "เพิ่มผู้เข้าร่วม",
+                "participantRemove": "ลบผู้เข้าร่วม",
+                "participantsEmpty": "ยังไม่มีผู้เข้าร่วมที่บันทึกไว้"
             },
             "errors": {
-                "titleRequired": "Title is required.",
-                "endedAtInvalid": "End time is not a valid date.",
-                "endedBeforeStarted": "End time cannot be before the start time.",
-                "transcriptRequired": "Transcript text is required."
+                "titleRequired": "ต้องระบุชื่อเรื่อง",
+                "startedAtInvalid": "เวลาเริ่มไม่ใช่วันที่ที่ถูกต้อง",
+                "endedAtInvalid": "เวลาสิ้นสุดไม่ใช่วันที่ที่ถูกต้อง",
+                "endedBeforeStarted": "เวลาสิ้นสุดต้องไม่อยู่ก่อนเวลาเริ่ม",
+                "participantEmailInvalid": "กรอกอีเมลที่ถูกต้อง หรือเว้นว่างไว้",
+                "participantDuplicate": "บุคคลนี้อยู่ในรายการอยู่แล้ว",
+                "transcriptRequired": "ต้องระบุเนื้อหาข้อความถอดเสียง"
             },
             "toasts": {
-                "transcriptSaved": "Transcript attached",
-                "transcriptSummarized": "Transcript attached and summarized",
-                "transcriptError": "Couldn't attach the transcript.",
-                "saved": "Meeting updated",
-                "saveError": "Couldn't update the meeting.",
-                "deleted": "Meeting deleted",
-                "deleteError": "Couldn't delete the meeting."
+                "transcriptSaved": "แนบข้อความถอดเสียงแล้ว",
+                "transcriptSummarized": "แนบข้อความถอดเสียงและสรุปแล้ว",
+                "transcriptError": "ไม่สามารถแนบข้อความถอดเสียงได้",
+                "saved": "อัปเดตการประชุมแล้ว",
+                "participantAdded": "เพิ่มผู้เข้าร่วมแล้ว",
+                "saveError": "ไม่สามารถอัปเดตการประชุมได้",
+                "deleted": "ลบการประชุมแล้ว",
+                "deleteError": "ไม่สามารถลบการประชุมได้"
             },
-            "confirm": {
-                "delete": "Delete this meeting? Its transcript and summary will be removed. This cannot be undone."
+            "deleteDialog": {
+                "title": "ลบการประชุมนี้?",
+                "body": "{title} จะถูกลบอย่างถาวร พร้อมกับบันทึกการถอดเสียงและสรุปของการประชุมนี้ การดำเนินการนี้ไม่สามารถย้อนกลับได้",
+                "confirm": "ลบการประชุม",
+                "cancel": "ยกเลิก",
+                "deleting": "กำลังลบ…",
+                "error": "ไม่สามารถลบการประชุมได้"
             }
         },
         "agentsPreview": {

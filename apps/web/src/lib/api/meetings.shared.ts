@@ -64,6 +64,17 @@ export interface MeetingParticipant {
 }
 
 /**
+ * Loose e-mail shape check — one `@`, a dot in the domain, no spaces.
+ *
+ * Deliberately permissive: the API stores the address as an opaque
+ * string, so this only has to catch the typo the user can see (a
+ * missing `@`, a trailing comma), never adjudicate RFC 5322.
+ */
+export function isLikelyEmail(value: string): boolean {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value);
+}
+
+/**
  * Parse a human-typed roster into `MeetingParticipant[]`.
  *
  * One participant per line, in any of:
@@ -89,7 +100,7 @@ export function parseParticipants(raw: string): MeetingParticipant[] {
             const name = (angled[1].trim() || email).slice(0, MEETING_PARTICIPANT_NAME_MAX_CHARS);
             return { name, email };
         }
-        if (/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(line)) {
+        if (isLikelyEmail(line)) {
             const email = line.slice(0, MEETING_PARTICIPANT_EMAIL_MAX_CHARS);
             return { name: email.slice(0, MEETING_PARTICIPANT_NAME_MAX_CHARS), email };
         }
