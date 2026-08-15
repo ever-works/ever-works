@@ -181,7 +181,8 @@
             "form": {
                 "name": {
                     "label": "Полное имя",
-                    "placeholder": "John Doe"
+                    "placeholder": "John Doe",
+                    "hint": "Must be at least {length} characters"
                 },
                 "email": {
                     "label": "Адрес email",
@@ -190,7 +191,7 @@
                 "password": {
                     "label": "Пароль",
                     "placeholder": "Создайте надёжный пароль",
-                    "hint": "Должен содержать минимум 8 символов"
+                    "hint": "Должен содержать минимум 8 символов, включая строчные буквы и цифру/спецсимвол"
                 },
                 "confirmPassword": {
                     "label": "Подтвердите пароль",
@@ -219,7 +220,12 @@
                 "passwordsDoNotMatch": "Пароли не совпадают",
                 "passwordTooShort": "Пароль должен содержать минимум 8 символов",
                 "generic": "Произошла ошибка. Пожалуйста, попробуйте снова.",
-                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue.",
+                "termsUnavailable": {
+                    "title": "Terms could not be loaded",
+                    "message": "We could not load the Terms of Service and Privacy Policy you need to accept, so account creation is paused. Please try again in a moment.",
+                    "retry": "Try again"
+                }
             }
         }
     },
@@ -7909,6 +7915,9 @@
             },
             "terms": {
                 "required": "You must accept the Terms of Service and Privacy Policy to create an account."
+            },
+            "name": {
+                "minLength": "Full name must be at least {length} characters"
             }
         }
     },

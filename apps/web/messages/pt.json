@@ -181,7 +181,8 @@
             "form": {
                 "name": {
                     "label": "Nome completo",
-                    "placeholder": "John Doe"
+                    "placeholder": "John Doe",
+                    "hint": "Must be at least {length} characters"
                 },
                 "email": {
                     "label": "Endereço de e-mail",
@@ -190,7 +191,7 @@
                 "password": {
                     "label": "Senha",
                     "placeholder": "Crie uma senha forte",
-                    "hint": "Deve ter pelo menos 8 caracteres"
+                    "hint": "Deve ter pelo menos 8 caracteres com minúscula e número/caractere especial"
                 },
                 "confirmPassword": {
                     "label": "Confirmar senha",
@@ -219,7 +220,12 @@
                 "passwordsDoNotMatch": "Senhas não coincidem",
                 "passwordTooShort": "Senha deve ter pelo menos 8 caracteres",
                 "generic": "Ocorreu um erro. Tente novamente.",
-                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue.",
+                "termsUnavailable": {
+                    "title": "Terms could not be loaded",
+                    "message": "We could not load the Terms of Service and Privacy Policy you need to accept, so account creation is paused. Please try again in a moment.",
+                    "retry": "Try again"
+                }
             }
         }
     },
@@ -7909,6 +7915,9 @@
             },
             "terms": {
                 "required": "You must accept the Terms of Service and Privacy Policy to create an account."
+            },
+            "name": {
+                "minLength": "Full name must be at least {length} characters"
             }
         }
     },

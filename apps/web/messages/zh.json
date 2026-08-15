@@ -181,7 +181,8 @@
             "form": {
                 "name": {
                     "label": "全名",
-                    "placeholder": "John Doe"
+                    "placeholder": "John Doe",
+                    "hint": "Must be at least {length} characters"
                 },
                 "email": {
                     "label": "电子邮件地址",
@@ -190,7 +191,7 @@
                 "password": {
                     "label": "密码",
                     "placeholder": "创建强密码",
-                    "hint": "至少 8 个字符"
+                    "hint": "至少 8 个字符，包含小写字母、数字/特殊字符"
                 },
                 "confirmPassword": {
                     "label": "确认密码",
@@ -219,7 +220,12 @@
                 "passwordsDoNotMatch": "密码不匹配",
                 "passwordTooShort": "密码至少 8 个字符",
                 "generic": "发生错误。请重试。",
-                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue."
+                "termsNotAccepted": "Please accept the Terms of Service and Privacy Policy to continue.",
+                "termsUnavailable": {
+                    "title": "Terms could not be loaded",
+                    "message": "We could not load the Terms of Service and Privacy Policy you need to accept, so account creation is paused. Please try again in a moment.",
+                    "retry": "Try again"
+                }
             }
         }
     },
@@ -7909,6 +7915,9 @@
             },
             "terms": {
                 "required": "You must accept the Terms of Service and Privacy Policy to create an account."
+            },
+            "name": {
+                "minLength": "Full name must be at least {length} characters"
             }
         }
     },
