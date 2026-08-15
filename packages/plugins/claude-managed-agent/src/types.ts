@@ -299,6 +299,15 @@ export interface RunManagedSessionsOptions {
 export interface ManagedSessionTokenUsage {
 	inputTokens: number;
 	outputTokens: number;
+	/**
+	 * Cached input tokens reported separately by the sessions API. Anthropic
+	 * excludes both counters from `input_tokens`, and managed-agent sessions
+	 * are cache-heavy by design (the system prompt + workspace context are
+	 * re-read on every turn), so they routinely dwarf `inputTokens`.
+	 */
+	cacheCreationInputTokens: number;
+	cacheReadInputTokens: number;
+	/** Every billed token: input + output + both cache counters. */
 	totalTokens: number;
 }
 
@@ -338,7 +347,12 @@ export interface ManagedAgentPipelineMetrics extends PipelineMetrics {
 	tokenUsage?: { total: { totalTokens: number } };
 	totalCost?: number;
 	custom?: {
-		usage: { inputTokens: number; outputTokens: number };
+		usage: {
+			inputTokens: number;
+			outputTokens: number;
+			cacheCreationInputTokens: number;
+			cacheReadInputTokens: number;
+		};
 		sessions: ManagedSessionUsageSummary[];
 	};
 }

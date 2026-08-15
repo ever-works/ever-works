@@ -4,11 +4,11 @@ import {
 	DEFAULT_POLL_INTERVAL_MS,
 	type ManagedSessionPromptInput,
 	type ManagedSessionRunResult,
-	type ManagedSessionTokenUsage,
 	type RunManagedSessionsOptions
 } from '../types.js';
 import { AnthropicManagedAgentsClient } from './managed-agents-client.js';
 import { extractAgentTranscript } from './result-parser.js';
+import { toManagedSessionTokenUsage } from './usage-metrics.js';
 
 const NOOP_LOGGER = { warn: () => undefined };
 
@@ -107,7 +107,7 @@ async function runOneSession(
 			status: 'completed',
 			output,
 			sessionId: session.id,
-			tokens: toTokenUsage(finalSession.usage),
+			tokens: toManagedSessionTokenUsage(finalSession.usage),
 			costUsd: finalSession.usage?.list_cost_usd
 		};
 	} catch (error) {
@@ -132,23 +132,6 @@ async function runOneSession(
 			}
 		}
 	}
-}
-
-function toTokenUsage(
-	usage: { input_tokens?: number; output_tokens?: number } | undefined
-): ManagedSessionTokenUsage | undefined {
-	if (!usage) {
-		return undefined;
-	}
-
-	const inputTokens = typeof usage.input_tokens === 'number' ? usage.input_tokens : 0;
-	const outputTokens = typeof usage.output_tokens === 'number' ? usage.output_tokens : 0;
-
-	return {
-		inputTokens,
-		outputTokens,
-		totalTokens: inputTokens + outputTokens
-	};
 }
 
 function resolveMaxPollAttempts(

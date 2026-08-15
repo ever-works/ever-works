@@ -1,14 +1,31 @@
 import { describe, expect, it } from 'vitest';
 
-import type { ManagedSessionRunResult } from '../types.js';
-import { buildManagedAgentMetrics } from './usage-metrics.js';
+import type { ManagedSessionRunResult, ManagedSessionTokenUsage } from '../types.js';
+import { buildManagedAgentMetrics, toManagedSessionTokenUsage } from './usage-metrics.js';
+
+function tokens(overrides: Partial<ManagedSessionTokenUsage> = {}): ManagedSessionTokenUsage {
+	const base = {
+		inputTokens: 100,
+		outputTokens: 50,
+		cacheCreationInputTokens: 0,
+		cacheReadInputTokens: 0,
+		...overrides
+	};
+
+	return {
+		...base,
+		totalTokens:
+			overrides.totalTokens ??
+			base.inputTokens + base.outputTokens + base.cacheCreationInputTokens + base.cacheReadInputTokens
+	};
+}
 
 function session(overrides: Partial<ManagedSessionRunResult> = {}): ManagedSessionRunResult {
 	return {
 		id: 'variant-1',
 		status: 'completed',
 		sessionId: 'session_1',
-		tokens: { inputTokens: 100, outputTokens: 50, totalTokens: 150 },
+		tokens: tokens(),
 		costUsd: 1.25,
 		...overrides
 	};
@@ -45,7 +62,7 @@ describe('buildManagedAgentMetrics', () => {
 				session({
 					id: 'variant-3',
 					sessionId: 's3',
-					tokens: { inputTokens: 10, outputTokens: 5, totalTokens: 15 },
+					tokens: tokens({ inputTokens: 10, outputTokens: 5 }),
 					costUsd: 0.5
 				})
 			]
@@ -53,7 +70,12 @@ describe('buildManagedAgentMetrics', () => {
 
 		expect(metrics.tokenUsage?.total.totalTokens).toBe(150 + 150 + 15);
 		expect(metrics.totalCost).toBe(2.5);
-		expect(metrics.custom?.usage).toEqual({ inputTokens: 210, outputTokens: 105 });
+		expect(metrics.custom?.usage).toEqual({
+			inputTokens: 210,
+			outputTokens: 105,
+			cacheCreationInputTokens: 0,
+			cacheReadInputTokens: 0
+		});
 		expect(metrics.custom?.sessions.map((s) => s.sessionId)).toEqual(['s1', 's2', 's3']);
 	});
 
@@ -106,5 +128,76 @@ describe('buildManagedAgentMetrics', () => {
 		});
 
 		expect(metrics.totalCost).toBe(0.3);
+	});
+
+	// Regression: cached input tokens are billed but are reported by the
+	// sessions API OUTSIDE `input_tokens`. Dropping them made
+	// `tokenUsage.total.totalTokens` — the only token field the platform's
+	// extractPipelineUsageMetrics reads — under-report cache-heavy managed
+	// agent runs by orders of magnitude.
+	it('counts cached input tokens in the root total and the custom breakdown', () => {
+		const metrics = buildManagedAgentMetrics({
+			startTime: 0,
+			duration: 1,
+			itemCount: 1,
+			sessions: [
+				session({
+					tokens: tokens({
+						inputTokens: 1200,
+						outputTokens: 800,
+						cacheCreationInputTokens: 24000,
+						cacheReadInputTokens: 640000
+					})
+				})
+			]
+		});
+
+		expect(metrics.tokenUsage).toEqual({ total: { totalTokens: 666000 } });
+		expect(metrics.custom?.usage).toEqual({
+			inputTokens: 1200,
+			outputTokens: 800,
+			cacheCreationInputTokens: 24000,
+			cacheReadInputTokens: 640000
+		});
+	});
+});
+
+describe('toManagedSessionTokenUsage', () => {
+	it('returns undefined when the session reported no usage', () => {
+		expect(toManagedSessionTokenUsage(undefined)).toBeUndefined();
+	});
+
+	it('sums every billed token class into totalTokens', () => {
+		expect(
+			toManagedSessionTokenUsage({
+				input_tokens: 100,
+				output_tokens: 50,
+				cache_creation_input_tokens: 700,
+				cache_read_input_tokens: 9000
+			})
+		).toEqual({
+			inputTokens: 100,
+			outputTokens: 50,
+			cacheCreationInputTokens: 700,
+			cacheReadInputTokens: 9000,
+			totalTokens: 9850
+		});
+	});
+
+	it('treats missing and non-numeric counters as zero', () => {
+		expect(toManagedSessionTokenUsage({ input_tokens: 10 })).toEqual({
+			inputTokens: 10,
+			outputTokens: 0,
+			cacheCreationInputTokens: 0,
+			cacheReadInputTokens: 0,
+			totalTokens: 10
+		});
+		expect(toManagedSessionTokenUsage({ input_tokens: Number.NaN, cache_read_input_tokens: 5 })).toEqual({
+			inputTokens: 0,
+			outputTokens: 0,
+			cacheCreationInputTokens: 0,
+			cacheReadInputTokens: 5,
+			totalTokens: 5
+		});
 	});
 });

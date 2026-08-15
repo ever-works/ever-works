@@ -64,9 +64,43 @@ describe('runManagedSessions', () => {
 		expect(results.map((r) => r.id)).toEqual(['p1', 'p2', 'p3', 'p4']);
 		expect(results.every((r) => r.status === 'completed')).toBe(true);
 		expect(results[0].output).toContain('output for');
-		expect(results[0].tokens).toEqual({ inputTokens: 100, outputTokens: 50, totalTokens: 150 });
+		expect(results[0].tokens).toEqual({
+			inputTokens: 100,
+			outputTokens: 50,
+			cacheCreationInputTokens: 0,
+			cacheReadInputTokens: 0,
+			totalTokens: 150
+		});
 		expect(results[0].costUsd).toBe(1.25);
 		expect(stub.createSession).toHaveBeenCalledTimes(4);
+	});
+
+	// Regression: managed-agent sessions re-read a large cached prefix on every
+	// turn, so `cache_read_input_tokens` typically dwarfs `input_tokens`.
+	// Reporting only input+output silently under-counted every run.
+	it('counts the cached input tokens the sessions API reports separately', async () => {
+		const stub = createClientStub({
+			waitForSessionIdle: vi.fn().mockImplementation(async (sessionId: string) => ({
+				id: sessionId,
+				status: 'idle',
+				usage: {
+					input_tokens: 1200,
+					output_tokens: 800,
+					cache_creation_input_tokens: 24000,
+					cache_read_input_tokens: 640000
+				}
+			}))
+		});
+
+		const results = await runManagedSessions(asClient(stub), { ...BASE_OPTIONS, prompts: prompts(1) });
+
+		expect(results[0].tokens).toEqual({
+			inputTokens: 1200,
+			outputTokens: 800,
+			cacheCreationInputTokens: 24000,
+			cacheReadInputTokens: 640000,
+			totalTokens: 666000
+		});
 	});
 
 	it('never runs more than `concurrency` sessions at once', async () => {
@@ -84,7 +118,10 @@ describe('runManagedSessions', () => {
 
 		await runManagedSessions(asClient(stub), { ...BASE_OPTIONS, prompts: prompts(7), concurrency: 2 });
 
-		expect(peakActive).toBeLessThanOrEqual(2);
+		// Exactly 2, not "at most 2": `toBeLessThanOrEqual` also passes for a
+		// fully serial pool, so it would not catch the worker pool regressing
+		// to one-at-a-time — the entire point of the fan-out.
+		expect(peakActive).toBe(2);
 		expect(stub.createSession).toHaveBeenCalledTimes(7);
 	});
 
