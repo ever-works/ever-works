@@ -22,11 +22,23 @@ import {
 } from '@/lib/api/goals';
 import { updateGoalLimitsAction } from './actions';
 
+/**
+ * The minimum an Agent has to be to appear in the routing pin. Deliberately
+ * NOT the full `Agent` type: this dialog is a client component and the whole
+ * Agent projection would ride the server→client boundary for two fields.
+ */
+export interface GoalAgentOption {
+    id: string;
+    name: string;
+}
+
 interface GoalLimitsDialogProps {
     goal: Goal;
     open: boolean;
     onOpenChange: (open: boolean) => void;
     onGoalChange: (goal: Goal) => void;
+    /** Agents the operator may pin routing to. Empty = no pin control. */
+    agents?: GoalAgentOption[];
 }
 
 /**
@@ -62,6 +74,7 @@ export function GoalLimitsDialog({
     open,
     onOpenChange,
     onGoalChange,
+    agents = [],
 }: GoalLimitsDialogProps) {
     const t = useTranslations('dashboard.goalDetail.limits');
     const [pending, startTransition] = useTransition();
@@ -84,6 +97,7 @@ export function GoalLimitsDialog({
     const [executionTarget, setExecutionTarget] = useState<string>(goal.executionTarget ?? '');
     const [plannerModel, setPlannerModel] = useState(goal.plannerModelHint ?? '');
     const [workerModel, setWorkerModel] = useState(goal.workerModelHint ?? '');
+    const [assignedAgent, setAssignedAgent] = useState<string>(goal.assignedAgentId ?? '');
 
     const submit = () => {
         const spendDollars = spendCapUsd.trim();
@@ -109,6 +123,10 @@ export function GoalLimitsDialog({
                 executionTarget === '' ? null : (executionTarget as GoalExecutionTarget),
             plannerModelHint: toNullableText(plannerModel),
             workerModelHint: toNullableText(workerModel),
+            // `null` unpins and restores round-robin over the Goal's history,
+            // which is why this is sent even when empty: omitting it would
+            // make the pin one-way.
+            assignedAgentId: assignedAgent === '' ? null : assignedAgent,
         };
 
         startTransition(async () => {
@@ -131,6 +149,28 @@ export function GoalLimitsDialog({
                 </DialogHeader>
 
                 <div className="grid gap-4 @lg/main:grid-cols-2">
+                    {agents.length > 0 ? (
+                        <div className="@lg/main:col-span-2">
+                            <label className="mb-1 block text-xs font-medium text-text dark:text-text-dark">
+                                {t('fields.assignedAgent')}
+                            </label>
+                            <Select
+                                value={assignedAgent}
+                                onValueChange={setAssignedAgent}
+                                placeholder={t('fields.assignedAgentNone')}
+                            >
+                                <option value="">{t('fields.assignedAgentNone')}</option>
+                                {agents.map((agent) => (
+                                    <option key={agent.id} value={agent.id}>
+                                        {agent.name}
+                                    </option>
+                                ))}
+                            </Select>
+                            <p className="mt-1 text-[11px] text-text-muted dark:text-text-muted-dark">
+                                {t('fields.assignedAgentHelp')}
+                            </p>
+                        </div>
+                    ) : null}
                     <Input
                         label={t('fields.spendCap')}
                         helperText={t('fields.spendCapHelp')}

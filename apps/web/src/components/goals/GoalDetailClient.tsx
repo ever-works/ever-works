@@ -36,7 +36,7 @@ import { COMPARATOR_GLYPH, OutcomeBadge, formatDateTime, formatMetricValue } fro
 import { DodRollup, LoopStatusBadge, formatCents } from './goal-loop-ui';
 import { Sparkline } from './Sparkline';
 import { GoalDodPanel } from './GoalDodPanel';
-import { GoalLimitsDialog } from './GoalLimitsDialog';
+import { GoalLimitsDialog, type GoalAgentOption } from './GoalLimitsDialog';
 import { GoalOrchestratorLog } from './GoalOrchestratorLog';
 import { GoalSessionsPanel } from './GoalSessionsPanel';
 import { GoalResultsPanel } from './GoalResultsPanel';
@@ -59,6 +59,12 @@ export interface GoalDetailClientProps {
     samples: GoalMetricSample[];
     events: GoalEvent[];
     sessions: GoalSession[];
+    /**
+     * Agents the routing pin may choose between. Server-fetched, because
+     * without a pin a Goal created in the UI has an empty candidate pool and
+     * the loop can only ever answer `no-candidate-agent`.
+     */
+    agents?: GoalAgentOption[];
 }
 
 const OUTCOMES: GoalOutcome[] = ['achieved', 'missed', 'abandoned'];
@@ -121,6 +127,7 @@ export function GoalDetailClient({
     samples,
     events,
     sessions,
+    agents = [],
 }: GoalDetailClientProps) {
     const t = useTranslations('dashboard.goalDetail');
     const router = useRouter();
@@ -652,6 +659,12 @@ export function GoalDetailClient({
                                 <DetailRow label={t('limits.fields.workerModel')}>
                                     {goal.workerModelHint ?? '—'}
                                 </DetailRow>
+                                <DetailRow label={t('limits.fields.assignedAgent')}>
+                                    {goal.assignedAgentId
+                                        ? (agents.find((agent) => agent.id === goal.assignedAgentId)
+                                              ?.name ?? goal.assignedAgentId)
+                                        : t('limits.fields.assignedAgentNone')}
+                                </DetailRow>
                             </div>
                         </section>
 
@@ -695,6 +708,7 @@ export function GoalDetailClient({
                 open={limitsOpen}
                 onOpenChange={setLimitsOpen}
                 onGoalChange={setGoal}
+                agents={agents}
             />
         </div>
     );

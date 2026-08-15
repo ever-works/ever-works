@@ -6324,7 +6324,10 @@
                     "plannerModel": "Planner model hint",
                     "plannerModelHelp": "Free text; passed through to planning runs.",
                     "workerModel": "Worker model hint",
-                    "workerModelHelp": "Free text; passed through to iteration runs."
+                    "workerModelHelp": "Free text; passed through to iteration runs.",
+                    "assignedAgent": "Pinned agent",
+                    "assignedAgentNone": "No pin (round-robin)",
+                    "assignedAgentHelp": "Routing always picks this agent. Without a pin the router round-robins over the agents that have already worked this Goal — so a brand-new Goal needs one before the loop can start work."
                 },
                 "executionTargets": {
                     "cloud": "Cloud",
