@@ -1,0 +1,379 @@
+# ---------------------------------------------------------------------------
+# External uptime monitor — probes the PUBLIC Ever Works endpoints from a
+# vantage point OUTSIDE the homelab.
+#
+# WHY THIS EXISTS
+# ---------------
+# Every other probe we have (Uptime Kuma, VictoriaMetrics blackbox, the
+# in-cluster smoke tests) runs INSIDE the `ever-k8s` cluster, i.e. behind the
+# same office uplink. On 2026-08-15 a routing fault at the owner's ISP (Orange,
+# Spain) made one of Cloudflare's anycast prefixes (188.114.96.0/22) unreachable
+# *from the homelab only*. Every internal probe went red at once and it looked
+# exactly like "production is down". It was not — real users were served
+# normally the entire time, and hours were burned chasing a phantom outage.
+#
+# Notably, `*.ever.works` rides a DIFFERENT Cloudflare prefix and stayed
+# reachable throughout: 34/34 of its probe targets were UP while the
+# `*.ever.co` / `gauzy.co` targets were down. A monitor sitting outside the
+# house would have made that contrast obvious in seconds.
+#
+# This workflow is that outside observer. When it is GREEN while the in-cluster
+# probes are RED, the fault is the office uplink — not the platform.
+#
+# ===========================================================================
+# 🛑 DO NOT CHANGE `runs-on: ubuntu-latest` TO A SELF-HOSTED / ARC RUNNER. 🛑
+#
+# This repo has a standing "self-hosted runners only" CI policy
+# (`RUNNER_LINUX_X64_4` / `RUNNER_LINUX_X64_8`, declared in
+# `.github/actionlint.yaml`). THIS WORKFLOW IS A DELIBERATE, DOCUMENTED
+# EXCEPTION and must stay on GitHub-hosted runners.
+#
+# The ARC runners live in the homelab. They share the exact uplink whose
+# failure this workflow exists to distinguish from a real outage. Moving this
+# job onto them would not "fix an inconsistency" — it would silently destroy
+# the workflow's only reason to exist, and turn it into one more probe that
+# goes red for the wrong reason.
+#
+# Cost is not a factor: `ever-works/ever-works` is a PUBLIC repository, and
+# GitHub-hosted minutes are free and unlimited on public repos.
+# ===========================================================================
+#
+# NO NEW SECRETS ARE REQUIRED. The automatic `GITHUB_TOKEN` is the only
+# credential used, scoped to `issues: write` + `contents: read`.
+# ---------------------------------------------------------------------------
+name: External Uptime Monitor
+
+on:
+  schedule:
+    # Every 15 minutes. Free on public repos; GitHub schedules are best-effort
+    # and may be delayed under load, which is fine for this purpose.
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+# Least privilege: enough to file/annotate/close the alert issue, nothing more.
+permissions:
+  contents: read
+  issues: write
+
+# Never let two probe runs race on the alert issue (create/comment/close).
+concurrency:
+  group: external-uptime-monitor
+  cancel-in-progress: false
+
+jobs:
+  probe:
+    name: Probe public endpoints (GitHub-hosted, outside the homelab)
+    # See the banner above before touching this line.
+    runs-on: ubuntu-latest
+    # Keeps forks that enable Actions from probing our hosts and filing issues.
+    if: github.repository == 'ever-works/ever-works'
+    # Budget for a TOTAL outage, when every target burns its full retry budget:
+    # 9 targets x (3 attempts x 20s max-time + 2 x 15s spacing) = ~13.5 min
+    # absolute worst case; a realistic all-down run (TCP timeouts) is ~8 min.
+    # This MUST exceed that worst case — if the job is killed by its own
+    # timeout it never reaches the "file an issue" step, i.e. the monitor would
+    # go silent in exactly the scenario it exists for.
+    timeout-minutes: 20
+
+    steps:
+      # No `actions/checkout` on purpose: this job needs nothing from the repo,
+      # and skipping it keeps each run to a handful of seconds.
+      - name: Probe every public endpoint
+        id: probe
+        env:
+          # Fixed UA so these hits are identifiable in Cloudflare / ingress logs.
+          PROBE_UA: 'Mozilla/5.0 (compatible; ever-works-external-uptime; +https://github.com/ever-works/ever-works)'
+        run: |
+          set -uo pipefail
+
+          REPORT="${RUNNER_TEMP}/uptime-report.md"
+          BODY="${RUNNER_TEMP}/body.out"
+          ERRF="${RUNNER_TEMP}/curl.err"
+          : > "${REPORT}"
+
+          # --- The runner's public egress IP -------------------------------
+          # Recorded in every alert so a future reader can tell "GitHub's egress
+          # was blocked / geo-routed" apart from "our platform is down", and can
+          # correlate against Cloudflare logs.
+          EGRESS_IP="$(curl -s --max-time 10 https://api.ipify.org || true)"
+          if [ -z "${EGRESS_IP}" ]; then
+            EGRESS_IP="$(curl -s --max-time 10 https://checkip.amazonaws.com | tr -d '[:space:]' || true)"
+          fi
+          [ -z "${EGRESS_IP}" ] && EGRESS_IP="(unknown)"
+          echo "Runner public egress IP: ${EGRESS_IP}"
+
+          # --- Targets ------------------------------------------------------
+          # Format:  <label>|<url>|<literal string that MUST appear in the body>
+          #
+          # 🛑 HTTP 200 IS NOT PROOF OF HEALTH IN THIS APP. Verified 2026-08-15:
+          #      GET https://app.ever.works/definitely-not-a-real-route-xyz
+          #      -> HTTP 200 + the full "Sign In | Ever Works" page.
+          # The web app's middleware renders the login shell for ANY unmatched
+          # path, so a missing/broken route is indistinguishable from a healthy
+          # one by status code alone. Every target therefore asserts on a
+          # literal body marker, and the two `/api/health` targets plus
+          # `/api/version` are real JSON endpoints (a bogus path under `/api/`
+          # returns a Next.js error page, not this JSON — checked).
+          #
+          # Every URL + marker below was probed live from this workstation on
+          # 2026-08-15 before being hard-coded.
+          #
+          # Production surfaces only. dev/stage are work-in-progress and go down
+          # by design; alerting on them would train everyone to ignore this
+          # monitor. To add one later, append a line here — nothing else changes.
+          TARGETS=(
+            'Marketing site (ever.works)|https://ever.works/|The Workshop for AI'
+            'Web app — health JSON|https://app.ever.works/api/health|"status":"OK"'
+            'Web app — login UI renders|https://app.ever.works/login|Sign In | Ever Works'
+            'Admin host — health JSON|https://admin.ever.works/api/health|"status":"OK"'
+            'API — health JSON|https://api.ever.works/|API is up and running'
+            'API — version JSON|https://api.ever.works/api/version|gitSha'
+            'Docs (Docusaurus)|https://docs.ever.works/|Ever Works Platform'
+            'Demo directory|https://demo.ever.works/|Discover | Ever Works'
+            'MCP server — health JSON|https://mcp.ever.works/health|"status":"ok"'
+          )
+
+          # --- Probe one URL once ------------------------------------------
+          # Emits: http_code dns connect appconnect starttransfer total size
+          # into $W, and the curl exit code into $CURL_RC.
+          probe_once() {
+            local url="$1"
+            : > "${BODY}"; : > "${ERRF}"
+            W="$(curl -sS -L \
+                  --connect-timeout 8 \
+                  --max-time 20 \
+                  -A "${PROBE_UA}" \
+                  -o "${BODY}" \
+                  -w '%{http_code} %{time_namelookup} %{time_connect} %{time_appconnect} %{time_starttransfer} %{time_total} %{size_download}' \
+                  "${url}" 2>"${ERRF}")"
+            CURL_RC=$?
+            if [ -z "${W}" ]; then
+              W="000 0.000000 0.000000 0.000000 0.000000 0.000000 0"
+            fi
+          }
+
+          OVERALL_OK=1
+          FAILING_URLS=""
+          ROWS=""
+          DETAILS=""
+
+          for entry in "${TARGETS[@]}"; do
+            LABEL="${entry%%|*}"
+            REST="${entry#*|}"
+            URL="${REST%%|*}"
+            # Everything after the SECOND '|' is the marker, so markers may
+            # themselves contain '|' (e.g. "Sign In | Ever Works").
+            MARKER="${REST#*|}"
+
+            echo "::group::${LABEL} — ${URL}"
+
+            ATTEMPT_LOG=""
+            OK=0
+            # Up to 3 attempts, spaced 15s. A single transient blip must never
+            # alert, so we only declare DOWN after 3 CONSECUTIVE failures
+            # (comfortably satisfies the "2+ consecutive" requirement).
+            for attempt in 1 2 3; do
+              probe_once "${URL}"
+              read -r HTTP_CODE T_DNS T_CONN T_TLS T_TTFB T_TOTAL SIZE <<< "${W}"
+
+              REASON=""
+              if [ "${CURL_RC}" -ne 0 ] || [ "${HTTP_CODE}" = "000" ]; then
+                REASON="transport failure (curl exit ${CURL_RC}: $(tr -d '\n' < "${ERRF}" | head -c 160))"
+              elif [ "${HTTP_CODE}" -lt 200 ] || [ "${HTTP_CODE}" -ge 400 ]; then
+                REASON="unexpected HTTP ${HTTP_CODE}"
+              elif ! grep -qF -- "${MARKER}" "${BODY}"; then
+                # This is the soft-404 / wrong-deployment detector.
+                REASON="HTTP ${HTTP_CODE} but the body is missing the expected marker \`${MARKER}\` (soft-404, error page, or a wrong/rolled-back deployment)"
+              else
+                OK=1
+              fi
+
+              if [ "${OK}" -eq 1 ]; then
+                echo "attempt ${attempt}: OK (HTTP ${HTTP_CODE}, marker found, ${SIZE} bytes, ttfb=${T_TTFB}s)"
+                ATTEMPT_LOG="${ATTEMPT_LOG}- attempt ${attempt}: **OK** — HTTP ${HTTP_CODE}, marker found, ${SIZE} bytes"$'\n'
+                break
+              fi
+
+              echo "attempt ${attempt}: FAIL — ${REASON}"
+              ATTEMPT_LOG="${ATTEMPT_LOG}- attempt ${attempt}: **FAIL** — ${REASON}"$'\n'
+              if [ "${attempt}" -lt 3 ]; then sleep 15; fi
+            done
+            echo "::endgroup::"
+
+            # --- Layer attribution -------------------------------------------
+            # This is the signal that resolved the 2026-08-15 false alarm:
+            # connect=0.000s with http_code=000 means the TCP handshake never
+            # happened at all — a network/routing blackhole, NOT an application
+            # fault. Keep these four timings in every report.
+            LAYER=""
+            if [ "${OK}" -eq 0 ]; then
+              if [ "${HTTP_CODE}" = "000" ] && [ "${T_CONN}" = "0.000000" ] && [ "${T_DNS}" = "0.000000" ]; then
+                LAYER="🌐 **DNS failed** — name never resolved. Nothing was ever contacted."
+              elif [ "${HTTP_CODE}" = "000" ] && [ "${T_CONN}" = "0.000000" ]; then
+                LAYER="🌐 **TCP blackhole** — DNS resolved (${T_DNS}s) but the connection never established (connect=0.000s). This is a NETWORK/ROUTING fault, not an application error."
+              elif [ "${HTTP_CODE}" = "000" ] && [ "${T_TLS}" = "0.000000" ]; then
+                LAYER="🔐 **TLS failed** — TCP connected in ${T_CONN}s but the handshake did not complete."
+              elif [ "${HTTP_CODE}" = "000" ]; then
+                LAYER="⏱️ **Timed out after connecting** — TCP+TLS were fine (connect=${T_CONN}s, tls=${T_TLS}s); the server accepted the connection but did not finish responding."
+              else
+                LAYER="🖥️ **Application-layer fault** — the network path is healthy (connect=${T_CONN}s, tls=${T_TLS}s) and the server answered HTTP ${HTTP_CODE}. The problem is in the app or its deployment."
+              fi
+            fi
+
+            if [ "${OK}" -eq 1 ]; then
+              ROWS="${ROWS}| ✅ | ${LABEL} | ${URL} | ${HTTP_CODE} | ${T_DNS} | ${T_CONN} | ${T_TLS} | ${T_TTFB} | ${T_TOTAL} | ${SIZE} |"$'\n'
+            else
+              OVERALL_OK=0
+              FAILING_URLS="${FAILING_URLS}${URL}"$'\n'
+              ROWS="${ROWS}| ❌ | ${LABEL} | ${URL} | ${HTTP_CODE} | ${T_DNS} | ${T_CONN} | ${T_TLS} | ${T_TTFB} | ${T_TOTAL} | ${SIZE} |"$'\n'
+              DETAILS="${DETAILS}#### ❌ ${LABEL}"$'\n\n'"\`${URL}\`"$'\n\n'"${LAYER}"$'\n\n'"${ATTEMPT_LOG}"$'\n'
+            fi
+          done
+
+          # --- Build the report --------------------------------------------
+          {
+            if [ "${OVERALL_OK}" -eq 1 ]; then
+              echo "## ✅ All Ever Works production endpoints reachable from outside the homelab"
+            else
+              echo "## 🔴 Ever Works endpoint(s) unreachable from outside the homelab"
+            fi
+            echo
+            echo "| | Surface | URL | HTTP | dns | connect | tls | ttfb | total | bytes |"
+            echo "|---|---|---|---|---|---|---|---|---|---|"
+            printf '%s' "${ROWS}"
+            echo
+            if [ -n "${DETAILS}" ]; then
+              echo "### Failure detail"
+              echo
+              printf '%s' "${DETAILS}"
+            fi
+            echo "### Vantage point"
+            echo
+            echo "- Observed from a **GitHub-hosted runner**, i.e. *outside* the homelab uplink."
+            echo "- Runner public egress IP: \`${EGRESS_IP}\`"
+            echo "- Checked at: \`$(date -u '+%Y-%m-%dT%H:%M:%SZ')\` (UTC)"
+            echo "- Each target was retried up to 3× spaced 15s; a surface is only reported DOWN after 3 consecutive failures."
+            echo "- Run: ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID}"
+            echo
+            echo "> **Reading this:** if these probes are GREEN while the in-cluster probes"
+            echo "> (Uptime Kuma / VictoriaMetrics) are RED, the platform is fine and the fault"
+            echo "> is the office uplink — see the header comment in"
+            echo "> \`.github/workflows/external-uptime-monitor.yml\`. A \`connect\` time of"
+            echo "> \`0.000000\` alongside HTTP \`000\` means the TCP handshake never happened:"
+            echo "> a routing blackhole, never an application bug."
+          } > "${REPORT}"
+
+          cat "${REPORT}" >> "${GITHUB_STEP_SUMMARY}"
+
+          # Fingerprint = which targets are failing. Used to suppress repeat
+          # comments while an outage is unchanged.
+          FINGERPRINT="$(printf '%s' "${FAILING_URLS}" | sort | sha256sum | cut -c1-16)"
+
+          {
+            echo "report_path=${REPORT}"
+            echo "egress_ip=${EGRESS_IP}"
+            echo "fingerprint=${FINGERPRINT}"
+            if [ "${OVERALL_OK}" -eq 1 ]; then echo "status=up"; else echo "status=down"; fi
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Open or update the alert issue
+        if: steps.probe.outputs.status == 'down'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          REPORT_PATH: ${{ steps.probe.outputs.report_path }}
+          FINGERPRINT: ${{ steps.probe.outputs.fingerprint }}
+          ALERT_LABEL: uptime-alert
+          ALERT_TITLE: '🔴 Uptime: Ever Works endpoints unreachable from outside the homelab'
+        run: |
+          set -uo pipefail
+
+          # Idempotent — the label may not exist yet on a fresh clone/fork.
+          gh label create "${ALERT_LABEL}" \
+            --color 'B60205' \
+            --description 'Automated external uptime probe (GitHub-hosted runner)' \
+            >/dev/null 2>&1 || true
+
+          # Reuse the single open alert issue. Issue spam is the #1 reason
+          # monitors like this get muted, so we NEVER open a second one.
+          EXISTING="$(gh issue list --label "${ALERT_LABEL}" --state open --limit 1 \
+                        --json number --jq '.[0].number // empty' 2>/dev/null || true)"
+          if [ -z "${EXISTING}" ]; then
+            EXISTING="$(gh issue list --state open --search "\"${ALERT_TITLE}\" in:title" --limit 1 \
+                          --json number --jq '.[0].number // empty' 2>/dev/null || true)"
+          fi
+
+          MARK="<!-- uptime-fingerprint: ${FINGERPRINT} -->"
+
+          if [ -z "${EXISTING}" ]; then
+            echo "No open alert issue — creating one."
+            printf '\n%s\n' "${MARK}" >> "${REPORT_PATH}"
+            if ! gh issue create --title "${ALERT_TITLE}" \
+                                 --label "${ALERT_LABEL}" \
+                                 --body-file "${REPORT_PATH}"; then
+              # Labels can fail on a repo where the token cannot create them.
+              gh issue create --title "${ALERT_TITLE}" --body-file "${REPORT_PATH}"
+            fi
+            exit 0
+          fi
+
+          echo "Reusing open alert issue #${EXISTING}."
+
+          # Only add a comment when something actually changed, or once an hour.
+          # Without this, a multi-hour outage produces a comment every 15 min.
+          LAST_AT="$(gh issue view "${EXISTING}" --json comments \
+                       --jq '.comments[-1].createdAt // empty' 2>/dev/null || true)"
+          LAST_BODY="$(gh issue view "${EXISTING}" --json comments \
+                         --jq '.comments[-1].body // empty' 2>/dev/null || true)"
+
+          SHOULD_COMMENT=1
+          if [ -n "${LAST_AT}" ] && printf '%s' "${LAST_BODY}" | grep -qF -- "${MARK}"; then
+            LAST_EPOCH="$(date -u -d "${LAST_AT}" +%s 2>/dev/null || echo 0)"
+            NOW_EPOCH="$(date -u +%s)"
+            AGE=$(( NOW_EPOCH - LAST_EPOCH ))
+            if [ "${LAST_EPOCH}" -gt 0 ] && [ "${AGE}" -lt 3600 ]; then
+              SHOULD_COMMENT=0
+              echo "Same failing set as the last comment ($(( AGE / 60 ))m ago) — staying quiet to avoid issue spam."
+            fi
+          fi
+
+          if [ "${SHOULD_COMMENT}" -eq 1 ]; then
+            printf '\n%s\n' "${MARK}" >> "${REPORT_PATH}"
+            gh issue comment "${EXISTING}" --body-file "${REPORT_PATH}"
+          fi
+
+      - name: Close the alert issue on recovery
+        if: steps.probe.outputs.status == 'up'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GH_REPO: ${{ github.repository }}
+          REPORT_PATH: ${{ steps.probe.outputs.report_path }}
+          ALERT_LABEL: uptime-alert
+          ALERT_TITLE: '🔴 Uptime: Ever Works endpoints unreachable from outside the homelab'
+        run: |
+          set -uo pipefail
+
+          EXISTING="$(gh issue list --label "${ALERT_LABEL}" --state open --limit 1 \
+                        --json number --jq '.[0].number // empty' 2>/dev/null || true)"
+          if [ -z "${EXISTING}" ]; then
+            EXISTING="$(gh issue list --state open --search "\"${ALERT_TITLE}\" in:title" --limit 1 \
+                          --json number --jq '.[0].number // empty' 2>/dev/null || true)"
+          fi
+
+          if [ -z "${EXISTING}" ]; then
+            echo "All endpoints healthy and no open alert issue — nothing to do."
+            exit 0
+          fi
+
+          echo "Recovered — commenting on and closing issue #${EXISTING}."
+          # One comment only (the report already leads with the all-green
+          # header), then close. Two comments per recovery is noise.
+          printf '\n%s\n' "_Recovered — closing automatically. The next failure opens a fresh issue._" >> "${REPORT_PATH}"
+          gh issue comment "${EXISTING}" --body-file "${REPORT_PATH}"
+          gh issue close "${EXISTING}" --reason completed
+
+      - name: Fail the run if any endpoint is down
+        if: steps.probe.outputs.status == 'down'
+        run: |
+          echo "::error::One or more Ever Works production endpoints failed 3 consecutive external probes. See the job summary and the open 'uptime-alert' issue."
+          exit 1
