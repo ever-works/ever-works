@@ -66,6 +66,9 @@ export * from './agent-notify-channel-facade';
 export * from './agent-plugin-tools-facade';
 export * from './agent-tools-skill';
 export * from './agent-tool.service';
+// Capabilities tab — the static tool catalog, derived from the same
+// assembly `resolveAllowedTools` runs (never hand-maintained).
+export * from './agent-tool-catalog';
 export * from './agent-domain-tool-sources';
 // Agent Plugins MCP slice — the optional MCP tool-source seam (T26).
 export * from './agent-mcp-tool-source';

@@ -65,6 +65,7 @@ import { MeetingsApiModule } from './meetings/meetings.module';
 import { FleetApiModule } from './fleet/fleet.module';
 import { MergePolicyApiModule } from './merge-policy/merge-policy.module';
 import { ToolGrantsApiModule } from './tool-grants/tool-grants.module';
+import { AgentCapabilitiesApiModule } from './agent-capabilities/agent-capabilities.module';
 import { DigestApiModule } from './digest/digest.module';
 import { EscalationsApiModule } from './escalations/escalations.module';
 import { PrReviewApiModule } from './pr-review/pr-review.module';
@@ -244,6 +245,9 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // ownership checks as the merge-policy preview; grants are their
         // own rows, so unlike a merge policy they need a write path here.
         ToolGrantsApiModule,
+        // Capabilities tab — composed per-Agent read (catalog + grants +
+        // permissions + init script). Additive leaf over the two above.
+        AgentCapabilitiesApiModule,
         // Digest read (Wave 7) — GET /api/digest owner-scoped composed
         // digest over the agent-side DigestModule. Cadence stays a
         // profile preference; delivery stays on the digest-dispatcher

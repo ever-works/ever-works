@@ -933,7 +933,8 @@
                 "settings": "設定",
                 "terminal": "Terminal",
                 "collaborators": "Collaborators",
-                "mcpServers": "MCP Servers"
+                "mcpServers": "MCP Servers",
+                "capabilities": "Capabilities"
             },
             "newDialog": {
                 "title": "新しいエージェント",
@@ -1136,6 +1137,45 @@
                 "overridden": "Override",
                 "connectionDisabled": "Connection disabled",
                 "revert": "Revert"
+            },
+            "capabilities": {
+                "title": "Capabilities",
+                "subtitle": "What this agent can do — tools, skills, and bootstrap script.",
+                "tools": {
+                    "title": "Agent tools",
+                    "description": "Per-tool access for this agent. A more specific scope can only narrow what its ancestors allow: turning a tool off writes an agent-level deny, and a tool denied by a parent scope cannot be re-enabled from this page.",
+                    "groupBuiltin": "Built-in tools",
+                    "groupFacade": "Platform tools",
+                    "groupDomain": "Domain tools",
+                    "resetToInherited": "Reset to inherited",
+                    "inheritedDeny": "Denied by {scope}",
+                    "permissionOff": "Permission off",
+                    "patternDeny": "Denied by a pattern on this agent",
+                    "permissionHint": "Requires the \"{permission}\" permission — enable it in Settings.",
+                    "empty": "No tools available."
+                },
+                "permissions": {
+                    "title": "Permissions",
+                    "description": "The capability switches stay editable in Settings; shown here read-only.",
+                    "edit": "Edit in Settings"
+                },
+                "skills": {
+                    "title": "Skills",
+                    "description": "Skills bound directly to this agent. Inherited bindings come from a parent scope and are managed there.",
+                    "attachPlaceholder": "Attach a skill…",
+                    "installAndAttach": "install & attach",
+                    "inherited": "Inherited",
+                    "empty": "No skills bound yet."
+                },
+                "initScript": {
+                    "title": "Init Script",
+                    "helper": "Runs at session/workspace bootstrap where the runtime supports it.",
+                    "placeholder": "#!/bin/sh\n# commands to run when a session starts…",
+                    "save": "Save",
+                    "saved": "Init script saved",
+                    "bytes": "{used} / {max} KB",
+                    "tooLong": "Init script exceeds 16 KB."
+                }
             }
         },
         "tasksPage": {

@@ -165,6 +165,8 @@ export const ROUTES = {
     DASHBOARD_AGENT_SKILLS: (id: string) => `/agents/${id}/skills`,
     DASHBOARD_AGENT_COLLABORATORS: (id: string) => `/agents/${id}/collaborators`,
     DASHBOARD_AGENT_MCP_SERVERS: (id: string) => `/agents/${id}/mcp-servers`,
+    // Capabilities tab — unified tools / skills / init-script surface.
+    DASHBOARD_AGENT_CAPABILITIES: (id: string) => `/agents/${id}/capabilities`,
     DASHBOARD_AGENT_BUDGETS: (id: string) => `/agents/${id}/budgets`,
     DASHBOARD_AGENT_SETTINGS: (id: string) => `/agents/${id}/settings`,
     // Phase 18.6 — Agents templates browser (ADR-010 scaffold).

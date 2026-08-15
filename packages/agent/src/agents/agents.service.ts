@@ -40,7 +40,15 @@ import { validateGuardrails, type AgentGuardrails } from './guardrails';
 // Merge-policy matrix (Wave 3, D4). The sanitizer is a pure contracts
 // helper (no Nest graph, no DB), so the agents module gains no runtime
 // dependency on the policy module.
-import { sanitizeMergePolicyOverride, type MergePolicyOverride } from '@ever-works/contracts';
+import {
+    AGENT_INIT_SCRIPT_MAX_BYTES,
+    sanitizeMergePolicyOverride,
+    type MergePolicyOverride,
+} from '@ever-works/contracts';
+// Capabilities tab — the init script is deliberate authoring (like the
+// five canonical Agent files), so a secret-like value is hard-rejected
+// rather than redacted.
+import { assertNoSecrets } from '../utils/secret-scan';
 
 // Upload IDs are SHA-256 hex strings (the `id` field returned by
 // POST /api/uploads/file). 64 lowercase hex chars — NOT UUID-shaped
@@ -153,6 +161,12 @@ export interface UpdateAgentInput {
      * OPENING a PR; this governs LANDING one.
      */
     mergePolicy?: MergePolicyOverride | null;
+    /**
+     * Capabilities tab — per-Agent init script (advisory v1). `null`
+     * or a blank string clears it. Capped at 16 KB, secret-scanned
+     * (hard-reject) on write.
+     */
+    initScript?: string | null;
 }
 
 /**
@@ -507,6 +521,27 @@ export class AgentsService {
             } else {
                 const sanitized = sanitizeMergePolicyOverride(input.mergePolicy);
                 patch.mergePolicy = Object.keys(sanitized).length > 0 ? sanitized : null;
+            }
+        }
+
+        // Capabilities tab — init script. Same posture as the five
+        // canonical Agent files (deliberate authoring surface): 16 KB
+        // byte cap + hard-reject secret scan. Blank normalises to null so
+        // an emptied editor clears the column instead of storing "".
+        if (input.initScript !== undefined) {
+            if (input.initScript === null || input.initScript.trim().length === 0) {
+                patch.initScript = null;
+            } else {
+                const bytes = Buffer.byteLength(input.initScript, 'utf8');
+                if (bytes > AGENT_INIT_SCRIPT_MAX_BYTES) {
+                    throw new BadRequestException(
+                        `Init script is ${Math.round(bytes / 1024)} KB; max ${
+                            AGENT_INIT_SCRIPT_MAX_BYTES / 1024
+                        } KB.`,
+                    );
+                }
+                assertNoSecrets(input.initScript, 'Agent init script');
+                patch.initScript = input.initScript;
             }
         }
 
