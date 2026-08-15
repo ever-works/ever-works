@@ -673,6 +673,12 @@ export class NotificationService {
      * One notification per item (`inbox_item_<id>` dedup key), so a
      * retried producer cannot ring twice. `question` items are urgent by
      * definition: a run is parked until the reply.
+     *
+     * The action URL carries `?id=` — the inbox page reads it and opens
+     * THAT message. A bare `/inbox` link opens whatever happens to be
+     * newest, so on a busy inbox the notification about item A lands the
+     * human on item B; the deep-link plumbing exists on the page for
+     * exactly this producer.
      */
     async notifyInboxItem(args: {
         userId: string;
@@ -693,13 +699,17 @@ export class NotificationService {
         // every other interpolated value in this file.
         const safeTitle = this.sanitizeLabel(args.title);
         const safeMessage = sanitizeDescription(args.message, 500);
+        // The id is a generated uuid, but it is interpolated into a URL —
+        // encode it rather than trusting the shape of a value that reaches
+        // here through a producer input.
+        const actionUrl = `/inbox?id=${encodeURIComponent(args.itemId)}`;
         await this.create({
             userId: args.userId,
             type: urgent ? NotificationType.WARNING : NotificationType.INFO,
             category: NotificationCategory.AGENT,
             title: safeTitle,
             message: safeMessage,
-            actionUrl: '/inbox',
+            actionUrl,
             actionLabel: 'Open inbox',
             metadata: { inboxItemId: args.itemId, kind: args.kind },
             deduplicationKey: `inbox_item_${args.itemId}`,
@@ -709,7 +719,7 @@ export class NotificationService {
             eventKey: eventKeyByKind[args.kind],
             title: safeTitle,
             message: safeMessage,
-            actionUrl: '/inbox',
+            actionUrl,
             actionLabel: 'Open inbox',
             urgent,
         });
