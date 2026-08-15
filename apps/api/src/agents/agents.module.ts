@@ -119,6 +119,7 @@ import { AuthModule } from '../auth/auth.module';
 import { SkillsModule as ApiSkillsModule } from '../skills/skills.module';
 import { SkillFileContentReaderService } from '../skills/skill-file-content-reader.service';
 import { AgentsController } from './agents.controller';
+import { AgentCollaboratorsController } from './agent-collaborators.controller';
 import { AgentTemplatesController } from './agent-templates.controller';
 import { AgentTemplateCatalogService } from './agent-template-catalog.service';
 
@@ -184,7 +185,7 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
         // no cycle is introduced.
         ApiSkillsModule,
     ],
-    controllers: [AgentsController, AgentTemplatesController],
+    controllers: [AgentsController, AgentCollaboratorsController, AgentTemplatesController],
     providers: [
         AgentTemplateCatalogService,
         // Security: provided LOCALLY (not exported) so the merge-policy

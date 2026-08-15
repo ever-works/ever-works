@@ -36,6 +36,11 @@ export function AgentDetailTabs({ agentId }: { agentId: string }) {
             href: ROUTES.DASHBOARD_AGENT_CAPABILITIES(agentId),
             label: t('capabilities'),
         },
+        {
+            key: 'collaborators',
+            href: ROUTES.DASHBOARD_AGENT_COLLABORATORS(agentId),
+            label: t('collaborators'),
+        },
         { key: 'budgets', href: ROUTES.DASHBOARD_AGENT_BUDGETS(agentId), label: t('budgets') },
         { key: 'settings', href: ROUTES.DASHBOARD_AGENT_SETTINGS(agentId), label: t('settings') },
     ];
