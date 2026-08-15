@@ -148,6 +148,30 @@ export enum ActivityActionType {
     MISSION_FAILED = 'mission_failed',
     MISSION_DELETED = 'mission_deleted',
     MISSION_TICK_CAPPED = 'mission_tick_capped',
+    // Autonomy layer — Goal execution loop. Additive members only
+    // (activity_log.actionType is a plain varchar, so no migration):
+    //   - GOAL_LOOP_STARTED / _PAUSED / _RESUMED / _CANCELLED are the
+    //     operator control actions on the iteration loop.
+    //   - GOAL_ITERATION_DISPATCHED fires once per routed iteration and
+    //     carries `{ iteration, agentId, taskId, reasonCode }` so "who
+    //     decided this run should happen?" is answerable.
+    //   - GOAL_LIMIT_TRIPPED records a budget / wall-clock / stuck ceiling
+    //     stopping the loop; `details` carries the reason code.
+    //   - GOAL_DOD_UPDATED covers every Definition-of-Done write,
+    //     including waivers (which carry the operator's note).
+    //   - GOAL_ARCHIVED / _UNARCHIVED are the catalog-visibility actions.
+    GOAL_LOOP_STARTED = 'goal_loop_started',
+    GOAL_LOOP_PAUSED = 'goal_loop_paused',
+    GOAL_LOOP_RESUMED = 'goal_loop_resumed',
+    GOAL_LOOP_CANCELLED = 'goal_loop_cancelled',
+    GOAL_LOOP_COMPLETED = 'goal_loop_completed',
+    GOAL_ITERATION_DISPATCHED = 'goal_iteration_dispatched',
+    GOAL_ITERATION_NUDGED = 'goal_iteration_nudged',
+    GOAL_LIMIT_TRIPPED = 'goal_limit_tripped',
+    GOAL_DOD_UPDATED = 'goal_dod_updated',
+    GOAL_ARCHIVED = 'goal_archived',
+    GOAL_UNARCHIVED = 'goal_unarchived',
+
     // PR-3 — Idea (WorkProposal) lifecycle
     IDEA_GENERATED = 'idea_generated',
     IDEA_DISMISSED = 'idea_dismissed',

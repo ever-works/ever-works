@@ -68,6 +68,7 @@ import { WorkKnowledgeChunkCoordinate } from '../entities/work-knowledge-chunk-c
 import { Mission } from '../entities/mission.entity';
 import { Goal } from '../entities/goal.entity';
 import { GoalMetricSample } from '../entities/goal-metric-sample.entity';
+import { GoalEvent } from '../entities/goal-event.entity';
 import { MissionGoal } from '../entities/mission-goal.entity';
 import { Tenant } from '../entities/tenant.entity';
 import { Organization } from '../entities/organization.entity';
@@ -193,6 +194,8 @@ export const ENTITIES = [
     // EntityMetadataNotFoundError → unmapped 500 on every query).
     Goal,
     GoalMetricSample,
+    // Autonomy layer — append-only orchestrator log.
+    GoalEvent,
     MissionGoal,
     // Tenants & Organizations (EW-651 epic) — Phase 1 / EW-653
     Tenant,
