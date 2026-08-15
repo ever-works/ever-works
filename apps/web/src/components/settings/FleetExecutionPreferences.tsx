@@ -113,6 +113,11 @@ export function FleetExecutionPreferences({
                     {t('accountLabel')}
                 </label>
                 <Select
+                    // `id` (not just the testid) so the label above
+                    // actually associates — a `htmlFor` pointing at a
+                    // testid names nothing, and a screen reader would
+                    // announce this control unlabelled.
+                    id="fleet-routing-account-mode"
                     value={accountMode}
                     onValueChange={(value) => handleAccountChange(value as FleetExecutionMode)}
                     disabled={isPending}
