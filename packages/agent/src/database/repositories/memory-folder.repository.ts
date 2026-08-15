@@ -13,6 +13,19 @@ export interface CreateMemoryFolderInput {
 }
 
 /**
+ * Character (code-point) length of a path — NOT `String.length`.
+ *
+ * SQL `substr()` counts CHARACTERS on both postgres and better-sqlite3,
+ * while JavaScript's `.length` counts UTF-16 code units. A single astral
+ * character (an emoji in a folder name is the everyday case) is 2 units
+ * in JS and 1 character in SQL, so a `.length`-derived offset walks past
+ * the separator and silently corrupts every descendant path.
+ */
+function charLength(value: string): number {
+    return Array.from(value).length;
+}
+
+/**
  * Persistence for the /memory Files folder tree.
  *
  * All reads are keyed by `userId` — a folder id belonging to another user
@@ -54,16 +67,27 @@ export class MemoryFolderRepository {
     }
 
     /**
-     * The folder at `path` plus every descendant (`path LIKE '<path>/%'`),
-     * ordered parents-first.
+     * The folder at `path` plus every descendant, ordered parents-first.
+     *
+     * The descendant test is a `substr(...) = '<path>/'` prefix EQUALITY,
+     * deliberately NOT a `LIKE`. Folder names are user text and may
+     * legally contain `%` and `_`, which `LIKE` reads as wildcards: the
+     * pattern `'/Q1_2026/%'` also matches `/Q1x2026/Receipts`, dragging an
+     * unrelated sibling subtree into this one (a recursive delete then
+     * dropped those folders and unfiled their files). Equality also
+     * removes the driver split that bit the search predicates — sqlite's
+     * `LIKE` is case-insensitive, postgres's is not, while `=` is
+     * case-sensitive on both.
      */
     async listSubtree(userId: string, path: string): Promise<MemoryFolder[]> {
+        const prefix = `${path}/`;
         return this.repo
             .createQueryBuilder('folder')
             .where('folder.userId = :userId', { userId })
-            .andWhere('(folder.path = :path OR folder.path LIKE :prefix)', {
+            .andWhere('(folder.path = :path OR substr(folder.path, 1, :prefixLength) = :prefix)', {
                 path,
-                prefix: `${path}/%`,
+                prefix,
+                prefixLength: charLength(prefix),
             })
             .orderBy('folder.path', 'ASC')
             .getMany();
@@ -79,19 +103,35 @@ export class MemoryFolderRepository {
      * has that prefix swapped for `newPath`. `||` concatenation and
      * `substr` work on both postgres and better-sqlite3, so the statement
      * is portable across the prod / e2e drivers.
+     *
+     * Three things this must never do, each of which it once did:
+     *  - inline `newPath` as a SQL literal. TypeORM expands `:name`
+     *    placeholders over the WHOLE statement text, string literals
+     *    included, so a folder named `:userId` turned the SET clause into
+     *    a positional placeholder and shifted every parameter after it.
+     *    `newPath` is a BOUND parameter here.
+     *  - match descendants with `LIKE`: `%` / `_` are legal in folder
+     *    names and are wildcards to `LIKE` (see `listSubtree`).
+     *  - derive the suffix offset from `String.length`: SQL `substr`
+     *    counts characters, JS counts UTF-16 units, so one emoji in an
+     *    ancestor name shifted every descendant path by a character.
      */
     async updateSubtreePaths(userId: string, oldPath: string, newPath: string): Promise<void> {
+        const prefix = `${oldPath}/`;
         await this.repo
             .createQueryBuilder()
             .update(MemoryFolder)
-            .set({
-                path: () =>
-                    `'${newPath.replace(/'/g, "''")}' || substr(path, ${oldPath.length + 1})`,
-            })
-            .where('userId = :userId', { userId })
-            .andWhere('(path = :oldPath OR path LIKE :prefix)', {
+            .set({ path: () => ':newPath || substr(path, :suffixFrom)' })
+            .where('userId = :userId')
+            .andWhere('(path = :oldPath OR substr(path, 1, :prefixLength) = :prefix)')
+            .setParameters({
+                userId,
+                newPath,
                 oldPath,
-                prefix: `${oldPath}/%`,
+                prefix,
+                prefixLength: charLength(prefix),
+                // 1-based: the character right after `oldPath`.
+                suffixFrom: charLength(oldPath) + 1,
             })
             .execute();
     }
