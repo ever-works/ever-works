@@ -312,7 +312,9 @@ export class TaskRecurrenceDispatcherService {
      * `agentId` column. No resolvable agent → `task_run_no_agent`
      * notification instead of a silent skip.
      */
-    private async dispatchInstance(task: Task): Promise<'dispatched' | 'no-agent' | 'not-attempted'> {
+    private async dispatchInstance(
+        task: Task,
+    ): Promise<'dispatched' | 'no-agent' | 'not-attempted'> {
         if (!this.transitions) return 'not-attempted';
 
         const agentIds = new Set<string>();

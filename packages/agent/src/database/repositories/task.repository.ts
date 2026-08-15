@@ -445,7 +445,11 @@ export class TaskRepository {
      * (or a reschedule racing a tick) resolve to exactly one winner.
      * Mirrors {@link casClaimRecurrence}.
      */
-    async casClaimSchedule(taskId: string, expected: Date, now: Date = new Date()): Promise<boolean> {
+    async casClaimSchedule(
+        taskId: string,
+        expected: Date,
+        now: Date = new Date(),
+    ): Promise<boolean> {
         const result = await this.repository
             .createQueryBuilder()
             .update(Task)

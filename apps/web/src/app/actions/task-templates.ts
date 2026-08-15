@@ -3,10 +3,7 @@
 import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 import { taskTemplatesAPI } from '@/lib/api/task-templates';
-import type {
-    InstantiateTemplateInput,
-    TaskTemplateRow,
-} from '@/lib/api/task-templates.shared';
+import type { InstantiateTemplateInput, TaskTemplateRow } from '@/lib/api/task-templates.shared';
 import type { Task } from '@/lib/api/tasks';
 import { getAuthFromCookie } from '@/lib/auth';
 import { ROUTES } from '@/lib/constants';

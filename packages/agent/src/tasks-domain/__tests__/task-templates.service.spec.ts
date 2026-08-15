@@ -56,13 +56,7 @@ describe('TaskTemplatesService', () => {
         counter = { nextSlug: jest.fn().mockImplementation(async () => ++slug) };
         agents = { findByIdAndUser: jest.fn().mockResolvedValue({ id: 'agent-1' }) };
         works = { findById: jest.fn().mockResolvedValue({ id: 'work-1', userId: 'u1' }) };
-        svc = new TaskTemplatesService(
-            templates as never,
-            counter,
-            agents,
-            works,
-            undefined,
-        );
+        svc = new TaskTemplatesService(templates as never, counter, agents, works, undefined);
     });
 
     describe('seeding', () => {
@@ -315,9 +309,9 @@ describe('TaskTemplatesService', () => {
         it('a mid-transaction failure surfaces (nothing partially applied by contract)', async () => {
             arm();
             templates.withTransaction.mockRejectedValueOnce(new Error('insert failed'));
-            await expect(
-                svc.instantiateTemplate('u1', 'tpl-1', { title: 'T' }),
-            ).rejects.toThrow('insert failed');
+            await expect(svc.instantiateTemplate('u1', 'tpl-1', { title: 'T' })).rejects.toThrow(
+                'insert failed',
+            );
         });
     });
 });

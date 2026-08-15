@@ -100,9 +100,7 @@ describe('recurrence.computeNextTemplateOccurrence', () => {
     });
 
     it('returns null for an invalid cron expression', () => {
-        expect(
-            computeNextTemplateOccurrence({ cron: 'garbage', from: new Date() }),
-        ).toBeNull();
+        expect(computeNextTemplateOccurrence({ cron: 'garbage', from: new Date() })).toBeNull();
     });
 });
 

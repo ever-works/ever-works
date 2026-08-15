@@ -310,9 +310,7 @@ describe('TaskRecurrenceDispatcherService — instance execution (schedule-modes
         });
 
         it('no resolvable agent → outcome=no-agent + notification, never a throw', async () => {
-            tasks.findDueScheduledTasks.mockResolvedValueOnce([
-                makeScheduled({ agentId: null }),
-            ]);
+            tasks.findDueScheduledTasks.mockResolvedValueOnce([makeScheduled({ agentId: null })]);
 
             const summary = await svc.dispatchDueScheduled();
 

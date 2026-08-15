@@ -109,7 +109,12 @@ export class CreateTaskTemplates1785020000000 implements MigrationInterface {
                         { name: 'title', type: 'varchar', length: '200' },
                         { name: 'prompt', type: 'text', isNullable: true },
                         { name: 'agentId', type: 'uuid', isNullable: true },
-                        { name: 'agentTemplateSlug', type: 'varchar', length: '80', isNullable: true },
+                        {
+                            name: 'agentTemplateSlug',
+                            type: 'varchar',
+                            length: '80',
+                            isNullable: true,
+                        },
                         { name: 'requiresApproval', type: 'boolean', default: false },
                         // simple-json int[] of depended-on positions.
                         { name: 'dependsOn', type: 'text', isNullable: true },
