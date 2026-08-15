@@ -20,6 +20,13 @@ export interface ListTasksFilter {
     parentTaskId?: string;
     label?: string;
     search?: string;
+    /**
+     * Include Tasks flagged `hiddenFromBoard` (trigger-spawned work the
+     * owning trigger chose to keep off the board). Omitted/false =
+     * hidden rows are excluded, which is what the board and every
+     * default list want.
+     */
+    includeHidden?: boolean;
     limit?: number;
     offset?: number;
 }
@@ -147,6 +154,14 @@ export class TaskRepository {
         if (filter.goalId) qb.andWhere('task.goalId = :goalId', { goalId: filter.goalId });
         if (filter.parentTaskId)
             qb.andWhere('task.parentTaskId = :parentTaskId', { parentTaskId: filter.parentTaskId });
+
+        // Board visibility: trigger-spawned Tasks whose trigger opted out
+        // of the board are excluded unless the caller explicitly asks for
+        // them. `= false` (not `!= true`) is correct because the column is
+        // NOT NULL DEFAULT false on every row.
+        if (!filter.includeHidden) {
+            qb.andWhere('task.hiddenFromBoard = :hiddenFromBoard', { hiddenFromBoard: false });
+        }
 
         if (filter.search) {
             // Escape LIKE wildcards (%/_/\) in the user-supplied search term

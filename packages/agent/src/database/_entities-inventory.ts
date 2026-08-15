@@ -119,6 +119,7 @@ import { TenantJobRuntimeAudit } from '../entities/tenant-job-runtime-audit.enti
 import { TenantRuntimeProviderAllowlist } from '../entities/tenant-runtime-provider-allowlist.entity';
 import { TenantCredentialSnapshot } from '../entities/tenant-credential-snapshot.entity';
 import { InboundTrigger } from '../entities/inbound-trigger.entity';
+import { InboundTriggerFire } from '../entities/inbound-trigger-fire.entity';
 import { IngestedEvent } from '../entities/ingested-event.entity';
 import { IngestCursor } from '../entities/ingest-cursor.entity';
 import { IngestInstallBinding } from '../entities/ingest-install-binding.entity';
@@ -285,6 +286,7 @@ export const ENTITIES = [
     // Inbound Triggers (Trigger Schedules) — signed webhook/API triggers
     // that spawn Tasks on verified HMAC deliveries.
     InboundTrigger,
+    InboundTriggerFire,
     // Event-ingest spine (Wave 6) — normalized external events awaiting
     // Activity/Memory fan-out.
     IngestedEvent,

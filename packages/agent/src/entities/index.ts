@@ -123,6 +123,8 @@ export * from './team-member.entity';
 export * from './team-resource.entity';
 // Inbound Triggers (Trigger Schedules) — signed webhook/API triggers that spawn Tasks
 export * from './inbound-trigger.entity';
+// Task Triggers — per-(trigger, event) fire ledger for ingest-spine idempotency
+export * from './inbound-trigger-fire.entity';
 // Event-ingest spine (Wave 6) — normalized external events awaiting fan-out
 export * from './ingested-event.entity';
 // Event-ingest pull path (Wave 8) — per-(user, plugin) pull watermarks/cursors

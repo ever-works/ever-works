@@ -176,6 +176,8 @@ export const ROUTES = {
     // Tasks
     DASHBOARD_TASKS: '/tasks',
     DASHBOARD_TASK_NEW: '/tasks/new',
+    DASHBOARD_TASK_TRIGGERS: '/tasks/triggers',
+    DASHBOARD_TASK_TRIGGER: (id: string) => `/tasks/triggers/${id}`,
     DASHBOARD_TASK: (id: string) => `/tasks/${id}`,
     // Phase 18.6 — Tasks templates browser (ADR-010 scaffold).
     DASHBOARD_TASK_TEMPLATES: '/tasks/templates',
