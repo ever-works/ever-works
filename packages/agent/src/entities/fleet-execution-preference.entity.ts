@@ -32,7 +32,7 @@ import type { FleetExecutionMode, FleetExecutionScopeType } from '@ever-works/co
  *
  * Scope columns are raw uuid references (no @ManyToOne) per the EW-654
  * cycle-avoidance rule; the FK to `users` lives in the migration
- * (`1785100000000-FleetRunnerTelemetryAndRouting`). `workId` / `goalId`
+ * (`1786920000000-FleetRunnerTelemetryAndRouting`). `workId` / `goalId`
  * intentionally get NO foreign key: a preference is advisory, and a
  * dangling row for a deleted Work simply never matches again.
  *

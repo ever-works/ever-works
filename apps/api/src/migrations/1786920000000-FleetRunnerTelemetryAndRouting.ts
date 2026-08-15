@@ -47,8 +47,8 @@ import { MigrationInterface, QueryRunner, Table, TableForeignKey, TableIndex } f
  * `resolveFleetExecutionMode` resolves deterministically even if a
  * duplicate ever appears.
  */
-export class FleetRunnerTelemetryAndRouting1785100000000 implements MigrationInterface {
-    name = 'FleetRunnerTelemetryAndRouting1785100000000';
+export class FleetRunnerTelemetryAndRouting1786920000000 implements MigrationInterface {
+    name = 'FleetRunnerTelemetryAndRouting1786920000000';
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         const nodes = await queryRunner.getTable('fleet_nodes');

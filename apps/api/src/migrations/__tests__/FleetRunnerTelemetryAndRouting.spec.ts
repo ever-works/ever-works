@@ -1,5 +1,5 @@
 import { DataSource } from 'typeorm';
-import { FleetRunnerTelemetryAndRouting1785100000000 } from '../1785100000000-FleetRunnerTelemetryAndRouting';
+import { FleetRunnerTelemetryAndRouting1786920000000 } from '../1786920000000-FleetRunnerTelemetryAndRouting';
 
 /**
  * Migration test for the fleet local-runner polish schema.
@@ -23,9 +23,9 @@ import { FleetRunnerTelemetryAndRouting1785100000000 } from '../1785100000000-Fl
  * exactly the shape it takes on SQLite/CI, where the bootstrap service
  * seeds the row instead.
  */
-describe('FleetRunnerTelemetryAndRouting1785100000000', () => {
+describe('FleetRunnerTelemetryAndRouting1786920000000', () => {
     let dataSource: DataSource;
-    const migration = new FleetRunnerTelemetryAndRouting1785100000000();
+    const migration = new FleetRunnerTelemetryAndRouting1786920000000();
 
     beforeEach(async () => {
         dataSource = new DataSource({

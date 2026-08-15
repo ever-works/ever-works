@@ -109,7 +109,7 @@ const CORE_EVENTS: readonly CoreEventRow[] = [
         defaultChannels: ['in-app'],
     },
     // Fleet local-runner routing. Seeded on Postgres by
-    // `1785100000000-FleetRunnerTelemetryAndRouting` too; this entry is
+    // `1786920000000-FleetRunnerTelemetryAndRouting` too; this entry is
     // what makes it exist on SQLite / CI, where migrations do not run.
     {
         key: 'fleet_runner_fallback',

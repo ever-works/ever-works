@@ -160,7 +160,7 @@ likely to be double-written, while implying that it did. The invariant is held b
 deterministically. No FK on `scopeId`: a preference is advisory, and a row left
 behind by a deleted Work simply stops matching.
 
-Migration: `apps/api/src/migrations/1785100000000-FleetRunnerTelemetryAndRouting.ts`
+Migration: `apps/api/src/migrations/1786920000000-FleetRunnerTelemetryAndRouting.ts`
 — forward-only, per-step guards, portable DDL (`Table`/`TableIndex`/
 `TableForeignKey`), full `down()`.
 
