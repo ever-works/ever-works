@@ -78,8 +78,28 @@ export function isFleetEnrollableNodeKind(value: unknown): value is FleetEnrolla
  */
 export type FleetNodeStatus = 'enrolling' | 'online' | 'offline' | 'paused' | 'disabled';
 
-/** Canonical status list. */
-export const FLEET_NODE_STATUSES: readonly FleetNodeStatus[] = ['enrolling', 'online', 'offline', 'disabled'];
+/**
+ * Canonical status list.
+ *
+ * `paused` was missing here while being a fully-supported
+ * {@link FleetNodeStatus} — the union, the entity, the service and the UI
+ * all handled it, so anything iterating THIS list (status filters, legend
+ * rendering) silently skipped a real state. Added rather than worked
+ * around: a canonical list that is not canonical is worse than no list.
+ */
+export const FLEET_NODE_STATUSES: readonly FleetNodeStatus[] = ['enrolling', 'online', 'offline', 'paused', 'disabled'];
+
+/**
+ * Statuses in which the platform will NOT lease new work onto a node.
+ *
+ * Lives here, next to the status union, rather than only on the server
+ * entity: "can this machine take work right now" is now asked by the API
+ * edge (runner availability for routing) as well as by the lease
+ * protocol, and two hand-written copies of a list like this drift the
+ * first time a status is added. The entity re-exports it, so every
+ * existing server-side importer is unchanged.
+ */
+export const FLEET_NODE_NON_LEASABLE_STATUSES: readonly FleetNodeStatus[] = ['enrolling', 'paused', 'disabled'];
 
 /**
  * Self-description a node sends on enroll and refreshes on every
@@ -93,6 +113,32 @@ export interface FleetNodeSelfDescription {
 	version?: string;
 	/** Scheduling capability tags, e.g. `['terminal', 'workspace', 'docker']`. */
 	capabilities?: string[];
+	/**
+	 * Version of the AGENT CLI installed on the machine (e.g. the
+	 * `claude-code` binary the `agent-task` steps shell out to), as
+	 * opposed to {@link FleetNodeSelfDescription.version}, which is the
+	 * daemon's own version.
+	 *
+	 * The distinction matters operationally: "the runner is up to date"
+	 * and "the tool the runner drives is up to date" are different
+	 * questions, and only the second one explains why a job that worked
+	 * yesterday now fails on one machine.
+	 *
+	 * ADDITIVE and OPTIONAL by contract — a daemon built before this
+	 * field existed simply omits it, and the server leaves the stored
+	 * value untouched rather than nulling it.
+	 */
+	cliVersion?: string;
+	/**
+	 * Free bytes on the volume the node's workspace lives on. A number,
+	 * not a formatted string, so the UI owns the units.
+	 *
+	 * Same additive contract as {@link FleetNodeSelfDescription.cliVersion}:
+	 * omitted by older daemons, and an omitted value never overwrites a
+	 * previously-reported one. Negative / non-finite values are refused
+	 * server-side rather than stored.
+	 */
+	diskFreeBytes?: number;
 }
 
 /** Wire view of one fleet node — never carries credentials or hashes. */
@@ -123,6 +169,15 @@ export interface FleetNodeView {
 	 * carry it — the platform does not lease work onto them.
 	 */
 	load?: FleetNodeLoadView | null;
+	/**
+	 * Agent-CLI version last reported by the node, or null when the node
+	 * has never reported one (an older daemon, or a machine with no CLI
+	 * installed). Distinct from {@link FleetNodeView.version}, which is
+	 * the daemon's own version.
+	 */
+	cliVersion?: string | null;
+	/** Free bytes last reported for the node's workspace volume, or null. */
+	diskFreeBytes?: number | null;
 }
 
 /** Request body for `POST /api/fleet/enroll`. */
@@ -158,6 +213,22 @@ export const FLEET_MAX_PLATFORM_LENGTH = 64;
 
 /** `sanitizeText(version, 32)` server-side; the node truncates to match. */
 export const FLEET_MAX_VERSION_LENGTH = 32;
+
+/**
+ * `sanitizeText(cliVersion, 64)` server-side. Wider than the daemon's own
+ * version because an agent CLI commonly reports something like
+ * `1.2.3 (Claude Code)` rather than a bare semver.
+ */
+export const FLEET_MAX_CLI_VERSION_LENGTH = 64;
+
+/**
+ * Ceiling on a reported `diskFreeBytes`, ~1 EiB. Not a real disk size —
+ * it is the point past which the value is certainly nonsense (a
+ * misreported unit, a signed-overflow, a hostile node). Values outside
+ * `[0, this]` are dropped rather than stored, so a bad reading cannot
+ * make the runner widget render a machine with an exabyte free.
+ */
+export const FLEET_MAX_DISK_FREE_BYTES = 2 ** 60;
 
 /** Node display-name bounds, enforced by the DTO and re-checked in the service. */
 export const FLEET_MIN_NODE_NAME_LENGTH = 1;

@@ -42,7 +42,13 @@ export function ChatProviderSelector({
         };
     }, [open]);
 
-    if (providers.length === 0) return null;
+    // A picker with one option is not a choice, it is decoration — and in this
+    // toolbar it actively misleads, because a lone provider chip reads as
+    // something the user is expected to act on. Most deployments activate a
+    // single AI provider, so the common case is no chip at all; which provider
+    // is in play stays discoverable in Settings → Plugins, and the model shown
+    // beside the composer already names what will answer.
+    if (providers.length < 2) return null;
 
     return (
         <div ref={ref} className="relative">

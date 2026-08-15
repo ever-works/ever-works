@@ -23,6 +23,7 @@ import { ActivityActionType, ActivityStatus } from '../entities/activity-log.typ
 import { assertNoSecrets } from '../utils/secret-scan';
 import { assertNoInjectionTokens } from '../utils/content-policy';
 import { slugifyText } from '../utils/text.utils';
+import { normalizeInvocationSlug } from './skill-invocation';
 import { AgentRepository } from '../database/repositories/agent.repository';
 import { WorkRepository } from '../database/repositories/work.repository';
 import { WorkProposalRepository } from '../user-research/work-proposal.repository';
@@ -41,6 +42,8 @@ export interface CreateSkillInput {
     frontmatter?: SkillFrontmatter;
     slug?: string;
     version?: string;
+    /** Optional slash command (`plan` or `/plan`); unique per user. */
+    invocationSlug?: string | null;
 }
 
 export interface UpdateSkillInput {
@@ -49,6 +52,8 @@ export interface UpdateSkillInput {
     instructionsMd?: string;
     frontmatter?: SkillFrontmatter;
     version?: string;
+    /** `null` clears the slash command; a string (re)assigns it. */
+    invocationSlug?: string | null;
 }
 
 export interface InstallFromCatalogInput {
@@ -139,6 +144,12 @@ export class SkillsService {
             );
         }
 
+        const invocationSlug = await this.resolveInvocationSlugForWrite(
+            userId,
+            input.invocationSlug,
+            null,
+        );
+
         const frontmatter: SkillFrontmatter = input.frontmatter ?? {
             name: slug,
             description: input.description,
@@ -154,6 +165,7 @@ export class SkillsService {
             frontmatter,
             contentHash: hashBody(input.instructionsMd),
             version: input.version ?? '1.0.0',
+            invocationSlug,
         });
         return created;
     }
@@ -169,6 +181,13 @@ export class SkillsService {
             assertBody(input.instructionsMd, 'instructionsMd');
             patch.instructionsMd = input.instructionsMd;
             patch.contentHash = hashBody(input.instructionsMd);
+        }
+        if (input.invocationSlug !== undefined) {
+            patch.invocationSlug = await this.resolveInvocationSlugForWrite(
+                userId,
+                input.invocationSlug,
+                id,
+            );
         }
         await this.skills.updateByIdAndUser(id, userId, patch);
         const refreshed = await this.skills.findByIdAndUser(id, userId);
@@ -317,6 +336,45 @@ export class SkillsService {
             grants,
         );
         return active.map((entry) => entry.row);
+    }
+
+    // ── Invocation slugs (slash commands) ─────────────────────────
+
+    /** The user's skills that carry an invocation slug (composer autocomplete). */
+    async listInvocable(userId: string): Promise<Skill[]> {
+        return this.skills.findInvocableByUser(userId);
+    }
+
+    // NOTE: resolving a message's leading `/slug` at RUN time lives in
+    // `AgentRunService` (parseSlashInvocation + the user-scoped
+    // `SkillRepository.findByUserAndInvocationSlug`), not here — one
+    // resolution path, so the popup, the parser and the injection
+    // cannot drift apart.
+
+    /**
+     * Normalize + validate an invocation slug and enforce per-user
+     * uniqueness (409 naming the conflicting skill). `excludeSkillId`
+     * lets an update keep its own slug.
+     */
+    private async resolveInvocationSlugForWrite(
+        userId: string,
+        raw: string | null | undefined,
+        excludeSkillId: string | null,
+    ): Promise<string | null> {
+        if (raw === undefined || raw === null || raw.trim() === '') return null;
+        const normalized = normalizeInvocationSlug(raw);
+        if (!normalized) {
+            throw new BadRequestException(
+                'invocationSlug must be lowercase letters, digits and hyphens, starting with a letter or digit (max 64 chars).',
+            );
+        }
+        const conflict = await this.skills.findByUserAndInvocationSlug(userId, normalized);
+        if (conflict && conflict.id !== excludeSkillId) {
+            throw new ConflictException(
+                `Invocation slug "/${normalized}" is already used by skill "${conflict.title}".`,
+            );
+        }
+        return normalized;
     }
 
     // ── internals ─────────────────────────────────────────────────

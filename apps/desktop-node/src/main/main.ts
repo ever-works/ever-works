@@ -7,6 +7,7 @@ import {
 	clampResourceLimits,
 	createBufferedLogger,
 	createCommandRunner,
+	createDiskProbe,
 	createConfigFileSystem,
 	createNodeRuntime,
 	createResourceProbe,
@@ -97,7 +98,11 @@ function bootstrap(): void {
 		environment: currentEnvironment(),
 		logger,
 		version: NODE_APP_VERSION,
-		userAgent: `ever-works-desktop-node/${NODE_APP_VERSION}`
+		userAgent: `ever-works-desktop-node/${NODE_APP_VERSION}`,
+		// Backs the free-disk figure in the Fleet runner indicator.
+		// Optional by contract — an unreadable volume reports nothing
+		// rather than failing the heartbeat that carries everything else.
+		diskProbe: createDiskProbe()
 	};
 
 	const fs = createConfigFileSystem();

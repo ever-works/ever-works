@@ -114,10 +114,12 @@ describe('activity-log.types', () => {
             //    ingestion, audit item j) -> 121.
             // +1 idea_deleted (Idea delete, #1997) -> 122.
             // +1 agent_unarchived (Agent archive/restore, #1994) -> 123.
+            // +3 memory_folder_created / _deleted / _synced (Memory Files —
+            //    the /memory Files area folder tree) -> 126.
             // +6 repo_connection_created / _updated / _deleted / _imported and
             //    repo_attached_to_agent / repo_detached_from_agent
-            //    (repository registry, Feature G) -> 129.
-            expect(literals).toHaveLength(129);
+            //    (repository registry, Feature G) -> 132.
+            expect(literals).toHaveLength(132);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

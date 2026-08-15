@@ -8,8 +8,7 @@ import { cn } from '@/lib/utils/cn';
  * (list cards + detail page) and by the source pickers (`/meetings/new`,
  * the `/meetings` filter).
  *
- * Same approach (and same caveat) as `ai/dictation-provider-icons`: the
- * vendor marks are STYLISED shapes in each vendor's signature colour,
+ * The vendor marks are STYLISED shapes in each vendor's signature colour,
  * NOT the vendors' official trademarked logos, drawn as inlined
  * theme-agnostic SVGs so a mid-tone badge with a white glyph reads
  * correctly in light and dark mode without per-theme variants. They can

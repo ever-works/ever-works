@@ -59,6 +59,12 @@ export interface AgentDto {
     reportsToAgentId: string | null;
     // Agent Scorecards increment 1 — quantified per-Agent goals.
     scorecard: AgentScorecardMetric[] | null;
+    /**
+     * Capabilities tab — per-Agent init script (advisory v1: stored +
+     * surfaced; consumed at session/workspace bootstrap where the
+     * runtime supports it).
+     */
+    initScript: string | null;
     hasInlineFiles: boolean;
     contentHash: string | null;
     createdAt: Date;
@@ -105,6 +111,7 @@ export function toAgentDto(agent: Agent): AgentDto {
         committerEmail: agent.committerEmail ?? null,
         reportsToAgentId: agent.reportsToAgentId ?? null,
         scorecard: agent.scorecard ?? null,
+        initScript: agent.initScript ?? null,
         hasInlineFiles,
         contentHash: agent.contentHash ?? null,
         createdAt: agent.createdAt,

@@ -5,7 +5,8 @@ import {
 	FILES_API_BETA,
 	type ManagedAgentsEvent,
 	type ManagedAgentsSession,
-	type ManagedAgentsSessionResource
+	type ManagedAgentsSessionResource,
+	type ManagedEnvironmentNetworking
 } from '../types.js';
 import { delayWithSignal } from './pipeline-helpers.js';
 
@@ -40,41 +41,76 @@ export class AnthropicManagedAgentsClient {
 		return { id: agent.id };
 	}
 
+	/**
+	 * Update an existing (persistent) agent. Agents are versioned upstream:
+	 * an update creates a new immutable version, which future sessions pin
+	 * automatically when created with the bare agent id.
+	 */
+	async updateAgent(
+		agentId: string,
+		input: { name?: string; model?: string; system?: string; description?: string }
+	): Promise<{ id: string }> {
+		const agent = await this.client.beta.agents.update(agentId, {
+			...(input.name !== undefined ? { name: input.name } : {}),
+			...(input.description !== undefined ? { description: input.description } : {}),
+			...(input.model !== undefined ? { model: input.model } : {}),
+			...(input.system !== undefined ? { system: input.system } : {})
+		});
+
+		return { id: agent.id };
+	}
+
+	/** Retrieve an agent; throws (404) when it no longer exists. */
+	async getAgent(agentId: string): Promise<{ id: string; archivedAt: string | null }> {
+		const agent = await this.client.beta.agents.retrieve(agentId);
+		return {
+			id: agent.id,
+			archivedAt: readNullableString((agent as { archived_at?: unknown }).archived_at)
+		};
+	}
+
 	async archiveAgent(agentId: string): Promise<void> {
 		await this.client.beta.agents.archive(agentId);
 	}
 
-	async createEnvironment(input: { name: string }): Promise<{ id: string }> {
-		// H-25: pin egress to an allow-list when CLAUDE_MANAGED_AGENT_EGRESS_HOSTS
-		// is set. Default stays `unrestricted` to preserve the current
-		// behavior (the env is opt-in until operators verify the agent
-		// tooling works with the constrained list). Comma-separated hosts;
-		// supports plain hostnames or `*.example.com` wildcards depending on
-		// what the upstream SDK accepts at runtime.
-		const allowHostsRaw = process.env.CLAUDE_MANAGED_AGENT_EGRESS_HOSTS?.trim();
-		const allowHosts = allowHostsRaw
-			? allowHostsRaw
-					.split(',')
-					.map((s) => s.trim())
-					.filter(Boolean)
-			: null;
-
-		// Use `any` because the SDK's `NetworkingConfig` type does not yet
-		// expose the allow-list shape in our pinned version. Once the SDK
-		// types update, narrow this.
-		// eslint-disable-next-line @typescript-eslint/no-explicit-any
-		const networking: any =
-			allowHosts && allowHosts.length > 0 ? { type: 'allowlist', hosts: allowHosts } : { type: 'unrestricted' };
-
+	async createEnvironment(input: { name: string; networking?: ManagedEnvironmentNetworking }): Promise<{
+		id: string;
+	}> {
 		const environment = await this.client.beta.environments.create({
 			name: input.name,
 			config: {
 				type: 'cloud',
-				networking
+				networking: input.networking ?? resolveEnvVarNetworking()
 			}
 		});
 
 		return { id: environment.id };
+	}
+
+	/** Update a persistent environment's networking config in place. */
+	async updateEnvironment(
+		environmentId: string,
+		input: { name?: string; networking?: ManagedEnvironmentNetworking }
+	): Promise<{ id: string }> {
+		const environment = await this.client.beta.environments.update(environmentId, {
+			...(input.name !== undefined ? { name: input.name } : {}),
+			...(input.networking
+				? {
+						config: {
+							type: 'cloud' as const,
+							networking: input.networking
+						}
+					}
+				: {})
+		});
+
+		return { id: environment.id };
+	}
+
+	/** Retrieve an environment; throws (404) when it no longer exists. */
+	async getEnvironment(environmentId: string): Promise<{ id: string; archivedAt: string | null }> {
+		const environment = await this.client.beta.environments.retrieve(environmentId);
+		return { id: environment.id, archivedAt: environment.archived_at };
 	}
 
 	async deleteEnvironment(environmentId: string): Promise<void> {
@@ -86,18 +122,47 @@ export class AnthropicManagedAgentsClient {
 		environmentId: string;
 		title: string;
 		resources?: ManagedAgentsSessionResource[];
+		/** Hard per-session spend ceiling in USD (`budget` is create-only). */
+		budgetUsd?: number;
+		/** Initial `user.message` events processed in order at creation. */
+		initialMessages?: string[];
+		/** Per-session model/system overrides (no agent version churn). */
+		agentOverrides?: { system?: string; model?: string };
 	}): Promise<ManagedAgentsSession> {
+		const hasOverrides =
+			input.agentOverrides &&
+			(input.agentOverrides.system !== undefined || input.agentOverrides.model !== undefined);
+
 		// Cast mirrors the `networking` precedent above: the pinned SDK's
 		// session-create params may lag the API's resource union (the
 		// `github_repository` variant, Feature G). Narrow once the SDK
 		// types catch up.
 		// eslint-disable-next-line @typescript-eslint/no-explicit-any
 		const resources: any = input.resources;
+
 		const session = await this.client.beta.sessions.create({
-			agent: input.agentId,
+			agent: hasOverrides
+				? {
+						type: 'agent_with_overrides',
+						id: input.agentId,
+						...(input.agentOverrides?.system !== undefined ? { system: input.agentOverrides.system } : {}),
+						...(input.agentOverrides?.model !== undefined ? { model: input.agentOverrides.model } : {})
+					}
+				: input.agentId,
 			environment_id: input.environmentId,
 			title: input.title,
-			...(input.resources?.length ? { resources } : {})
+			...(input.resources?.length ? { resources } : {}),
+			...(typeof input.budgetUsd === 'number' && input.budgetUsd > 0
+				? { budget: buildBudgetLimit(input.budgetUsd) }
+				: {}),
+			...(input.initialMessages?.length
+				? {
+						initial_events: input.initialMessages.map((text) => ({
+							type: 'user.message' as const,
+							content: [{ type: 'text' as const, text }]
+						}))
+					}
+				: {})
 		});
 
 		return mapSession(session);
@@ -188,6 +253,50 @@ export class AnthropicManagedAgentsClient {
 	}
 }
 
+/**
+ * H-25: pin egress to an allow-list when CLAUDE_MANAGED_AGENT_EGRESS_HOSTS is
+ * set. Default stays `unrestricted` to preserve the current behavior (the env
+ * is opt-in until operators verify the agent tooling works with the
+ * constrained list). Comma-separated hosts. SDK >= 0.117 exposes the typed
+ * `limited` networking policy, so the former untyped `allowlist` payload is
+ * migrated to `{ type: 'limited', allowed_hosts }`.
+ */
+export function resolveEnvVarNetworking(): ManagedEnvironmentNetworking {
+	const allowHostsRaw = process.env.CLAUDE_MANAGED_AGENT_EGRESS_HOSTS?.trim();
+	const allowHosts = allowHostsRaw
+		? allowHostsRaw
+				.split(',')
+				.map((s) => s.trim())
+				.filter(Boolean)
+		: null;
+
+	if (allowHosts && allowHosts.length > 0) {
+		return {
+			type: 'limited',
+			allowed_hosts: allowHosts,
+			allow_package_managers: false,
+			allow_mcp_servers: false
+		};
+	}
+
+	return { type: 'unrestricted' };
+}
+
+/**
+ * Convert a USD budget into the API's `budget` limit shape. `max_list_cost`
+ * amounts are integer minor-unit strings ("250" = $2.50) — never floats.
+ */
+export function buildBudgetLimit(budgetUsd: number): {
+	type: 'limit';
+	max_list_cost: { amount: string; currency: 'USD' };
+} {
+	const cents = Math.max(1, Math.round(budgetUsd * 100));
+	return {
+		type: 'limit',
+		max_list_cost: { amount: String(cents), currency: 'USD' }
+	};
+}
+
 function normalizeAnthropicBaseUrl(baseUrl: string): string {
 	const trimmed = baseUrl.trim();
 	if (!trimmed) {
@@ -195,6 +304,10 @@ function normalizeAnthropicBaseUrl(baseUrl: string): string {
 	}
 
 	return trimmed.replace(/\/v1\/?$/, '').replace(/\/+$/, '');
+}
+
+function readNullableString(value: unknown): string | null {
+	return typeof value === 'string' ? value : null;
 }
 
 function mapSession(session: {
@@ -205,20 +318,40 @@ function mapSession(session: {
 		output_tokens?: number;
 		cache_creation_input_tokens?: number;
 		cache_read_input_tokens?: number;
-	};
+		list_cost?: { amount?: string; currency?: string } | null;
+	} | null;
 }): ManagedAgentsSession {
+	const usage = session.usage ?? undefined;
 	return {
 		id: session.id,
 		status: session.status,
-		usage: session.usage
+		usage: usage
 			? {
-					input_tokens: session.usage.input_tokens,
-					output_tokens: session.usage.output_tokens,
-					cache_creation_input_tokens: session.usage.cache_creation_input_tokens,
-					cache_read_input_tokens: session.usage.cache_read_input_tokens
+					input_tokens: usage.input_tokens,
+					output_tokens: usage.output_tokens,
+					cache_creation_input_tokens: usage.cache_creation_input_tokens,
+					cache_read_input_tokens: usage.cache_read_input_tokens,
+					list_cost_usd: parseListCostUsd(usage.list_cost)
 				}
 			: undefined
 	};
+}
+
+/**
+ * `list_cost.amount` is an integer minor-unit decimal string (e.g. "250" is
+ * $2.50). Only USD is currently supported upstream; non-USD or malformed
+ * amounts return undefined rather than a wrong number.
+ */
+function parseListCostUsd(listCost: { amount?: string; currency?: string } | null | undefined): number | undefined {
+	if (!listCost || typeof listCost.amount !== 'string' || !/^\d+$/.test(listCost.amount)) {
+		return undefined;
+	}
+
+	if (typeof listCost.currency === 'string' && listCost.currency.toUpperCase() !== 'USD') {
+		return undefined;
+	}
+
+	return Number(listCost.amount) / 100;
 }
 
 function mapEvent(event: {
