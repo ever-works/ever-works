@@ -98,6 +98,7 @@ describe('FullPipelineExecutorService', () => {
                 undefined, // no kbTools (no adapter wired)
                 undefined, // no memorySessionId (no orchestrator session)
                 undefined, // no memoryRecall (recall not resolved in these fixtures)
+                undefined, // no runtimeEnvironment (no agentId / EnvironmentsService)
             );
 
             // plugin.execute received {...options, execContext, onLogEntry}.
@@ -148,6 +149,7 @@ describe('FullPipelineExecutorService', () => {
                 undefined,
                 undefined, // no memorySessionId
                 undefined, // no memoryRecall
+                undefined, // no runtimeEnvironment
             );
         });
 
@@ -224,6 +226,7 @@ describe('FullPipelineExecutorService', () => {
                 undefined,
                 undefined, // no memorySessionId
                 undefined, // no memoryRecall
+                undefined, // no runtimeEnvironment
             );
         });
 
@@ -254,6 +257,7 @@ describe('FullPipelineExecutorService', () => {
                 undefined,
                 undefined, // no memorySessionId
                 undefined, // no memoryRecall
+                undefined, // no runtimeEnvironment
             );
         });
 
@@ -291,6 +295,7 @@ describe('FullPipelineExecutorService', () => {
                 undefined,
                 undefined, // no memorySessionId
                 undefined, // no memoryRecall
+                undefined, // no runtimeEnvironment
             );
         });
     });

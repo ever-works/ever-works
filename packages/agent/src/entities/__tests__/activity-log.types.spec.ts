@@ -114,7 +114,10 @@ describe('activity-log.types', () => {
             //    ingestion, audit item j) -> 121.
             // +1 idea_deleted (Idea delete, #1997) -> 122.
             // +1 agent_unarchived (Agent archive/restore, #1994) -> 123.
-            expect(literals).toHaveLength(123);
+            // +4 environment_created / environment_updated /
+            //    environment_published / environment_deleted
+            //    (Settings → Environments, #2079) -> 127.
+            expect(literals).toHaveLength(127);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

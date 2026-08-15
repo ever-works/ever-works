@@ -75,8 +75,14 @@ unknown-property 400s and is unaffected by an added optional field).
   otherwise `options.agentId` resolves through an `@Optional()`
   `EnvironmentsService` (`resolveRuntimeEnvironmentForAgent`: agent →
   `environmentId` → published, same-owner row → plain carrier).
-  Fail-open: resolution errors log a warning and the run continues with
-  no Environment. `PipelineModule` imports the (leaf) agent-side
+  FAILS CLOSED (changed in PR review): "no Environment" — no agentId,
+  no wired service, nothing assigned — still resolves to `undefined` and
+  the run proceeds exactly as before Environments existed, but a
+  resolution ERROR now propagates and `execute()` returns a failed
+  PipelineResult. Continuing there would have handed the run the
+  plugin's fallback egress posture (`CLAUDE_MANAGED_AGENT_EGRESS_HOSTS`
+  or `unrestricted`) in place of the assigned Environment's
+  restrictions. `PipelineModule` imports the (leaf) agent-side
   `EnvironmentsModule`; the module pin spec was updated (3 imports).
 - `claude-managed-agent`: with a carrier present, the CMA environment is
   created with `{type:'limited', allowed_hosts, allow_package_managers}`
@@ -90,7 +96,9 @@ unknown-property 400s and is unaffected by an added optional field).
 
 - **Settings → Environments** (`/settings/environments`): list (Name,
   Networking, Status chip, Updated) + dialog editor (name, description,
-  available-in-all-projects toggle, comma-separated pip/npm inputs,
+  available-in-all-projects toggle, one-per-line pip/npm textareas
+  (newline is the ONLY separator: a comma is legal INSIDE one pip
+  specifier, `pandas>=2.0,<3.0`),
   networking radio with hosts textarea + allow-package-managers toggle
   when limited, Save draft / Save & publish), per-row Publish/Edit/Delete
   with delete confirmation. New "Environments" tab in

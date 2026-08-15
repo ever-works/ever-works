@@ -247,11 +247,6 @@
             "optional": true
         }
     },
-    "peerDependenciesMeta": {
-        "pacote": {
-            "optional": true
-        }
-    },
     "devDependencies": {
         "@eslint/eslintrc": "^3.3.3",
         "@eslint/js": "^9.39.2",
