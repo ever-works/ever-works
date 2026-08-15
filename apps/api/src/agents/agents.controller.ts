@@ -156,8 +156,9 @@ export function isSessionAttachable(run: {
 
 // ── Session detail (Feature K) ─────────────────────────────────────
 // Step names the timeline/counts are composed from. Kept as local
-// literals (mirroring TIMELINE_STEPS / MESSAGE_STEPS in
-// packages/agent/src/agents/run-capture.ts) rather than imported: five
+// literals (mirroring the step names `AgentRunService`'s capture writes —
+// see the reciprocal note in packages/agent/src/agents/run-capture.ts,
+// which documents them but exports no constant) rather than imported: five
 // spec files jest.mock '@ever-works/agent/agents' with explicit export
 // lists, and a runtime value import here would arrive as `undefined`
 // in every one of them.

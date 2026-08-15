@@ -151,6 +151,46 @@ describe('SessionDetailClient', () => {
         expect(screen.getByTestId('session-timeline-tool-call').textContent).toContain('call-9');
     });
 
+    it('⭐ renders sub-second tool calls at millisecond resolution, not as "0s"', () => {
+        // Most tool calls finish in tens of ms. Rendering durationMs through
+        // the RUN-scale formatter collapsed every one of them to "0s", which
+        // makes the captured duration unreadable exactly where it matters.
+        render(
+            <SessionDetailClient
+                initialDetail={detail({
+                    timeline: {
+                        entries: [
+                            entry({
+                                id: 'fast',
+                                kind: 'tool-call',
+                                text: null,
+                                toolName: 'transitionTask',
+                                durationMs: 41,
+                            }),
+                            entry({
+                                id: 'slow',
+                                kind: 'tool-call',
+                                text: null,
+                                toolName: 'commitToRepo',
+                                durationMs: 4100,
+                            }),
+                        ],
+                        nextCursor: null,
+                        limit: 100,
+                    },
+                })}
+                agentName="Builder"
+                taskTitle={null}
+            />,
+        );
+
+        const rows = screen.getAllByTestId('session-timeline-tool-call');
+        expect(rows[0].textContent).toContain('41ms');
+        expect(rows[0].textContent).not.toContain('0s');
+        // Second-scale calls keep the run-scale rendering.
+        expect(rows[1].textContent).toContain('4s');
+    });
+
     it('⭐ appends the next page instead of replacing the rows already shown', async () => {
         const user = userEvent.setup();
         getRunSessionDetailAction.mockResolvedValue({
@@ -243,6 +283,60 @@ describe('SessionDetailClient', () => {
         expect(screen.getByTestId('session-detail-activity')).toHaveTextContent('Running checks');
         expect(screen.getByText('Working on it.')).toBeInTheDocument();
         expect(screen.queryByText('Page one row.')).toBeNull();
+    });
+
+    it('⭐ fills in a timeline that was still empty when the page opened', async () => {
+        vi.useFakeTimers({ shouldAdvanceTime: true });
+        // Drilling into a run whose capture rows have not landed yet (a
+        // queued run, or one dispatched a second ago) is the MOST likely
+        // moment to open this page. There is no tail row to follow from,
+        // but there is also nothing to preserve — page one IS the tail, so
+        // live-follow must adopt it rather than treating "no cursor" as
+        // "the reader is mid-pagination".
+        getRunSessionDetailAction.mockResolvedValue({
+            ...detail(),
+            timeline: {
+                entries: [entry({ id: 'e1', text: 'First captured turn.' })],
+                nextCursor: null,
+                limit: 100,
+            },
+        });
+
+        render(
+            <SessionDetailClient
+                initialDetail={detail({
+                    timeline: { entries: [], nextCursor: null, limit: 100 },
+                })}
+                agentName="Builder"
+                taskTitle={null}
+            />,
+        );
+
+        expect(screen.getByTestId('session-timeline-empty')).toBeInTheDocument();
+
+        await vi.advanceTimersByTimeAsync(5_000);
+
+        await waitFor(() => expect(screen.getByText('First captured turn.')).toBeInTheDocument());
+        // No row on screen ⇒ no cursor to follow from; the poll asks for page one.
+        expect(getRunSessionDetailAction).toHaveBeenCalledWith(RUN_ID, {});
+        expect(screen.queryByTestId('session-timeline-empty')).toBeNull();
+
+        // …and the NEXT tick follows from the row it just adopted, so the
+        // adopted page becomes a real tail rather than being re-fetched.
+        getRunSessionDetailAction.mockResolvedValue({
+            ...detail(),
+            timeline: {
+                entries: [entry({ id: 'e2', text: 'Second captured turn.' })],
+                nextCursor: null,
+                limit: 100,
+            },
+        });
+        await vi.advanceTimersByTimeAsync(5_000);
+        await waitFor(() => expect(screen.getByText('Second captured turn.')).toBeInTheDocument());
+        expect(getRunSessionDetailAction).toHaveBeenLastCalledWith(RUN_ID, {
+            cursor: `${new Date('2026-08-14T10:00:00.000Z').getTime()}_e1`,
+        });
+        expect(screen.getByText('First captured turn.')).toBeInTheDocument();
     });
 
     it('⭐ a finished run neither polls nor offers steering controls', async () => {

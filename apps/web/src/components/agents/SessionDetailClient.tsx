@@ -74,6 +74,18 @@ function formatDuration(ms: number): string {
     return `${hours}h ${minutes % 60}m`;
 }
 
+/**
+ * Tool-call scale. `formatDuration` is the RUN-scale formatter (its
+ * smallest unit is a whole second), and most tool calls finish in tens of
+ * milliseconds — rendering them through it collapses every fast call to
+ * "0s" and throws away the entire point of capturing `durationMs`.
+ */
+function formatToolDuration(ms: number): string {
+    if (!Number.isFinite(ms) || ms < 0) return '—';
+    if (ms < 1000) return `${Math.round(ms)}ms`;
+    return formatDuration(ms);
+}
+
 function runDurationMs(run: AgentRunSessionDetail['run']): number | null {
     if (run.durationMs != null) return run.durationMs;
     if (!run.startedAt) return null;
@@ -122,7 +134,7 @@ function ToolCallRow({ entry }: { entry: AgentRunTimelineEntry }) {
                 <span className="truncate flex-1 min-w-0 opacity-70">{summaryPreview}</span>
                 {entry.durationMs != null && (
                     <span className="shrink-0 tabular-nums text-text-muted">
-                        {formatDuration(entry.durationMs)}
+                        {formatToolDuration(entry.durationMs)}
                     </span>
                 )}
             </summary>
@@ -237,15 +249,29 @@ export function SessionDetailClient({
      * on screen, so its page is APPENDED (deduped on id — the cursor edge
      * can legitimately re-return its own row).
      *
-     * When the caller is mid-pagination (`afterCursor` undefined because
-     * older pages are still unwalked) the poll deliberately leaves the
-     * timeline ALONE: replacing it with page one would throw away every
-     * "Load more" the reader just clicked through, every 5 seconds.
+     * `afterCursor` is undefined for TWO different reasons, and they need
+     * opposite handling:
+     *
+     *  - mid-pagination (older pages still unwalked) — leave the timeline
+     *    ALONE; replacing it with page one would throw away every "Load
+     *    more" the reader just clicked through, every 5 seconds;
+     *  - the timeline is EMPTY, so there is no row to follow from — there
+     *    is nothing to preserve, and page one IS the tail. A run opened
+     *    before its first capture row landed (a queued run, or one
+     *    dispatched a second ago — the most likely moment to drill in)
+     *    would otherwise sit on "no entries captured" forever while the
+     *    poll happily fetched the rows and dropped them.
      */
+    const timelineIsEmpty = entries.length === 0;
     const applyPolled = useCallback(
         (detail: AgentRunSessionDetail, afterCursor: string | undefined) => {
             applyRunState(detail);
-            if (afterCursor === undefined) return;
+            if (afterCursor === undefined) {
+                if (!timelineIsEmpty) return;
+                setEntries(detail.timeline.entries);
+                setNextCursor(detail.timeline.nextCursor);
+                return;
+            }
             setEntries((prev) => {
                 const known = new Set(prev.map((e) => e.id));
                 const fresh = detail.timeline.entries.filter((e) => !known.has(e.id));
@@ -253,7 +279,7 @@ export function SessionDetailClient({
             });
             if (detail.timeline.nextCursor) setNextCursor(detail.timeline.nextCursor);
         },
-        [applyRunState],
+        [applyRunState, timelineIsEmpty],
     );
 
     // 5s live-follow while the run is open (terminal runs cost zero requests).

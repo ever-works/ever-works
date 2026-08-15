@@ -87,7 +87,12 @@ column, so there is **no migration in this PR**.
   input (a terminal run costs zero requests). The poll follows from the last row on screen and
   appends (deduped on id). **Mid-pagination it refreshes only the header/chips/files and leaves
   the timeline alone** — replacing it with page one would discard the reader's "Load more"
-  clicks every 5 seconds.
+  clicks every 5 seconds. The one exception is an **empty** timeline: there is no row to follow
+  from and nothing to preserve, so page one is adopted — a run opened before its first capture
+  row landed (a queued run, the likeliest drill-in moment) must still fill in.
+- Tool-row durations render at ms resolution below a second (`formatToolDuration`); the
+  run-scale formatter's smallest unit is a whole second, which collapsed every fast tool call
+  to "0s".
 - Steering: steer input + interrupt/cancel, reusing the existing server actions.
 - Each `/agents/sessions` row body now links here; the Attach link stays a sibling so the two
   targets never nest.
