@@ -1,5 +1,5 @@
 import { DataSource } from 'typeorm';
-import { AddMemoryFolderIdToUploads1786600001000 } from '../1786600001000-AddMemoryFolderIdToUploads';
+import { AddMemoryFolderIdToUploads1786830001000 } from '../1786830001000-AddMemoryFolderIdToUploads';
 
 /**
  * Migration test for the `folderId` membership columns on BOTH upload
@@ -11,9 +11,9 @@ import { AddMemoryFolderIdToUploads1786600001000 } from '../1786600001000-AddMem
  * exactly why the migration gates it on the driver; this spec proves
  * the sqlite path (column + index, no FK) works and stays idempotent.
  */
-describe('AddMemoryFolderIdToUploads1786600001000', () => {
+describe('AddMemoryFolderIdToUploads1786830001000', () => {
     let dataSource: DataSource;
-    const migration = new AddMemoryFolderIdToUploads1786600001000();
+    const migration = new AddMemoryFolderIdToUploads1786830001000();
 
     const createUploadTables = async () => {
         // Minimal stand-ins for the real tables — only what the migration

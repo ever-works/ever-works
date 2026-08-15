@@ -30,11 +30,11 @@ syncRepo simple-json NULL, timestamps`. - `path` is the materialized absolute pa
   root). Membership only; deleting a folder unlinks (`SET NULL` FK on
   postgres + service-level unlink), never touches bytes.
 - **Migrations** (`apps/api/src/migrations/`):
-    - `1786600000000-CreateMemoryFolders.ts` — portable Table API; FK to
+    - `1786830000000-CreateMemoryFolders.ts` — portable Table API; FK to
       users (CASCADE); deliberately **no scope XOR CHECK** (the
       ScopeStampingSubscriber lesson from `CreateWorkflows`) and **no
       self-FK on parentId** (subtree deletes are one statement).
-    - `1786600001000-AddMemoryFolderIdToUploads.ts` — adds `folderId` +
+    - `1786830001000-AddMemoryFolderIdToUploads.ts` — adds `folderId` +
       index to both upload tables; FK (`ON DELETE SET NULL`) postgres-only
       (sqlite cannot add an FK without a table rebuild; service re-checks
       ownership on every write anyway).

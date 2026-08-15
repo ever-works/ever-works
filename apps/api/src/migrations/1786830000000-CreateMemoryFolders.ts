@@ -30,8 +30,8 @@ import { MigrationInterface, QueryRunner, Table, TableForeignKey, TableIndex } f
  * Portable DDL (Table/TableIndex/TableForeignKey — prod postgres, CI
  * better-sqlite3), forward-safe with an idempotent guard, house pattern.
  */
-export class CreateMemoryFolders1786600000000 implements MigrationInterface {
-    name = 'CreateMemoryFolders1786600000000';
+export class CreateMemoryFolders1786830000000 implements MigrationInterface {
+    name = 'CreateMemoryFolders1786830000000';
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         if (await queryRunner.hasTable('memory_folders')) {

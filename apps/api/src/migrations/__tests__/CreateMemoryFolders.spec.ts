@@ -1,5 +1,5 @@
 import { DataSource } from 'typeorm';
-import { CreateMemoryFolders1786600000000 } from '../1786600000000-CreateMemoryFolders';
+import { CreateMemoryFolders1786830000000 } from '../1786830000000-CreateMemoryFolders';
 
 /**
  * Migration test for the `memory_folders` table (Memory Files area).
@@ -16,9 +16,9 @@ import { CreateMemoryFolders1786600000000 } from '../1786600000000-CreateMemoryF
  *    folders service relies on for duplicate detection;
  *  - NO self-FK on parentId (subtree deletes are one statement).
  */
-describe('CreateMemoryFolders1786600000000', () => {
+describe('CreateMemoryFolders1786830000000', () => {
     let dataSource: DataSource;
-    const migration = new CreateMemoryFolders1786600000000();
+    const migration = new CreateMemoryFolders1786830000000();
 
     beforeEach(async () => {
         dataSource = new DataSource({

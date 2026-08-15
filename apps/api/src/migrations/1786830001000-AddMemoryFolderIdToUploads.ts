@@ -14,13 +14,13 @@ import { MigrationInterface, QueryRunner, TableColumn, TableIndex } from 'typeor
  * Idempotent + portable per the house pattern (guards on hasColumn, no
  * raw postgres-only DDL outside the driver check).
  */
-export class AddMemoryFolderIdToUploads1786600001000 implements MigrationInterface {
-    name = 'AddMemoryFolderIdToUploads1786600001000';
+export class AddMemoryFolderIdToUploads1786830001000 implements MigrationInterface {
+    name = 'AddMemoryFolderIdToUploads1786830001000';
 
     private static readonly TARGETS = ['user_uploads', 'work_knowledge_uploads'] as const;
 
     public async up(queryRunner: QueryRunner): Promise<void> {
-        for (const table of AddMemoryFolderIdToUploads1786600001000.TARGETS) {
+        for (const table of AddMemoryFolderIdToUploads1786830001000.TARGETS) {
             if (!(await queryRunner.hasTable(table))) continue;
             if (await queryRunner.hasColumn(table, 'folderId')) continue;
 
@@ -51,7 +51,7 @@ export class AddMemoryFolderIdToUploads1786600001000 implements MigrationInterfa
     }
 
     public async down(queryRunner: QueryRunner): Promise<void> {
-        for (const table of AddMemoryFolderIdToUploads1786600001000.TARGETS) {
+        for (const table of AddMemoryFolderIdToUploads1786830001000.TARGETS) {
             if (!(await queryRunner.hasTable(table))) continue;
             if (!(await queryRunner.hasColumn(table, 'folderId'))) continue;
 
