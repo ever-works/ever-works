@@ -76,8 +76,15 @@ are stored, so a cross-user skill id 404s without an orphan write. Cross-user re
 
 **Upload mime coercion**: the uploads spine enforces a fixed mime allow-list, and browsers report
 `.py` / `.sh` / `.toml` with exotic or empty mimes. The controller decodes the buffer as strict
-UTF-8; if that succeeds and the declared mime is neither text-like nor a known-binary the spine
-accepts, it stores as `text/plain`. The display filename and `kind` keep the real identity.
+UTF-8; if that succeeds and the declared mime is one the spine would **reject**, it stores as
+`text/plain`. The display filename and `kind` keep the real identity.
+
+The reject test is the spine's own `UploadsService.acceptsSaveFileMime` — deliberately NOT a
+`startsWith('text/')` heuristic. Review pass found that using the loose test broke the flagship case:
+Chrome and Firefox declare `.py` as `text/x-python`, which passes `startsWith('text/')` but is not in
+the spine's `TEXT_LIKE_MIMES` map, so the coercion was skipped and every script upload 400'd with
+`MimeNotAllowed`. `apps/api/src/skills/skills.controller.spec.ts` pins the hand-off against the real
+predicate so the two cannot drift again.
 
 Text uploads are secret-scanned with the **same** scanner skill bodies use (`assertNoSecrets` +
 `assertNoInjectionTokens`, inside `SkillFilesService.add`).
@@ -151,10 +158,15 @@ failing DI.
 - `NewSkillDialog` — Invocation Slug field on create.
 - `SkillsPageClient` — `/slug` chip on the skill card when set.
 - `SlashCommandAutocomplete.tsx` (new) — shared `useSlashCommands` hook + `SlashCommandPopup`.
-  Used by **both** `PromptComposer` and the **task-chat composer in `TaskDetailClient`** — task chat
-  is the surface whose messages actually run through the chat-kind pipeline, so the affordance had
-  to exist there. One module-level cache means one fetch per page load across composers; a failed
-  fetch is not cached so a later keystroke retries.
+  Mounted **only** on the **task-chat composer in `TaskDetailClient`** — task chat is the one surface
+  whose messages run through `AgentRunService` with `kind: 'chat'`, which is where a leading
+  `/<invocation-slug>` is resolved. One module-level cache means one fetch per page load across
+  composers; a failed fetch is not cached so a later keystroke retries.
+    - **Not** mounted on `PromptComposer` (review-pass fix). Every `PromptComposer` call site — `/new`,
+      `/works/new`, and the Missions / Ideas / Agents / Works quick-adds — feeds an entity-creation
+      server action, not a chat run. The popup there offered a completion the server never resolves
+      and baked a literal `"/plan "` into the created entity's description. `PromptComposer.unit.spec.tsx`
+      now pins that the popup does not open and that the composer never fetches `/api/skills/invocable`.
     - Dismissal and the highlighted index are stored against the query they belong to and derived back
       out rather than reset from an effect — `react-hooks/set-state-in-effect` is an ERROR in this
       repo's eslint config and the composer re-renders on every keystroke.
@@ -207,8 +219,11 @@ cd packages/agent && npx jest src/skills src/account-transfer \
   src/agents/__tests__/agent-tools-skill-file.spec.ts \
   src/agents/__tests__/prompt-assembler-file-manifest.spec.ts
 
-# api (Jest) — the module pin that keeps SKILL_FILE_CONTENT_READER bound
-cd apps/api && npx jest src/agents/agents.module.spec.ts
+# api (Jest) — the module pin that keeps SKILL_FILE_CONTENT_READER bound,
+# the migration, and the controller↔uploads-spine mime hand-off
+cd apps/api && npx jest src/agents/agents.module.spec.ts \
+  src/skills/skills.controller.spec.ts \
+  src/migrations/__tests__/AddSkillInvocationSlugAndSkillFiles.spec.ts
 
 # web (Vitest) — the shared slash-command autocomplete
 cd apps/web && npx vitest run src/components/skills/SlashCommandAutocomplete.unit.spec.tsx \

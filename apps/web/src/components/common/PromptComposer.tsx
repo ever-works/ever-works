@@ -26,7 +26,6 @@ import {
 import { createPortal } from 'react-dom';
 import { cn } from '@/lib/utils/cn';
 import { uploadFile, UploadError } from '@/lib/api/uploads';
-import { SlashCommandPopup, useSlashCommands } from '@/components/skills/SlashCommandAutocomplete';
 import { AttachmentStrip } from './composer/AttachmentStrip';
 import { AttachmentPreview } from './composer/AttachmentPreview';
 import { VoiceBar } from './composer/VoiceBar';
@@ -718,22 +717,15 @@ export function PromptComposer({
         return '';
     }, [attachments]);
 
-    /* ---------------------------------------------------------------- */
-    /* Slash commands (skill invocation slugs)                          */
-    /* ---------------------------------------------------------------- */
-
-    // Typing `/` as the FIRST token surfaces the user's invocation-slugged
-    // skills (GET /api/skills/invocable through the cookie→Bearer proxy).
-    // Selecting one completes the token; the server resolves it when the
-    // message is submitted. Unknown `/foo` stays plain text. Shared with
-    // the task-chat composer via the hook, so both surfaces offer the
-    // same completions off one fetch.
-    const slash = useSlashCommands({
-        value,
-        onChange,
-        disabled: inputDisabled,
-        inputRef: textareaRef,
-    });
+    // NOTE (skills / invocation slugs): this composer deliberately has NO
+    // `/slug` autocomplete. Its text never becomes an agent chat message —
+    // every call site (`/new`, `/works/new`, Missions / Ideas / Agents /
+    // Works quick-add) feeds an entity-creation server action, and only
+    // `AgentRunService` chat-kind runs resolve a leading `/<invocation-slug>`.
+    // Offering the completion here would promise an injection that never
+    // happens and would bake a literal "/plan " into the created entity's
+    // description. The popup lives on the task-chat composer
+    // (`TaskDetailClient`), which IS that surface.
 
     /* ---------------------------------------------------------------- */
     /* Text input                                                       */
@@ -762,8 +754,6 @@ export function PromptComposer({
     }, [value, autoGrow]);
 
     function onKeyDown(e: KeyboardEvent<HTMLTextAreaElement>) {
-        // Slash-command popup owns the navigation keys while open.
-        if (slash.handleKeyDown(e)) return;
         if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
             e.preventDefault();
             if (canSubmit) onSubmit();
@@ -1018,8 +1008,7 @@ export function PromptComposer({
     );
 
     return (
-        <div className={cn('relative w-full space-y-3', className)}>
-            <SlashCommandPopup state={slash} />
+        <div className={cn('w-full space-y-3', className)}>
             <div
                 onDragEnter={onDragEnter}
                 onDragOver={onDragOver}
