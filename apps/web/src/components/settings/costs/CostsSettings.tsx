@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { AlertCircle } from 'lucide-react';
 import { Link } from '@/i18n/navigation';
@@ -92,16 +92,34 @@ export function CostsSettings({ initialWindowDays, initialSnapshot }: CostsSetti
     const [loading, setLoading] = useState(false);
     const [loadFailed, setLoadFailed] = useState(false);
 
+    /**
+     * Monotonic token for the in-flight window fetch.
+     *
+     * Five requests go out per window change and nothing cancels the
+     * previous batch, so clicking 7d then 90d races two batches whose
+     * completion order is not the click order. Without this guard the
+     * SLOWER batch wins and the page renders 7d numbers under a
+     * highlighted 90d button — silently wrong spend, which is the one
+     * thing this view must never show. Stale batches still populate the
+     * cache (their data is correct for THEIR window); they just may not
+     * touch what is on screen.
+     */
+    const latestRequest = useRef(0);
+
     const handleWindowChange = async (next: CostsWindowDays) => {
         if (next === windowDays) {
             return;
         }
+        const request = latestRequest.current + 1;
+        latestRequest.current = request;
+
         setWindowDays(next);
         setLoadFailed(false);
 
         const cached = cache[next];
         if (cached) {
             setSnapshot(cached);
+            setLoading(false);
             return;
         }
 
@@ -116,11 +134,19 @@ export function CostsSettings({ initialWindowDays, initialSnapshot }: CostsSetti
             ]);
             const fresh: CostsSnapshot = { summary, daily, byAgent, byModel, topRuns };
             setCache((current) => ({ ...current, [next]: fresh }));
+            if (latestRequest.current !== request) {
+                return;
+            }
             setSnapshot(fresh);
         } catch {
+            if (latestRequest.current !== request) {
+                return;
+            }
             setLoadFailed(true);
         } finally {
-            setLoading(false);
+            if (latestRequest.current === request) {
+                setLoading(false);
+            }
         }
     };
 

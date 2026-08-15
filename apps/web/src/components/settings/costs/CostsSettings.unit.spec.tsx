@@ -302,6 +302,71 @@ describe('CostsSettings', () => {
             expect(await screen.findByTestId('costs-load-error')).toBeInTheDocument();
         });
 
+        it('ignores a slow batch for a window the user has already moved off', async () => {
+            // Five requests go out per window change and nothing cancels
+            // the previous batch. Resolving them out of click order is
+            // exactly the production case (a 7d batch on a heavy account
+            // finishing after the 90d batch); the LAST click must win, or
+            // the page shows one window's spend under another window's
+            // highlighted button.
+            const pending = new Map<string, ((value: unknown) => void)[]>();
+            const respond = (windowDays: string, totalCostCents: number) => {
+                for (const resolve of pending.get(windowDays) ?? []) {
+                    resolve({
+                        ok: true,
+                        json: async () => ({
+                            status: 'success',
+                            windowDays: Number(windowDays),
+                            from: 'F',
+                            to: 'T',
+                            totalCostCents,
+                            runsCount: 1,
+                            avgPerRunCents: totalCostCents,
+                            series: [],
+                            days: [],
+                            rows: [],
+                        }),
+                    });
+                }
+                pending.set(windowDays, []);
+            };
+
+            vi.stubGlobal(
+                'fetch',
+                vi.fn((url: string) => {
+                    const windowDays =
+                        new URLSearchParams(url.split('?')[1] ?? '').get('windowDays') ?? '';
+                    return new Promise((resolve) => {
+                        pending.set(windowDays, [...(pending.get(windowDays) ?? []), resolve]);
+                    });
+                }),
+            );
+
+            render(<CostsSettings initialWindowDays={30} initialSnapshot={snapshot()} />);
+
+            await userEvent.click(screen.getByTestId('costs-window-7'));
+            await waitFor(() => expect(pending.get('7')).toHaveLength(5));
+            await userEvent.click(screen.getByTestId('costs-window-90'));
+            await waitFor(() => expect(pending.get('90')).toHaveLength(5));
+
+            // 90d (the current selection) lands first, 7d (abandoned) after.
+            respond('90', 9000);
+            await waitFor(() =>
+                expect(screen.getByTestId('costs-tile-total')).toHaveTextContent('$90.00'),
+            );
+            respond('7', 700);
+
+            await waitFor(() =>
+                expect(screen.getByTestId('costs-window-90')).toHaveAttribute(
+                    'aria-pressed',
+                    'true',
+                ),
+            );
+            // The abandoned batch must not repaint the tiles.
+            expect(screen.getByTestId('costs-tile-total')).toHaveTextContent('$90.00');
+            expect(screen.queryByTestId('costs-load-error')).toBeNull();
+        });
+
         it('marks the active window for assistive tech', async () => {
             render(<CostsSettings initialWindowDays={30} initialSnapshot={snapshot()} />);
 

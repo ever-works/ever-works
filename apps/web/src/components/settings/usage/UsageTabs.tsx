@@ -32,7 +32,10 @@ export async function UsageTabs({ active, children }: UsageTabsProps) {
         {
             id: USAGE_TAB_COSTS,
             label: t('costs'),
-            href: `${ROUTES.DASHBOARD_USAGE}?tab=${USAGE_TAB_COSTS}`,
+            // The deep link lives in ROUTES beside every other settings
+            // destination — re-interpolating it here would give the
+            // constant no caller and let the two drift apart.
+            href: ROUTES.DASHBOARD_USAGE_COSTS,
         },
     ];
 

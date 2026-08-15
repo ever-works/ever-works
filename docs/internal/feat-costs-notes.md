@@ -140,8 +140,10 @@ cd packages/agent && npx jest --testPathPattern='subscriptions.module'
 # Controller owner-scoping, DTO allow-list, 400 mapping
 cd apps/api && npx jest --testPathPattern='costs.controller'
 
-# Migration applied + reverted against a real database, twice each
-cd apps/api && npx jest --testPathPattern='costs-dashboard-indexes'
+# Migration applied + reverted against a real database, twice each, plus the
+# guard that keeps migration specs OUT of the flat `dist/migrations/*.js`
+# runtime glob (a spec compiled into it crash-loops the API on boot).
+cd apps/api && npx jest --testPathPattern='migrations/__tests__'
 
 # Wire helpers, tab parsing, and the rendered panels + window picker
 cd apps/web && npx vitest run src/lib/api/costs.shared.unit.spec.ts \
