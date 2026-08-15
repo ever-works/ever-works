@@ -29,6 +29,35 @@ export const MEETING_SUMMARY_INPUT_MAX_CHARS = 24_000;
 export const MEETING_SUMMARY_MAX_CHARS = 4_000;
 
 /**
+ * Summarizer instructions.
+ *
+ * The summary is stored as Markdown and rendered as Markdown on
+ * `/meetings/:id`, so the shape asked for here IS the shape a reader sees.
+ * It used to ask for a few sentences plus a flat bullet list, which
+ * flattened a decision, an owner and an aside into one undifferentiated
+ * run — the reader had to re-read the summary to find the part that
+ * concerned them.
+ *
+ * Sections are conditional on purpose: a heading followed by "none" is
+ * noise, and inviting the model to fill an empty section is inviting it to
+ * invent one.
+ */
+const MEETING_SUMMARY_SYSTEM_PROMPT = [
+    'You summarize meeting transcripts into Markdown for a meeting record.',
+    '',
+    'Structure:',
+    '- Open with one short paragraph (2-4 sentences) covering what the meeting was about and what came out of it. No heading above it.',
+    '- Then add only the sections the transcript actually supports, in this order, each a `###` heading followed by bullets: Discussion, Decisions, Action items, Open questions.',
+    '- Name the owner on an action item when the transcript does; write "Unassigned" when it does not.',
+    '',
+    'Rules:',
+    '- Omit any section you have nothing for. Never write a heading followed by "none" or "N/A".',
+    '- Plain Markdown only: paragraphs, `###` headings, `-` bullets, `**bold**` for emphasis. No title heading, no code fences, no tables.',
+    '- Never invent facts, owners, dates or decisions that are not in the transcript.',
+    '- Keep the whole summary under 400 words.',
+].join('\n');
+
+/**
  * Envelope kinds the meetings processor consumes (recordings → rows).
  *
  * One processor, one path: every provider that can hand the platform a
@@ -340,8 +369,7 @@ export class MeetingsService implements OnModuleInit {
                     messages: [
                         {
                             role: 'system',
-                            content:
-                                'You summarize meeting transcripts. Write a concise summary: 2-4 sentences of what was discussed and decided, then up to 5 bullet action items when present. Never invent facts that are not in the transcript.',
+                            content: MEETING_SUMMARY_SYSTEM_PROMPT,
                         },
                         {
                             role: 'user',
@@ -349,7 +377,11 @@ export class MeetingsService implements OnModuleInit {
                         },
                     ],
                     temperature: 0.2,
-                    maxTokens: 512,
+                    // Room for the opening paragraph plus the sections the
+                    // prompt asks for. The 400-word ceiling above keeps the
+                    // result well inside MEETING_SUMMARY_MAX_CHARS, so the
+                    // stored text is never a sentence cut in half.
+                    maxTokens: 900,
                 },
                 {
                     userId: meeting.userId,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { Plus, Video } from 'lucide-react';
+import { ListFilter, Plus, Video } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { Select } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
@@ -10,6 +10,23 @@ import { PageHeader } from '@/components/common/PageHeader';
 import { MEETING_SOURCES, type MeetingSource } from '@/lib/api/meetings.shared';
 import type { Meeting } from '@/lib/api/meetings';
 import { MeetingCard } from './MeetingCard';
+import { sourceIconMap } from './meeting-ui';
+
+/**
+ * The same marks the cards carry, plus a neutral one for "Any source" —
+ * without it the trigger would lose its icon (and shift) whenever the
+ * filter is cleared.
+ */
+const SOURCE_FILTER_ICONS = {
+    ...sourceIconMap(MEETING_SOURCES),
+    any: (
+        <ListFilter
+            aria-hidden="true"
+            strokeWidth={1.75}
+            className="h-3.5 w-3.5 shrink-0 text-text-muted dark:text-text-muted-dark"
+        />
+    ),
+};
 
 /** Minimal Work reference used by the "routed to" filter. */
 export interface MeetingWorkOption {
@@ -106,10 +123,13 @@ export function MeetingsList({
                         placeholder={t('filterBar.anySource')}
                         size="xs"
                         data-testid="meetings-source-filter"
+                        iconMap={SOURCE_FILTER_ICONS}
                     >
-                        <option value="">{t('filterBar.anySource')}</option>
+                        <option value="" data-icon="any">
+                            {t('filterBar.anySource')}
+                        </option>
                         {MEETING_SOURCES.map((source) => (
-                            <option key={source} value={source}>
+                            <option key={source} value={source} data-icon={source}>
                                 {t(`sources.${source}`)}
                             </option>
                         ))}

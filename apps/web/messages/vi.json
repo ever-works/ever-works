@@ -996,7 +996,8 @@
                 "allTemplates": "All templates",
                 "yourTemplates": "Your templates",
                 "yourTemplatesEmpty": "Agents you create will appear here as reusable templates.",
-                "openInWizard": "Open in wizard"
+                "openInWizard": "Open in wizard",
+                "browsePage": "Open the full template browser"
             },
             "pageTabs": {
                 "agents": "Agents",
@@ -1149,7 +1150,8 @@
                     "showing": "Hiển thị {from}-{to} trong {total}",
                     "previous": "Trước",
                     "next": "Tiếp theo"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "newDialog": {
                 "title": "Tạo Task mới",
@@ -1385,7 +1387,8 @@
                 "filter": {
                     "scope": "Phạm vi",
                     "all": "Tất cả"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "detail": {
                 "instructions": "Hướng dẫn",
@@ -1833,7 +1836,21 @@
                     "empty": "Chưa có Work nào liên kết với Ý tưởng này."
                 },
                 "agents": {
-                    "empty": "Không có Tác nhân nào gắn với Ý tưởng này."
+                    "empty": "Không có Tác nhân nào gắn với Ý tưởng này.",
+                    "assignExisting": "Gán Tác nhân có sẵn",
+                    "assignTitle": "Gán một Tác nhân cho Ý tưởng này",
+                    "assignSubtitle": "Đưa một Tác nhân bạn đã có vào Ý tưởng này thay vì tạo thêm một Tác nhân mới.",
+                    "assignSearchPlaceholder": "Tìm Tác nhân…",
+                    "assignLoading": "Đang tải Tác nhân…",
+                    "assignNoneAvailable": "Không còn Tác nhân nào khác để gán.",
+                    "assignNoMatches": "Không có Tác nhân nào khớp với tìm kiếm đó.",
+                    "assignLoadFailed": "Không thể tải Tác nhân",
+                    "assignedToast": "Đã gán {name} cho Ý tưởng này",
+                    "assignFailed": "Không thể gán Tác nhân",
+                    "assignCancel": "Hủy",
+                    "unassign": "Gỡ khỏi Ý tưởng này",
+                    "unassignedToast": "Đã gỡ {name} khỏi Ý tưởng này",
+                    "unassignFailed": "Không thể gỡ Tác nhân"
                 },
                 "meta": {
                     "source": "Nguồn",
@@ -1853,7 +1870,8 @@
                         "idea-agents": "Không thể xóa: {count} Tác nhân đang gắn với Ý tưởng này. Hãy xóa hoặc đổi phạm vi trước.",
                         "build-in-flight": "Không thể xóa khi đang dựng. Hãy đợi hoàn tất.",
                         "unknown": "Hiện không thể xóa Ý tưởng này."
-                    }
+                    },
+                    "unlinksWorks": "Ý tưởng này liên kết với {count} Work. Work sẽ được giữ lại — chỉ liên kết bị xóa."
                 },
                 "toasts": {
                     "built": "Đã dựng Work từ Ý tưởng này",
@@ -2130,7 +2148,10 @@
                 "usageCredits": "Usage & Credits",
                 "fleet": "Fleet",
                 "jobRuntime": "Job Runtime",
-                "digest": "Digest"
+                "digest": "Digest",
+                "notifications": "Notifications",
+                "channels": "Channels",
+                "emails": "Email Addresses"
             },
             "githubApp": {
                 "title": "Cài đặt Ứng dụng GitHub",
@@ -6930,7 +6951,6 @@
             "created": "Meeting captured",
             "sections": {
                 "provenance": "Where it came from",
-                "participants": "Participants",
                 "transcript": "Transcript"
             },
             "sources": {
@@ -6953,7 +6973,6 @@
                 "externalId": "Provider meeting ID (optional)",
                 "externalIdHint": "Used to de-duplicate against a later connector sync of the same meeting.",
                 "participants": "Participants",
-                "participantsHint": "One per line. Use \"Name <email>\" to record an address.",
                 "transcript": "Transcript (optional)",
                 "transcriptPlaceholder": "Ada: shipping the gate.\nGrace: reviewing the branch.",
                 "transcriptHint": "Adding a transcript runs the summary, Memory and activity pipeline. You can also attach it later from the meeting page."
@@ -6963,6 +6982,7 @@
                 "startedAtInvalid": "Start time is not a valid date.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
+                "participantEmailInvalid": "Nhập địa chỉ email hợp lệ, hoặc để trống.",
                 "createFailed": "Couldn't capture the meeting. Please try again."
             },
             "actions": {
@@ -6971,71 +6991,94 @@
             }
         },
         "meetingDetail": {
-            "backToMeetings": "Back to Meetings",
+            "backToMeetings": "Quay lại Cuộc họp",
             "actions": {
-                "openRecording": "Open recording",
-                "delete": "Delete",
-                "attachTranscript": "Attach transcript",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
-                "save": "Save changes"
+                "openRecording": "Mở bản ghi hình",
+                "edit": "Chỉnh sửa",
+                "delete": "Xóa",
+                "attachTranscript": "Đính kèm bản ghi",
+                "attaching": "Đang đính kèm…",
+                "editTranscript": "Chỉnh sửa bản ghi",
+                "cancelEdit": "Hủy chỉnh sửa",
+                "saveTranscript": "Lưu bản ghi",
+                "savingTranscript": "Đang lưu…",
+                "save": "Lưu thay đổi",
+                "cancel": "Hủy"
             },
             "sections": {
-                "summary": "Summary",
-                "transcript": "Transcript",
-                "details": "Details",
-                "edit": "Edit meeting"
+                "summary": "Bản tóm tắt",
+                "transcript": "Bản ghi",
+                "details": "Chi tiết",
+                "edit": "Chỉnh sửa cuộc họp"
             },
             "summary": {
-                "notGenerated": "No summary was generated for this transcript. Enable an AI provider and re-attach the transcript to try again.",
-                "noTranscript": "Attach a transcript to generate a summary."
+                "generating": "Đang tạo bản tóm tắt…",
+                "generatingHint": "Đang đọc bản ghi và viết bản tóm tắt — việc này thường mất vài giây.",
+                "notGenerated": "Không có bản tóm tắt nào được tạo cho bản ghi này. Hãy bật một nhà cung cấp AI và đính kèm lại bản ghi để thử lại.",
+                "noTranscript": "Đính kèm bản ghi để tạo bản tóm tắt."
             },
             "transcript": {
-                "composerLabel": "Transcript text",
-                "composerPlaceholder": "Paste the meeting transcript here.",
-                "pipelineHint": "Stored first, then summarized, remembered and posted to your activity feed — best effort.",
-                "storedElsewhere": "The transcript is stored but was not returned with this view."
+                "composerLabel": "Nội dung bản ghi",
+                "composerPlaceholder": "Dán bản ghi cuộc họp vào đây.",
+                "pipelineHint": "Được lưu trước, sau đó tóm tắt, ghi nhớ và đăng lên bảng tin hoạt động của bạn — trong khả năng có thể.",
+                "storedElsewhere": "Bản ghi đã được lưu nhưng không được trả về cùng chế độ xem này."
             },
             "details": {
-                "source": "Source",
-                "startedAt": "Started",
-                "endedAt": "Ended",
-                "openEnded": "Still open",
-                "duration": "Duration",
-                "work": "Work",
-                "orgWide": "Org-wide",
-                "externalId": "Provider ID",
-                "createdAt": "Captured",
-                "participants": "Participants",
-                "noParticipants": "No participants recorded."
+                "source": "Nguồn",
+                "startedAt": "Bắt đầu",
+                "endedAt": "Kết thúc",
+                "openEnded": "Vẫn đang diễn ra",
+                "duration": "Thời lượng",
+                "work": "Công việc",
+                "orgWide": "Toàn tổ chức",
+                "externalId": "ID nhà cung cấp",
+                "createdAt": "Đã ghi nhận",
+                "participants": "Người tham dự",
+                "noParticipants": "Chưa ghi nhận người tham dự nào."
             },
             "edit": {
-                "hint": "Rename the meeting, close it out, point it at a recording, or re-route it to a Work."
+                "hint": "Sửa thời gian, đổi tên cuộc họp, chỉnh danh sách người tham dự, liên kết bản ghi, hoặc chuyển sang một Công việc."
             },
             "fields": {
-                "title": "Title",
-                "endedAt": "Ended at",
-                "sourceUrl": "Recording link",
-                "work": "Work",
-                "workNone": "Org-wide (no Work)"
+                "title": "Tiêu đề",
+                "startedAt": "Bắt đầu",
+                "endedAt": "Kết thúc",
+                "sourceUrl": "Liên kết bản ghi hình",
+                "work": "Công việc",
+                "workNone": "Toàn tổ chức (không có Công việc)",
+                "participants": "Người tham dự",
+                "participantName": "Tên",
+                "participantEmail": "Email (tùy chọn)",
+                "participantAdd": "Thêm người tham gia",
+                "participantRemove": "Xóa người tham gia",
+                "participantsEmpty": "Chưa có ai được ghi nhận."
             },
             "errors": {
-                "titleRequired": "Title is required.",
-                "endedAtInvalid": "End time is not a valid date.",
-                "endedBeforeStarted": "End time cannot be before the start time.",
-                "transcriptRequired": "Transcript text is required."
+                "titleRequired": "Tiêu đề là bắt buộc.",
+                "startedAtInvalid": "Thời gian bắt đầu không phải là ngày hợp lệ.",
+                "endedAtInvalid": "Thời gian kết thúc không phải là ngày hợp lệ.",
+                "endedBeforeStarted": "Thời gian kết thúc không thể trước thời gian bắt đầu.",
+                "participantEmailInvalid": "Nhập địa chỉ email hợp lệ, hoặc để trống.",
+                "participantDuplicate": "Người này đã có trong danh sách.",
+                "transcriptRequired": "Nội dung bản ghi là bắt buộc."
             },
             "toasts": {
-                "transcriptSaved": "Transcript attached",
-                "transcriptSummarized": "Transcript attached and summarized",
-                "transcriptError": "Couldn't attach the transcript.",
-                "saved": "Meeting updated",
-                "saveError": "Couldn't update the meeting.",
-                "deleted": "Meeting deleted",
-                "deleteError": "Couldn't delete the meeting."
+                "transcriptSaved": "Đã đính kèm bản ghi",
+                "transcriptSummarized": "Đã đính kèm và tóm tắt bản ghi",
+                "transcriptError": "Không thể đính kèm bản ghi.",
+                "saved": "Đã cập nhật cuộc họp",
+                "participantAdded": "Đã thêm người tham dự",
+                "saveError": "Không thể cập nhật cuộc họp.",
+                "deleted": "Đã xóa cuộc họp",
+                "deleteError": "Không thể xóa cuộc họp."
             },
-            "confirm": {
-                "delete": "Delete this meeting? Its transcript and summary will be removed. This cannot be undone."
+            "deleteDialog": {
+                "title": "Xóa cuộc họp này?",
+                "body": "{title} sẽ bị xóa vĩnh viễn, cùng với bản ghi và bản tóm tắt của nó. Không thể hoàn tác thao tác này.",
+                "confirm": "Xóa cuộc họp",
+                "cancel": "Hủy",
+                "deleting": "Đang xóa…",
+                "error": "Không thể xóa cuộc họp"
             }
         },
         "agentsPreview": {

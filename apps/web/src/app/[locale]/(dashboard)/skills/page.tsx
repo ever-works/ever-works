@@ -85,14 +85,27 @@ export default async function SkillsPage({
                 subtitle={t('subtitle')}
                 tone="success"
                 actions={
-                    <Button
-                        href={ROUTES.DASHBOARD_SKILL_NEW}
-                        size="sm"
-                        className="gap-1.5 shrink-0"
-                    >
-                        <Plus className="w-3.5 h-3.5" aria-hidden="true" />
-                        {t('list.newSkill')}
-                    </Button>
+                    <>
+                        {/* EW-058: first inbound link to the orphaned
+                            /skills/templates browser (route existed, nothing
+                            linked to it). */}
+                        <Button
+                            href={ROUTES.DASHBOARD_SKILL_TEMPLATES}
+                            variant="secondary"
+                            size="sm"
+                            className="gap-1.5 shrink-0"
+                        >
+                            {t('list.browseTemplates')}
+                        </Button>
+                        <Button
+                            href={ROUTES.DASHBOARD_SKILL_NEW}
+                            size="sm"
+                            className="gap-1.5 shrink-0"
+                        >
+                            <Plus className="w-3.5 h-3.5" aria-hidden="true" />
+                            {t('list.newSkill')}
+                        </Button>
+                    </>
                 }
             />
             <SkillsPageClient
