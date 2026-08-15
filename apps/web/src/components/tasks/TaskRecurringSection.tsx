@@ -27,6 +27,15 @@ import { clearTaskRecurringAction, setTaskRecurringAction } from '@/app/actions/
  * with no future occurrences are rejected with a clear error.
  */
 
+/* The right rail is one visual system: every section is the same neutral
+ * card under the same uppercase muted heading. Kept as constants so this
+ * section cannot drift away from `TaskBranchSection` and the Details card
+ * next to it. */
+const SECTION_CLASS =
+    'rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 space-y-3';
+const HEADING_CLASS =
+    'text-xs font-semibold uppercase tracking-wide text-text-muted flex items-center gap-2';
+
 type Frequency = 'DAILY' | 'WEEKLY' | 'MONTHLY' | 'CUSTOM';
 
 export function TaskRecurringSection({ task }: { task: Task }) {
@@ -36,6 +45,16 @@ export function TaskRecurringSection({ task }: { task: Task }) {
     return <InactivePanel task={task} />;
 }
 
+/** Rail row: fixed label column, value on the right — mirrors `DetailRow`. */
+function RecurrenceRow({ label, children }: { label: string; children: React.ReactNode }) {
+    return (
+        <div className="grid grid-cols-[5.5rem_1fr] items-start gap-3">
+            <dt className="text-xs text-text-muted pt-0.5">{label}</dt>
+            <dd className="min-w-0">{children}</dd>
+        </div>
+    );
+}
+
 function ActivePanel({ task }: { task: Task }) {
     const t = useTranslations('dashboard.tasksPage.recurring');
     const router = useRouter();
@@ -43,7 +62,7 @@ function ActivePanel({ task }: { task: Task }) {
     const [error, setError] = useState<string | null>(null);
 
     const handleStop = () => {
-        if (!confirm('Stop the recurring schedule? Existing instances stay; no new ones spawn.')) {
+        if (!confirm(t('stopConfirm'))) {
             return;
         }
         setError(null);
@@ -53,61 +72,62 @@ function ActivePanel({ task }: { task: Task }) {
                     await clearTaskRecurringAction(task.id);
                     router.refresh();
                 } catch (err) {
-                    setError(err instanceof Error ? err.message : 'Failed to stop');
+                    setError(err instanceof Error ? err.message : t('stopError'));
                 }
             })();
         });
     };
 
     return (
-        <section className="rounded-xl border border-info/30 bg-info/5 p-5 space-y-3">
-            <h2 className="text-sm font-medium text-info flex items-center gap-2">
-                <Repeat className="w-4 h-4" />
+        <section className={SECTION_CLASS} data-testid="task-recurring-section">
+            <h2 className={HEADING_CLASS}>
+                <Repeat className="w-3.5 h-3.5" />
                 {t('section')}
             </h2>
-            <dl className="grid grid-cols-[140px_1fr] gap-x-3 gap-y-1 text-xs">
-                <dt className="text-text-muted">Rule</dt>
-                <dd className="font-mono break-all text-text-secondary dark:text-text-secondary-dark">
-                    {task.recurrenceRule ?? '(unknown)'}
-                </dd>
+            <dl className="space-y-3">
+                <RecurrenceRow label={t('rule')}>
+                    <span className="text-xs font-mono break-all text-text dark:text-text-dark">
+                        {task.recurrenceRule ?? '—'}
+                    </span>
+                </RecurrenceRow>
                 {task.recurrenceTimezone && (
-                    <>
-                        <dt className="text-text-muted">Timezone</dt>
-                        <dd className="text-text-secondary">{task.recurrenceTimezone}</dd>
-                    </>
+                    <RecurrenceRow label={t('timezone')}>
+                        <span className="text-xs font-mono text-text-secondary dark:text-text-secondary-dark">
+                            {task.recurrenceTimezone}
+                        </span>
+                    </RecurrenceRow>
                 )}
                 {task.nextOccurrenceAt && (
-                    <>
-                        <dt className="text-text-muted">Next at</dt>
-                        <dd className="text-text-secondary">
+                    <RecurrenceRow label={t('nextAt')}>
+                        <span className="text-xs text-text-secondary dark:text-text-secondary-dark">
                             {new Date(task.nextOccurrenceAt).toLocaleString()}
-                        </dd>
-                    </>
+                        </span>
+                    </RecurrenceRow>
                 )}
                 {task.recurrenceEndsAt && (
-                    <>
-                        <dt className="text-text-muted">Ends</dt>
-                        <dd className="text-text-secondary">
+                    <RecurrenceRow label={t('ends')}>
+                        <span className="text-xs text-text-secondary dark:text-text-secondary-dark">
                             {new Date(task.recurrenceEndsAt).toLocaleDateString()}
-                        </dd>
-                    </>
+                        </span>
+                    </RecurrenceRow>
                 )}
                 {task.recurrenceMaxOccurrences != null && (
-                    <>
-                        <dt className="text-text-muted">Max</dt>
-                        <dd className="text-text-secondary">
+                    <RecurrenceRow label={t('max')}>
+                        <span className="text-xs text-text-secondary dark:text-text-secondary-dark">
                             {task.recurrenceOccurredCount ?? 0} / {task.recurrenceMaxOccurrences}
-                        </dd>
-                    </>
+                        </span>
+                    </RecurrenceRow>
                 )}
             </dl>
-            <div>
+            <div className="pt-2 border-t border-border/40 dark:border-border-dark/40">
                 <Button
+                    type="button"
                     size="sm"
                     variant="ghost"
                     onClick={handleStop}
                     disabled={pending}
                     className="text-danger gap-1.5"
+                    data-testid="task-recurring-demote"
                 >
                     <Trash2 className="w-3.5 h-3.5" />
                     {pending ? '…' : t('demote')}
