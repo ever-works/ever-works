@@ -1475,7 +1475,35 @@
                 "agentOff": "Agent: off",
                 "generatorOn": "Generator: on",
                 "add": "Add",
-                "adding": "Adding…"
+                "adding": "Adding…",
+                "invocation": {
+                    "title": "Invocation Slug",
+                    "helper": "Give this skill a slash command. Typing it at the start of a chat message injects the skill's full instructions into that turn.",
+                    "placeholder": "plan",
+                    "save": "Save",
+                    "saving": "Saving…",
+                    "savedNote": "Saved",
+                    "saveFailed": "Save failed"
+                },
+                "files": {
+                    "title": "Files",
+                    "helper": "Companion files the model can read on demand — scripts, reference docs, and configs. Scripts are read-only: they are never executed.",
+                    "empty": "No files yet — upload scripts, references, or configs below.",
+                    "upload": "Upload file",
+                    "uploading": "Uploading…",
+                    "uploadFailed": "Upload failed",
+                    "deleteFailed": "Remove failed",
+                    "remove": "Remove file",
+                    "kindLabel": "Kind",
+                    "kindAuto": "Auto (by extension)",
+                    "limits": "Max 2 MB per file, 20 files per skill",
+                    "kind": {
+                        "script": "Script",
+                        "reference": "Reference",
+                        "config": "Config",
+                        "asset": "Asset"
+                    }
+                }
             },
             "newPage": {
                 "title": "مهارة جديدة",
@@ -1512,7 +1540,10 @@
                 "creating": "جارٍ الإنشاء...",
                 "titleRequired": "العنوان مطلوب.",
                 "parentRequired": "اختر عنصراً أصلياً لهذا النطاق.",
-                "createFailed": "فشل إنشاء المهارة"
+                "createFailed": "فشل إنشاء المهارة",
+                "invocationLabel": "Invocation Slug (optional)",
+                "invocationPlaceholder": "plan",
+                "invocationHint": "A slash command like /plan that injects this skill into a chat message."
             }
         },
         "templatesPage": {
