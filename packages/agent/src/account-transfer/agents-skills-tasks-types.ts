@@ -32,6 +32,21 @@ export interface ExportedSkillBinding {
     injectIntoGenerator: boolean;
 }
 
+/**
+ * Skill companion-file METADATA (skill files feature). The bytes live
+ * in the uploads spine and are NOT part of the transfer envelope —
+ * `uploadId` is the content sha256, so an importing account that owns
+ * (or re-uploads) the same bytes reconnects automatically; otherwise
+ * the row is skipped on import.
+ */
+export interface ExportedSkillFile {
+    uploadId: string;
+    filename: string;
+    kind: 'script' | 'reference' | 'asset' | 'config';
+    sizeBytes: number;
+    mime: string;
+}
+
 export interface ExportedSkill {
     __kind: 'skill';
     ownerType: 'tenant' | 'mission' | 'idea' | 'work' | 'agent';
@@ -51,6 +66,13 @@ export interface ExportedSkill {
     sourceCatalogVersion: string | null;
     version: string;
     bindings: ExportedSkillBinding[];
+    /**
+     * Skill files feature (ADDITIVE tail fields — absent in older
+     * envelopes, so readers must treat both as optional):
+     * the user-facing slash command + companion-file metadata.
+     */
+    invocationSlug?: string | null;
+    files?: ExportedSkillFile[];
 }
 
 export interface ExportedTaskChatMessage {

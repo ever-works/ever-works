@@ -63,3 +63,9 @@ export * from './workflows.module';
 // (the walk). Split so the API cannot reach an executor.
 export * from './workflow-runs.service';
 export * from './workflow-run-executor.service';
+// Memory Files — folder tree + unified file list + manual git sync
+// backing the /memory Files area.
+export * from './memory-folders.service';
+export * from './memory-files.service';
+export * from './memory-folder-sync.service';
+export * from './memory-files.module';

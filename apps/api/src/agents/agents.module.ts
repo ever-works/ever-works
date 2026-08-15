@@ -13,6 +13,7 @@ import {
     AGENT_NOTIFY_CHANNEL_FACADE,
     AGENT_DOMAIN_TOOL_SOURCES,
     AGENT_MCP_TOOL_SOURCE,
+    SKILL_FILE_CONTENT_READER,
     AgentEscalationService,
     RunSteeringService,
     WorkflowGraphExecutorService,
@@ -114,6 +115,13 @@ import { McpModule, McpToolSource } from '@ever-works/agent/mcp';
 // and every tryLog() was a no-op — same wiring as works/plugins/auth.
 import { ActivityLogModule } from '@ever-works/agent/activity-log';
 import { AuthModule } from '../auth/auth.module';
+// Skill files feature — the uploads-spine content reader behind the
+// agent-side `getSkillFile` tool. The class lives in (and is exported
+// by) the api-side SkillsModule; the token binding lives HERE because
+// this module is @Global(), so the agent-side AgentToolService's
+// @Optional() @Inject(SKILL_FILE_CONTENT_READER) resolves in production.
+import { SkillsModule as ApiSkillsModule } from '../skills/skills.module';
+import { SkillFileContentReaderService } from '../skills/skill-file-content-reader.service';
 import { AgentsController } from './agents.controller';
 import { AgentTemplatesController } from './agent-templates.controller';
 import { AgentTemplateCatalogService } from './agent-template-catalog.service';
@@ -178,6 +186,11 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
         // AGENT_MCP_TOOL_SOURCE binding below. Imports nothing api-side,
         // so no cycle is introduced.
         McpModule,
+        // Skill files — supplies SkillFileContentReaderService for the
+        // SKILL_FILE_CONTENT_READER binding below. api SkillsModule
+        // imports nothing api-side beyond UploadsModule/AuthModule, so
+        // no cycle is introduced.
+        ApiSkillsModule,
     ],
     controllers: [AgentsController, AgentTemplatesController],
     providers: [
@@ -871,8 +884,13 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
         // catch. `useExisting` so the McpModule-provided singleton (with
         // its listTools TTL cache) is shared with the HTTP surface.
         { provide: AGENT_MCP_TOOL_SOURCE, useExisting: McpToolSource },
+        // Skill files — expose the uploads-spine reader to the agent-side
+        // AgentToolService (@Optional() @Inject(SKILL_FILE_CONTENT_READER)).
+        // Unbound, `getSkillFile` would list files but refuse every read.
+        { provide: SKILL_FILE_CONTENT_READER, useExisting: SkillFileContentReaderService },
     ],
     exports: [
+        SKILL_FILE_CONTENT_READER,
         AGENT_HEARTBEAT_TRIGGER,
         AGENT_RUN_CHAT_BACK_POSTER,
         AGENT_RUN_TASK_FINISHER,

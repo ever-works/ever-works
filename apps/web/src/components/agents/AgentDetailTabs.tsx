@@ -32,6 +32,11 @@ export function AgentDetailTabs({ agentId }: { agentId: string }) {
         },
         { key: 'skills', href: ROUTES.DASHBOARD_AGENT_SKILLS(agentId), label: t('skills') },
         {
+            key: 'capabilities',
+            href: ROUTES.DASHBOARD_AGENT_CAPABILITIES(agentId),
+            label: t('capabilities'),
+        },
+        {
             key: 'mcp-servers',
             href: ROUTES.DASHBOARD_AGENT_MCP_SERVERS(agentId),
             label: t('mcpServers'),

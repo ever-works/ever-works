@@ -121,10 +121,12 @@ describe('activity-log.types', () => {
             //    ingestion, audit item j) -> 121.
             // +1 idea_deleted (Idea delete, #1997) -> 122.
             // +1 agent_unarchived (Agent archive/restore, #1994) -> 123.
+            // +3 memory_folder_created / _deleted / _synced (Memory Files —
+            //    the /memory Files area folder tree) -> 126.
             // +5 mcp_connection_created / mcp_connection_updated /
             //    mcp_connection_deleted / mcp_connection_tested /
-            //    mcp_binding_updated (agent-plugins MCP slice) -> 128.
-            expect(literals).toHaveLength(128);
+            //    mcp_binding_updated (agent-plugins MCP slice) -> 131.
+            expect(literals).toHaveLength(131);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

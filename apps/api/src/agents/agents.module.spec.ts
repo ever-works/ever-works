@@ -38,6 +38,7 @@ jest.mock('@ever-works/agent/agents', () => ({
     AGENT_DOMAIN_TOOL_SOURCES: 'AGENT_DOMAIN_TOOL_SOURCES',
     // Agent Plugins MCP slice (T26) — the MCP tool-source seam.
     AGENT_MCP_TOOL_SOURCE: 'AGENT_MCP_TOOL_SOURCE',
+    SKILL_FILE_CONTENT_READER: 'SKILL_FILE_CONTENT_READER',
 }));
 jest.mock('@ever-works/agent/mcp', () => ({
     McpModule: class McpModule {},
@@ -113,6 +114,10 @@ jest.mock('@ever-works/trigger-tasks', () => ({
     TriggerService: class TriggerService {},
     agentHeartbeatTriggerAdapter: {},
     createAgentRunCancellerAdapter: () => ({}),
+}));
+jest.mock('../skills/skills.module', () => ({ SkillsModule: class SkillsModule {} }));
+jest.mock('../skills/skill-file-content-reader.service', () => ({
+    SkillFileContentReaderService: class SkillFileContentReaderService {},
 }));
 jest.mock('../email/email.module', () => ({ EmailModule: class EmailModule {} }));
 jest.mock('../email/email.service', () => ({ EmailService: class EmailService {} }));
@@ -230,6 +235,14 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
         expect(provider).toBeDefined();
         expect(provider?.useExisting).toBe(McpToolSource);
         expect(meta('exports')).toContain(AGENT_MCP_TOOL_SOURCE);
+    });
+
+    it('binds + exports SKILL_FILE_CONTENT_READER — without it getSkillFile refuses every read', () => {
+        const provider = (meta('providers') as Array<{ provide?: unknown }>).find(
+            (p) => p && typeof p === 'object' && p.provide === 'SKILL_FILE_CONTENT_READER',
+        );
+        expect(provider).toBeDefined();
+        expect(meta('exports')).toContain('SKILL_FILE_CONTENT_READER');
     });
 
     it('binds all three Task membership repositories (the commentOnTask gate is fail-closed)', () => {

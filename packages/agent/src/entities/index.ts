@@ -65,6 +65,7 @@ export * from './agent-budget.entity';
 export * from './agent-membership.entity';
 export * from './skill.entity';
 export * from './skill-binding.entity';
+export * from './skill-file.entity';
 export * from './task.entity';
 export * from './task-assignee.entity';
 export * from './task-reviewer.entity';
@@ -122,6 +123,8 @@ export * from './team-member.entity';
 export * from './team-resource.entity';
 // Inbound Triggers (Trigger Schedules) — signed webhook/API triggers that spawn Tasks
 export * from './inbound-trigger.entity';
+// Task Triggers — per-(trigger, event) fire ledger for ingest-spine idempotency
+export * from './inbound-trigger-fire.entity';
 // Event-ingest spine (Wave 6) — normalized external events awaiting fan-out
 export * from './ingested-event.entity';
 // Event-ingest pull path (Wave 8) — per-(user, plugin) pull watermarks/cursors
@@ -146,6 +149,9 @@ export * from './fleet-node.entity';
 export * from './terminal-transcript-chunk.entity';
 
 export * from './fleet-job.entity';
+// Fleet local-runner routing — per Work / Goal / account execution
+// preference (local runner vs cloud) read by the fleet run router.
+export * from './fleet-execution-preference.entity';
 // Tool-grant matrix (audit item G4) — per-scope tool allow/deny rows.
 export * from './tool-grant.entity';
 // Agent Plugins MCP slice — external MCP server connections + per-agent
@@ -156,3 +162,5 @@ export * from './workflow.entity';
 // One execution of a saved graph — what makes running a workflow leave a
 // trace instead of vanishing into a chat tool's return value.
 export * from './workflow-run.entity';
+// Memory Files — user-defined folders organizing uploads on /memory.
+export * from './memory-folder.entity';

@@ -8,6 +8,7 @@ import { RUN_COST_SETTLER } from '@ever-works/agent/database';
 import { RUN_CREDITS_PRECHECK } from '@ever-works/agent/agents';
 import { SubscriptionsController } from './subscriptions.controller';
 import { CreditsController } from './credits.controller';
+import { CostsController } from './costs.controller';
 
 /**
  * Pricing Wave 9 M2 — @Global() for the same reason as the api-side
@@ -25,7 +26,10 @@ import { CreditsController } from './credits.controller';
     imports: [AuthModule, AgentSubscriptionsModule],
     // CreditsController (pricing Wave 9 M1) — read-only credits surface
     // beside the existing plan endpoints; consumed by the Wave 13 UI.
-    controllers: [SubscriptionsController, CreditsController],
+    // CostsController — the Costs dashboard aggregations
+    // (`GET /api/usage/costs/*`); reads the same metering rows as
+    // CreditsController's usage summary, on a rolling 7/30/90-day window.
+    controllers: [SubscriptionsController, CreditsController, CostsController],
     providers: [
         // Wave 9 M2 — metering → credits debit hook (run terminal writes)
         // + the dispatch gate's soft enforcement precheck. One service

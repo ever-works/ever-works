@@ -11,6 +11,9 @@ export * from './agent-schedule-dispatcher.service';
 export * from './agent-export.service';
 export * from './prompt-assembler.service';
 export * from './agent-run.service';
+// Session detail (Feature K) — timeline-capture constants + preview
+// helpers, shared with the api-side detail endpoint.
+export * from './run-capture';
 // Judgment layer G15 — the pre-run path as a composable middleware chain.
 // Named exports (not `export *`) so the two QUEUED_REASON_* constants have
 // exactly ONE path out of this barrel: `run-dispatch-gate.service`, which
@@ -65,7 +68,11 @@ export * from './agent-email-facade';
 export * from './agent-notify-channel-facade';
 export * from './agent-plugin-tools-facade';
 export * from './agent-tools-skill';
+export * from './agent-tools-skill-file';
 export * from './agent-tool.service';
+// Capabilities tab — the static tool catalog, derived from the same
+// assembly `resolveAllowedTools` runs (never hand-maintained).
+export * from './agent-tool-catalog';
 export * from './agent-domain-tool-sources';
 // Agent Plugins MCP slice — the optional MCP tool-source seam (T26).
 export * from './agent-mcp-tool-source';
