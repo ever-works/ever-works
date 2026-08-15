@@ -279,8 +279,6 @@ export class TaskAttachmentRepository {
             .where('attachment.uploadId IN (:...uploadIds)', { uploadIds })
             .getMany();
     }
-    async add(taskId: string, uploadId: string): Promise<TaskAttachment> {
-        const entity = this.repo.create({ taskId, uploadId });
     async add(
         taskId: string,
         uploadId: string,

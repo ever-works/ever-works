@@ -74,9 +74,33 @@ describe('activity-log.types', () => {
             ['GIT_COMMITTED', 'git_committed'],
             ['GIT_MERGED', 'git_merged'],
             // Agent Collaborators — sub-agent delegation allow-list edits.
+            ['AGENT_COLLABORATOR_ENABLED', 'agent_collaborator_enabled'],
+            ['AGENT_COLLABORATOR_DISABLED', 'agent_collaborator_disabled'],
+            ['AGENT_COLLABORATOR_REMOVED', 'agent_collaborator_removed'],
+            // +3 agent_collaborator_enabled / _disabled / _removed
+            //    (Agent Collaborators allow-list edits) -> 126.
+            // +4 environment_created / environment_updated /
+            //    environment_published / environment_deleted
+            //    (Settings → Environments, #2079) -> 127.
+            // +3 memory_folder_created / _deleted / _synced (Memory Files —
+            //    the /memory Files area folder tree) -> 126.
             // MCP connections (agent-plugins MCP slice, plan §2.4) — manual
             // connection lifecycle + per-agent binding changes.
-            expect(literals).toHaveLength(157);
+            ['MCP_CONNECTION_CREATED', 'mcp_connection_created'],
+            ['MCP_CONNECTION_UPDATED', 'mcp_connection_updated'],
+            ['MCP_CONNECTION_DELETED', 'mcp_connection_deleted'],
+            ['MCP_CONNECTION_TESTED', 'mcp_connection_tested'],
+            ['MCP_BINDING_UPDATED', 'mcp_binding_updated'],
+            // +5 mcp_connection_created / mcp_connection_updated /
+            //    mcp_connection_deleted / mcp_connection_tested /
+            //    mcp_binding_updated (agent-plugins MCP slice) -> 128.
+            // +6 repo_connection_created / _updated / _deleted / _imported and
+            //    repo_attached_to_agent / repo_detached_from_agent
+            //    (repository registry, Feature G) -> 129.
+            // +2 inbox_item_created / inbox_item_answered (Inbox operator
+            //    message center) -> 125.
+            // +11 goal_* (Goals autonomy layer: loop lifecycle x5, iteration
+            //     dispatch/nudge, limit trip, DoD update, archive/unarchive) -> 134.
         ];
 
         it.each(cases)('%s → %s', (key, value) => {
@@ -118,22 +142,7 @@ describe('activity-log.types', () => {
             //    ingestion, audit item j) -> 121.
             // +1 idea_deleted (Idea delete, #1997) -> 122.
             // +1 agent_unarchived (Agent archive/restore, #1994) -> 123.
-            // +3 agent_collaborator_enabled / _disabled / _removed
-            //    (Agent Collaborators allow-list edits) -> 126.
-            // +4 environment_created / _updated / _published / _deleted
-            //    (Settings -> Environments) -> 130.
-            // +3 memory_folder_created / _deleted / _synced (Memory Files —
-            //    the /memory Files area folder tree) -> 126.
-            // +5 mcp_connection_created / mcp_connection_updated /
-            //    mcp_connection_deleted / mcp_connection_tested /
-            //    mcp_binding_updated (agent-plugins MCP slice) -> 128.
-            // +6 repo_connection_created / _updated / _deleted / _imported and
-            //    repo_attached_to_agent / repo_detached_from_agent
-            //    (repository registry, Feature G) -> 129.
-            // +2 inbox_item_created / inbox_item_answered (Inbox operator
-            //    message center) -> 125.
-            // +11 goal_* (Goals autonomy layer: loop lifecycle x5, iteration
-            //     dispatch/nudge, limit trip, DoD update, archive/unarchive) -> 134.
+            expect(literals).toHaveLength(157);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {
@@ -167,6 +176,7 @@ describe('activity-log.types', () => {
 
         it('has exactly 5 documented literal values', () => {
             const literals = Object.values(ActivityStatus).filter((v) => typeof v === 'string');
+            expect(literals).toHaveLength(5);
         });
 
         it('every literal value is unique', () => {

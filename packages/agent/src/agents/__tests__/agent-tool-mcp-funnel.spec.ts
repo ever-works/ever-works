@@ -99,6 +99,11 @@ function makeSvc(
         undefined,
         over.toolGrants,
         over.credentials,
+        // Collaborators (PR #2078) appended its two optional params ahead of
+        // the MCP slice's, so `mcpTools` sits two positions further along than
+        // it did when this branch stood alone.
+        undefined,
+        undefined,
         over.mcpTools,
     );
 }

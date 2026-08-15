@@ -95,6 +95,7 @@ export interface PipelineExecutionOptions {
 	 * forwarded verbatim to `StepExecutionContext.runtimeEnvironment`.
 	 */
 	readonly runtimeEnvironment?: RuntimeEnvironmentData;
+	/**
 	 * Repository registry (Feature G) — repos attached to the executing
 	 * agent, resolved at dispatch. Optional carrier (same posture as
 	 * `memorySessionId`): absent on plain Work-generation runs, older
