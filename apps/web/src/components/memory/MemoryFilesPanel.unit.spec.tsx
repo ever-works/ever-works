@@ -38,17 +38,32 @@ const file: MemoryFileRow = {
     updatedAt: '2026-08-02T00:00:00.000Z',
 };
 
+/** A file filed under an agent-private folder — its owner comes with it. */
+const agentFile: MemoryFileRow = {
+    id: 'up-2',
+    source: 'upload',
+    filename: 'agent-notes.md',
+    mime: 'text/markdown',
+    size: 512,
+    folderId: 'fold-2',
+    ownerAgentId: 'agent-7',
+    provenance: { chat: true },
+    updatedAt: '2026-08-03T00:00:00.000Z',
+};
+
 /** Records every request the panel makes and answers the three GETs. */
-function installFetch() {
+function installFetch(payload: { folders?: MemoryFolderNode[]; files?: MemoryFileRow[] } = {}) {
+    const folders = payload.folders ?? [folder];
+    const files = payload.files ?? [file];
     const calls: string[] = [];
     const fetchMock = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
         const url = String(input);
         calls.push(`${init?.method ?? 'GET'} ${url}`);
         if (url.startsWith('/api/memory/files/tree')) {
-            return { ok: true, status: 200, json: async () => ({ folders: [folder] }) } as Response;
+            return { ok: true, status: 200, json: async () => ({ folders }) } as Response;
         }
         if (url.startsWith('/api/memory/files?') || url === '/api/memory/files') {
-            return { ok: true, status: 200, json: async () => ({ files: [file] }) } as Response;
+            return { ok: true, status: 200, json: async () => ({ files }) } as Response;
         }
         return { ok: true, status: 200, json: async () => ({}) } as Response;
     });
@@ -121,6 +136,52 @@ describe('MemoryFilesPanel', () => {
         fireEvent.click(screen.getByTestId('memory-files-preview-up-1'));
 
         expect(screen.getByTestId('memory-files-preview')).toBeInTheDocument();
+    });
+
+    // The Global/Agents toggle sits above a table holding BOTH folder and
+    // file rows, and a file carries the ownership of the folder it is
+    // filed under. Filtering only the folder rows made "Global" show
+    // agent-private files and "Agents" show every Global file.
+    describe('scope toggle', () => {
+        it('hides agent-owned files under the Global scope', async () => {
+            installFetch({ files: [file, agentFile] });
+            render(<MemoryFilesPanel />);
+            await waitFor(() =>
+                expect(screen.getByTestId('memory-files-preview-up-2')).toBeVisible(),
+            );
+
+            fireEvent.click(screen.getByTestId('memory-files-scope-global'));
+
+            expect(screen.queryByTestId('memory-files-preview-up-2')).not.toBeInTheDocument();
+            expect(screen.getByTestId('memory-files-preview-up-1')).toBeVisible();
+        });
+
+        it('hides Global files under the Agents scope', async () => {
+            installFetch({ files: [file, agentFile] });
+            render(<MemoryFilesPanel />);
+            await waitFor(() =>
+                expect(screen.getByTestId('memory-files-preview-up-1')).toBeVisible(),
+            );
+
+            fireEvent.click(screen.getByTestId('memory-files-scope-agents'));
+
+            expect(screen.queryByTestId('memory-files-preview-up-1')).not.toBeInTheDocument();
+            expect(screen.getByTestId('memory-files-preview-up-2')).toBeVisible();
+        });
+
+        it('shows both again under the All scope', async () => {
+            installFetch({ files: [file, agentFile] });
+            render(<MemoryFilesPanel />);
+            await waitFor(() =>
+                expect(screen.getByTestId('memory-files-preview-up-1')).toBeVisible(),
+            );
+
+            fireEvent.click(screen.getByTestId('memory-files-scope-agents'));
+            fireEvent.click(screen.getByTestId('memory-files-scope-all'));
+
+            expect(screen.getByTestId('memory-files-preview-up-1')).toBeVisible();
+            expect(screen.getByTestId('memory-files-preview-up-2')).toBeVisible();
+        });
     });
 
     it('exposes a sync-target editor so a folder can be pointed at a repo', async () => {

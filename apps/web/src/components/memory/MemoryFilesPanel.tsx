@@ -142,18 +142,29 @@ export function MemoryFilesPanel() {
         return chain;
     }, [currentFolder, folders]);
 
+    // Global = not owned by any agent; Agents = owned by one. The same
+    // predicate has to answer for BOTH row kinds in the table: a file
+    // inherits the ownership of the folder it is filed under (the API
+    // resolves it into `row.ownerAgentId`), so filtering only the folder
+    // rows left agent-private files on screen under "Global" — and every
+    // unfiled (Global) file on screen under "Agents".
+    const matchesScope = useCallback(
+        (ownerAgentId: string | null) =>
+            scope === 'all' ? true : scope === 'global' ? !ownerAgentId : Boolean(ownerAgentId),
+        [scope],
+    );
+
     const childFolders = useMemo(
         () =>
             folders
                 .filter((f) => f.parentId === currentFolderId)
-                .filter((f) =>
-                    scope === 'all'
-                        ? true
-                        : scope === 'global'
-                          ? !f.ownerAgentId
-                          : Boolean(f.ownerAgentId),
-                ),
-        [folders, currentFolderId, scope],
+                .filter((f) => matchesScope(f.ownerAgentId)),
+        [folders, currentFolderId, matchesScope],
+    );
+
+    const visibleFiles = useMemo(
+        () => files.filter((row) => matchesScope(row.ownerAgentId)),
+        [files, matchesScope],
     );
 
     // A search returns rows from every folder, so folder rows (which are
@@ -566,7 +577,7 @@ export function MemoryFilesPanel() {
 
             {/* Table — OS files can also be dropped straight onto it */}
             <UploadDropZone onDrop={(dropped) => void upload(dropped)}>
-                {visibleFolders.length === 0 && files.length === 0 ? (
+                {visibleFolders.length === 0 && visibleFiles.length === 0 ? (
                     <p
                         data-testid="memory-files-empty"
                         className="text-xs text-text-muted dark:text-text-muted-dark py-6 text-center"
@@ -699,7 +710,7 @@ export function MemoryFilesPanel() {
                                             </td>
                                         </tr>
                                     ))}
-                                {files.map((row) => (
+                                {visibleFiles.map((row) => (
                                     <tr
                                         key={`${row.source}:${row.id}`}
                                         data-testid={`memory-files-row-${row.id}`}
