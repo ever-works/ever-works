@@ -134,6 +134,35 @@
                 "link": "साइन अप"
             }
         },
+        "resendVerification": {
+            "title": "Resend verification email",
+            "subtitle": "Enter your email address and we'll send a fresh verification link",
+            "form": {
+                "email": {
+                    "label": "Email address",
+                    "placeholder": "Enter your email"
+                },
+                "submit": "Send verification email",
+                "submitting": "Sending..."
+            },
+            "successTitle": "Check your email",
+            "successSubtitle": "If that address still needs verifying, a new link is on its way",
+            "success": {
+                "title": "Verification link sent — if the account needs one",
+                "message": "If an account exists for {email} and is not yet verified, we have sent a new verification link there. Nothing arrives if the address is not registered or is already verified, so double-check it for typos.",
+                "checkSpam": "If you don't see the email, check your spam folder.",
+                "linkExpiry": "Verification links are valid for 24 hours."
+            },
+            "errors": {
+                "failed": "Failed to send verification email. Please try again."
+            },
+            "alreadyVerified": "Already verified?",
+            "backToLogin": "Back to login",
+            "noAccount": {
+                "text": "Don't have an account?",
+                "link": "Sign up"
+            }
+        },
         "resetPassword": {
             "title": "अपना पासवर्ड रीसेट करें",
             "subtitle": "नीचे अपना नया पासवर्ड दर्ज करें",
@@ -168,6 +197,10 @@
             },
             "errors": {
                 "failed": "पासवर्ड रीसेट करने में विफल। कृपया पुनः प्रयास करें या नया रीसेट लिंक अनुरोध करें।",
+                "expiredToken": "This password reset link has expired. Reset links are valid for one hour — request a new one to continue.",
+                "invalidToken": "This password reset link is no longer valid. It may have already been used, or a newer link may have replaced it. Request a new one to continue.",
+                "rateLimited": "Too many attempts in a short time. Wait about a minute and try again — your reset link has not been used up.",
+                "upstream": "Something went wrong on our end, not with your link. Wait a moment and try again; if your new password already works, sign in with it instead.",
                 "noToken": "अमान्य रीसेट लिंक",
                 "invalidLink": "अमान्य रीसेट लिंक",
                 "missingTokenMessage": "पासवर्ड रीसेट लिंक अमान्य या अपूर्ण है। कृपया नया पासवर्ड रीसेट अनुरोध करें।",
@@ -7728,6 +7761,7 @@
             "signIn": "साइन इन करें",
             "createAccount": "खाता बनाएं",
             "forgotPassword": "पासवर्ड भूल गए",
+            "resendVerification": "Resend Verification Email",
             "resetPassword": "पासवर्ड रीसेट करें",
             "authError": "प्रमाणीकरण त्रुटि",
             "dashboard": "डैशबोर्ड",
@@ -7769,6 +7803,7 @@
             "unsupportedProvider": "असमर्थित प्रदाता",
             "providerConnectFailed": "प्रदाता से कनेक्ट करने में विफल",
             "forgotPasswordFailed": "पासवर्ड रीसेट ईमेल भेजने में विफल",
+            "resendVerificationFailed": "Failed to send verification email",
             "resetPasswordFailed": "पासवर्ड रीसेट करने में विफल",
             "magicLinkFailed": "Failed to send magic link",
             "magicLinkInvalid": "Invalid or expired magic link"

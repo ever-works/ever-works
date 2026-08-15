@@ -483,6 +483,203 @@ describe('AuthService', () => {
         });
     });
 
+    // EW-070 — the signed-out resend. Before this existed, an unverified user
+    // whose verification mail never arrived was locked out permanently: login
+    // answers 403, and the only resend route required the session the 403 was
+    // withholding.
+    describe('resendVerificationEmail', () => {
+        const MESSAGE = AuthService.RESEND_VERIFICATION_MESSAGE;
+
+        it('THE anti-enumeration assertion: byte-identical response for a known and an unknown address', async () => {
+            // Unknown address.
+            userRepo.findByEmail.mockResolvedValueOnce(null);
+            const unknown = await service.resendVerificationEmail({
+                email: 'nobody@x.test',
+            } as any);
+
+            // Known, unverified address — this branch really does send mail.
+            userRepo.findByEmail.mockResolvedValueOnce({
+                id: 'u-1',
+                emailVerified: false,
+                isActive: true,
+            } as any);
+            userRepo.findById.mockResolvedValue({
+                id: 'u-1',
+                emailVerified: false,
+            } as any);
+            userRepo.update.mockResolvedValue({} as any);
+            const known = await service.resendVerificationEmail({ email: 'real@x.test' } as any);
+
+            // Same keys, same values — and byte-for-byte the same serialization,
+            // which is what a caller on the wire actually compares.
+            expect(known).toEqual(unknown);
+            expect(JSON.stringify(known)).toBe(JSON.stringify(unknown));
+            expect(Object.keys(known)).toEqual(Object.keys(unknown));
+            expect(known.message).toBe(MESSAGE);
+
+            // ...and the branches really WERE different underneath, otherwise
+            // this test would pass just as happily against a stub that never
+            // sends anything.
+            expect(emitter.emit).toHaveBeenCalledTimes(1);
+        });
+
+        it('returns the same body for an ALREADY VERIFIED address, and sends nothing', async () => {
+            userRepo.findByEmail.mockResolvedValue({
+                id: 'u-2',
+                emailVerified: true,
+                isActive: true,
+            } as any);
+
+            const result = await service.resendVerificationEmail({
+                email: 'done@x.test',
+            } as any);
+
+            expect(result).toEqual({ message: MESSAGE });
+            // Resending to a verified address is pointless, and answering
+            // differently would turn this route into a verification-state oracle.
+            expect(emitter.emit).not.toHaveBeenCalled();
+            expect(userRepo.update).not.toHaveBeenCalled();
+        });
+
+        it('returns the same body for a DEACTIVATED account, and sends nothing', async () => {
+            userRepo.findByEmail.mockResolvedValue({
+                id: 'u-3',
+                emailVerified: false,
+                isActive: false,
+            } as any);
+
+            const result = await service.resendVerificationEmail({
+                email: 'suspended@x.test',
+            } as any);
+
+            expect(result).toEqual({ message: MESSAGE });
+            expect(emitter.emit).not.toHaveBeenCalled();
+        });
+
+        it('reuses the EXISTING verification-token machinery — no second token format', async () => {
+            userRepo.findByEmail.mockResolvedValue({
+                id: 'u-1',
+                emailVerified: false,
+                isActive: true,
+            } as any);
+            userRepo.findById.mockResolvedValue({ id: 'u-1', emailVerified: false } as any);
+            userRepo.update.mockResolvedValue({} as any);
+
+            await service.resendVerificationEmail({ email: 'real@x.test' } as any);
+
+            // Same event as registration's first send...
+            expect(emitter.emit).toHaveBeenCalledWith(
+                UserCreatedEvent.EVENT_NAME,
+                expect.any(UserCreatedEvent),
+            );
+            const event = emitter.emit.mock.calls[0][1] as UserCreatedEvent;
+
+            // ...same 32-byte raw token in the link (64 hex chars)...
+            expect(event.confirmationToken).toMatch(/^[0-9a-f]{64}$/);
+
+            // ...same H-01 sha256-at-rest storage in the SAME column...
+            const updateInput = userRepo.update.mock.calls[0][1];
+            expect(updateInput.emailVerificationToken).toBe(
+                createHash('sha256').update(event.confirmationToken, 'utf8').digest('hex'),
+            );
+
+            // ...and the same 24h expiry.
+            const expires = updateInput.emailVerificationExpires as Date;
+            expect(expires.getTime() - Date.now()).toBeGreaterThan(23 * 60 * 60 * 1000);
+            expect(expires.getTime() - Date.now()).toBeLessThan(25 * 60 * 60 * 1000);
+        });
+
+        it('never leaks the token in the response body (C-01)', async () => {
+            userRepo.findByEmail.mockResolvedValue({
+                id: 'u-1',
+                emailVerified: false,
+                isActive: true,
+            } as any);
+            userRepo.findById.mockResolvedValue({ id: 'u-1', emailVerified: false } as any);
+            userRepo.update.mockResolvedValue({} as any);
+
+            const result = await service.resendVerificationEmail({ email: 'real@x.test' } as any);
+            const event = emitter.emit.mock.calls[0][1] as UserCreatedEvent;
+
+            expect(JSON.stringify(result)).not.toContain(event.confirmationToken);
+            expect(Object.keys(result)).toEqual(['message']);
+        });
+
+        it('inherits the C-04 callback-host allow-list — an attacker host falls back to the platform default', async () => {
+            userRepo.findByEmail.mockResolvedValue({
+                id: 'u-1',
+                emailVerified: false,
+                isActive: true,
+            } as any);
+            userRepo.findById.mockResolvedValue({ id: 'u-1', emailVerified: false } as any);
+            userRepo.update.mockResolvedValue({} as any);
+
+            await service.resendVerificationEmail({
+                email: 'real@x.test',
+                emailVerificationCallbackUrl: 'https://attacker.example/steal',
+            } as any);
+
+            const event = emitter.emit.mock.calls[0][1] as UserCreatedEvent;
+            expect(event.confirmationUrl).toBe(
+                `https://app.test/api/auth/verify-email?token=${event.confirmationToken}`,
+            );
+        });
+
+        it('honours an ALLOWED callback host', async () => {
+            userRepo.findByEmail.mockResolvedValue({
+                id: 'u-1',
+                emailVerified: false,
+                isActive: true,
+            } as any);
+            userRepo.findById.mockResolvedValue({ id: 'u-1', emailVerified: false } as any);
+            userRepo.update.mockResolvedValue({} as any);
+
+            await service.resendVerificationEmail({
+                email: 'real@x.test',
+                emailVerificationCallbackUrl: 'https://x.test/verify',
+            } as any);
+
+            const event = emitter.emit.mock.calls[0][1] as UserCreatedEvent;
+            expect(event.confirmationUrl).toBe(
+                `https://x.test/verify?token=${event.confirmationToken}`,
+            );
+        });
+
+        it('a DOWNSTREAM FAILURE still returns the identical body — a 500 here would itself be an oracle', async () => {
+            userRepo.findByEmail.mockResolvedValue({
+                id: 'u-1',
+                emailVerified: false,
+                isActive: true,
+            } as any);
+            // sendVerificationEmail re-reads the user and throws if it is gone.
+            userRepo.findById.mockResolvedValue(null);
+
+            const result = await service.resendVerificationEmail({
+                email: 'real@x.test',
+            } as any);
+
+            expect(result).toEqual({ message: MESSAGE });
+            expect(emitter.emit).not.toHaveBeenCalled();
+        });
+
+        it('runs the timing-equalization hash on the no-user branch too (H-03)', async () => {
+            userRepo.findByEmail.mockResolvedValue(null);
+            const bcryptSpy = jest.spyOn(bcrypt, 'hash').mockResolvedValue('dummy' as never);
+            bcryptSpy.mockClear();
+
+            await service.resendVerificationEmail({ email: 'no@one.test' } as any);
+
+            // Without this, the no-user branch returns in microseconds while the
+            // user-exists branch does a DB write plus an email dispatch — and
+            // wall-clock leaks exactly what the identical body hides.
+            expect(bcryptSpy).toHaveBeenCalledTimes(1);
+            // eslint-disable-next-line @typescript-eslint/no-require-imports
+            const { getBcryptCost } = require('../providers/bcrypt-cost');
+            expect(bcryptSpy.mock.calls[0][1]).toBe(getBcryptCost());
+            bcryptSpy.mockRestore();
+        });
+    });
+
     describe('forgotPassword', () => {
         it('returns generic message and skips emit when email unknown', async () => {
             userRepo.findByEmail.mockResolvedValue(null);

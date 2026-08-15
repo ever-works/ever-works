@@ -134,6 +134,35 @@
                 "link": "S'inscrire"
             }
         },
+        "resendVerification": {
+            "title": "Resend verification email",
+            "subtitle": "Enter your email address and we'll send a fresh verification link",
+            "form": {
+                "email": {
+                    "label": "Email address",
+                    "placeholder": "Enter your email"
+                },
+                "submit": "Send verification email",
+                "submitting": "Sending..."
+            },
+            "successTitle": "Check your email",
+            "successSubtitle": "If that address still needs verifying, a new link is on its way",
+            "success": {
+                "title": "Verification link sent — if the account needs one",
+                "message": "If an account exists for {email} and is not yet verified, we have sent a new verification link there. Nothing arrives if the address is not registered or is already verified, so double-check it for typos.",
+                "checkSpam": "If you don't see the email, check your spam folder.",
+                "linkExpiry": "Verification links are valid for 24 hours."
+            },
+            "errors": {
+                "failed": "Failed to send verification email. Please try again."
+            },
+            "alreadyVerified": "Already verified?",
+            "backToLogin": "Back to login",
+            "noAccount": {
+                "text": "Don't have an account?",
+                "link": "Sign up"
+            }
+        },
         "resetPassword": {
             "title": "Réinitialiser votre mot de passe",
             "subtitle": "Saisissez votre nouveau mot de passe ci-dessous",
@@ -168,6 +197,10 @@
             },
             "errors": {
                 "failed": "Échec de la réinitialisation du mot de passe. Veuillez réessayer ou demander un nouveau lien de réinitialisation.",
+                "expiredToken": "This password reset link has expired. Reset links are valid for one hour — request a new one to continue.",
+                "invalidToken": "This password reset link is no longer valid. It may have already been used, or a newer link may have replaced it. Request a new one to continue.",
+                "rateLimited": "Too many attempts in a short time. Wait about a minute and try again — your reset link has not been used up.",
+                "upstream": "Something went wrong on our end, not with your link. Wait a moment and try again; if your new password already works, sign in with it instead.",
                 "noToken": "Lien de réinitialisation invalide",
                 "invalidLink": "Lien de réinitialisation invalide",
                 "missingTokenMessage": "Le lien de réinitialisation du mot de passe est invalide ou incomplet. Veuillez demander une nouvelle réinitialisation du mot de passe.",
@@ -7727,6 +7760,7 @@
             "signIn": "Se connecter",
             "createAccount": "Créer un compte",
             "forgotPassword": "Mot de passe oublié",
+            "resendVerification": "Resend Verification Email",
             "resetPassword": "Réinitialiser le mot de passe",
             "authError": "Erreur d'authentification",
             "dashboard": "Tableau de bord",
@@ -7768,6 +7802,7 @@
             "unsupportedProvider": "Fournisseur non pris en charge",
             "providerConnectFailed": "Échec de la connexion du fournisseur",
             "forgotPasswordFailed": "Échec de l'envoi de l'e-mail de réinitialisation du mot de passe",
+            "resendVerificationFailed": "Failed to send verification email",
             "resetPasswordFailed": "Échec de la réinitialisation du mot de passe",
             "magicLinkFailed": "Échec de l'envoi du lien magique",
             "magicLinkInvalid": "Lien magique invalide ou expiré"

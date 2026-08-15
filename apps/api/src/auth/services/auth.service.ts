@@ -31,13 +31,22 @@ import {
     UserForgotPasswordEvent,
     UserMagicLinkRequestedEvent,
 } from '../../events';
-import { ForgotPasswordDto } from '../dto/email-verification.dto';
+import { ForgotPasswordDto, ResendVerificationDto } from '../dto/email-verification.dto';
 import { RequestMagicLinkDto } from '../dto/magic-link.dto';
 import { UpdateProfileDto } from '../dto/update-profile.dto';
 import type { SocialAuthUser } from '../types/social-auth.types';
 
 @Injectable()
 export class AuthService {
+    /**
+     * EW-070 — the single body `resendVerificationEmail` answers with, on
+     * every branch. Held as a constant so the anti-enumeration test can
+     * assert the known-address and unknown-address responses are the same
+     * string rather than two independently-drifting literals.
+     */
+    static readonly RESEND_VERIFICATION_MESSAGE =
+        'If an account exists for that address and still needs verification, a verification email has been sent';
+
     private readonly logger = new Logger(AuthService.name);
 
     private webAppUrl: string;
@@ -342,6 +351,71 @@ export class AuthService {
         );
 
         return updatedUser;
+    }
+
+    /**
+     * EW-070 — signed-out resend of the email-verification link.
+     *
+     * Until this existed there was no way back in for a user whose
+     * verification mail never arrived: `login` answers 403 for an unverified
+     * address, and the only resend route (`POST /auth/send-verification`)
+     * sits behind `AuthSessionGuard` — it needs the session the 403 is
+     * withholding. That is a permanent lockout reachable by nothing worse
+     * than a slow mail server.
+     *
+     * Security properties, mirroring `forgotPassword` below:
+     *  - ANTI-ENUMERATION. Every outcome — unknown address, already-verified
+     *    address, deactivated account, unverified account that really was
+     *    mailed, downstream mailer failure — returns HTTP 200 with the
+     *    byte-identical body `RESEND_VERIFICATION_MESSAGE`. Nothing in the
+     *    response distinguishes them, so this endpoint cannot be used to
+     *    test whether an address has an account here.
+     *  - TIMING. The same throwaway bcrypt runs on every branch (see H-03 on
+     *    `forgotPassword`) so wall-clock does not leak what the body hides.
+     *  - ONE TOKEN FORMAT. The mail itself is issued by the existing
+     *    `sendVerificationEmail`, so this shares the 32-byte token, the
+     *    sha256-at-rest storage (H-01), the 24h expiry, the callback-host
+     *    allow-list (C-04) and the `UserCreatedEvent` mail path. No second
+     *    token format is introduced.
+     *
+     * Rate limiting lives on the controller (`@Throttle`) — without it this
+     * is a mail cannon aimed at any address an attacker names.
+     */
+    async resendVerificationEmail(resendVerificationDto: ResendVerificationDto) {
+        // Same expensive work on every branch before any branch-specific
+        // behaviour, so timing cannot separate "account exists and is
+        // unverified" from the three silent branches below.
+        await this.randomHashedPassword().catch(() => undefined);
+
+        const user = await this.userRepository.findByEmail(resendVerificationDto.email);
+
+        // Three silent branches, one shared body:
+        //  - no account for this address,
+        //  - the address is already verified (resending would be pointless
+        //    and lets an attacker probe verification state),
+        //  - the account is deactivated (do not mail it; a suspension must
+        //    not become a mail-cannon trigger).
+        const shouldSend = Boolean(user) && !user!.emailVerified && user!.isActive !== false;
+
+        if (shouldSend) {
+            try {
+                await this.sendVerificationEmail(
+                    user!.id,
+                    resendVerificationDto.emailVerificationCallbackUrl,
+                );
+            } catch (error) {
+                // A downstream failure must NOT change the response — a 500
+                // here where an unknown address gets a 200 is itself an
+                // enumeration oracle. Log for operators, answer identically.
+                this.logger.error(
+                    `Failed to resend verification email for user ${user!.id}: ${
+                        error instanceof Error ? error.message : String(error)
+                    }`,
+                );
+            }
+        }
+
+        return { message: AuthService.RESEND_VERIFICATION_MESSAGE };
     }
 
     async forgotPassword(forgotPasswordDto: ForgotPasswordDto) {

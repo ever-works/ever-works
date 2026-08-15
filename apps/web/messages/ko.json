@@ -134,6 +134,35 @@
                 "link": "회원가입"
             }
         },
+        "resendVerification": {
+            "title": "Resend verification email",
+            "subtitle": "Enter your email address and we'll send a fresh verification link",
+            "form": {
+                "email": {
+                    "label": "Email address",
+                    "placeholder": "Enter your email"
+                },
+                "submit": "Send verification email",
+                "submitting": "Sending..."
+            },
+            "successTitle": "Check your email",
+            "successSubtitle": "If that address still needs verifying, a new link is on its way",
+            "success": {
+                "title": "Verification link sent — if the account needs one",
+                "message": "If an account exists for {email} and is not yet verified, we have sent a new verification link there. Nothing arrives if the address is not registered or is already verified, so double-check it for typos.",
+                "checkSpam": "If you don't see the email, check your spam folder.",
+                "linkExpiry": "Verification links are valid for 24 hours."
+            },
+            "errors": {
+                "failed": "Failed to send verification email. Please try again."
+            },
+            "alreadyVerified": "Already verified?",
+            "backToLogin": "Back to login",
+            "noAccount": {
+                "text": "Don't have an account?",
+                "link": "Sign up"
+            }
+        },
         "resetPassword": {
             "title": "비밀번호 재설정",
             "subtitle": "아래에 새 비밀번호 입력",
@@ -168,6 +197,10 @@
             },
             "errors": {
                 "failed": "비밀번호 재설정 실패. 다시 시도하거나 새 재설정 링크를 요청해 주세요.",
+                "expiredToken": "This password reset link has expired. Reset links are valid for one hour — request a new one to continue.",
+                "invalidToken": "This password reset link is no longer valid. It may have already been used, or a newer link may have replaced it. Request a new one to continue.",
+                "rateLimited": "Too many attempts in a short time. Wait about a minute and try again — your reset link has not been used up.",
+                "upstream": "Something went wrong on our end, not with your link. Wait a moment and try again; if your new password already works, sign in with it instead.",
                 "noToken": "잘못된 재설정 링크",
                 "invalidLink": "잘못된 재설정 링크",
                 "missingTokenMessage": "비밀번호 재설정 링크가 유효하지 않거나 불완전합니다. 새 비밀번호 재설정을 요청해 주세요.",
@@ -7728,6 +7761,7 @@
             "signIn": "로그인",
             "createAccount": "계정 생성",
             "forgotPassword": "비밀번호 찾기",
+            "resendVerification": "Resend Verification Email",
             "resetPassword": "비밀번호 재설정",
             "authError": "인증 오류",
             "dashboard": "대시보드",
@@ -7769,6 +7803,7 @@
             "unsupportedProvider": "지원되지 않는 공급자",
             "providerConnectFailed": "공급자 연결 실패",
             "forgotPasswordFailed": "비밀번호 재설정 이메일 발송 실패",
+            "resendVerificationFailed": "Failed to send verification email",
             "resetPasswordFailed": "비밀번호 재설정 실패",
             "magicLinkFailed": "Failed to send magic link",
             "magicLinkInvalid": "Invalid or expired magic link"

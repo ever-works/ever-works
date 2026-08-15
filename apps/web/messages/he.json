@@ -134,6 +134,35 @@
                 "link": "הירשם"
             }
         },
+        "resendVerification": {
+            "title": "Resend verification email",
+            "subtitle": "Enter your email address and we'll send a fresh verification link",
+            "form": {
+                "email": {
+                    "label": "Email address",
+                    "placeholder": "Enter your email"
+                },
+                "submit": "Send verification email",
+                "submitting": "Sending..."
+            },
+            "successTitle": "Check your email",
+            "successSubtitle": "If that address still needs verifying, a new link is on its way",
+            "success": {
+                "title": "Verification link sent — if the account needs one",
+                "message": "If an account exists for {email} and is not yet verified, we have sent a new verification link there. Nothing arrives if the address is not registered or is already verified, so double-check it for typos.",
+                "checkSpam": "If you don't see the email, check your spam folder.",
+                "linkExpiry": "Verification links are valid for 24 hours."
+            },
+            "errors": {
+                "failed": "Failed to send verification email. Please try again."
+            },
+            "alreadyVerified": "Already verified?",
+            "backToLogin": "Back to login",
+            "noAccount": {
+                "text": "Don't have an account?",
+                "link": "Sign up"
+            }
+        },
         "resetPassword": {
             "title": "אפס את הסיסמה שלך",
             "subtitle": "הזן את הסיסמה החדשה למטה",
@@ -168,6 +197,10 @@
             },
             "errors": {
                 "failed": "נכשל לאפס סיסמה. נסה שוב או בקש קישור איפוס חדש.",
+                "expiredToken": "This password reset link has expired. Reset links are valid for one hour — request a new one to continue.",
+                "invalidToken": "This password reset link is no longer valid. It may have already been used, or a newer link may have replaced it. Request a new one to continue.",
+                "rateLimited": "Too many attempts in a short time. Wait about a minute and try again — your reset link has not been used up.",
+                "upstream": "Something went wrong on our end, not with your link. Wait a moment and try again; if your new password already works, sign in with it instead.",
                 "noToken": "קישור איפוס לא תקין",
                 "invalidLink": "קישור איפוס לא תקין",
                 "missingTokenMessage": "קישור איפוס הסיסמה לא תקין או חלקי. בקש איפוס סיסמה חדש.",
@@ -7727,6 +7760,7 @@
             "signIn": "התחבר",
             "createAccount": "צור חשבון",
             "forgotPassword": "שכחת סיסמה",
+            "resendVerification": "Resend Verification Email",
             "resetPassword": "אפס סיסמה",
             "authError": "שגיאת אימות",
             "dashboard": "לוח בקרה",
@@ -7768,6 +7802,7 @@
             "unsupportedProvider": "ספק לא נתמך",
             "providerConnectFailed": "נכשל בחיבור לספק",
             "forgotPasswordFailed": "נכשל בשליחת דוא\"ל איפוס סיסמה",
+            "resendVerificationFailed": "Failed to send verification email",
             "resetPasswordFailed": "נכשל באיפוס סיסמה",
             "magicLinkFailed": "Failed to send magic link",
             "magicLinkInvalid": "Invalid or expired magic link"
