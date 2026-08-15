@@ -153,3 +153,5 @@ export * from './workflow.entity';
 // One execution of a saved graph — what makes running a workflow leave a
 // trace instead of vanishing into a chat tool's return value.
 export * from './workflow-run.entity';
+// Memory Files — user-defined folders organizing uploads on /memory.
+export * from './memory-folder.entity';
