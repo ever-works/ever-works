@@ -206,6 +206,9 @@ export const ROUTES = {
     // Payment-method management (billing PRD §3.3, audit B10 + B25).
     DASHBOARD_SETTINGS_PAYMENT_METHOD: '/settings/billing/payment-method',
     DASHBOARD_USAGE: '/settings/usage',
+    // Costs dashboard — a tab of the Usage & Credits page, not its own
+    // route, so the settings nav keeps ONE entry for the whole surface.
+    DASHBOARD_USAGE_COSTS: '/settings/usage?tab=costs',
     // Dynamic plugin settings routes
     DASHBOARD_SETTINGS_PLUGIN_CATEGORY: (category: string) => `/settings/plugins/${category}`,
     // Profile (alias of settings — `/profile` redirects to `/settings`)

@@ -3334,6 +3334,11 @@
                 "export": {
                     "csv": "Export CSV",
                     "csvHint": "Download every usage event in {period} as a CSV file"
+                },
+                "tabs": {
+                    "label": "Usage views",
+                    "overview": "Overview",
+                    "costs": "Costs"
                 }
             },
             "digest": {
@@ -3370,6 +3375,63 @@
                     "saveError": "Failed to save the digest settings",
                     "noOrg": "No active organization for this session, so there is no organization digest to configure. Create or switch to an organization first.",
                     "noAiProvider": "No AI provider is configured, so digests will arrive without the written summary. Every count is still computed and delivered."
+                }
+            },
+            "costs": {
+                "title": "Costs",
+                "subtitle": "Total AI spend for the selected window, and where it went — by day, agent, model and run.",
+                "loadError": "Some cost data could not be loaded. Refresh the page to try again.",
+                "loading": "Loading…",
+                "empty": "No spend in this window.",
+                "cacheHitNote": "Cache-hit rate is not shown: the metering path does not record cached-read tokens yet.",
+                "window": {
+                    "label": "Reporting window",
+                    "days": "{days}d"
+                },
+                "tiles": {
+                    "total": "Total spend",
+                    "runs": "Agent runs",
+                    "avgPerRun": "Average per run"
+                },
+                "panels": {
+                    "daily": "Spend per day, by agent",
+                    "byAgent": "By agent",
+                    "byModel": "By model",
+                    "topRuns": "Most expensive runs"
+                },
+                "series": {
+                    "other": "Other agents",
+                    "unattributed": "Unattributed",
+                    "unknownAgent": "Deleted agent",
+                    "noModel": "No model"
+                },
+                "byAgent": {
+                    "colAgent": "Agent",
+                    "colCost": "Cost",
+                    "colRuns": "Runs",
+                    "colAvg": "Avg / run"
+                },
+                "topRuns": {
+                    "colCost": "Cost",
+                    "colAgent": "Agent",
+                    "colTask": "Task",
+                    "colModel": "Model",
+                    "colStarted": "Started",
+                    "colStatus": "Status",
+                    "noTask": "{trigger} run",
+                    "runHint": "Run {runId}",
+                    "empty": "No runs with settled cost in this window.",
+                    "status": {
+                        "queued": "Queued",
+                        "running": "Running",
+                        "completed": "Completed",
+                        "failed": "Failed",
+                        "cancelled": "Cancelled"
+                    }
+                },
+                "byModel": {
+                    "units": "{units} units",
+                    "total": "{total} across all models in this window"
                 }
             }
         },
