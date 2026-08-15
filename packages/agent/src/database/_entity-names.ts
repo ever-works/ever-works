@@ -49,6 +49,7 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'AgentActionProposal',
     'AgentAttachment',
     'AgentBudget',
+    'AgentCollaborator',
     'AgentEmailAssignment',
     'AgentEscalation',
     'AgentMembership',

@@ -906,7 +906,8 @@
                 "skills": "Умения",
                 "budgets": "Бюджети",
                 "settings": "Настройки",
-                "terminal": "Terminal"
+                "terminal": "Terminal",
+                "collaborators": "Collaborators"
             },
             "newDialog": {
                 "title": "Нов Агент",
@@ -1089,6 +1090,16 @@
                 "confirm": "Изтрий завинаги",
                 "success": "{name} е изтрит",
                 "error": "Агентът не можа да бъде изтрит"
+            },
+            "collaborators": {
+                "title": "Collaborator Agents",
+                "description": "Select which agents this agent can spawn as collaborators for subtasks. Delegations to agents that are not enabled here are refused.",
+                "empty": "No other agents yet. Create another agent to enable it as a collaborator.",
+                "enabledCount": "{count} enabled",
+                "noTitle": "No role set",
+                "toggleFailed": "Could not update collaborator",
+                "reset": "Clear rule",
+                "legacyNote": "With no collaborators enabled, this agent can only delegate subtasks to itself."
             }
         },
         "tasksPage": {

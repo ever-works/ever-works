@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+	evaluateCollaboratorDelegation,
 	filterToolNamesBySubAgentScope,
 	isSubAgentDelegationSuccessful,
 	isSubAgentScopeSubset,
@@ -41,6 +42,7 @@ describe('delegation vocabularies', () => {
 	it('pins the refusal codes', () => {
 		expect([...SUB_AGENT_DELEGATION_REFUSAL_CODES].sort()).toEqual([
 			'budget-exceeded',
+			'collaborator-not-allowed',
 			'depth-exceeded',
 			'fanout-exceeded',
 			'invalid-request',
@@ -248,5 +250,59 @@ describe('filterToolNamesBySubAgentScope', () => {
 			allowedTools: ['read_file', 'deploy']
 		});
 		expect(result).toEqual(['read_file']);
+	});
+});
+
+describe('evaluateCollaboratorDelegation', () => {
+	const PARENT = 'agent-parent';
+	const CHILD = 'agent-child';
+
+	it('always allows self-delegation — empty childAgentId', () => {
+		expect(evaluateCollaboratorDelegation(PARENT, null, [])).toEqual({ allowed: true });
+		expect(evaluateCollaboratorDelegation(PARENT, undefined, [])).toEqual({ allowed: true });
+	});
+
+	it('always allows self-delegation — childAgentId equal to the parent', () => {
+		expect(evaluateCollaboratorDelegation(PARENT, PARENT, [])).toEqual({ allowed: true });
+	});
+
+	it('refuses a foreign child when no rules are configured (legacy: self only)', () => {
+		const decision = evaluateCollaboratorDelegation(PARENT, CHILD, []);
+		expect(decision.allowed).toBe(false);
+		if (decision.allowed === false) {
+			expect(decision.refusalCode).toBe('collaborator-not-allowed');
+			expect(decision.message).toContain('not an enabled collaborator');
+		}
+	});
+
+	it('allows a child with an enabled collaborator rule', () => {
+		const decision = evaluateCollaboratorDelegation(PARENT, CHILD, [{ collaboratorAgentId: CHILD, enabled: true }]);
+		expect(decision).toEqual({ allowed: true });
+	});
+
+	it('refuses a child whose rule is disabled — and says so', () => {
+		const decision = evaluateCollaboratorDelegation(PARENT, CHILD, [
+			{ collaboratorAgentId: CHILD, enabled: false }
+		]);
+		expect(decision.allowed).toBe(false);
+		if (decision.allowed === false) {
+			expect(decision.refusalCode).toBe('collaborator-not-allowed');
+			expect(decision.message).toContain('disabled');
+		}
+	});
+
+	it('refuses a child not present in a non-empty rule set', () => {
+		const decision = evaluateCollaboratorDelegation(PARENT, CHILD, [
+			{ collaboratorAgentId: 'agent-other', enabled: true }
+		]);
+		expect(decision.allowed).toBe(false);
+	});
+
+	it('an enabled rule for one agent does not open the door for another', () => {
+		const decision = evaluateCollaboratorDelegation(PARENT, 'agent-third', [
+			{ collaboratorAgentId: CHILD, enabled: true },
+			{ collaboratorAgentId: 'agent-third', enabled: false }
+		]);
+		expect(decision.allowed).toBe(false);
 	});
 });

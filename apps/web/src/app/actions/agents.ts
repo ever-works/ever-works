@@ -416,3 +416,29 @@ export async function listRunSessionsAction(query: ListRunSessionsQuery = {}) {
     await ensureAuth();
     return agentsAPI.listSessions(query);
 }
+
+// ── Agent Collaborators — sub-agent delegation allow-list ──
+
+/** Read-only refresh for the Collaborators tab (no revalidate — a poll). */
+export async function listAgentCollaboratorsAction(agentId: string) {
+    await ensureAuth();
+    return agentsAPI.listCollaborators(agentId);
+}
+
+export async function setAgentCollaboratorAction(
+    agentId: string,
+    collaboratorAgentId: string,
+    enabled: boolean,
+) {
+    await ensureAuth();
+    const result = await agentsAPI.setCollaborator(agentId, collaboratorAgentId, enabled);
+    revalidatePath(`/agents/${agentId}/collaborators`);
+    return result;
+}
+
+export async function removeAgentCollaboratorAction(agentId: string, collaboratorAgentId: string) {
+    await ensureAuth();
+    const result = await agentsAPI.removeCollaborator(agentId, collaboratorAgentId);
+    revalidatePath(`/agents/${agentId}/collaborators`);
+    return result;
+}

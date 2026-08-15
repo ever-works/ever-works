@@ -112,6 +112,11 @@ jest.mock('../email/email.module', () => ({ EmailModule: class EmailModule {} })
 jest.mock('../email/email.service', () => ({ EmailService: class EmailService {} }));
 jest.mock('../auth/auth.module', () => ({ AuthModule: class AuthModule {} }));
 jest.mock('./agents.controller', () => ({ AgentsController: class AgentsController {} }));
+// Agent Collaborators — same stub posture as the sibling controllers so
+// the decorator-metadata assertions never drag the DTO/entity graph in.
+jest.mock('./agent-collaborators.controller', () => ({
+    AgentCollaboratorsController: class AgentCollaboratorsController {},
+}));
 jest.mock('./agent-templates.controller', () => ({
     AgentTemplatesController: class AgentTemplatesController {},
 }));
