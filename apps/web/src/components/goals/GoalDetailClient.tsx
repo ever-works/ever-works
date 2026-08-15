@@ -24,14 +24,9 @@ import { StatusPill } from '@/components/work-agent';
 import { Select } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils/cn';
-import {
-    MAX_NUDGE_CHARS,
-    type Goal,
-    type GoalEvent,
-    type GoalMetricSample,
-    type GoalOutcome,
-    type GoalSession,
-} from '@/lib/api/goals';
+// Value import from `goals.shared`; `@/lib/api/goals` is `server-only`.
+import { MAX_NUDGE_CHARS } from '@/lib/api/goals.shared';
+import type { Goal, GoalEvent, GoalMetricSample, GoalOutcome, GoalSession } from '@/lib/api/goals';
 import { COMPARATOR_GLYPH, OutcomeBadge, formatDateTime, formatMetricValue } from './goal-ui';
 import { DodRollup, LoopStatusBadge, formatCents } from './goal-loop-ui';
 import { Sparkline } from './Sparkline';

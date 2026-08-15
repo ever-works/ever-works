@@ -6,13 +6,16 @@ import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+// Runtime constants come from `goals.shared` — `@/lib/api/goals` is
+// `server-only` and a VALUE import from a `'use client'` module pulls it into
+// the client bundle (build error). Types are erased, so `import type` from the
+// barrel stays fine.
 import {
     MAX_DOD_NOTE_CHARS,
     MAX_DOD_TEXT_CHARS,
     MAX_GOAL_DOD_CRITERIA,
-    type Goal,
-    type GoalDoDCriterion,
-} from '@/lib/api/goals';
+} from '@/lib/api/goals.shared';
+import type { Goal, GoalDoDCriterion } from '@/lib/api/goals';
 import { cn } from '@/lib/utils/cn';
 import { DodProgressBar, DodRollup } from './goal-loop-ui';
 import { approveGoalDodAction, patchGoalDodCriterionAction, setGoalDodAction } from './actions';

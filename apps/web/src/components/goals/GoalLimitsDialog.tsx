@@ -14,12 +14,9 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select } from '@/components/ui/select';
-import {
-    GOAL_EXECUTION_TARGETS,
-    type Goal,
-    type GoalExecutionTarget,
-    type UpdateGoalLimitsInput,
-} from '@/lib/api/goals';
+// Value import from `goals.shared`; `@/lib/api/goals` is `server-only`.
+import { GOAL_EXECUTION_TARGETS } from '@/lib/api/goals.shared';
+import type { Goal, GoalExecutionTarget, UpdateGoalLimitsInput } from '@/lib/api/goals';
 import { updateGoalLimitsAction } from './actions';
 
 /**
