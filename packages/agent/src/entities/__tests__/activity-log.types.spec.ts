@@ -76,7 +76,7 @@ describe('activity-log.types', () => {
             // Agent Collaborators — sub-agent delegation allow-list edits.
             // MCP connections (agent-plugins MCP slice, plan §2.4) — manual
             // connection lifecycle + per-agent binding changes.
-            expect(literals).toHaveLength(138);
+            expect(literals).toHaveLength(144);
         ];
 
         it.each(cases)('%s → %s', (key, value) => {

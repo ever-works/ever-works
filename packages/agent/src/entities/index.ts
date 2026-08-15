@@ -77,6 +77,8 @@ export * from './task-chat-message.entity';
 export * from './task-attachment.entity';
 export * from './task-watcher.entity';
 export * from './task-kb-mention.entity';
+export * from './task-template.entity';
+export * from './task-template-step.entity';
 export * from './user-task-counter.entity';
 export * from './mission-attachment.entity';
 export * from './mission-work.entity';

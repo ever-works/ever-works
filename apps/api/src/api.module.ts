@@ -54,6 +54,7 @@ import { SkillsModule } from './skills/skills.module';
 import { McpConnectionsModule } from './mcp-connections/mcp-connections.module';
 import { RepoConnectionsModule } from './repo-connections/repo-connections.module';
 import { TasksModule } from './tasks/tasks.module';
+import { TaskTemplatesModule } from './task-templates/task-templates.module';
 import { WorkflowsModule } from './workflows/workflows.module';
 import { TerminalModule } from './terminal/terminal.module';
 import { TeamsModule } from './teams/teams.module';
@@ -200,6 +201,8 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // Phase 12 — Tasks API (CRUD + transitions + member CRUD).
         // Chat + attachments + per-task spend land in Phase 13.
         TasksModule,
+        // Tasks upgrades — workflow Task Templates (CRUD + instantiate).
+        TaskTemplatesModule,
         // Saved workflow graphs (judgment layer G5) — the persistence and
         // CRUD surface for graphs the executor could already run but
         // nothing could keep.
