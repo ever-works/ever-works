@@ -4,10 +4,11 @@ jest.mock('../../auth', () => ({
 }));
 
 import { BadRequestException, ServiceUnavailableException } from '@nestjs/common';
+import { Test, TestingModule } from '@nestjs/testing';
 import { TranscriptionController } from './transcription.controller';
-import { TranscriptionNotConfiguredError } from '@ever-works/agent/facades';
-import type { AiFacadeService } from '@ever-works/agent/facades';
-import type { PluginOperationsService } from '@ever-works/agent/plugins';
+import { AiFacadeService, TranscriptionNotConfiguredError } from '@ever-works/agent/facades';
+import { PluginOperationsService } from '@ever-works/agent/plugins';
+import { AuthSessionGuard } from '../../auth';
 import type { AuthenticatedUser } from '../../auth/types/auth.types';
 
 /**
@@ -40,7 +41,7 @@ describe('TranscriptionController', () => {
     let pluginOperations: { getGlobalVoiceDefault: jest.Mock };
     let controller: TranscriptionController;
 
-    beforeEach(() => {
+    beforeEach(async () => {
         aiFacade = {
             transcribe: jest.fn().mockResolvedValue({ text: 'hello world', model: 'whisper-1' }),
             listTranscriptionProviders: jest.fn().mockResolvedValue([
@@ -53,10 +54,21 @@ describe('TranscriptionController', () => {
         pluginOperations = { getGlobalVoiceDefault: jest.fn().mockResolvedValue(null) };
         delete process.env.TRANSCRIPTION_PROVIDER_ID;
         delete process.env.KB_TRANSCRIPTION_PROVIDER_ID;
-        controller = new TranscriptionController(
-            aiFacade as unknown as AiFacadeService,
-            pluginOperations as unknown as PluginOperationsService,
-        );
+        // Resolve the controller through Nest rather than `new`-ing it, so the
+        // DI wiring itself is under test: a constructor parameter that loses
+        // its decorator, or a provider token that stops matching, fails here
+        // instead of at boot.
+        const moduleRef: TestingModule = await Test.createTestingModule({
+            controllers: [TranscriptionController],
+            providers: [
+                { provide: AiFacadeService, useValue: aiFacade },
+                { provide: PluginOperationsService, useValue: pluginOperations },
+            ],
+        })
+            .overrideGuard(AuthSessionGuard)
+            .useValue({ canActivate: () => true })
+            .compile();
+        controller = moduleRef.get(TranscriptionController);
     });
 
     afterEach(() => jest.restoreAllMocks());

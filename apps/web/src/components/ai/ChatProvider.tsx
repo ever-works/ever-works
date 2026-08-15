@@ -72,7 +72,6 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     const t = useTranslations('dashboard.aiChat');
     const pathname = usePathname();
     const pathnameRef = useRef(pathname);
-    pathnameRef.current = pathname;
     const [providers, setProviders] = useState<ProviderOption[]>([]);
     const [selectedProvider, setSelectedProvider] = useLocalStorage<string>(
         'chat-ai-provider',
@@ -99,19 +98,33 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
     const conversationIdRef = useRef<string | null>(persistedConvId || null);
     const selectedProviderRef = useRef(selectedProvider);
-    selectedProviderRef.current = selectedProvider;
 
     // Which model the composer is actually pinned to right now. A thread that
     // exists owns its pin; before that, the browser-level seed does. Derived
     // rather than stored so the two can never disagree.
     const selectedModel = conversationId ? threadModel : seedModel || null;
     const selectedModelRef = useRef(selectedModel);
-    selectedModelRef.current = selectedModel;
 
     const chat = useChat({ id: 'ever-works-chat', transport });
 
     const chatRef = useRef(chat);
-    chatRef.current = chat;
+
+    // Keep the "latest value" refs current WITHOUT writing during render.
+    // These four exist so the long-lived callbacks below (sendMessage, the
+    // conversation loaders) can read today's value without taking it as a
+    // dependency and re-creating themselves on every keystroke. Assigning
+    // `.current` in the render body is what `react-hooks/refs` forbids — a
+    // render may be thrown away or replayed, which would publish a value that
+    // was never committed. Syncing here instead runs after every commit, so
+    // the refs are up to date by the time any handler or effect can read
+    // them, and every consumer below is exactly that. No dependency array on
+    // purpose: "after every render" IS the contract.
+    useEffect(() => {
+        pathnameRef.current = pathname;
+        selectedProviderRef.current = selectedProvider;
+        selectedModelRef.current = selectedModel;
+        chatRef.current = chat;
+    });
 
     // Restore active conversation on mount if messages are empty
     const hasRestoredRef = useRef(false);
