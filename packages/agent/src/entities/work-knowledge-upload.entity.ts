@@ -137,6 +137,16 @@ export class WorkKnowledgeUpload {
     @Column({ type: 'simple-json', nullable: true })
     metadata?: Record<string, unknown> | null;
 
+    /**
+     * Memory Files — the `memory_folders` row this original is filed
+     * under in the /memory Files area. NULL = unfiled (root). Raw uuid +
+     * FK by migration (EW-654 no-cycle rule); membership only — deleting
+     * a folder unlinks (SET NULL) and never touches the bytes or the
+     * extraction lifecycle.
+     */
+    @Column({ type: 'uuid', nullable: true })
+    folderId?: string | null;
+
     // Tenant + Organization scope FKs (EW-657 Tier C denormalization).
     // No @ManyToOne — cycle-avoidance, see user.entity.ts EW-654 comment.
     @Column({ type: 'uuid', nullable: true })

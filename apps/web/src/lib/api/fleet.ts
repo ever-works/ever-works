@@ -24,6 +24,10 @@ import type {
     FleetNodeDetailView,
     FleetNodeDrainResult,
     FleetEnrollmentTokenView,
+    FleetExecutionMode,
+    FleetExecutionPreferenceView,
+    FleetExecutionScopeType,
+    FleetRunnerStatusView,
 } from '@ever-works/contracts';
 
 export type {
@@ -35,6 +39,11 @@ export type {
     FleetNodeDetailView,
     FleetNodeDrainResult,
     FleetEnrollmentTokenView,
+    FleetExecutionMode,
+    FleetExecutionPreferenceView,
+    FleetExecutionScopeType,
+    FleetRunnerNodeView,
+    FleetRunnerStatusView,
 } from '@ever-works/contracts';
 
 export interface CreateFleetEnrollmentTokenPayload {
@@ -52,10 +61,28 @@ export interface CreateFleetEnrollmentTokenResponse {
 export interface UpdateFleetNodePayload {
     name?: string;
     disabled?: boolean;
+    /**
+     * Soft drain: no new work is leased onto the node, but its in-flight
+     * claims keep reporting and it keeps heartbeating so it stays
+     * observable.
+     *
+     * `UpdateFleetNodeDto` and `FleetService.setPausedForUser` have
+     * accepted this since pause shipped; this payload type simply never
+     * declared it, so the web tier could not send it — a control that
+     * existed end-to-end on the server and was unreachable from the UI.
+     */
+    paused?: boolean;
     /** Admin-edited tags. Writing them pins the set by default. */
     capabilities?: string[];
     /** `false` hands tag ownership back to the node's heartbeats. */
     capabilitiesPinned?: boolean;
+}
+
+export interface SetFleetExecutionPreferencePayload {
+    scopeType: FleetExecutionScopeType;
+    /** Required for 'work'/'goal'; omitted for the account-wide row. */
+    scopeId?: string;
+    mode: FleetExecutionMode;
 }
 
 // NOTE: no leading `/api` here — `serverFetch`/`serverMutation` prepend
@@ -118,6 +145,44 @@ export const fleetAPI = {
             endpoint: `${BASE}/nodes/${nodeId}/rotate`,
             data: {},
             method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * Compact runner status behind the always-visible sidebar pill.
+     *
+     * A narrower read than `listNodes` on purpose: it is polled every 30s
+     * from every dashboard page, and it excludes cluster-sourced nodes,
+     * which are not runners the platform can lease work onto.
+     */
+    runnerStatus: async () => {
+        return serverFetch<FleetRunnerStatusView>(`${BASE}/runner-status`);
+    },
+
+    listExecutionPreferences: async () => {
+        return serverFetch<FleetExecutionPreferenceView[]>(`${BASE}/execution-preferences`);
+    },
+
+    setExecutionPreference: async (payload: SetFleetExecutionPreferencePayload) => {
+        return serverMutation<FleetExecutionPreferenceView>({
+            endpoint: `${BASE}/execution-preference`,
+            data: payload,
+            method: 'PUT',
+            wrapInData: false,
+        });
+    },
+
+    clearExecutionPreference: async (
+        scopeType: FleetExecutionScopeType,
+        scopeId?: string | null,
+    ) => {
+        const query = new URLSearchParams({ scopeType });
+        if (scopeId) query.set('scopeId', scopeId);
+        return serverMutation<void>({
+            endpoint: `${BASE}/execution-preference?${query.toString()}`,
+            data: {},
+            method: 'DELETE',
             wrapInData: false,
         });
     },

@@ -25,8 +25,13 @@ export const taskRecurrenceDispatcherTask = schedules.task({
 
         try {
             const dispatcher = appContext.get(TaskRecurrenceDispatcherService);
-            const summary = await dispatcher.dispatchDue();
-            return summary;
+            // Two due-scans per tick: recurring templates spawn+dispatch
+            // instances, and one-shot `scheduledAt` Tasks dispatch
+            // themselves. Sequential on purpose — they share the tasks
+            // table and one summary keeps the operator dashboard whole.
+            const recurrence = await dispatcher.dispatchDue();
+            const scheduled = await dispatcher.dispatchDueScheduled();
+            return { recurrence, scheduled };
         } finally {
             await appContext.close();
         }

@@ -12,7 +12,11 @@ import {
     type FleetEnrollmentTokenView,
     type FleetNodeDetailView,
     type FleetNodeDrainResult,
+    type FleetExecutionPreferenceView,
+    type FleetExecutionScopeType,
     type FleetNodeView,
+    type FleetRunnerStatusView,
+    type SetFleetExecutionPreferencePayload,
     type UpdateFleetNodePayload,
 } from '@/lib/api/fleet';
 
@@ -188,6 +192,84 @@ export async function drainFleetNodeAction(
             success: false,
             data: null,
             error: errorMessage(error, 'Failed to drain the node'),
+        };
+    }
+}
+
+/**
+ * Runner status for the always-visible sidebar pill.
+ *
+ * Polled every 30s from every dashboard page, so it deliberately does
+ * NOT `revalidatePath` — this is a read, and invalidating the settings
+ * page cache twice a minute for every signed-in user would be a
+ * self-inflicted load problem.
+ */
+export async function getFleetRunnerStatusAction(): Promise<
+    FleetActionResult<FleetRunnerStatusView>
+> {
+    await ensureAuth();
+    try {
+        const data = await fleetAPI.runnerStatus();
+        return { success: true, data, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Failed to load runner status'),
+        };
+    }
+}
+
+/** Every execution routing preference this owner has configured. */
+export async function listFleetExecutionPreferencesAction(): Promise<
+    FleetActionResult<FleetExecutionPreferenceView[]>
+> {
+    await ensureAuth();
+    try {
+        const data = await fleetAPI.listExecutionPreferences();
+        return { success: true, data, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Failed to load execution preferences'),
+        };
+    }
+}
+
+/** Set where runs in one scope execute (local runner vs cloud). */
+export async function setFleetExecutionPreferenceAction(
+    payload: SetFleetExecutionPreferencePayload,
+): Promise<FleetActionResult<FleetExecutionPreferenceView>> {
+    await ensureAuth();
+    try {
+        const data = await fleetAPI.setExecutionPreference(payload);
+        revalidatePath(SETTINGS_PAGE_PATTERN, 'page');
+        return { success: true, data, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Failed to save the execution preference'),
+        };
+    }
+}
+
+/** Clear one scope so it inherits from the next scope out. */
+export async function clearFleetExecutionPreferenceAction(
+    scopeType: FleetExecutionScopeType,
+    scopeId?: string | null,
+): Promise<FleetActionResult<{ cleared: true }>> {
+    await ensureAuth();
+    try {
+        await fleetAPI.clearExecutionPreference(scopeType, scopeId ?? null);
+        revalidatePath(SETTINGS_PAGE_PATTERN, 'page');
+        return { success: true, data: { cleared: true }, error: null };
+    } catch (error) {
+        return {
+            success: false,
+            data: null,
+            error: errorMessage(error, 'Failed to clear the execution preference'),
         };
     }
 }

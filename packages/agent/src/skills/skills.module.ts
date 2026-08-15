@@ -2,14 +2,17 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { Skill } from '../entities/skill.entity';
 import { SkillBinding } from '../entities/skill-binding.entity';
+import { SkillFile } from '../entities/skill-file.entity';
 import { Mission } from '../entities/mission.entity';
 import { Agent } from '../entities/agent.entity';
 import { WorkProposal } from '../entities/work-proposal.entity';
 import { SkillRepository } from '../database/repositories/skill.repository';
 import { SkillBindingRepository } from '../database/repositories/skill-binding.repository';
+import { SkillFileRepository } from '../database/repositories/skill-file.repository';
+import { SkillsService } from './skills.service';
+import { SkillFilesService } from './skill-files.service';
 import { AgentRepository } from '../database/repositories/agent.repository';
 import { WorkProposalRepository } from '../user-research/work-proposal.repository';
-import { SkillsService } from './skills.service';
 import { ActivityLogModule } from '../activity-log/activity-log.module';
 import { DatabaseModule } from '../database/database.module';
 import { PolicyModule } from '../policy/policy.module';
@@ -28,7 +31,7 @@ import { PolicyModule } from '../policy/policy.module';
 @Module({
     imports: [
         DatabaseModule,
-        TypeOrmModule.forFeature([Skill, SkillBinding, Mission, Agent, WorkProposal]),
+        TypeOrmModule.forFeature([Skill, SkillBinding, SkillFile, Mission, Agent, WorkProposal]),
         ActivityLogModule,
         // Audit item G12 — grant-aware activation. Binds
         // TOOL_GRANT_ENFORCER for `SkillsService.resolveActiveForAgent`,
@@ -39,10 +42,18 @@ import { PolicyModule } from '../policy/policy.module';
     providers: [
         SkillRepository,
         SkillBindingRepository,
+        SkillFileRepository,
         AgentRepository,
         WorkProposalRepository,
         SkillsService,
+        SkillFilesService,
     ],
-    exports: [SkillRepository, SkillBindingRepository, SkillsService],
+    exports: [
+        SkillRepository,
+        SkillBindingRepository,
+        SkillFileRepository,
+        SkillsService,
+        SkillFilesService,
+    ],
 })
 export class SkillsModule {}

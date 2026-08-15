@@ -290,7 +290,14 @@ test.describe('Agent detail — tab navigation', () => {
         await expect(page.getByText(agent.name).first()).toBeVisible({ timeout: 30_000 });
 
         await expect(page.locator(`a[href$="/agents/${agent.id}"]`).first()).toBeVisible();
-        for (const tab of ['activity', 'instructions', 'skills', 'budgets', 'settings']) {
+        for (const tab of [
+            'activity',
+            'instructions',
+            'skills',
+            'capabilities',
+            'budgets',
+            'settings',
+        ]) {
             await expect(
                 page.locator(`a[href$="/agents/${agent.id}/${tab}"]`).first(),
             ).toBeVisible();

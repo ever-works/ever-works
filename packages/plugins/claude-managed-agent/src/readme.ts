@@ -27,8 +27,15 @@ export const README = [
 	'3. Choose the Claude model you want to use',
 	'4. Start generation as usual and let the agent return structured results to Ever Works',
 	'',
+	'## Running at scale',
+	'',
+	'- **Persistent control plane** — by default the plugin keeps one managed agent and environment per user and only creates sessions per run. Disable "Reuse Control Plane" in the plugin settings to fall back to creating and deleting them on every run.',
+	'- **Parallel variants** — set "Parallel Variant Sessions" above 1 to fan out multiple managed-agent sessions in one run; their results are merged and de-duplicated. One failed variant does not fail the run.',
+	'- **Budget caps** — "Per-Session Budget (USD)" sets a hard spend ceiling per session; the session stops issuing model requests once its tracked cost reaches the cap.',
+	'',
 	'## Notes',
 	'',
 	'- Managed Agents is currently in beta',
-	'- This plugin is designed for autonomous runs and does not yet rely on manual tool confirmations during generation'
+	'- This plugin is designed for autonomous runs and does not yet rely on manual tool confirmations during generation',
+	'- Sessions are billed for model tokens plus hosted runtime, so budget caps are recommended for fan-out runs'
 ].join('\n');

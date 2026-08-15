@@ -242,21 +242,78 @@ export function applyCapabilitySelection(detected: readonly string[], selection?
 }
 
 /**
+ * What {@link describeSelf} returns.
+ *
+ * The three ORIGINAL fields stay required — callers dereference
+ * `platform` and `capabilities` directly, and they are always computed.
+ * The telemetry fields stay optional, because "absent" is a meaningful
+ * value on the wire: the server reads it as "leave the stored reading
+ * alone". This used to be `Required<NodeSelfDescription>`, which stopped
+ * being expressible the moment a genuinely optional field joined the
+ * contract.
+ */
+export type NodeSelfDescriptionPayload = NodeSelfDescription &
+	Required<Pick<NodeSelfDescription, 'platform' | 'version' | 'capabilities'>>;
+
+/**
+ * Optional telemetry sources for {@link describeSelf}.
+ *
+ * Injected rather than probed inline so the description stays testable
+ * without a host, and OPTIONAL so every existing caller — and every
+ * older build of this app — produces exactly the description it did
+ * before these fields existed.
+ */
+export interface SelfDescriptionTelemetry {
+	/** Agent-CLI probe, e.g. `detectAgentCliVersion(runner)`. */
+	cliVersion?: () => Promise<string | null> | string | null;
+	/** Free-disk probe for the node's workspace volume. */
+	diskFreeBytes?: () => Promise<number | null> | number | null;
+}
+
+/**
  * Full self-description for an enroll or heartbeat request.
  *
  * `selection` is the operator's capability opt-in; omitting it preserves the
  * original "advertise everything detected" behaviour.
+ *
+ * `telemetry` adds the two optional fields the Fleet runner indicator
+ * renders (agent-CLI version, free disk). They are OMITTED from the
+ * payload entirely when the probe returns null rather than sent as
+ * `null`, because the server's heartbeat treats an absent field as
+ * "leave the stored value alone" — so a probe that fails transiently
+ * (a busy machine, a hung `--version`) does not wipe a good reading.
  */
 export async function describeSelf(
 	runner: CommandRunner,
 	environment: CapabilityEnvironment,
 	version: string,
-	selection?: readonly string[] | null
-): Promise<Required<NodeSelfDescription>> {
+	selection?: readonly string[] | null,
+	telemetry: SelfDescriptionTelemetry = {}
+): Promise<NodeSelfDescriptionPayload> {
 	const detected = await detectCapabilities(runner, environment);
-	return {
+	const description: NodeSelfDescriptionPayload = {
 		platform: describePlatform(environment),
 		version: version.slice(0, MAX_VERSION_LENGTH),
 		capabilities: applyCapabilitySelection(detected, selection)
 	};
+
+	const cliVersion = await resolveTelemetry(telemetry.cliVersion);
+	if (typeof cliVersion === 'string' && cliVersion) {
+		description.cliVersion = cliVersion;
+	}
+	const diskFreeBytes = await resolveTelemetry(telemetry.diskFreeBytes);
+	if (typeof diskFreeBytes === 'number' && Number.isFinite(diskFreeBytes) && diskFreeBytes >= 0) {
+		description.diskFreeBytes = diskFreeBytes;
+	}
+	return description;
+}
+
+/** Run one optional probe. A throwing probe is an absent field, never a failed beat. */
+async function resolveTelemetry<T>(probe: (() => Promise<T | null> | T | null) | undefined): Promise<T | null> {
+	if (!probe) return null;
+	try {
+		return await probe();
+	} catch {
+		return null;
+	}
 }

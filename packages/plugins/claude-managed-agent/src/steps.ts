@@ -18,10 +18,19 @@ export const STEP_DEFINITIONS: readonly PipelineStepDefinition<ClaudeManagedAgen
 		estimatedDuration: 120
 	},
 	{
+		id: 'run-variant-sessions',
+		name: 'Run Variant Sessions',
+		description:
+			'Fan out parallel Claude Managed Agents sessions to generate complementary result variants (only when the form requests more than one variant).',
+		position: { type: 'after', stepId: 'run-managed-session' },
+		optional: true,
+		estimatedDuration: 120
+	},
+	{
 		id: 'parse-agent-output',
 		name: 'Parse Agent Output',
 		description: 'Extract normalized work items, taxonomy, and warnings from the session transcript.',
-		position: { type: 'after', stepId: 'run-managed-session' },
+		position: { type: 'after', stepId: 'run-variant-sessions' },
 		estimatedDuration: 5
 	},
 	{

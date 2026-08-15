@@ -176,6 +176,42 @@ export function buildWorkspaceSeedPrompt(manifest: WorkspaceSeedManifest): strin
 	].join('\n');
 }
 
+/**
+ * Single combined prompt for a fan-out variant session (feat-cma-scale).
+ *
+ * Fan-out sessions are independent — each one bootstraps its own workspace
+ * from the mounted seed manifest, generates, then reports — so the three
+ * phase prompts of the interactive single-session flow are collapsed into
+ * one initial message. The same neutralized user-data fencing applies via
+ * the reused phase builders.
+ */
+export function buildVariantSessionPrompt(input: {
+	manifest: WorkspaceSeedManifest;
+	work: WorkReference;
+	request: GenerationRequest;
+	existing: ExistingItems;
+	targetItems: number;
+	variantIndex: number;
+	variantCount: number;
+	workspacePath?: string;
+}): string {
+	const workspacePath = input.workspacePath ?? DEFAULT_WORKSPACE_PATH;
+
+	return [
+		`You are producing variant ${input.variantIndex + 1} of ${input.variantCount} independent result sets for the same request. Explore a distinct angle, sub-niche, or source pool for this variant so the variants complement rather than duplicate each other.`,
+		'Complete the following three phases in order within this single session.',
+		'PHASE 1 — WORKSPACE BOOTSTRAP:',
+		buildWorkspaceSeedPrompt(input.manifest),
+		'Do not reply with WORKSPACE_READY as a final answer; continue straight to phase 2 once the workspace is verified.',
+		'PHASE 2 — GENERATION:',
+		buildUserPrompt(input.work, input.request, input.existing, input.targetItems, workspacePath),
+		'Do not output the JSON yet; continue to phase 3.',
+		'PHASE 3 — FINAL RESULT COLLECTION:',
+		buildResultCollectionPrompt(workspacePath),
+		'Your final message must contain only the phase 3 JSON object.'
+	].join('\n\n');
+}
+
 export function buildResultCollectionPrompt(workspacePath = DEFAULT_WORKSPACE_PATH): string {
 	return [
 		'Inspect the current workspace and return the final Ever Works result based on the actual filesystem state.',

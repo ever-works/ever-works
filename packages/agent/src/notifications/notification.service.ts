@@ -544,6 +544,70 @@ export class NotificationService {
         });
     }
 
+    /**
+     * Fleet local-runner fallback — a run that PREFERRED the owner's own
+     * machine was handed to the platform runtime instead.
+     *
+     * Why this is a notification and not just a log line: the whole point
+     * of choosing a local runner is that WHERE a run executes is
+     * load-bearing (the checkout, the credentials, the GPU live there).
+     * A silent relocation is therefore not a graceful degradation, it is
+     * a changed outcome the owner has to be able to see — and the reason
+     * ("your laptop was busy" vs "you have no runner enrolled") is what
+     * tells them whether to wait, enrol another machine, or switch the
+     * Work to `local-wait`.
+     *
+     * Dedup key is per (task, reason), so a Task retried in a loop while
+     * a laptop is closed produces one notification rather than one per
+     * attempt — but a DIFFERENT reason still gets through, because
+     * "busy" becoming "offline" is news.
+     */
+    async notifyFleetRunnerFallback(args: {
+        userId: string;
+        taskId?: string | null;
+        /** Machine token: `no-runners` | `runners-offline` | `runners-busy`. */
+        reason: string;
+        /** Enrolled runners at decision time (0 when none). */
+        runnerCount: number;
+    }): Promise<void> {
+        const safeReason = this.sanitizeLabel(args.reason);
+        const detail =
+            args.reason === 'no-runners'
+                ? 'no local runner is enrolled'
+                : args.reason === 'runners-offline'
+                  ? 'your local runner is offline'
+                  : 'your local runner was busy';
+        const title = 'Local runner fallback → cloud';
+        const message =
+            `A run that preferred your local runner ran in the cloud instead because ${detail}. ` +
+            'Set the Work to "Local runner (wait for a free slot)" if it must run on your machine.';
+        const actionUrl = '/settings/fleet';
+        await this.create({
+            userId: args.userId,
+            type: NotificationType.INFO,
+            category: NotificationCategory.AGENT,
+            title,
+            message,
+            actionUrl,
+            actionLabel: 'View fleet',
+            metadata: {
+                taskId: args.taskId ?? null,
+                reason: safeReason,
+                runnerCount: args.runnerCount,
+            },
+            deduplicationKey: `fleet_runner_fallback_${args.taskId ?? 'unknown'}_${safeReason}`,
+        });
+        await this.dispatchFanout({
+            userId: args.userId,
+            eventKey: 'fleet_runner_fallback',
+            title,
+            message,
+            actionUrl,
+            actionLabel: 'View fleet',
+            urgent: false,
+        });
+    }
+
     async notifyGitAuthExpired(userId: string, provider: string): Promise<void> {
         await this.create({
             userId,

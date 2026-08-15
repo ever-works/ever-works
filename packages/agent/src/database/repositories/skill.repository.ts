@@ -87,6 +87,24 @@ export class SkillRepository {
         return { rows, total };
     }
 
+    /** The user's skill carrying this invocation slug, else null. */
+    async findByUserAndInvocationSlug(
+        userId: string,
+        invocationSlug: string,
+    ): Promise<Skill | null> {
+        return this.repository.findOne({ where: { userId, invocationSlug } });
+    }
+
+    /** All of the user's skills that carry an invocation slug (composer autocomplete). */
+    async findInvocableByUser(userId: string): Promise<Skill[]> {
+        return this.repository
+            .createQueryBuilder('skill')
+            .where('skill.userId = :userId', { userId })
+            .andWhere('skill.invocationSlug IS NOT NULL')
+            .orderBy('skill.invocationSlug', 'ASC')
+            .getMany();
+    }
+
     async findManyByIds(userId: string, ids: string[]): Promise<Skill[]> {
         if (ids.length === 0) return [];
         return this.repository

@@ -52,12 +52,16 @@ import { PortableDateColumn } from './_types';
  * `k8s` is list-time only — never persisted as a row.
  */
 export type { FleetNodeKind, FleetNodeStatus } from '@ever-works/contracts';
-/** Statuses in which the platform will NOT lease new work onto a node. */
-export const FLEET_NODE_NON_LEASABLE_STATUSES: readonly FleetNodeStatus[] = [
-    'enrolling',
-    'paused',
-    'disabled',
-];
+/**
+ * Statuses in which the platform will NOT lease new work onto a node.
+ *
+ * The list itself MOVED to `@ever-works/contracts` (next to the status
+ * union) once the API edge started asking the same question for run
+ * routing — two copies of it would drift the first time a status is
+ * added. Re-exported here so every existing server-side importer keeps
+ * working unchanged.
+ */
+export { FLEET_NODE_NON_LEASABLE_STATUSES } from '@ever-works/contracts';
 
 /**
  * Statuses that must be PRESERVED by an accepted heartbeat instead of
@@ -144,6 +148,31 @@ export class FleetNode {
 
     @Column({ type: 'varchar', length: 32, nullable: true })
     version?: string | null;
+
+    /**
+     * Version of the AGENT CLI installed on the machine — the binary an
+     * `agent-task` step shells out to — as opposed to {@link version},
+     * which is the node daemon's own.
+     *
+     * Additive telemetry: a daemon built before this field existed sends
+     * nothing and the column stays NULL, which is why the heartbeat
+     * treats "absent" as "leave alone" rather than "clear".
+     */
+    @Column({ type: 'varchar', length: 64, nullable: true })
+    cliVersion?: string | null;
+
+    /**
+     * Free bytes on the volume the node's workspace lives on, as last
+     * reported.
+     *
+     * `bigint` because a modern volume overflows a 32-bit int by three
+     * orders of magnitude. TypeORM hands `bigint` back as a STRING on
+     * Postgres and a number on sqlite, so nothing may read this column
+     * without normalizing it — `FleetService.toView` is the one place
+     * that does (see `toOptionalNumber` there).
+     */
+    @Column({ type: 'bigint', nullable: true })
+    diskFreeBytes?: string | number | null;
 
     @CreateDateColumn()
     createdAt: Date;

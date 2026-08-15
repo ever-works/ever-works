@@ -55,9 +55,11 @@ export * from './repositories/agent-run.repository';
 export * from './repositories/agent-run-log.repository';
 export * from './repositories/agent-budget.repository';
 export * from './repositories/agent-membership.repository';
+export * from './repositories/agent-collaborator.repository';
 // Agents/Skills/Tasks PR #1017 — Phase 8. Skill catalog repositories.
 export * from './repositories/skill.repository';
 export * from './repositories/skill-binding.repository';
+export * from './repositories/skill-file.repository';
 // Agent Plugins MCP slice — feature-owned repositories, wired by McpModule.
 export * from './repositories/mcp-server-connection.repository';
 export * from './repositories/agent-mcp-server-binding.repository';
@@ -81,3 +83,5 @@ export * from './repositories/organization-onboarding-profile.repository';
 export * from './database-init.service';
 export * from './repositories/workflow.repository';
 export * from './repositories/workflow-run.repository';
+// Memory Files — user-defined folders organizing uploads on /memory.
+export * from './repositories/memory-folder.repository';

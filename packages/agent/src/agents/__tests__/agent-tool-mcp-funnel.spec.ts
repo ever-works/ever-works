@@ -86,6 +86,12 @@ const agentsService: any = { create: jest.fn() };
 function makeSvc(
     over: { mcpTools?: AgentMcpToolSource; toolGrants?: any; credentials?: any } = {},
 ) {
+    // Positional construction — the constructor's param order IS the
+    // contract here. `mcpTools` used to sit at position 13, directly
+    // after `credentials`; merging develop landed the Collaborators
+    // (delegation, collaborators) and Skill-files (skillFiles,
+    // skillFileReader) params ahead of it, so it now sits at 17.
+    // The four `undefined`s below hold those slots open.
     return new AgentToolService(
         agentsRepo,
         agentsService,
@@ -99,6 +105,10 @@ function makeSvc(
         undefined,
         over.toolGrants,
         over.credentials,
+        undefined, // delegation
+        undefined, // collaborators
+        undefined, // skillFiles
+        undefined, // skillFileReader
         over.mcpTools,
     );
 }

@@ -58,6 +58,7 @@ export async function createCustomSkillAction(input: {
     instructionsMd: string;
     frontmatter?: SkillFrontmatter;
     slug?: string;
+    invocationSlug?: string | null;
 }): Promise<Skill> {
     const ownerId =
         input.ownerType === 'tenant' && !input.ownerId ? await getCurrentUserId() : input.ownerId;
@@ -69,7 +70,15 @@ export async function createCustomSkillAction(input: {
 export async function updateSkillAction(
     id: string,
     body: Partial<
-        Pick<Skill, 'title' | 'description' | 'instructionsMd' | 'frontmatter' | 'version'>
+        Pick<
+            Skill,
+            | 'title'
+            | 'description'
+            | 'instructionsMd'
+            | 'frontmatter'
+            | 'version'
+            | 'invocationSlug'
+        >
     >,
 ): Promise<Skill> {
     const skill = await skillsAPI.update(id, body);
@@ -102,6 +111,21 @@ export async function createBindingAction(
 export async function deleteBindingAction(bindingId: string): Promise<{ deleted: true }> {
     const res = await skillsAPI.deleteBinding(bindingId);
     revalidatePath('/skills');
+    return res;
+}
+
+// ── Skill files (companion files) ────────────────────────────────
+
+export async function listSkillFilesAction(skillId: string) {
+    return skillsAPI.listFiles(skillId);
+}
+
+export async function deleteSkillFileAction(
+    skillId: string,
+    fileId: string,
+): Promise<{ deleted: true }> {
+    const res = await skillsAPI.deleteFile(skillId, fileId);
+    revalidatePath(`/skills/${skillId}`);
     return res;
 }
 

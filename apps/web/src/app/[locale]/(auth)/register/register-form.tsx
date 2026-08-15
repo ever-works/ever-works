@@ -2,6 +2,7 @@
 
 import { useState, useTransition } from 'react';
 import { Link } from '@/i18n/navigation';
+import { COMPANY_OWNER_WEBSITE } from '@/lib/constants';
 import { AuthLayout } from '@/components/layout/AuthLayout';
 import { useTranslations } from 'next-intl';
 import { SocialLoginButtons } from '@/components/auth/social-login';
@@ -48,6 +49,20 @@ export default function RegisterForm({
     // Nothing to pin an acceptance to means nothing truthful to record, so the
     // form refuses rather than registering silently.
     const termsUnavailable = termsDocuments.length === 0;
+
+    /**
+     * Where to send someone who wants to READ what they are accepting.
+     *
+     * Resolved from the documents this form was handed, so the link and the
+     * recorded acceptance can never disagree. `url` is a site-relative path on
+     * the company website (e.g. `/tos`), so it is resolved against
+     * COMPANY_OWNER_WEBSITE. Falls back to that same path convention when a
+     * document omits `url` — never to the old in-app paths, which have no pages.
+     */
+    const legalHref = (kind: 'tos' | 'privacy') => {
+        const doc = termsDocuments.find((d) => d.documentId.startsWith(`${kind}:`));
+        return new URL(doc?.url || `/${kind}`, COMPANY_OWNER_WEBSITE).toString();
+    };
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -185,13 +200,37 @@ export default function RegisterForm({
                         className="ml-2 text-xs text-text-secondary dark:text-text-secondary-dark"
                     >
                         {t('form.terms.text')}{' '}
-                        <Link href="/terms" className="text-primary hover:text-primary-hover">
+                        {/*
+                         * Both hrefs come from the SAME documents whose acceptance
+                         * this form records, so the page a user reads can never
+                         * drift from the version they are agreeing to.
+                         *
+                         * They used to be hardcoded `/terms` and `/privacy`, and
+                         * BOTH 404'd: those paths are declared public in
+                         * constants.ts but no page exists behind them, so the
+                         * signup told users they were agreeing to documents it
+                         * then failed to show. The corpus has always carried the
+                         * real locations — `/tos` and `/privacy` on the marketing
+                         * site — which is also why `/terms` was never going to
+                         * work: it is simply not the path.
+                         */}
+                        <a
+                            href={legalHref('tos')}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:text-primary-hover"
+                        >
                             {t('form.terms.termsLink')}
-                        </Link>{' '}
+                        </a>{' '}
                         {t('form.terms.and')}{' '}
-                        <Link href="/privacy" className="text-primary hover:text-primary-hover">
+                        <a
+                            href={legalHref('privacy')}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-primary hover:text-primary-hover"
+                        >
                             {t('form.terms.privacyLink')}
-                        </Link>
+                        </a>
                     </label>
                 </div>
 
@@ -219,7 +258,20 @@ export default function RegisterForm({
                             </div>
                         </div>
 
-                        <SocialLoginButtons providers={availableSocialProviders} />
+                        {/*
+                         * Gated on the SAME condition as Create account. These
+                         * buttons sit inside this form but are type="button",
+                         * so they never triggered the required checkbox's
+                         * validation and never reached handleSubmit — a click
+                         * created a real account with consent unticked, and
+                         * with the documents unloaded even though the email
+                         * path refuses in that state.
+                         */}
+                        <SocialLoginButtons
+                            providers={availableSocialProviders}
+                            disabled={!formData.acceptedTerms || termsUnavailable}
+                            disabledReason={t('form.terms.required')}
+                        />
                     </>
                 )}
 

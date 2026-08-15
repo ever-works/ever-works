@@ -1,5 +1,11 @@
 import { PlatformAuthClient } from './auth-client';
-import { describeSelf, type CapabilityEnvironment, type CommandRunner } from './capabilities';
+import {
+	describeSelf,
+	type CapabilityEnvironment,
+	type CommandRunner,
+	type SelfDescriptionTelemetry
+} from './capabilities';
+import { detectAgentCliVersion, detectDiskFreeBytes, type DiskProbeIo } from './telemetry-probe';
 import { FleetClient, type FetchLike } from './fleet-client';
 import { FleetJobClient } from './job-client';
 import { HeartbeatLoop, type Scheduler } from './heartbeat';
@@ -38,6 +44,38 @@ export interface NodeIo {
 	userAgent?: string;
 	scheduler?: Scheduler;
 	now?: () => number;
+	/**
+	 * Free-disk probe for the node's workspace volume. Optional: without
+	 * it the node simply reports no disk figure, exactly as it did before
+	 * the field existed. `node-io.ts` supplies the real `node:fs`-backed
+	 * one; the renderer and every test can leave it out.
+	 */
+	diskProbe?: DiskProbeIo;
+	/** Path whose volume the disk probe measures. Defaults to the node's cwd. */
+	workspacePath?: string;
+}
+
+/**
+ * Telemetry probes for the runner-status fields (agent-CLI version, free
+ * disk), built from whatever the caller's {@link NodeIo} actually
+ * supplies.
+ *
+ * Both probes are best-effort by construction — `describeSelf` treats a
+ * throwing or null probe as an absent field, and the platform reads an
+ * absent field as "leave the stored reading alone". So a machine with no
+ * agent CLI, or an unreadable volume, keeps heartbeating with everything
+ * else intact.
+ */
+export function buildSelfDescriptionTelemetry(io: NodeIo): SelfDescriptionTelemetry {
+	const telemetry: SelfDescriptionTelemetry = {
+		cliVersion: () => detectAgentCliVersion(io.runner)
+	};
+	if (io.diskProbe) {
+		const probe = io.diskProbe;
+		const path = io.workspacePath ?? process.cwd();
+		telemetry.diskFreeBytes = () => detectDiskFreeBytes(probe, path);
+	}
+	return telemetry;
 }
 
 export interface EnrollNodeOptions extends NodeIo {
@@ -88,7 +126,8 @@ export async function enrollNode(options: EnrollNodeOptions): Promise<NodeConfig
 		options.runner,
 		options.environment,
 		options.version,
-		options.capabilitySelection ?? null
+		options.capabilitySelection ?? null,
+		buildSelfDescriptionTelemetry(options)
 	);
 	logger.info(`Enrolling with ${client.baseUrl} as ${description.platform} [${description.capabilities.join(', ')}]`);
 
@@ -234,11 +273,15 @@ export function createNodeRuntime(config: NodeConfig, io: NodeIo, options: Creat
 	// Re-detection stays intersected with the operator's opt-in, so a tool
 	// installed after enrollment never silently widens what this node offers.
 	const selection = config.capabilitySelection ?? null;
+	const telemetry = buildSelfDescriptionTelemetry(io);
 	const loopOptions = {
 		client,
 		nodeId: config.nodeId,
 		secret: config.secret,
-		describe: () => describeSelf(io.runner, io.environment, io.version, selection),
+		// Re-probed on EVERY beat, like the capability tags: installing an
+		// agent CLI or filling a disk is exactly the kind of change an
+		// operator needs to see without restarting the node.
+		describe: () => describeSelf(io.runner, io.environment, io.version, selection, telemetry),
 		intervalMs: clampHeartbeatInterval(config.heartbeatIntervalMs),
 		logger: io.logger,
 		...(io.scheduler ? { scheduler: io.scheduler } : {}),

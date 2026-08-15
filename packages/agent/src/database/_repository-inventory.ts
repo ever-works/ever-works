@@ -43,6 +43,7 @@ import { GitHubAppInstallationRepoRepository } from './repositories/github-app-i
 import { GitHubAppInstallationRepository } from './repositories/github-app-installation.repository';
 import { GitHubAppUserLinkRepository } from './repositories/github-app-user-link.repository';
 import { InvoiceRepository } from './repositories/invoice.repository';
+import { MemoryFolderRepository } from './repositories/memory-folder.repository';
 import { NotificationChannelDeliveryLogRepository } from './repositories/notification-channel-delivery-log.repository';
 import { NotificationChannelRepository } from './repositories/notification-channel.repository';
 import { NotificationEventTypeRepository } from './repositories/notification-event-type.repository';
@@ -94,6 +95,7 @@ export const REPOSITORY_PROVIDERS: ReadonlyArray<Type<unknown>> = [
     GitHubAppInstallationRepository,
     GitHubAppUserLinkRepository,
     InvoiceRepository,
+    MemoryFolderRepository,
     NotificationChannelDeliveryLogRepository,
     NotificationChannelRepository,
     NotificationEventTypeRepository,

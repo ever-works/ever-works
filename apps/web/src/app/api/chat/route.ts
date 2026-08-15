@@ -64,6 +64,26 @@ const chatBodySchema = z.object({
         .min(1)
         .max(128)
         .regex(/^[a-zA-Z0-9_-]+$/, 'providerOverride contains invalid characters'),
+    /**
+     * Model the user pinned in the composer. Absent means "let the provider
+     * resolve its configured model" — the route then sends the sentinel
+     * `'auto'`, which the API maps back to `undefined` so the facade's
+     * defaultModel/tier resolution runs exactly as it always has.
+     *
+     * Security: this reaches the backend in the JSON BODY (not a header), so
+     * it cannot split a response the way `providerOverride` could. The charset
+     * is still constrained because a model id is an identifier, never prose:
+     * vendor ids look like `openai/gpt-5-mini`, `anthropic.claude-3:0` or
+     * `meta-llama/Llama-3.3-70B-Instruct`, all of which fit. The cap matches
+     * the conversations table's `model` column (varchar 100) so a value that
+     * round-trips through the chat route can always be persisted.
+     */
+    model: z
+        .string()
+        .min(1)
+        .max(100)
+        .regex(/^[a-zA-Z0-9_.:/-]+$/, 'model contains invalid characters')
+        .optional(),
     workId: z.string().min(1).max(128).optional(),
     conversationId: z.string().min(1).max(128).optional(),
     currentPageUrl: z.string().max(2048).optional(),
@@ -106,15 +126,23 @@ export async function POST(request: Request) {
             { status: 400 },
         );
     }
-    const { messages, providerOverride, workId, conversationId, currentPageUrl, attachmentIds } =
-        parsed.data as {
-            messages: UIMessage[];
-            providerOverride: string;
-            workId?: string;
-            conversationId?: string;
-            currentPageUrl?: string;
-            attachmentIds?: string[];
-        };
+    const {
+        messages,
+        providerOverride,
+        model,
+        workId,
+        conversationId,
+        currentPageUrl,
+        attachmentIds,
+    } = parsed.data as {
+        messages: UIMessage[];
+        providerOverride: string;
+        model?: string;
+        workId?: string;
+        conversationId?: string;
+        currentPageUrl?: string;
+        attachmentIds?: string[];
+    };
     // Files attached in chat also land in global Memory, so the org keeps
     // them after the conversation scrolls away.
     //
@@ -154,6 +182,7 @@ export async function POST(request: Request) {
         messages,
         authToken: token,
         providerOverride,
+        model,
         workId,
         conversationId,
         currentPageUrl,

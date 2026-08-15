@@ -196,15 +196,31 @@ function isPathWithin(outputDir: string, entryName: string): boolean {
 	return resolved === root || resolved.startsWith(root + path.sep);
 }
 
+// Security: a zip entry's unix mode lives in the high 16 bits of
+// externalFileAttributes; S_IFLNK (0o120000) marks it a symlink.
+function isSymlinkEntry(entry: { externalFileAttributes: number }): boolean {
+	const unixMode = (entry.externalFileAttributes >>> 16) & 0xffff;
+	return (unixMode & 0o170000) === 0o120000;
+}
+
 async function unzipArchive(archivePath: string, outputDir: string): Promise<void> {
 	const root = path.resolve(outputDir);
 	await extractZip(archivePath, {
 		dir: outputDir,
-		// Security: defense-in-depth zip-slip guard (does not rely solely on extract-zip's
-		// internal confinement, which could regress on a downgrade).
 		onEntry: (entry) => {
+			// Security: defense-in-depth zip-slip guard (does not rely solely on extract-zip's
+			// internal confinement, which could regress on a downgrade).
 			if (!isPathWithin(root, entry.fileName)) {
 				throw new Error(`Refusing to extract path-traversing zip entry: ${entry.fileName}`);
+			}
+			// Security: extract-zip <=2.0.1 does not validate symlink TARGETS
+			// (GHSA-jmr9-qjv8-65gv) and has no patched release. The entry name above can be
+			// perfectly benign while the link points outside the tree, so a later entry
+			// written through it escapes. An OpenCode release archive is a single binary
+			// plus data files and never legitimately contains a symlink — refuse them
+			// outright rather than trying to validate targets.
+			if (isSymlinkEntry(entry)) {
+				throw new Error(`Refusing to extract symlink zip entry: ${entry.fileName}`);
 			}
 		}
 	});

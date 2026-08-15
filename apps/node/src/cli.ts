@@ -4,6 +4,7 @@ import { createLogger } from './core/logger';
 import {
 	createCommandRunner,
 	createConfigFileSystem,
+	createDiskProbe,
 	createSecretStore,
 	createResourceProbe,
 	currentEnvironment,
@@ -28,7 +29,11 @@ function buildDeps(): CliDeps {
 			environment: currentEnvironment(),
 			logger,
 			version: NODE_APP_VERSION,
-			userAgent: `ever-works-node/${NODE_APP_VERSION}`
+			userAgent: `ever-works-node/${NODE_APP_VERSION}`,
+			// Backs the free-disk figure in the Fleet runner indicator.
+			// Optional by contract — an unreadable volume reports nothing
+			// rather than failing the heartbeat that carries everything else.
+			diskProbe: createDiskProbe()
 		},
 		fs: createConfigFileSystem(),
 		configPath: defaultConfigPath(),

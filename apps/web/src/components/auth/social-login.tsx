@@ -17,9 +17,28 @@ const providerIcons: Record<OAuthProvider, ComponentType<{ className?: string }>
 
 interface SocialLoginButtonsProps {
     providers: OAuthProvider[];
+    /**
+     * Block the providers when the surrounding page has a precondition the
+     * buttons would otherwise walk straight past.
+     *
+     * Registration needs this: its consent checkbox is `required`, but these
+     * are `type="button"` inside that form, so clicking one never runs HTML5
+     * constraint validation and never reaches the submit handler. An account
+     * was created with the box unticked.
+     *
+     * Optional and defaulting to false so the login page — which has no such
+     * precondition — is unchanged.
+     */
+    disabled?: boolean;
+    /** Shown when `disabled`, so the buttons are not mysteriously inert. */
+    disabledReason?: string;
 }
 
-export function SocialLoginButtons({ providers }: SocialLoginButtonsProps) {
+export function SocialLoginButtons({
+    providers,
+    disabled = false,
+    disabledReason,
+}: SocialLoginButtonsProps) {
     const t = useTranslations('auth.login');
     const [isPending, startTransition] = useTransition();
     const isSingleProvider = providers.length === 1;
@@ -58,7 +77,9 @@ export function SocialLoginButtons({ providers }: SocialLoginButtonsProps) {
                         key={provider}
                         type="button"
                         onClick={() => handleConnectProvider(provider)}
-                        disabled={isPending}
+                        disabled={isPending || disabled}
+                        title={disabled ? disabledReason : undefined}
+                        aria-disabled={isPending || disabled}
                         variant="secondary"
                         className="h-10 gap-2 text-sm"
                     >

@@ -13,6 +13,8 @@ import {
     FLEET_DEFAULT_MAX_CAPABILITY_TAGS,
     FLEET_DEFAULT_NODE_OFFLINE_AFTER_MS,
     FLEET_ENROLLABLE_NODE_KINDS,
+    FLEET_MAX_CLI_VERSION_LENGTH,
+    FLEET_MAX_DISK_FREE_BYTES,
     FLEET_MAX_NODE_NAME_LENGTH,
     FLEET_MAX_PLATFORM_LENGTH,
     FLEET_MAX_VERSION_LENGTH,
@@ -123,6 +125,17 @@ export interface EnrollInput {
     platform?: string;
     version?: string;
     capabilities?: string[];
+    /**
+     * Version of the AGENT CLI on the machine (not the daemon's own).
+     *
+     * OPTIONAL and BACKWARD-COMPATIBLE by contract: a daemon that
+     * predates the field omits it, and `heartbeat` leaves the stored
+     * value untouched rather than nulling it. That asymmetry is the
+     * whole compatibility story — see the comment in `heartbeat`.
+     */
+    cliVersion?: string;
+    /** Free bytes on the node's workspace volume. Same optional contract. */
+    diskFreeBytes?: number;
 }
 
 export interface EnrollResult {
@@ -256,6 +269,12 @@ export class FleetService {
             platform: sanitizeText(input.platform, FLEET_MAX_PLATFORM_LENGTH),
             version: sanitizeText(input.version, FLEET_MAX_VERSION_LENGTH),
             capabilities: sanitizeCapabilities(input.capabilities),
+            // Telemetry is set (possibly to null) on ENROLL because the
+            // row is brand new — there is no earlier reading to preserve.
+            // Heartbeat is the opposite case and treats absent as
+            // "leave alone"; see the comment there.
+            cliVersion: sanitizeText(input.cliVersion, FLEET_MAX_CLI_VERSION_LENGTH),
+            diskFreeBytes: sanitizeByteCount(input.diskFreeBytes),
         };
         // CAS: single-use by construction — a raced duplicate enroll
         // matches zero rows and gets the same null as a bad token.
@@ -324,6 +343,18 @@ export class FleetService {
         if (platform) patch.platform = platform;
         const version = sanitizeText(refresh.version, FLEET_MAX_VERSION_LENGTH);
         if (version) patch.version = version;
+        // BACKWARD COMPATIBILITY, stated precisely: a heartbeat that
+        // omits a telemetry field leaves the stored value alone. That is
+        // what lets an OLDER daemon — one built before `cliVersion` /
+        // `diskFreeBytes` existed — keep beating without wiping columns a
+        // newer build populated, and it is why these are `if (value)`
+        // rather than unconditional assignments. A node that genuinely
+        // wants to clear a reading re-enrolls; nothing in the fleet needs
+        // "report nothing" to mean "erase".
+        const cliVersion = sanitizeText(refresh.cliVersion, FLEET_MAX_CLI_VERSION_LENGTH);
+        if (cliVersion) patch.cliVersion = cliVersion;
+        const diskFreeBytes = sanitizeByteCount(refresh.diskFreeBytes);
+        if (diskFreeBytes !== null) patch.diskFreeBytes = diskFreeBytes;
 
         await this.repository.update(node.id, patch);
         return { node: this.toView({ ...node, ...patch }) };
@@ -336,13 +367,31 @@ export class FleetService {
      * (best-effort, `kind: 'k8s'`, never persisted).
      */
     async listForUser(userId: string): Promise<FleetNodeView[]> {
+        const rows = await this.listEnrolledForUser(userId);
+        const clusterNodes = await this.listOwnClusterNodes(userId);
+        return [...rows, ...clusterNodes];
+    }
+
+    /**
+     * The owner's ENROLLED rows only — same offline sweep as
+     * {@link listForUser}, without the live cluster merge.
+     *
+     * Split out because the cluster merge talks to the user's Kubernetes
+     * API through the deployment plugin, and two callers must never pay
+     * for that: the runner-status pill (polled every 30s from every
+     * dashboard page) and the run router (on the dispatch hot path). It
+     * would also be actively wrong for them — a cluster node is not a
+     * runner the platform can lease work onto, so counting one would
+     * have the pill claim capacity that cannot execute anything and the
+     * router route work to a machine that will never poll for it.
+     */
+    async listEnrolledForUser(userId: string): Promise<FleetNodeView[]> {
         await this.repository.sweepOffline(
             userId,
             new Date(Date.now() - config.fleet.getNodeOfflineAfterMs()),
         );
         const rows = await this.repository.findByUser(userId);
-        const clusterNodes = await this.listOwnClusterNodes(userId);
-        return [...rows.map((row) => this.toView(row)), ...clusterNodes];
+        return rows.map((row) => this.toView(row));
     }
 
     /**
@@ -710,8 +759,27 @@ export class FleetService {
             createdAt: node.createdAt ? toIso(node.createdAt) : null,
             persisted: true,
             capabilitiesPinned: Boolean(node.capabilitiesPinned),
+            cliVersion: node.cliVersion ?? null,
+            // `bigint` comes back as a STRING on Postgres and a number on
+            // sqlite. Normalizing HERE — the one place an entity becomes
+            // a wire view — is what stops `"12345" > 0` style bugs from
+            // reaching the UI on one driver and not the other.
+            diskFreeBytes: toOptionalNumber(node.diskFreeBytes),
         };
     }
+}
+
+/**
+ * Coerce a `bigint` column value (string on Postgres, number on sqlite,
+ * null when unset) into a plain number or null. Values that are not
+ * finite non-negative numbers collapse to null rather than propagating a
+ * NaN into a JSON response.
+ */
+function toOptionalNumber(value: string | number | null | undefined): number | null {
+    if (value === null || value === undefined) return null;
+    const parsed = typeof value === 'number' ? value : Number(value);
+    if (!Number.isFinite(parsed) || parsed < 0) return null;
+    return parsed;
 }
 
 /**
@@ -726,6 +794,21 @@ function credentialIssuedAtMs(node: FleetNode): number {
     if (issued instanceof Date) return issued.getTime();
     if (typeof issued === 'string') return new Date(issued).getTime();
     return NaN;
+}
+
+/**
+ * Accept a node-reported byte count, or refuse it.
+ *
+ * Refuses (returns null) rather than clamps: a machine reporting a
+ * negative, non-integral or absurd free-space figure has a broken probe
+ * — or is lying — and clamping would turn that into a plausible-looking
+ * number the operator would then act on. `null` renders as "unknown",
+ * which is the honest answer.
+ */
+function sanitizeByteCount(value: unknown): number | null {
+    if (typeof value !== 'number' || !Number.isFinite(value)) return null;
+    if (value < 0 || value > FLEET_MAX_DISK_FREE_BYTES) return null;
+    return Math.floor(value);
 }
 
 function sanitizeText(value: unknown, maxLength: number): string | null {

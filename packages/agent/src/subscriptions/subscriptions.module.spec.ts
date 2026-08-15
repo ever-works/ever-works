@@ -1,4 +1,5 @@
 import * as subscriptionsBarrel from './index';
+import { AgentRunRepository } from '../database/repositories/agent-run.repository';
 import { SubscriptionsModule } from './subscriptions.module';
 import { SubscriptionService } from './subscription.service';
 import { UsageLedgerService } from './usage-ledger.service';
@@ -37,6 +38,18 @@ import {
     USAGE_SUMMARY_GROUP_BYS,
     UsageSummaryService,
 } from './credits/usage-summary.service';
+import {
+    COSTS_DAILY_MAX_SERIES,
+    COSTS_DEFAULT_WINDOW_DAYS,
+    COSTS_OTHER_SERIES_KEY,
+    COSTS_TOP_RUNS_DEFAULT_LIMIT,
+    COSTS_TOP_RUNS_MAX_LIMIT,
+    COSTS_UNATTRIBUTED_SERIES_KEY,
+    COSTS_WINDOW_DAYS,
+    CostsSummaryService,
+    InvalidCostsWindowError,
+    resolveCostsWindow,
+} from './credits/costs-summary.service';
 
 /**
  * Pins the public `@ever-works/agent/subscriptions` barrel surface and the
@@ -86,6 +99,17 @@ describe('SubscriptionsModule + barrel re-exports', () => {
             expect(subscriptionsBarrel.resolveUsageSummaryWindow).toBe(resolveUsageSummaryWindow);
             expect(subscriptionsBarrel.InvalidUsagePeriodError).toBe(InvalidUsagePeriodError);
             expect(subscriptionsBarrel.USAGE_SUMMARY_GROUP_BYS).toBe(USAGE_SUMMARY_GROUP_BYS);
+        });
+
+        it('re-exports the costs-dashboard surface', () => {
+            expect(subscriptionsBarrel.CostsSummaryService).toBe(CostsSummaryService);
+            expect(subscriptionsBarrel.resolveCostsWindow).toBe(resolveCostsWindow);
+            expect(subscriptionsBarrel.InvalidCostsWindowError).toBe(InvalidCostsWindowError);
+            expect(subscriptionsBarrel.COSTS_WINDOW_DAYS).toBe(COSTS_WINDOW_DAYS);
+            // The window vocabulary is a wire contract: the API DTO
+            // validates against it and the web selector renders it.
+            expect(COSTS_WINDOW_DAYS).toEqual([7, 30, 90]);
+            expect(COSTS_DEFAULT_WINDOW_DAYS).toBe(30);
         });
 
         it('re-exports the account-wide CSV export column contract (B29)', () => {
@@ -194,6 +218,17 @@ describe('SubscriptionsModule + barrel re-exports', () => {
                     'USAGE_SUMMARY_GROUP_BYS',
                     // Account-wide usage CSV export (B29)
                     'USAGE_EXPORT_COLUMNS',
+                    // Costs dashboard aggregations
+                    'CostsSummaryService',
+                    'resolveCostsWindow',
+                    'InvalidCostsWindowError',
+                    'COSTS_WINDOW_DAYS',
+                    'COSTS_DEFAULT_WINDOW_DAYS',
+                    'COSTS_TOP_RUNS_DEFAULT_LIMIT',
+                    'COSTS_TOP_RUNS_MAX_LIMIT',
+                    'COSTS_DAILY_MAX_SERIES',
+                    'COSTS_UNATTRIBUTED_SERIES_KEY',
+                    'COSTS_OTHER_SERIES_KEY',
                 ].sort(),
             );
         });
@@ -227,6 +262,21 @@ describe('SubscriptionsModule + barrel re-exports', () => {
         it('declares + exports UsageSummaryService (Wave 13 — consumed by apps/api CreditsController)', () => {
             expect(getMeta('providers')).toContain(UsageSummaryService);
             expect(getMeta('exports')).toContain(UsageSummaryService);
+        });
+
+        it('declares + exports CostsSummaryService (consumed by apps/api CostsController)', () => {
+            expect(getMeta('providers')).toContain(CostsSummaryService);
+            expect(getMeta('exports')).toContain(CostsSummaryService);
+        });
+
+        it('provides AgentRunRepository locally so CostsSummaryService can resolve it', () => {
+            // AgentRunRepository is owned by AgentsModule, not the
+            // DatabaseModule repository inventory — without this local
+            // provider CostsSummaryService fails to instantiate at boot.
+            expect(getMeta('providers')).toContain(AgentRunRepository);
+            // Module-local on purpose: exporting it would hand consumers a
+            // second AgentRunRepository instance beside AgentsModule's.
+            expect(getMeta('exports')).not.toContain(AgentRunRepository);
         });
 
         it('binds the abstract BillingProvider token through a config-driven factory', () => {

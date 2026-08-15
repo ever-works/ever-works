@@ -1,8 +1,10 @@
 import { Injectable, Logger } from '@nestjs/common';
 import { AgentRepository } from '../database/repositories/agent.repository';
 import { AgentExportService } from '../agents/agent-export.service';
+import { Optional } from '@nestjs/common';
 import { SkillRepository } from '../database/repositories/skill.repository';
 import { SkillBindingRepository } from '../database/repositories/skill-binding.repository';
+import { SkillFileRepository } from '../database/repositories/skill-file.repository';
 import { TaskRepository } from '../database/repositories/task.repository';
 import {
     TaskAssigneeRepository,
@@ -45,6 +47,11 @@ export class AgentsSkillsTasksExportService {
         private readonly reviewers: TaskReviewerRepository,
         private readonly approvers: TaskApproverRepository,
         private readonly chat: TaskChatMessageRepository,
+        // Skill files feature — companion-file metadata rides along with
+        // each exported skill. Trailing + @Optional() so existing
+        // positional constructor calls (unit tests) keep working; unbound
+        // → skills export exactly as before, without `files`.
+        @Optional() private readonly skillFiles?: SkillFileRepository,
     ) {}
 
     async exportTail(
@@ -99,6 +106,21 @@ export class AgentsSkillsTasksExportService {
                 injectIntoAgent: b.injectIntoAgent,
                 injectIntoGenerator: b.injectIntoGenerator,
             }));
+            // Skill files feature — companion-file metadata (bytes stay in
+            // the uploads spine; uploadId is the content sha256). One of
+            // the THREE whitelist places for new skill fields — the others
+            // are `ExportedSkill` (types) and the import service.
+            const files = this.skillFiles
+                ? (await this.skillFiles.findBySkillId(skill.id, userId).catch(() => [])).map(
+                      (f) => ({
+                          uploadId: f.uploadId,
+                          filename: f.filename,
+                          kind: f.kind,
+                          sizeBytes: f.sizeBytes,
+                          mime: f.mime,
+                      }),
+                  )
+                : [];
             out.push({
                 __kind: 'skill',
                 ownerType: skill.ownerType,
@@ -114,6 +136,8 @@ export class AgentsSkillsTasksExportService {
                 sourceCatalogVersion: skill.sourceCatalogVersion ?? null,
                 version: skill.version,
                 bindings,
+                invocationSlug: skill.invocationSlug ?? null,
+                files,
             });
         }
         return out;

@@ -3,22 +3,34 @@ import {
     IsArray,
     IsBoolean,
     IsIn,
+    IsInt,
     IsOptional,
     IsString,
     IsUUID,
+    Max,
     MaxLength,
+    Min,
     MinLength,
+    ValidateIf,
 } from 'class-validator';
 import {
     FLEET_CREDENTIAL_MAX_LENGTH,
     FLEET_CREDENTIAL_MIN_LENGTH,
     FLEET_ENROLLABLE_NODE_KINDS,
+    FLEET_EXECUTION_MODES,
+    FLEET_EXECUTION_SCOPE_TYPES,
+    FLEET_MAX_CLI_VERSION_LENGTH,
+    FLEET_MAX_DISK_FREE_BYTES,
     FLEET_MAX_NODE_NAME_LENGTH,
     FLEET_MAX_PLATFORM_LENGTH,
     FLEET_MAX_VERSION_LENGTH,
     FLEET_MIN_NODE_NAME_LENGTH,
 } from '@ever-works/contracts';
-import type { FleetEnrollableNodeKind } from '@ever-works/contracts';
+import type {
+    FleetEnrollableNodeKind,
+    FleetExecutionMode,
+    FleetExecutionScopeType,
+} from '@ever-works/contracts';
 import {
     MaxConfiguredCapabilityTagLength,
     MaxConfiguredCapabilityTags,
@@ -157,6 +169,39 @@ export class FleetNodeSelfDescriptionDto {
     @IsString({ each: true })
     @MaxConfiguredCapabilityTagLength({ each: true })
     capabilities?: string[];
+
+    /**
+     * Version of the AGENT CLI on the machine — the binary an
+     * `agent-task` step shells out to — as opposed to `version`, which
+     * is the daemon's own.
+     *
+     * Optional here AND optional in the service, which is what keeps
+     * older daemons working: they send nothing, and a heartbeat that
+     * omits the field leaves the stored value untouched instead of
+     * clearing it.
+     */
+    @ApiProperty({
+        required: false,
+        maxLength: FLEET_MAX_CLI_VERSION_LENGTH,
+        description: 'Version of the agent CLI installed on the node, e.g. "1.4.2".',
+    })
+    @IsOptional()
+    @IsString()
+    @MaxLength(FLEET_MAX_CLI_VERSION_LENGTH)
+    cliVersion?: string;
+
+    /** Free bytes on the node's workspace volume. Same optional contract. */
+    @ApiProperty({
+        required: false,
+        minimum: 0,
+        maximum: FLEET_MAX_DISK_FREE_BYTES,
+        description: "Free bytes on the volume the node's workspace lives on.",
+    })
+    @IsOptional()
+    @IsInt()
+    @Min(0)
+    @Max(FLEET_MAX_DISK_FREE_BYTES)
+    diskFreeBytes?: number;
 }
 
 /**
@@ -233,3 +278,58 @@ export class FleetNodePauseDto extends FleetNodeCredentialDto {
  * credential worthless from that moment on.
  */
 export class FleetUnenrollDto extends FleetNodeCredentialDto {}
+
+/**
+ * Request body for `PUT /api/fleet/execution-preference` — set (or
+ * change) where runs in one scope should execute.
+ *
+ * `scopeId` is conditionally required rather than blanket-optional. A
+ * `work` row without an id would silently behave like an account-wide
+ * default and a `user` row carrying one would be invisible to
+ * resolution: both are "saved fine, did nothing" failures, and the
+ * service re-validates the same pairing as the single source of truth.
+ */
+export class SetFleetExecutionPreferenceDto {
+    @ApiProperty({
+        enum: FLEET_EXECUTION_SCOPE_TYPES,
+        description:
+            "What the preference applies to. 'user' is the account-wide default; 'work' and 'goal' narrow it.",
+    })
+    @IsIn(FLEET_EXECUTION_SCOPE_TYPES)
+    scopeType: FleetExecutionScopeType;
+
+    @ApiProperty({
+        required: false,
+        format: 'uuid',
+        description:
+            "Id of the Work or Goal. REQUIRED for scopeType 'work'/'goal'; must be omitted for 'user'.",
+    })
+    // Only validated (and only allowed) for the narrowing scopes — a
+    // `user` row must not carry an id at all.
+    @ValidateIf((dto: SetFleetExecutionPreferenceDto) => dto.scopeType !== 'user')
+    @IsUUID()
+    scopeId?: string;
+
+    @ApiProperty({
+        enum: FLEET_EXECUTION_MODES,
+        description:
+            "'local-wait' runs on the fleet and waits for a free runner slot; 'local-fallback' prefers the fleet but runs in the cloud (with a notification) when no runner can take it; 'cloud' always uses the platform runtime.",
+    })
+    @IsIn(FLEET_EXECUTION_MODES)
+    mode: FleetExecutionMode;
+}
+
+/**
+ * Query for `DELETE /api/fleet/execution-preference` — clear one scope
+ * so it inherits from the next scope out.
+ */
+export class ClearFleetExecutionPreferenceDto {
+    @ApiProperty({ enum: FLEET_EXECUTION_SCOPE_TYPES })
+    @IsIn(FLEET_EXECUTION_SCOPE_TYPES)
+    scopeType: FleetExecutionScopeType;
+
+    @ApiProperty({ required: false, format: 'uuid' })
+    @ValidateIf((dto: ClearFleetExecutionPreferenceDto) => dto.scopeType !== 'user')
+    @IsUUID()
+    scopeId?: string;
+}

@@ -38,6 +38,7 @@ export async function getConversation(id: string): Promise<ConversationDetail> {
 export async function createConversation(
     providerId?: string,
     title?: string,
+    model?: string,
 ): Promise<ConversationSummary> {
     // Security: defense-in-depth auth guard at the web tier (see listConversations).
     const user = await getAuthFromCookie();
@@ -45,7 +46,22 @@ export async function createConversation(
         redirect(ROUTES.AUTH_LOGIN);
     }
 
-    return conversationsAPI.create({ providerId, title });
+    return conversationsAPI.create({ providerId, title, model });
+}
+
+/**
+ * Persist the model a conversation is pinned to, so re-opening the thread
+ * restores the user's choice instead of falling back to whatever the browser
+ * last used. Pass `null` to clear the pin back to the provider default.
+ */
+export async function updateConversationModel(id: string, model: string | null): Promise<void> {
+    // Security: defense-in-depth auth guard at the web tier (see listConversations).
+    const user = await getAuthFromCookie();
+    if (!user) {
+        redirect(ROUTES.AUTH_LOGIN);
+    }
+
+    await conversationsAPI.updateModel(id, model);
 }
 
 export async function deleteConversation(id: string): Promise<void> {

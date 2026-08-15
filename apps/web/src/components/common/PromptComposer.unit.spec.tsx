@@ -314,3 +314,52 @@ describe('PromptComposer dictation', () => {
         expect(screen.queryByTestId(`${TEST_ID}-voice-bar`)).toBeNull();
     });
 });
+
+/**
+ * Skills feature — invocation slugs. Regression guard: the `/slug`
+ * autocomplete must NOT be mounted on this composer. Its text goes to
+ * entity-creation server actions (`/new`, `/works/new`, Missions /
+ * Ideas / Agents / Works quick-add), never to an `AgentRunService`
+ * chat-kind run — the only place a leading `/<invocation-slug>` is
+ * resolved. Offering it here promises an injection that never happens
+ * and writes a literal "/plan " into the created entity's description.
+ */
+describe('PromptComposer slash commands', () => {
+    it('does not open a slash-command popup for a leading "/" (wrong surface)', async () => {
+        const fetchMock = vi.fn((_url: RequestInfo | URL) =>
+            Promise.resolve({
+                ok: true,
+                json: () =>
+                    Promise.resolve({
+                        data: [
+                            {
+                                id: 's1',
+                                title: 'Planning Guide',
+                                invocationSlug: 'plan',
+                                description: 'plan things',
+                            },
+                        ],
+                    }),
+            } as unknown as Response),
+        );
+        vi.stubGlobal('fetch', fetchMock);
+        try {
+            render(<Harness />);
+            const textarea = screen.getByTestId(TEST_ID) as HTMLTextAreaElement;
+            fireEvent.change(textarea, { target: { value: '/' } });
+            await act(async () => {
+                await Promise.resolve();
+            });
+
+            expect(screen.queryByTestId('composer-slash-popup')).toBeNull();
+            // And the composer never reaches for the invocable-skills list.
+            expect(
+                fetchMock.mock.calls.some(([url]) => String(url).includes('/api/skills/invocable')),
+            ).toBe(false);
+            // The typed text is left exactly as the user typed it.
+            expect(textarea.value).toBe('/');
+        } finally {
+            vi.unstubAllGlobals();
+        }
+    });
+});

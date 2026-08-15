@@ -73,6 +73,10 @@ describe('activity-log.types', () => {
             ['GIT_PUSHED', 'git_pushed'],
             ['GIT_COMMITTED', 'git_committed'],
             ['GIT_MERGED', 'git_merged'],
+            // Agent Collaborators — sub-agent delegation allow-list edits.
+            ['AGENT_COLLABORATOR_ENABLED', 'agent_collaborator_enabled'],
+            ['AGENT_COLLABORATOR_DISABLED', 'agent_collaborator_disabled'],
+            ['AGENT_COLLABORATOR_REMOVED', 'agent_collaborator_removed'],
             // MCP connections (agent-plugins MCP slice, plan §2.4) — manual
             // connection lifecycle + per-agent binding changes.
             ['MCP_CONNECTION_CREATED', 'mcp_connection_created'],
@@ -121,10 +125,16 @@ describe('activity-log.types', () => {
             //    ingestion, audit item j) -> 121.
             // +1 idea_deleted (Idea delete, #1997) -> 122.
             // +1 agent_unarchived (Agent archive/restore, #1994) -> 123.
+            // +3 memory_folder_created / _deleted / _synced (Memory Files —
+            //    the /memory Files area folder tree) -> 126.
+            // +3 agent_collaborator_enabled / _disabled / _removed
+            //    (Agent Collaborators allow-list edits) -> 129.
             // +5 mcp_connection_created / mcp_connection_updated /
             //    mcp_connection_deleted / mcp_connection_tested /
-            //    mcp_binding_updated (agent-plugins MCP slice) -> 128.
-            expect(literals).toHaveLength(128);
+            //    mcp_binding_updated (agent-plugins MCP slice) -> 134.
+            // NOTE: this pin is set by COUNTING the merged enum, not by
+            // adding deltas — the running total above is narrative only.
+            expect(literals).toHaveLength(134);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

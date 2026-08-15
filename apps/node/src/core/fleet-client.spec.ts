@@ -117,6 +117,36 @@ describe('enroll', () => {
 		expect(JSON.parse(calls[0].init.body)).toEqual({ token: TOKEN });
 	});
 
+	it('carries the runner telemetry fields onto the wire', async () => {
+		// REGRESSION: `selfDescription` is an explicit whitelist, and it
+		// named only platform/version/capabilities. The probes computed
+		// `cliVersion` + `diskFreeBytes` on every enroll and beat and the
+		// client dropped them, so the columns, the settings table and the
+		// runner popover stayed empty forever on a fully-updated fleet.
+		const { fetchFn, calls } = fakeFetch(() => ({
+			status: 201,
+			body: { nodeId: NODE_ID, secret: SECRET, node: nodeView }
+		}));
+
+		await client(fetchFn).enroll({
+			token: TOKEN,
+			platform: 'linux/x64',
+			version: '0.1.0',
+			capabilities: ['os:linux'],
+			cliVersion: 'claude 1.4.2',
+			diskFreeBytes: 900_000_000
+		});
+
+		expect(JSON.parse(calls[0].init.body)).toEqual({
+			token: TOKEN,
+			platform: 'linux/x64',
+			version: '0.1.0',
+			capabilities: ['os:linux'],
+			cliVersion: 'claude 1.4.2',
+			diskFreeBytes: 900_000_000
+		});
+	});
+
 	it('surfaces an invalid/expired/used token as a single undifferentiated unauthorized error', async () => {
 		const { fetchFn } = fakeFetch(() => ({
 			status: 401,
@@ -206,6 +236,25 @@ describe('heartbeat', () => {
 			secret: SECRET,
 			capabilities: ['os:linux', 'git']
 		});
+	});
+
+	it('refreshes the runner telemetry, and OMITS what the probes could not read', async () => {
+		// Omission is load-bearing on this path: the server treats an
+		// absent telemetry field as "leave the stored reading alone", so a
+		// beat whose disk probe failed must not blank a good value — and a
+		// beat whose probe DID answer must actually send it.
+		const { fetchFn, calls } = fakeFetch(() => ({ status: 200, body: { ok: true, node: nodeView } }));
+
+		await client(fetchFn).heartbeat({
+			nodeId: NODE_ID,
+			secret: SECRET,
+			platform: 'linux/x64',
+			cliVersion: 'codex 0.9.1'
+		});
+
+		const body = JSON.parse(calls[0].init.body);
+		expect(body.cliVersion).toBe('codex 0.9.1');
+		expect(body).not.toHaveProperty('diskFreeBytes');
 	});
 
 	it('reports a revoked/disabled node as unauthorized with an actionable message', async () => {

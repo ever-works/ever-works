@@ -318,6 +318,20 @@ export class FleetClient {
 }
 
 /** Only send self-description fields that are actually set. */
+/**
+ * Project the self-description onto the wire body.
+ *
+ * An explicit copy rather than a spread, so an unrelated field on the
+ * request object can never leak into a `@Public()` body. That makes it
+ * the one place a NEW description field has to be added: a field this
+ * function does not name is a field the machine computes, logs and then
+ * silently never sends — which is exactly how `cliVersion` /
+ * `diskFreeBytes` were wired at the probe end only.
+ *
+ * `undefined` is preserved as ABSENT, never sent as null: the server's
+ * heartbeat reads an absent telemetry field as "leave the stored reading
+ * alone", so a transient probe failure must not wipe a good value.
+ */
 function selfDescription(source: NodeSelfDescription): NodeSelfDescription {
 	const out: NodeSelfDescription = {};
 	if (source.platform !== undefined) {
@@ -328,6 +342,12 @@ function selfDescription(source: NodeSelfDescription): NodeSelfDescription {
 	}
 	if (source.capabilities !== undefined) {
 		out.capabilities = source.capabilities;
+	}
+	if (source.cliVersion !== undefined) {
+		out.cliVersion = source.cliVersion;
+	}
+	if (source.diskFreeBytes !== undefined) {
+		out.diskFreeBytes = source.diskFreeBytes;
 	}
 	return out;
 }

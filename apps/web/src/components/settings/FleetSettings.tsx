@@ -30,6 +30,7 @@ import {
 import type {
     CreateFleetEnrollmentTokenResponse,
     FleetEnrollmentTokenView,
+    FleetExecutionPreferenceView,
     FleetNodeDetailView,
     FleetNodeKind,
     FleetNodeView,
@@ -44,7 +45,9 @@ import {
     rotateFleetNodeCredentialAction,
     updateFleetNodeAction,
 } from '@/app/actions/settings/fleet';
+import { formatBytes } from '@/components/dashboard/runner-status.shared';
 import { FleetEnrollHandoff } from './FleetEnrollHandoff';
+import { FleetExecutionPreferences } from './FleetExecutionPreferences';
 import { FleetNodeDrawer } from './FleetNodeDrawer';
 import { FleetTokensSection } from './FleetTokensSection';
 
@@ -58,6 +61,9 @@ interface FleetSettingsProps {
     apiBaseUrl: string;
     desktopDownloadUrl: string;
     nodeDownloadUrl: string;
+    /** Execution routing preferences (account-wide + narrower overrides). */
+    initialPreferences: FleetExecutionPreferenceView[];
+    preferencesError: string | null;
 }
 
 const ENROLLABLE_KINDS: Exclude<FleetNodeKind, 'k8s'>[] = ['desktop-node', 'node'];
@@ -101,6 +107,8 @@ export function FleetSettings({
     apiBaseUrl,
     desktopDownloadUrl,
     nodeDownloadUrl,
+    initialPreferences,
+    preferencesError,
 }: FleetSettingsProps) {
     const t = useTranslations('dashboard.settings.fleet');
     const [nodes, setNodes] = useState<FleetNodeView[]>(initialNodes);
@@ -407,6 +415,12 @@ export function FleetSettings({
                                     {t('table.platform')}
                                 </th>
                                 <th className="px-4 py-2.5 font-medium text-text-muted dark:text-text-muted-dark">
+                                    {t('table.cliVersion')}
+                                </th>
+                                <th className="px-4 py-2.5 font-medium text-text-muted dark:text-text-muted-dark">
+                                    {t('table.diskFree')}
+                                </th>
+                                <th className="px-4 py-2.5 font-medium text-text-muted dark:text-text-muted-dark">
                                     {t('table.load')}
                                 </th>
                                 <th className="px-4 py-2.5 font-medium text-text-muted dark:text-text-muted-dark">
@@ -451,6 +465,22 @@ export function FleetSettings({
                                     </td>
                                     <td className="px-4 py-3 text-text-muted dark:text-text-muted-dark">
                                         {node.platform ?? '-'}
+                                    </td>
+                                    {/* Same two telemetry fields the sidebar
+                                        runner popover shows, so the pill and
+                                        this table can never tell different
+                                        stories about the same machine. */}
+                                    <td
+                                        className="px-4 py-3 text-text-muted dark:text-text-muted-dark whitespace-nowrap"
+                                        data-testid={`fleet-node-cli-${node.id}`}
+                                    >
+                                        {node.cliVersion ?? t('table.cliNotInstalled')}
+                                    </td>
+                                    <td
+                                        className="px-4 py-3 text-text-muted dark:text-text-muted-dark whitespace-nowrap"
+                                        data-testid={`fleet-node-disk-${node.id}`}
+                                    >
+                                        {formatBytes(node.diskFreeBytes) ?? '-'}
                                     </td>
                                     <td className="px-4 py-3">
                                         {(() => {
@@ -561,6 +591,11 @@ export function FleetSettings({
                     </table>
                 </div>
             )}
+
+            <FleetExecutionPreferences
+                initialPreferences={initialPreferences}
+                error={preferencesError}
+            />
 
             <FleetTokensSection
                 tokens={tokens}

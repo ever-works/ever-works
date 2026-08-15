@@ -24,6 +24,7 @@ import {
 import { Throttle } from '@nestjs/throttler';
 import { IsOptional, IsString, Matches, MaxLength } from 'class-validator';
 import { AiFacadeService, TranscriptionNotConfiguredError } from '@ever-works/agent/facades';
+import { PluginOperationsService } from '@ever-works/agent/plugins';
 import { config } from '@ever-works/agent/config';
 import { AuthSessionGuard, CurrentUser } from '../../auth';
 import { AuthenticatedUser } from '../../auth/types/auth.types';
@@ -93,7 +94,10 @@ export class TranscribeDto {
 export class TranscriptionController {
     private readonly logger = new Logger(TranscriptionController.name);
 
-    constructor(private readonly aiFacade: AiFacadeService) {}
+    constructor(
+        private readonly aiFacade: AiFacadeService,
+        private readonly pluginOperations: PluginOperationsService,
+    ) {}
 
     /**
      * The platform-wide default voice provider, if an operator set one.
@@ -123,10 +127,19 @@ export class TranscriptionController {
     })
     @ApiResponse({ status: 200, description: '{ providers: [{ id, name, isActive }] }' })
     async listProviders(@CurrentUser() auth: AuthenticatedUser) {
-        const providers = await this.aiFacade.listTranscriptionProviders({
-            userId: auth.userId,
-        });
-        return { providers, configuredDefault: this.defaultProviderId() ?? null };
+        const [providers, selectedDefault] = await Promise.all([
+            this.aiFacade.listTranscriptionProviders({ userId: auth.userId }),
+            this.pluginOperations.getGlobalVoiceDefault(auth.userId),
+        ]);
+        // `selectedDefault` is the account's own pick (Settings → Plugins → AI
+        // Providers) and is what the settings UI renders as selected;
+        // `configuredDefault` remains the operator's env-level fallback, which
+        // only applies when the account has expressed no preference.
+        return {
+            providers,
+            selectedDefault,
+            configuredDefault: this.defaultProviderId() ?? null,
+        };
     }
 
     @Post()
@@ -178,6 +191,14 @@ export class TranscriptionController {
             });
         }
 
+        // The account's Settings choice acts exactly like an explicit
+        // per-request pick, because it IS one — just made once, in the place
+        // where swapping speech vendors belongs, instead of re-made beside
+        // every message. An explicit `providerId` on the request still wins,
+        // so API clients and future surfaces keep the narrower lever.
+        const selectedProviderId =
+            body.providerId ?? (await this.pluginOperations.getGlobalVoiceDefault(auth.userId));
+
         try {
             const result = await this.aiFacade.transcribe(
                 {
@@ -187,10 +208,11 @@ export class TranscriptionController {
                 },
                 {
                     userId: auth.userId,
-                    // Only an explicit per-request pick pins a provider.
-                    // Everything else flows through the facade's chain so
-                    // tenant activation keeps its precedence.
-                    providerOverride: body.providerId,
+                    // Only an explicit pick (per-request, or the account's
+                    // saved one) pins a provider. Everything else flows
+                    // through the facade's chain so tenant activation keeps
+                    // its precedence.
+                    providerOverride: selectedProviderId ?? undefined,
                 },
                 { fallbackProviderId: this.defaultProviderId() },
             );

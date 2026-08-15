@@ -58,6 +58,28 @@ function mountCard(
     return onSave;
 }
 
+/**
+ * Wait until the card has the resolved policy.
+ *
+ * The whole card renders immediately — switches, reset buttons, the summary —
+ * while `mp-summary` reads "Loading the effective policy…" until the resolver
+ * answers (`lib/merge-policy.ts`: `if (!policy) return …`). So `findByTestId`
+ * hands back a control that exists but is not yet backed by data: a click lands
+ * on a pre-hydration element and the save assertion that follows never sees its
+ * call. It fails only when the resolver is slower than the test — i.e. on a
+ * loaded CI runner, which is exactly where it failed.
+ *
+ * Waiting on the loading text disappearing is the honest barrier: it is the
+ * component's own signal that the policy arrived.
+ */
+async function waitForLoaded() {
+    await waitFor(() =>
+        expect(screen.getByTestId('mp-summary')).not.toHaveTextContent(
+            'Loading the effective policy',
+        ),
+    );
+}
+
 describe('MergePolicyCard', () => {
     beforeEach(() => {
         vi.stubGlobal(
@@ -77,8 +99,12 @@ describe('MergePolicyCard', () => {
     it('renders each field’s owning scope from the resolution chain', async () => {
         mountCard({ allowAgentMerge: true, allowedMergeMethods: ['squash'] });
 
-        expect(await screen.findByTestId('mp-allowAgentMerge-origin')).toHaveTextContent(
-            'Set here',
+        // Wait for the resolved origin label rather than for the element: the
+        // origin badges render alongside mp-summary's loading placeholder, so
+        // findByTestId can hand back a row that has not been populated yet. The
+        // getBy assertions that follow are then safe — one poll settles the card.
+        await waitFor(() =>
+            expect(screen.getByTestId('mp-allowAgentMerge-origin')).toHaveTextContent('Set here'),
         );
         expect(screen.getByTestId('mp-requireGreenGate-origin')).toHaveTextContent(
             'Inherited from tenant',
@@ -101,8 +127,16 @@ describe('MergePolicyCard', () => {
 
     it('summarizes the effective policy in one sentence', async () => {
         mountCard(null);
-        expect(await screen.findByTestId('mp-summary')).toHaveTextContent(
-            'Agents may merge using squash when the quality gate is green.',
+        // findByTestId resolves as soon as the ELEMENT exists — and mp-summary
+        // always exists, rendering "Loading the effective policy…" until the
+        // resolver answers (lib/merge-policy.ts: `if (!policy) return …`). The
+        // synchronous toHaveTextContent then read the placeholder and failed on
+        // a loaded CI runner. Poll the assertion itself, so the wait is for the
+        // CONTENT this test is actually about.
+        await waitFor(() =>
+            expect(screen.getByTestId('mp-summary')).toHaveTextContent(
+                'Agents may merge using squash when the quality gate is green.',
+            ),
         );
     });
 
@@ -116,6 +150,7 @@ describe('MergePolicyCard', () => {
 
     it('reset-to-inherit DELETES the key rather than writing false', async () => {
         const onSave = mountCard({ allowAgentMerge: true, requireGreenGate: false });
+        await waitForLoaded();
 
         fireEvent.click(await screen.findByTestId('mp-requireGreenGate-reset'));
 
@@ -127,13 +162,15 @@ describe('MergePolicyCard', () => {
 
     it('clearing the only override sends null, so the row stores NULL', async () => {
         const onSave = mountCard({ allowAgentMerge: true });
-        fireEvent.click(await screen.findByTestId('mp-allowAgentMerge-reset'));
+        await waitForLoaded();
+        fireEvent.click(screen.getByTestId('mp-allowAgentMerge-reset'));
         await waitFor(() => expect(onSave).toHaveBeenCalledWith(null));
     });
 
     it('toggling a switch writes a PARTIAL that touches one field', async () => {
         const onSave = mountCard(null);
-        fireEvent.click(await screen.findByTestId('mp-requireHumanApproval'));
+        await waitForLoaded();
+        fireEvent.click(screen.getByTestId('mp-requireHumanApproval'));
         await waitFor(() => expect(onSave).toHaveBeenCalledWith({ requireHumanApproval: true }));
     });
 
@@ -166,8 +203,12 @@ describe('MergePolicyCard', () => {
     it('surfaces a save failure instead of pretending it worked', async () => {
         const onSave = vi.fn().mockResolvedValue({ success: false, error: 'Forbidden' });
         mountCard(null, onSave);
-        fireEvent.click(await screen.findByTestId('mp-allowAgentMerge'));
-        expect(await screen.findByTestId('mp-save-error')).toHaveTextContent('Forbidden');
+        await waitForLoaded();
+        fireEvent.click(screen.getByTestId('mp-allowAgentMerge'));
+        // Same shape: wait for the message, not merely for the element.
+        await waitFor(() =>
+            expect(screen.getByTestId('mp-save-error')).toHaveTextContent('Forbidden'),
+        );
     });
 
     it('surfaces an unreachable resolver rather than rendering a fabricated policy', async () => {

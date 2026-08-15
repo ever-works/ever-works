@@ -26,12 +26,20 @@ describe('taxonomy-watcher', () => {
 			const item = JSON.stringify({ name: 'Tool', category: 'Cloud Services', tags: ['cloud'] });
 			await writeFile(join(workspacePath, 'tool.json'), item, 'utf-8');
 
-			// Wait for debounce (50ms) + file read + processing
-			await sleep(300);
+			// Wait for debounce (50ms) + file read + processing. Polled, not a
+			// fixed sleep: on a loaded CI runner 300ms was not always enough and
+			// the read below threw ENOENT before the watcher had written the file.
+			const { readFile: rf } = await import('node:fs/promises');
+			const catPath = join(workspacePath, '_meta', 'categories.json');
+			await waitUntil(() =>
+				rf(catPath, 'utf-8').then(
+					() => true,
+					() => false
+				)
+			);
 
 			// Check that _meta/categories.json was created
-			const { readFile: rf } = await import('node:fs/promises');
-			const catContent = await rf(join(workspacePath, '_meta', 'categories.json'), 'utf-8');
+			const catContent = await rf(catPath, 'utf-8');
 			const categories = JSON.parse(catContent);
 			expect(categories).toEqual([{ id: 'cloud-services', name: 'Cloud Services' }]);
 		} finally {
@@ -200,14 +208,16 @@ describe('taxonomy-watcher', () => {
 					JSON.stringify({ name: 'A', category: 'Cat' }),
 					'utf-8'
 				);
-				await sleep(200);
+				// Both waits expect a callback to FIRE, so poll for it rather than
+				// hoping a fixed sleep outlasts fs-watch latency.
+				await waitUntil(() => onNewItem.mock.calls.length >= 1);
 
 				await writeFile(
 					join(workspacePath, 'item-b.json'),
 					JSON.stringify({ name: 'B', category: 'Cat' }),
 					'utf-8'
 				);
-				await sleep(200);
+				await waitUntil(() => onNewItem.mock.calls.length >= 2);
 
 				expect(onNewItem).toHaveBeenCalledTimes(2);
 				expect(onNewItem).toHaveBeenNthCalledWith(1, 1, 'item-a.json');
@@ -237,13 +247,15 @@ describe('taxonomy-watcher', () => {
 				);
 				await sleep(200);
 
-				// Write a new file — should trigger onNewItem
+				// Write a new file — should trigger onNewItem. This wait expects an
+				// event, so poll. (The sleep above stays: it waits for a NON-event,
+				// which cannot be polled for.)
 				await writeFile(
 					join(workspacePath, 'new-item.json'),
 					JSON.stringify({ name: 'New', category: 'Test' }),
 					'utf-8'
 				);
-				await sleep(200);
+				await waitUntil(() => onNewItem.mock.calls.length >= 1);
 
 				expect(onNewItem).toHaveBeenCalledTimes(1);
 				expect(onNewItem).toHaveBeenCalledWith(1, 'new-item.json');
@@ -262,7 +274,8 @@ describe('taxonomy-watcher', () => {
 					JSON.stringify({ name: 'V1', category: 'Cat' }),
 					'utf-8'
 				);
-				await sleep(200);
+				// Poll for the FIRST call to land...
+				await waitUntil(() => onNewItem.mock.calls.length >= 1);
 
 				// Write again to the same file
 				await writeFile(
@@ -270,6 +283,8 @@ describe('taxonomy-watcher', () => {
 					JSON.stringify({ name: 'V2', category: 'Cat' }),
 					'utf-8'
 				);
+				// ...then a fixed sleep, because this one waits for a NON-event: the
+				// point is that no SECOND call arrives, and absence cannot be polled.
 				await sleep(200);
 
 				expect(onNewItem).toHaveBeenCalledTimes(1);
@@ -301,4 +316,26 @@ describe('taxonomy-watcher', () => {
 
 function sleep(ms: number): Promise<void> {
 	return new Promise((resolve) => setTimeout(resolve, ms));
+}
+
+/**
+ * Poll `check` until it returns true, or give up after `timeoutMs`.
+ *
+ * fs-watch latency is unbounded under CI load, so "write a file, sleep a fixed
+ * 200-300ms, then assert the watcher already reacted" is a race — it fails on a
+ * loaded runner while passing every time locally. The concurrent-writes test
+ * below already learned this and polls; these helpers make that the norm for
+ * every wait that expects something to HAPPEN.
+ *
+ * Note the asymmetry: a wait that asserts something did NOT happen cannot be
+ * polled (there is no state to converge on), so those keep their fixed sleep.
+ * Returns rather than throws — the caller's own assertion should produce the
+ * failure message, not this helper.
+ */
+async function waitUntil(check: () => boolean | Promise<boolean>, timeoutMs = 6000): Promise<void> {
+	const deadline = Date.now() + timeoutMs;
+	while (Date.now() < deadline) {
+		if (await check()) return;
+		await sleep(50);
+	}
 }

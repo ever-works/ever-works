@@ -36,6 +36,7 @@ jest.mock('@ever-works/agent/agents', () => ({
     AGENT_EMAIL_FACADE: 'AGENT_EMAIL_FACADE',
     AGENT_NOTIFY_CHANNEL_FACADE: 'AGENT_NOTIFY_CHANNEL_FACADE',
     AGENT_DOMAIN_TOOL_SOURCES: 'AGENT_DOMAIN_TOOL_SOURCES',
+    SKILL_FILE_CONTENT_READER: 'SKILL_FILE_CONTENT_READER',
     // Agent Plugins MCP slice (T26) — the MCP tool-source seam.
     AGENT_MCP_TOOL_SOURCE: 'AGENT_MCP_TOOL_SOURCE',
 }));
@@ -114,10 +115,19 @@ jest.mock('@ever-works/trigger-tasks', () => ({
     agentHeartbeatTriggerAdapter: {},
     createAgentRunCancellerAdapter: () => ({}),
 }));
+jest.mock('../skills/skills.module', () => ({ SkillsModule: class SkillsModule {} }));
+jest.mock('../skills/skill-file-content-reader.service', () => ({
+    SkillFileContentReaderService: class SkillFileContentReaderService {},
+}));
 jest.mock('../email/email.module', () => ({ EmailModule: class EmailModule {} }));
 jest.mock('../email/email.service', () => ({ EmailService: class EmailService {} }));
 jest.mock('../auth/auth.module', () => ({ AuthModule: class AuthModule {} }));
 jest.mock('./agents.controller', () => ({ AgentsController: class AgentsController {} }));
+// Agent Collaborators — same stub posture as the sibling controllers so
+// the decorator-metadata assertions never drag the DTO/entity graph in.
+jest.mock('./agent-collaborators.controller', () => ({
+    AgentCollaboratorsController: class AgentCollaboratorsController {},
+}));
 jest.mock('./agent-templates.controller', () => ({
     AgentTemplatesController: class AgentTemplatesController {},
 }));
@@ -218,17 +228,25 @@ describe('api-side AgentsModule — domain chat-tool wiring', () => {
         expect(meta('exports')).toContain(AGENT_DOMAIN_TOOL_SOURCES);
     });
 
+    it('binds + exports SKILL_FILE_CONTENT_READER — without it getSkillFile refuses every read', () => {
+        const provider = (meta('providers') as Array<{ provide?: unknown }>).find(
+            (p) => p && typeof p === 'object' && p.provide === 'SKILL_FILE_CONTENT_READER',
+        );
+        expect(provider).toBeDefined();
+        expect(meta('exports')).toContain('SKILL_FILE_CONTENT_READER');
+    });
+
     it('imports McpModule and binds AGENT_MCP_TOOL_SOURCE to the shared McpToolSource', () => {
         // Agent Plugins MCP slice (T26). Without this binding the
         // @Optional() injection in AgentToolService resolves to undefined
         // and no run ever sees an mcp__<server>__<tool> descriptor —
         // exactly the dead-seam failure mode this pin exists to catch.
         expect(meta('imports')).toContain(McpModule);
-        const provider = (meta('providers') as { provide?: unknown; useExisting?: unknown }[]).find(
-            (p) => p && typeof p === 'object' && p.provide === AGENT_MCP_TOOL_SOURCE,
-        );
-        expect(provider).toBeDefined();
-        expect(provider?.useExisting).toBe(McpToolSource);
+        const mcpProvider = (
+            meta('providers') as { provide?: unknown; useExisting?: unknown }[]
+        ).find((p) => p && typeof p === 'object' && p.provide === AGENT_MCP_TOOL_SOURCE);
+        expect(mcpProvider).toBeDefined();
+        expect(mcpProvider?.useExisting).toBe(McpToolSource);
         expect(meta('exports')).toContain(AGENT_MCP_TOOL_SOURCE);
     });
 

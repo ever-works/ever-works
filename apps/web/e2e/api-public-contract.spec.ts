@@ -74,9 +74,20 @@ const protectedEndpoints = [
     // Fleet registry (Wave 12) — the OWNER half; enroll/heartbeat are
     // deliberately @Public() and asserted separately below.
     '/api/fleet/nodes',
+    // Fleet local-runner polish — the runner-status widget's data
+    // endpoint and the execution-routing preference list. The widget is
+    // rendered on EVERY dashboard page and polls every 30s, so an
+    // accidental @Public() here would leak one account's machine
+    // inventory (names, platforms, versions, free disk) to anyone.
+    '/api/fleet/runner-status',
+    '/api/fleet/execution-preferences',
     // Sessions list (Wave 4 M3) — literal `runs` segment, declared
     // before `:id` so it never reaches ParseUUIDPipe.
     '/api/agents/runs',
+    // Session detail (Feature K) — the drill-in behind a Sessions row.
+    // The guard runs before ParseUUIDPipe, so an unauthenticated call is
+    // 401 even though this uuid belongs to no run.
+    '/api/agents/runs/aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa/detail',
     // Prebuilt agent templates (Wave 10) — the AGENTS-scoped catalog.
     // (`/api/agent-templates`, the repo-backed metadata catalog, is
     // @Public() by design and is asserted separately below.)

@@ -204,3 +204,22 @@ export class SetGlobalPipelineDefaultDto {
     @IsBoolean()
     enforce: boolean;
 }
+
+/**
+ * DTO for setting the user's default voice (speech-to-text) provider.
+ *
+ * No `enforce` twin of the pipeline DTO: there is no per-work or per-request
+ * voice selection left to override, because voice selection is exactly the
+ * decision this setting centralises.
+ */
+export class SetGlobalVoiceDefaultDto {
+    @ApiPropertyOptional({
+        description:
+            'AI-provider plugin ID to use for voice transcription, or null to fall back to the scope-active provider and then the platform default. The plugin must implement transcribe().',
+        example: 'mistral',
+        nullable: true,
+    })
+    @IsString()
+    @IsOptional()
+    pluginId?: string | null;
+}

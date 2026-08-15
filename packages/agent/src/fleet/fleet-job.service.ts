@@ -32,6 +32,12 @@ export interface EnqueueFleetJobInput {
     requiredCapabilities?: string[];
     maxAttempts?: number;
     idempotencyKey?: string | null;
+    /**
+     * Stamped when the job is accepted with no runner able to take it —
+     * today only `waiting-for-runner`, written by the fleet run router.
+     * Cleared by the lease CAS, so it can never outlive the condition.
+     */
+    queuedReason?: string | null;
 }
 
 export interface LeaseFleetJobsInput {
@@ -127,6 +133,7 @@ export class FleetJobService {
             requiredCapabilities,
             maxAttempts: clampMaxAttempts(input.maxAttempts),
             idempotencyKey,
+            queuedReason: normalizeQueuedReason(input.queuedReason),
         });
         return toJobView(created);
     }
@@ -176,6 +183,9 @@ export class FleetJobService {
                 status: 'leased',
                 leaseExpiresAt,
                 attempts,
+                // The claim IS the moment "waiting for a runner" stops
+                // being true, so it is the claim that clears the token.
+                queuedReason: null,
             });
             if (!won) {
                 // Another node won the race. Not an error — just skip it.
@@ -188,6 +198,7 @@ export class FleetJobService {
                     status: 'leased',
                     leaseExpiresAt,
                     attempts,
+                    queuedReason: null,
                 } as FleetJob),
             );
         }
@@ -444,7 +455,21 @@ export function toJobView(job: FleetJob): FleetJobView {
         createdAt: job.createdAt ? toIso(job.createdAt) : null,
         startedAt: job.startedAt ? toIso(job.startedAt) : null,
         completedAt: job.completedAt ? toIso(job.completedAt) : null,
+        queuedReason: job.queuedReason ?? null,
     };
+}
+
+/**
+ * Queued reasons are short machine tokens, never free text — the same
+ * discipline `agent_runs.queuedReason` follows. Anything that is not a
+ * short token collapses to null rather than being stored and later
+ * rendered.
+ */
+function normalizeQueuedReason(value: unknown): string | null {
+    if (typeof value !== 'string') return null;
+    const trimmed = value.trim();
+    if (!trimmed || trimmed.length > 64) return null;
+    return trimmed;
 }
 
 function clampBatch(value: unknown): number {

@@ -68,6 +68,11 @@ export type TaskActorType = 'user' | 'agent';
 @Index('idx_tasks_branch_state', ['workId', 'branchState'])
 // Phase 17 hot path — dispatcher walks rows where (isRecurring, nextOccurrenceAt <= now).
 @Index('idx_tasks_recurrence_due', ['isRecurring', 'nextOccurrenceAt'])
+// Schedule-modes hot path — the one-shot dispatcher walks rows where
+// (scheduledAt <= now AND scheduleClaimedAt IS NULL). A composite index
+// keeps the claim-filter cheap on both drivers (a partial index would
+// be Postgres-only, and this table is small enough not to need one).
+@Index('idx_tasks_scheduled_due', ['scheduledAt', 'scheduleClaimedAt'])
 export class Task {
     @PrimaryGeneratedColumn('uuid')
     id: string;
@@ -278,12 +283,54 @@ export class Task {
     @Column({ type: 'int', nullable: true })
     delegationDepth?: number | null;
 
+    // ── Scheduled (one-shot) ───────────────────────────────────────
+    /**
+     * Schedule mode "Scheduled": run once at this instant. NULL = not
+     * scheduled (Run Once / Recurring modes). The schedule dispatcher
+     * CAS-claims due rows via `scheduleClaimedAt` and dispatches the
+     * Task itself (no clone — a one-shot IS the task).
+     */
+    @PortableDateColumn({ nullable: true })
+    scheduledAt?: Date | null;
+
+    /**
+     * CAS guard for the one-shot dispatcher: set exactly once by the
+     * worker that wins the claim, so two concurrent dispatcher ticks
+     * can never double-dispatch the same scheduled Task. Re-scheduling
+     * clears it.
+     */
+    @PortableDateColumn({ nullable: true })
+    scheduleClaimedAt?: Date | null;
+
+    /**
+     * Keep this Task off the Kanban board and the default Task lists.
+     *
+     * SERVER-WRITTEN, never a create-DTO field: an inbound trigger whose
+     * `showOnBoard` is false stamps it on the Tasks its fires produce so
+     * automated work does not flood the human board. The rows stay fully
+     * addressable (detail page, the trigger's fire log, and any list
+     * asking for `includeHidden`) — this hides, it never deletes.
+     */
+    @Column({ type: 'boolean', default: false })
+    hiddenFromBoard: boolean;
+
     // ── Recurring (F5 override) ────────────────────────────────────
     @Column({ type: 'boolean', default: false })
     isRecurring: boolean;
 
     @Column({ type: 'varchar', length: 200, nullable: true })
     recurrenceRule?: string | null;
+
+    /**
+     * Alternative recurrence cadence as a 5-field cron expression.
+     * XOR with `recurrenceRule` — service validation enforces exactly
+     * one of the two on a recurring template. `nextOccurrenceAt` is
+     * computed via `schedules/cadence.ts#computeNextCronFire` for cron
+     * templates, so the dispatcher's due-scan works identically for
+     * both cadence dialects.
+     */
+    @Column({ type: 'varchar', length: 120, nullable: true })
+    recurrenceCron?: string | null;
 
     @Column({ type: 'varchar', length: 64, nullable: true, default: 'UTC' })
     recurrenceTimezone?: string | null;

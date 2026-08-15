@@ -19,6 +19,9 @@ jest.mock('../../entities/fleet-node.entity', () => ({
 jest.mock('../../entities/fleet-job.entity', () => ({
     FleetJob: class FleetJob {},
 }));
+jest.mock('../../entities/fleet-execution-preference.entity', () => ({
+    FleetExecutionPreference: class FleetExecutionPreference {},
+}));
 jest.mock('../../plugins/services/plugin-registry.service', () => ({
     PluginRegistryService: class PluginRegistryService {},
 }));
@@ -31,11 +34,17 @@ jest.mock('../fleet-node.repository', () => ({
 jest.mock('../fleet-job.repository', () => ({
     FleetJobRepository: class FleetJobRepository {},
 }));
+jest.mock('../fleet-execution-preference.repository', () => ({
+    FleetExecutionPreferenceRepository: class FleetExecutionPreferenceRepository {},
+}));
 jest.mock('../fleet.service', () => ({
     FleetService: class FleetService {},
 }));
 jest.mock('../fleet-job.service', () => ({
     FleetJobService: class FleetJobService {},
+}));
+jest.mock('../fleet-execution-preference.service', () => ({
+    FleetExecutionPreferenceService: class FleetExecutionPreferenceService {},
 }));
 
 import 'reflect-metadata';
@@ -44,25 +53,31 @@ import { FleetNodeRepository } from '../fleet-node.repository';
 import { FleetJobRepository } from '../fleet-job.repository';
 import { FleetService } from '../fleet.service';
 import { FleetJobService } from '../fleet-job.service';
+import { FleetExecutionPreferenceRepository } from '../fleet-execution-preference.repository';
+import { FleetExecutionPreferenceService } from '../fleet-execution-preference.service';
 
 describe('FleetModule', () => {
     const meta = (key: string): unknown[] => Reflect.getMetadata(key, FleetModule) ?? [];
 
-    it('provides the registry and the job-runtime halves', () => {
+    it('provides the registry, the job-runtime halves and the routing preference', () => {
         expect(meta('providers')).toEqual([
             FleetNodeRepository,
             FleetJobRepository,
+            FleetExecutionPreferenceRepository,
             FleetService,
             FleetJobService,
+            FleetExecutionPreferenceService,
         ]);
     });
 
-    it('exports all four for the API surface + chat-tool assembly', () => {
+    it('exports all six for the API surface + chat-tool assembly', () => {
         expect(meta('exports')).toEqual([
             FleetNodeRepository,
             FleetJobRepository,
+            FleetExecutionPreferenceRepository,
             FleetService,
             FleetJobService,
+            FleetExecutionPreferenceService,
         ]);
     });
 
@@ -81,6 +96,8 @@ describe('fleet barrel', () => {
         expect(barrel.FleetNodeRepository).toBe(FleetNodeRepository);
         expect(barrel.FleetJobService).toBe(FleetJobService);
         expect(barrel.FleetJobRepository).toBe(FleetJobRepository);
+        expect(barrel.FleetExecutionPreferenceService).toBe(FleetExecutionPreferenceService);
+        expect(barrel.FleetExecutionPreferenceRepository).toBe(FleetExecutionPreferenceRepository);
         expect(typeof barrel.buildFleetTools).toBe('function');
     });
 
