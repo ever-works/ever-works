@@ -130,6 +130,8 @@ describe('activity-log.types', () => {
             // +6 repo_connection_created / _updated / _deleted / _imported and
             //    repo_attached_to_agent / repo_detached_from_agent
             //    (repository registry, Feature G) -> 129.
+            // +2 inbox_item_created / inbox_item_answered (Inbox operator
+            //    message center) -> 125.
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {

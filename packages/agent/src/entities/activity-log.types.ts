@@ -277,6 +277,13 @@ export enum ActivityActionType {
     MCP_CONNECTION_DELETED = 'mcp_connection_deleted',
     MCP_CONNECTION_TESTED = 'mcp_connection_tested',
     MCP_BINDING_UPDATED = 'mcp_binding_updated',
+    // Inbox (operator message center) — one row when a message lands in
+    // the human's inbox and one when they answer it, so "what did the
+    // agent ask, and what did I decide?" shows in the Activity feed
+    // next to the run that asked. Additive members — storage is a plain
+    // varchar, so no migration is needed.
+    INBOX_ITEM_CREATED = 'inbox_item_created',
+    INBOX_ITEM_ANSWERED = 'inbox_item_answered',
 }
 
 export enum ActivityStatus {

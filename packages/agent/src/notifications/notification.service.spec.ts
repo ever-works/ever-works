@@ -1,5 +1,5 @@
 import { BadRequestException } from '@nestjs/common';
-import { NotificationService } from './notification.service';
+import { NotificationService, NOTIFICATION_FANOUT_EVENT } from './notification.service';
 import { NotificationType, NotificationCategory } from '@src/entities/notification.types';
 function makeRepository(overrides: Record<string, jest.Mock> = {}) {
     return {
@@ -597,6 +597,90 @@ describe('NotificationService', () => {
 
             const args = (repository.create as jest.Mock).mock.calls[0][0];
             expect(args.deduplicationKey).toBe('git_auth_expired_gitlab');
+        });
+    });
+
+    describe('notifyInboxItem', () => {
+        function makeInboxService() {
+            const repository = makeRepository({
+                findByDeduplicationKey: jest.fn().mockResolvedValue(null),
+                create: jest.fn().mockResolvedValue({ id: 'n1' }),
+            });
+            const emitter = { emit: jest.fn() };
+            const service = new NotificationService(repository as any, emitter as any);
+            return { service, repository, emitter };
+        }
+
+        it('DEEP-LINKS the bell row and the fanout at the item, not at the inbox root', async () => {
+            // `/inbox` alone opens whatever is newest — on a busy inbox the
+            // notification about item A lands the human on item B. The page
+            // reads `?id=`; this producer is the only thing that writes it.
+            const { service, repository, emitter } = makeInboxService();
+
+            await service.notifyInboxItem({
+                userId: 'u1',
+                itemId: 'item-9',
+                kind: 'question',
+                title: 'Which database?',
+                message: 'Postgres or SQLite?',
+            });
+
+            const args = (repository.create as jest.Mock).mock.calls[0][0];
+            expect(args.actionUrl).toBe('/inbox?id=item-9');
+            expect(args.metadata).toEqual({ inboxItemId: 'item-9', kind: 'question' });
+            expect(args.deduplicationKey).toBe('inbox_item_item-9');
+
+            const [eventName, payload] = (emitter.emit as jest.Mock).mock.calls[0];
+            expect(eventName).toBe(NOTIFICATION_FANOUT_EVENT);
+            expect(payload.actionUrl).toBe('/inbox?id=item-9');
+            expect(payload.eventKey).toBe('inbox_question');
+        });
+
+        it('treats a question as urgent and everything else as informational', async () => {
+            const urgent = makeInboxService();
+            await urgent.service.notifyInboxItem({
+                userId: 'u1',
+                itemId: 'i1',
+                kind: 'question',
+                title: 't',
+                message: 'm',
+            });
+            expect((urgent.repository.create as jest.Mock).mock.calls[0][0].type).toBe(
+                NotificationType.WARNING,
+            );
+            expect((urgent.emitter.emit as jest.Mock).mock.calls[0][1].urgent).toBe(true);
+
+            const notice = makeInboxService();
+            await notice.service.notifyInboxItem({
+                userId: 'u1',
+                itemId: 'i2',
+                kind: 'notice',
+                title: 't',
+                message: 'm',
+            });
+            expect((notice.repository.create as jest.Mock).mock.calls[0][0].type).toBe(
+                NotificationType.INFO,
+            );
+            expect((notice.emitter.emit as jest.Mock).mock.calls[0][1].eventKey).toBe(
+                'inbox_notice',
+            );
+            expect((notice.emitter.emit as jest.Mock).mock.calls[0][1].urgent).toBe(false);
+        });
+
+        it('sanitizes the MODEL-authored title before it is stored', async () => {
+            const { service, repository } = makeInboxService();
+
+            await service.notifyInboxItem({
+                userId: 'u1',
+                itemId: 'i1',
+                kind: 'question',
+                title: '<img src=x onerror=alert(1)>Which one?',
+                message: 'm',
+            });
+
+            const args = (repository.create as jest.Mock).mock.calls[0][0];
+            expect(args.title).not.toContain('<');
+            expect(args.title).not.toContain('>');
         });
     });
 

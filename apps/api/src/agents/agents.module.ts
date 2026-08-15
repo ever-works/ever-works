@@ -107,6 +107,11 @@ import { DatabaseModule } from '@ever-works/agent/database';
 // Agent Plugins MCP slice — McpToolSource backs the AGENT_MCP_TOOL_SOURCE
 // binding below so agent runs expose `mcp__<server>__<tool>` descriptors.
 import { McpModule, McpToolSource } from '@ever-works/agent/mcp';
+// Inbox (operator message center) — InboxService backs the `ask_human`
+// domain tool source below. The agent-side InboxModule imports the
+// agent-side AgentsModule / AgentApprovalsModule / NotificationsModule
+// (never anything api-side), so no cycle is introduced.
+import { InboxModule as AgentInboxModule, InboxService } from '@ever-works/agent/inbox';
 // ActivityLogService is injected @Optional() into AgentsController for
 // the lifecycle trail (AGENT_PAUSED / AGENT_RESUMED / run-triggered /
 // run-cancelled / task-assigned) and the GET :id/events feed. Without
@@ -179,6 +184,7 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
         // AGENT_MCP_TOOL_SOURCE binding below. Imports nothing api-side,
         // so no cycle is introduced.
         McpModule,
+        AgentInboxModule,
     ],
     controllers: [AgentsController, AgentCollaboratorsController, AgentTemplatesController],
     providers: [
@@ -761,6 +767,7 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                 AgentEscalationService,
                 ToolGrantService,
                 WorkflowGraphExecutorService,
+                InboxService,
             ],
             useFactory: (
                 tasksService: TasksService,
@@ -780,6 +787,7 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                 escalationService: AgentEscalationService,
                 toolGrants: ToolGrantService,
                 workflowExecutor: WorkflowGraphExecutorService,
+                inboxService: InboxService,
             ): AgentDomainToolSources => ({
                 // All three membership repositories are bound: the
                 // commentOnTask gate is fail-closed and DENIES every call
@@ -863,6 +871,12 @@ import { AgentTemplateCatalogService } from './agent-template-catalog.service';
                 // `buildDomainTools`, and the tool schema has no parameter
                 // that could carry one.
                 workflow: { executor: workflowExecutor },
+                // Inbox (operator message center) — the `ask_human`
+                // blocking-question tool, available to every agent (no
+                // permission gate: asking is always safe). Only
+                // `askHuman` is carried, so the reply router and list
+                // surface are unreachable from the model.
+                inbox: { service: inboxService },
             }),
         },
         // Agent Plugins MCP slice (T26) — AGENT_MCP_TOOL_SOURCE binding.

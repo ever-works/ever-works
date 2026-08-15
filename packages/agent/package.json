@@ -189,6 +189,10 @@
             "types": "./dist/triggers/index.d.ts",
             "default": "./dist/triggers/index.js"
         },
+        "./inbox": {
+            "types": "./dist/inbox/index.d.ts",
+            "default": "./dist/inbox/index.js"
+        },
         "./ingest": {
             "types": "./dist/ingest/index.d.ts",
             "default": "./dist/ingest/index.js"

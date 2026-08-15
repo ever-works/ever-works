@@ -598,6 +598,64 @@
                 "error": "Algo deu errado. Tente novamente."
             }
         },
+        "inbox": {
+            "title": "Inbox",
+            "subtitle": "Questions, approvals and notices your agents and works sent you.",
+            "unreadCount": "{count} unread",
+            "unreadDot": "Unread",
+            "tabs": {
+                "active": "Active",
+                "archived": "Archived"
+            },
+            "kind": {
+                "question": "Question",
+                "approval": "Approval",
+                "escalation": "Escalation",
+                "notice": "Notice"
+            },
+            "empty": {
+                "active": "Nothing is waiting on you.",
+                "archived": "No archived messages."
+            },
+            "rowMenu": {
+                "label": "Message actions",
+                "markRead": "Mark as read",
+                "markUnread": "Mark as unread",
+                "archive": "Archive",
+                "unarchive": "Move to Active",
+                "delete": "Delete"
+            },
+            "detail": {
+                "none": "Select a message to read it.",
+                "waitingBanner": "The agent is waiting for your reply. Its run is paused until you answer.",
+                "yourReply": "Your reply",
+                "noReplyText": "No reply text was recorded."
+            },
+            "reply": {
+                "chooseOption": "Choose an answer",
+                "other": "Other (write your own)",
+                "recommended": "Recommended",
+                "placeholder": "Write your reply…",
+                "send": "Send Reply",
+                "hint": "Your reply goes straight back to the agent.",
+                "needsAnswer": "Pick an option or write a reply first."
+            },
+            "routed": {
+                "steered": "Reply delivered — the running agent picked it up.",
+                "resumed": "Reply delivered — a new run is answering it.",
+                "approved": "Approved.",
+                "rejected": "Rejected.",
+                "escalationResolved": "Escalation resolved.",
+                "alreadyDecided": "This was already decided elsewhere.",
+                "recorded": "Reply recorded."
+            },
+            "toast": {
+                "archived": "Message archived.",
+                "unarchived": "Message moved back to Active.",
+                "deleted": "Message deleted.",
+                "error": "Something went wrong. Please try again."
+            }
+        },
         "title": "Painel",
         "connectGithub": {
             "title": "Conecte sua conta do GitHub",
@@ -6452,8 +6510,10 @@
             "newWork": "Novo Trabalho",
             "new": "Novo",
             "activityIndicator": "Trabalho gerando",
+            "inboxUnread": "{count} unread messages",
             "navigation": {
                 "dashboard": "Painel",
+                "inbox": "Inbox",
                 "activity": "Atividade",
                 "missions": "Missions",
                 "goals": "Goals",
