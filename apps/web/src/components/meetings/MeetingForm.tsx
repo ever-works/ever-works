@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useTransition } from 'react';
-import { ChevronLeft, Video } from 'lucide-react';
+import { ChevronLeft, Folder, Video } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { toast } from 'sonner';
 import { Link, useRouter } from '@/i18n/navigation';
@@ -16,20 +16,30 @@ import {
     MEETING_SOURCE_URL_MAX_CHARS,
     MEETING_TITLE_MAX_CHARS,
     MEETING_TRANSCRIPT_MAX_CHARS,
-    parseParticipants,
     type MeetingSource,
 } from '@/lib/api/meetings.shared';
 import type { MeetingWorkOption } from './MeetingsList';
-import { localInputToIso } from './meeting-ui';
+import { localInputToIso, sourceIconMap } from './meeting-ui';
+import {
+    MeetingParticipantsEditor,
+    participantsFromRows,
+    type ParticipantRow,
+} from './MeetingParticipantsEditor';
 import { createMeetingAction } from './actions';
+
+/** Stable across renders — the marks never depend on form state. */
+const SOURCE_ICONS = sourceIconMap(MEETING_CREATABLE_SOURCES);
 
 const sectionCard =
     'rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 space-y-4';
 
 const fieldLabel = 'block text-xs font-medium text-text dark:text-text-dark mb-2';
 
+// `text-xs` throughout, matching the detail page's edit dialog: one type
+// size across every control (Inputs, both pickers at `size="xs"`, the two
+// textareas) rather than `text-sm` fields above `text-xs` textareas.
 const dateInput = cn(
-    'w-full text-sm rounded-lg transition-colors outline-none px-4 py-2',
+    'w-full text-xs rounded-lg transition-colors outline-none px-4 py-2',
     'bg-card dark:bg-card-primary-dark',
     'border border-card-border dark:border-white/9',
     'text-text dark:text-text-dark',
@@ -63,7 +73,7 @@ export function MeetingForm({ works = [] }: { works?: MeetingWorkOption[] }) {
     const [workId, setWorkId] = useState('');
     const [sourceUrl, setSourceUrl] = useState('');
     const [externalId, setExternalId] = useState('');
-    const [participantsText, setParticipantsText] = useState('');
+    const [participantRows, setParticipantRows] = useState<ParticipantRow[]>([]);
     const [transcriptText, setTranscriptText] = useState('');
 
     const submit = () => {
@@ -96,7 +106,15 @@ export function MeetingForm({ works = [] }: { works?: MeetingWorkOption[] }) {
             endedIso = parsed;
         }
 
-        const participants = parseParticipants(participantsText);
+        // Malformed addresses are caught here rather than at the API, so the
+        // message names the typo instead of surfacing a 400 — same guard the
+        // detail page's edit dialog runs.
+        const { participants, invalidEmail } = participantsFromRows(participantRows);
+        if (invalidEmail) {
+            toast.error(t('errors.participantEmailInvalid'));
+            return;
+        }
+
         const trimmedTranscript = transcriptText.trim();
 
         startSubmit(async () => {
@@ -164,6 +182,7 @@ export function MeetingForm({ works = [] }: { works?: MeetingWorkOption[] }) {
                     onChange={(e) => setTitle(e.target.value)}
                     maxLength={MEETING_TITLE_MAX_CHARS}
                     placeholder={t('fields.titlePlaceholder')}
+                    className="text-xs"
                 />
                 <div className="grid gap-4 @lg/main:grid-cols-2">
                     <div>
@@ -209,10 +228,12 @@ export function MeetingForm({ works = [] }: { works?: MeetingWorkOption[] }) {
                         <Select
                             value={source}
                             onValueChange={(v) => setSource(v as MeetingSource)}
+                            size="xs"
                             data-testid="meeting-source-select"
+                            iconMap={SOURCE_ICONS}
                         >
                             {MEETING_CREATABLE_SOURCES.map((s) => (
-                                <option key={s} value={s}>
+                                <option key={s} value={s} data-icon={s}>
                                     {t(`sources.${s}`)}
                                 </option>
                             ))}
@@ -220,15 +241,27 @@ export function MeetingForm({ works = [] }: { works?: MeetingWorkOption[] }) {
                     </div>
                     <div>
                         <label className={fieldLabel}>{t('fields.work')}</label>
+                        {/* `data-icon` on every option (the org-wide row
+                            included) keeps the folder in the trigger whatever
+                            is selected, rather than letting it appear and
+                            vanish with the choice — as on the edit dialog. */}
                         <Select
                             value={workId}
                             onValueChange={setWorkId}
                             placeholder={t('fields.workNone')}
+                            size="xs"
                             data-testid="meeting-work-select"
+                            iconMap={{
+                                work: (
+                                    <Folder className="h-3.5 w-3.5 text-text-muted dark:text-text-muted-dark" />
+                                ),
+                            }}
                         >
-                            <option value="">{t('fields.workNone')}</option>
+                            <option value="" data-icon="work">
+                                {t('fields.workNone')}
+                            </option>
                             {works.map((work) => (
-                                <option key={work.id} value={work.id}>
+                                <option key={work.id} value={work.id} data-icon="work">
                                     {work.name}
                                 </option>
                             ))}
@@ -244,6 +277,7 @@ export function MeetingForm({ works = [] }: { works?: MeetingWorkOption[] }) {
                     onChange={(e) => setSourceUrl(e.target.value)}
                     maxLength={MEETING_SOURCE_URL_MAX_CHARS}
                     placeholder="https://example.com/recordings/123"
+                    className="text-xs"
                 />
                 <Input
                     label={t('fields.externalId')}
@@ -251,31 +285,23 @@ export function MeetingForm({ works = [] }: { works?: MeetingWorkOption[] }) {
                     onChange={(e) => setExternalId(e.target.value)}
                     maxLength={MEETING_EXTERNAL_ID_MAX_CHARS}
                     helperText={t('fields.externalIdHint')}
+                    className="text-xs"
                 />
             </section>
 
-            {/* Roster */}
+            {/* Roster — rows, not `Name <email>` syntax in a textarea. The
+                capture form was the last surface still teaching that format;
+                it now authors the roster exactly the way the detail page's
+                edit dialog does, so there is one way to name a participant.
+                The editor carries its own label and count, so the section
+                needs no heading of its own. */}
             <section className={sectionCard}>
-                <h2 className="text-sm font-semibold text-text dark:text-text-dark">
-                    {t('sections.participants')}
-                </h2>
-                <div>
-                    <label className={fieldLabel} htmlFor="meeting-participants">
-                        {t('fields.participants')}
-                    </label>
-                    <Textarea
-                        id="meeting-participants"
-                        data-testid="meeting-participants-input"
-                        value={participantsText}
-                        onChange={(e) => setParticipantsText(e.target.value)}
-                        rows={4}
-                        placeholder={'Ada Lovelace <ada@example.com>\nGrace Hopper'}
-                        className="font-mono text-xs"
-                    />
-                    <p className="mt-1.5 text-xs text-text-muted dark:text-text-muted-dark">
-                        {t('fields.participantsHint')}
-                    </p>
-                </div>
+                <MeetingParticipantsEditor
+                    label={t('fields.participants')}
+                    rows={participantRows}
+                    onChange={setParticipantRows}
+                    disabled={pending}
+                />
             </section>
 
             {/* Transcript */}
@@ -303,18 +329,21 @@ export function MeetingForm({ works = [] }: { works?: MeetingWorkOption[] }) {
                 </div>
             </section>
 
-            <div className="flex items-center gap-2">
+            {/* Cancel then submit, secondary beside primary — the pairing the
+                edit dialog's footer uses, so the two forms end the same way. */}
+            <div className="flex items-center justify-end gap-2">
+                <Button href="/meetings" variant="secondary" size="sm">
+                    {t('actions.cancel')}
+                </Button>
                 <Button
                     onClick={submit}
                     loading={pending}
                     disabled={pending}
-                    size="md"
+                    variant="primary"
+                    size="sm"
                     data-testid="meeting-create-submit"
                 >
                     {t('actions.create')}
-                </Button>
-                <Button href="/meetings" variant="ghost" size="md">
-                    {t('actions.cancel')}
                 </Button>
             </div>
         </div>

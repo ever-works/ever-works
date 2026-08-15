@@ -67,12 +67,37 @@ const getWorkCandidates = cache(
             .catch(() => []),
 );
 
+/** Per-population cap; the rail is a summary panel, not the roster. */
+const AGENT_FETCH_LIMIT = 20;
+
+/**
+ * "Agents on this Idea" is two populations, exactly as on the Work
+ * detail header: Agents PINNED here by scope (`ideaId`), and Agents from
+ * elsewhere in the roster ASSIGNED here through their `targets`
+ * (`assignedIdeaId`). The rail renders one merged list and tells them
+ * apart via `assignedAgentIds` — assignment is detachable, pinning is
+ * not (a pinned Agent's placement IS its scope). Both fetches degrade to
+ * an empty list so a flaky endpoint costs the panel, not the page.
+ */
 const getAgents = cache(
-    (id: string): Promise<Agent[]> =>
-        agentsAPI
-            .list({ ideaId: id, limit: 20 })
-            .then((r) => r.data)
-            .catch(() => []),
+    async (id: string): Promise<{ agents: Agent[]; assignedAgentIds: string[] }> => {
+        const [pinnedRes, assignedRes] = await Promise.all([
+            agentsAPI
+                .list({ ideaId: id, limit: AGENT_FETCH_LIMIT })
+                .then((r) => r.data)
+                .catch(() => [] as Agent[]),
+            agentsAPI
+                .list({ assignedIdeaId: id, limit: AGENT_FETCH_LIMIT })
+                .then((r) => r.data)
+                .catch(() => [] as Agent[]),
+        ]);
+        const pinnedIds = new Set(pinnedRes.map((agent) => agent.id));
+        const assignedOnly = assignedRes.filter((agent) => !pinnedIds.has(agent.id));
+        return {
+            agents: [...pinnedRes, ...assignedOnly],
+            assignedAgentIds: assignedOnly.map((agent) => agent.id),
+        };
+    },
 );
 
 const getAttachments = cache(
@@ -99,7 +124,7 @@ export default async function IdeaDetailPage({ params }: { params: Params }) {
 
     // Satellites only — the Idea itself is already resolved above, and
     // the parent Mission lookup needs its `missionId`.
-    const [ideaWorks, workCandidates, agents, attachments, mission] = await Promise.all([
+    const [ideaWorks, workCandidates, agentRoster, attachments, mission] = await Promise.all([
         getIdeaWorks(id),
         getWorkCandidates(idea.title),
         getAgents(id),
@@ -121,7 +146,8 @@ export default async function IdeaDetailPage({ params }: { params: Params }) {
                     ? { id: matched.id, name: matched.name, createdAt: matched.createdAt }
                     : null
             }
-            agents={agents}
+            agents={agentRoster.agents}
+            assignedAgentIds={agentRoster.assignedAgentIds}
             attachments={attachments}
             missionTitle={mission?.title ?? null}
         />

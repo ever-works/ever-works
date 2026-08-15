@@ -1,8 +1,10 @@
 'use client';
 
+import type { ReactNode } from 'react';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils/cn';
 import type { MeetingSource } from '@/lib/api/meetings.shared';
+import { MeetingSourceIcon } from './meeting-source-icons';
 
 /**
  * Meetings — shared presentational helpers for the surface (list card +
@@ -22,6 +24,27 @@ const UNKNOWN_SOURCE_STYLE =
 
 /** Sources the UI has a translated label for. */
 const KNOWN_SOURCES: readonly string[] = ['zoom', 'google-meet', 'manual', 'import'];
+
+/**
+ * Build the `iconMap` for a `<Select>` whose `<option>`s declare
+ * `data-icon={source}` — the picker then shows the same marks as the
+ * badges. A select row has no source color of its own, so the neutral
+ * (non-vendor) glyphs are tinted explicitly here; the vendor badges
+ * bring their own.
+ */
+export function sourceIconMap(sources: readonly string[]): Record<string, ReactNode> {
+    return Object.fromEntries(
+        sources.map((source) => [
+            source,
+            <MeetingSourceIcon
+                key={source}
+                source={source}
+                size={14}
+                className="text-text-muted dark:text-text-muted-dark"
+            />,
+        ]),
+    );
+}
 
 /**
  * Format an ISO timestamp for display. Locale/timezone formatting
@@ -106,11 +129,12 @@ export function SourceBadge({ source, className }: { source: string; className?:
         <span
             data-testid="meeting-source-badge"
             className={cn(
-                'inline-flex shrink-0 items-center rounded-full border px-2 py-0.5 text-[11px] font-medium',
+                'inline-flex shrink-0 items-center gap-1 rounded-full border py-0.5 pl-1.5 pr-2 text-[11px] font-medium',
                 SOURCE_STYLES[source] ?? UNKNOWN_SOURCE_STYLE,
                 className,
             )}
         >
+            <MeetingSourceIcon source={source} />
             {known ? t(`sources.${source as MeetingSource}`) : source}
         </span>
     );

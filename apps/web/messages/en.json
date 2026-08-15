@@ -1094,7 +1094,8 @@
                 "allTemplates": "All templates",
                 "yourTemplates": "Your templates",
                 "yourTemplatesEmpty": "Agents you create will appear here as reusable templates.",
-                "openInWizard": "Open in wizard"
+                "openInWizard": "Open in wizard",
+                "browsePage": "Open the full template browser"
             },
             "settings": {
                 "identity": {
@@ -1263,7 +1264,8 @@
                     "showing": "Showing {from}-{to} of {total}",
                     "previous": "Previous",
                     "next": "Next"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "newDialog": {
                 "title": "Create a new Task",
@@ -1538,7 +1540,8 @@
                 "filter": {
                     "scope": "Scope",
                     "all": "All"
-                }
+                },
+                "browseTemplates": "Browse templates"
             },
             "detail": {
                 "backToSkills": "Back to Skills",
@@ -1939,7 +1942,21 @@
                     "empty": "No Works linked to this Idea yet."
                 },
                 "agents": {
-                    "empty": "No Agents scoped to this Idea."
+                    "empty": "No Agents on this Idea yet.",
+                    "assignExisting": "Assign existing",
+                    "assignTitle": "Assign an Agent to this Idea",
+                    "assignSubtitle": "Put an Agent you already have on this Idea instead of creating another one.",
+                    "assignSearchPlaceholder": "Search Agents…",
+                    "assignLoading": "Loading Agents…",
+                    "assignNoneAvailable": "No other Agents left to assign.",
+                    "assignNoMatches": "No Agents match that search.",
+                    "assignLoadFailed": "Could not load Agents",
+                    "assignedToast": "{name} assigned to this Idea",
+                    "assignFailed": "Could not assign Agent",
+                    "assignCancel": "Cancel",
+                    "unassign": "Remove from this Idea",
+                    "unassignedToast": "{name} removed from this Idea",
+                    "unassignFailed": "Could not remove Agent"
                 },
                 "meta": {
                     "source": "Source",
@@ -1959,7 +1976,8 @@
                         "idea-agents": "Can't delete: {count} Agent(s) are scoped to this Idea. Delete or re-scope them first.",
                         "build-in-flight": "Can't delete while a build is running. Wait for it to finish.",
                         "unknown": "Can't delete this Idea right now."
-                    }
+                    },
+                    "unlinksWorks": "{count, plural, one {This Idea is linked to # Work. It will be kept — only the link is removed.} other {This Idea is linked to # Works. They will be kept — only the link is removed.}}"
                 },
                 "toasts": {
                     "built": "Work built from this Idea",
@@ -2273,7 +2291,10 @@
                 "dangerZone": "Danger Zone",
                 "billing": "Billing",
                 "usageCredits": "Usage & Credits",
-                "digest": "Digest"
+                "digest": "Digest",
+                "notifications": "Notifications",
+                "channels": "Channels",
+                "emails": "Email Addresses"
             },
             "githubApp": {
                 "title": "GitHub App Installations",
@@ -6291,7 +6312,6 @@
             "created": "Meeting captured",
             "sections": {
                 "provenance": "Where it came from",
-                "participants": "Participants",
                 "transcript": "Transcript"
             },
             "sources": {
@@ -6314,7 +6334,6 @@
                 "externalId": "Provider meeting ID (optional)",
                 "externalIdHint": "Used to de-duplicate against a later connector sync of the same meeting.",
                 "participants": "Participants",
-                "participantsHint": "One per line. Use \"Name <email>\" to record an address.",
                 "transcript": "Transcript (optional)",
                 "transcriptPlaceholder": "Ada: shipping the gate.\nGrace: reviewing the branch.",
                 "transcriptHint": "Adding a transcript runs the summary, Memory and activity pipeline. You can also attach it later from the meeting page."
@@ -6324,6 +6343,7 @@
                 "startedAtInvalid": "Start time is not a valid date.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
+                "participantEmailInvalid": "Enter a valid email address, or leave it blank.",
                 "createFailed": "Couldn't capture the meeting. Please try again."
             },
             "actions": {
@@ -6335,11 +6355,16 @@
             "backToMeetings": "Back to Meetings",
             "actions": {
                 "openRecording": "Open recording",
+                "edit": "Edit",
                 "delete": "Delete",
                 "attachTranscript": "Attach transcript",
-                "replaceTranscript": "Replace transcript",
-                "cancelReplace": "Cancel replace",
-                "save": "Save changes"
+                "attaching": "Attaching…",
+                "editTranscript": "Edit transcript",
+                "cancelEdit": "Cancel edit",
+                "saveTranscript": "Save transcript",
+                "savingTranscript": "Saving…",
+                "save": "Save changes",
+                "cancel": "Cancel"
             },
             "sections": {
                 "summary": "Summary",
@@ -6348,6 +6373,8 @@
                 "edit": "Edit meeting"
             },
             "summary": {
+                "generating": "Generating summary…",
+                "generatingHint": "Reading the transcript and writing the recap — this usually takes a few seconds.",
                 "notGenerated": "No summary was generated for this transcript. Enable an AI provider and re-attach the transcript to try again.",
                 "noTranscript": "Attach a transcript to generate a summary."
             },
@@ -6371,19 +6398,29 @@
                 "noParticipants": "No participants recorded."
             },
             "edit": {
-                "hint": "Rename the meeting, close it out, point it at a recording, or re-route it to a Work."
+                "hint": "Correct the times, rename the meeting, fix the roster, point it at a recording, or re-route it to a Work."
             },
             "fields": {
                 "title": "Title",
+                "startedAt": "Started at",
                 "endedAt": "Ended at",
                 "sourceUrl": "Recording link",
                 "work": "Work",
-                "workNone": "Org-wide (no Work)"
+                "workNone": "Org-wide (no Work)",
+                "participants": "Participants",
+                "participantName": "Name",
+                "participantEmail": "Email (optional)",
+                "participantAdd": "Add participant",
+                "participantRemove": "Remove participant",
+                "participantsEmpty": "No one recorded yet."
             },
             "errors": {
                 "titleRequired": "Title is required.",
+                "startedAtInvalid": "Start time is not a valid date.",
                 "endedAtInvalid": "End time is not a valid date.",
                 "endedBeforeStarted": "End time cannot be before the start time.",
+                "participantEmailInvalid": "Enter a valid email address, or leave it blank.",
+                "participantDuplicate": "That person is already on the list.",
                 "transcriptRequired": "Transcript text is required."
             },
             "toasts": {
@@ -6391,12 +6428,18 @@
                 "transcriptSummarized": "Transcript attached and summarized",
                 "transcriptError": "Couldn't attach the transcript.",
                 "saved": "Meeting updated",
+                "participantAdded": "Participant added",
                 "saveError": "Couldn't update the meeting.",
                 "deleted": "Meeting deleted",
                 "deleteError": "Couldn't delete the meeting."
             },
-            "confirm": {
-                "delete": "Delete this meeting? Its transcript and summary will be removed. This cannot be undone."
+            "deleteDialog": {
+                "title": "Delete this meeting?",
+                "body": "{title} will be permanently deleted, along with its transcript and summary. This cannot be undone.",
+                "confirm": "Delete meeting",
+                "cancel": "Cancel",
+                "deleting": "Deleting…",
+                "error": "Failed to delete the meeting"
             }
         },
         "sidebar": {
@@ -6597,6 +6640,7 @@
             "disableWarning": "Disabling this plugin will also disable it in all your works",
             "cannotDisableSystem": "System plugins cannot be disabled",
             "disableFailed": "Failed to disable plugin",
+            "enableFailed": "Failed to enable plugin",
             "autoEnableForWorks": "Also enable for all works",
             "autoEnableForWorksDescription": "This plugin will be automatically active in all your works. You can still disable it per Work.",
             "confirmDisable": "Confirm Disable",

@@ -412,3 +412,75 @@ describe('TaskTransitionService — Phase 15.3 agent dispatch hook', () => {
         });
     });
 });
+
+describe('TaskTransitionService — owner-column agent fallback (kanban/detail-page assign)', () => {
+    let tasks: any;
+    let blocks: any;
+    let approvers: any;
+    let assignees: any;
+    let runs: any;
+    let dispatcher: any;
+
+    beforeEach(() => {
+        tasks = { casUpdateStatus: jest.fn().mockResolvedValue(true), findById: jest.fn() };
+        blocks = { findByTaskId: jest.fn().mockResolvedValue([]) };
+        approvers = { allApproved: jest.fn().mockResolvedValue(true) };
+        assignees = { findAgentAssignees: jest.fn().mockResolvedValue([]) };
+        runs = {
+            createQueued: jest.fn().mockResolvedValue({ id: 'r1' }),
+            markDispatchFailed: jest.fn().mockResolvedValue(undefined),
+            setTriggerRunId: jest.fn().mockResolvedValue(undefined),
+        };
+        dispatcher = { enqueue: jest.fn().mockResolvedValue({ runId: 'trd-1' }) };
+    });
+
+    const makeSvc = () =>
+        new TaskTransitionService(tasks, blocks, approvers, assignees, runs, dispatcher);
+
+    it('dispatches the Task OWN agent (task.agentId) when there are no assignee rows', async () => {
+        // The Task detail page assigns an Agent by writing task.agentId — it
+        // creates NO task_assignees row. Pre-fix, fanOutAgentExecutions
+        // returned at `agentAssignees.length === 0`, so moving such a Task to
+        // In Progress dispatched nothing, silently: the primary human flow.
+        const svc = makeSvc();
+        const task = makeTask({ status: TaskStatus.TODO, agentId: 'agent-9' } as Partial<Task>);
+        tasks.findById.mockResolvedValueOnce({
+            ...task,
+            status: TaskStatus.IN_PROGRESS,
+        });
+        assignees.findAgentAssignees.mockResolvedValueOnce([]);
+
+        await svc.transition(task, TaskStatus.IN_PROGRESS);
+        await new Promise((r) => setImmediate(r));
+
+        expect(dispatcher.enqueue).toHaveBeenCalledTimes(1);
+        const call = dispatcher.enqueue.mock.calls[0][0];
+        expect(call.taskId).toBe('t1');
+        // The dedup key carries the agent id — proves WHICH agent dispatched.
+        expect(call.dedupKey).toContain('agent-9');
+    });
+
+    it('assignee rows take precedence — the owner column does not double-dispatch', async () => {
+        // When explicit assignee rows exist they are the fan-out set, exactly
+        // as before this fix; task.agentId must not add a duplicate run.
+        const svc = makeSvc();
+        const task = makeTask({ status: TaskStatus.TODO, agentId: 'agent-9' } as Partial<Task>);
+        tasks.findById.mockResolvedValueOnce({
+            ...task,
+            status: TaskStatus.IN_PROGRESS,
+        });
+        assignees.findAgentAssignees.mockResolvedValueOnce([
+            { assigneeId: 'agent-a' },
+            { assigneeId: 'agent-b' },
+        ]);
+
+        await svc.transition(task, TaskStatus.IN_PROGRESS);
+        await new Promise((r) => setImmediate(r));
+
+        expect(dispatcher.enqueue).toHaveBeenCalledTimes(2);
+        const keys = dispatcher.enqueue.mock.calls.map((c: any[]) => c[0].dedupKey).join('|');
+        expect(keys).toContain('agent-a');
+        expect(keys).toContain('agent-b');
+        expect(keys).not.toContain('agent-9');
+    });
+});
