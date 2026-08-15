@@ -73,6 +73,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'EmailMessage',
     // Event-ingest spine — external tracker issue → platform Task mapping
     'ExternalIssueLink',
+    // Fleet local-runner routing — local-vs-cloud execution preference
+    'FleetExecutionPreference',
     // Fleet job runtime (Desktop PRD M4) — lease-able work for nodes
     'FleetJob',
     // Fleet (Wave 12, slice 1) — enrolled execution nodes w/ heartbeat
@@ -82,6 +84,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'GitHubAppUserLink',
     // Inbound Triggers (Trigger Schedules) — signed webhook/API triggers
     'InboundTrigger',
+    // Task Triggers — per-(trigger, event) fire ledger (ingest idempotency)
+    'InboundTriggerFire',
     // Event-ingest pull path (Wave 8) — per-(user, plugin) pull cursors
     'IngestCursor',
     // Inbound receivers — workspace/installation → platform user binding
@@ -95,6 +99,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'Invoice',
     // Meetings v1 (Wave 8, feature a) — captured meetings w/ transcripts
     'Meeting',
+    // Memory Files — user-defined folders organizing uploads on /memory
+    'MemoryFolder',
     'Mission',
     // Domain-model evolution PR-8 — Goals + measurement
     'Goal',
@@ -118,6 +124,7 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     // Skills family (PR #1019) ──
     'Skill',
     'SkillBinding',
+    'SkillFile',
     // ───────────────────────────
     'SubscriptionPlan',
     // Tasks family (PR #1019) ──

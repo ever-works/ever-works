@@ -39,6 +39,7 @@ import {
     SetActiveCapabilityDto,
     SettingsMenuResponseDto,
     SetGlobalPipelineDefaultDto,
+    SetGlobalVoiceDefaultDto,
 } from './dto';
 import { PluginValidationService } from './plugin-validation.service';
 import { ActivityLogService } from '@ever-works/agent/activity-log';
@@ -389,6 +390,22 @@ export class PluginsController {
             dto.pluginId ?? null,
             dto.enforce,
         );
+    }
+
+    @Post('plugins/voice-default')
+    @HttpCode(HttpStatus.OK)
+    @ApiOperation({
+        summary: 'Set the default voice (speech-to-text) provider',
+        description:
+            'Set or clear which AI-provider plugin transcribes voice dictation for the current user. The plugin must implement transcribe() — being an AI provider does not imply speech-to-text, so a provider that cannot transcribe is rejected here rather than failing at the mic. Clearing falls back to the scope-active provider, then the platform default.',
+    })
+    @ApiResponse({ status: 200, description: 'Voice provider default updated' })
+    @ApiResponse({ status: 400, description: 'Plugin cannot transcribe or is not an AI provider' })
+    async setGlobalVoiceDefault(
+        @CurrentUser() auth: AuthenticatedUser,
+        @Body() dto: SetGlobalVoiceDefaultDto,
+    ): Promise<void> {
+        await this.pluginsService.setGlobalVoiceDefault(auth.userId, dto.pluginId ?? null);
     }
 
     @Post('plugins/:pluginId/validate-connection')

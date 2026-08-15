@@ -1,5 +1,5 @@
 import 'server-only';
-import type { MergePolicyOverride } from '@ever-works/contracts';
+import type { AgentCapabilitiesPayload, MergePolicyOverride } from '@ever-works/contracts';
 import { serverFetch, serverMutation } from './server-api';
 
 /**
@@ -40,16 +40,22 @@ export {
     type RunSteerResponse,
     type RunInterruptResponse,
     type RunResumeResponse,
+    type AgentRunSessionDetail,
+    type AgentRunTimelineEntry,
+    type AgentRunTimelineEntryKind,
+    type SessionDetailQuery,
     type AgentCollaboratorCandidate,
 } from './agents.shared';
 import type {
     AgentGuardrails,
     AgentStatus,
     AgentRunSession,
+    AgentRunSessionDetail,
     ListRunSessionsQuery,
     RunSteerResponse,
     RunInterruptResponse,
     RunResumeResponse,
+    SessionDetailQuery,
     AgentCollaboratorCandidate,
 } from './agents.shared';
 
@@ -127,6 +133,12 @@ export interface Agent {
      * tenant → platform default; `null` clears the Agent override.
      */
     mergePolicy?: MergePolicyOverride | null;
+    /**
+     * Capabilities tab — per-Agent init script (advisory v1: stored +
+     * surfaced; consumed at session/workspace bootstrap where the
+     * runtime supports it).
+     */
+    initScript: string | null;
     contentHash: string | null;
     createdAt: string;
     updatedAt: string;
@@ -202,6 +214,8 @@ export interface UpdateAgentInput {
     scorecard?: AgentScorecardMetric[] | null;
     /** Merge-policy matrix (Wave 3, D4) — PARTIAL; `null` clears the override. */
     mergePolicy?: MergePolicyOverride | null;
+    /** Capabilities tab — init script; `null` (or blank) clears it. */
+    initScript?: string | null;
 }
 
 export interface AgentFileBody {
@@ -520,6 +534,26 @@ export const agentsAPI = {
         return serverFetch(`/agents/runs${qs ? `?${qs}` : ''}`, { method: 'GET' });
     },
 
+    /**
+     * Session detail (Feature K) — the drill-in behind each Sessions row
+     * (`GET /api/agents/runs/:runId/detail`): full session projection +
+     * message/tool-call/file counts + one cursor page of the captured
+     * timeline + the touched-file list. Addressed by runId alone; the
+     * API scopes by the acting user (cross-user runs 404).
+     */
+    async getSessionDetail(
+        runId: string,
+        query: SessionDetailQuery = {},
+    ): Promise<AgentRunSessionDetail> {
+        const params = new URLSearchParams();
+        if (query.cursor) params.set('cursor', query.cursor);
+        if (query.limit != null) params.set('limit', String(query.limit));
+        const qs = params.toString();
+        return serverFetch(`/agents/runs/${runId}/detail${qs ? `?${qs}` : ''}`, {
+            method: 'GET',
+        });
+    },
+
     // ── Agent Collaborators — sub-agent delegation allow-list ──
 
     /**
@@ -634,6 +668,17 @@ export const agentsAPI = {
         }>;
     }> {
         return serverFetch(`/agents/${id}/runs/${runId}`, { method: 'GET' });
+    },
+
+    /**
+     * Capabilities tab — the composed read behind `/agents/[id]/capabilities`:
+     * tool catalog + resolved tool-grant chain + effective per-tool decision
+     * + permissions + init script, in one request.
+     */
+    async getCapabilities(id: string): Promise<AgentCapabilitiesPayload> {
+        return serverFetch<AgentCapabilitiesPayload>(`/agents/${id}/capabilities`, {
+            method: 'GET',
+        });
     },
 
     async listSkills(id: string): Promise<{

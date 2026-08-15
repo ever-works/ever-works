@@ -16,6 +16,12 @@ import { SkillBindingRepository } from '../database/repositories/skill-binding.r
 import { SkillRepository } from '../database/repositories/skill.repository';
 import { createGetSkillBodyTool } from './agent-tools-skill';
 import {
+    createGetSkillFileTool,
+    SKILL_FILE_CONTENT_READER,
+    type SkillFileContentReader,
+} from './agent-tools-skill-file';
+import { SkillFileRepository } from '../database/repositories/skill-file.repository';
+import {
     AGENT_GIT_FACADE,
     type AgentGitFacade,
     type AgentCommitToRepoResult,
@@ -205,12 +211,23 @@ export class AgentToolService {
         @Optional()
         @Inject(CREDENTIAL_RESOLVER)
         private readonly credentials?: CredentialResolver,
-        // Agent Collaborators — delegateToAgent. Both APPENDED LAST +
-        // @Optional() so every positional constructor call in the unit
-        // tests keeps compiling, and a runtime without them simply never
-        // exposes the tool (the model sees nothing that would fail).
+        // Agent Collaborators — delegateToAgent. Both APPENDED + @Optional()
+        // so every positional constructor call in the unit tests keeps
+        // compiling, and a runtime without them simply never exposes the
+        // tool (the model sees nothing that would fail).
+        // NOTE: these keep positions 13/14 because `agent-tool-delegate.spec.ts`
+        // constructs the service positionally through this slot. Nest resolves
+        // every param below by type/token, so ordering is a test-only concern.
         @Optional() private readonly delegation?: SubAgentDelegationService,
         @Optional() private readonly collaborators?: AgentCollaboratorRepository,
+        // Skill files feature — companion-file rows + the uploads-spine
+        // content reader (bound API-side). APPENDED LAST + @Optional() so
+        // every existing positional constructor call keeps working;
+        // unbound → getSkillFile simply isn't registered / errs politely.
+        @Optional() private readonly skillFiles?: SkillFileRepository,
+        @Optional()
+        @Inject(SKILL_FILE_CONTENT_READER)
+        private readonly skillFileReader?: SkillFileContentReader,
     ) {}
 
     /**
@@ -261,6 +278,28 @@ export class AgentToolService {
                     ideaId: agent.ideaId ?? undefined,
                 }) as AgentToolDescriptor,
             );
+            // getSkillFile — companion to getSkillBody. Registered under
+            // the same predicate (skills bound); the descriptor itself
+            // 404s unknown slugs/filenames and refuses binary mimes.
+            // Scripts are DATA-ONLY in v1 (agent-plugins spec US-6): the
+            // tool returns their text, nothing executes them.
+            if (this.skillFiles) {
+                tools.push(
+                    createGetSkillFileTool(
+                        this.skills,
+                        this.bindings,
+                        this.skillFiles,
+                        this.skillFileReader,
+                        {
+                            userId: agent.userId,
+                            agentId: agent.id,
+                            workId: agent.workId ?? undefined,
+                            missionId: agent.missionId ?? undefined,
+                            ideaId: agent.ideaId ?? undefined,
+                        },
+                    ) as AgentToolDescriptor,
+                );
+            }
         }
 
         // editAgentFile — gated by permissions.canEditAgentFiles.
