@@ -321,6 +321,28 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         [t, updateConversationId],
     );
 
+    /**
+     * Serialises model-pin writes so the row ends up on the LAST model the
+     * user picked, not whichever PATCH the network happened to deliver last.
+     *
+     * Picking A then B fires two independent requests; if A lands second the
+     * row keeps A, and re-opening the thread silently restores a model the
+     * user already moved off. Chaining each write onto the previous one makes
+     * server order match click order. Failures are swallowed into the chain so
+     * one dropped request cannot stall every later write.
+     */
+    const modelWriteChainRef = useRef<Promise<unknown>>(Promise.resolve());
+    const persistModelPin = useCallback((conversationId: string, modelId: string | null) => {
+        modelWriteChainRef.current = modelWriteChainRef.current
+            .catch(() => {})
+            .then(() => updateConversationModel(conversationId, modelId))
+            .catch(() => {
+                // Best-effort durability: the pin still governs this session's
+                // next turn, only its survival across a reload is lost. Not
+                // worth a toast that interrupts a message being composed.
+            });
+    }, []);
+
     const handleSetSelectedProvider = useCallback(
         (id: string) => {
             if (id === selectedProviderRef.current) return;
@@ -332,14 +354,10 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             setThreadModel(null);
             setSeedModel('');
             if (conversationIdRef.current) {
-                void updateConversationModel(conversationIdRef.current, null).catch(() => {
-                    // Best-effort: the pin is already cleared in the UI and the
-                    // next turn omits the model either way, so a failed write
-                    // costs nothing this session.
-                });
+                persistModelPin(conversationIdRef.current, null);
             }
         },
-        [setSelectedProvider, setSeedModel],
+        [setSelectedProvider, setSeedModel, persistModelPin],
     );
 
     const handleSetSelectedModel = useCallback(
@@ -347,18 +365,14 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             const conversationId = conversationIdRef.current;
             if (conversationId) {
                 setThreadModel(modelId);
-                void updateConversationModel(conversationId, modelId).catch(() => {
-                    // The pin still applies to this session's next turn; only
-                    // its durability across a reload is lost. Not worth a
-                    // toast that interrupts a message the user is composing.
-                });
+                persistModelPin(conversationId, modelId);
                 return;
             }
             // No row yet — hold it in the browser seed until the first message
             // creates the conversation, which stamps it on the row.
             setSeedModel(modelId ?? '');
         },
-        [setSeedModel],
+        [setSeedModel, persistModelPin],
     );
 
     const value: ChatContextValue = useMemo(

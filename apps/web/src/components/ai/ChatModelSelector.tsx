@@ -111,6 +111,13 @@ export function ChatModelSelector({
         [cached, loadedFor, providerId, catalog],
     );
     const loading = open && Boolean(providerId) && !cached && loadedFor !== providerId;
+    // Scoped to the provider the error actually came from. `error` is plain
+    // state, and the fetch effect bails early when a catalogue is cached, so
+    // switching providers after a failed load would otherwise keep the old
+    // provider's message on screen — and because the catalogue section is
+    // gated on `!activeError`, it would hide the NEW provider's models too.
+    // Same guard `PluginModelSelect` uses.
+    const activeError = cached ? null : loadedFor === providerId ? error : null;
 
     // De-duplicated against the curated list: a tier model is almost always
     // also in the catalogue, and showing it twice makes the curated section
@@ -261,11 +268,11 @@ export function ChatModelSelector({
                             </div>
                         )}
 
-                        {!loading && error && (
-                            <div className="px-2 py-2 text-xs text-danger">{error}</div>
+                        {!loading && activeError && (
+                            <div className="px-2 py-2 text-xs text-danger">{activeError}</div>
                         )}
 
-                        {!loading && !error && filteredCatalog.length > 0 && (
+                        {!loading && !activeError && filteredCatalog.length > 0 && (
                             <>
                                 <SectionLabel>{t('all')}</SectionLabel>
                                 {filteredCatalog.map((model) => (
@@ -289,7 +296,7 @@ export function ChatModelSelector({
                         )}
 
                         {!loading &&
-                            !error &&
+                            !activeError &&
                             filteredCatalog.length === 0 &&
                             filteredCurated.length === 0 && (
                                 <div className="px-2 py-2 text-xs text-text-muted dark:text-text-muted-dark">
