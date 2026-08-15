@@ -89,6 +89,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'GitHubAppUserLink',
     // Inbound Triggers (Trigger Schedules) — signed webhook/API triggers
     'InboundTrigger',
+    // Task Triggers — per-(trigger, event) fire ledger (ingest idempotency)
+    'InboundTriggerFire',
     // Event-ingest pull path (Wave 8) — per-(user, plugin) pull cursors
     'IngestCursor',
     // Inbound receivers — workspace/installation → platform user binding
