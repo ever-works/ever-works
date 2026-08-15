@@ -751,6 +751,7 @@
                 "secretWarning": "Copy the new secret now — you won't be able to see it again.",
                 "recentFires": "Recent fires",
                 "noFires": "This trigger hasn't fired yet.",
+                "viewTask": "View task",
                 "fireStatus": {
                     "running": "Running",
                     "done": "Done",

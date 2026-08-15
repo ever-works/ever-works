@@ -6988,6 +6988,7 @@
                 "secretWarning": "Copy the new secret now — you won't be able to see it again.",
                 "recentFires": "Recent fires",
                 "noFires": "This trigger hasn't fired yet.",
+                "viewTask": "कार्य देखें",
                 "fireStatus": {
                     "running": "Running",
                     "done": "Done",

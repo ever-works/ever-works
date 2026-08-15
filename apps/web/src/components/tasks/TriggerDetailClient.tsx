@@ -14,6 +14,8 @@ import {
     RefreshCw,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Link } from '@/i18n/navigation';
+import { ROUTES } from '@/lib/constants';
 import {
     fireNowInboundTriggerAction,
     listInboundTriggerFiresAction,
@@ -323,6 +325,18 @@ export function TriggerDetailClient({
                                     {t(`fireOrigin.${fire.origin}`)}
                                 </span>
                                 <ActivityTimestamp value={fire.firedAt} />
+                                {/* Trigger-spawned Tasks are hidden from the
+                                    board unless `showOnBoard` is set, so this
+                                    link is the only route to them. */}
+                                {fire.taskId ? (
+                                    <Link
+                                        href={ROUTES.DASHBOARD_TASK(fire.taskId)}
+                                        className="text-primary-600 hover:underline dark:text-primary-400"
+                                        data-testid={`trigger-fire-task-${fire.id}`}
+                                    >
+                                        {t('viewTask')}
+                                    </Link>
+                                ) : null}
                                 {fire.reason ? (
                                     <span className="text-text-muted dark:text-text-muted-dark">
                                         {fire.reason}
