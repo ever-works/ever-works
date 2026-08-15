@@ -44,6 +44,54 @@ export type RepoConnectionSourceType = 'manual' | 'work' | 'github-app';
 export const REPO_CONNECTION_ENV_FILE_MAX_COUNT = 8;
 export const REPO_CONNECTION_ENV_FILE_MAX_CONTENT_BYTES = 32 * 1024;
 
+/** A single, traversal-free directory segment. */
+export const REPO_CONNECTION_MOUNT_DIR_PATTERN = /^[A-Za-z0-9._-]{1,200}$/;
+
+/** True when `value` is safe to use verbatim as `/workspace/<value>`. */
+export function isSafeMountDir(value: string): boolean {
+    if (typeof value !== 'string') return false;
+    if (!REPO_CONNECTION_MOUNT_DIR_PATTERN.test(value)) return false;
+    return value !== '.' && value !== '..';
+}
+
+/**
+ * Coerce an arbitrary string into ONE safe directory segment: every
+ * character outside the mount-dir alphabet (path separators, spaces,
+ * unicode) collapses to `-`, and leading dots/dashes are dropped so the
+ * result can never be `.`, `..`, a hidden directory, or an option-looking
+ * argument. Empty input degrades to `repo`, never to an empty segment.
+ */
+export function sanitizeMountDirSegment(value: string | null | undefined): string {
+    const sanitized = (typeof value === 'string' ? value : '')
+        .trim()
+        .replace(/[^A-Za-z0-9._-]+/g, '-')
+        .replace(/^[.\-]+/, '')
+        .slice(0, 200)
+        .replace(/[.\-]+$/, '');
+    return sanitized || 'repo';
+}
+
+/**
+ * THE effective workspace mount directory for a registry row.
+ *
+ * `mountPath` is validated as a single traversal-free segment at the API
+ * boundary — but it is OPTIONAL, and the fallback is the display `name`,
+ * which is only length-checked (it may contain `/`, `..`, or spaces).
+ * Every path-building consumer (provision specs, managed-session mount
+ * paths) resolves through this one function so the fallback can never
+ * escape `/workspace/<dir>`.
+ */
+export function resolveMountDir(
+    mountPath: string | null | undefined,
+    name: string | null | undefined,
+): string {
+    const explicit = typeof mountPath === 'string' ? mountPath.trim() : '';
+    if (explicit) {
+        return isSafeMountDir(explicit) ? explicit : sanitizeMountDirSegment(explicit);
+    }
+    return sanitizeMountDirSegment(name);
+}
+
 /**
  * Repository registry (Feature G) — a global, account-level repository
  * record independent of Works. Rows are standalone: they describe a
@@ -146,8 +194,11 @@ export class RepoConnection {
     @UpdateDateColumn()
     updatedAt: Date;
 
-    /** Effective workspace mount directory (mountPath override or name). */
+    /**
+     * Effective workspace mount directory (mountPath override or name),
+     * always a single traversal-free segment — see {@link resolveMountDir}.
+     */
     getMountDir(): string {
-        return (this.mountPath && this.mountPath.trim()) || this.name;
+        return resolveMountDir(this.mountPath, this.name);
     }
 }

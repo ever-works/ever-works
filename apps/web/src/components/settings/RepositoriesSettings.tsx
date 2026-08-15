@@ -31,7 +31,7 @@ interface RepositoriesSettingsProps {
 
 type FormTab = 'general' | 'environment';
 
-interface FormState {
+export interface FormState {
     name: string;
     url: string;
     defaultBranch: string;
@@ -52,6 +52,29 @@ const EMPTY_FORM: FormState = {
     credentialRef: '',
     availableInAllProjects: true,
 };
+
+/**
+ * Form → API payload.
+ *
+ * Emptied optional fields are sent as explicit `null` (= CLEAR), never
+ * omitted: the API reads `undefined` as "leave the stored value alone",
+ * so omitting them made clearing a Mount Path / Default Branch /
+ * Description — or switching Credential Key back to "Inherited", which
+ * must drop the stale pointer — a silent no-op that snapped back to the
+ * old value on the next load.
+ */
+export function buildRepoConnectionPayload(form: FormState): SaveRepoConnectionInput {
+    return {
+        name: form.name.trim(),
+        url: form.url.trim(),
+        availableInAllProjects: form.availableInAllProjects,
+        credentialMode: form.credentialMode,
+        defaultBranch: form.defaultBranch.trim() || null,
+        mountPath: form.mountPath.trim() || null,
+        description: form.description.trim() || null,
+        credentialRef: form.credentialMode === 'inherit' ? null : form.credentialRef.trim() || null,
+    };
+}
 
 function sourceBadgeClasses(sourceType: RepoConnectionDto['sourceType']): string {
     if (sourceType === 'work') {
@@ -124,21 +147,7 @@ export function RepositoriesSettings({
         setEnvFiles([]);
     };
 
-    const buildPayload = (): SaveRepoConnectionInput => {
-        const payload: SaveRepoConnectionInput = {
-            name: form.name.trim(),
-            url: form.url.trim(),
-            availableInAllProjects: form.availableInAllProjects,
-            credentialMode: form.credentialMode,
-        };
-        if (form.defaultBranch.trim()) payload.defaultBranch = form.defaultBranch.trim();
-        if (form.mountPath.trim()) payload.mountPath = form.mountPath.trim();
-        if (form.description.trim()) payload.description = form.description.trim();
-        if (form.credentialMode !== 'inherit' && form.credentialRef.trim()) {
-            payload.credentialRef = form.credentialRef.trim();
-        }
-        return payload;
-    };
+    const buildPayload = (): SaveRepoConnectionInput => buildRepoConnectionPayload(form);
 
     const handleSaveGeneral = async () => {
         setPending(true);

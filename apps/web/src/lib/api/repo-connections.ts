@@ -47,15 +47,21 @@ export interface AgentRepoDto extends RepoConnectionDto {
     attachmentEnabled: boolean;
 }
 
+/**
+ * `undefined` = leave the stored value alone; `null` = CLEAR it. The API
+ * distinguishes the two (`@IsOptional()` accepts null, and the service
+ * writes null through), which is the only way an edit can empty a field
+ * the user had previously filled in.
+ */
 export interface SaveRepoConnectionInput {
     name: string;
     url: string;
     provider?: RepoConnectionProvider;
-    defaultBranch?: string;
-    mountPath?: string;
-    description?: string;
+    defaultBranch?: string | null;
+    mountPath?: string | null;
+    description?: string | null;
     credentialMode?: RepoConnectionCredentialMode;
-    credentialRef?: string;
+    credentialRef?: string | null;
     envFiles?: RepoConnectionEnvFileDto[];
     availableInAllProjects?: boolean;
     enabled?: boolean;

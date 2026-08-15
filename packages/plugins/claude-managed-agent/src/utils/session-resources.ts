@@ -20,14 +20,37 @@ export interface UploadedAttachedEnvFile {
 	path: string;
 }
 
+/**
+ * Traversal guard. The registry already resolves `mountDir` to one safe
+ * segment, but THIS module builds the actual mount paths — so it refuses
+ * to emit one that escapes the workspace no matter what an orchestrator
+ * hands it. Separators collapse, `.`/`..` segments are dropped.
+ */
+function safeMountDir(mountDir: string): string {
+	const joined = String(mountDir ?? '')
+		.split(/[\\/]+/)
+		.filter((segment) => segment && segment !== '.' && segment !== '..')
+		.join('-');
+	return joined || 'repo';
+}
+
+/** Same guard for a relative path INSIDE a repo (nesting stays allowed). */
+function safeRelativePath(path: string): string {
+	const joined = String(path ?? '')
+		.split(/[\\/]+/)
+		.filter((segment) => segment && segment !== '.' && segment !== '..')
+		.join('/');
+	return joined || '.env';
+}
+
 /** Mount path for an attached repo: `/workspace/<mountDir>`. */
 export function attachedRepoMountPath(workspacePath: string, mountDir: string): string {
-	return `${workspacePath.replace(/\/+$/, '')}/${mountDir}`;
+	return `${workspacePath.replace(/\/+$/, '')}/${safeMountDir(mountDir)}`;
 }
 
 /** Mount path for an attached repo's env file: `/workspace/<mountDir>/<path>`. */
 export function attachedEnvFileMountPath(workspacePath: string, mountDir: string, path: string): string {
-	return `${attachedRepoMountPath(workspacePath, mountDir)}/${path.replace(/^\/+/, '')}`;
+	return `${attachedRepoMountPath(workspacePath, mountDir)}/${safeRelativePath(path)}`;
 }
 
 /**

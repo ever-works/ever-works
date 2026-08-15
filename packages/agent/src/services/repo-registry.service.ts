@@ -10,6 +10,9 @@ import {
     REPO_CONNECTION_ENV_FILE_MAX_CONTENT_BYTES,
     REPO_CONNECTION_ENV_FILE_MAX_COUNT,
     RepoConnection,
+    isSafeMountDir,
+    resolveMountDir,
+    sanitizeMountDirSegment,
     type RepoConnectionCredentialMode,
     type RepoConnectionProvider,
     type RepoConnectionSourceType,
@@ -98,7 +101,6 @@ export interface CreateRepoConnectionInput {
 
 export type UpdateRepoConnectionInput = Partial<CreateRepoConnectionInput>;
 
-const MOUNT_PATH_PATTERN = /^[A-Za-z0-9._-]{1,200}$/;
 // Env-file paths may nest (e.g. `apps/api/.env`): slash-joined segments,
 // each mount-path-shaped, no `.`/`..` segments, capped at 200 chars total.
 const ENV_FILE_SEGMENT_PATTERN = /^[A-Za-z0-9._-]{1,200}$/;
@@ -123,11 +125,14 @@ export function isValidRepoUrl(url: string): boolean {
     return /^[A-Za-z0-9._-]+@[A-Za-z0-9._-]+:[^\s]+$/.test(trimmed);
 }
 
-/** Single directory segment; no separators, so traversal is impossible. */
+/**
+ * Single directory segment; no separators, so traversal is impossible.
+ * Shares its definition with the mount-dir resolver on the entity — the
+ * API boundary REJECTS what the resolver would otherwise have to
+ * sanitize.
+ */
 export function isValidMountPath(mountPath: string): boolean {
-    if (typeof mountPath !== 'string') return false;
-    if (!MOUNT_PATH_PATTERN.test(mountPath)) return false;
-    return mountPath !== '.' && mountPath !== '..';
+    return isSafeMountDir(mountPath);
 }
 
 export function isValidEnvFilePath(path: string): boolean {
@@ -228,7 +233,10 @@ export function mapAttachmentEdgesToRepos(
             repoConnectionId: repo.id,
             url: repo.url,
             branch: repo.defaultBranch ?? null,
-            mountDir: (repo.mountPath && repo.mountPath.trim()) || repo.name,
+            // NEVER the raw `name`: it is only length-checked, so an
+            // unsanitized fallback would let `../../etc` escape
+            // `/workspace/<dir>` in every path-building consumer.
+            mountDir: resolveMountDir(repo.mountPath, repo.name),
             envFiles: envFilesFromRecord(repo.envFiles).files,
         });
     }
@@ -351,7 +359,15 @@ export class RepoRegistryService {
         input: UpdateRepoConnectionInput,
     ): Promise<RepoConnectionView> {
         const row = await this.requireOwned(userId, id);
-        this.assertValidCore({ name: input.name ?? row.name, url: input.url ?? row.url, ...input });
+        // Fallbacks LAST: an in-process caller that passes an explicit
+        // `name: undefined` on a partial update must validate against the
+        // stored row, not against undefined (spreading `input` after the
+        // fallbacks would overwrite them with the undefined key).
+        this.assertValidCore({
+            ...input,
+            name: input.name ?? row.name,
+            url: input.url ?? row.url,
+        });
 
         if (input.name !== undefined) {
             const name = input.name.trim();
@@ -593,7 +609,7 @@ export class RepoRegistryService {
             provider: 'github',
             defaultBranch: null,
             mountPath: null,
-            mountDir: fullName.split('/')[1] ?? fullName,
+            mountDir: sanitizeMountDirSegment(fullName.split('/')[1] ?? fullName),
             description: null,
             credentialMode: 'inherit',
             credentialRef: null,
@@ -686,7 +702,7 @@ export class RepoRegistryService {
             provider: row.provider,
             defaultBranch: row.defaultBranch ?? null,
             mountPath: row.mountPath ?? null,
-            mountDir: (row.mountPath && row.mountPath.trim()) || row.name,
+            mountDir: resolveMountDir(row.mountPath, row.name),
             description: row.description ?? null,
             credentialMode: row.credentialMode,
             credentialRef: row.credentialRef ?? null,

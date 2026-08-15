@@ -8,7 +8,11 @@ import {
     resolveAttachedReposForAgent,
     toAdvisoryRepoSpecs,
 } from '../repo-registry.service';
-import type { RepoConnection } from '../../entities/repo-connection.entity';
+import {
+    resolveMountDir,
+    sanitizeMountDirSegment,
+    type RepoConnection,
+} from '../../entities/repo-connection.entity';
 
 /**
  * Repository registry (Feature G) — service-level behavior:
@@ -109,6 +113,25 @@ describe('validators', () => {
         expect(isValidRepoUrl('')).toBe(false);
     });
 
+    it('resolves the mount dir to ONE safe segment even when the name is hostile', () => {
+        // Regression: `mountPath` was validated but the FALLBACK (`name`,
+        // only length-checked) was used verbatim, so a repo named
+        // `../../etc` produced the mount dir `../../etc` — i.e.
+        // `/workspace/../../etc` in every path-building consumer.
+        expect(resolveMountDir(null, '../../etc')).toBe('etc');
+        expect(resolveMountDir(null, '..')).toBe('repo');
+        expect(resolveMountDir(null, '.')).toBe('repo');
+        expect(resolveMountDir(null, '.ssh')).toBe('ssh');
+        expect(resolveMountDir(null, 'my service')).toBe('my-service');
+        expect(resolveMountDir(null, 'a/b')).toBe('a-b');
+        expect(resolveMountDir(null, '   ')).toBe('repo');
+        // A valid explicit mountPath still wins verbatim.
+        expect(resolveMountDir('api', 'my-service')).toBe('api');
+        // …and a legacy/hostile stored mountPath is sanitized, not trusted.
+        expect(resolveMountDir('../../etc', 'my-service')).toBe('etc');
+        expect(sanitizeMountDirSegment('-rf')).toBe('rf');
+    });
+
     it('constrains mountPath to a single traversal-free segment', () => {
         expect(isValidMountPath('my-repo')).toBe(true);
         expect(isValidMountPath('repo_1.data')).toBe(true);
@@ -159,6 +182,56 @@ describe('registry CRUD', () => {
         expect(JSON.stringify(view)).not.toContain('SECRET=value');
         expect(view.mountDir).toBe('my-service');
         expect(view.readonly).toBe(false);
+    });
+
+    it('never surfaces a traversing mountDir for a hostile display name', async () => {
+        const { service, repoConnections } = makeMocks();
+        const view = await service.create(USER, {
+            name: '../../root/.ssh',
+            url: 'https://github.com/acme/x',
+        });
+        // The name is stored as typed (it is only a label)…
+        expect(repoConnections.create).toHaveBeenCalledWith(
+            expect.objectContaining({ name: '../../root/.ssh' }),
+        );
+        // …but the effective mount dir can never escape /workspace.
+        expect(view.mountDir).toBe('root-.ssh');
+        expect(view.mountDir).not.toContain('/');
+        expect(view.mountDir).not.toContain('..');
+    });
+
+    it('update() distinguishes undefined (leave alone) from null (clear)', async () => {
+        const { service, repoConnections } = makeMocks();
+        repoConnections.findByIdAndUser.mockResolvedValue(
+            makeRow({ mountPath: 'svc', description: 'old', credentialRef: 'env:TOKEN' }),
+        );
+
+        // undefined → untouched (including an explicitly-undefined name/url
+        // key, which must validate against the stored row, not against
+        // undefined).
+        const untouched = await service.update(USER, 'rc-1', {
+            name: undefined,
+            url: undefined,
+            enabled: false,
+        });
+        expect(untouched.mountPath).toBe('svc');
+        expect(untouched.credentialRef).toBe('env:TOKEN');
+        expect(untouched.description).toBe('old');
+        expect(untouched.enabled).toBe(false);
+
+        // null → cleared. The Settings form sends these when a field is
+        // emptied / the credential mode goes back to "inherit"; before the
+        // fix it omitted them and the stale values silently survived.
+        const cleared = await service.update(USER, 'rc-1', {
+            mountPath: null,
+            description: null,
+            credentialRef: null,
+            credentialMode: 'inherit',
+        });
+        expect(cleared.mountPath).toBeNull();
+        expect(cleared.description).toBeNull();
+        expect(cleared.credentialRef).toBeNull();
+        expect(cleared.credentialMode).toBe('inherit');
     });
 
     it('rejects an invalid URL and a traversal mountPath', async () => {
@@ -471,6 +544,26 @@ describe('provisioning resolver', () => {
             { url: 'https://github.com/acme/my-service', branch: 'develop', mountDir: 'api' },
         ]);
         expect(JSON.stringify(specs)).not.toContain('A=1');
+    });
+
+    it('sanitizes the mountDir of a hostile display name before it reaches a consumer', () => {
+        const resolved = mapAttachmentEdgesToRepos([
+            {
+                repoConnectionId: 'rc-8',
+                enabled: true,
+                repoConnection: makeRow({
+                    id: 'rc-8',
+                    name: '../../root/.ssh',
+                    mountPath: null,
+                    envFiles: { '.env': 'A=1' },
+                }),
+            },
+        ] as never);
+        // Pre-fix this was '../../root/.ssh', which a mounting executor
+        // would resolve to '/workspace/../../root/.ssh' — writing the
+        // attacker-supplied env file outside the workspace.
+        expect(resolved[0].mountDir).toBe('root-.ssh');
+        expect(toAdvisoryRepoSpecs(resolved)[0].mountDir).toBe('root-.ssh');
     });
 
     it('a branch-less repo omits `branch` instead of emitting null', () => {

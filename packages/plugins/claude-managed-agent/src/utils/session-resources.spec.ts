@@ -92,4 +92,20 @@ describe('mount path helpers', () => {
 		expect(attachedRepoMountPath('/workspace/', 'api')).toBe('/workspace/api');
 		expect(attachedEnvFileMountPath('/workspace', 'api', '/.env')).toBe('/workspace/api/.env');
 	});
+
+	it('never emits a mount path that escapes the workspace', () => {
+		// The registry sanitizes `mountDir`, but this module builds the real
+		// path — so a traversing mountDir/path from ANY orchestrator is
+		// collapsed rather than mounted at `/workspace/../../…`.
+		expect(attachedRepoMountPath('/workspace', '../../etc')).toBe('/workspace/etc');
+		expect(attachedRepoMountPath('/workspace', '..')).toBe('/workspace/repo');
+		expect(attachedEnvFileMountPath('/workspace', 'api', '../../../root/.ssh/authorized_keys')).toBe(
+			'/workspace/api/root/.ssh/authorized_keys'
+		);
+		expect(attachedEnvFileMountPath('/workspace', '../etc', '../.env')).toBe('/workspace/etc/.env');
+	});
+
+	it('keeps legitimate nesting inside the repo directory', () => {
+		expect(attachedEnvFileMountPath('/workspace', 'api', 'apps/api/.env')).toBe('/workspace/api/apps/api/.env');
+	});
 });

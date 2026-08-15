@@ -30,7 +30,7 @@ Two new tables, migration `apps/api/src/migrations/1786850000000-CreateRepoConne
 | `url` varchar(512)                         | https or ssh clone URL, validated at the API boundary                                               |
 | `provider` varchar(16)                     | `github` \| `git`                                                                                   |
 | `defaultBranch` varchar(120)?              |                                                                                                     |
-| `mountPath` varchar(200)?                  | single traversal-free segment; NULL → falls back to `name`                                          |
+| `mountPath` varchar(200)?                  | single traversal-free segment; NULL → falls back to a SANITIZED `name` (see below)                  |
 | `description` text?                        |                                                                                                     |
 | `credentialMode` varchar(24)               | `inherit` \| `github-app` \| `secret-ref` (default `inherit`)                                       |
 | `credentialRef` varchar(200)?              | **pointer only** — `env:NAME`, `plugin:github`, or a `GitHubAppInstallation` id. Never a raw token. |
@@ -115,6 +115,27 @@ Module-level helpers (not methods — they have consumers outside the Nest graph
 
 Derived Work entries get synthetic ids (`work:<workId>:<role>`) that cannot collide with row
 uuids, `readonly: true`, and no edit/delete affordance in the UI.
+
+## Mount-dir resolution (the one path-building rule)
+
+`mountPath` is validated as a single traversal-free segment at the API boundary, but it is
+optional and the fallback is `name`, which is only length-checked. **Everything that turns a
+registry row into a filesystem path goes through `resolveMountDir(mountPath, name)`**
+(`entities/repo-connection.entity.ts`): a valid explicit `mountPath` is used verbatim, anything
+else is coerced to ONE safe segment (separators/spaces collapse to `-`, leading dots and dashes
+dropped, empty → `repo`). `RepoConnection.getMountDir()`, `RepoRegistryService.toView()` and
+`mapAttachmentEdgesToRepos()` all resolve through it, so a repo named `../../root/.ssh` mounts
+at `/workspace/root-.ssh` rather than escaping the workspace. `session-resources.ts` repeats the
+guard on the plugin side — it builds the real mount paths, so it refuses a traversing `mountDir`
+from any orchestrator.
+
+## Null vs undefined on update
+
+`PATCH /api/repo-connections/:id` reads **`undefined` = leave the stored value alone** and
+**`null` = clear it**. The Settings form sends explicit `null` for every emptied optional field
+(`buildRepoConnectionPayload`), including `credentialRef` whenever the credential mode goes back
+to `inherit` — otherwise clearing a Mount Path or dropping a credential pointer saved
+"successfully" and silently kept the old value.
 
 ## Provisioning wiring (v1, additive)
 
