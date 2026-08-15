@@ -2340,6 +2340,15 @@
                     "enforceLabel": "Forçar este padrão",
                     "enforceDescription": "Sempre pré-selecionar este pipeline, mesmo quando um trabalho tem seu próprio pipeline configurado. Você ainda pode trocar pipelines manualmente no formulário.",
                     "saveFailed": "Falha ao salvar pipeline padrão"
+                },
+                "voiceDefault": {
+                    "title": "Provedor de voz",
+                    "description": "Qual provedor transcreve o ditado por voz do microfone do chat.",
+                    "autoLabel": "Automático",
+                    "autoDescription": "Usar o provedor ativo na sua conta",
+                    "currentlyActive": "Em uso atualmente",
+                    "noProviders": "Nenhum dos seus provedores de IA configurados suporta transcrição de voz.",
+                    "saveFailed": "Não foi possível salvar o provedor de voz"
                 }
             },
             "profile": {
@@ -6205,6 +6214,18 @@
                 "start": "Ditar",
                 "stop": "Parar gravação",
                 "transcribing": "A transcrever…"
+            },
+            "model": {
+                "label": "Modelo",
+                "auto": "Padrão do provedor",
+                "autoHint": "Usar o modelo configurado para este provedor",
+                "configured": "Configurados",
+                "all": "Todos os modelos",
+                "searchPlaceholder": "Pesquisar modelos...",
+                "loading": "Carregando modelos...",
+                "loadError": "Não foi possível carregar os modelos",
+                "noModels": "Nenhum modelo disponível",
+                "context": "contexto de {value}"
             }
         },
         "plugins": {

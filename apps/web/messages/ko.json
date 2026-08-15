@@ -2340,6 +2340,15 @@
                     "enforceLabel": "이 기본값 강제",
                     "enforceDescription": "워크에 자체 파이프라인이 구성되어 있어도 항상 이 파이프라인을 미리 선택합니다. 폼에서 수동으로 파이프라인을 전환할 수 있습니다.",
                     "saveFailed": "기본 파이프라인 저장에 실패했습니다"
+                },
+                "voiceDefault": {
+                    "title": "음성 공급자",
+                    "description": "채팅 마이크의 음성 받아쓰기를 텍스트로 변환할 공급자입니다.",
+                    "autoLabel": "자동",
+                    "autoDescription": "계정에서 활성화된 공급자를 사용합니다",
+                    "currentlyActive": "현재 사용 중",
+                    "noProviders": "구성된 AI 공급자 중 음성 변환을 지원하는 것이 없습니다.",
+                    "saveFailed": "음성 공급자를 저장하지 못했습니다"
                 }
             },
             "profile": {
@@ -6205,6 +6214,18 @@
                 "start": "받아쓰기",
                 "stop": "녹음 중지",
                 "transcribing": "변환 중…"
+            },
+            "model": {
+                "label": "모델",
+                "auto": "공급자 기본값",
+                "autoHint": "이 공급자에 설정된 모델을 사용합니다",
+                "configured": "구성됨",
+                "all": "모든 모델",
+                "searchPlaceholder": "모델 검색...",
+                "loading": "모델 불러오는 중...",
+                "loadError": "모델을 불러오지 못했습니다",
+                "noModels": "사용 가능한 모델 없음",
+                "context": "컨텍스트 {value}"
             }
         },
         "plugins": {

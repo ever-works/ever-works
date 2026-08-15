@@ -776,6 +776,95 @@ export class PluginOperationsService {
         );
     }
 
+    /**
+     * Set or clear the user's default VOICE (speech-to-text) provider.
+     *
+     * Deliberately a mirror of `setGlobalPipelineDefault`: one flag on the
+     * user-plugin metadata blob, cleared everywhere before being set once.
+     * That keeps this a settings change with no schema change — the same
+     * reason the pipeline default lives there.
+     *
+     * Why a dedicated setting rather than reusing the active AI provider:
+     * transcription is an OPTIONAL method on the AI-provider interface, so
+     * the plugin answering chat is frequently not one that can transcribe at
+     * all (a gateway with no Whisper route, say). Without this the user's
+     * only lever was a per-request pick in the chat composer, which is the
+     * wrong altitude — swapping speech vendors is a once-a-year decision.
+     *
+     * @param userId - The user to update
+     * @param pluginId - Plugin to set as the voice default, or null to clear
+     */
+    async setGlobalVoiceDefault(userId: string, pluginId: string | null): Promise<void> {
+        // Clear from the DB rather than the registry so a flag left on a
+        // plugin that has since been unloaded is cleaned up too.
+        const flaggedPlugins = await this.userPluginRepository.find({ where: { userId } });
+        for (const existing of flaggedPlugins) {
+            if (existing.metadata?.isGlobalVoiceDefault) {
+                const newMeta = { ...existing.metadata };
+                delete newMeta.isGlobalVoiceDefault;
+                await this.userPluginRepository.save({ ...existing, metadata: newMeta });
+            }
+        }
+
+        if (!pluginId) return;
+
+        const target = this.pluginRegistryService.get(pluginId);
+        if (!target) {
+            throw new NotFoundException(`Plugin "${pluginId}" not found`);
+        }
+        if (!target.plugin.capabilities.includes(PLUGIN_CAPABILITIES.AI_PROVIDER)) {
+            throw new BadRequestException(`Plugin "${pluginId}" is not an AI provider plugin`);
+        }
+        // Being an AI provider does NOT imply speech-to-text — `transcribe` is
+        // optional on the interface. Probing the instance here turns a
+        // mis-selection into a clean 400 at save time instead of a 503 the
+        // next time someone holds the mic down.
+        if (typeof (target.plugin as { transcribe?: unknown }).transcribe !== 'function') {
+            throw new BadRequestException(
+                `Plugin "${pluginId}" does not support voice transcription`,
+            );
+        }
+
+        let userPlugin = await this.userPluginRepository.findOne({
+            where: { userId, pluginId },
+        });
+
+        if (!userPlugin) {
+            const pluginEntity = await this.pluginRepository.findOne({ where: { pluginId } });
+            if (!pluginEntity) {
+                throw new NotFoundException(`Plugin entity "${pluginId}" not found`);
+            }
+            userPlugin = this.userPluginRepository.create({
+                userId,
+                pluginId,
+                pluginEntityId: pluginEntity.id,
+                enabled: true,
+                settings: {},
+                secretSettings: {},
+                metadata: {},
+            });
+        }
+
+        userPlugin.metadata = {
+            ...userPlugin.metadata,
+            isGlobalVoiceDefault: true,
+        };
+        await this.userPluginRepository.save(userPlugin);
+        this.logger.log(`Voice provider default set to "${pluginId}" for user "${userId}"`);
+    }
+
+    /**
+     * The plugin id this user picked as their voice provider, if any.
+     *
+     * Returns `null` when unset, which is meaningful rather than an error
+     * state: selection then falls through to the scope-active plugin and the
+     * platform default, exactly as it did before this setting existed.
+     */
+    async getGlobalVoiceDefault(userId: string): Promise<string | null> {
+        const flagged = await this.userPluginRepository.find({ where: { userId } });
+        return flagged.find((p) => p.metadata?.isGlobalVoiceDefault)?.pluginId ?? null;
+    }
+
     // ============================================
     // Work Plugin Operations
     // ============================================

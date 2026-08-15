@@ -2340,6 +2340,15 @@
                     "enforceLabel": "Impone questa predefinita",
                     "enforceDescription": "Seleziona sempre questa pipeline in anticipo, anche quando una lavori ha la sua pipeline configurata. Puoi comunque cambiare pipeline manualmente nel form.",
                     "saveFailed": "Errore nel salvataggio della pipeline predefinita"
+                },
+                "voiceDefault": {
+                    "title": "Provider vocale",
+                    "description": "Quale provider trascrive la dettatura vocale dal microfono della chat.",
+                    "autoLabel": "Automatico",
+                    "autoDescription": "Usa il provider attivo per il tuo account",
+                    "currentlyActive": "Attualmente in uso",
+                    "noProviders": "Nessuno dei tuoi provider IA configurati supporta la trascrizione vocale.",
+                    "saveFailed": "Impossibile salvare il provider vocale"
                 }
             },
             "profile": {
@@ -6205,6 +6214,18 @@
                 "start": "Detta",
                 "stop": "Interrompi registrazione",
                 "transcribing": "Trascrizione…"
+            },
+            "model": {
+                "label": "Modello",
+                "auto": "Predefinito del provider",
+                "autoHint": "Usa il modello configurato per questo provider",
+                "configured": "Configurati",
+                "all": "Tutti i modelli",
+                "searchPlaceholder": "Cerca modelli...",
+                "loading": "Caricamento modelli...",
+                "loadError": "Impossibile caricare i modelli",
+                "noModels": "Nessun modello disponibile",
+                "context": "contesto {value}"
             }
         },
         "plugins": {

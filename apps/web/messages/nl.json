@@ -2340,6 +2340,15 @@
                     "enforceLabel": "Deze standaard afdwingen",
                     "enforceDescription": "Selecteer altijd deze pipeline vooraf, zelfs als een werk zijn eigen pipeline heeft geconfigureerd. Je kunt pipelines nog steeds handmatig wisselen in het formulier.",
                     "saveFailed": "Kon standaardpipeline niet opslaan"
+                },
+                "voiceDefault": {
+                    "title": "Spraakprovider",
+                    "description": "Welke provider spraakdictaat van de chatmicrofoon transcribeert.",
+                    "autoLabel": "Automatisch",
+                    "autoDescription": "Gebruik de provider die actief is voor je account",
+                    "currentlyActive": "Momenteel in gebruik",
+                    "noProviders": "Geen van je geconfigureerde AI-providers ondersteunt spraaktranscriptie.",
+                    "saveFailed": "Spraakprovider kon niet worden opgeslagen"
                 }
             },
             "profile": {
@@ -6205,6 +6214,18 @@
                 "start": "Dicteren",
                 "stop": "Opname stoppen",
                 "transcribing": "Transcriberen…"
+            },
+            "model": {
+                "label": "Model",
+                "auto": "Standaard van provider",
+                "autoHint": "Gebruik het model dat voor deze provider is ingesteld",
+                "configured": "Geconfigureerd",
+                "all": "Alle modellen",
+                "searchPlaceholder": "Modellen zoeken...",
+                "loading": "Modellen laden...",
+                "loadError": "Modellen konden niet worden geladen",
+                "noModels": "Geen modellen beschikbaar",
+                "context": "{value} context"
             }
         },
         "plugins": {

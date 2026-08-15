@@ -2460,6 +2460,15 @@
                     "enforceLabel": "Enforce this default",
                     "enforceDescription": "Always pre-select this pipeline, even when a Work has its own pipeline configured. You can still switch pipelines manually in the form.",
                     "saveFailed": "Failed to save pipeline default"
+                },
+                "voiceDefault": {
+                    "title": "Voice provider",
+                    "description": "Which provider transcribes voice dictation from the chat microphone.",
+                    "autoLabel": "Automatic",
+                    "autoDescription": "Use whichever provider is active for your account",
+                    "currentlyActive": "Currently used",
+                    "noProviders": "None of your configured AI providers support voice transcription.",
+                    "saveFailed": "Could not save the voice provider"
                 }
             },
             "profile": {
@@ -6531,6 +6540,18 @@
                 "start": "Dictate",
                 "stop": "Stop recording",
                 "transcribing": "Transcribing…"
+            },
+            "model": {
+                "label": "Model",
+                "auto": "Provider default",
+                "autoHint": "Use the model configured for this provider",
+                "configured": "Configured",
+                "all": "All models",
+                "searchPlaceholder": "Search models...",
+                "loading": "Loading models...",
+                "loadError": "Could not load models",
+                "noModels": "No models available",
+                "context": "{value} context"
             }
         },
         "plugins": {

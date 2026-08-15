@@ -2340,6 +2340,15 @@
                     "enforceLabel": "Áp dụng mặc định này",
                     "enforceDescription": "Luôn chọn trước đường ống này, ngay cả khi công việc có đường ống riêng được cấu hình. Bạn vẫn có thể chuyển đổi đường ống thủ công trong biểu mẫu.",
                     "saveFailed": "Không thể lưu đường ống mặc định"
+                },
+                "voiceDefault": {
+                    "title": "Nhà cung cấp giọng nói",
+                    "description": "Nhà cung cấp nào chuyển lời nói từ micrô trong trò chuyện thành văn bản.",
+                    "autoLabel": "Tự động",
+                    "autoDescription": "Dùng nhà cung cấp đang hoạt động cho tài khoản của bạn",
+                    "currentlyActive": "Đang được dùng",
+                    "noProviders": "Không nhà cung cấp AI nào đã cấu hình hỗ trợ chuyển giọng nói thành văn bản.",
+                    "saveFailed": "Không thể lưu nhà cung cấp giọng nói"
                 }
             },
             "profile": {
@@ -6205,6 +6214,18 @@
                 "start": "Đọc chính tả",
                 "stop": "Dừng ghi âm",
                 "transcribing": "Đang chuyển thành văn bản…"
+            },
+            "model": {
+                "label": "Mô hình",
+                "auto": "Mặc định của nhà cung cấp",
+                "autoHint": "Dùng mô hình đã cấu hình cho nhà cung cấp này",
+                "configured": "Đã cấu hình",
+                "all": "Tất cả mô hình",
+                "searchPlaceholder": "Tìm mô hình...",
+                "loading": "Đang tải mô hình...",
+                "loadError": "Không thể tải mô hình",
+                "noModels": "Không có mô hình nào",
+                "context": "ngữ cảnh {value}"
             }
         },
         "plugins": {

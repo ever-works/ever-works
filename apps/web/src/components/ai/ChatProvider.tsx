@@ -31,6 +31,7 @@ import {
     getConversation,
     createConversation,
     deleteConversation,
+    updateConversationModel,
 } from '@/app/actions/dashboard/conversations';
 
 const ACTIVE_CONVERSATION_KEY = 'chat-active-conversation';
@@ -51,6 +52,9 @@ interface ChatContextValue {
     providers: ProviderOption[];
     selectedProvider: string;
     setSelectedProvider: (id: string) => void;
+    /** Model pinned for the active thread, or `null` for the provider default. */
+    selectedModel: string | null;
+    setSelectedModel: (modelId: string | null) => void;
     conversationId: string | null;
     conversations: ConversationSummary[];
     conversationsLoading: boolean;
@@ -74,6 +78,17 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
         'chat-ai-provider',
         DEFAULT_AI_PROVIDER,
     );
+    // Seed for the NEXT thread only. Once a conversation exists, the pin lives
+    // on the conversation row (see `handleSetSelectedModel`) — otherwise the
+    // model a thread was built around would silently change the moment the
+    // user picked a different one in some other thread, or opened the app on
+    // another device. Empty string is the stored form of "provider default";
+    // `useLocalStorage` has no null channel.
+    const [seedModel, setSeedModel] = useLocalStorage<string>('chat-ai-model', '');
+    // The pin for the thread currently open. Only meaningful while
+    // `conversationId` is set; before the first message there is no row to
+    // hold it, so the seed above stands in.
+    const [threadModel, setThreadModel] = useState<string | null>(null);
     const [conversations, setConversations] = useState<ConversationSummary[]>([]);
     const [conversationsLoading, setConversationsLoading] = useState(false);
     const [persistedConvId, setPersistedConvId] = useLocalStorage<string>(
@@ -85,6 +100,13 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     const conversationIdRef = useRef<string | null>(persistedConvId || null);
     const selectedProviderRef = useRef(selectedProvider);
     selectedProviderRef.current = selectedProvider;
+
+    // Which model the composer is actually pinned to right now. A thread that
+    // exists owns its pin; before that, the browser-level seed does. Derived
+    // rather than stored so the two can never disagree.
+    const selectedModel = conversationId ? threadModel : seedModel || null;
+    const selectedModelRef = useRef(selectedModel);
+    selectedModelRef.current = selectedModel;
 
     const chat = useChat({ id: 'ever-works-chat', transport });
 
@@ -112,6 +134,12 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                         ],
                     }));
                 chatRef.current.setMessages(uiMessages);
+                // Re-pin the panel to what this thread was actually built on.
+                // Without it, a thread started on Anthropic silently continues
+                // on whatever the browser last used — the conversation row
+                // still says Anthropic while every new turn goes elsewhere.
+                if (conv.providerId) setSelectedProvider(conv.providerId);
+                setThreadModel(conv.model ?? null);
             })
             .catch(() => {
                 // Conversation may have been deleted
@@ -119,7 +147,7 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 setConversationId(null);
                 setPersistedConvId('');
             });
-    }, [setPersistedConvId]);
+    }, [setPersistedConvId, setSelectedProvider]);
 
     // Fetch providers on mount
     useEffect(() => {
@@ -195,7 +223,15 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                     const normalised = seed.replace(/\s+/g, ' ').trim();
                     const title =
                         normalised.length <= 60 ? normalised : normalised.substring(0, 57) + '...';
-                    const conv = await createConversation(selectedProviderRef.current, title);
+                    // The seed becomes the new thread's own pin, stamped on the
+                    // row at creation so it survives a reload on any device.
+                    const modelPin = selectedModelRef.current;
+                    const conv = await createConversation(
+                        selectedProviderRef.current,
+                        title,
+                        modelPin ?? undefined,
+                    );
+                    setThreadModel(modelPin);
                     updateConversationId(conv.id);
                 } catch {
                     toast.error(t('errors.unableToSend'));
@@ -213,6 +249,11 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                 {
                     body: {
                         providerOverride: selectedProviderRef.current,
+                        // Omitted (not sent as null) when unpinned: the route
+                        // schema treats absence as "let the provider resolve
+                        // its configured model", which is exactly the
+                        // `'auto'` path the engine already understood.
+                        ...(selectedModelRef.current ? { model: selectedModelRef.current } : {}),
                         conversationId: conversationIdRef.current,
                         currentPageUrl: pathnameRef.current,
                         attachmentIds: attachmentUploadIds(refs),
@@ -225,9 +266,14 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
 
     const resetChat = useCallback(() => {
         chatRef.current.setMessages([]);
+        // Carry the pin forward into the seed so "New chat" continues on the
+        // model the user was just working with, instead of snapping back to
+        // whatever the seed held before this thread was opened.
+        setSeedModel(selectedModelRef.current ?? '');
+        setThreadModel(null);
         updateConversationId(null);
         refreshConversations();
-    }, [refreshConversations, updateConversationId]);
+    }, [refreshConversations, setSeedModel, updateConversationId]);
 
     const loadConversation = useCallback(
         async (id: string) => {
@@ -246,11 +292,17 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
                     }));
 
                 chatRef.current.setMessages(uiMessages);
+                // Same re-pin as the mount restore: opening a thread from
+                // History puts the panel back on that thread's provider and
+                // model, so the next turn continues it rather than silently
+                // switching vendors mid-conversation.
+                if (conv.providerId) setSelectedProvider(conv.providerId);
+                setThreadModel(conv.model ?? null);
             } catch {
                 toast.error(t('errors.unableToSend'));
             }
         },
-        [t, updateConversationId],
+        [t, updateConversationId, setSelectedProvider],
     );
 
     const deleteConv = useCallback(
@@ -270,8 +322,43 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
     );
 
     const handleSetSelectedProvider = useCallback(
-        (id: string) => setSelectedProvider(id),
-        [setSelectedProvider],
+        (id: string) => {
+            if (id === selectedProviderRef.current) return;
+            setSelectedProvider(id);
+            // Model ids are provider-specific — `openai/gpt-5-mini` means
+            // nothing to Anthropic. Keeping the old pin across a provider
+            // switch would send an unroutable id; clearing falls back to the
+            // new provider's own configured default, which always resolves.
+            setThreadModel(null);
+            setSeedModel('');
+            if (conversationIdRef.current) {
+                void updateConversationModel(conversationIdRef.current, null).catch(() => {
+                    // Best-effort: the pin is already cleared in the UI and the
+                    // next turn omits the model either way, so a failed write
+                    // costs nothing this session.
+                });
+            }
+        },
+        [setSelectedProvider, setSeedModel],
+    );
+
+    const handleSetSelectedModel = useCallback(
+        (modelId: string | null) => {
+            const conversationId = conversationIdRef.current;
+            if (conversationId) {
+                setThreadModel(modelId);
+                void updateConversationModel(conversationId, modelId).catch(() => {
+                    // The pin still applies to this session's next turn; only
+                    // its durability across a reload is lost. Not worth a
+                    // toast that interrupts a message the user is composing.
+                });
+                return;
+            }
+            // No row yet — hold it in the browser seed until the first message
+            // creates the conversation, which stamps it on the row.
+            setSeedModel(modelId ?? '');
+        },
+        [setSeedModel],
     );
 
     const value: ChatContextValue = useMemo(
@@ -287,6 +374,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             providers,
             selectedProvider,
             setSelectedProvider: handleSetSelectedProvider,
+            selectedModel,
+            setSelectedModel: handleSetSelectedModel,
             conversationId,
             conversations,
             conversationsLoading,
@@ -306,6 +395,8 @@ export function ChatProvider({ children }: { children: React.ReactNode }) {
             providers,
             selectedProvider,
             handleSetSelectedProvider,
+            selectedModel,
+            handleSetSelectedModel,
             conversationId,
             conversations,
             conversationsLoading,

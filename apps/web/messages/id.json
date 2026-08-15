@@ -2340,6 +2340,15 @@
                     "enforceLabel": "Terapkan default ini",
                     "enforceDescription": "Selalu pra-pilih pipeline ini, bahkan ketika karya memiliki pipeline sendiri yang dikonfigurasi. Anda masih dapat mengganti pipeline secara manual di formulir.",
                     "saveFailed": "Gagal menyimpan pipeline default"
+                },
+                "voiceDefault": {
+                    "title": "Penyedia suara",
+                    "description": "Penyedia mana yang mentranskripsi dikte suara dari mikrofon obrolan.",
+                    "autoLabel": "Otomatis",
+                    "autoDescription": "Gunakan penyedia yang aktif untuk akun Anda",
+                    "currentlyActive": "Sedang digunakan",
+                    "noProviders": "Tidak ada penyedia AI terkonfigurasi Anda yang mendukung transkripsi suara.",
+                    "saveFailed": "Tidak dapat menyimpan penyedia suara"
                 }
             },
             "profile": {
@@ -6205,6 +6214,18 @@
                 "start": "Dikte",
                 "stop": "Hentikan perekaman",
                 "transcribing": "Mentranskripsi…"
+            },
+            "model": {
+                "label": "Model",
+                "auto": "Default penyedia",
+                "autoHint": "Gunakan model yang dikonfigurasi untuk penyedia ini",
+                "configured": "Terkonfigurasi",
+                "all": "Semua model",
+                "searchPlaceholder": "Cari model...",
+                "loading": "Memuat model...",
+                "loadError": "Tidak dapat memuat model",
+                "noModels": "Tidak ada model tersedia",
+                "context": "konteks {value}"
             }
         },
         "plugins": {
