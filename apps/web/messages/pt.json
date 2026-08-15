@@ -929,6 +929,7 @@
                 "activity": "Atividade",
                 "instructions": "Instruções",
                 "skills": "Habilidades",
+                "capabilities": "Capacidades",
                 "budgets": "Orçamentos",
                 "settings": "Configurações",
                 "terminal": "Terminal"
@@ -1114,6 +1115,45 @@
                 "confirm": "Excluir definitivamente",
                 "success": "{name} excluído",
                 "error": "Não foi possível excluir o agente"
+            },
+            "capabilities": {
+                "title": "Capacidades",
+                "subtitle": "O que este agente pode fazer — ferramentas, habilidades e script de inicialização.",
+                "tools": {
+                    "title": "Ferramentas do agente",
+                    "description": "Acesso por ferramenta para este agente. Um escopo mais específico só pode restringir o que os escopos superiores permitem: alternar uma ferramenta registra uma restrição no nível do agente — atualizando a lista de negação deste agente ou a sua lista de permissões, quando houver uma — e uma ferramenta negada por um escopo superior não pode ser reativada nesta página.",
+                    "groupBuiltin": "Ferramentas integradas",
+                    "groupFacade": "Ferramentas da plataforma",
+                    "groupDomain": "Ferramentas de domínio",
+                    "resetToInherited": "Redefinir para herdado",
+                    "inheritedDeny": "Negada por {scope}",
+                    "permissionOff": "Permissão desativada",
+                    "patternDeny": "Negada por um padrão deste agente",
+                    "permissionHint": "Requer a permissão “{permission}” — ative-a em Configurações.",
+                    "empty": "Nenhuma ferramenta disponível."
+                },
+                "permissions": {
+                    "title": "Permissões",
+                    "description": "Os interruptores de capacidade continuam editáveis em Configurações; aqui são exibidos apenas para leitura.",
+                    "edit": "Editar em Configurações"
+                },
+                "skills": {
+                    "title": "Habilidades",
+                    "description": "Habilidades vinculadas diretamente a este agente. Os vínculos herdados vêm de um escopo superior e são gerenciados lá.",
+                    "attachPlaceholder": "Anexar uma habilidade…",
+                    "installAndAttach": "instalar e anexar",
+                    "inherited": "Herdada",
+                    "empty": "Nenhuma habilidade vinculada ainda."
+                },
+                "initScript": {
+                    "title": "Script de inicialização",
+                    "helper": "Executa na inicialização da sessão ou do espaço de trabalho, quando o runtime oferece suporte.",
+                    "placeholder": "#!/bin/sh\n# comandos a executar quando uma sessão iniciar…",
+                    "save": "Salvar",
+                    "saved": "Script de inicialização salvo",
+                    "bytes": "{used} / {max} KB",
+                    "tooLong": "O script de inicialização excede 16 KB."
+                }
             }
         },
         "tasksPage": {

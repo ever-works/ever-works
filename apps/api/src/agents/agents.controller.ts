@@ -465,6 +465,8 @@ export class AgentsController {
             scorecard: body.scorecard as AgentScorecardMetric[] | null | undefined,
             // Merge-policy matrix (Wave 3, D4) — the Agent-scoped slice.
             mergePolicy: body.mergePolicy,
+            // Capabilities tab — init script (advisory v1).
+            initScript: body.initScript,
         });
     }
 

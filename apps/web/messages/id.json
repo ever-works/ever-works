@@ -929,6 +929,7 @@
                 "activity": "Aktivitas",
                 "instructions": "Petunjuk",
                 "skills": "Keterampilan",
+                "capabilities": "Kemampuan",
                 "budgets": "Anggaran",
                 "settings": "Pengaturan",
                 "terminal": "Terminal"
@@ -1114,6 +1115,45 @@
                 "confirm": "Hapus permanen",
                 "success": "{name} dihapus",
                 "error": "Tidak dapat menghapus agen"
+            },
+            "capabilities": {
+                "title": "Kemampuan",
+                "subtitle": "Apa yang bisa dilakukan agen ini — alat, keterampilan, dan skrip awal.",
+                "tools": {
+                    "title": "Alat agen",
+                    "description": "Akses per alat untuk agen ini. Cakupan yang lebih spesifik hanya dapat mempersempit apa yang diizinkan cakupan induknya: mengalihkan sebuah alat akan mencatat pembatasan di tingkat agen — memperbarui daftar tolak agen ini, atau daftar izinnya bila ada — dan alat yang ditolak oleh cakupan induk tidak dapat diaktifkan kembali dari halaman ini.",
+                    "groupBuiltin": "Alat bawaan",
+                    "groupFacade": "Alat platform",
+                    "groupDomain": "Alat domain",
+                    "resetToInherited": "Setel ulang ke warisan",
+                    "inheritedDeny": "Ditolak oleh {scope}",
+                    "permissionOff": "Izin nonaktif",
+                    "patternDeny": "Ditolak oleh pola pada agen ini",
+                    "permissionHint": "Memerlukan izin \"{permission}\" — aktifkan di Pengaturan.",
+                    "empty": "Tidak ada alat yang tersedia."
+                },
+                "permissions": {
+                    "title": "Izin",
+                    "description": "Sakelar kemampuan tetap dapat diubah di Pengaturan; di sini hanya ditampilkan untuk dibaca.",
+                    "edit": "Ubah di Pengaturan"
+                },
+                "skills": {
+                    "title": "Keterampilan",
+                    "description": "Keterampilan yang terikat langsung ke agen ini. Ikatan warisan berasal dari cakupan induk dan dikelola di sana.",
+                    "attachPlaceholder": "Lampirkan keterampilan…",
+                    "installAndAttach": "pasang & lampirkan",
+                    "inherited": "Warisan",
+                    "empty": "Belum ada keterampilan yang terikat."
+                },
+                "initScript": {
+                    "title": "Skrip Init",
+                    "helper": "Dijalankan saat sesi/ruang kerja dimulai, jika runtime mendukungnya.",
+                    "placeholder": "#!/bin/sh\n# perintah yang dijalankan saat sesi dimulai…",
+                    "save": "Simpan",
+                    "saved": "Skrip init disimpan",
+                    "bytes": "{used} / {max} KB",
+                    "tooLong": "Skrip init melebihi 16 KB."
+                }
             }
         },
         "tasksPage": {

@@ -960,6 +960,7 @@
                 "activity": "Aktivität",
                 "instructions": "Anweisungen",
                 "skills": "Fähigkeiten",
+                "capabilities": "Funktionen",
                 "budgets": "Budgets",
                 "settings": "Einstellungen",
                 "terminal": "Terminal"
@@ -1145,6 +1146,45 @@
                 "confirm": "Endgültig löschen",
                 "success": "{name} gelöscht",
                 "error": "Agent konnte nicht gelöscht werden"
+            },
+            "capabilities": {
+                "title": "Funktionen",
+                "subtitle": "Was dieser Agent kann — Werkzeuge, Fähigkeiten und Startskript.",
+                "tools": {
+                    "title": "Agent-Werkzeuge",
+                    "description": "Werkzeugbezogener Zugriff für diesen Agenten. Ein spezifischerer Geltungsbereich kann das, was seine übergeordneten Bereiche erlauben, nur einschränken: Das Umschalten eines Werkzeugs hinterlegt eine Einschränkung auf Agentenebene — es aktualisiert die Sperrliste dieses Agenten oder seine Erlaubnisliste, sofern eine gesetzt ist — und ein von einem übergeordneten Bereich gesperrtes Werkzeug kann auf dieser Seite nicht wieder aktiviert werden.",
+                    "groupBuiltin": "Integrierte Werkzeuge",
+                    "groupFacade": "Plattform-Werkzeuge",
+                    "groupDomain": "Fachliche Werkzeuge",
+                    "resetToInherited": "Auf geerbt zurücksetzen",
+                    "inheritedDeny": "Gesperrt durch {scope}",
+                    "permissionOff": "Berechtigung aus",
+                    "patternDeny": "Durch ein Muster auf diesem Agenten gesperrt",
+                    "permissionHint": "Erfordert die Berechtigung „{permission}“ — aktivieren Sie sie in den Einstellungen.",
+                    "empty": "Keine Werkzeuge verfügbar."
+                },
+                "permissions": {
+                    "title": "Berechtigungen",
+                    "description": "Die Berechtigungsschalter bleiben in den Einstellungen bearbeitbar; hier werden sie nur zur Ansicht angezeigt.",
+                    "edit": "In den Einstellungen bearbeiten"
+                },
+                "skills": {
+                    "title": "Fähigkeiten",
+                    "description": "Fähigkeiten, die direkt an diesen Agenten gebunden sind. Geerbte Bindungen stammen aus einem übergeordneten Bereich und werden dort verwaltet.",
+                    "attachPlaceholder": "Fähigkeit hinzufügen …",
+                    "installAndAttach": "installieren & hinzufügen",
+                    "inherited": "Geerbt",
+                    "empty": "Noch keine Fähigkeiten gebunden."
+                },
+                "initScript": {
+                    "title": "Startskript",
+                    "helper": "Läuft beim Start der Sitzung bzw. des Arbeitsbereichs, sofern die Laufzeitumgebung dies unterstützt.",
+                    "placeholder": "#!/bin/sh\n# Befehle, die beim Start einer Sitzung ausgeführt werden …",
+                    "save": "Speichern",
+                    "saved": "Startskript gespeichert",
+                    "bytes": "{used} / {max} KB",
+                    "tooLong": "Das Startskript überschreitet 16 KB."
+                }
             }
         },
         "tasksPage": {

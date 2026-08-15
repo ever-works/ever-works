@@ -929,6 +929,7 @@
                 "activity": "Aktivite",
                 "instructions": "Talimatlar",
                 "skills": "Yetenekler",
+                "capabilities": "Yetkinlikler",
                 "budgets": "Bütçeler",
                 "settings": "Ayarlar",
                 "terminal": "Terminal"
@@ -1114,6 +1115,45 @@
                 "confirm": "Kalıcı olarak sil",
                 "success": "{name} silindi",
                 "error": "Ajan silinemedi"
+            },
+            "capabilities": {
+                "title": "Yetkinlikler",
+                "subtitle": "Bu ajanın neler yapabileceği: araçlar, yetenekler ve başlangıç betiği.",
+                "tools": {
+                    "title": "Ajan araçları",
+                    "description": "Bu ajan için araç bazında erişim. Daha özel bir kapsam, üst kapsamların izin verdiklerini yalnızca daraltabilir: bir aracı açıp kapatmak ajan düzeyinde bir kısıtlama kaydeder — bu ajanın reddetme listesini ya da tanımlıysa izin listesini günceller — ve üst bir kapsam tarafından reddedilen bir araç bu sayfadan yeniden etkinleştirilemez.",
+                    "groupBuiltin": "Yerleşik araçlar",
+                    "groupFacade": "Platform araçları",
+                    "groupDomain": "Alan araçları",
+                    "resetToInherited": "Devralınana sıfırla",
+                    "inheritedDeny": "{scope} tarafından reddedildi",
+                    "permissionOff": "İzin kapalı",
+                    "patternDeny": "Bu ajandaki bir desen tarafından reddedildi",
+                    "permissionHint": "“{permission}” iznini gerektirir — Ayarlar'dan etkinleştirin.",
+                    "empty": "Kullanılabilir araç yok."
+                },
+                "permissions": {
+                    "title": "İzinler",
+                    "description": "Yetkinlik anahtarları Ayarlar'da düzenlenebilir; burada salt okunur gösterilir.",
+                    "edit": "Ayarlar'da düzenle"
+                },
+                "skills": {
+                    "title": "Yetenekler",
+                    "description": "Doğrudan bu ajana bağlanan yetenekler. Devralınan bağlar üst bir kapsamdan gelir ve orada yönetilir.",
+                    "attachPlaceholder": "Bir yetenek ekle…",
+                    "installAndAttach": "kur ve ekle",
+                    "inherited": "Devralınan",
+                    "empty": "Henüz bağlı yetenek yok."
+                },
+                "initScript": {
+                    "title": "Başlangıç betiği",
+                    "helper": "Çalışma zamanı desteklediğinde oturum/çalışma alanı başlatılırken çalışır.",
+                    "placeholder": "#!/bin/sh\n# bir oturum başladığında çalıştırılacak komutlar…",
+                    "save": "Kaydet",
+                    "saved": "Başlangıç betiği kaydedildi",
+                    "bytes": "{used} / {max} KB",
+                    "tooLong": "Başlangıç betiği 16 KB sınırını aşıyor."
+                }
             }
         },
         "tasksPage": {

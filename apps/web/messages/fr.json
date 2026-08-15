@@ -960,6 +960,7 @@
                 "activity": "Activité",
                 "instructions": "Instructions",
                 "skills": "Compétences",
+                "capabilities": "Capacités",
                 "budgets": "Budgets",
                 "settings": "Paramètres",
                 "terminal": "Terminal"
@@ -1145,6 +1146,45 @@
                 "confirm": "Supprimer définitivement",
                 "success": "{name} supprimé",
                 "error": "Impossible de supprimer l'agent"
+            },
+            "capabilities": {
+                "title": "Capacités",
+                "subtitle": "Ce que cet agent peut faire : outils, compétences et script de démarrage.",
+                "tools": {
+                    "title": "Outils de l'agent",
+                    "description": "Accès outil par outil pour cet agent. Une portée plus spécifique ne peut que restreindre ce que ses portées parentes autorisent : basculer un outil enregistre une restriction au niveau de l'agent — en mettant à jour sa liste de refus, ou sa liste d'autorisations lorsqu'elle existe — et un outil refusé par une portée parente ne peut pas être réactivé depuis cette page.",
+                    "groupBuiltin": "Outils intégrés",
+                    "groupFacade": "Outils de la plateforme",
+                    "groupDomain": "Outils métier",
+                    "resetToInherited": "Rétablir la valeur héritée",
+                    "inheritedDeny": "Refusé par {scope}",
+                    "permissionOff": "Autorisation désactivée",
+                    "patternDeny": "Refusé par un motif défini sur cet agent",
+                    "permissionHint": "Nécessite l'autorisation « {permission} » — activez-la dans les Paramètres.",
+                    "empty": "Aucun outil disponible."
+                },
+                "permissions": {
+                    "title": "Autorisations",
+                    "description": "Les interrupteurs de capacités restent modifiables dans les Paramètres ; ils sont affichés ici en lecture seule.",
+                    "edit": "Modifier dans les Paramètres"
+                },
+                "skills": {
+                    "title": "Compétences",
+                    "description": "Compétences rattachées directement à cet agent. Les rattachements hérités proviennent d'une portée parente et se gèrent à ce niveau.",
+                    "attachPlaceholder": "Rattacher une compétence…",
+                    "installAndAttach": "installer et rattacher",
+                    "inherited": "Héritée",
+                    "empty": "Aucune compétence rattachée pour l'instant."
+                },
+                "initScript": {
+                    "title": "Script d'initialisation",
+                    "helper": "S'exécute au démarrage de la session ou de l'espace de travail, lorsque l'environnement d'exécution le permet.",
+                    "placeholder": "#!/bin/sh\n# commandes à exécuter au démarrage d'une session…",
+                    "save": "Enregistrer",
+                    "saved": "Script d'initialisation enregistré",
+                    "bytes": "{used} / {max} Ko",
+                    "tooLong": "Le script d'initialisation dépasse 16 Ko."
+                }
             }
         },
         "tasksPage": {

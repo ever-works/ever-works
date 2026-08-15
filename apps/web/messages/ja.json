@@ -929,6 +929,7 @@
                 "activity": "アクティビティ",
                 "instructions": "指示",
                 "skills": "スキル",
+                "capabilities": "機能",
                 "budgets": "予算",
                 "settings": "設定",
                 "terminal": "Terminal"
@@ -1114,6 +1115,45 @@
                 "confirm": "完全に削除",
                 "success": "{name} を削除しました",
                 "error": "エージェントを削除できませんでした"
+            },
+            "capabilities": {
+                "title": "機能",
+                "subtitle": "このエージェントにできること — ツール、スキル、初期化スクリプト。",
+                "tools": {
+                    "title": "エージェントのツール",
+                    "description": "このエージェントのツール単位のアクセス権です。より具体的なスコープは、上位スコープが許可する範囲を狭めることしかできません。ツールを切り替えるとエージェントレベルの制限が記録され、このエージェントの拒否リスト、または許可リストが設定されている場合はそちらが更新されます。上位スコープで拒否されたツールは、このページから再度有効にはできません。",
+                    "groupBuiltin": "組み込みツール",
+                    "groupFacade": "プラットフォームツール",
+                    "groupDomain": "ドメインツール",
+                    "resetToInherited": "継承された設定に戻す",
+                    "inheritedDeny": "{scope} により拒否",
+                    "permissionOff": "権限がオフ",
+                    "patternDeny": "このエージェントのパターンにより拒否",
+                    "permissionHint": "「{permission}」権限が必要です — 設定で有効にしてください。",
+                    "empty": "利用できるツールがありません。"
+                },
+                "permissions": {
+                    "title": "権限",
+                    "description": "機能のスイッチは設定で変更できます。ここでは読み取り専用で表示しています。",
+                    "edit": "設定で編集"
+                },
+                "skills": {
+                    "title": "スキル",
+                    "description": "このエージェントに直接バインドされたスキルです。継承されたバインドは上位スコープに由来し、そちらで管理します。",
+                    "attachPlaceholder": "スキルを追加…",
+                    "installAndAttach": "インストールして追加",
+                    "inherited": "継承",
+                    "empty": "バインドされたスキルはまだありません。"
+                },
+                "initScript": {
+                    "title": "初期化スクリプト",
+                    "helper": "ランタイムが対応している場合、セッション／ワークスペースの起動時に実行されます。",
+                    "placeholder": "#!/bin/sh\n# セッション開始時に実行するコマンド…",
+                    "save": "保存",
+                    "saved": "初期化スクリプトを保存しました",
+                    "bytes": "{used} / {max} KB",
+                    "tooLong": "初期化スクリプトが 16 KB を超えています。"
+                }
             }
         },
         "tasksPage": {
