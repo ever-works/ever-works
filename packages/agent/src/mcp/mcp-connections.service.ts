@@ -337,6 +337,19 @@ export class McpConnectionsService {
             if (typeof value !== 'string' || value.length === 0 || value.length > 4096) {
                 throw new BadRequestException(`Invalid value for header "${name}".`);
             }
+            // Header VALUES need the same care as header names: a value
+            // carrying CR/LF (trivially pasted from a token file) is
+            // rejected by the runtime's `Headers` at CONNECT time, in a
+            // TypeError that quotes the value back. Refusing it here means
+            // a clear 400 instead of a connection that is permanently
+            // broken and whose failure message has to be scrubbed.
+            // NEVER name the value in the error — only the header.
+            // eslint-disable-next-line no-control-regex
+            if (/[\u0000-\u001f\u007f]/.test(value)) {
+                throw new BadRequestException(
+                    `Value for header "${name}" contains control characters.`,
+                );
+            }
         }
     }
 

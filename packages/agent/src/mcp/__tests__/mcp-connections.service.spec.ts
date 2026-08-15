@@ -141,6 +141,30 @@ describe('McpConnectionsService', () => {
             }
         });
 
+        it('rejects an auth header VALUE carrying control characters', async () => {
+            // A CR/LF in the value (trivially pasted from a token file) is
+            // rejected by the runtime's `Headers` at connect time, in a
+            // TypeError that quotes the value back — so it must never be
+            // stored. The 400 names the header, never the value.
+            const { service } = makeHarness([]);
+            await expect(
+                service.create('u1', {
+                    name: 'x1',
+                    url: 'https://mcp.example.com',
+                    transport: 'streamable-http',
+                    authHeaders: { Authorization: 'Bearer tok\r\nX-Injected: 1' },
+                }),
+            ).rejects.toThrow(BadRequestException);
+            await expect(
+                service.create('u1', {
+                    name: 'x1',
+                    url: 'https://mcp.example.com',
+                    transport: 'streamable-http',
+                    authHeaders: { Authorization: 'Bearer tok\r\nX-Injected: 1' },
+                }),
+            ).rejects.toThrow(/Authorization/);
+        });
+
         it('rejects malformed auth header names', async () => {
             const { service } = makeHarness([]);
             await expect(
