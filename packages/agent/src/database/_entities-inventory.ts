@@ -133,6 +133,7 @@ import { FleetNode } from '../entities/fleet-node.entity';
 import { TerminalTranscriptChunk } from '../entities/terminal-transcript-chunk.entity';
 
 import { FleetJob } from '../entities/fleet-job.entity';
+import { FleetExecutionPreference } from '../entities/fleet-execution-preference.entity';
 import { ToolGrant } from '../entities/tool-grant.entity';
 import { Workflow } from '../entities/workflow.entity';
 import { WorkflowRun } from '../entities/workflow-run.entity';
@@ -324,6 +325,9 @@ export const ENTITIES = [
     // Fleet job runtime (Desktop PRD M4) — the lease-able work queue
     // whose workers are the enrolled nodes above.
     FleetJob,
+    // Fleet local-runner routing — per Work / Goal / account preference
+    // for local-runner vs cloud execution.
+    FleetExecutionPreference,
     // Tool-grant matrix (audit item G4) — one row per (owner, scope)
     // carrying that scope's tool allow/deny contribution.
     ToolGrant,

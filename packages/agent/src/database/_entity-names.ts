@@ -72,6 +72,8 @@ export const AGENT_ENTITY_NAMES: ReadonlyArray<string> = [
     'EmailMessage',
     // Event-ingest spine — external tracker issue → platform Task mapping
     'ExternalIssueLink',
+    // Fleet local-runner routing — local-vs-cloud execution preference
+    'FleetExecutionPreference',
     // Fleet job runtime (Desktop PRD M4) — lease-able work for nodes
     'FleetJob',
     // Fleet (Wave 12, slice 1) — enrolled execution nodes w/ heartbeat
