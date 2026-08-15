@@ -1,5 +1,6 @@
 import {
     McpClientService,
+    MCP_LIST_TIMEOUT_MS,
     MCP_RESULT_SIZE_CAP,
     MCP_TOOLS_CACHE_TTL_MS,
 } from '../mcp-client.service';
@@ -107,6 +108,72 @@ describe('McpClientService', () => {
             const stamped = repo.stampConnectionResult.mock.calls[0][1];
             expect(stamped.ok).toBe(false);
             expect(String(stamped.error)).not.toContain('secret-token-value');
+        });
+
+        it('redacts the auth header VALUE an error quotes back at us', async () => {
+            // Regression: `new Headers({...})` reports a malformed value by
+            // quoting it verbatim. That message is short and matches no
+            // classifier branch, so it used to pass straight through into
+            // `lastError` (a plaintext column the API returns and the
+            // Settings screen renders) and into the thrown message.
+            const repo = makeRepo();
+            const factory: McpClientFactory = {
+                connect: jest
+                    .fn()
+                    .mockRejectedValue(
+                        new Error(
+                            'Headers.append: "Bearer secret-token-value" is an invalid header value.',
+                        ),
+                    ),
+            };
+            const service = new McpClientService(repo as never, factory);
+
+            await expect(service.listTools(makeConnection())).rejects.toThrow(/\*\*\*/);
+            const stamped = repo.stampConnectionResult.mock.calls[0][1];
+            expect(String(stamped.error)).not.toContain('secret-token-value');
+            expect(String(stamped.error)).toContain('***');
+        });
+
+        it('redacts the header value out of a callTool { error } too', async () => {
+            const client = makeClient({
+                callTool: jest
+                    .fn()
+                    .mockRejectedValue(new Error('upstream said: Bearer secret-token-value')),
+            });
+            const { service } = makeService(client);
+
+            const result = (await service.callTool(makeConnection(), 'search_issues', {})) as {
+                error: string;
+            };
+
+            expect(result.error).not.toContain('secret-token-value');
+            expect(result.error).toContain('***');
+        });
+
+        it('bounds a connect that never settles (run assembly must not hang)', async () => {
+            // The SDK bounds nothing here: SSE `start()` resolves only on the
+            // server's `endpoint` event, so a silent server leaves connect
+            // pending forever — and connect is awaited inside run assembly.
+            jest.useFakeTimers();
+            try {
+                const repo = makeRepo();
+                const factory: McpClientFactory = {
+                    connect: jest.fn().mockReturnValue(new Promise<never>(() => undefined)),
+                };
+                const service = new McpClientService(repo as never, factory);
+
+                const pending = service.listTools(makeConnection());
+                const assertion = expect(pending).rejects.toThrow(/timed out/i);
+                await jest.advanceTimersByTimeAsync(MCP_LIST_TIMEOUT_MS + 1);
+                await assertion;
+
+                expect(repo.stampConnectionResult).toHaveBeenCalledWith(
+                    'c1',
+                    expect.objectContaining({ ok: false }),
+                );
+            } finally {
+                jest.useRealTimers();
+            }
         });
 
         it('classifies a 401 into an auth message', async () => {

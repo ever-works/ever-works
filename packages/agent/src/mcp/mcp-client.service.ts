@@ -77,7 +77,7 @@ export class McpClientService {
             await this.stamp(connection, { ok: true });
             return tools;
         } catch (err) {
-            const message = this.classifyError(err);
+            const message = this.classifyError(err, connection);
             await this.stamp(connection, { ok: false, error: message });
             throw new Error(message);
         } finally {
@@ -108,7 +108,7 @@ export class McpClientService {
             await this.stamp(connection, { ok: true });
             return this.capResultSize(result);
         } catch (err) {
-            const message = this.classifyError(err);
+            const message = this.classifyError(err, connection);
             await this.stamp(connection, { ok: false, error: message });
             return { error: `MCP server "${connection.name}": ${message}` };
         } finally {
@@ -123,12 +123,37 @@ export class McpClientService {
 
     // ── internals ─────────────────────────────────────────────────
 
+    /**
+     * Connect with an EXPLICIT timeout.
+     *
+     * The SDK's own `connect()` bounds nothing that matters here: the
+     * `initialize` request falls back to the SDK's 60s default, and the
+     * SSE transport's `start()` resolves only when the server emits its
+     * `endpoint` event — a server that accepts the stream and then goes
+     * quiet leaves that promise UNSETTLED FOREVER. Since `connect` is
+     * awaited inside run assembly (`McpToolSource.buildTools` →
+     * `AgentToolService.resolveGrantedTools`), an unbounded connect hangs
+     * the whole run, not just the MCP tools. This race is the only bound.
+     *
+     * A late-arriving success is closed rather than leaked — otherwise a
+     * slow server would strand an open socket per attempt.
+     */
     private async connect(connection: McpServerConnection): Promise<McpSdkClient> {
-        return this.factory.connect({
+        const pending = this.factory.connect({
             url: connection.url,
             transport: connection.transport,
             headers: connection.authHeaders ?? {},
         });
+        try {
+            return await this.withTimeout(
+                pending,
+                MCP_LIST_TIMEOUT_MS,
+                `Connection to MCP server "${connection.name}" timed out after ${MCP_LIST_TIMEOUT_MS}ms.`,
+            );
+        } catch (err) {
+            void pending.then((client) => this.closeQuietly(client)).catch(() => undefined);
+            throw err;
+        }
     }
 
     private normalizeTool(tool: McpSdkTool): McpToolInfo {
@@ -173,12 +198,40 @@ export class McpClientService {
     }
 
     /**
+     * Strip this connection's auth header VALUES out of a message before
+     * anything else looks at it.
+     *
+     * Not theoretical: `new Headers({...})` reports a malformed value by
+     * quoting it verbatim — `Headers.append: "Bearer <token>" is an
+     * invalid header value.` — and that message reaches `classifyError`,
+     * whose unknown-class branch passes short messages through. Without
+     * this scrub the token lands in `mcp_server_connections.lastError` (a
+     * PLAINTEXT column), in the `GET /api/mcp-connections` response, on
+     * the Settings screen, and — via `callTool`'s `{ error }` — in the
+     * model's conversation history.
+     *
+     * Runs on the RAW message so no later transform (whitespace collapse,
+     * truncation) can reconstitute a partial value.
+     */
+    private redactHeaderValues(message: string, connection: McpServerConnection): string {
+        let out = message;
+        for (const value of Object.values(connection.authHeaders ?? {})) {
+            if (typeof value !== 'string' || value.length === 0) continue;
+            out = out.split(value).join('***');
+        }
+        return out;
+    }
+
+    /**
      * Classify an SDK/network error into a short, header-free message.
      * NEVER passes the raw error through: fetch errors can echo request
      * headers (i.e. credentials) in their message chains.
      */
-    private classifyError(err: unknown): string {
-        const raw = err instanceof Error ? err.message : String(err);
+    private classifyError(err: unknown, connection: McpServerConnection): string {
+        const raw = this.redactHeaderValues(
+            err instanceof Error ? err.message : String(err),
+            connection,
+        );
         const lower = raw.toLowerCase();
         if (lower.includes('timed out') || lower.includes('timeout')) {
             return raw.length <= 120 ? raw : 'Request timed out.';
