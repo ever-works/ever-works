@@ -54,12 +54,24 @@ export async function setAgentToolGrantAction(
     return agentsAPI.getCapabilities(agentId);
 }
 
-/** Delete the agent-scope grant row — the Agent reverts to inheriting. */
+/**
+ * Delete the agent-scope grant row — the Agent reverts to inheriting.
+ *
+ * `DELETE /api/tool-grants/:id` is scoped by `{ id, userId }` only, so it
+ * would happily drop ANOTHER Agent's row inside the same account if the id
+ * on the wire did not belong to `agentId`. This surface is per-Agent, so
+ * bind the two together first: the composed read already returns the one
+ * row that is agent-scoped to `agentId`, and only that id may be deleted.
+ */
 export async function resetAgentToolGrantAction(
     agentId: string,
     grantRowId: string,
 ): Promise<AgentCapabilitiesPayload> {
     await ensureAuth();
+    const current = await agentsAPI.getCapabilities(agentId);
+    if (current.agentGrantRow?.id !== grantRowId) {
+        throw new Error('That tool-grant row does not belong to this agent.');
+    }
     await toolGrantsAPI.remove(grantRowId);
     revalidatePath(`/agents/${agentId}/capabilities`);
     return agentsAPI.getCapabilities(agentId);
@@ -129,12 +141,27 @@ export async function installAndBindSkillAction(
     return { skill, binding };
 }
 
-/** Unbind (delete the agent-scope binding row). */
+/**
+ * Unbind (delete the agent-scope binding row).
+ *
+ * Same guard as `resetAgentToolGrantAction`: `DELETE /api/skill-bindings/:id`
+ * is scoped by `{ id, userId }` only, so an id belonging to a sibling Agent —
+ * or to an INHERITED binding owned by a parent scope, which this page renders
+ * read-only — would delete just as happily. Require that the binding is
+ * listed for `agentId` AND is itself agent-scoped before removing it.
+ */
 export async function unbindSkillFromAgentAction(
     agentId: string,
     bindingId: string,
 ): Promise<{ deleted: true }> {
     await ensureAuth();
+    const bound = await agentsAPI.listSkills(agentId);
+    const owned = bound.data.some(
+        (entry) => entry.bindingId === bindingId && entry.targetType === 'agent',
+    );
+    if (!owned) {
+        throw new Error('That skill binding is not owned by this agent.');
+    }
     const res = await skillsAPI.deleteBinding(bindingId);
     revalidatePath(`/agents/${agentId}/capabilities`);
     revalidatePath(`/agents/${agentId}/skills`);

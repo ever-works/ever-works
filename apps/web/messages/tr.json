@@ -992,7 +992,7 @@
                 "terminal": "Terminal",
                 "collaborators": "Collaborators",
                 "mcpServers": "MCP Servers",
-                "capabilities": "Capabilities"
+                "capabilities": "Yetkinlikler"
             },
             "newDialog": {
                 "title": "Yeni Ajan",
@@ -1232,33 +1232,33 @@
                 "revert": "Revert"
             },
             "capabilities": {
-                "title": "Capabilities",
-                "subtitle": "What this agent can do — tools, skills, and bootstrap script.",
+                "title": "Yetkinlikler",
+                "subtitle": "Bu ajanın neler yapabileceği: araçlar, yetenekler ve başlangıç betiği.",
                 "tools": {
-                    "title": "Agent tools",
-                    "description": "Per-tool access for this agent. A more specific scope can only narrow what its ancestors allow: turning a tool off writes an agent-level deny, and a tool denied by a parent scope cannot be re-enabled from this page.",
-                    "groupBuiltin": "Built-in tools",
-                    "groupFacade": "Platform tools",
-                    "groupDomain": "Domain tools",
-                    "resetToInherited": "Reset to inherited",
-                    "inheritedDeny": "Denied by {scope}",
-                    "permissionOff": "Permission off",
-                    "patternDeny": "Denied by a pattern on this agent",
-                    "permissionHint": "Requires the \"{permission}\" permission — enable it in Settings.",
-                    "empty": "No tools available."
+                    "title": "Ajan araçları",
+                    "description": "Bu ajan için araç bazında erişim. Daha özel bir kapsam, üst kapsamların izin verdiklerini yalnızca daraltabilir: bir aracı açıp kapatmak ajan düzeyinde bir kısıtlama kaydeder — bu ajanın reddetme listesini ya da tanımlıysa izin listesini günceller — ve üst bir kapsam tarafından reddedilen bir araç bu sayfadan yeniden etkinleştirilemez.",
+                    "groupBuiltin": "Yerleşik araçlar",
+                    "groupFacade": "Platform araçları",
+                    "groupDomain": "Alan araçları",
+                    "resetToInherited": "Devralınana sıfırla",
+                    "inheritedDeny": "{scope} tarafından reddedildi",
+                    "permissionOff": "İzin kapalı",
+                    "patternDeny": "Bu ajandaki bir desen tarafından reddedildi",
+                    "permissionHint": "“{permission}” iznini gerektirir — Ayarlar'dan etkinleştirin.",
+                    "empty": "Kullanılabilir araç yok."
                 },
                 "permissions": {
-                    "title": "Permissions",
-                    "description": "The capability switches stay editable in Settings; shown here read-only.",
-                    "edit": "Edit in Settings"
+                    "title": "İzinler",
+                    "description": "Yetkinlik anahtarları Ayarlar'da düzenlenebilir; burada salt okunur gösterilir.",
+                    "edit": "Ayarlar'da düzenle"
                 },
                 "skills": {
-                    "title": "Skills",
-                    "description": "Skills bound directly to this agent. Inherited bindings come from a parent scope and are managed there.",
-                    "attachPlaceholder": "Attach a skill…",
-                    "installAndAttach": "install & attach",
-                    "inherited": "Inherited",
-                    "empty": "No skills bound yet."
+                    "title": "Yetenekler",
+                    "description": "Doğrudan bu ajana bağlanan yetenekler. Devralınan bağlar üst bir kapsamdan gelir ve orada yönetilir.",
+                    "attachPlaceholder": "Bir yetenek ekle…",
+                    "installAndAttach": "kur ve ekle",
+                    "inherited": "Devralınan",
+                    "empty": "Henüz bağlı yetenek yok."
                 },
                 "mcp": {
                     "title": "MCP Connections",
@@ -1289,13 +1289,13 @@
                     "saved": "Environment updated"
                 },
                 "initScript": {
-                    "title": "Init Script",
-                    "helper": "Runs at session/workspace bootstrap where the runtime supports it.",
-                    "placeholder": "#!/bin/sh\n# commands to run when a session starts…",
-                    "save": "Save",
-                    "saved": "Init script saved",
+                    "title": "Başlangıç betiği",
+                    "helper": "Çalışma zamanı desteklediğinde oturum/çalışma alanı başlatılırken çalışır.",
+                    "placeholder": "#!/bin/sh\n# bir oturum başladığında çalıştırılacak komutlar…",
+                    "save": "Kaydet",
+                    "saved": "Başlangıç betiği kaydedildi",
                     "bytes": "{used} / {max} KB",
-                    "tooLong": "Init script exceeds 16 KB."
+                    "tooLong": "Başlangıç betiği 16 KB sınırını aşıyor."
                 }
             }
         },
@@ -2682,6 +2682,15 @@
                     "enforceLabel": "Bu varsayılanı zorunlu kıl",
                     "enforceDescription": "Bir işin kendi iş akışı yapılandırılmış olsa bile her zaman bu iş akışını önceden seç. Formda manuel olarak iş akışlarını değiştirebilirsiniz.",
                     "saveFailed": "Varsayılan iş akışı kaydedilemedi"
+                },
+                "voiceDefault": {
+                    "title": "Ses sağlayıcısı",
+                    "description": "Sohbet mikrofonundan gelen sesli dikteyi hangi sağlayıcının yazıya döktüğü.",
+                    "autoLabel": "Otomatik",
+                    "autoDescription": "Hesabınızda etkin olan sağlayıcıyı kullan",
+                    "currentlyActive": "Şu anda kullanılıyor",
+                    "noProviders": "Yapılandırılmış yapay zekâ sağlayıcılarınızın hiçbiri sesli yazıya dökmeyi desteklemiyor.",
+                    "saveFailed": "Ses sağlayıcısı kaydedilemedi"
                 }
             },
             "profile": {
@@ -3006,6 +3015,11 @@
                 "export": {
                     "csv": "Export CSV",
                     "csvHint": "Download every usage event in {period} as a CSV file"
+                },
+                "tabs": {
+                    "label": "Usage views",
+                    "overview": "Overview",
+                    "costs": "Costs"
                 }
             },
             "fleet": {
@@ -3476,6 +3490,63 @@
                     "empty": "No repositories in your registry yet.",
                     "manageLink": "Manage repositories",
                     "toggleError": "Failed to update repository attachment"
+                }
+            },
+            "costs": {
+                "title": "Costs",
+                "subtitle": "Total AI spend for the selected window, and where it went — by day, agent, model and run.",
+                "loadError": "Some cost data could not be loaded. Refresh the page to try again.",
+                "loading": "Loading…",
+                "empty": "No spend in this window.",
+                "cacheHitNote": "Cache-hit rate is not shown: the metering path does not record cached-read tokens yet.",
+                "window": {
+                    "label": "Reporting window",
+                    "days": "{days}d"
+                },
+                "tiles": {
+                    "total": "Total spend",
+                    "runs": "Agent runs",
+                    "avgPerRun": "Average per run"
+                },
+                "panels": {
+                    "daily": "Spend per day, by agent",
+                    "byAgent": "By agent",
+                    "byModel": "By model",
+                    "topRuns": "Most expensive runs"
+                },
+                "series": {
+                    "other": "Other agents",
+                    "unattributed": "Unattributed",
+                    "unknownAgent": "Deleted agent",
+                    "noModel": "No model"
+                },
+                "byAgent": {
+                    "colAgent": "Agent",
+                    "colCost": "Cost",
+                    "colRuns": "Runs",
+                    "colAvg": "Avg / run"
+                },
+                "topRuns": {
+                    "colCost": "Cost",
+                    "colAgent": "Agent",
+                    "colTask": "Task",
+                    "colModel": "Model",
+                    "colStarted": "Started",
+                    "colStatus": "Status",
+                    "noTask": "{trigger} run",
+                    "runHint": "Run {runId}",
+                    "empty": "No runs with settled cost in this window.",
+                    "status": {
+                        "queued": "Queued",
+                        "running": "Running",
+                        "completed": "Completed",
+                        "failed": "Failed",
+                        "cancelled": "Cancelled"
+                    }
+                },
+                "byModel": {
+                    "units": "{units} units",
+                    "total": "{total} across all models in this window"
                 }
             }
         },
@@ -6922,6 +6993,18 @@
                 "start": "Dikte et",
                 "stop": "Kaydı durdur",
                 "transcribing": "Yazıya dökülüyor…"
+            },
+            "model": {
+                "label": "Model",
+                "auto": "Sağlayıcı varsayılanı",
+                "autoHint": "Bu sağlayıcı için yapılandırılmış modeli kullan",
+                "configured": "Yapılandırılmış",
+                "all": "Tüm modeller",
+                "searchPlaceholder": "Model ara...",
+                "loading": "Modeller yükleniyor...",
+                "loadError": "Modeller yüklenemedi",
+                "noModels": "Kullanılabilir model yok",
+                "context": "{value} bağlam"
             }
         },
         "plugins": {

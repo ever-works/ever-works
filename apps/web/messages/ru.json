@@ -992,7 +992,7 @@
                 "terminal": "Terminal",
                 "collaborators": "Collaborators",
                 "mcpServers": "MCP Servers",
-                "capabilities": "Capabilities"
+                "capabilities": "Возможности"
             },
             "newDialog": {
                 "title": "Новый агент",
@@ -1232,33 +1232,33 @@
                 "revert": "Revert"
             },
             "capabilities": {
-                "title": "Capabilities",
-                "subtitle": "What this agent can do — tools, skills, and bootstrap script.",
+                "title": "Возможности",
+                "subtitle": "Что умеет этот агент — инструменты, навыки и стартовый скрипт.",
                 "tools": {
-                    "title": "Agent tools",
-                    "description": "Per-tool access for this agent. A more specific scope can only narrow what its ancestors allow: turning a tool off writes an agent-level deny, and a tool denied by a parent scope cannot be re-enabled from this page.",
-                    "groupBuiltin": "Built-in tools",
-                    "groupFacade": "Platform tools",
-                    "groupDomain": "Domain tools",
-                    "resetToInherited": "Reset to inherited",
-                    "inheritedDeny": "Denied by {scope}",
-                    "permissionOff": "Permission off",
-                    "patternDeny": "Denied by a pattern on this agent",
-                    "permissionHint": "Requires the \"{permission}\" permission — enable it in Settings.",
-                    "empty": "No tools available."
+                    "title": "Инструменты агента",
+                    "description": "Доступ к отдельным инструментам для этого агента. Более узкая область может только ограничить то, что разрешают вышестоящие области: переключение инструмента записывает ограничение на уровне агента — обновляя его список запретов либо список разрешений, если он задан, — а инструмент, запрещённый вышестоящей областью, нельзя снова включить на этой странице.",
+                    "groupBuiltin": "Встроенные инструменты",
+                    "groupFacade": "Инструменты платформы",
+                    "groupDomain": "Доменные инструменты",
+                    "resetToInherited": "Сбросить до унаследованного",
+                    "inheritedDeny": "Запрещено областью {scope}",
+                    "permissionOff": "Разрешение выключено",
+                    "patternDeny": "Запрещено шаблоном этого агента",
+                    "permissionHint": "Требуется разрешение «{permission}» — включите его в Настройках.",
+                    "empty": "Нет доступных инструментов."
                 },
                 "permissions": {
-                    "title": "Permissions",
-                    "description": "The capability switches stay editable in Settings; shown here read-only.",
-                    "edit": "Edit in Settings"
+                    "title": "Разрешения",
+                    "description": "Переключатели возможностей редактируются в Настройках; здесь они показаны только для чтения.",
+                    "edit": "Изменить в Настройках"
                 },
                 "skills": {
-                    "title": "Skills",
-                    "description": "Skills bound directly to this agent. Inherited bindings come from a parent scope and are managed there.",
-                    "attachPlaceholder": "Attach a skill…",
-                    "installAndAttach": "install & attach",
-                    "inherited": "Inherited",
-                    "empty": "No skills bound yet."
+                    "title": "Навыки",
+                    "description": "Навыки, привязанные непосредственно к этому агенту. Унаследованные привязки приходят из вышестоящей области и управляются там.",
+                    "attachPlaceholder": "Привязать навык…",
+                    "installAndAttach": "установить и привязать",
+                    "inherited": "Унаследовано",
+                    "empty": "Навыки ещё не привязаны."
                 },
                 "mcp": {
                     "title": "MCP Connections",
@@ -1289,13 +1289,13 @@
                     "saved": "Environment updated"
                 },
                 "initScript": {
-                    "title": "Init Script",
-                    "helper": "Runs at session/workspace bootstrap where the runtime supports it.",
-                    "placeholder": "#!/bin/sh\n# commands to run when a session starts…",
-                    "save": "Save",
-                    "saved": "Init script saved",
-                    "bytes": "{used} / {max} KB",
-                    "tooLong": "Init script exceeds 16 KB."
+                    "title": "Стартовый скрипт",
+                    "helper": "Выполняется при запуске сессии или рабочей среды, если среда выполнения это поддерживает.",
+                    "placeholder": "#!/bin/sh\n# команды, выполняемые при запуске сессии…",
+                    "save": "Сохранить",
+                    "saved": "Стартовый скрипт сохранён",
+                    "bytes": "{used} / {max} КБ",
+                    "tooLong": "Стартовый скрипт превышает 16 КБ."
                 }
             }
         },
@@ -2682,6 +2682,15 @@
                     "enforceLabel": "Применять этот по умолчанию",
                     "enforceDescription": "Всегда предвыбирать этот пайплайн, даже если у работы настроен свой пайплайн. Вы все равно можете вручную переключать пайплайны в форме.",
                     "saveFailed": "Не удалось сохранить пайплайн по умолчанию"
+                },
+                "voiceDefault": {
+                    "title": "Голосовой провайдер",
+                    "description": "Какой провайдер расшифровывает голосовой ввод с микрофона в чате.",
+                    "autoLabel": "Автоматически",
+                    "autoDescription": "Использовать провайдера, активного для вашей учётной записи",
+                    "currentlyActive": "Используется сейчас",
+                    "noProviders": "Ни один из настроенных AI-провайдеров не поддерживает распознавание речи.",
+                    "saveFailed": "Не удалось сохранить голосового провайдера"
                 }
             },
             "profile": {
@@ -3006,6 +3015,11 @@
                 "export": {
                     "csv": "Export CSV",
                     "csvHint": "Download every usage event in {period} as a CSV file"
+                },
+                "tabs": {
+                    "label": "Usage views",
+                    "overview": "Overview",
+                    "costs": "Costs"
                 }
             },
             "fleet": {
@@ -3476,6 +3490,63 @@
                     "empty": "No repositories in your registry yet.",
                     "manageLink": "Manage repositories",
                     "toggleError": "Failed to update repository attachment"
+                }
+            },
+            "costs": {
+                "title": "Costs",
+                "subtitle": "Total AI spend for the selected window, and where it went — by day, agent, model and run.",
+                "loadError": "Some cost data could not be loaded. Refresh the page to try again.",
+                "loading": "Loading…",
+                "empty": "No spend in this window.",
+                "cacheHitNote": "Cache-hit rate is not shown: the metering path does not record cached-read tokens yet.",
+                "window": {
+                    "label": "Reporting window",
+                    "days": "{days}d"
+                },
+                "tiles": {
+                    "total": "Total spend",
+                    "runs": "Agent runs",
+                    "avgPerRun": "Average per run"
+                },
+                "panels": {
+                    "daily": "Spend per day, by agent",
+                    "byAgent": "By agent",
+                    "byModel": "By model",
+                    "topRuns": "Most expensive runs"
+                },
+                "series": {
+                    "other": "Other agents",
+                    "unattributed": "Unattributed",
+                    "unknownAgent": "Deleted agent",
+                    "noModel": "No model"
+                },
+                "byAgent": {
+                    "colAgent": "Agent",
+                    "colCost": "Cost",
+                    "colRuns": "Runs",
+                    "colAvg": "Avg / run"
+                },
+                "topRuns": {
+                    "colCost": "Cost",
+                    "colAgent": "Agent",
+                    "colTask": "Task",
+                    "colModel": "Model",
+                    "colStarted": "Started",
+                    "colStatus": "Status",
+                    "noTask": "{trigger} run",
+                    "runHint": "Run {runId}",
+                    "empty": "No runs with settled cost in this window.",
+                    "status": {
+                        "queued": "Queued",
+                        "running": "Running",
+                        "completed": "Completed",
+                        "failed": "Failed",
+                        "cancelled": "Cancelled"
+                    }
+                },
+                "byModel": {
+                    "units": "{units} units",
+                    "total": "{total} across all models in this window"
                 }
             }
         },
@@ -6922,6 +6993,18 @@
                 "start": "Диктовать",
                 "stop": "Остановить запись",
                 "transcribing": "Расшифровка…"
+            },
+            "model": {
+                "label": "Модель",
+                "auto": "По умолчанию у провайдера",
+                "autoHint": "Использовать модель, настроенную для этого провайдера",
+                "configured": "Настроенные",
+                "all": "Все модели",
+                "searchPlaceholder": "Поиск моделей...",
+                "loading": "Загрузка моделей...",
+                "loadError": "Не удалось загрузить модели",
+                "noModels": "Нет доступных моделей",
+                "context": "контекст {value}"
             }
         },
         "plugins": {

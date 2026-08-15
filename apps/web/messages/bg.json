@@ -1023,7 +1023,7 @@
                 "terminal": "Terminal",
                 "collaborators": "Collaborators",
                 "mcpServers": "MCP Servers",
-                "capabilities": "Capabilities"
+                "capabilities": "Възможности"
             },
             "newDialog": {
                 "title": "Нов Агент",
@@ -1263,33 +1263,33 @@
                 "revert": "Revert"
             },
             "capabilities": {
-                "title": "Capabilities",
-                "subtitle": "What this agent can do — tools, skills, and bootstrap script.",
+                "title": "Възможности",
+                "subtitle": "Какво може този агент — инструменти, умения и стартиращ скрипт.",
                 "tools": {
-                    "title": "Agent tools",
-                    "description": "Per-tool access for this agent. A more specific scope can only narrow what its ancestors allow: turning a tool off writes an agent-level deny, and a tool denied by a parent scope cannot be re-enabled from this page.",
-                    "groupBuiltin": "Built-in tools",
-                    "groupFacade": "Platform tools",
-                    "groupDomain": "Domain tools",
-                    "resetToInherited": "Reset to inherited",
-                    "inheritedDeny": "Denied by {scope}",
-                    "permissionOff": "Permission off",
-                    "patternDeny": "Denied by a pattern on this agent",
-                    "permissionHint": "Requires the \"{permission}\" permission — enable it in Settings.",
-                    "empty": "No tools available."
+                    "title": "Инструменти на агента",
+                    "description": "Достъп до отделните инструменти за този агент. По-конкретен обхват може само да стеснява това, което разрешават по-горните обхвати: превключването на инструмент записва ограничение на ниво агент — обновявайки списъка му със забрани или списъка с разрешения, ако е зададен — а инструмент, забранен от по-горен обхват, не може да бъде включен отново от тази страница.",
+                    "groupBuiltin": "Вградени инструменти",
+                    "groupFacade": "Инструменти на платформата",
+                    "groupDomain": "Домейн инструменти",
+                    "resetToInherited": "Връщане към наследеното",
+                    "inheritedDeny": "Забранен от {scope}",
+                    "permissionOff": "Разрешението е изключено",
+                    "patternDeny": "Забранен от шаблон на този агент",
+                    "permissionHint": "Изисква разрешението „{permission}“ — включете го в Настройки.",
+                    "empty": "Няма налични инструменти."
                 },
                 "permissions": {
-                    "title": "Permissions",
-                    "description": "The capability switches stay editable in Settings; shown here read-only.",
-                    "edit": "Edit in Settings"
+                    "title": "Разрешения",
+                    "description": "Превключвателите на възможностите остават редактируеми в Настройки; тук са показани само за четене.",
+                    "edit": "Редактиране в Настройки"
                 },
                 "skills": {
-                    "title": "Skills",
-                    "description": "Skills bound directly to this agent. Inherited bindings come from a parent scope and are managed there.",
-                    "attachPlaceholder": "Attach a skill…",
-                    "installAndAttach": "install & attach",
-                    "inherited": "Inherited",
-                    "empty": "No skills bound yet."
+                    "title": "Умения",
+                    "description": "Умения, свързани директно с този агент. Наследените връзки идват от по-горен обхват и се управляват там.",
+                    "attachPlaceholder": "Прикачване на умение…",
+                    "installAndAttach": "инсталиране и прикачване",
+                    "inherited": "Наследено",
+                    "empty": "Все още няма свързани умения."
                 },
                 "mcp": {
                     "title": "MCP Connections",
@@ -1320,13 +1320,13 @@
                     "saved": "Environment updated"
                 },
                 "initScript": {
-                    "title": "Init Script",
-                    "helper": "Runs at session/workspace bootstrap where the runtime supports it.",
-                    "placeholder": "#!/bin/sh\n# commands to run when a session starts…",
-                    "save": "Save",
-                    "saved": "Init script saved",
-                    "bytes": "{used} / {max} KB",
-                    "tooLong": "Init script exceeds 16 KB."
+                    "title": "Стартиращ скрипт",
+                    "helper": "Изпълнява се при стартиране на сесията или работната среда, когато средата за изпълнение го поддържа.",
+                    "placeholder": "#!/bin/sh\n# команди, които да се изпълнят при стартиране на сесия…",
+                    "save": "Запазване",
+                    "saved": "Стартиращият скрипт е запазен",
+                    "bytes": "{used} / {max} КБ",
+                    "tooLong": "Стартиращият скрипт надхвърля 16 КБ."
                 }
             }
         },
@@ -2750,6 +2750,15 @@
                     "enforceLabel": "Налагай този по подразбиране",
                     "enforceDescription": "Винаги предварително избирай този конвейер, дори когато работата има собствен конвейер. Все още можете ръчно да смените конвейерите във формата.",
                     "saveFailed": "Грешка при запазване на конвейера по подразбиране"
+                },
+                "voiceDefault": {
+                    "title": "Гласов доставчик",
+                    "description": "Кой доставчик транскрибира гласовата диктовка от микрофона в чата.",
+                    "autoLabel": "Автоматично",
+                    "autoDescription": "Използвай доставчика, активен за твоя акаунт",
+                    "currentlyActive": "Използва се в момента",
+                    "noProviders": "Никой от конфигурираните AI доставчици не поддържа гласова транскрипция.",
+                    "saveFailed": "Гласовият доставчик не можа да бъде запазен"
                 }
             },
             "profile": {
@@ -3074,6 +3083,11 @@
                 "export": {
                     "csv": "Export CSV",
                     "csvHint": "Download every usage event in {period} as a CSV file"
+                },
+                "tabs": {
+                    "label": "Usage views",
+                    "overview": "Overview",
+                    "costs": "Costs"
                 }
             },
             "fleet": {
@@ -3544,6 +3558,63 @@
                     "empty": "No repositories in your registry yet.",
                     "manageLink": "Manage repositories",
                     "toggleError": "Failed to update repository attachment"
+                }
+            },
+            "costs": {
+                "title": "Costs",
+                "subtitle": "Total AI spend for the selected window, and where it went — by day, agent, model and run.",
+                "loadError": "Some cost data could not be loaded. Refresh the page to try again.",
+                "loading": "Loading…",
+                "empty": "No spend in this window.",
+                "cacheHitNote": "Cache-hit rate is not shown: the metering path does not record cached-read tokens yet.",
+                "window": {
+                    "label": "Reporting window",
+                    "days": "{days}d"
+                },
+                "tiles": {
+                    "total": "Total spend",
+                    "runs": "Agent runs",
+                    "avgPerRun": "Average per run"
+                },
+                "panels": {
+                    "daily": "Spend per day, by agent",
+                    "byAgent": "By agent",
+                    "byModel": "By model",
+                    "topRuns": "Most expensive runs"
+                },
+                "series": {
+                    "other": "Other agents",
+                    "unattributed": "Unattributed",
+                    "unknownAgent": "Deleted agent",
+                    "noModel": "No model"
+                },
+                "byAgent": {
+                    "colAgent": "Agent",
+                    "colCost": "Cost",
+                    "colRuns": "Runs",
+                    "colAvg": "Avg / run"
+                },
+                "topRuns": {
+                    "colCost": "Cost",
+                    "colAgent": "Agent",
+                    "colTask": "Task",
+                    "colModel": "Model",
+                    "colStarted": "Started",
+                    "colStatus": "Status",
+                    "noTask": "{trigger} run",
+                    "runHint": "Run {runId}",
+                    "empty": "No runs with settled cost in this window.",
+                    "status": {
+                        "queued": "Queued",
+                        "running": "Running",
+                        "completed": "Completed",
+                        "failed": "Failed",
+                        "cancelled": "Cancelled"
+                    }
+                },
+                "byModel": {
+                    "units": "{units} units",
+                    "total": "{total} across all models in this window"
                 }
             }
         },
@@ -6989,6 +7060,18 @@
                 "start": "Диктуване",
                 "stop": "Спри записа",
                 "transcribing": "Транскрибиране…"
+            },
+            "model": {
+                "label": "Модел",
+                "auto": "По подразбиране за доставчика",
+                "autoHint": "Използвай модела, конфигуриран за този доставчик",
+                "configured": "Конфигурирани",
+                "all": "Всички модели",
+                "searchPlaceholder": "Търсене на модели...",
+                "loading": "Зареждане на модели...",
+                "loadError": "Моделите не можаха да се заредят",
+                "noModels": "Няма налични модели",
+                "context": "{value} контекст"
             }
         },
         "plugins": {

@@ -992,7 +992,7 @@
                 "terminal": "Terminal",
                 "collaborators": "Collaborators",
                 "mcpServers": "MCP Servers",
-                "capabilities": "Capabilities"
+                "capabilities": "Kemampuan"
             },
             "newDialog": {
                 "title": "Agen Baru",
@@ -1232,33 +1232,33 @@
                 "revert": "Revert"
             },
             "capabilities": {
-                "title": "Capabilities",
-                "subtitle": "What this agent can do — tools, skills, and bootstrap script.",
+                "title": "Kemampuan",
+                "subtitle": "Apa yang bisa dilakukan agen ini — alat, keterampilan, dan skrip awal.",
                 "tools": {
-                    "title": "Agent tools",
-                    "description": "Per-tool access for this agent. A more specific scope can only narrow what its ancestors allow: turning a tool off writes an agent-level deny, and a tool denied by a parent scope cannot be re-enabled from this page.",
-                    "groupBuiltin": "Built-in tools",
-                    "groupFacade": "Platform tools",
-                    "groupDomain": "Domain tools",
-                    "resetToInherited": "Reset to inherited",
-                    "inheritedDeny": "Denied by {scope}",
-                    "permissionOff": "Permission off",
-                    "patternDeny": "Denied by a pattern on this agent",
-                    "permissionHint": "Requires the \"{permission}\" permission — enable it in Settings.",
-                    "empty": "No tools available."
+                    "title": "Alat agen",
+                    "description": "Akses per alat untuk agen ini. Cakupan yang lebih spesifik hanya dapat mempersempit apa yang diizinkan cakupan induknya: mengalihkan sebuah alat akan mencatat pembatasan di tingkat agen — memperbarui daftar tolak agen ini, atau daftar izinnya bila ada — dan alat yang ditolak oleh cakupan induk tidak dapat diaktifkan kembali dari halaman ini.",
+                    "groupBuiltin": "Alat bawaan",
+                    "groupFacade": "Alat platform",
+                    "groupDomain": "Alat domain",
+                    "resetToInherited": "Setel ulang ke warisan",
+                    "inheritedDeny": "Ditolak oleh {scope}",
+                    "permissionOff": "Izin nonaktif",
+                    "patternDeny": "Ditolak oleh pola pada agen ini",
+                    "permissionHint": "Memerlukan izin \"{permission}\" — aktifkan di Pengaturan.",
+                    "empty": "Tidak ada alat yang tersedia."
                 },
                 "permissions": {
-                    "title": "Permissions",
-                    "description": "The capability switches stay editable in Settings; shown here read-only.",
-                    "edit": "Edit in Settings"
+                    "title": "Izin",
+                    "description": "Sakelar kemampuan tetap dapat diubah di Pengaturan; di sini hanya ditampilkan untuk dibaca.",
+                    "edit": "Ubah di Pengaturan"
                 },
                 "skills": {
-                    "title": "Skills",
-                    "description": "Skills bound directly to this agent. Inherited bindings come from a parent scope and are managed there.",
-                    "attachPlaceholder": "Attach a skill…",
-                    "installAndAttach": "install & attach",
-                    "inherited": "Inherited",
-                    "empty": "No skills bound yet."
+                    "title": "Keterampilan",
+                    "description": "Keterampilan yang terikat langsung ke agen ini. Ikatan warisan berasal dari cakupan induk dan dikelola di sana.",
+                    "attachPlaceholder": "Lampirkan keterampilan…",
+                    "installAndAttach": "pasang & lampirkan",
+                    "inherited": "Warisan",
+                    "empty": "Belum ada keterampilan yang terikat."
                 },
                 "mcp": {
                     "title": "MCP Connections",
@@ -1289,13 +1289,13 @@
                     "saved": "Environment updated"
                 },
                 "initScript": {
-                    "title": "Init Script",
-                    "helper": "Runs at session/workspace bootstrap where the runtime supports it.",
-                    "placeholder": "#!/bin/sh\n# commands to run when a session starts…",
-                    "save": "Save",
-                    "saved": "Init script saved",
+                    "title": "Skrip Init",
+                    "helper": "Dijalankan saat sesi/ruang kerja dimulai, jika runtime mendukungnya.",
+                    "placeholder": "#!/bin/sh\n# perintah yang dijalankan saat sesi dimulai…",
+                    "save": "Simpan",
+                    "saved": "Skrip init disimpan",
                     "bytes": "{used} / {max} KB",
-                    "tooLong": "Init script exceeds 16 KB."
+                    "tooLong": "Skrip init melebihi 16 KB."
                 }
             }
         },
@@ -2682,6 +2682,15 @@
                     "enforceLabel": "Terapkan default ini",
                     "enforceDescription": "Selalu pra-pilih pipeline ini, bahkan ketika karya memiliki pipeline sendiri yang dikonfigurasi. Anda masih dapat mengganti pipeline secara manual di formulir.",
                     "saveFailed": "Gagal menyimpan pipeline default"
+                },
+                "voiceDefault": {
+                    "title": "Penyedia suara",
+                    "description": "Penyedia mana yang mentranskripsi dikte suara dari mikrofon obrolan.",
+                    "autoLabel": "Otomatis",
+                    "autoDescription": "Gunakan penyedia yang aktif untuk akun Anda",
+                    "currentlyActive": "Sedang digunakan",
+                    "noProviders": "Tidak ada penyedia AI terkonfigurasi Anda yang mendukung transkripsi suara.",
+                    "saveFailed": "Tidak dapat menyimpan penyedia suara"
                 }
             },
             "profile": {
@@ -3006,6 +3015,11 @@
                 "export": {
                     "csv": "Export CSV",
                     "csvHint": "Download every usage event in {period} as a CSV file"
+                },
+                "tabs": {
+                    "label": "Usage views",
+                    "overview": "Overview",
+                    "costs": "Costs"
                 }
             },
             "fleet": {
@@ -3476,6 +3490,63 @@
                     "empty": "No repositories in your registry yet.",
                     "manageLink": "Manage repositories",
                     "toggleError": "Failed to update repository attachment"
+                }
+            },
+            "costs": {
+                "title": "Costs",
+                "subtitle": "Total AI spend for the selected window, and where it went — by day, agent, model and run.",
+                "loadError": "Some cost data could not be loaded. Refresh the page to try again.",
+                "loading": "Loading…",
+                "empty": "No spend in this window.",
+                "cacheHitNote": "Cache-hit rate is not shown: the metering path does not record cached-read tokens yet.",
+                "window": {
+                    "label": "Reporting window",
+                    "days": "{days}d"
+                },
+                "tiles": {
+                    "total": "Total spend",
+                    "runs": "Agent runs",
+                    "avgPerRun": "Average per run"
+                },
+                "panels": {
+                    "daily": "Spend per day, by agent",
+                    "byAgent": "By agent",
+                    "byModel": "By model",
+                    "topRuns": "Most expensive runs"
+                },
+                "series": {
+                    "other": "Other agents",
+                    "unattributed": "Unattributed",
+                    "unknownAgent": "Deleted agent",
+                    "noModel": "No model"
+                },
+                "byAgent": {
+                    "colAgent": "Agent",
+                    "colCost": "Cost",
+                    "colRuns": "Runs",
+                    "colAvg": "Avg / run"
+                },
+                "topRuns": {
+                    "colCost": "Cost",
+                    "colAgent": "Agent",
+                    "colTask": "Task",
+                    "colModel": "Model",
+                    "colStarted": "Started",
+                    "colStatus": "Status",
+                    "noTask": "{trigger} run",
+                    "runHint": "Run {runId}",
+                    "empty": "No runs with settled cost in this window.",
+                    "status": {
+                        "queued": "Queued",
+                        "running": "Running",
+                        "completed": "Completed",
+                        "failed": "Failed",
+                        "cancelled": "Cancelled"
+                    }
+                },
+                "byModel": {
+                    "units": "{units} units",
+                    "total": "{total} across all models in this window"
                 }
             }
         },
@@ -6922,6 +6993,18 @@
                 "start": "Dikte",
                 "stop": "Hentikan perekaman",
                 "transcribing": "Mentranskripsi…"
+            },
+            "model": {
+                "label": "Model",
+                "auto": "Default penyedia",
+                "autoHint": "Gunakan model yang dikonfigurasi untuk penyedia ini",
+                "configured": "Terkonfigurasi",
+                "all": "Semua model",
+                "searchPlaceholder": "Cari model...",
+                "loading": "Memuat model...",
+                "loadError": "Tidak dapat memuat model",
+                "noModels": "Tidak ada model tersedia",
+                "context": "konteks {value}"
             }
         },
         "plugins": {

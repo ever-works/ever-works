@@ -1467,7 +1467,7 @@
                 "subtitle": "What this agent can do — tools, skills, and bootstrap script.",
                 "tools": {
                     "title": "Agent tools",
-                    "description": "Per-tool access for this agent. A more specific scope can only narrow what its ancestors allow: turning a tool off writes an agent-level deny, and a tool denied by a parent scope cannot be re-enabled from this page.",
+                    "description": "Per-tool access for this agent. A more specific scope can only narrow what its ancestors allow: toggling a tool records an agent-level restriction — updating this agent's deny list, or its allow list when one is set — and a tool denied by a parent scope cannot be re-enabled from this page.",
                     "groupBuiltin": "Built-in tools",
                     "groupFacade": "Platform tools",
                     "groupDomain": "Domain tools",
@@ -2950,6 +2950,15 @@
                     "enforceLabel": "Enforce this default",
                     "enforceDescription": "Always pre-select this pipeline, even when a Work has its own pipeline configured. You can still switch pipelines manually in the form.",
                     "saveFailed": "Failed to save pipeline default"
+                },
+                "voiceDefault": {
+                    "title": "Voice provider",
+                    "description": "Which provider transcribes voice dictation from the chat microphone.",
+                    "autoLabel": "Automatic",
+                    "autoDescription": "Use whichever provider is active for your account",
+                    "currentlyActive": "Currently used",
+                    "noProviders": "None of your configured AI providers support voice transcription.",
+                    "saveFailed": "Could not save the voice provider"
                 }
             },
             "profile": {
@@ -3610,6 +3619,11 @@
                 "export": {
                     "csv": "Export CSV",
                     "csvHint": "Download every usage event in {period} as a CSV file"
+                },
+                "tabs": {
+                    "label": "Usage views",
+                    "overview": "Overview",
+                    "costs": "Costs"
                 }
             },
             "digest": {
@@ -3744,6 +3758,63 @@
                     "empty": "No repositories in your registry yet.",
                     "manageLink": "Manage repositories",
                     "toggleError": "Failed to update repository attachment"
+                }
+            },
+            "costs": {
+                "title": "Costs",
+                "subtitle": "Total AI spend for the selected window, and where it went — by day, agent, model and run.",
+                "loadError": "Some cost data could not be loaded. Refresh the page to try again.",
+                "loading": "Loading…",
+                "empty": "No spend in this window.",
+                "cacheHitNote": "Cache-hit rate is not shown: the metering path does not record cached-read tokens yet.",
+                "window": {
+                    "label": "Reporting window",
+                    "days": "{days}d"
+                },
+                "tiles": {
+                    "total": "Total spend",
+                    "runs": "Agent runs",
+                    "avgPerRun": "Average per run"
+                },
+                "panels": {
+                    "daily": "Spend per day, by agent",
+                    "byAgent": "By agent",
+                    "byModel": "By model",
+                    "topRuns": "Most expensive runs"
+                },
+                "series": {
+                    "other": "Other agents",
+                    "unattributed": "Unattributed",
+                    "unknownAgent": "Deleted agent",
+                    "noModel": "No model"
+                },
+                "byAgent": {
+                    "colAgent": "Agent",
+                    "colCost": "Cost",
+                    "colRuns": "Runs",
+                    "colAvg": "Avg / run"
+                },
+                "topRuns": {
+                    "colCost": "Cost",
+                    "colAgent": "Agent",
+                    "colTask": "Task",
+                    "colModel": "Model",
+                    "colStarted": "Started",
+                    "colStatus": "Status",
+                    "noTask": "{trigger} run",
+                    "runHint": "Run {runId}",
+                    "empty": "No runs with settled cost in this window.",
+                    "status": {
+                        "queued": "Queued",
+                        "running": "Running",
+                        "completed": "Completed",
+                        "failed": "Failed",
+                        "cancelled": "Cancelled"
+                    }
+                },
+                "byModel": {
+                    "units": "{units} units",
+                    "total": "{total} across all models in this window"
                 }
             }
         },
@@ -7396,6 +7467,18 @@
                 "start": "Dictate",
                 "stop": "Stop recording",
                 "transcribing": "Transcribing…"
+            },
+            "model": {
+                "label": "Model",
+                "auto": "Provider default",
+                "autoHint": "Use the model configured for this provider",
+                "configured": "Configured",
+                "all": "All models",
+                "searchPlaceholder": "Search models...",
+                "loading": "Loading models...",
+                "loadError": "Could not load models",
+                "noModels": "No models available",
+                "context": "{value} context"
             }
         },
         "plugins": {

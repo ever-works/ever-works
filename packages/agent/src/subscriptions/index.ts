@@ -19,3 +19,5 @@ export * from './credits/entitlements.service';
 export * from './credits/run-cost-settlement.service';
 // Account-wide usage aggregations for the Billing/Usage pages (Wave 13)
 export * from './credits/usage-summary.service';
+// Costs dashboard aggregations (Settings → Usage & Credits → Costs)
+export * from './credits/costs-summary.service';

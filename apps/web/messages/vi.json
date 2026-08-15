@@ -992,7 +992,7 @@
                 "terminal": "Terminal",
                 "collaborators": "Collaborators",
                 "mcpServers": "MCP Servers",
-                "capabilities": "Capabilities"
+                "capabilities": "Khả năng"
             },
             "newDialog": {
                 "title": "Agent mới",
@@ -1232,33 +1232,33 @@
                 "revert": "Revert"
             },
             "capabilities": {
-                "title": "Capabilities",
-                "subtitle": "What this agent can do — tools, skills, and bootstrap script.",
+                "title": "Khả năng",
+                "subtitle": "Những gì tác nhân này có thể làm — công cụ, kỹ năng và tập lệnh khởi tạo.",
                 "tools": {
-                    "title": "Agent tools",
-                    "description": "Per-tool access for this agent. A more specific scope can only narrow what its ancestors allow: turning a tool off writes an agent-level deny, and a tool denied by a parent scope cannot be re-enabled from this page.",
-                    "groupBuiltin": "Built-in tools",
-                    "groupFacade": "Platform tools",
-                    "groupDomain": "Domain tools",
-                    "resetToInherited": "Reset to inherited",
-                    "inheritedDeny": "Denied by {scope}",
-                    "permissionOff": "Permission off",
-                    "patternDeny": "Denied by a pattern on this agent",
-                    "permissionHint": "Requires the \"{permission}\" permission — enable it in Settings.",
-                    "empty": "No tools available."
+                    "title": "Công cụ của tác nhân",
+                    "description": "Quyền truy cập theo từng công cụ cho tác nhân này. Phạm vi cụ thể hơn chỉ có thể thu hẹp những gì các phạm vi cấp trên cho phép: bật/tắt một công cụ sẽ ghi lại một hạn chế ở cấp tác nhân — cập nhật danh sách từ chối của tác nhân, hoặc danh sách cho phép nếu đã được đặt — và công cụ bị phạm vi cấp trên từ chối thì không thể bật lại từ trang này.",
+                    "groupBuiltin": "Công cụ tích hợp",
+                    "groupFacade": "Công cụ nền tảng",
+                    "groupDomain": "Công cụ nghiệp vụ",
+                    "resetToInherited": "Đặt lại về kế thừa",
+                    "inheritedDeny": "Bị {scope} từ chối",
+                    "permissionOff": "Quyền đã tắt",
+                    "patternDeny": "Bị từ chối bởi một mẫu trên tác nhân này",
+                    "permissionHint": "Cần quyền “{permission}” — hãy bật quyền này trong Cài đặt.",
+                    "empty": "Không có công cụ nào."
                 },
                 "permissions": {
-                    "title": "Permissions",
-                    "description": "The capability switches stay editable in Settings; shown here read-only.",
-                    "edit": "Edit in Settings"
+                    "title": "Quyền",
+                    "description": "Các công tắc khả năng vẫn chỉnh sửa được trong Cài đặt; ở đây chỉ hiển thị để xem.",
+                    "edit": "Chỉnh sửa trong Cài đặt"
                 },
                 "skills": {
-                    "title": "Skills",
-                    "description": "Skills bound directly to this agent. Inherited bindings come from a parent scope and are managed there.",
-                    "attachPlaceholder": "Attach a skill…",
-                    "installAndAttach": "install & attach",
-                    "inherited": "Inherited",
-                    "empty": "No skills bound yet."
+                    "title": "Kỹ năng",
+                    "description": "Các kỹ năng được gắn trực tiếp vào tác nhân này. Liên kết kế thừa đến từ phạm vi cấp trên và được quản lý ở đó.",
+                    "attachPlaceholder": "Gắn một kỹ năng…",
+                    "installAndAttach": "cài đặt và gắn",
+                    "inherited": "Kế thừa",
+                    "empty": "Chưa có kỹ năng nào được gắn."
                 },
                 "mcp": {
                     "title": "MCP Connections",
@@ -1289,13 +1289,13 @@
                     "saved": "Environment updated"
                 },
                 "initScript": {
-                    "title": "Init Script",
-                    "helper": "Runs at session/workspace bootstrap where the runtime supports it.",
-                    "placeholder": "#!/bin/sh\n# commands to run when a session starts…",
-                    "save": "Save",
-                    "saved": "Init script saved",
+                    "title": "Tập lệnh khởi tạo",
+                    "helper": "Chạy khi khởi tạo phiên/không gian làm việc, nếu môi trường chạy hỗ trợ.",
+                    "placeholder": "#!/bin/sh\n# các lệnh chạy khi một phiên bắt đầu…",
+                    "save": "Lưu",
+                    "saved": "Đã lưu tập lệnh khởi tạo",
                     "bytes": "{used} / {max} KB",
-                    "tooLong": "Init script exceeds 16 KB."
+                    "tooLong": "Tập lệnh khởi tạo vượt quá 16 KB."
                 }
             }
         },
@@ -2682,6 +2682,15 @@
                     "enforceLabel": "Áp dụng mặc định này",
                     "enforceDescription": "Luôn chọn trước đường ống này, ngay cả khi công việc có đường ống riêng được cấu hình. Bạn vẫn có thể chuyển đổi đường ống thủ công trong biểu mẫu.",
                     "saveFailed": "Không thể lưu đường ống mặc định"
+                },
+                "voiceDefault": {
+                    "title": "Nhà cung cấp giọng nói",
+                    "description": "Nhà cung cấp nào chuyển lời nói từ micrô trong trò chuyện thành văn bản.",
+                    "autoLabel": "Tự động",
+                    "autoDescription": "Dùng nhà cung cấp đang hoạt động cho tài khoản của bạn",
+                    "currentlyActive": "Đang được dùng",
+                    "noProviders": "Không nhà cung cấp AI nào đã cấu hình hỗ trợ chuyển giọng nói thành văn bản.",
+                    "saveFailed": "Không thể lưu nhà cung cấp giọng nói"
                 }
             },
             "profile": {
@@ -3006,6 +3015,11 @@
                 "export": {
                     "csv": "Export CSV",
                     "csvHint": "Download every usage event in {period} as a CSV file"
+                },
+                "tabs": {
+                    "label": "Usage views",
+                    "overview": "Overview",
+                    "costs": "Costs"
                 }
             },
             "fleet": {
@@ -3476,6 +3490,63 @@
                     "empty": "No repositories in your registry yet.",
                     "manageLink": "Manage repositories",
                     "toggleError": "Failed to update repository attachment"
+                }
+            },
+            "costs": {
+                "title": "Costs",
+                "subtitle": "Total AI spend for the selected window, and where it went — by day, agent, model and run.",
+                "loadError": "Some cost data could not be loaded. Refresh the page to try again.",
+                "loading": "Loading…",
+                "empty": "No spend in this window.",
+                "cacheHitNote": "Cache-hit rate is not shown: the metering path does not record cached-read tokens yet.",
+                "window": {
+                    "label": "Reporting window",
+                    "days": "{days}d"
+                },
+                "tiles": {
+                    "total": "Total spend",
+                    "runs": "Agent runs",
+                    "avgPerRun": "Average per run"
+                },
+                "panels": {
+                    "daily": "Spend per day, by agent",
+                    "byAgent": "By agent",
+                    "byModel": "By model",
+                    "topRuns": "Most expensive runs"
+                },
+                "series": {
+                    "other": "Other agents",
+                    "unattributed": "Unattributed",
+                    "unknownAgent": "Deleted agent",
+                    "noModel": "No model"
+                },
+                "byAgent": {
+                    "colAgent": "Agent",
+                    "colCost": "Cost",
+                    "colRuns": "Runs",
+                    "colAvg": "Avg / run"
+                },
+                "topRuns": {
+                    "colCost": "Cost",
+                    "colAgent": "Agent",
+                    "colTask": "Task",
+                    "colModel": "Model",
+                    "colStarted": "Started",
+                    "colStatus": "Status",
+                    "noTask": "{trigger} run",
+                    "runHint": "Run {runId}",
+                    "empty": "No runs with settled cost in this window.",
+                    "status": {
+                        "queued": "Queued",
+                        "running": "Running",
+                        "completed": "Completed",
+                        "failed": "Failed",
+                        "cancelled": "Cancelled"
+                    }
+                },
+                "byModel": {
+                    "units": "{units} units",
+                    "total": "{total} across all models in this window"
                 }
             }
         },
@@ -6922,6 +6993,18 @@
                 "start": "Đọc chính tả",
                 "stop": "Dừng ghi âm",
                 "transcribing": "Đang chuyển thành văn bản…"
+            },
+            "model": {
+                "label": "Mô hình",
+                "auto": "Mặc định của nhà cung cấp",
+                "autoHint": "Dùng mô hình đã cấu hình cho nhà cung cấp này",
+                "configured": "Đã cấu hình",
+                "all": "Tất cả mô hình",
+                "searchPlaceholder": "Tìm mô hình...",
+                "loading": "Đang tải mô hình...",
+                "loadError": "Không thể tải mô hình",
+                "noModels": "Không có mô hình nào",
+                "context": "ngữ cảnh {value}"
             }
         },
         "plugins": {

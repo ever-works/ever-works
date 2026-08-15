@@ -992,7 +992,7 @@
                 "terminal": "Terminal",
                 "collaborators": "Collaborators",
                 "mcpServers": "MCP Servers",
-                "capabilities": "Capabilities"
+                "capabilities": "क्षमताएँ"
             },
             "newDialog": {
                 "title": "नए एजेंट",
@@ -1232,33 +1232,33 @@
                 "revert": "Revert"
             },
             "capabilities": {
-                "title": "Capabilities",
-                "subtitle": "What this agent can do — tools, skills, and bootstrap script.",
+                "title": "क्षमताएँ",
+                "subtitle": "यह एजेंट क्या कर सकता है — टूल, कौशल और आरंभिक स्क्रिप्ट।",
                 "tools": {
-                    "title": "Agent tools",
-                    "description": "Per-tool access for this agent. A more specific scope can only narrow what its ancestors allow: turning a tool off writes an agent-level deny, and a tool denied by a parent scope cannot be re-enabled from this page.",
-                    "groupBuiltin": "Built-in tools",
-                    "groupFacade": "Platform tools",
-                    "groupDomain": "Domain tools",
-                    "resetToInherited": "Reset to inherited",
-                    "inheritedDeny": "Denied by {scope}",
-                    "permissionOff": "Permission off",
-                    "patternDeny": "Denied by a pattern on this agent",
-                    "permissionHint": "Requires the \"{permission}\" permission — enable it in Settings.",
-                    "empty": "No tools available."
+                    "title": "एजेंट टूल",
+                    "description": "इस एजेंट के लिए प्रति-टूल पहुँच। अधिक विशिष्ट दायरा केवल उसे सीमित कर सकता है जो उसके ऊपरी दायरे अनुमति देते हैं: किसी टूल को टॉगल करने पर एजेंट-स्तर की एक पाबंदी दर्ज होती है — इस एजेंट की अस्वीकृति सूची, या अनुमति सूची निर्धारित होने पर वह सूची, अपडेट होती है — और ऊपरी दायरे द्वारा अस्वीकृत टूल को इस पृष्ठ से दोबारा सक्षम नहीं किया जा सकता।",
+                    "groupBuiltin": "अंतर्निहित टूल",
+                    "groupFacade": "प्लेटफ़ॉर्म टूल",
+                    "groupDomain": "डोमेन टूल",
+                    "resetToInherited": "विरासत में मिली सेटिंग पर रीसेट करें",
+                    "inheritedDeny": "{scope} द्वारा अस्वीकृत",
+                    "permissionOff": "अनुमति बंद",
+                    "patternDeny": "इस एजेंट के एक पैटर्न द्वारा अस्वीकृत",
+                    "permissionHint": "\"{permission}\" अनुमति आवश्यक है — इसे सेटिंग्स में सक्षम करें।",
+                    "empty": "कोई टूल उपलब्ध नहीं है।"
                 },
                 "permissions": {
-                    "title": "Permissions",
-                    "description": "The capability switches stay editable in Settings; shown here read-only.",
-                    "edit": "Edit in Settings"
+                    "title": "अनुमतियाँ",
+                    "description": "क्षमता स्विच सेटिंग्स में संपादित किए जा सकते हैं; यहाँ वे केवल पढ़ने के लिए दिखाए गए हैं।",
+                    "edit": "सेटिंग्स में संपादित करें"
                 },
                 "skills": {
-                    "title": "Skills",
-                    "description": "Skills bound directly to this agent. Inherited bindings come from a parent scope and are managed there.",
-                    "attachPlaceholder": "Attach a skill…",
-                    "installAndAttach": "install & attach",
-                    "inherited": "Inherited",
-                    "empty": "No skills bound yet."
+                    "title": "कौशल",
+                    "description": "सीधे इस एजेंट से जुड़े कौशल। विरासत में मिले संबंध किसी ऊपरी दायरे से आते हैं और वहीं प्रबंधित होते हैं।",
+                    "attachPlaceholder": "कोई कौशल जोड़ें…",
+                    "installAndAttach": "इंस्टॉल करें और जोड़ें",
+                    "inherited": "विरासत में मिला",
+                    "empty": "अभी तक कोई कौशल नहीं जोड़ा गया।"
                 },
                 "mcp": {
                     "title": "MCP Connections",
@@ -1289,13 +1289,13 @@
                     "saved": "Environment updated"
                 },
                 "initScript": {
-                    "title": "Init Script",
-                    "helper": "Runs at session/workspace bootstrap where the runtime supports it.",
-                    "placeholder": "#!/bin/sh\n# commands to run when a session starts…",
-                    "save": "Save",
-                    "saved": "Init script saved",
+                    "title": "आरंभिक स्क्रिप्ट",
+                    "helper": "जहाँ रनटाइम समर्थन करता है, सत्र/कार्यक्षेत्र आरंभ होने पर चलती है।",
+                    "placeholder": "#!/bin/sh\n# सत्र शुरू होने पर चलने वाले कमांड…",
+                    "save": "सहेजें",
+                    "saved": "आरंभिक स्क्रिप्ट सहेजी गई",
                     "bytes": "{used} / {max} KB",
-                    "tooLong": "Init script exceeds 16 KB."
+                    "tooLong": "आरंभिक स्क्रिप्ट 16 KB से अधिक है।"
                 }
             }
         },
@@ -2682,6 +2682,15 @@
                     "enforceLabel": "इस डिफ़ॉल्ट को लागू करें",
                     "enforceDescription": "हमेशा इस पाइपलाइन को पूर्व-चयनित करें, भले ही कार्य में अपनी खुद की पाइपलाइन कॉन्फ़िगर की गई हो। आप फ़ॉर्म में मैन्युअल रूप से पाइपलाइन बदल सकते हैं।",
                     "saveFailed": "डिफ़ॉल्ट पाइपलाइन सहेजने में विफल"
+                },
+                "voiceDefault": {
+                    "title": "वॉइस प्रदाता",
+                    "description": "चैट माइक्रोफ़ोन से वॉइस डिक्टेशन को कौन सा प्रदाता ट्रांसक्राइब करता है।",
+                    "autoLabel": "स्वचालित",
+                    "autoDescription": "अपने खाते में सक्रिय प्रदाता का उपयोग करें",
+                    "currentlyActive": "वर्तमान में उपयोग में",
+                    "noProviders": "आपके कॉन्फ़िगर किए गए किसी भी AI प्रदाता में वॉइस ट्रांसक्रिप्शन समर्थित नहीं है।",
+                    "saveFailed": "वॉइस प्रदाता सहेजा नहीं जा सका"
                 }
             },
             "profile": {
@@ -3006,6 +3015,11 @@
                 "export": {
                     "csv": "Export CSV",
                     "csvHint": "Download every usage event in {period} as a CSV file"
+                },
+                "tabs": {
+                    "label": "Usage views",
+                    "overview": "Overview",
+                    "costs": "Costs"
                 }
             },
             "fleet": {
@@ -3476,6 +3490,63 @@
                     "empty": "No repositories in your registry yet.",
                     "manageLink": "Manage repositories",
                     "toggleError": "Failed to update repository attachment"
+                }
+            },
+            "costs": {
+                "title": "Costs",
+                "subtitle": "Total AI spend for the selected window, and where it went — by day, agent, model and run.",
+                "loadError": "Some cost data could not be loaded. Refresh the page to try again.",
+                "loading": "Loading…",
+                "empty": "No spend in this window.",
+                "cacheHitNote": "Cache-hit rate is not shown: the metering path does not record cached-read tokens yet.",
+                "window": {
+                    "label": "Reporting window",
+                    "days": "{days}d"
+                },
+                "tiles": {
+                    "total": "Total spend",
+                    "runs": "Agent runs",
+                    "avgPerRun": "Average per run"
+                },
+                "panels": {
+                    "daily": "Spend per day, by agent",
+                    "byAgent": "By agent",
+                    "byModel": "By model",
+                    "topRuns": "Most expensive runs"
+                },
+                "series": {
+                    "other": "Other agents",
+                    "unattributed": "Unattributed",
+                    "unknownAgent": "Deleted agent",
+                    "noModel": "No model"
+                },
+                "byAgent": {
+                    "colAgent": "Agent",
+                    "colCost": "Cost",
+                    "colRuns": "Runs",
+                    "colAvg": "Avg / run"
+                },
+                "topRuns": {
+                    "colCost": "Cost",
+                    "colAgent": "Agent",
+                    "colTask": "Task",
+                    "colModel": "Model",
+                    "colStarted": "Started",
+                    "colStatus": "Status",
+                    "noTask": "{trigger} run",
+                    "runHint": "Run {runId}",
+                    "empty": "No runs with settled cost in this window.",
+                    "status": {
+                        "queued": "Queued",
+                        "running": "Running",
+                        "completed": "Completed",
+                        "failed": "Failed",
+                        "cancelled": "Cancelled"
+                    }
+                },
+                "byModel": {
+                    "units": "{units} units",
+                    "total": "{total} across all models in this window"
                 }
             }
         },
@@ -6922,6 +6993,18 @@
                 "start": "बोलकर लिखें",
                 "stop": "रिकॉर्डिंग रोकें",
                 "transcribing": "लिप्यंतरण हो रहा है…"
+            },
+            "model": {
+                "label": "मॉडल",
+                "auto": "प्रदाता डिफ़ॉल्ट",
+                "autoHint": "इस प्रदाता के लिए कॉन्फ़िगर किया गया मॉडल उपयोग करें",
+                "configured": "कॉन्फ़िगर किए गए",
+                "all": "सभी मॉडल",
+                "searchPlaceholder": "मॉडल खोजें...",
+                "loading": "मॉडल लोड हो रहे हैं...",
+                "loadError": "मॉडल लोड नहीं हो सके",
+                "noModels": "कोई मॉडल उपलब्ध नहीं",
+                "context": "{value} संदर्भ"
             }
         },
         "plugins": {

@@ -1023,7 +1023,7 @@
                 "terminal": "Terminal",
                 "collaborators": "Collaborators",
                 "mcpServers": "MCP Servers",
-                "capabilities": "Capabilities"
+                "capabilities": "יכולות"
             },
             "newDialog": {
                 "title": "סוכן חדש",
@@ -1263,33 +1263,33 @@
                 "revert": "Revert"
             },
             "capabilities": {
-                "title": "Capabilities",
-                "subtitle": "What this agent can do — tools, skills, and bootstrap script.",
+                "title": "יכולות",
+                "subtitle": "מה הסוכן הזה יכול לעשות — כלים, מיומנויות וסקריפט אתחול.",
                 "tools": {
-                    "title": "Agent tools",
-                    "description": "Per-tool access for this agent. A more specific scope can only narrow what its ancestors allow: turning a tool off writes an agent-level deny, and a tool denied by a parent scope cannot be re-enabled from this page.",
-                    "groupBuiltin": "Built-in tools",
-                    "groupFacade": "Platform tools",
-                    "groupDomain": "Domain tools",
-                    "resetToInherited": "Reset to inherited",
-                    "inheritedDeny": "Denied by {scope}",
-                    "permissionOff": "Permission off",
-                    "patternDeny": "Denied by a pattern on this agent",
-                    "permissionHint": "Requires the \"{permission}\" permission — enable it in Settings.",
-                    "empty": "No tools available."
+                    "title": "כלי הסוכן",
+                    "description": "הרשאת גישה לכל כלי בנפרד עבור סוכן זה. היקף ספציפי יותר יכול רק לצמצם את מה שההיקפים שמעליו מתירים: החלפת מצב של כלי רושמת הגבלה ברמת הסוכן — ומעדכנת את רשימת החסימה של הסוכן, או את רשימת ההיתר אם הוגדרה — וכלי שנחסם על ידי היקף שמעליו לא ניתן להפעלה מחדש מדף זה.",
+                    "groupBuiltin": "כלים מובנים",
+                    "groupFacade": "כלי הפלטפורמה",
+                    "groupDomain": "כלי תחום",
+                    "resetToInherited": "איפוס לערך שעבר בירושה",
+                    "inheritedDeny": "נחסם על ידי {scope}",
+                    "permissionOff": "ההרשאה כבויה",
+                    "patternDeny": "נחסם על ידי תבנית בסוכן זה",
+                    "permissionHint": "דורש את ההרשאה \"{permission}\" — הפעילו אותה בהגדרות.",
+                    "empty": "אין כלים זמינים."
                 },
                 "permissions": {
-                    "title": "Permissions",
-                    "description": "The capability switches stay editable in Settings; shown here read-only.",
-                    "edit": "Edit in Settings"
+                    "title": "הרשאות",
+                    "description": "מתגי היכולות ניתנים לעריכה בהגדרות; כאן הם מוצגים לקריאה בלבד.",
+                    "edit": "עריכה בהגדרות"
                 },
                 "skills": {
-                    "title": "Skills",
-                    "description": "Skills bound directly to this agent. Inherited bindings come from a parent scope and are managed there.",
-                    "attachPlaceholder": "Attach a skill…",
-                    "installAndAttach": "install & attach",
-                    "inherited": "Inherited",
-                    "empty": "No skills bound yet."
+                    "title": "מיומנויות",
+                    "description": "מיומנויות המשויכות ישירות לסוכן זה. שיוכים שעברו בירושה מגיעים מהיקף שמעליו ומנוהלים שם.",
+                    "attachPlaceholder": "צירוף מיומנות…",
+                    "installAndAttach": "התקנה וצירוף",
+                    "inherited": "עבר בירושה",
+                    "empty": "עדיין לא שויכו מיומנויות."
                 },
                 "mcp": {
                     "title": "MCP Connections",
@@ -1320,13 +1320,13 @@
                     "saved": "Environment updated"
                 },
                 "initScript": {
-                    "title": "Init Script",
-                    "helper": "Runs at session/workspace bootstrap where the runtime supports it.",
-                    "placeholder": "#!/bin/sh\n# commands to run when a session starts…",
-                    "save": "Save",
-                    "saved": "Init script saved",
+                    "title": "סקריפט אתחול",
+                    "helper": "רץ באתחול הפעלה/סביבת עבודה, היכן שסביבת ההרצה תומכת בכך.",
+                    "placeholder": "#!/bin/sh\n# פקודות שירוצו כשהפעלה מתחילה…",
+                    "save": "שמירה",
+                    "saved": "סקריפט האתחול נשמר",
                     "bytes": "{used} / {max} KB",
-                    "tooLong": "Init script exceeds 16 KB."
+                    "tooLong": "סקריפט האתחול חורג מ-16 KB."
                 }
             }
         },
@@ -2750,6 +2750,15 @@
                     "enforceLabel": "אכף ברירת מחדל זו",
                     "enforceDescription": "תמיד בחר מראש צינור זה, אפילו כאשר לעבודה יש צינור משלה מוגדר. עדיין תוכל להחליף צינורות ידנית בטופס.",
                     "saveFailed": "נכשל לשמור צינור ברירת מחדל"
+                },
+                "voiceDefault": {
+                    "title": "ספק קולי",
+                    "description": "איזה ספק מתמלל את ההכתבה הקולית מהמיקרופון בצ'אט.",
+                    "autoLabel": "אוטומטי",
+                    "autoDescription": "השתמש בספק הפעיל בחשבון שלך",
+                    "currentlyActive": "בשימוש כעת",
+                    "noProviders": "אף אחד מספקי ה-AI המוגדרים שלך אינו תומך בתמלול קולי.",
+                    "saveFailed": "לא ניתן לשמור את הספק הקולי"
                 }
             },
             "profile": {
@@ -3074,6 +3083,11 @@
                 "export": {
                     "csv": "Export CSV",
                     "csvHint": "Download every usage event in {period} as a CSV file"
+                },
+                "tabs": {
+                    "label": "Usage views",
+                    "overview": "Overview",
+                    "costs": "Costs"
                 }
             },
             "fleet": {
@@ -3544,6 +3558,63 @@
                     "empty": "No repositories in your registry yet.",
                     "manageLink": "Manage repositories",
                     "toggleError": "Failed to update repository attachment"
+                }
+            },
+            "costs": {
+                "title": "Costs",
+                "subtitle": "Total AI spend for the selected window, and where it went — by day, agent, model and run.",
+                "loadError": "Some cost data could not be loaded. Refresh the page to try again.",
+                "loading": "Loading…",
+                "empty": "No spend in this window.",
+                "cacheHitNote": "Cache-hit rate is not shown: the metering path does not record cached-read tokens yet.",
+                "window": {
+                    "label": "Reporting window",
+                    "days": "{days}d"
+                },
+                "tiles": {
+                    "total": "Total spend",
+                    "runs": "Agent runs",
+                    "avgPerRun": "Average per run"
+                },
+                "panels": {
+                    "daily": "Spend per day, by agent",
+                    "byAgent": "By agent",
+                    "byModel": "By model",
+                    "topRuns": "Most expensive runs"
+                },
+                "series": {
+                    "other": "Other agents",
+                    "unattributed": "Unattributed",
+                    "unknownAgent": "Deleted agent",
+                    "noModel": "No model"
+                },
+                "byAgent": {
+                    "colAgent": "Agent",
+                    "colCost": "Cost",
+                    "colRuns": "Runs",
+                    "colAvg": "Avg / run"
+                },
+                "topRuns": {
+                    "colCost": "Cost",
+                    "colAgent": "Agent",
+                    "colTask": "Task",
+                    "colModel": "Model",
+                    "colStarted": "Started",
+                    "colStatus": "Status",
+                    "noTask": "{trigger} run",
+                    "runHint": "Run {runId}",
+                    "empty": "No runs with settled cost in this window.",
+                    "status": {
+                        "queued": "Queued",
+                        "running": "Running",
+                        "completed": "Completed",
+                        "failed": "Failed",
+                        "cancelled": "Cancelled"
+                    }
+                },
+                "byModel": {
+                    "units": "{units} units",
+                    "total": "{total} across all models in this window"
                 }
             }
         },
@@ -6989,6 +7060,18 @@
                 "start": "הכתבה בדיבור",
                 "stop": "עצור הקלטה",
                 "transcribing": "מתמלל…"
+            },
+            "model": {
+                "label": "מודל",
+                "auto": "ברירת המחדל של הספק",
+                "autoHint": "השתמש במודל שהוגדר עבור ספק זה",
+                "configured": "מוגדרים",
+                "all": "כל המודלים",
+                "searchPlaceholder": "חיפוש מודלים...",
+                "loading": "טוען מודלים...",
+                "loadError": "לא ניתן לטעון מודלים",
+                "noModels": "אין מודלים זמינים",
+                "context": "הקשר {value}"
             }
         },
         "plugins": {

@@ -11,6 +11,8 @@ import {
     useChatAttachments,
 } from './ChatAttachments';
 import { ChatDictation } from './ChatDictation';
+import { ChatModelSelector } from './ChatModelSelector';
+import { useChatContext } from './ChatProvider';
 import { useDictation } from '@/components/common/composer/use-dictation';
 import { VoiceBar } from '@/components/common/composer/VoiceBar';
 import type { ChatAttachmentRef } from '@/lib/ai/attachments';
@@ -23,6 +25,11 @@ interface ChatInputProps {
 
 export function ChatInput({ isStreaming, onSubmit, onStop }: ChatInputProps) {
     const t = useTranslations('dashboard.aiChat');
+    // Read straight from context rather than threading four more props through
+    // ChatInterface: the model picker lives here because choosing a model is
+    // part of writing the message, not part of the panel's chrome.
+    const { providers, selectedProvider, selectedModel, setSelectedModel } = useChatContext();
+    const activeProvider = providers.find((p) => p.id === selectedProvider);
     const textareaRef = useRef<HTMLTextAreaElement | null>(null);
     const inputRef = useRef('');
     const { items, addFiles, remove, clear, readyRefs, uploading } = useChatAttachments();
@@ -100,9 +107,9 @@ export function ChatInput({ isStreaming, onSubmit, onStop }: ChatInputProps) {
 
     // `useDictation` can only detect Web Speech from a mount effect, so its
     // first render always reports "unsupported". Picking the engine on that
-    // frame would mount ChatDictation in Chrome too, firing its authenticated
-    // providers request on every load before unmounting. Wait for the same
-    // effect flush that sets `supported` and choose once.
+    // frame would mount ChatDictation in Chrome too, then unmount it a frame
+    // later — a mic button that flickers in and out on every page load. Wait
+    // for the same effect flush that sets `supported` and choose once.
     const [engineResolved, setEngineResolved] = useState(false);
     useEffect(() => {
         // eslint-disable-next-line react-hooks/set-state-in-effect -- one-shot: pairs with the capability detection inside useDictation, which is only knowable after mount.
@@ -256,39 +263,46 @@ export function ChatInput({ isStreaming, onSubmit, onStop }: ChatInputProps) {
                                 <ChatAttachButton onFiles={addFiles} disabled={isStreaming} />
                                 {/* ONE mic, not one per engine. Where the
                                     browser speaks (Chrome / Edge / Safari) it
-                                    drives the live engine and ChatDictation is
-                                    reduced to its provider picker; elsewhere
-                                    ChatDictation supplies both the mic and the
-                                    picker and records-and-uploads instead.
-                                    Either way the user sees one mic, because
-                                    to them it is one gesture. */}
+                                    drives the live engine; elsewhere
+                                    ChatDictation supplies the mic and
+                                    records-and-uploads instead. Either way the
+                                    user sees one mic, because to them it is
+                                    one gesture — and neither engine offers a
+                                    provider choice here: WHICH provider
+                                    transcribes is a set-once account setting
+                                    (Settings → Plugins → AI Providers), not a
+                                    decision to re-make beside every message. */}
                                 {!engineResolved ? null : dictation.supported ? (
-                                    <>
-                                        <ChatDictation
-                                            onText={appendDictated}
-                                            disabled={isStreaming}
-                                            pickerOnly
-                                        />
-                                        <button
-                                            type="button"
-                                            onClick={startDictation}
-                                            disabled={isStreaming}
-                                            aria-label={t('dictation.start')}
-                                            title={t('dictation.start')}
-                                            data-testid="chat-dictation-button"
-                                            className={cn(
-                                                'flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg transition-colors',
-                                                'text-text-muted hover:bg-card-hover hover:text-text',
-                                                'dark:text-white/40 dark:hover:bg-white/10 dark:hover:text-white',
-                                                'disabled:cursor-not-allowed disabled:opacity-40',
-                                            )}
-                                        >
-                                            <Mic className="h-3.5 w-3.5" aria-hidden="true" />
-                                        </button>
-                                    </>
+                                    <button
+                                        type="button"
+                                        onClick={startDictation}
+                                        disabled={isStreaming}
+                                        aria-label={t('dictation.start')}
+                                        title={t('dictation.start')}
+                                        data-testid="chat-dictation-button"
+                                        className={cn(
+                                            'flex h-7 w-7 shrink-0 cursor-pointer items-center justify-center rounded-lg transition-colors',
+                                            'text-text-muted hover:bg-card-hover hover:text-text',
+                                            'dark:text-white/40 dark:hover:bg-white/10 dark:hover:text-white',
+                                            'disabled:cursor-not-allowed disabled:opacity-40',
+                                        )}
+                                    >
+                                        <Mic className="h-3.5 w-3.5" aria-hidden="true" />
+                                    </button>
                                 ) : (
                                     <ChatDictation onText={appendDictated} disabled={isStreaming} />
                                 )}
+                                {/* The model this turn runs on. Beside the
+                                    message because it is a per-message choice
+                                    — the PROVIDER, which is the thread's
+                                    identity, is chosen once in the header. */}
+                                <ChatModelSelector
+                                    providerId={selectedProvider}
+                                    configuredModels={activeProvider?.models}
+                                    value={selectedModel}
+                                    disabled={isStreaming}
+                                    onChange={setSelectedModel}
+                                />
                                 {/* The panel is user-resizable, so this hint is the
                                 one thing here that must give way: truncating it
                                 keeps the controls and the send button in place

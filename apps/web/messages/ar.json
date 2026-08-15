@@ -1023,7 +1023,7 @@
                 "terminal": "Terminal",
                 "collaborators": "Collaborators",
                 "mcpServers": "MCP Servers",
-                "capabilities": "Capabilities"
+                "capabilities": "القدرات"
             },
             "newDialog": {
                 "title": "وكيل جديد",
@@ -1263,33 +1263,33 @@
                 "revert": "Revert"
             },
             "capabilities": {
-                "title": "Capabilities",
-                "subtitle": "What this agent can do — tools, skills, and bootstrap script.",
+                "title": "القدرات",
+                "subtitle": "ما يستطيع هذا الوكيل فعله — الأدوات والمهارات وبرنامج التهيئة.",
                 "tools": {
-                    "title": "Agent tools",
-                    "description": "Per-tool access for this agent. A more specific scope can only narrow what its ancestors allow: turning a tool off writes an agent-level deny, and a tool denied by a parent scope cannot be re-enabled from this page.",
-                    "groupBuiltin": "Built-in tools",
-                    "groupFacade": "Platform tools",
-                    "groupDomain": "Domain tools",
-                    "resetToInherited": "Reset to inherited",
-                    "inheritedDeny": "Denied by {scope}",
-                    "permissionOff": "Permission off",
-                    "patternDeny": "Denied by a pattern on this agent",
-                    "permissionHint": "Requires the \"{permission}\" permission — enable it in Settings.",
-                    "empty": "No tools available."
+                    "title": "أدوات الوكيل",
+                    "description": "صلاحية الوصول لكل أداة على حدة لهذا الوكيل. النطاق الأكثر تحديدًا لا يمكنه إلا تضييق ما تسمح به النطاقات الأعلى: تبديل أداة يسجّل تقييدًا على مستوى الوكيل — بتحديث قائمة الرفض الخاصة به، أو قائمة السماح إن كانت محددة — والأداة المرفوضة من نطاق أعلى لا يمكن تفعيلها مجددًا من هذه الصفحة.",
+                    "groupBuiltin": "الأدوات المدمجة",
+                    "groupFacade": "أدوات المنصة",
+                    "groupDomain": "أدوات المجال",
+                    "resetToInherited": "إعادة التعيين إلى الموروث",
+                    "inheritedDeny": "مرفوضة من {scope}",
+                    "permissionOff": "الإذن معطّل",
+                    "patternDeny": "مرفوضة بواسطة نمط على هذا الوكيل",
+                    "permissionHint": "يتطلب إذن \"{permission}\" — فعّله من الإعدادات.",
+                    "empty": "لا توجد أدوات متاحة."
                 },
                 "permissions": {
-                    "title": "Permissions",
-                    "description": "The capability switches stay editable in Settings; shown here read-only.",
-                    "edit": "Edit in Settings"
+                    "title": "الأذونات",
+                    "description": "تظل مفاتيح القدرات قابلة للتعديل في الإعدادات؛ وتُعرض هنا للقراءة فقط.",
+                    "edit": "التعديل في الإعدادات"
                 },
                 "skills": {
-                    "title": "Skills",
-                    "description": "Skills bound directly to this agent. Inherited bindings come from a parent scope and are managed there.",
-                    "attachPlaceholder": "Attach a skill…",
-                    "installAndAttach": "install & attach",
-                    "inherited": "Inherited",
-                    "empty": "No skills bound yet."
+                    "title": "المهارات",
+                    "description": "المهارات المرتبطة مباشرة بهذا الوكيل. الارتباطات الموروثة تأتي من نطاق أعلى وتُدار هناك.",
+                    "attachPlaceholder": "إرفاق مهارة…",
+                    "installAndAttach": "تثبيت وإرفاق",
+                    "inherited": "موروثة",
+                    "empty": "لا توجد مهارات مرتبطة بعد."
                 },
                 "mcp": {
                     "title": "MCP Connections",
@@ -1320,13 +1320,13 @@
                     "saved": "Environment updated"
                 },
                 "initScript": {
-                    "title": "Init Script",
-                    "helper": "Runs at session/workspace bootstrap where the runtime supports it.",
-                    "placeholder": "#!/bin/sh\n# commands to run when a session starts…",
-                    "save": "Save",
-                    "saved": "Init script saved",
-                    "bytes": "{used} / {max} KB",
-                    "tooLong": "Init script exceeds 16 KB."
+                    "title": "برنامج التهيئة",
+                    "helper": "يُنفَّذ عند بدء الجلسة أو مساحة العمل، حيث تدعم بيئة التشغيل ذلك.",
+                    "placeholder": "#!/bin/sh\n# الأوامر التي تُنفَّذ عند بدء الجلسة…",
+                    "save": "حفظ",
+                    "saved": "تم حفظ برنامج التهيئة",
+                    "bytes": "{used} / {max} كيلوبايت",
+                    "tooLong": "برنامج التهيئة يتجاوز 16 كيلوبايت."
                 }
             }
         },
@@ -2750,6 +2750,15 @@
                     "enforceLabel": "فرض هذا الافتراضي",
                     "enforceDescription": "قم دائمًا بتحديد هذا الأنبوب مسبقًا، حتى عندما يكون لدى العمل أنبوب خاص به. لا يزال بإمكانك تبديل الأنابيب يدويًا في النموذج.",
                     "saveFailed": "فشل في حفظ الافتراضي للأنبوب"
+                },
+                "voiceDefault": {
+                    "title": "مزوّد الصوت",
+                    "description": "المزوّد الذي يحوّل الإملاء الصوتي من ميكروفون الدردشة إلى نص.",
+                    "autoLabel": "تلقائي",
+                    "autoDescription": "استخدام المزوّد النشط في حسابك",
+                    "currentlyActive": "المستخدم حاليًا",
+                    "noProviders": "لا يدعم أي من مزوّدي الذكاء الاصطناعي المُهيّئين تحويل الصوت إلى نص.",
+                    "saveFailed": "تعذّر حفظ مزوّد الصوت"
                 }
             },
             "profile": {
@@ -3074,6 +3083,11 @@
                 "export": {
                     "csv": "Export CSV",
                     "csvHint": "Download every usage event in {period} as a CSV file"
+                },
+                "tabs": {
+                    "label": "Usage views",
+                    "overview": "Overview",
+                    "costs": "Costs"
                 }
             },
             "fleet": {
@@ -3544,6 +3558,63 @@
                     "empty": "No repositories in your registry yet.",
                     "manageLink": "Manage repositories",
                     "toggleError": "Failed to update repository attachment"
+                }
+            },
+            "costs": {
+                "title": "Costs",
+                "subtitle": "Total AI spend for the selected window, and where it went — by day, agent, model and run.",
+                "loadError": "Some cost data could not be loaded. Refresh the page to try again.",
+                "loading": "Loading…",
+                "empty": "No spend in this window.",
+                "cacheHitNote": "Cache-hit rate is not shown: the metering path does not record cached-read tokens yet.",
+                "window": {
+                    "label": "Reporting window",
+                    "days": "{days}d"
+                },
+                "tiles": {
+                    "total": "Total spend",
+                    "runs": "Agent runs",
+                    "avgPerRun": "Average per run"
+                },
+                "panels": {
+                    "daily": "Spend per day, by agent",
+                    "byAgent": "By agent",
+                    "byModel": "By model",
+                    "topRuns": "Most expensive runs"
+                },
+                "series": {
+                    "other": "Other agents",
+                    "unattributed": "Unattributed",
+                    "unknownAgent": "Deleted agent",
+                    "noModel": "No model"
+                },
+                "byAgent": {
+                    "colAgent": "Agent",
+                    "colCost": "Cost",
+                    "colRuns": "Runs",
+                    "colAvg": "Avg / run"
+                },
+                "topRuns": {
+                    "colCost": "Cost",
+                    "colAgent": "Agent",
+                    "colTask": "Task",
+                    "colModel": "Model",
+                    "colStarted": "Started",
+                    "colStatus": "Status",
+                    "noTask": "{trigger} run",
+                    "runHint": "Run {runId}",
+                    "empty": "No runs with settled cost in this window.",
+                    "status": {
+                        "queued": "Queued",
+                        "running": "Running",
+                        "completed": "Completed",
+                        "failed": "Failed",
+                        "cancelled": "Cancelled"
+                    }
+                },
+                "byModel": {
+                    "units": "{units} units",
+                    "total": "{total} across all models in this window"
                 }
             }
         },
@@ -6989,6 +7060,18 @@
                 "start": "إملاء صوتي",
                 "stop": "إيقاف التسجيل",
                 "transcribing": "جارٍ التفريغ…"
+            },
+            "model": {
+                "label": "النموذج",
+                "auto": "الافتراضي للمزوّد",
+                "autoHint": "استخدام النموذج المُهيّأ لهذا المزوّد",
+                "configured": "مُهيّأ",
+                "all": "كل النماذج",
+                "searchPlaceholder": "البحث في النماذج...",
+                "loading": "جارٍ تحميل النماذج...",
+                "loadError": "تعذّر تحميل النماذج",
+                "noModels": "لا توجد نماذج متاحة",
+                "context": "سياق {value}"
             }
         },
         "plugins": {

@@ -992,7 +992,7 @@
                 "terminal": "Terminal",
                 "collaborators": "Collaborators",
                 "mcpServers": "MCP Servers",
-                "capabilities": "Capabilities"
+                "capabilities": "Можливості"
             },
             "newDialog": {
                 "title": "Новий Агент",
@@ -1232,33 +1232,33 @@
                 "revert": "Revert"
             },
             "capabilities": {
-                "title": "Capabilities",
-                "subtitle": "What this agent can do — tools, skills, and bootstrap script.",
+                "title": "Можливості",
+                "subtitle": "Що вміє цей агент — інструменти, навички та стартовий скрипт.",
                 "tools": {
-                    "title": "Agent tools",
-                    "description": "Per-tool access for this agent. A more specific scope can only narrow what its ancestors allow: turning a tool off writes an agent-level deny, and a tool denied by a parent scope cannot be re-enabled from this page.",
-                    "groupBuiltin": "Built-in tools",
-                    "groupFacade": "Platform tools",
-                    "groupDomain": "Domain tools",
-                    "resetToInherited": "Reset to inherited",
-                    "inheritedDeny": "Denied by {scope}",
-                    "permissionOff": "Permission off",
-                    "patternDeny": "Denied by a pattern on this agent",
-                    "permissionHint": "Requires the \"{permission}\" permission — enable it in Settings.",
-                    "empty": "No tools available."
+                    "title": "Інструменти агента",
+                    "description": "Доступ до окремих інструментів для цього агента. Вужча область може лише обмежити те, що дозволяють вищі області: перемикання інструмента записує обмеження на рівні агента — оновлюючи його список заборон або список дозволів, якщо його задано, — а інструмент, заборонений вищою областю, не можна знову ввімкнути з цієї сторінки.",
+                    "groupBuiltin": "Вбудовані інструменти",
+                    "groupFacade": "Інструменти платформи",
+                    "groupDomain": "Доменні інструменти",
+                    "resetToInherited": "Скинути до успадкованого",
+                    "inheritedDeny": "Заборонено областю {scope}",
+                    "permissionOff": "Дозвіл вимкнено",
+                    "patternDeny": "Заборонено шаблоном цього агента",
+                    "permissionHint": "Потрібен дозвіл «{permission}» — увімкніть його в Налаштуваннях.",
+                    "empty": "Немає доступних інструментів."
                 },
                 "permissions": {
-                    "title": "Permissions",
-                    "description": "The capability switches stay editable in Settings; shown here read-only.",
-                    "edit": "Edit in Settings"
+                    "title": "Дозволи",
+                    "description": "Перемикачі можливостей залишаються редагованими в Налаштуваннях; тут вони показані лише для читання.",
+                    "edit": "Змінити в Налаштуваннях"
                 },
                 "skills": {
-                    "title": "Skills",
-                    "description": "Skills bound directly to this agent. Inherited bindings come from a parent scope and are managed there.",
-                    "attachPlaceholder": "Attach a skill…",
-                    "installAndAttach": "install & attach",
-                    "inherited": "Inherited",
-                    "empty": "No skills bound yet."
+                    "title": "Навички",
+                    "description": "Навички, прив'язані безпосередньо до цього агента. Успадковані прив'язки походять із вищої області й керуються там.",
+                    "attachPlaceholder": "Прив'язати навичку…",
+                    "installAndAttach": "встановити та прив'язати",
+                    "inherited": "Успадковано",
+                    "empty": "Навички ще не прив'язані."
                 },
                 "mcp": {
                     "title": "MCP Connections",
@@ -1289,13 +1289,13 @@
                     "saved": "Environment updated"
                 },
                 "initScript": {
-                    "title": "Init Script",
-                    "helper": "Runs at session/workspace bootstrap where the runtime supports it.",
-                    "placeholder": "#!/bin/sh\n# commands to run when a session starts…",
-                    "save": "Save",
-                    "saved": "Init script saved",
-                    "bytes": "{used} / {max} KB",
-                    "tooLong": "Init script exceeds 16 KB."
+                    "title": "Стартовий скрипт",
+                    "helper": "Виконується під час запуску сесії або робочого простору, якщо середовище виконання це підтримує.",
+                    "placeholder": "#!/bin/sh\n# команди, що виконуються на старті сесії…",
+                    "save": "Зберегти",
+                    "saved": "Стартовий скрипт збережено",
+                    "bytes": "{used} / {max} КБ",
+                    "tooLong": "Стартовий скрипт перевищує 16 КБ."
                 }
             }
         },
@@ -2682,6 +2682,15 @@
                     "enforceLabel": "Примусово використовувати цей за замовчуванням",
                     "enforceDescription": "Завжди попередньо вибирати цей конвеєр, навіть якщо робота має власний налаштований конвеєр. Ви все ще можете вручну перемикати конвеєри у формі.",
                     "saveFailed": "Не вдалося зберегти конвеєр за замовчуванням"
+                },
+                "voiceDefault": {
+                    "title": "Голосовий провайдер",
+                    "description": "Який провайдер розшифровує голосове введення з мікрофона в чаті.",
+                    "autoLabel": "Автоматично",
+                    "autoDescription": "Використовувати провайдера, активного для вашого облікового запису",
+                    "currentlyActive": "Використовується зараз",
+                    "noProviders": "Жоден із налаштованих AI-провайдерів не підтримує розпізнавання мовлення.",
+                    "saveFailed": "Не вдалося зберегти голосового провайдера"
                 }
             },
             "profile": {
@@ -3006,6 +3015,11 @@
                 "export": {
                     "csv": "Export CSV",
                     "csvHint": "Download every usage event in {period} as a CSV file"
+                },
+                "tabs": {
+                    "label": "Usage views",
+                    "overview": "Overview",
+                    "costs": "Costs"
                 }
             },
             "fleet": {
@@ -3476,6 +3490,63 @@
                     "empty": "No repositories in your registry yet.",
                     "manageLink": "Manage repositories",
                     "toggleError": "Failed to update repository attachment"
+                }
+            },
+            "costs": {
+                "title": "Costs",
+                "subtitle": "Total AI spend for the selected window, and where it went — by day, agent, model and run.",
+                "loadError": "Some cost data could not be loaded. Refresh the page to try again.",
+                "loading": "Loading…",
+                "empty": "No spend in this window.",
+                "cacheHitNote": "Cache-hit rate is not shown: the metering path does not record cached-read tokens yet.",
+                "window": {
+                    "label": "Reporting window",
+                    "days": "{days}d"
+                },
+                "tiles": {
+                    "total": "Total spend",
+                    "runs": "Agent runs",
+                    "avgPerRun": "Average per run"
+                },
+                "panels": {
+                    "daily": "Spend per day, by agent",
+                    "byAgent": "By agent",
+                    "byModel": "By model",
+                    "topRuns": "Most expensive runs"
+                },
+                "series": {
+                    "other": "Other agents",
+                    "unattributed": "Unattributed",
+                    "unknownAgent": "Deleted agent",
+                    "noModel": "No model"
+                },
+                "byAgent": {
+                    "colAgent": "Agent",
+                    "colCost": "Cost",
+                    "colRuns": "Runs",
+                    "colAvg": "Avg / run"
+                },
+                "topRuns": {
+                    "colCost": "Cost",
+                    "colAgent": "Agent",
+                    "colTask": "Task",
+                    "colModel": "Model",
+                    "colStarted": "Started",
+                    "colStatus": "Status",
+                    "noTask": "{trigger} run",
+                    "runHint": "Run {runId}",
+                    "empty": "No runs with settled cost in this window.",
+                    "status": {
+                        "queued": "Queued",
+                        "running": "Running",
+                        "completed": "Completed",
+                        "failed": "Failed",
+                        "cancelled": "Cancelled"
+                    }
+                },
+                "byModel": {
+                    "units": "{units} units",
+                    "total": "{total} across all models in this window"
                 }
             }
         },
@@ -6922,6 +6993,18 @@
                 "start": "Диктувати",
                 "stop": "Зупинити запис",
                 "transcribing": "Розшифрування…"
+            },
+            "model": {
+                "label": "Модель",
+                "auto": "Типова для провайдера",
+                "autoHint": "Використовувати модель, налаштовану для цього провайдера",
+                "configured": "Налаштовані",
+                "all": "Усі моделі",
+                "searchPlaceholder": "Пошук моделей...",
+                "loading": "Завантаження моделей...",
+                "loadError": "Не вдалося завантажити моделі",
+                "noModels": "Немає доступних моделей",
+                "context": "контекст {value}"
             }
         },
         "plugins": {

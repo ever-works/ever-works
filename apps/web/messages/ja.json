@@ -992,7 +992,7 @@
                 "terminal": "Terminal",
                 "collaborators": "Collaborators",
                 "mcpServers": "MCP Servers",
-                "capabilities": "Capabilities"
+                "capabilities": "機能"
             },
             "newDialog": {
                 "title": "新しいエージェント",
@@ -1232,33 +1232,33 @@
                 "revert": "Revert"
             },
             "capabilities": {
-                "title": "Capabilities",
-                "subtitle": "What this agent can do — tools, skills, and bootstrap script.",
+                "title": "機能",
+                "subtitle": "このエージェントにできること — ツール、スキル、初期化スクリプト。",
                 "tools": {
-                    "title": "Agent tools",
-                    "description": "Per-tool access for this agent. A more specific scope can only narrow what its ancestors allow: turning a tool off writes an agent-level deny, and a tool denied by a parent scope cannot be re-enabled from this page.",
-                    "groupBuiltin": "Built-in tools",
-                    "groupFacade": "Platform tools",
-                    "groupDomain": "Domain tools",
-                    "resetToInherited": "Reset to inherited",
-                    "inheritedDeny": "Denied by {scope}",
-                    "permissionOff": "Permission off",
-                    "patternDeny": "Denied by a pattern on this agent",
-                    "permissionHint": "Requires the \"{permission}\" permission — enable it in Settings.",
-                    "empty": "No tools available."
+                    "title": "エージェントのツール",
+                    "description": "このエージェントのツール単位のアクセス権です。より具体的なスコープは、上位スコープが許可する範囲を狭めることしかできません。ツールを切り替えるとエージェントレベルの制限が記録され、このエージェントの拒否リスト、または許可リストが設定されている場合はそちらが更新されます。上位スコープで拒否されたツールは、このページから再度有効にはできません。",
+                    "groupBuiltin": "組み込みツール",
+                    "groupFacade": "プラットフォームツール",
+                    "groupDomain": "ドメインツール",
+                    "resetToInherited": "継承された設定に戻す",
+                    "inheritedDeny": "{scope} により拒否",
+                    "permissionOff": "権限がオフ",
+                    "patternDeny": "このエージェントのパターンにより拒否",
+                    "permissionHint": "「{permission}」権限が必要です — 設定で有効にしてください。",
+                    "empty": "利用できるツールがありません。"
                 },
                 "permissions": {
-                    "title": "Permissions",
-                    "description": "The capability switches stay editable in Settings; shown here read-only.",
-                    "edit": "Edit in Settings"
+                    "title": "権限",
+                    "description": "機能のスイッチは設定で変更できます。ここでは読み取り専用で表示しています。",
+                    "edit": "設定で編集"
                 },
                 "skills": {
-                    "title": "Skills",
-                    "description": "Skills bound directly to this agent. Inherited bindings come from a parent scope and are managed there.",
-                    "attachPlaceholder": "Attach a skill…",
-                    "installAndAttach": "install & attach",
-                    "inherited": "Inherited",
-                    "empty": "No skills bound yet."
+                    "title": "スキル",
+                    "description": "このエージェントに直接バインドされたスキルです。継承されたバインドは上位スコープに由来し、そちらで管理します。",
+                    "attachPlaceholder": "スキルを追加…",
+                    "installAndAttach": "インストールして追加",
+                    "inherited": "継承",
+                    "empty": "バインドされたスキルはまだありません。"
                 },
                 "mcp": {
                     "title": "MCP Connections",
@@ -1289,13 +1289,13 @@
                     "saved": "Environment updated"
                 },
                 "initScript": {
-                    "title": "Init Script",
-                    "helper": "Runs at session/workspace bootstrap where the runtime supports it.",
-                    "placeholder": "#!/bin/sh\n# commands to run when a session starts…",
-                    "save": "Save",
-                    "saved": "Init script saved",
+                    "title": "初期化スクリプト",
+                    "helper": "ランタイムが対応している場合、セッション／ワークスペースの起動時に実行されます。",
+                    "placeholder": "#!/bin/sh\n# セッション開始時に実行するコマンド…",
+                    "save": "保存",
+                    "saved": "初期化スクリプトを保存しました",
                     "bytes": "{used} / {max} KB",
-                    "tooLong": "Init script exceeds 16 KB."
+                    "tooLong": "初期化スクリプトが 16 KB を超えています。"
                 }
             }
         },
@@ -2682,6 +2682,15 @@
                     "enforceLabel": "このデフォルトを強制",
                     "enforceDescription": "ワークに独自のパイプラインが設定されていても、このパイプラインを常に事前選択します。フォームで手動でパイプラインを切り替えることは可能です。",
                     "saveFailed": "デフォルト パイプラインの保存に失敗しました"
+                },
+                "voiceDefault": {
+                    "title": "音声プロバイダー",
+                    "description": "チャットのマイクからの音声入力を文字起こしするプロバイダーです。",
+                    "autoLabel": "自動",
+                    "autoDescription": "アカウントで有効なプロバイダーを使用します",
+                    "currentlyActive": "現在使用中",
+                    "noProviders": "設定済みの AI プロバイダーはいずれも音声文字起こしに対応していません。",
+                    "saveFailed": "音声プロバイダーを保存できませんでした"
                 }
             },
             "profile": {
@@ -3006,6 +3015,11 @@
                 "export": {
                     "csv": "Export CSV",
                     "csvHint": "Download every usage event in {period} as a CSV file"
+                },
+                "tabs": {
+                    "label": "Usage views",
+                    "overview": "Overview",
+                    "costs": "Costs"
                 }
             },
             "fleet": {
@@ -3476,6 +3490,63 @@
                     "empty": "No repositories in your registry yet.",
                     "manageLink": "Manage repositories",
                     "toggleError": "Failed to update repository attachment"
+                }
+            },
+            "costs": {
+                "title": "Costs",
+                "subtitle": "Total AI spend for the selected window, and where it went — by day, agent, model and run.",
+                "loadError": "Some cost data could not be loaded. Refresh the page to try again.",
+                "loading": "Loading…",
+                "empty": "No spend in this window.",
+                "cacheHitNote": "Cache-hit rate is not shown: the metering path does not record cached-read tokens yet.",
+                "window": {
+                    "label": "Reporting window",
+                    "days": "{days}d"
+                },
+                "tiles": {
+                    "total": "Total spend",
+                    "runs": "Agent runs",
+                    "avgPerRun": "Average per run"
+                },
+                "panels": {
+                    "daily": "Spend per day, by agent",
+                    "byAgent": "By agent",
+                    "byModel": "By model",
+                    "topRuns": "Most expensive runs"
+                },
+                "series": {
+                    "other": "Other agents",
+                    "unattributed": "Unattributed",
+                    "unknownAgent": "Deleted agent",
+                    "noModel": "No model"
+                },
+                "byAgent": {
+                    "colAgent": "Agent",
+                    "colCost": "Cost",
+                    "colRuns": "Runs",
+                    "colAvg": "Avg / run"
+                },
+                "topRuns": {
+                    "colCost": "Cost",
+                    "colAgent": "Agent",
+                    "colTask": "Task",
+                    "colModel": "Model",
+                    "colStarted": "Started",
+                    "colStatus": "Status",
+                    "noTask": "{trigger} run",
+                    "runHint": "Run {runId}",
+                    "empty": "No runs with settled cost in this window.",
+                    "status": {
+                        "queued": "Queued",
+                        "running": "Running",
+                        "completed": "Completed",
+                        "failed": "Failed",
+                        "cancelled": "Cancelled"
+                    }
+                },
+                "byModel": {
+                    "units": "{units} units",
+                    "total": "{total} across all models in this window"
                 }
             }
         },
@@ -6922,6 +6993,18 @@
                 "start": "音声入力",
                 "stop": "録音を停止",
                 "transcribing": "文字起こし中…"
+            },
+            "model": {
+                "label": "モデル",
+                "auto": "プロバイダーの既定",
+                "autoHint": "このプロバイダーに設定されたモデルを使用します",
+                "configured": "設定済み",
+                "all": "すべてのモデル",
+                "searchPlaceholder": "モデルを検索...",
+                "loading": "モデルを読み込み中...",
+                "loadError": "モデルを読み込めませんでした",
+                "noModels": "利用できるモデルがありません",
+                "context": "コンテキスト {value}"
             }
         },
         "plugins": {

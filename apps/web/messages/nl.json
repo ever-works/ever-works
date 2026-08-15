@@ -992,7 +992,7 @@
                 "terminal": "Terminal",
                 "collaborators": "Collaborators",
                 "mcpServers": "MCP Servers",
-                "capabilities": "Capabilities"
+                "capabilities": "Mogelijkheden"
             },
             "newDialog": {
                 "title": "Nieuwe Agent",
@@ -1232,33 +1232,33 @@
                 "revert": "Revert"
             },
             "capabilities": {
-                "title": "Capabilities",
-                "subtitle": "What this agent can do — tools, skills, and bootstrap script.",
+                "title": "Mogelijkheden",
+                "subtitle": "Wat deze agent kan — tools, vaardigheden en opstartscript.",
                 "tools": {
-                    "title": "Agent tools",
-                    "description": "Per-tool access for this agent. A more specific scope can only narrow what its ancestors allow: turning a tool off writes an agent-level deny, and a tool denied by a parent scope cannot be re-enabled from this page.",
-                    "groupBuiltin": "Built-in tools",
-                    "groupFacade": "Platform tools",
-                    "groupDomain": "Domain tools",
-                    "resetToInherited": "Reset to inherited",
-                    "inheritedDeny": "Denied by {scope}",
-                    "permissionOff": "Permission off",
-                    "patternDeny": "Denied by a pattern on this agent",
-                    "permissionHint": "Requires the \"{permission}\" permission — enable it in Settings.",
-                    "empty": "No tools available."
+                    "title": "Agenttools",
+                    "description": "Toegang per tool voor deze agent. Een specifieker bereik kan alleen beperken wat de bovenliggende bereiken toestaan: het omzetten van een tool legt een beperking op agentniveau vast — de weigerlijst van deze agent wordt bijgewerkt, of zijn toestaanlijst als die is ingesteld — en een tool die door een bovenliggend bereik is geweigerd, kan op deze pagina niet opnieuw worden ingeschakeld.",
+                    "groupBuiltin": "Ingebouwde tools",
+                    "groupFacade": "Platformtools",
+                    "groupDomain": "Domeintools",
+                    "resetToInherited": "Terugzetten naar overgeërfd",
+                    "inheritedDeny": "Geweigerd door {scope}",
+                    "permissionOff": "Machtiging uit",
+                    "patternDeny": "Geweigerd door een patroon op deze agent",
+                    "permissionHint": "Vereist de machtiging ‘{permission}’ — schakel die in bij Instellingen.",
+                    "empty": "Geen tools beschikbaar."
                 },
                 "permissions": {
-                    "title": "Permissions",
-                    "description": "The capability switches stay editable in Settings; shown here read-only.",
-                    "edit": "Edit in Settings"
+                    "title": "Machtigingen",
+                    "description": "De schakelaars voor mogelijkheden blijven bewerkbaar in Instellingen; hier worden ze alleen-lezen getoond.",
+                    "edit": "Bewerken in Instellingen"
                 },
                 "skills": {
-                    "title": "Skills",
-                    "description": "Skills bound directly to this agent. Inherited bindings come from a parent scope and are managed there.",
-                    "attachPlaceholder": "Attach a skill…",
-                    "installAndAttach": "install & attach",
-                    "inherited": "Inherited",
-                    "empty": "No skills bound yet."
+                    "title": "Vaardigheden",
+                    "description": "Vaardigheden die rechtstreeks aan deze agent zijn gekoppeld. Overgeërfde koppelingen komen uit een bovenliggend bereik en worden daar beheerd.",
+                    "attachPlaceholder": "Een vaardigheid koppelen…",
+                    "installAndAttach": "installeren & koppelen",
+                    "inherited": "Overgeërfd",
+                    "empty": "Nog geen vaardigheden gekoppeld."
                 },
                 "mcp": {
                     "title": "MCP Connections",
@@ -1289,13 +1289,13 @@
                     "saved": "Environment updated"
                 },
                 "initScript": {
-                    "title": "Init Script",
-                    "helper": "Runs at session/workspace bootstrap where the runtime supports it.",
-                    "placeholder": "#!/bin/sh\n# commands to run when a session starts…",
-                    "save": "Save",
-                    "saved": "Init script saved",
+                    "title": "Initialisatiescript",
+                    "helper": "Wordt uitgevoerd bij het opstarten van de sessie of werkruimte, waar de runtime dit ondersteunt.",
+                    "placeholder": "#!/bin/sh\n# opdrachten die bij het starten van een sessie worden uitgevoerd…",
+                    "save": "Opslaan",
+                    "saved": "Initialisatiescript opgeslagen",
                     "bytes": "{used} / {max} KB",
-                    "tooLong": "Init script exceeds 16 KB."
+                    "tooLong": "Het initialisatiescript is groter dan 16 KB."
                 }
             }
         },
@@ -2682,6 +2682,15 @@
                     "enforceLabel": "Deze standaard afdwingen",
                     "enforceDescription": "Selecteer altijd deze pipeline vooraf, zelfs als een werk zijn eigen pipeline heeft geconfigureerd. Je kunt pipelines nog steeds handmatig wisselen in het formulier.",
                     "saveFailed": "Kon standaardpipeline niet opslaan"
+                },
+                "voiceDefault": {
+                    "title": "Spraakprovider",
+                    "description": "Welke provider spraakdictaat van de chatmicrofoon transcribeert.",
+                    "autoLabel": "Automatisch",
+                    "autoDescription": "Gebruik de provider die actief is voor je account",
+                    "currentlyActive": "Momenteel in gebruik",
+                    "noProviders": "Geen van je geconfigureerde AI-providers ondersteunt spraaktranscriptie.",
+                    "saveFailed": "Spraakprovider kon niet worden opgeslagen"
                 }
             },
             "profile": {
@@ -3006,6 +3015,11 @@
                 "export": {
                     "csv": "Export CSV",
                     "csvHint": "Download every usage event in {period} as a CSV file"
+                },
+                "tabs": {
+                    "label": "Usage views",
+                    "overview": "Overview",
+                    "costs": "Costs"
                 }
             },
             "fleet": {
@@ -3476,6 +3490,63 @@
                     "empty": "No repositories in your registry yet.",
                     "manageLink": "Manage repositories",
                     "toggleError": "Failed to update repository attachment"
+                }
+            },
+            "costs": {
+                "title": "Costs",
+                "subtitle": "Total AI spend for the selected window, and where it went — by day, agent, model and run.",
+                "loadError": "Some cost data could not be loaded. Refresh the page to try again.",
+                "loading": "Loading…",
+                "empty": "No spend in this window.",
+                "cacheHitNote": "Cache-hit rate is not shown: the metering path does not record cached-read tokens yet.",
+                "window": {
+                    "label": "Reporting window",
+                    "days": "{days}d"
+                },
+                "tiles": {
+                    "total": "Total spend",
+                    "runs": "Agent runs",
+                    "avgPerRun": "Average per run"
+                },
+                "panels": {
+                    "daily": "Spend per day, by agent",
+                    "byAgent": "By agent",
+                    "byModel": "By model",
+                    "topRuns": "Most expensive runs"
+                },
+                "series": {
+                    "other": "Other agents",
+                    "unattributed": "Unattributed",
+                    "unknownAgent": "Deleted agent",
+                    "noModel": "No model"
+                },
+                "byAgent": {
+                    "colAgent": "Agent",
+                    "colCost": "Cost",
+                    "colRuns": "Runs",
+                    "colAvg": "Avg / run"
+                },
+                "topRuns": {
+                    "colCost": "Cost",
+                    "colAgent": "Agent",
+                    "colTask": "Task",
+                    "colModel": "Model",
+                    "colStarted": "Started",
+                    "colStatus": "Status",
+                    "noTask": "{trigger} run",
+                    "runHint": "Run {runId}",
+                    "empty": "No runs with settled cost in this window.",
+                    "status": {
+                        "queued": "Queued",
+                        "running": "Running",
+                        "completed": "Completed",
+                        "failed": "Failed",
+                        "cancelled": "Cancelled"
+                    }
+                },
+                "byModel": {
+                    "units": "{units} units",
+                    "total": "{total} across all models in this window"
                 }
             }
         },
@@ -6922,6 +6993,18 @@
                 "start": "Dicteren",
                 "stop": "Opname stoppen",
                 "transcribing": "Transcriberen…"
+            },
+            "model": {
+                "label": "Model",
+                "auto": "Standaard van provider",
+                "autoHint": "Gebruik het model dat voor deze provider is ingesteld",
+                "configured": "Geconfigureerd",
+                "all": "Alle modellen",
+                "searchPlaceholder": "Modellen zoeken...",
+                "loading": "Modellen laden...",
+                "loadError": "Modellen konden niet worden geladen",
+                "noModels": "Geen modellen beschikbaar",
+                "context": "{value} context"
             }
         },
         "plugins": {

@@ -992,7 +992,7 @@
                 "terminal": "Terminal",
                 "collaborators": "Collaborators",
                 "mcpServers": "MCP Servers",
-                "capabilities": "Capabilities"
+                "capabilities": "ความสามารถ"
             },
             "newDialog": {
                 "title": "เอเจนต์ใหม่",
@@ -1232,33 +1232,33 @@
                 "revert": "Revert"
             },
             "capabilities": {
-                "title": "Capabilities",
-                "subtitle": "What this agent can do — tools, skills, and bootstrap script.",
+                "title": "ความสามารถ",
+                "subtitle": "สิ่งที่เอเจนต์นี้ทำได้ — เครื่องมือ ทักษะ และสคริปต์เริ่มต้น",
                 "tools": {
-                    "title": "Agent tools",
-                    "description": "Per-tool access for this agent. A more specific scope can only narrow what its ancestors allow: turning a tool off writes an agent-level deny, and a tool denied by a parent scope cannot be re-enabled from this page.",
-                    "groupBuiltin": "Built-in tools",
-                    "groupFacade": "Platform tools",
-                    "groupDomain": "Domain tools",
-                    "resetToInherited": "Reset to inherited",
-                    "inheritedDeny": "Denied by {scope}",
-                    "permissionOff": "Permission off",
-                    "patternDeny": "Denied by a pattern on this agent",
-                    "permissionHint": "Requires the \"{permission}\" permission — enable it in Settings.",
-                    "empty": "No tools available."
+                    "title": "เครื่องมือของเอเจนต์",
+                    "description": "สิทธิ์การเข้าถึงรายเครื่องมือสำหรับเอเจนต์นี้ ขอบเขตที่เจาะจงกว่าทำได้เพียงจำกัดสิ่งที่ขอบเขตเหนือกว่าอนุญาตไว้เท่านั้น การสลับเปิดปิดเครื่องมือจะบันทึกข้อจำกัดในระดับเอเจนต์ โดยอัปเดตรายการปฏิเสธของเอเจนต์นี้ หรือรายการอนุญาตหากมีการตั้งค่าไว้ และเครื่องมือที่ถูกปฏิเสธโดยขอบเขตเหนือกว่าจะไม่สามารถเปิดใช้งานใหม่จากหน้านี้ได้",
+                    "groupBuiltin": "เครื่องมือในตัว",
+                    "groupFacade": "เครื่องมือของแพลตฟอร์ม",
+                    "groupDomain": "เครื่องมือเฉพาะโดเมน",
+                    "resetToInherited": "รีเซ็ตเป็นค่าที่สืบทอด",
+                    "inheritedDeny": "ถูกปฏิเสธโดย {scope}",
+                    "permissionOff": "สิทธิ์ปิดอยู่",
+                    "patternDeny": "ถูกปฏิเสธโดยรูปแบบบนเอเจนต์นี้",
+                    "permissionHint": "ต้องใช้สิทธิ์ “{permission}” — เปิดใช้งานได้ที่การตั้งค่า",
+                    "empty": "ไม่มีเครื่องมือที่ใช้ได้"
                 },
                 "permissions": {
-                    "title": "Permissions",
-                    "description": "The capability switches stay editable in Settings; shown here read-only.",
-                    "edit": "Edit in Settings"
+                    "title": "สิทธิ์",
+                    "description": "สวิตช์ความสามารถยังแก้ไขได้ที่การตั้งค่า ที่นี่แสดงแบบอ่านอย่างเดียว",
+                    "edit": "แก้ไขในการตั้งค่า"
                 },
                 "skills": {
-                    "title": "Skills",
-                    "description": "Skills bound directly to this agent. Inherited bindings come from a parent scope and are managed there.",
-                    "attachPlaceholder": "Attach a skill…",
-                    "installAndAttach": "install & attach",
-                    "inherited": "Inherited",
-                    "empty": "No skills bound yet."
+                    "title": "ทักษะ",
+                    "description": "ทักษะที่ผูกกับเอเจนต์นี้โดยตรง การผูกที่สืบทอดมาจากขอบเขตเหนือกว่าและจัดการได้ที่นั่น",
+                    "attachPlaceholder": "แนบทักษะ…",
+                    "installAndAttach": "ติดตั้งและแนบ",
+                    "inherited": "สืบทอด",
+                    "empty": "ยังไม่มีทักษะที่ผูกไว้"
                 },
                 "mcp": {
                     "title": "MCP Connections",
@@ -1289,13 +1289,13 @@
                     "saved": "Environment updated"
                 },
                 "initScript": {
-                    "title": "Init Script",
-                    "helper": "Runs at session/workspace bootstrap where the runtime supports it.",
-                    "placeholder": "#!/bin/sh\n# commands to run when a session starts…",
-                    "save": "Save",
-                    "saved": "Init script saved",
+                    "title": "สคริปต์เริ่มต้น",
+                    "helper": "ทำงานตอนเริ่มเซสชัน/พื้นที่ทำงาน หากรันไทม์รองรับ",
+                    "placeholder": "#!/bin/sh\n# คำสั่งที่จะทำงานเมื่อเริ่มเซสชัน…",
+                    "save": "บันทึก",
+                    "saved": "บันทึกสคริปต์เริ่มต้นแล้ว",
                     "bytes": "{used} / {max} KB",
-                    "tooLong": "Init script exceeds 16 KB."
+                    "tooLong": "สคริปต์เริ่มต้นเกิน 16 KB"
                 }
             }
         },
@@ -2682,6 +2682,15 @@
                     "enforceLabel": "บังคับใช้ค่าเริ่มต้นนี้",
                     "enforceDescription": "เลือก pipeline นี้ล่วงหน้าสม่ำเสมอ แม้ว่างานจะมี pipeline ของตัวเอง คุณยังสามารถสลับ pipeline ด้วยตัวเองในฟอร์มได้",
                     "saveFailed": "ล้มเหลวในการบันทึก pipeline เริ่มต้น"
+                },
+                "voiceDefault": {
+                    "title": "ผู้ให้บริการเสียง",
+                    "description": "ผู้ให้บริการที่ถอดเสียงจากไมโครโฟนในแชทเป็นข้อความ",
+                    "autoLabel": "อัตโนมัติ",
+                    "autoDescription": "ใช้ผู้ให้บริการที่เปิดใช้งานอยู่สำหรับบัญชีของคุณ",
+                    "currentlyActive": "กำลังใช้งานอยู่",
+                    "noProviders": "ไม่มีผู้ให้บริการ AI ที่ตั้งค่าไว้รองรับการถอดเสียง",
+                    "saveFailed": "ไม่สามารถบันทึกผู้ให้บริการเสียงได้"
                 }
             },
             "profile": {
@@ -3006,6 +3015,11 @@
                 "export": {
                     "csv": "Export CSV",
                     "csvHint": "Download every usage event in {period} as a CSV file"
+                },
+                "tabs": {
+                    "label": "Usage views",
+                    "overview": "Overview",
+                    "costs": "Costs"
                 }
             },
             "fleet": {
@@ -3476,6 +3490,63 @@
                     "empty": "No repositories in your registry yet.",
                     "manageLink": "Manage repositories",
                     "toggleError": "Failed to update repository attachment"
+                }
+            },
+            "costs": {
+                "title": "Costs",
+                "subtitle": "Total AI spend for the selected window, and where it went — by day, agent, model and run.",
+                "loadError": "Some cost data could not be loaded. Refresh the page to try again.",
+                "loading": "Loading…",
+                "empty": "No spend in this window.",
+                "cacheHitNote": "Cache-hit rate is not shown: the metering path does not record cached-read tokens yet.",
+                "window": {
+                    "label": "Reporting window",
+                    "days": "{days}d"
+                },
+                "tiles": {
+                    "total": "Total spend",
+                    "runs": "Agent runs",
+                    "avgPerRun": "Average per run"
+                },
+                "panels": {
+                    "daily": "Spend per day, by agent",
+                    "byAgent": "By agent",
+                    "byModel": "By model",
+                    "topRuns": "Most expensive runs"
+                },
+                "series": {
+                    "other": "Other agents",
+                    "unattributed": "Unattributed",
+                    "unknownAgent": "Deleted agent",
+                    "noModel": "No model"
+                },
+                "byAgent": {
+                    "colAgent": "Agent",
+                    "colCost": "Cost",
+                    "colRuns": "Runs",
+                    "colAvg": "Avg / run"
+                },
+                "topRuns": {
+                    "colCost": "Cost",
+                    "colAgent": "Agent",
+                    "colTask": "Task",
+                    "colModel": "Model",
+                    "colStarted": "Started",
+                    "colStatus": "Status",
+                    "noTask": "{trigger} run",
+                    "runHint": "Run {runId}",
+                    "empty": "No runs with settled cost in this window.",
+                    "status": {
+                        "queued": "Queued",
+                        "running": "Running",
+                        "completed": "Completed",
+                        "failed": "Failed",
+                        "cancelled": "Cancelled"
+                    }
+                },
+                "byModel": {
+                    "units": "{units} units",
+                    "total": "{total} across all models in this window"
                 }
             }
         },
@@ -6922,6 +6993,18 @@
                 "start": "พูดเพื่อพิมพ์",
                 "stop": "หยุดบันทึก",
                 "transcribing": "กำลังถอดความ…"
+            },
+            "model": {
+                "label": "โมเดล",
+                "auto": "ค่าเริ่มต้นของผู้ให้บริการ",
+                "autoHint": "ใช้โมเดลที่ตั้งค่าไว้สำหรับผู้ให้บริการนี้",
+                "configured": "ที่ตั้งค่าไว้",
+                "all": "โมเดลทั้งหมด",
+                "searchPlaceholder": "ค้นหาโมเดล...",
+                "loading": "กำลังโหลดโมเดล...",
+                "loadError": "ไม่สามารถโหลดโมเดลได้",
+                "noModels": "ไม่มีโมเดลที่ใช้ได้",
+                "context": "บริบท {value}"
             }
         },
         "plugins": {

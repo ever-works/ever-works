@@ -992,7 +992,7 @@
                 "terminal": "Terminal",
                 "collaborators": "Collaborators",
                 "mcpServers": "MCP Servers",
-                "capabilities": "Capabilities"
+                "capabilities": "Capacità"
             },
             "newDialog": {
                 "title": "Nuovo Agente",
@@ -1232,33 +1232,33 @@
                 "revert": "Revert"
             },
             "capabilities": {
-                "title": "Capabilities",
-                "subtitle": "What this agent can do — tools, skills, and bootstrap script.",
+                "title": "Capacità",
+                "subtitle": "Cosa può fare questo agente: strumenti, competenze e script di avvio.",
                 "tools": {
-                    "title": "Agent tools",
-                    "description": "Per-tool access for this agent. A more specific scope can only narrow what its ancestors allow: turning a tool off writes an agent-level deny, and a tool denied by a parent scope cannot be re-enabled from this page.",
-                    "groupBuiltin": "Built-in tools",
-                    "groupFacade": "Platform tools",
-                    "groupDomain": "Domain tools",
-                    "resetToInherited": "Reset to inherited",
-                    "inheritedDeny": "Denied by {scope}",
-                    "permissionOff": "Permission off",
-                    "patternDeny": "Denied by a pattern on this agent",
-                    "permissionHint": "Requires the \"{permission}\" permission — enable it in Settings.",
-                    "empty": "No tools available."
+                    "title": "Strumenti dell'agente",
+                    "description": "Accesso per singolo strumento per questo agente. Un ambito più specifico può solo restringere ciò che consentono gli ambiti superiori: attivare o disattivare uno strumento registra una restrizione a livello di agente — aggiornando l'elenco dei divieti dell'agente, oppure il suo elenco di permessi se ne è impostato uno — e uno strumento vietato da un ambito superiore non può essere riabilitato da questa pagina.",
+                    "groupBuiltin": "Strumenti integrati",
+                    "groupFacade": "Strumenti della piattaforma",
+                    "groupDomain": "Strumenti di dominio",
+                    "resetToInherited": "Ripristina al valore ereditato",
+                    "inheritedDeny": "Vietato da {scope}",
+                    "permissionOff": "Autorizzazione disattivata",
+                    "patternDeny": "Vietato da un pattern su questo agente",
+                    "permissionHint": "Richiede l'autorizzazione «{permission}»: attivala in Impostazioni.",
+                    "empty": "Nessuno strumento disponibile."
                 },
                 "permissions": {
-                    "title": "Permissions",
-                    "description": "The capability switches stay editable in Settings; shown here read-only.",
-                    "edit": "Edit in Settings"
+                    "title": "Autorizzazioni",
+                    "description": "Gli interruttori delle capacità restano modificabili in Impostazioni; qui sono mostrati in sola lettura.",
+                    "edit": "Modifica in Impostazioni"
                 },
                 "skills": {
-                    "title": "Skills",
-                    "description": "Skills bound directly to this agent. Inherited bindings come from a parent scope and are managed there.",
-                    "attachPlaceholder": "Attach a skill…",
-                    "installAndAttach": "install & attach",
-                    "inherited": "Inherited",
-                    "empty": "No skills bound yet."
+                    "title": "Competenze",
+                    "description": "Competenze associate direttamente a questo agente. Le associazioni ereditate provengono da un ambito superiore e si gestiscono lì.",
+                    "attachPlaceholder": "Associa una competenza…",
+                    "installAndAttach": "installa e associa",
+                    "inherited": "Ereditata",
+                    "empty": "Nessuna competenza ancora associata."
                 },
                 "mcp": {
                     "title": "MCP Connections",
@@ -1289,13 +1289,13 @@
                     "saved": "Environment updated"
                 },
                 "initScript": {
-                    "title": "Init Script",
-                    "helper": "Runs at session/workspace bootstrap where the runtime supports it.",
-                    "placeholder": "#!/bin/sh\n# commands to run when a session starts…",
-                    "save": "Save",
-                    "saved": "Init script saved",
+                    "title": "Script di inizializzazione",
+                    "helper": "Viene eseguito all'avvio della sessione o dello spazio di lavoro, dove il runtime lo supporta.",
+                    "placeholder": "#!/bin/sh\n# comandi da eseguire all'avvio di una sessione…",
+                    "save": "Salva",
+                    "saved": "Script di inizializzazione salvato",
                     "bytes": "{used} / {max} KB",
-                    "tooLong": "Init script exceeds 16 KB."
+                    "tooLong": "Lo script di inizializzazione supera i 16 KB."
                 }
             }
         },
@@ -2682,6 +2682,15 @@
                     "enforceLabel": "Impone questa predefinita",
                     "enforceDescription": "Seleziona sempre questa pipeline in anticipo, anche quando una lavori ha la sua pipeline configurata. Puoi comunque cambiare pipeline manualmente nel form.",
                     "saveFailed": "Errore nel salvataggio della pipeline predefinita"
+                },
+                "voiceDefault": {
+                    "title": "Provider vocale",
+                    "description": "Quale provider trascrive la dettatura vocale dal microfono della chat.",
+                    "autoLabel": "Automatico",
+                    "autoDescription": "Usa il provider attivo per il tuo account",
+                    "currentlyActive": "Attualmente in uso",
+                    "noProviders": "Nessuno dei tuoi provider IA configurati supporta la trascrizione vocale.",
+                    "saveFailed": "Impossibile salvare il provider vocale"
                 }
             },
             "profile": {
@@ -3006,6 +3015,11 @@
                 "export": {
                     "csv": "Export CSV",
                     "csvHint": "Download every usage event in {period} as a CSV file"
+                },
+                "tabs": {
+                    "label": "Usage views",
+                    "overview": "Overview",
+                    "costs": "Costs"
                 }
             },
             "fleet": {
@@ -3476,6 +3490,63 @@
                     "empty": "No repositories in your registry yet.",
                     "manageLink": "Manage repositories",
                     "toggleError": "Failed to update repository attachment"
+                }
+            },
+            "costs": {
+                "title": "Costs",
+                "subtitle": "Total AI spend for the selected window, and where it went — by day, agent, model and run.",
+                "loadError": "Some cost data could not be loaded. Refresh the page to try again.",
+                "loading": "Loading…",
+                "empty": "No spend in this window.",
+                "cacheHitNote": "Cache-hit rate is not shown: the metering path does not record cached-read tokens yet.",
+                "window": {
+                    "label": "Reporting window",
+                    "days": "{days}d"
+                },
+                "tiles": {
+                    "total": "Total spend",
+                    "runs": "Agent runs",
+                    "avgPerRun": "Average per run"
+                },
+                "panels": {
+                    "daily": "Spend per day, by agent",
+                    "byAgent": "By agent",
+                    "byModel": "By model",
+                    "topRuns": "Most expensive runs"
+                },
+                "series": {
+                    "other": "Other agents",
+                    "unattributed": "Unattributed",
+                    "unknownAgent": "Deleted agent",
+                    "noModel": "No model"
+                },
+                "byAgent": {
+                    "colAgent": "Agent",
+                    "colCost": "Cost",
+                    "colRuns": "Runs",
+                    "colAvg": "Avg / run"
+                },
+                "topRuns": {
+                    "colCost": "Cost",
+                    "colAgent": "Agent",
+                    "colTask": "Task",
+                    "colModel": "Model",
+                    "colStarted": "Started",
+                    "colStatus": "Status",
+                    "noTask": "{trigger} run",
+                    "runHint": "Run {runId}",
+                    "empty": "No runs with settled cost in this window.",
+                    "status": {
+                        "queued": "Queued",
+                        "running": "Running",
+                        "completed": "Completed",
+                        "failed": "Failed",
+                        "cancelled": "Cancelled"
+                    }
+                },
+                "byModel": {
+                    "units": "{units} units",
+                    "total": "{total} across all models in this window"
                 }
             }
         },
@@ -6922,6 +6993,18 @@
                 "start": "Detta",
                 "stop": "Interrompi registrazione",
                 "transcribing": "Trascrizione…"
+            },
+            "model": {
+                "label": "Modello",
+                "auto": "Predefinito del provider",
+                "autoHint": "Usa il modello configurato per questo provider",
+                "configured": "Configurati",
+                "all": "Tutti i modelli",
+                "searchPlaceholder": "Cerca modelli...",
+                "loading": "Caricamento modelli...",
+                "loadError": "Impossibile caricare i modelli",
+                "noModels": "Nessun modello disponibile",
+                "context": "contesto {value}"
             }
         },
         "plugins": {

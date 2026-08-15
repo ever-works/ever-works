@@ -992,7 +992,7 @@
                 "terminal": "Terminal",
                 "collaborators": "Collaborators",
                 "mcpServers": "MCP Servers",
-                "capabilities": "Capabilities"
+                "capabilities": "能力"
             },
             "newDialog": {
                 "title": "新代理",
@@ -1232,33 +1232,33 @@
                 "revert": "Revert"
             },
             "capabilities": {
-                "title": "Capabilities",
-                "subtitle": "What this agent can do — tools, skills, and bootstrap script.",
+                "title": "能力",
+                "subtitle": "此代理可以做什么——工具、技能和启动脚本。",
                 "tools": {
-                    "title": "Agent tools",
-                    "description": "Per-tool access for this agent. A more specific scope can only narrow what its ancestors allow: turning a tool off writes an agent-level deny, and a tool denied by a parent scope cannot be re-enabled from this page.",
-                    "groupBuiltin": "Built-in tools",
-                    "groupFacade": "Platform tools",
-                    "groupDomain": "Domain tools",
-                    "resetToInherited": "Reset to inherited",
-                    "inheritedDeny": "Denied by {scope}",
-                    "permissionOff": "Permission off",
-                    "patternDeny": "Denied by a pattern on this agent",
-                    "permissionHint": "Requires the \"{permission}\" permission — enable it in Settings.",
-                    "empty": "No tools available."
+                    "title": "代理工具",
+                    "description": "此代理的逐个工具访问权限。更具体的作用域只能收窄其上级作用域所允许的范围：切换某个工具会记录一条代理级限制——更新此代理的拒绝列表，或在已设置允许列表时更新该允许列表——并且被上级作用域拒绝的工具无法在本页面重新启用。",
+                    "groupBuiltin": "内置工具",
+                    "groupFacade": "平台工具",
+                    "groupDomain": "领域工具",
+                    "resetToInherited": "重置为继承",
+                    "inheritedDeny": "被 {scope} 拒绝",
+                    "permissionOff": "权限已关闭",
+                    "patternDeny": "被此代理上的某个模式拒绝",
+                    "permissionHint": "需要“{permission}”权限——请在设置中启用。",
+                    "empty": "没有可用的工具。"
                 },
                 "permissions": {
-                    "title": "Permissions",
-                    "description": "The capability switches stay editable in Settings; shown here read-only.",
-                    "edit": "Edit in Settings"
+                    "title": "权限",
+                    "description": "能力开关仍可在设置中编辑；此处仅以只读方式显示。",
+                    "edit": "在设置中编辑"
                 },
                 "skills": {
-                    "title": "Skills",
-                    "description": "Skills bound directly to this agent. Inherited bindings come from a parent scope and are managed there.",
-                    "attachPlaceholder": "Attach a skill…",
-                    "installAndAttach": "install & attach",
-                    "inherited": "Inherited",
-                    "empty": "No skills bound yet."
+                    "title": "技能",
+                    "description": "直接绑定到此代理的技能。继承的绑定来自上级作用域，需在该处管理。",
+                    "attachPlaceholder": "附加技能…",
+                    "installAndAttach": "安装并附加",
+                    "inherited": "继承",
+                    "empty": "尚未绑定任何技能。"
                 },
                 "mcp": {
                     "title": "MCP Connections",
@@ -1289,13 +1289,13 @@
                     "saved": "Environment updated"
                 },
                 "initScript": {
-                    "title": "Init Script",
-                    "helper": "Runs at session/workspace bootstrap where the runtime supports it.",
-                    "placeholder": "#!/bin/sh\n# commands to run when a session starts…",
-                    "save": "Save",
-                    "saved": "Init script saved",
+                    "title": "初始化脚本",
+                    "helper": "在运行时支持的情况下，于会话/工作区启动时运行。",
+                    "placeholder": "#!/bin/sh\n# 会话启动时要执行的命令…",
+                    "save": "保存",
+                    "saved": "初始化脚本已保存",
                     "bytes": "{used} / {max} KB",
-                    "tooLong": "Init script exceeds 16 KB."
+                    "tooLong": "初始化脚本超过 16 KB。"
                 }
             }
         },
@@ -2682,6 +2682,15 @@
                     "enforceLabel": "强制使用此默认值",
                     "enforceDescription": "即使作品有自己的管道配置，也始终预选此管道。您仍可在表单中手动切换管道。",
                     "saveFailed": "保存默认管道失败"
+                },
+                "voiceDefault": {
+                    "title": "语音提供商",
+                    "description": "由哪个提供商将聊天麦克风的语音口述转写为文字。",
+                    "autoLabel": "自动",
+                    "autoDescription": "使用你账户中处于启用状态的提供商",
+                    "currentlyActive": "当前使用中",
+                    "noProviders": "你已配置的 AI 提供商均不支持语音转写。",
+                    "saveFailed": "无法保存语音提供商"
                 }
             },
             "profile": {
@@ -3006,6 +3015,11 @@
                 "export": {
                     "csv": "Export CSV",
                     "csvHint": "Download every usage event in {period} as a CSV file"
+                },
+                "tabs": {
+                    "label": "Usage views",
+                    "overview": "Overview",
+                    "costs": "Costs"
                 }
             },
             "fleet": {
@@ -3476,6 +3490,63 @@
                     "empty": "No repositories in your registry yet.",
                     "manageLink": "Manage repositories",
                     "toggleError": "Failed to update repository attachment"
+                }
+            },
+            "costs": {
+                "title": "Costs",
+                "subtitle": "Total AI spend for the selected window, and where it went — by day, agent, model and run.",
+                "loadError": "Some cost data could not be loaded. Refresh the page to try again.",
+                "loading": "Loading…",
+                "empty": "No spend in this window.",
+                "cacheHitNote": "Cache-hit rate is not shown: the metering path does not record cached-read tokens yet.",
+                "window": {
+                    "label": "Reporting window",
+                    "days": "{days}d"
+                },
+                "tiles": {
+                    "total": "Total spend",
+                    "runs": "Agent runs",
+                    "avgPerRun": "Average per run"
+                },
+                "panels": {
+                    "daily": "Spend per day, by agent",
+                    "byAgent": "By agent",
+                    "byModel": "By model",
+                    "topRuns": "Most expensive runs"
+                },
+                "series": {
+                    "other": "Other agents",
+                    "unattributed": "Unattributed",
+                    "unknownAgent": "Deleted agent",
+                    "noModel": "No model"
+                },
+                "byAgent": {
+                    "colAgent": "Agent",
+                    "colCost": "Cost",
+                    "colRuns": "Runs",
+                    "colAvg": "Avg / run"
+                },
+                "topRuns": {
+                    "colCost": "Cost",
+                    "colAgent": "Agent",
+                    "colTask": "Task",
+                    "colModel": "Model",
+                    "colStarted": "Started",
+                    "colStatus": "Status",
+                    "noTask": "{trigger} run",
+                    "runHint": "Run {runId}",
+                    "empty": "No runs with settled cost in this window.",
+                    "status": {
+                        "queued": "Queued",
+                        "running": "Running",
+                        "completed": "Completed",
+                        "failed": "Failed",
+                        "cancelled": "Cancelled"
+                    }
+                },
+                "byModel": {
+                    "units": "{units} units",
+                    "total": "{total} across all models in this window"
                 }
             }
         },
@@ -6922,6 +6993,18 @@
                 "start": "语音输入",
                 "stop": "停止录音",
                 "transcribing": "转写中…"
+            },
+            "model": {
+                "label": "模型",
+                "auto": "提供商默认",
+                "autoHint": "使用为该提供商配置的模型",
+                "configured": "已配置",
+                "all": "全部模型",
+                "searchPlaceholder": "搜索模型...",
+                "loading": "正在加载模型...",
+                "loadError": "无法加载模型",
+                "noModels": "没有可用模型",
+                "context": "{value} 上下文"
             }
         },
         "plugins": {

@@ -46,6 +46,12 @@ export type AgentRunStatus = 'queued' | 'running' | 'completed' | 'failed' | 'ca
 // Run orchestration (Wave 4 M1) — cheap per-Work concurrency counts +
 // Sessions-view grouping both scan (workId, status).
 @Index('idx_agent_runs_work_status', ['workId', 'status'])
+// Costs dashboard — the account-wide "runs per Agent" and "top runs by
+// cost" aggregations both scan one user's runs inside a date window.
+// Before this index the only user-keyed access path was a full scan;
+// `listSessionsForUser` filters on the same leading column.
+// Migration: `AddCostsDashboardIndexes1786910000000`.
+@Index('idx_agent_runs_user_created', ['userId', 'createdAt'])
 export class AgentRun {
     @PrimaryGeneratedColumn('uuid')
     id: string;

@@ -992,7 +992,7 @@
                 "terminal": "Terminal",
                 "collaborators": "Collaborators",
                 "mcpServers": "MCP Servers",
-                "capabilities": "Capabilities"
+                "capabilities": "Capacidades"
             },
             "newDialog": {
                 "title": "Novo Agente",
@@ -1232,33 +1232,33 @@
                 "revert": "Revert"
             },
             "capabilities": {
-                "title": "Capabilities",
-                "subtitle": "What this agent can do — tools, skills, and bootstrap script.",
+                "title": "Capacidades",
+                "subtitle": "O que este agente pode fazer — ferramentas, habilidades e script de inicialização.",
                 "tools": {
-                    "title": "Agent tools",
-                    "description": "Per-tool access for this agent. A more specific scope can only narrow what its ancestors allow: turning a tool off writes an agent-level deny, and a tool denied by a parent scope cannot be re-enabled from this page.",
-                    "groupBuiltin": "Built-in tools",
-                    "groupFacade": "Platform tools",
-                    "groupDomain": "Domain tools",
-                    "resetToInherited": "Reset to inherited",
-                    "inheritedDeny": "Denied by {scope}",
-                    "permissionOff": "Permission off",
-                    "patternDeny": "Denied by a pattern on this agent",
-                    "permissionHint": "Requires the \"{permission}\" permission — enable it in Settings.",
-                    "empty": "No tools available."
+                    "title": "Ferramentas do agente",
+                    "description": "Acesso por ferramenta para este agente. Um escopo mais específico só pode restringir o que os escopos superiores permitem: alternar uma ferramenta registra uma restrição no nível do agente — atualizando a lista de negação deste agente ou a sua lista de permissões, quando houver uma — e uma ferramenta negada por um escopo superior não pode ser reativada nesta página.",
+                    "groupBuiltin": "Ferramentas integradas",
+                    "groupFacade": "Ferramentas da plataforma",
+                    "groupDomain": "Ferramentas de domínio",
+                    "resetToInherited": "Redefinir para herdado",
+                    "inheritedDeny": "Negada por {scope}",
+                    "permissionOff": "Permissão desativada",
+                    "patternDeny": "Negada por um padrão deste agente",
+                    "permissionHint": "Requer a permissão “{permission}” — ative-a em Configurações.",
+                    "empty": "Nenhuma ferramenta disponível."
                 },
                 "permissions": {
-                    "title": "Permissions",
-                    "description": "The capability switches stay editable in Settings; shown here read-only.",
-                    "edit": "Edit in Settings"
+                    "title": "Permissões",
+                    "description": "Os interruptores de capacidade continuam editáveis em Configurações; aqui são exibidos apenas para leitura.",
+                    "edit": "Editar em Configurações"
                 },
                 "skills": {
-                    "title": "Skills",
-                    "description": "Skills bound directly to this agent. Inherited bindings come from a parent scope and are managed there.",
-                    "attachPlaceholder": "Attach a skill…",
-                    "installAndAttach": "install & attach",
-                    "inherited": "Inherited",
-                    "empty": "No skills bound yet."
+                    "title": "Habilidades",
+                    "description": "Habilidades vinculadas diretamente a este agente. Os vínculos herdados vêm de um escopo superior e são gerenciados lá.",
+                    "attachPlaceholder": "Anexar uma habilidade…",
+                    "installAndAttach": "instalar e anexar",
+                    "inherited": "Herdada",
+                    "empty": "Nenhuma habilidade vinculada ainda."
                 },
                 "mcp": {
                     "title": "MCP Connections",
@@ -1289,13 +1289,13 @@
                     "saved": "Environment updated"
                 },
                 "initScript": {
-                    "title": "Init Script",
-                    "helper": "Runs at session/workspace bootstrap where the runtime supports it.",
-                    "placeholder": "#!/bin/sh\n# commands to run when a session starts…",
-                    "save": "Save",
-                    "saved": "Init script saved",
+                    "title": "Script de inicialização",
+                    "helper": "Executa na inicialização da sessão ou do espaço de trabalho, quando o runtime oferece suporte.",
+                    "placeholder": "#!/bin/sh\n# comandos a executar quando uma sessão iniciar…",
+                    "save": "Salvar",
+                    "saved": "Script de inicialização salvo",
                     "bytes": "{used} / {max} KB",
-                    "tooLong": "Init script exceeds 16 KB."
+                    "tooLong": "O script de inicialização excede 16 KB."
                 }
             }
         },
@@ -2682,6 +2682,15 @@
                     "enforceLabel": "Forçar este padrão",
                     "enforceDescription": "Sempre pré-selecionar este pipeline, mesmo quando um trabalho tem seu próprio pipeline configurado. Você ainda pode trocar pipelines manualmente no formulário.",
                     "saveFailed": "Falha ao salvar pipeline padrão"
+                },
+                "voiceDefault": {
+                    "title": "Provedor de voz",
+                    "description": "Qual provedor transcreve o ditado por voz do microfone do chat.",
+                    "autoLabel": "Automático",
+                    "autoDescription": "Usar o provedor ativo na sua conta",
+                    "currentlyActive": "Em uso atualmente",
+                    "noProviders": "Nenhum dos seus provedores de IA configurados suporta transcrição de voz.",
+                    "saveFailed": "Não foi possível salvar o provedor de voz"
                 }
             },
             "profile": {
@@ -3006,6 +3015,11 @@
                 "export": {
                     "csv": "Export CSV",
                     "csvHint": "Download every usage event in {period} as a CSV file"
+                },
+                "tabs": {
+                    "label": "Usage views",
+                    "overview": "Overview",
+                    "costs": "Costs"
                 }
             },
             "fleet": {
@@ -3476,6 +3490,63 @@
                     "empty": "No repositories in your registry yet.",
                     "manageLink": "Manage repositories",
                     "toggleError": "Failed to update repository attachment"
+                }
+            },
+            "costs": {
+                "title": "Costs",
+                "subtitle": "Total AI spend for the selected window, and where it went — by day, agent, model and run.",
+                "loadError": "Some cost data could not be loaded. Refresh the page to try again.",
+                "loading": "Loading…",
+                "empty": "No spend in this window.",
+                "cacheHitNote": "Cache-hit rate is not shown: the metering path does not record cached-read tokens yet.",
+                "window": {
+                    "label": "Reporting window",
+                    "days": "{days}d"
+                },
+                "tiles": {
+                    "total": "Total spend",
+                    "runs": "Agent runs",
+                    "avgPerRun": "Average per run"
+                },
+                "panels": {
+                    "daily": "Spend per day, by agent",
+                    "byAgent": "By agent",
+                    "byModel": "By model",
+                    "topRuns": "Most expensive runs"
+                },
+                "series": {
+                    "other": "Other agents",
+                    "unattributed": "Unattributed",
+                    "unknownAgent": "Deleted agent",
+                    "noModel": "No model"
+                },
+                "byAgent": {
+                    "colAgent": "Agent",
+                    "colCost": "Cost",
+                    "colRuns": "Runs",
+                    "colAvg": "Avg / run"
+                },
+                "topRuns": {
+                    "colCost": "Cost",
+                    "colAgent": "Agent",
+                    "colTask": "Task",
+                    "colModel": "Model",
+                    "colStarted": "Started",
+                    "colStatus": "Status",
+                    "noTask": "{trigger} run",
+                    "runHint": "Run {runId}",
+                    "empty": "No runs with settled cost in this window.",
+                    "status": {
+                        "queued": "Queued",
+                        "running": "Running",
+                        "completed": "Completed",
+                        "failed": "Failed",
+                        "cancelled": "Cancelled"
+                    }
+                },
+                "byModel": {
+                    "units": "{units} units",
+                    "total": "{total} across all models in this window"
                 }
             }
         },
@@ -6922,6 +6993,18 @@
                 "start": "Ditar",
                 "stop": "Parar gravação",
                 "transcribing": "A transcrever…"
+            },
+            "model": {
+                "label": "Modelo",
+                "auto": "Padrão do provedor",
+                "autoHint": "Usar o modelo configurado para este provedor",
+                "configured": "Configurados",
+                "all": "Todos os modelos",
+                "searchPlaceholder": "Pesquisar modelos...",
+                "loading": "Carregando modelos...",
+                "loadError": "Não foi possível carregar os modelos",
+                "noModels": "Nenhum modelo disponível",
+                "context": "contexto de {value}"
             }
         },
         "plugins": {
