@@ -110,8 +110,8 @@
         "forgotPassword": {
             "title": "Забравили сте паролата си?",
             "subtitle": "Без притеснения, ще ви изпратим инструкции за нова парола",
-            "successTitle": "Проверете имейла си",
-            "successSubtitle": "Изпратихме ви инструкции за нова парола",
+            "successTitle": "Check your email",
+            "successSubtitle": "If an account exists for that address, password reset instructions are on their way",
             "form": {
                 "email": {
                     "label": "Имейл адрес",
@@ -121,8 +121,8 @@
                 "submitting": "Изпращане..."
             },
             "success": {
-                "title": "Имейлът е изпратен успешно",
-                "message": "Изпратихме инструкции за нова парола на {email}",
+                "title": "Reset instructions sent — if the account exists",
+                "message": "If an account exists for {email}, we have sent password reset instructions there. Nothing arrives if the address is not registered, so double-check it for typos.",
                 "checkSpam": "Ако не виждате имейла, проверете папката за спам."
             },
             "errors": {

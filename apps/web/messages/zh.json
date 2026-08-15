@@ -110,8 +110,8 @@
         "forgotPassword": {
             "title": "忘记密码？",
             "subtitle": "别担心，我们会发送重置说明",
-            "successTitle": "检查您的电子邮件",
-            "successSubtitle": "我们已向您发送密码重置说明",
+            "successTitle": "Check your email",
+            "successSubtitle": "If an account exists for that address, password reset instructions are on their way",
             "form": {
                 "email": {
                     "label": "电子邮件地址",
@@ -121,8 +121,8 @@
                 "submitting": "正在发送..."
             },
             "success": {
-                "title": "邮件发送成功",
-                "message": "我们已向 {email} 发送密码重置说明",
+                "title": "Reset instructions sent — if the account exists",
+                "message": "If an account exists for {email}, we have sent password reset instructions there. Nothing arrives if the address is not registered, so double-check it for typos.",
                 "checkSpam": "如果您没有看到邮件，请检查垃圾邮件文件夹。"
             },
             "errors": {

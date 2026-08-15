@@ -110,8 +110,8 @@
         "forgotPassword": {
             "title": "Şifrenizi mi unuttunuz?",
             "subtitle": "Endişelenmeyin, size sıfırlama talimatları göndereceğiz",
-            "successTitle": "E-postanızı kontrol edin",
-            "successSubtitle": "Size şifre sıfırlama talimatları gönderdik",
+            "successTitle": "Check your email",
+            "successSubtitle": "If an account exists for that address, password reset instructions are on their way",
             "form": {
                 "email": {
                     "label": "E-posta adresi",
@@ -121,8 +121,8 @@
                 "submitting": "Gönderiliyor..."
             },
             "success": {
-                "title": "E-posta başarıyla gönderildi",
-                "message": "{email} adresine şifre sıfırlama talimatları gönderdik",
+                "title": "Reset instructions sent — if the account exists",
+                "message": "If an account exists for {email}, we have sent password reset instructions there. Nothing arrives if the address is not registered, so double-check it for typos.",
                 "checkSpam": "E-postayı görmüyorsanız, spam klasörünüzü kontrol edin."
             },
             "errors": {

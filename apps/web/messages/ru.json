@@ -110,8 +110,8 @@
         "forgotPassword": {
             "title": "Забыли пароль?",
             "subtitle": "Не волнуйтесь, мы отправим вам инструкции для сброса",
-            "successTitle": "Проверьте вашу почту",
-            "successSubtitle": "Мы отправили вам инструкции для сброса пароля",
+            "successTitle": "Check your email",
+            "successSubtitle": "If an account exists for that address, password reset instructions are on their way",
             "form": {
                 "email": {
                     "label": "Адрес email",
@@ -121,8 +121,8 @@
                 "submitting": "Отправка..."
             },
             "success": {
-                "title": "Email успешно отправлен",
-                "message": "Мы отправили инструкции для сброса пароля на {email}",
+                "title": "Reset instructions sent — if the account exists",
+                "message": "If an account exists for {email}, we have sent password reset instructions there. Nothing arrives if the address is not registered, so double-check it for typos.",
                 "checkSpam": "Если вы не видите email, проверьте папку спама."
             },
             "errors": {

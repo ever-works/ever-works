@@ -110,8 +110,8 @@
         "forgotPassword": {
             "title": "ลืมรหัสผ่านของคุณหรือ",
             "subtitle": "ไม่ต้องกังวล เราจะส่งคำแนะนำการรีเซ็ตให้คุณ",
-            "successTitle": "ตรวจสอบอีเมลของคุณ",
-            "successSubtitle": "เราได้ส่งคำแนะนำการรีเซ็ตรหัสผ่านให้คุณแล้ว",
+            "successTitle": "Check your email",
+            "successSubtitle": "If an account exists for that address, password reset instructions are on their way",
             "form": {
                 "email": {
                     "label": "ที่อยู่อีเมล",
@@ -121,8 +121,8 @@
                 "submitting": "กำลังส่ง..."
             },
             "success": {
-                "title": "ส่งอีเมลสำเร็จ",
-                "message": "เราได้ส่งคำแนะนำการรีเซ็ตรหัสผ่านไปยัง {email}",
+                "title": "Reset instructions sent — if the account exists",
+                "message": "If an account exists for {email}, we have sent password reset instructions there. Nothing arrives if the address is not registered, so double-check it for typos.",
                 "checkSpam": "หากคุณไม่เห็นอีเมล กรุณาตรวจสอบโฟลเดอร์สแปม"
             },
             "errors": {

@@ -110,8 +110,8 @@
         "forgotPassword": {
             "title": "비밀번호를 잊으셨나요?",
             "subtitle": "걱정 마세요, 재설정 지침을 보내드리겠습니다",
-            "successTitle": "이메일 확인",
-            "successSubtitle": "비밀번호 재설정 지침을 보냈습니다",
+            "successTitle": "Check your email",
+            "successSubtitle": "If an account exists for that address, password reset instructions are on their way",
             "form": {
                 "email": {
                     "label": "이메일 주소",
@@ -121,8 +121,8 @@
                 "submitting": "전송 중..."
             },
             "success": {
-                "title": "이메일 전송 성공",
-                "message": "비밀번호 재설정 지침을 {email}로 보냈습니다",
+                "title": "Reset instructions sent — if the account exists",
+                "message": "If an account exists for {email}, we have sent password reset instructions there. Nothing arrives if the address is not registered, so double-check it for typos.",
                 "checkSpam": "이메일을 받지 못했다면 스팸 폴더를 확인해 주세요."
             },
             "errors": {

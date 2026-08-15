@@ -110,8 +110,8 @@
         "forgotPassword": {
             "title": "Lupa kata sandi Anda?",
             "subtitle": "Tenang, kami akan kirimkan instruksi reset",
-            "successTitle": "Periksa email Anda",
-            "successSubtitle": "Kami telah mengirimkan instruksi reset kata sandi",
+            "successTitle": "Check your email",
+            "successSubtitle": "If an account exists for that address, password reset instructions are on their way",
             "form": {
                 "email": {
                     "label": "Alamat email",
@@ -121,8 +121,8 @@
                 "submitting": "Mengirim..."
             },
             "success": {
-                "title": "Email berhasil dikirim",
-                "message": "Kami telah mengirimkan instruksi reset kata sandi ke {email}",
+                "title": "Reset instructions sent — if the account exists",
+                "message": "If an account exists for {email}, we have sent password reset instructions there. Nothing arrives if the address is not registered, so double-check it for typos.",
                 "checkSpam": "Jika Anda tidak melihat email tersebut, periksa folder spam."
             },
             "errors": {

@@ -110,8 +110,8 @@
         "forgotPassword": {
             "title": "Quên mật khẩu của bạn?",
             "subtitle": "Đừng lo, chúng tôi sẽ gửi hướng dẫn đặt lại",
-            "successTitle": "Kiểm tra email của bạn",
-            "successSubtitle": "Chúng tôi đã gửi hướng dẫn đặt lại mật khẩu cho bạn",
+            "successTitle": "Check your email",
+            "successSubtitle": "If an account exists for that address, password reset instructions are on their way",
             "form": {
                 "email": {
                     "label": "Địa chỉ email",
@@ -121,8 +121,8 @@
                 "submitting": "Đang gửi..."
             },
             "success": {
-                "title": "Email đã gửi thành công",
-                "message": "Chúng tôi đã gửi hướng dẫn đặt lại mật khẩu đến {email}",
+                "title": "Reset instructions sent — if the account exists",
+                "message": "If an account exists for {email}, we have sent password reset instructions there. Nothing arrives if the address is not registered, so double-check it for typos.",
                 "checkSpam": "Nếu bạn không thấy email, hãy kiểm tra công việc spam."
             },
             "errors": {

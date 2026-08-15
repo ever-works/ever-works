@@ -110,8 +110,8 @@
         "forgotPassword": {
             "title": "שכחת את הסיסמה שלך?",
             "subtitle": "אל דאגה, נשלח לך הוראות איפוס",
-            "successTitle": "בדוק את האימייל שלך",
-            "successSubtitle": "שלחנו לך הוראות איפוס סיסמה",
+            "successTitle": "Check your email",
+            "successSubtitle": "If an account exists for that address, password reset instructions are on their way",
             "form": {
                 "email": {
                     "label": "כתובת אימייל",
@@ -121,8 +121,8 @@
                 "submitting": "שולח..."
             },
             "success": {
-                "title": "אימייל נשלח בהצלחה",
-                "message": "שלחנו הוראות איפוס סיסמה ל-{email}",
+                "title": "Reset instructions sent — if the account exists",
+                "message": "If an account exists for {email}, we have sent password reset instructions there. Nothing arrives if the address is not registered, so double-check it for typos.",
                 "checkSpam": "אם אינך רואה את האימייל, בדוק את תיקיית הספאם."
             },
             "errors": {
