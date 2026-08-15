@@ -549,6 +549,10 @@ export const agentsAPI = {
      */
     async listCollaborators(id: string): Promise<{ data: AgentCollaboratorCandidate[] }> {
         return serverFetch<{ data: AgentCollaboratorCandidate[] }>(`/agents/${id}/collaborators`, {
+            method: 'GET',
+        });
+    },
+
     /**
      * Session detail (Feature K) — the drill-in behind each Sessions row
      * (`GET /api/agents/runs/:runId/detail`): full session projection +

@@ -441,6 +441,8 @@ export async function removeAgentCollaboratorAction(agentId: string, collaborato
     const result = await agentsAPI.removeCollaborator(agentId, collaboratorAgentId);
     revalidatePath(`/agents/${agentId}/collaborators`);
     return result;
+}
+
 /**
  * Session detail (Feature K) — read used by the detail page's refresh
  * button, live-follow poll and timeline pagination. No revalidatePath —

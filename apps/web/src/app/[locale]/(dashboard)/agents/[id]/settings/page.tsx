@@ -72,17 +72,12 @@ export default async function AgentSettingsPage({ params }: { params: Promise<{ 
     const agentRepos = await repoConnectionsAPI.listForAgent(id).catch(() => []);
 
     return (
-        <AgentSettingsClient
-            agent={agent}
-            organization={organization}
-            aiProviders={aiProviders}
-            environments={environments}
-        />
         <div className="space-y-6">
             <AgentSettingsClient
                 agent={agent}
                 organization={organization}
                 aiProviders={aiProviders}
+                environments={environments}
             />
             <AgentReposCard agentId={id} repos={agentRepos} />
         </div>

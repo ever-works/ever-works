@@ -143,6 +143,9 @@ const CORE_EVENTS: readonly CoreEventRow[] = [
         category: 'system',
         title: 'Inbox notice',
         description: 'The platform filed a notice in your Inbox.',
+        urgent: false,
+        defaultChannels: ['in-app'],
+    },
     // Fleet local-runner routing. Seeded on Postgres by
     // `1786920000000-FleetRunnerTelemetryAndRouting` too; this entry is
     // what makes it exist on SQLite / CI, where migrations do not run.

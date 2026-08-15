@@ -134,6 +134,7 @@ export function SettingsLayoutClient({
                     label: t('tabs.environments'),
                     icon: Boxes,
                     href: `${baseSettingsPath}/environments`,
+                },
                 // MCP Connections — external MCP servers agents can consume
                 // (agent-plugins spec 2.3; manual connections in v1).
                 {
