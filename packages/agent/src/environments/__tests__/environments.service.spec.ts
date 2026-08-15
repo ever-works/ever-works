@@ -1,4 +1,9 @@
-import { BadRequestException, ConflictException, NotFoundException } from '@nestjs/common';
+import {
+    BadRequestException,
+    ConflictException,
+    InternalServerErrorException,
+    NotFoundException,
+} from '@nestjs/common';
 import { QueryFailedError } from 'typeorm';
 import { EnvironmentsService, toRuntimeEnvironmentData } from '../environments.service';
 import type { EnvironmentRepository } from '../environment.repository';
@@ -93,6 +98,31 @@ describe('EnvironmentsService — create', () => {
         );
         expect(dto.status).toBe('draft');
         expect(dto.pipPackages).toEqual(['pandas==2.2.0', 'requests']);
+    });
+
+    it('caps the derived slug at the varchar(80) column width', async () => {
+        const repo = makeRepo();
+        const svc = makeService(repo);
+        // 120 chars — the DTO maximum for `name`; `slug` is varchar(80),
+        // so an untruncated slug would reach Postgres as an unmapped 500.
+        const name = 'a'.repeat(60) + ' ' + 'b'.repeat(59);
+
+        await svc.create(USER, { name });
+
+        const slug = repo.create.mock.calls[0][0].slug as string;
+        expect(slug.length).toBeLessThanOrEqual(80);
+        expect(slug.endsWith('-')).toBe(false);
+        expect(repo.findByUserIdAndSlug).toHaveBeenCalledWith(USER, slug);
+    });
+
+    it('rejects an unknown networking mode at the service layer', async () => {
+        const svc = makeService(makeRepo());
+        await expect(
+            svc.create(USER, {
+                name: 'Bogus',
+                networkingMode: 'wide-open' as never,
+            }),
+        ).rejects.toBeInstanceOf(BadRequestException);
     });
 
     it('rejects a name without any alphanumeric character', async () => {
@@ -254,6 +284,17 @@ describe('EnvironmentsService — publish + delete guard', () => {
 
         await svc.remove(USER, 'env-1');
         expect(repo.deleteById).toHaveBeenCalledWith('env-1');
+    });
+
+    it('delete fails closed when the agent reference guard is not wired', async () => {
+        const repo = makeRepo();
+        repo.findByIdAndUser.mockResolvedValue(makeRow());
+        const svc = makeService(repo);
+
+        await expect(svc.remove(USER, 'env-1')).rejects.toBeInstanceOf(
+            InternalServerErrorException,
+        );
+        expect(repo.deleteById).not.toHaveBeenCalled();
     });
 });
 

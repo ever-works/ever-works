@@ -2,6 +2,7 @@ import {
     BadRequestException,
     ConflictException,
     Injectable,
+    InternalServerErrorException,
     Logger,
     NotFoundException,
     Optional,
@@ -113,6 +114,15 @@ export function toRuntimeEnvironmentData(row: Environment): RuntimeEnvironmentDa
     };
 }
 
+/** Width of `environments.slug` (`varchar(80)`) — see `deriveSlug`. */
+const ENVIRONMENT_SLUG_MAX_LENGTH = 80;
+
+/** The only two persistable networking postures. */
+const ENVIRONMENT_NETWORKING_MODES: readonly EnvironmentNetworkingMode[] = [
+    'unrestricted',
+    'limited',
+];
+
 /**
  * Environments (Settings → Environments) — CRUD + publish lifecycle +
  * the agent-run resolver. Cross-user reads return 404 (never leak
@@ -145,19 +155,14 @@ export class EnvironmentsService {
     }
 
     async create(userId: string, input: CreateEnvironmentInput): Promise<EnvironmentDto> {
-        const slug = slugifyText(input.name);
-        if (!slug || !/[a-z0-9]/i.test(slug)) {
-            throw new BadRequestException(
-                'Environment name must contain at least one alphanumeric character.',
-            );
-        }
+        const slug = this.deriveSlug(input.name);
 
         const conflict = await this.environments.findByUserIdAndSlug(userId, slug);
         if (conflict) {
             throw new ConflictException(`An Environment named "${input.name}" already exists.`);
         }
 
-        const networkingMode = input.networkingMode ?? 'unrestricted';
+        const networkingMode = this.requireNetworkingMode(input.networkingMode ?? 'unrestricted');
         const normalized = this.validateAndNormalize({
             pipPackages: input.pipPackages ?? [],
             npmPackages: input.npmPackages ?? [],
@@ -202,12 +207,7 @@ export class EnvironmentsService {
         const row = await this.requireOwned(userId, id);
 
         if (input.name !== undefined && input.name !== row.name) {
-            const slug = slugifyText(input.name);
-            if (!slug || !/[a-z0-9]/i.test(slug)) {
-                throw new BadRequestException(
-                    'Environment name must contain at least one alphanumeric character.',
-                );
-            }
+            const slug = this.deriveSlug(input.name);
             if (slug !== row.slug) {
                 const conflict = await this.environments.findByUserIdAndSlug(userId, slug);
                 if (conflict && conflict.id !== row.id) {
@@ -225,7 +225,8 @@ export class EnvironmentsService {
             row.allowPackageManagers = input.allowPackageManagers;
         if (input.availableInAllProjects !== undefined)
             row.availableInAllProjects = input.availableInAllProjects;
-        if (input.networkingMode !== undefined) row.networkingMode = input.networkingMode;
+        if (input.networkingMode !== undefined)
+            row.networkingMode = this.requireNetworkingMode(input.networkingMode);
 
         const normalized = this.validateAndNormalize({
             pipPackages: input.pipPackages ?? row.pipPackages ?? [],
@@ -263,19 +264,28 @@ export class EnvironmentsService {
      * Delete an Environment. Refused with 409 while any Agent still
      * references it — silently orphaning `agents.environmentId` would
      * flip those Agents' runtime behavior without anyone choosing that.
+     *
+     * The guard is mandatory, not best-effort: `agentRepo` is
+     * `@Optional()` so hand-rolled unit tests stay light, but a delete
+     * that CANNOT count references would produce exactly the silent
+     * orphaning above (the FK is ON DELETE SET NULL), so an unwired
+     * repository refuses the delete instead of skipping the check.
      */
     async remove(userId: string, id: string): Promise<void> {
         const row = await this.requireOwned(userId, id);
 
-        if (this.agentRepo) {
-            const referencing = await this.agentRepo.count({
-                where: { environmentId: row.id },
-            });
-            if (referencing > 0) {
-                throw new ConflictException(
-                    `Environment is assigned to ${referencing} agent(s). Unassign it before deleting.`,
-                );
-            }
+        if (!this.agentRepo) {
+            throw new InternalServerErrorException(
+                'Environment deletion is unavailable: the agent reference guard is not wired.',
+            );
+        }
+        const referencing = await this.agentRepo.count({
+            where: { environmentId: row.id },
+        });
+        if (referencing > 0) {
+            throw new ConflictException(
+                `Environment is assigned to ${referencing} agent(s). Unassign it before deleting.`,
+            );
         }
 
         await this.environments.deleteById(row.id);
@@ -309,6 +319,37 @@ export class EnvironmentsService {
             return undefined;
         }
         return toRuntimeEnvironmentData(row);
+    }
+
+    /**
+     * `name` → `slug`, capped at the column width. `environments.slug`
+     * is `varchar(80)` while `name` accepts 120 characters, and
+     * `slugifyText` does not truncate — an over-long slug would reach
+     * Postgres as an unmapped 22001 (500) instead of a clean conflict
+     * check, so the cap happens BEFORE any uniqueness lookup.
+     */
+    /**
+     * `networkingMode` is the one security-sensitive scalar that reaches
+     * the row without a class-validator pass on the tool/import callers
+     * this service also serves. A bogus value would persist and then
+     * read back as `unrestricted` through `toRuntimeEnvironmentData`,
+     * so the stored row and the effective posture would disagree.
+     */
+    private requireNetworkingMode(value: EnvironmentNetworkingMode): EnvironmentNetworkingMode {
+        if (!ENVIRONMENT_NETWORKING_MODES.includes(value)) {
+            throw new BadRequestException(`Invalid networking mode: ${String(value)}`);
+        }
+        return value;
+    }
+
+    private deriveSlug(name: string): string {
+        const slug = slugifyText(name).slice(0, ENVIRONMENT_SLUG_MAX_LENGTH).replace(/-+$/, '');
+        if (!slug || !/[a-z0-9]/i.test(slug)) {
+            throw new BadRequestException(
+                'Environment name must contain at least one alphanumeric character.',
+            );
+        }
+        return slug;
     }
 
     private async requireOwned(userId: string, id: string): Promise<Environment> {
