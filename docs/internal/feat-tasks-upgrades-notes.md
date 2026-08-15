@@ -64,10 +64,10 @@ sections plus attachment roles.
 
 ## Data model / migrations
 
-| Migration                                | Change                                                                                            |
-| ---------------------------------------- | ------------------------------------------------------------------------------------------------- |
+| Migration                                 | Change                                                                                                                     |
+| ----------------------------------------- | -------------------------------------------------------------------------------------------------------------------------- |
 | `1785010000000-AddTaskScheduleColumns.ts` | `tasks.scheduledAt`, `tasks.scheduleClaimedAt`, `tasks.recurrenceCron`, `idx_tasks_scheduled_due`, `task_attachments.role` |
-| `1785020000000-CreateTaskTemplates.ts`    | `task_templates` + `task_template_steps` (+ indexes + FKs, portable Table API)                      |
+| `1785020000000-CreateTaskTemplates.ts`    | `task_templates` + `task_template_steps` (+ indexes + FKs, portable Table API)                                             |
 
 Both are forward-only with per-step idempotent guards, and deliberately carry NO
 scope XOR CHECK (`ScopeStampingSubscriber` stamps `organizationId` on insert, so
@@ -75,17 +75,17 @@ ordinary rows carry both columns — same reasoning as `CreateWorkflows`).
 
 ## Endpoints
 
-| Method + path                          | Purpose                                                        |
-| -------------------------------------- | -------------------------------------------------------------- |
-| `POST /api/tasks/:id/schedule`          | Arm/move a one-shot (`{runAt}`, future-only)                    |
-| `DELETE /api/tasks/:id/schedule`        | Remove the one-shot (back to Run once)                          |
-| `POST /api/tasks/:id/recurring`         | Now accepts EITHER `recurrenceRule` OR `recurrenceCron` (XOR)   |
-| `GET /api/tasks/:id/subtasks`           | Checklist projection (`{data, meta:{total,doneCount}}`)         |
-| `GET /api/tasks/:id/activity`           | Per-Task activity rows (`?limit`/`?offset`, owner-scoped)       |
-| `POST /api/tasks` / `PATCH /api/tasks/:id` | `scheduledAt` (ISO; `null` on PATCH clears the schedule)     |
-| `POST /api/tasks/:id/attachments`       | `role: 'initial' \| 'result'`                                   |
-| `api/task-templates` CRUD               | Workflow templates (list seeds the default on first call)       |
-| `POST /api/task-templates/:id/instantiate` | Expand into parent + sub-tasks (one transaction)             |
+| Method + path                              | Purpose                                                       |
+| ------------------------------------------ | ------------------------------------------------------------- |
+| `POST /api/tasks/:id/schedule`             | Arm/move a one-shot (`{runAt}`, future-only)                  |
+| `DELETE /api/tasks/:id/schedule`           | Remove the one-shot (back to Run once)                        |
+| `POST /api/tasks/:id/recurring`            | Now accepts EITHER `recurrenceRule` OR `recurrenceCron` (XOR) |
+| `GET /api/tasks/:id/subtasks`              | Checklist projection (`{data, meta:{total,doneCount}}`)       |
+| `GET /api/tasks/:id/activity`              | Per-Task activity rows (`?limit`/`?offset`, owner-scoped)     |
+| `POST /api/tasks` / `PATCH /api/tasks/:id` | `scheduledAt` (ISO; `null` on PATCH clears the schedule)      |
+| `POST /api/tasks/:id/attachments`          | `role: 'initial' \| 'result'`                                 |
+| `api/task-templates` CRUD                  | Workflow templates (list seeds the default on first call)     |
+| `POST /api/task-templates/:id/instantiate` | Expand into parent + sub-tasks (one transaction)              |
 
 Every new DTO field was traced end to end (the "wired-but-dead" bug class): the
 PATCH path needed an explicit `scheduledAt` string→`Date` mapping in the
@@ -105,7 +105,7 @@ controller, because the service works in `Date` and `body` is spread wholesale.
   catalog cards (delete + step list + approval/agent-hint chips).
 - i18n: new keys added to **all 21** locale files (English values copied, per the
   repo's no-machine-translation rule): `dashboard.tasksPage.{schedule,subtasks,
-  activity,templates}` plus additions to `newDialog`, `recurring`, `detail`.
+activity,templates}` plus additions to `newDialog`, `recurring`, `detail`.
 
 ## Test commands
 
@@ -136,6 +136,12 @@ now assert that message, and the first also pins the both-dialects rejection.
   resolution errors unrelated to this branch (`@ever-works/k8s-plugin` in
   `deploy.e2e.spec.ts`; `@src/*` aliases resolved from `packages/agent` sources).
   They reproduce without these changes once workspace packages are built.
+- No new Playwright specs for the new endpoints (`:id/schedule`,
+  `:id/subtasks`, `:id/activity`, `api/task-templates`): they need a live
+  API + DB, which this session had no stack for. A
+  `flow-task-templates-validation-authz-matrix.spec.ts` mirroring the
+  existing matrices (unknown body prop → 400, cross-user id → 404, bad
+  uuid → 400, no auth → 401) is the natural next spec.
 - Attachment `role` is settable through the API but the web uploader always
   sends `initial`; the `result` path is for agent-authored outputs (the chip
   already renders them).
