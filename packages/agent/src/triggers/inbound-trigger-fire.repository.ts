@@ -34,6 +34,13 @@ export interface FireClaim {
  * window dedupes while a genuine later re-delivery of the same id is a
  * new fire — the older row is re-claimed in place, which keeps the
  * UNIQUE index intact.
+ *
+ * One rule overrides BOTH: a claim that ended `'failed'` or
+ * `'refused'` produced NO Task, so it never consumed the delivery and
+ * is always re-claimable. Dedupe exists to stop a retry creating a
+ * SECOND Task; when the first attempt created zero, answering the
+ * retry with "duplicate, nothing to do" would drop the delivery on the
+ * floor — and a 5xx is exactly what makes a sender retry.
  */
 @Injectable()
 export class InboundTriggerFireRepository {
@@ -45,7 +52,9 @@ export class InboundTriggerFireRepository {
     /**
      * Claim `dedupeKey` for `triggerId`. With `windowMs` set, an existing
      * claim older than the window is RE-claimed (same row, reset to a
-     * fresh `running` fire); without it, any existing claim wins forever.
+     * fresh `running` fire); without it, any existing claim wins forever
+     * — UNLESS that claim produced nothing (see
+     * {@link producedNoTask}), which is always re-claimable.
      */
     async claim(
         triggerId: string,
@@ -56,7 +65,7 @@ export class InboundTriggerFireRepository {
         const existing = await this.repository.findOne({ where: { triggerId, dedupeKey } });
         if (existing) {
             const age = Date.now() - new Date(existing.firedAt).getTime();
-            if (windowMs === undefined || age <= windowMs) {
+            if (!this.producedNoTask(existing) && (windowMs === undefined || age <= windowMs)) {
                 return { fire: existing, won: false };
             }
             // Explicit UPDATE rather than save(): `firedAt` is a
@@ -115,6 +124,17 @@ export class InboundTriggerFireRepository {
             order: { firedAt: 'DESC' },
             take: limit,
         });
+    }
+
+    /**
+     * True for a settled claim that created no Task: `'failed'` (the
+     * fire blew up) or `'refused'` (the trigger's own contract said
+     * no). `'running'` is NOT included — that is either a live fire or
+     * a concurrent claimant, and stealing it is how a delivery gets
+     * processed twice.
+     */
+    private producedNoTask(fire: InboundTriggerFire): boolean {
+        return (fire.status === 'failed' || fire.status === 'refused') && !fire.taskId;
     }
 
     private isUniqueViolation(error: unknown): boolean {

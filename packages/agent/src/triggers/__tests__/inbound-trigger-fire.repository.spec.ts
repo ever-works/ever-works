@@ -78,6 +78,68 @@ describe('InboundTriggerFireRepository.claim', () => {
         expect(claim.fire.status).toBe('running');
     });
 
+    it('re-claims a FAILED fire inside the window — it created no Task, so it consumed nothing', async () => {
+        // Regression: a fire that threw left a 'failed' claim behind. The
+        // sender retries the same delivery id (that is what a 5xx is for)
+        // and used to get "duplicate, nothing to do" with a null taskId —
+        // a 200 for work that was never created.
+        const existing = {
+            id: 'fire-1',
+            firedAt: new Date(Date.now() - 1_000),
+            status: 'failed' as const,
+            taskId: null,
+            reason: 'db down',
+        };
+        const { repository, svc } = makeRepo(existing);
+
+        const claim = await svc.claim('t1', 'wh:id:gh-42', 'webhook', 300_000);
+
+        expect(claim.won).toBe(true);
+        expect(repository.update).toHaveBeenCalled();
+        expect(claim.fire.status).toBe('running');
+        expect(claim.fire.reason).toBeNull();
+    });
+
+    it('re-claims a REFUSED fire, and does so on the windowless event path too', async () => {
+        const existing = {
+            id: 'fire-1',
+            firedAt: new Date(Date.now() - 1_000),
+            status: 'refused' as const,
+            taskId: null,
+            reason: 'Missing required payload variable(s): repo.',
+        };
+        const { svc } = makeRepo(existing);
+        await expect(svc.claim('t1', 'event-1', 'event')).resolves.toMatchObject({ won: true });
+    });
+
+    it('does NOT steal a still-running claim, however old (that is the concurrency guard)', async () => {
+        const existing = {
+            id: 'fire-1',
+            firedAt: new Date(Date.now() - 1_000),
+            status: 'running' as const,
+            taskId: null,
+            reason: null,
+        };
+        const { repository, svc } = makeRepo(existing);
+        const claim = await svc.claim('t1', 'wh:id:gh-42', 'webhook', 300_000);
+        expect(claim.won).toBe(false);
+        expect(repository.update).not.toHaveBeenCalled();
+    });
+
+    it('keeps deduping a settled fire that DID create a Task', async () => {
+        const existing = {
+            id: 'fire-1',
+            firedAt: new Date(Date.now() - 1_000),
+            status: 'done' as const,
+            taskId: 'task-7',
+            reason: null,
+        };
+        const { svc } = makeRepo(existing);
+        const claim = await svc.claim('t1', 'wh:id:gh-42', 'webhook', 300_000);
+        expect(claim.won).toBe(false);
+        expect(claim.fire.taskId).toBe('task-7');
+    });
+
     it('treats a lost insert race as the idempotent outcome it is', async () => {
         const winner = { id: 'fire-winner', firedAt: new Date() } as InboundTriggerFire;
         const repository = {

@@ -114,7 +114,13 @@ function makeFires() {
                 const existing = rows.get(key);
                 if (existing) {
                     const age = Date.now() - existing.firedAt.getTime();
-                    if (windowMs === undefined || age <= windowMs) {
+                    // Mirrors the repository contract: a claim that ended
+                    // 'failed'/'refused' created no Task, so it never
+                    // consumed the delivery and is always re-claimable.
+                    const producedNoTask =
+                        (existing.status === 'failed' || existing.status === 'refused') &&
+                        !existing.taskId;
+                    if (!producedNoTask && (windowMs === undefined || age <= windowMs)) {
                         return { fire: existing, won: false };
                     }
                     existing.origin = origin;
@@ -488,6 +494,53 @@ describe('InboundTriggersService — modes, contracts and the fire log', () => {
 
             expect(later.duplicate).toBeUndefined();
             expect(tasks.create).toHaveBeenCalledTimes(2);
+        });
+
+        it('a retry after a FAILED fire creates the Task instead of a phantom 200', async () => {
+            // Regression: dedupe must not swallow a redelivery that the
+            // sender is retrying precisely BECAUSE the first attempt 500'd
+            // and produced nothing. Losing this loses the delivery.
+            const { service, tasks, repo } = makeService();
+            const { trigger, secret } = await service.create(SCOPE, { name: 'Flaky' });
+            tasks.create.mockRejectedValueOnce(new Error('db down'));
+
+            await expect(
+                service.fire(trigger.id, {
+                    ...signed(secret, '{"a":1}'),
+                    deliveryHeader: 'gh-42',
+                }),
+            ).rejects.toThrow('db down');
+
+            const retry = await service.fire(trigger.id, {
+                ...signed(secret, '{"a":1}'),
+                deliveryHeader: 'gh-42',
+            });
+
+            expect(retry.duplicate).toBeUndefined();
+            expect(retry.taskId).toBe('task-1');
+            expect(tasks.create).toHaveBeenCalledTimes(2);
+            expect((repo._rows.get(trigger.id) as InboundTrigger).fireCount).toBe(1);
+            const log = await service.listFires(SCOPE, trigger.id);
+            // The ledger row is re-used, so the failure is not left behind
+            // as a second phantom entry.
+            expect(log).toHaveLength(1);
+            expect(log[0]).toMatchObject({ status: 'done', taskId: 'task-1' });
+        });
+
+        it('a retry after a REFUSED fire is refused again, never answered with a 200', async () => {
+            const { service } = makeService();
+            const { trigger, secret } = await service.create(SCOPE, {
+                name: 'Contracted',
+                defaultVariables: [{ key: 'repo', required: true }],
+            });
+            const delivery = { ...signed(secret, '{"a":1}'), deliveryHeader: 'gh-42' };
+
+            await expect(service.fire(trigger.id, delivery)).rejects.toBeInstanceOf(
+                FireRefusedError,
+            );
+            await expect(service.fire(trigger.id, delivery)).rejects.toBeInstanceOf(
+                FireRefusedError,
+            );
         });
 
         it('the per-trigger window also governs how stale a signed timestamp may be', async () => {
