@@ -12,11 +12,14 @@ import {
     FileText,
     Lightbulb,
     Link2,
+    Paperclip,
     Plus,
     Search,
+    Slash,
     Sparkles,
     Target,
     Trash2,
+    Upload,
     type LucideIcon,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -25,11 +28,18 @@ import { Select } from '@/components/ui/select';
 import { SkillMarkdownEditor } from '@/components/skills/SkillMarkdownEditor';
 import { Link, useRouter } from '@/i18n/navigation';
 import { ROUTES } from '@/lib/constants';
-import type { Skill, SkillBinding, SkillBindingTargetType } from '@/lib/api/skills';
+import type {
+    Skill,
+    SkillBinding,
+    SkillBindingTargetType,
+    SkillFile,
+    SkillFileKind,
+} from '@/lib/api/skills';
 import {
     createBindingAction,
     deleteBindingAction,
     deleteSkillAction,
+    deleteSkillFileAction,
     loadBindingTargetOptionsAction,
     updateSkillAction,
 } from '@/app/actions/skills';
@@ -52,9 +62,11 @@ type SaveStatus = 'idle' | 'saving' | 'saved' | 'error';
 export function SkillDetailClient({
     skill,
     initialBindings,
+    initialFiles = [],
 }: {
     skill: Skill;
     initialBindings: SkillBinding[];
+    initialFiles?: SkillFile[];
 }) {
     const t = useTranslations('dashboard.skillsPage.detail');
     const OwnerTypeIcon = TARGET_TYPE_ICONS[skill.ownerType];
@@ -101,7 +113,9 @@ export function SkillDetailClient({
                 </div>
             </header>
 
+            <InvocationSlugSection skill={skill} />
             <BodyEditor skill={skill} />
+            <FilesSection skillId={skill.id} initialFiles={initialFiles} />
             <BindingsPanel skillId={skill.id} initialBindings={initialBindings} />
             <DangerZone skillId={skill.id} />
         </div>
@@ -168,6 +182,326 @@ function BodyEditor({ skill }: { skill: Skill }) {
                     </span>
                 }
             />
+        </section>
+    );
+}
+
+/**
+ * Skill files feature — "Invocation Slug" section. One input with a
+ * literal `/` prefix chip; saving with an empty value clears the
+ * command. Per-account uniqueness conflicts surface the API's 409
+ * message (it names the conflicting skill).
+ */
+function InvocationSlugSection({ skill }: { skill: Skill }) {
+    const t = useTranslations('dashboard.skillsPage.detail.invocation');
+    const [value, setValue] = useState(skill.invocationSlug ?? '');
+    const [saved, setSaved] = useState(skill.invocationSlug ?? '');
+    const [pending, startTransition] = useTransition();
+    const [status, setStatus] = useState<SaveStatus>('idle');
+    const [error, setError] = useState<string | null>(null);
+
+    const normalized = value.trim().replace(/^\//, '').toLowerCase();
+    const dirty = normalized !== saved;
+
+    const handleSave = (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!dirty) return;
+        setError(null);
+        setStatus('saving');
+        startTransition(() => {
+            void (async () => {
+                try {
+                    const updated = await updateSkillAction(skill.id, {
+                        invocationSlug: normalized === '' ? null : normalized,
+                    });
+                    const next = updated.invocationSlug ?? '';
+                    setSaved(next);
+                    setValue(next);
+                    setStatus('saved');
+                } catch (err) {
+                    setError(err instanceof Error ? err.message : t('saveFailed'));
+                    setStatus('error');
+                }
+            })();
+        });
+    };
+
+    return (
+        <section className="rounded-xl border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-5 space-y-3">
+            <div className="flex items-center gap-2">
+                <h2 className="text-sm font-medium text-text dark:text-text-dark flex items-center gap-2">
+                    <Slash className="w-4 h-4 text-primary" />
+                    {t('title')}
+                </h2>
+                {saved && (
+                    <span className="text-[11px] font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                        /{saved}
+                    </span>
+                )}
+                <span className="text-[11px] text-text-muted" aria-live="polite">
+                    {status === 'saving' && t('saving')}
+                    {status === 'saved' && t('savedNote')}
+                </span>
+            </div>
+            <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
+                {t('helper')}
+            </p>
+            <form onSubmit={handleSave} className="flex items-center gap-2">
+                <div className="relative flex-1 max-w-xs">
+                    <span
+                        aria-hidden="true"
+                        className="absolute left-2 top-1/2 -translate-y-1/2 text-xs font-mono text-text-muted pointer-events-none"
+                    >
+                        /
+                    </span>
+                    <Input
+                        id="skill-invocation-slug"
+                        variant="form"
+                        type="text"
+                        value={value}
+                        onChange={(e) => setValue(e.target.value)}
+                        placeholder={t('placeholder')}
+                        autoComplete="off"
+                        spellCheck={false}
+                        maxLength={64}
+                        className="h-8 pl-5 pr-2 text-xs font-mono"
+                        data-testid="skill-invocation-slug"
+                    />
+                </div>
+                <Button type="submit" size="sm" disabled={pending || !dirty}>
+                    {pending ? t('saving') : t('save')}
+                </Button>
+            </form>
+            {error && (
+                <p className="text-xs text-danger" role="alert">
+                    {error}
+                </p>
+            )}
+        </section>
+    );
+}
+
+const FILE_KINDS: SkillFileKind[] = ['script', 'reference', 'config', 'asset'];
+
+/**
+ * Mirrors `MAX_FILES_PER_SKILL` in `@ever-works/agent/skills` — that
+ * package is server-only, so the client keeps its own copy purely to
+ * disable the button early. The API is what actually enforces the cap.
+ */
+const MAX_SKILL_FILES = 20;
+
+function formatFileSize(sizeBytes: number): string {
+    if (sizeBytes >= 1024 * 1024) return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
+    if (sizeBytes >= 1024) return `${(sizeBytes / 1024).toFixed(1)} KB`;
+    return `${sizeBytes} B`;
+}
+
+function defaultKindForFilename(filename: string): SkillFileKind {
+    const ext = filename.includes('.') ? filename.split('.').pop()!.toLowerCase() : '';
+    if (['py', 'sh', 'js', 'ts', 'mjs', 'cjs', 'rb', 'ps1', 'bash'].includes(ext)) return 'script';
+    if (['md', 'markdown', 'txt', 'pdf', 'rst'].includes(ext)) return 'reference';
+    if (['json', 'yml', 'yaml', 'toml', 'ini', 'env', 'xml'].includes(ext)) return 'config';
+    return 'asset';
+}
+
+const KIND_BADGE_CLASS: Record<SkillFileKind, string> = {
+    script: 'bg-warning/10 text-warning border-warning/20',
+    reference: 'bg-info/10 text-info border-info/20',
+    config: 'bg-primary/10 text-primary border-primary/20',
+    asset: 'bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark border-border/40 dark:border-border-dark/40',
+};
+
+/**
+ * Skill files feature — "Files" section. Companion files (scripts /
+ * references / configs / assets) upload through the uploads spine via
+ * the `/api/skills/:id/files` proxy route; the kind defaults by
+ * extension and can be overridden with the picker before upload.
+ */
+function FilesSection({ skillId, initialFiles }: { skillId: string; initialFiles: SkillFile[] }) {
+    const t = useTranslations('dashboard.skillsPage.detail.files');
+    const [files, setFiles] = useState(initialFiles);
+    const [kindOverride, setKindOverride] = useState<'' | SkillFileKind>('');
+    const [uploading, setUploading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+    const [dragging, setDragging] = useState(false);
+    const inputRef = useRef<HTMLInputElement | null>(null);
+    const atCapacity = files.length >= MAX_SKILL_FILES;
+
+    const handlePicked = (picked: FileList | null) => {
+        const file = picked?.[0];
+        if (!file) return;
+        setError(null);
+        setUploading(true);
+        void (async () => {
+            try {
+                const form = new FormData();
+                form.append('file', file, file.name);
+                const kind = kindOverride || defaultKindForFilename(file.name);
+                form.append('kind', kind);
+                const res = await fetch(`/api/skills/${encodeURIComponent(skillId)}/files`, {
+                    method: 'POST',
+                    body: form,
+                });
+                const body = (await res.json().catch(() => null)) as
+                    | (SkillFile & { message?: string })
+                    | { message?: string }
+                    | null;
+                if (!res.ok) {
+                    const message =
+                        body && typeof body.message === 'string' ? body.message : t('uploadFailed');
+                    throw new Error(message);
+                }
+                setFiles((prev) => [...prev, body as SkillFile]);
+                setKindOverride('');
+            } catch (err) {
+                setError(err instanceof Error ? err.message : t('uploadFailed'));
+            } finally {
+                setUploading(false);
+                if (inputRef.current) inputRef.current.value = '';
+            }
+        })();
+    };
+
+    const handleDelete = (fileId: string) => {
+        const before = files;
+        setFiles((prev) => prev.filter((f) => f.id !== fileId));
+        void (async () => {
+            try {
+                await deleteSkillFileAction(skillId, fileId);
+            } catch (err) {
+                setFiles(before);
+                setError(err instanceof Error ? err.message : t('deleteFailed'));
+            }
+        })();
+    };
+
+    // Drop target covers the whole card, so a file can be dragged onto
+    // the list as well as the empty state. `dragenter`/`dragover` must
+    // both preventDefault or the browser navigates to the dropped file.
+    const onDragOver = (e: React.DragEvent) => {
+        if (uploading || atCapacity) return;
+        e.preventDefault();
+        setDragging(true);
+    };
+    const onDragLeave = (e: React.DragEvent) => {
+        // Ignore bubbling leaves from children still inside the card.
+        if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
+        setDragging(false);
+    };
+    const onDrop = (e: React.DragEvent) => {
+        e.preventDefault();
+        setDragging(false);
+        if (uploading || atCapacity) return;
+        handlePicked(e.dataTransfer?.files ?? null);
+    };
+
+    return (
+        <section
+            onDragEnter={onDragOver}
+            onDragOver={onDragOver}
+            onDragLeave={onDragLeave}
+            onDrop={onDrop}
+            data-testid="skill-files-dropzone"
+            className={`rounded-xl border bg-card dark:bg-card-primary-dark p-5 space-y-3 transition-colors ${
+                dragging
+                    ? 'border-primary ring-2 ring-primary/30'
+                    : 'border-border/60 dark:border-border-dark/60'
+            }`}
+        >
+            <div className="flex items-center gap-2">
+                <h2 className="text-sm font-medium text-text dark:text-text-dark flex items-center gap-2">
+                    <Paperclip className="w-4 h-4 text-warning" />
+                    {t('title')}
+                </h2>
+                <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-surface-secondary dark:bg-surface-secondary-dark text-text-secondary dark:text-text-secondary-dark">
+                    {files.length}
+                </span>
+            </div>
+            <p className="text-xs text-text-secondary dark:text-text-secondary-dark">
+                {t('helper')}
+            </p>
+            {files.length === 0 ? (
+                <div className="rounded-lg border border-dashed border-border/60 dark:border-border-dark/60 px-4 py-6 text-center">
+                    <p className="text-xs text-text-muted">{t('empty')}</p>
+                </div>
+            ) : (
+                <ul className="space-y-2" data-testid="skill-files-list">
+                    {files.map((f) => (
+                        <li
+                            key={f.id}
+                            className="flex items-center justify-between gap-3 rounded-lg border border-border/40 dark:border-border-dark/40 bg-surface-secondary/30 dark:bg-surface-secondary-dark/30 px-3 py-2 text-xs"
+                        >
+                            <span className="flex items-center gap-2 min-w-0 flex-wrap">
+                                <span className="font-mono text-[11px] text-text dark:text-text-dark truncate">
+                                    {f.filename}
+                                </span>
+                                <span
+                                    className={`text-[10px] font-medium px-1.5 py-0.5 rounded-md border ${KIND_BADGE_CLASS[f.kind]}`}
+                                >
+                                    {t(`kind.${f.kind}`)}
+                                </span>
+                                <span className="text-[11px] text-text-muted">
+                                    {formatFileSize(f.sizeBytes)}
+                                </span>
+                            </span>
+                            <button
+                                type="button"
+                                onClick={() => handleDelete(f.id)}
+                                className="shrink-0 p-1.5 rounded-md text-text-muted hover:text-danger hover:bg-danger/10 transition-colors"
+                                aria-label={t('remove')}
+                            >
+                                <Trash2 className="w-3.5 h-3.5" />
+                            </button>
+                        </li>
+                    ))}
+                </ul>
+            )}
+            <div className="pt-3 border-t border-border/40 dark:border-border-dark/40 flex items-center gap-2 flex-wrap">
+                <input
+                    ref={inputRef}
+                    type="file"
+                    className="sr-only"
+                    id="skill-file-input"
+                    onChange={(e) => handlePicked(e.target.files)}
+                />
+                <Button
+                    type="button"
+                    size="sm"
+                    variant="secondary"
+                    disabled={uploading || atCapacity}
+                    onClick={() => inputRef.current?.click()}
+                    className="gap-1.5"
+                >
+                    <Upload className="w-3.5 h-3.5" />
+                    {uploading ? t('uploading') : t('upload')}
+                </Button>
+                <label
+                    htmlFor="skill-file-kind"
+                    className="text-[11px] text-text-secondary dark:text-text-secondary-dark"
+                >
+                    {t('kindLabel')}
+                </label>
+                <Select
+                    id="skill-file-kind"
+                    size="xs"
+                    value={kindOverride}
+                    onValueChange={(v) => setKindOverride(v as '' | SkillFileKind)}
+                    className="w-36"
+                >
+                    <option value="">{t('kindAuto')}</option>
+                    {FILE_KINDS.map((k) => (
+                        <option key={k} value={k}>
+                            {t(`kind.${k}`)}
+                        </option>
+                    ))}
+                </Select>
+                <span className="text-[11px] text-text-muted">{t('limits')}</span>
+            </div>
+            {error && (
+                <p className="text-xs text-danger" role="alert">
+                    {error}
+                </p>
+            )}
         </section>
     );
 }

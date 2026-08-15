@@ -52,6 +52,7 @@ import { AgentApprovalsModule } from './agent-approvals/agent-approvals.module';
 import { SkillsModule } from './skills/skills.module';
 import { RepoConnectionsModule } from './repo-connections/repo-connections.module';
 import { TasksModule } from './tasks/tasks.module';
+import { TaskTemplatesModule } from './task-templates/task-templates.module';
 import { WorkflowsModule } from './workflows/workflows.module';
 import { TerminalModule } from './terminal/terminal.module';
 import { TeamsModule } from './teams/teams.module';
@@ -62,6 +63,7 @@ import { MeetingsApiModule } from './meetings/meetings.module';
 import { FleetApiModule } from './fleet/fleet.module';
 import { MergePolicyApiModule } from './merge-policy/merge-policy.module';
 import { ToolGrantsApiModule } from './tool-grants/tool-grants.module';
+import { AgentCapabilitiesApiModule } from './agent-capabilities/agent-capabilities.module';
 import { DigestApiModule } from './digest/digest.module';
 import { EscalationsApiModule } from './escalations/escalations.module';
 import { PrReviewApiModule } from './pr-review/pr-review.module';
@@ -73,6 +75,7 @@ import { SessionScopeGuard } from './scope/session-scope.guard';
 import { OrganizationsModule } from './organizations/organizations.module';
 import { FunnelAnalyticsBindingModule } from './telemetry/funnel-analytics-binding.module';
 import { UploadsModule } from './uploads/uploads.module';
+import { MemoryFilesApiModule } from './memory-files/memory-files.module';
 import { WebhooksModule } from './webhooks/webhooks.module';
 import {
     PluginsModule as AgentPluginsModule,
@@ -191,6 +194,8 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // Phase 12 — Tasks API (CRUD + transitions + member CRUD).
         // Chat + attachments + per-task spend land in Phase 13.
         TasksModule,
+        // Tasks upgrades — workflow Task Templates (CRUD + instantiate).
+        TaskTemplatesModule,
         // Saved workflow graphs (judgment layer G5) — the persistence and
         // CRUD surface for graphs the executor could already run but
         // nothing could keep.
@@ -232,6 +237,9 @@ import { DatabaseModule } from '@ever-works/agent/database';
         // ownership checks as the merge-policy preview; grants are their
         // own rows, so unlike a merge policy they need a write path here.
         ToolGrantsApiModule,
+        // Capabilities tab — composed per-Agent read (catalog + grants +
+        // permissions + init script). Additive leaf over the two above.
+        AgentCapabilitiesApiModule,
         // Digest read (Wave 7) — GET /api/digest owner-scoped composed
         // digest over the agent-side DigestModule. Cadence stays a
         // profile preference; delivery stays on the digest-dispatcher
@@ -259,6 +267,9 @@ import { DatabaseModule } from '@ever-works/agent/database';
         TelemetryModule,
         FunnelAnalyticsBindingModule,
         UploadsModule,
+        // Memory Files — /api/memory/files: the unified Files area of
+        // /memory (folder tree + both upload spines + manual git sync).
+        MemoryFilesApiModule,
         WebhooksModule,
         // EW-652 (Tenants & Organizations Phase 0) — UsersModule provides
         // `UsernameAllocatorService` (consumed by AuthModule callers,

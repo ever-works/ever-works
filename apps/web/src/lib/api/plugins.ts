@@ -66,6 +66,22 @@ export type SettingsMenuResponse = ISettingsMenuResponse;
 export type SettingsMenuCategory = ISettingsMenuCategory;
 export type SettingsMenuPlugin = ISettingsMenuPlugin;
 
+/** One AI-provider plugin that implements speech-to-text. */
+export interface VoiceProvider {
+    id: string;
+    name: string;
+    /** True for the plugin the scope resolves to when nothing is pinned. */
+    isActive: boolean;
+}
+
+export interface VoiceProvidersResponse {
+    providers: VoiceProvider[];
+    /** The account's own pick, or `null` when it has expressed no preference. */
+    selectedDefault: string | null;
+    /** Operator-level env fallback, applied only when `selectedDefault` is null. */
+    configuredDefault: string | null;
+}
+
 // ============================================
 // API Client
 // ============================================
@@ -281,6 +297,29 @@ export const pluginsAPI = {
             method: 'POST',
             wrapInData: false,
         });
+    },
+
+    /**
+     * Set or clear which AI-provider plugin transcribes voice dictation.
+     * `null` falls back to the scope-active provider, then the platform default.
+     */
+    setGlobalVoiceDefault: async (pluginId: string | null): Promise<void> => {
+        await serverMutation<void>({
+            endpoint: '/plugins/voice-default',
+            data: { pluginId },
+            method: 'POST',
+            wrapInData: false,
+        });
+    },
+
+    /**
+     * AI-provider plugins that actually implement `transcribe()`, plus which
+     * one this account has selected. Probed on the plugin instance server-side
+     * because speech-to-text is an OPTIONAL method — being an AI provider does
+     * not imply it, so this list is usually much shorter than the AI list.
+     */
+    listVoiceProviders: async (): Promise<VoiceProvidersResponse> => {
+        return serverFetch<VoiceProvidersResponse>('/transcription/providers');
     },
 
     /**

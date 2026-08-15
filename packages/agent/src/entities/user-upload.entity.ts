@@ -68,6 +68,15 @@ export class UserUpload {
     @Column({ type: 'uuid', nullable: true })
     organizationId?: string | null;
 
+    /**
+     * Memory Files — the `memory_folders` row this upload is filed under.
+     * NULL = unfiled (shows at the root of the /memory Files area). Raw
+     * uuid + FK by migration (EW-654 no-cycle rule); membership only —
+     * deleting a folder unlinks (SET NULL), never destroys the bytes.
+     */
+    @Column({ type: 'uuid', nullable: true })
+    folderId?: string | null;
+
     /** Plugin id of the Storage backend holding the bytes. */
     @Column({ type: 'varchar', length: 64, name: 'storage_provider' })
     storageProvider: string;

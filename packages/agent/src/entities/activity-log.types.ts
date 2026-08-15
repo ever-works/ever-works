@@ -118,6 +118,14 @@ export enum ActivityActionType {
     // upload-extraction event shape; transcription is "extraction for media".
     KB_UPLOAD_TRANSCRIBED = 'kb_upload_transcribed',
     KB_UPLOAD_TRANSCRIPTION_FAILED = 'kb_upload_transcription_failed',
+    // Memory Files (/memory Files area) — the user-visible folder-tree
+    // state changes. `details` carries `{ folderId, path }` plus
+    // `{ ownerAgentId }` on create, `{ deletedFolders, unlinkedFiles }`
+    // on delete (files are only UNFILED — bytes are never destroyed),
+    // and `{ committed, skipped, failed, commitSha }` on a manual sync.
+    MEMORY_FOLDER_CREATED = 'memory_folder_created',
+    MEMORY_FOLDER_DELETED = 'memory_folder_deleted',
+    MEMORY_FOLDER_SYNCED = 'memory_folder_synced',
     // EW-643 Phase 3 slice 4b — wikilink rename rewriter. Fires when a
     // KB document is renamed and the rewriter sweeps the rest of the
     // Work's docs replacing `[[oldPath]]` with `[[newPath]]`. Details
@@ -175,6 +183,15 @@ export enum ActivityActionType {
     AGENT_BUDGET_EXCEEDED = 'agent_budget_exceeded',
     AGENT_EXPORTED = 'agent_exported',
     AGENT_IMPORTED = 'agent_imported',
+    // Agent Collaborators — edits to the per-agent sub-agent delegation
+    // allow-list. These are security-relevant: enabling a collaborator
+    // widens which agents this one may spawn, so the trail records the
+    // pair (details.collaboratorAgentId) alongside the parent agent.
+    // Additive members only — `activity_log.actionType` is a plain
+    // varchar, so no migration.
+    AGENT_COLLABORATOR_ENABLED = 'agent_collaborator_enabled',
+    AGENT_COLLABORATOR_DISABLED = 'agent_collaborator_disabled',
+    AGENT_COLLABORATOR_REMOVED = 'agent_collaborator_removed',
     SKILL_INSTALLED = 'skill_installed',
     SKILL_ATTACHED_TO_AGENT = 'skill_attached_to_agent',
     SKILL_INVOKED = 'skill_invoked',

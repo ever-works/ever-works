@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useTransition } from 'react';
+import { useRef, useState, useTransition } from 'react';
 import { useTranslations } from 'next-intl';
 import { ArrowLeft, Loader2, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -11,10 +11,20 @@ import { cn } from '@/lib/utils/cn';
 // picker cannot drift apart. Labels stay in the `tasksPage.priority`
 // i18n namespace.
 import { TASK_PRIORITY_PRESENTATION } from '@/lib/task-priorities/catalog';
-import type { Task, TaskAttachmentRow, TaskChatMessage, TaskStatus } from '@/lib/api/tasks';
+import type {
+    Task,
+    TaskActivityRow,
+    TaskAttachmentRow,
+    TaskChatMessage,
+    TaskStatus,
+    TaskSubtaskRow,
+    TaskSubtasksMeta,
+} from '@/lib/api/tasks';
 import type { AgentRunSession } from '@/lib/api/agents.shared';
 import { postTaskChatAction, transitionTaskAction, updateTaskAction } from '@/app/actions/tasks';
-import { TaskRecurringSection } from './TaskRecurringSection';
+import { TaskScheduleSection } from './TaskScheduleSection';
+import { TaskSubtasksSection } from './TaskSubtasksSection';
+import { TaskActivitySection } from './TaskActivitySection';
 import { TaskAttachmentsSection } from './TaskAttachmentsSection';
 import { TaskBranchSection } from './TaskBranchSection';
 import { TaskChecksSection } from './TaskChecksSection';
@@ -25,6 +35,11 @@ import { TaskDecisionConflicts } from './TaskDecisionConflicts';
 import { TaskDeleteButton } from './TaskDeleteButton';
 import { WorkSelect } from './WorkSelect';
 import { AgentSelect } from './AgentSelect';
+// Skills feature — invocation slugs. Task chat is the surface whose
+// messages run through `AgentRunService` with kind='chat', which is
+// where a leading `/<invocation-slug>` is resolved server-side; the
+// popup is the discovery affordance for it.
+import { SlashCommandPopup, useSlashCommands } from '@/components/skills/SlashCommandAutocomplete';
 
 // Status tones + dots mirror /tasks (TasksList) so colours stay
 // consistent across the list filter and the detail workflow buttons.
@@ -94,12 +109,26 @@ export function TaskDetailClient({
     initialAttachmentsError = null,
     initialGateRun = null,
     initialRuns = [],
+    initialSubtasks = [],
+    initialSubtasksMeta = { total: 0, doneCount: 0 },
+    initialSubtasksError = null,
+    initialActivity = [],
+    initialActivityTotal = 0,
+    initialActivityError = null,
 }: {
     task: Task;
     initialChat: TaskChatMessage[];
     initialAttachments?: TaskAttachmentRow[];
     initialChatError?: string | null;
     initialAttachmentsError?: string | null;
+    /** Tasks upgrades — Subtasks checklist rows + its n/m counters. */
+    initialSubtasks?: TaskSubtaskRow[];
+    initialSubtasksMeta?: TaskSubtasksMeta;
+    initialSubtasksError?: string | null;
+    /** Tasks upgrades — per-Task activity feed (audit trail, not chat). */
+    initialActivity?: TaskActivityRow[];
+    initialActivityTotal?: number;
+    initialActivityError?: string | null;
     /**
      * Latest run for this Task, server-fetched (`listSessions({ taskId,
      * limit: 1 })`). Feeds BOTH the quality-gate Checks section (Wave 3 M6 —
@@ -123,6 +152,7 @@ export function TaskDetailClient({
     const [messages, setMessages] = useState(initialChat);
     const [currentStatus, setCurrentStatus] = useState<TaskStatus>(task.status);
     const [draft, setDraft] = useState('');
+    const draftRef = useRef<HTMLTextAreaElement | null>(null);
     const [pendingPost, startPost] = useTransition();
     const [pendingTransition, startTransition] = useTransition();
     const [postError, setPostError] = useState<string | null>(null);
@@ -145,6 +175,14 @@ export function TaskDetailClient({
     // description save so the conflict check re-runs against the new
     // intent — "created OR its description is edited".
     const [conflictKey, setConflictKey] = useState(0);
+
+    // Skills feature — `/slug` completions for the chat draft.
+    const slash = useSlashCommands({
+        value: draft,
+        onChange: setDraft,
+        disabled: pendingPost,
+        inputRef: draftRef,
+    });
 
     const handlePost = (e: React.FormEvent) => {
         e.preventDefault();
@@ -406,6 +444,15 @@ export function TaskDetailClient({
                         )}
                     </section>
 
+                    {/* Tasks upgrades — Subtasks checklist (n/m, per-row
+                        agent chip + approval badge, add-subtask input). */}
+                    <TaskSubtasksSection
+                        task={task}
+                        initial={initialSubtasks}
+                        initialMeta={initialSubtasksMeta}
+                        initialError={initialSubtasksError}
+                    />
+
                     {/* Run steering (Wave 4 M5) + attach action (M8) — steer /
                         interrupt / resume the Task's latest run. Renders
                         nothing when there is no actionable run. */}
@@ -425,6 +472,14 @@ export function TaskDetailClient({
                         workId={workId}
                         initial={initialAttachments}
                         initialError={initialAttachmentsError}
+                    />
+
+                    {/* Tasks upgrades — audit trail for this Task (distinct
+                        from the conversation thread below). */}
+                    <TaskActivitySection
+                        rows={initialActivity}
+                        total={initialActivityTotal}
+                        error={initialActivityError}
                     />
 
                     {/* Activity / conversation */}
@@ -484,11 +539,14 @@ export function TaskDetailClient({
 
                         <form
                             onSubmit={handlePost}
-                            className="mt-5 pt-4 border-t border-border/40 dark:border-border-dark/40 space-y-2"
+                            className="relative mt-5 pt-4 border-t border-border/40 dark:border-border-dark/40 space-y-2"
                         >
+                            <SlashCommandPopup state={slash} />
                             <textarea
+                                ref={draftRef}
                                 value={draft}
                                 onChange={(e) => setDraft(e.target.value)}
+                                onKeyDown={(e) => slash.handleKeyDown(e)}
                                 rows={3}
                                 placeholder={t('draftPlaceholder')}
                                 className="w-full rounded-md border border-border/60 dark:border-border-dark/60 bg-card dark:bg-card-primary-dark p-3 text-sm text-text dark:text-text-dark"
@@ -611,8 +669,10 @@ export function TaskDetailClient({
                     {/* Wave 2 M7 — isolated-branch cockpit / isolation override. */}
                     <TaskBranchSection task={task} />
 
-                    {/* Phase 17.8 UI — Recurring template controls. */}
-                    <TaskRecurringSection task={task} />
+                    {/* Tasks upgrades — Schedule section: Run once |
+                        Scheduled (one-shot) | Recurring (Phase 17.8 panel,
+                        rendered by the section for the recurring mode). */}
+                    <TaskScheduleSection task={task} />
                 </aside>
             </div>
         </div>

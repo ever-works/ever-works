@@ -101,6 +101,67 @@ export interface AgentRunSession {
     createdAt: string;
 }
 
+// ── Session detail (Feature K) ──
+// Client-safe mirror of `GET /api/agents/runs/:runId/detail`
+// (AgentsController.getRunSessionDetail).
+
+export type AgentRunTimelineEntryKind =
+    | 'assistant-message'
+    | 'user-message'
+    | 'tool-call'
+    | 'marker';
+
+/**
+ * One rendered row of the session-detail timeline. Message rows carry
+ * `text` (already redacted + size-capped server-side); tool rows carry
+ * the tool name plus redacted args/result previews and duration; marker
+ * rows flag that the capture cap was reached.
+ */
+export interface AgentRunTimelineEntry {
+    id: string;
+    kind: AgentRunTimelineEntryKind;
+    createdAt: string;
+    text: string | null;
+    toolName: string | null;
+    callId: string | null;
+    argsPreview: string | null;
+    resultPreview: string | null;
+    durationMs: number | null;
+    isError: boolean;
+    truncated: boolean;
+}
+
+export interface AgentRunSessionDetail {
+    run: AgentRunSession & {
+        chatMessageId: string | null;
+        memorySessionId: string | null;
+    };
+    counts: { messages: number; toolCalls: number; filesTouched: number };
+    /** Explicit paths when capture recorded them; may be empty while
+     *  `counts.filesTouched` still carries the workspace-diff rollup. */
+    filesTouched: string[];
+    timeline: {
+        entries: AgentRunTimelineEntry[];
+        /** Opaque `<epochMillis>_<uuid>` token; null = no more pages. */
+        nextCursor: string | null;
+        limit: number;
+    };
+}
+
+export interface SessionDetailQuery {
+    cursor?: string;
+    limit?: number;
+}
+
+/**
+ * Client-side twin of the server's cursor builder: the token for one
+ * timeline entry, used by the live-follow poll to ask "everything after
+ * the last row I already have".
+ */
+export function timelineEntryCursor(entry: AgentRunTimelineEntry): string {
+    return `${new Date(entry.createdAt).getTime()}_${entry.id}`;
+}
+
 /**
  * Run steering (Wave 4 M5) — the shape returned by the steer endpoint.
  * `new-run` is a normal answer, not an error: the run finished while the
@@ -165,4 +226,29 @@ export interface AgentPickerOption {
  */
 export interface AgentAssignCandidate extends AgentPickerOption {
     title: string | null;
+}
+
+// ── Agent Collaborators ──
+// Client-safe mirror of the `GET /api/agents/:id/collaborators` row
+// (AgentCollaboratorsController.list). Lives here so the `'use client'`
+// Collaborators tab can type its rows without pulling the `server-only`
+// `agents.ts` module into the bundle.
+
+/**
+ * One collaborator candidate: another agent of the same owner, plus the
+ * allow-list state for THIS parent agent. `configured` says a rule row
+ * exists at all; `enabled` says it currently permits delegation — a
+ * configured-but-disabled row renders as an OFF switch just like an
+ * unconfigured one, but deleting vs disabling are different writes.
+ */
+export interface AgentCollaboratorCandidate {
+    agentId: string;
+    name: string;
+    slug: string;
+    title: string | null;
+    status: string;
+    avatarMode: string;
+    avatarIcon: string | null;
+    configured: boolean;
+    enabled: boolean;
 }

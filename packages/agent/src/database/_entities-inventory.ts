@@ -78,11 +78,13 @@ import { AgentRunLog } from '../entities/agent-run-log.entity';
 import { AgentEscalation } from '../entities/agent-escalation.entity';
 import { AgentBudget } from '../entities/agent-budget.entity';
 import { AgentMembership } from '../entities/agent-membership.entity';
+import { AgentCollaborator } from '../entities/agent-collaborator.entity';
 import { Team } from '../entities/team.entity';
 import { TeamMember } from '../entities/team-member.entity';
 import { TeamResource } from '../entities/team-resource.entity';
 import { Skill } from '../entities/skill.entity';
 import { SkillBinding } from '../entities/skill-binding.entity';
+import { SkillFile } from '../entities/skill-file.entity';
 import { Task } from '../entities/task.entity';
 import { TaskAssignee } from '../entities/task-assignee.entity';
 import { TaskReviewer } from '../entities/task-reviewer.entity';
@@ -94,6 +96,8 @@ import { TaskChatMessage } from '../entities/task-chat-message.entity';
 import { TaskAttachment } from '../entities/task-attachment.entity';
 import { TaskWatcher } from '../entities/task-watcher.entity';
 import { TaskKbMention } from '../entities/task-kb-mention.entity';
+import { TaskTemplate } from '../entities/task-template.entity';
+import { TaskTemplateStep } from '../entities/task-template-step.entity';
 import { UserTaskCounter } from '../entities/user-task-counter.entity';
 import { MissionAttachment } from '../entities/mission-attachment.entity';
 import { MissionWork } from '../entities/mission-work.entity';
@@ -118,6 +122,7 @@ import { TenantJobRuntimeAudit } from '../entities/tenant-job-runtime-audit.enti
 import { TenantRuntimeProviderAllowlist } from '../entities/tenant-runtime-provider-allowlist.entity';
 import { TenantCredentialSnapshot } from '../entities/tenant-credential-snapshot.entity';
 import { InboundTrigger } from '../entities/inbound-trigger.entity';
+import { InboundTriggerFire } from '../entities/inbound-trigger-fire.entity';
 import { IngestedEvent } from '../entities/ingested-event.entity';
 import { IngestCursor } from '../entities/ingest-cursor.entity';
 import { IngestInstallBinding } from '../entities/ingest-install-binding.entity';
@@ -131,12 +136,14 @@ import { FleetNode } from '../entities/fleet-node.entity';
 import { TerminalTranscriptChunk } from '../entities/terminal-transcript-chunk.entity';
 
 import { FleetJob } from '../entities/fleet-job.entity';
+import { FleetExecutionPreference } from '../entities/fleet-execution-preference.entity';
 import { ToolGrant } from '../entities/tool-grant.entity';
 import { Workflow } from '../entities/workflow.entity';
 import { WorkflowRun } from '../entities/workflow-run.entity';
 // Repository registry (Feature G)
 import { RepoConnection } from '../entities/repo-connection.entity';
 import { AgentRepoAttachment } from '../entities/agent-repo-attachment.entity';
+import { MemoryFolder } from '../entities/memory-folder.entity';
 
 import {
     PluginEntity,
@@ -210,6 +217,8 @@ export const ENTITIES = [
     AgentEscalation,
     AgentBudget,
     AgentMembership,
+    // Agent Collaborators — per-agent sub-agent delegation allow-list.
+    AgentCollaborator,
     AgentAttachment,
     // Teams & Prebuilt Companies (teams-and-companies spec §2)
     Team,
@@ -218,6 +227,7 @@ export const ENTITIES = [
     TeamResource,
     Skill,
     SkillBinding,
+    SkillFile,
     // Phase 11 — Tasks family
     Task,
     TaskAssignee,
@@ -231,6 +241,9 @@ export const ENTITIES = [
     TaskAttachment,
     TaskWatcher,
     TaskKbMention,
+    // Tasks upgrades — workflow templates (parent + steps).
+    TaskTemplate,
+    TaskTemplateStep,
     UserTaskCounter,
     // PR #1044 — Mission/Idea attachment edge tables
     MissionAttachment,
@@ -285,6 +298,7 @@ export const ENTITIES = [
     // Inbound Triggers (Trigger Schedules) — signed webhook/API triggers
     // that spawn Tasks on verified HMAC deliveries.
     InboundTrigger,
+    InboundTriggerFire,
     // Event-ingest spine (Wave 6) — normalized external events awaiting
     // Activity/Memory fan-out.
     IngestedEvent,
@@ -322,6 +336,9 @@ export const ENTITIES = [
     // Fleet job runtime (Desktop PRD M4) — the lease-able work queue
     // whose workers are the enrolled nodes above.
     FleetJob,
+    // Fleet local-runner routing — per Work / Goal / account preference
+    // for local-runner vs cloud execution.
+    FleetExecutionPreference,
     // Tool-grant matrix (audit item G4) — one row per (owner, scope)
     // carrying that scope's tool allow/deny contribution.
     ToolGrant,
@@ -335,4 +352,6 @@ export const ENTITIES = [
     // the Agent → repo grant edge rows.
     RepoConnection,
     AgentRepoAttachment,
+    // Memory Files — user-defined folders organizing uploads on /memory.
+    MemoryFolder,
 ];

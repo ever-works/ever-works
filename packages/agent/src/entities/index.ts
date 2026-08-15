@@ -62,9 +62,11 @@ export * from './agent-run.entity';
 export * from './agent-escalation.entity';
 export * from './agent-run-log.entity';
 export * from './agent-budget.entity';
+export * from './agent-collaborator.entity';
 export * from './agent-membership.entity';
 export * from './skill.entity';
 export * from './skill-binding.entity';
+export * from './skill-file.entity';
 export * from './task.entity';
 export * from './task-assignee.entity';
 export * from './task-reviewer.entity';
@@ -76,6 +78,8 @@ export * from './task-chat-message.entity';
 export * from './task-attachment.entity';
 export * from './task-watcher.entity';
 export * from './task-kb-mention.entity';
+export * from './task-template.entity';
+export * from './task-template-step.entity';
 export * from './user-task-counter.entity';
 export * from './mission-attachment.entity';
 export * from './mission-work.entity';
@@ -122,6 +126,8 @@ export * from './team-member.entity';
 export * from './team-resource.entity';
 // Inbound Triggers (Trigger Schedules) — signed webhook/API triggers that spawn Tasks
 export * from './inbound-trigger.entity';
+// Task Triggers — per-(trigger, event) fire ledger for ingest-spine idempotency
+export * from './inbound-trigger-fire.entity';
 // Event-ingest spine (Wave 6) — normalized external events awaiting fan-out
 export * from './ingested-event.entity';
 // Event-ingest pull path (Wave 8) — per-(user, plugin) pull watermarks/cursors
@@ -146,6 +152,9 @@ export * from './fleet-node.entity';
 export * from './terminal-transcript-chunk.entity';
 
 export * from './fleet-job.entity';
+// Fleet local-runner routing — per Work / Goal / account execution
+// preference (local runner vs cloud) read by the fleet run router.
+export * from './fleet-execution-preference.entity';
 // Tool-grant matrix (audit item G4) — per-scope tool allow/deny rows.
 export * from './tool-grant.entity';
 export * from './workflow.entity';
@@ -155,3 +164,5 @@ export * from './workflow-run.entity';
 // Repository registry (Feature G) — account-level repo records + agent grants.
 export * from './repo-connection.entity';
 export * from './agent-repo-attachment.entity';
+// Memory Files — user-defined folders organizing uploads on /memory.
+export * from './memory-folder.entity';
