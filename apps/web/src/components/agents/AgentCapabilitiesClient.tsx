@@ -101,10 +101,20 @@ export function AgentCapabilitiesClient({
     const t = useTranslations('dashboard.agentsPage.capabilities');
     const [caps, setCaps] = useState(initialCapabilities);
     const [boundSkills, setBoundSkills] = useState(initialBoundSkills);
-    const [pending, startTransition] = useTransition();
+    // `useTransition`'s `pending` is deliberately NOT the busy signal: the
+    // work below is a fire-and-forget async IIFE, so the transition scope
+    // returns synchronously and `pending` is already false while the PUT
+    // is still in flight. Gating a switch on it disables nothing, and two
+    // quick clicks then compose their grants from the SAME stale
+    // `agentGrantRow` — the second PUT replaces the row and silently drops
+    // the first toggle's deny. `busyTool` / `busySkill` are the real
+    // in-flight markers, so they gate on their own.
+    const [, startTransition] = useTransition();
     const [busyTool, setBusyTool] = useState<string | null>(null);
     const [busySkill, setBusySkill] = useState<string | null>(null);
     const [skillPick, setSkillPick] = useState('');
+    const toolsBusy = busyTool !== null;
+    const skillsBusy = busySkill !== null;
 
     // ── Tools ─────────────────────────────────────────────────────────
 
@@ -123,6 +133,10 @@ export function AgentCapabilitiesClient({
     }, [caps.tools, t]);
 
     const toggleTool = (tool: AgentCapabilityToolRow, next: boolean) => {
+        // Second line of defence behind the disabled switches: every grant
+        // is composed from the CURRENT `agentGrantRow`, so overlapping
+        // writes lose whichever one lands first.
+        if (toolsBusy) return;
         const grant = composeGrantForToggle(tool, caps.agentGrantRow, next);
 
         setBusyTool(tool.name);
@@ -141,7 +155,7 @@ export function AgentCapabilitiesClient({
 
     const resetGrants = () => {
         const row = caps.agentGrantRow;
-        if (!row) return;
+        if (!row || toolsBusy) return;
         setBusyTool('__reset__');
         startTransition(() => {
             void (async () => {
@@ -188,7 +202,7 @@ export function AgentCapabilitiesClient({
 
     const attachSkill = (value: string) => {
         setSkillPick(value);
-        if (!value) return;
+        if (!value || skillsBusy) return;
         setBusySkill(value);
         startTransition(() => {
             void (async () => {
@@ -210,6 +224,7 @@ export function AgentCapabilitiesClient({
     };
 
     const detachSkill = (bindingId: string) => {
+        if (skillsBusy) return;
         setBusySkill(bindingId);
         startTransition(() => {
             void (async () => {
@@ -285,7 +300,7 @@ export function AgentCapabilitiesClient({
                             variant="ghost"
                             size="sm"
                             onClick={resetGrants}
-                            disabled={pending && busyTool === '__reset__'}
+                            disabled={toolsBusy}
                             className="gap-1.5 shrink-0"
                             data-testid="capabilities-reset-grants"
                         >
@@ -306,7 +321,6 @@ export function AgentCapabilitiesClient({
                                     caps.agentGrantRow,
                                     caps.grants.chain,
                                 );
-                                const busy = pending && busyTool === tool.name;
                                 return (
                                     <article
                                         key={tool.name}
@@ -350,7 +364,7 @@ export function AgentCapabilitiesClient({
                                                 state.kind === 'editable' ? state.checked : false
                                             }
                                             onChange={(next) => toggleTool(tool, next)}
-                                            disabled={busy || state.kind !== 'editable'}
+                                            disabled={toolsBusy || state.kind !== 'editable'}
                                             className="mt-0 shrink-0"
                                             data-testid={`capabilities-tool-switch-${tool.name}`}
                                         />
@@ -418,7 +432,7 @@ export function AgentCapabilitiesClient({
                                 onChange={attachSkill}
                                 options={skillOptions}
                                 placeholder={t('skills.attachPlaceholder')}
-                                disabled={pending && busySkill !== null}
+                                disabled={skillsBusy}
                                 testId="capabilities-attach-skill"
                             />
                         </div>
@@ -450,7 +464,7 @@ export function AgentCapabilitiesClient({
                             <Switch
                                 checked
                                 onChange={() => detachSkill(row.bindingId)}
-                                disabled={pending && busySkill === row.bindingId}
+                                disabled={skillsBusy}
                                 className="mt-0 shrink-0"
                                 data-testid={`capabilities-skill-switch-${row.skill.slug}`}
                             />

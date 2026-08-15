@@ -201,6 +201,30 @@ describe('composeGrantForToggle', () => {
         ).toEqual({ allow: ['search*'], deny: [] });
     });
 
+    /**
+     * Regression: the API writes `note = body.note ?? null` on every PUT,
+     * so a toggle that omits the note DELETES the operator's rationale for
+     * the whole grant row. Both directions must carry it.
+     */
+    it('re-sends the stored note so a toggle cannot destroy it', () => {
+        const stored = row({ deny: ['createTask'], note: 'SOC2: no direct external calls' });
+        expect(composeGrantForToggle(tool(), stored, false)).toEqual({
+            deny: ['createTask', 'searchWeb'],
+            note: 'SOC2: no direct external calls',
+        });
+        expect(composeGrantForToggle(tool(), stored, true)).toEqual({
+            deny: ['createTask'],
+            note: 'SOC2: no direct external calls',
+        });
+    });
+
+    it('omits note entirely when the row carries none (never writes an empty note)', () => {
+        expect(composeGrantForToggle(tool(), row({ note: null }), false)).not.toHaveProperty(
+            'note',
+        );
+        expect(composeGrantForToggle(tool(), null, false)).not.toHaveProperty('note');
+    });
+
     it('never mutates the stored row', () => {
         const stored = row({ allow: ['createTask'], deny: ['x'] });
         composeGrantForToggle(tool(), stored, true);

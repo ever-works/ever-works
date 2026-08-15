@@ -266,6 +266,58 @@ describe('AgentCapabilitiesClient — tools section', () => {
         );
     });
 
+    /**
+     * Regression: `useTransition`'s `pending` is already false while the
+     * PUT is in flight (the handler fires a detached async IIFE), so the
+     * old `pending && busyTool === tool.name` guard disabled nothing. Two
+     * quick clicks then composed their grants from the same stale
+     * `agentGrantRow`, and the second PUT — which REPLACES the row —
+     * silently dropped the first toggle's deny.
+     */
+    it('locks every tool switch while a toggle is in flight (no lost-write race)', async () => {
+        const user = userEvent.setup();
+        let release!: (value: AgentCapabilitiesPayload) => void;
+        setAgentToolGrantAction.mockReturnValue(
+            new Promise<AgentCapabilitiesPayload>((resolve) => {
+                release = resolve;
+            }),
+        );
+        renderTab();
+
+        await user.click(screen.getByTestId('capabilities-tool-switch-searchWeb'));
+        await waitFor(() => expect(setAgentToolGrantAction).toHaveBeenCalledTimes(1));
+
+        const other = screen.getByTestId('capabilities-tool-switch-getSkillBody');
+        await waitFor(() => expect(other).toBeDisabled());
+        await user.click(other);
+        expect(setAgentToolGrantAction).toHaveBeenCalledTimes(1);
+
+        release(payload());
+        await waitFor(() => expect(other).not.toBeDisabled());
+    });
+
+    /**
+     * Regression: `PUT /api/tool-grants` writes `note = body.note ?? null`,
+     * so a toggle that omits the stored note deletes the operator's
+     * rationale for the entire grant row.
+     */
+    it('carries the stored grant note through a toggle', async () => {
+        const user = userEvent.setup();
+        setAgentToolGrantAction.mockResolvedValue(payload());
+        renderTab({
+            agentGrantRow: { id: 'row-1', allow: null, deny: [], note: 'SOC2 restriction' },
+        });
+
+        await user.click(screen.getByTestId('capabilities-tool-switch-searchWeb'));
+
+        await waitFor(() =>
+            expect(setAgentToolGrantAction).toHaveBeenCalledWith(AGENT_ID, {
+                deny: ['searchWeb'],
+                note: 'SOC2 restriction',
+            }),
+        );
+    });
+
     it('locks the switch and badges the scope when a PARENT layer denies the tool', () => {
         renderTab({
             tools: [

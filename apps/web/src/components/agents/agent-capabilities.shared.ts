@@ -108,27 +108,36 @@ export function toolToggleState(
  * grants. Turning a tool ON when an allow list exists adds the tool to
  * that list: without it, ON would only clear a deny the tool was never
  * on, and the switch would flip straight back on the next render.
+ *
+ * The stored `note` rides along for the SAME reason, and it is the field
+ * where "replace" bites hardest: the API writes `note = body.note ?? null`,
+ * so a body that merely omits it DELETES the operator's note. A toggle
+ * must never be a destructive edit of a field it does not own.
  */
 export function composeGrantForToggle(
     tool: AgentCapabilityToolRow,
     agentGrantRow: AgentStoredToolGrant | null,
     next: boolean,
-): { allow?: string[]; deny: string[] } {
+): { allow?: string[]; deny: string[]; note?: string } {
     const currentDeny = agentGrantRow?.deny ?? [];
     const currentAllow = agentGrantRow?.allow ?? null;
 
+    const grant: { allow?: string[]; deny: string[]; note?: string } = { deny: [] };
+
     if (!next) {
-        const deny = matchesAnyToolPattern(currentDeny, tool.name)
+        grant.deny = matchesAnyToolPattern(currentDeny, tool.name)
             ? [...currentDeny]
             : [...currentDeny, tool.name];
-        if (currentAllow) return { allow: [...currentAllow], deny };
-        return { deny };
+        if (currentAllow) grant.allow = [...currentAllow];
+    } else {
+        grant.deny = currentDeny.filter((pattern) => !sameName(pattern, tool.name));
+        if (currentAllow) {
+            grant.allow = matchesAnyToolPattern(currentAllow, tool.name)
+                ? [...currentAllow]
+                : [...currentAllow, tool.name];
+        }
     }
 
-    const deny = currentDeny.filter((pattern) => !sameName(pattern, tool.name));
-    if (!currentAllow) return { deny };
-    const allow = matchesAnyToolPattern(currentAllow, tool.name)
-        ? [...currentAllow]
-        : [...currentAllow, tool.name];
-    return { allow, deny };
+    if (agentGrantRow?.note) grant.note = agentGrantRow.note;
+    return grant;
 }
