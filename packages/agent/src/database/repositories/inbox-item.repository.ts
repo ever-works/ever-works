@@ -180,6 +180,30 @@ export class InboxItemRepository {
     }
 
     /**
+     * Release a claim whose downstream routing blew up, so the human can
+     * answer again. Owner-scoped and CAS'd on `status='answered'` so it
+     * can only ever undo THIS reply's claim, never reopen an item that
+     * was meanwhile archived. `unread` deliberately stays `false`: the
+     * human has read it either way.
+     */
+    async reopen(id: string, userId: string): Promise<boolean> {
+        const result = await this.repository
+            .createQueryBuilder()
+            .update(InboxItem)
+            .set({
+                status: 'open' as InboxItemStatus,
+                answeredAt: null,
+                answerText: null,
+                answerOptionId: null,
+            })
+            .where('id = :id', { id })
+            .andWhere('userId = :userId', { userId })
+            .andWhere('status = :answered', { answered: 'answered' })
+            .execute();
+        return (result.affected ?? 0) > 0;
+    }
+
+    /**
      * Hard delete one item, owner-scoped. The inbox row is a MESSAGE,
      * not the system of record (escalations / proposals / runs keep
      * their own rows), so deleting it destroys no audit trail.

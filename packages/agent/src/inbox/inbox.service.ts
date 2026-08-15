@@ -270,7 +270,11 @@ export class InboxService implements InboxProducer {
             workId: input.workId ?? null,
             organizationId: input.organizationId ?? null,
         });
-        await this.notifyCreated(row);
+        // `notify: false` = this event already reached the human through
+        // another producer; file the row, skip the second bell.
+        if (input.notify !== false) {
+            await this.notifyCreated(row);
+        }
         this.logCreated(row);
     }
 
@@ -308,50 +312,80 @@ export class InboxService implements InboxProducer {
             throw new BadRequestException('A reply needs text, an option, or both.');
         }
 
+        // Shape rules that do not depend on any downstream, checked
+        // BEFORE the claim so a malformed reply never has to be rolled
+        // back: an approval answer must name approve or reject.
+        if (row.kind === 'approval' && row.proposalId && this.approvals) {
+            if (!option || (option.id !== 'approve' && option.id !== 'reject')) {
+                throw new BadRequestException(
+                    'An approval reply must pick the approve or reject option.',
+                );
+            }
+        }
+
         // The message the downstream run/record receives: option label
         // first (the structured half), free text after it.
         const composed = option ? (text ? `${option.label} — ${text}` : option.label) : text;
 
-        let routed: InboxReplyRouted = 'none';
-        let runId: string | undefined;
-        switch (row.kind) {
-            case 'question': {
-                const outcome = await this.routeQuestionReply(row, userId, composed);
-                routed = outcome.routed;
-                runId = outcome.runId;
-                break;
-            }
-            case 'approval': {
-                routed = await this.routeApprovalReply(row, userId, option);
-                break;
-            }
-            case 'escalation': {
-                routed = await this.routeEscalationReply(row, userId, composed);
-                if (routed === 'escalation-resolved') {
-                    const resumed = await this.tryResumeLinkedRun(row, userId, composed);
-                    if (resumed) runId = resumed;
-                }
-                break;
-            }
-            case 'notice':
-                routed = 'none';
-                break;
-        }
-
-        // CAS-claim LAST: the routing above is what the reply exists to
-        // do, and each downstream is its own idempotency boundary
-        // (steer/resume act on a run the human owns, decide 409s a
-        // second decision, resolve CASes on open). A concurrent reply
-        // losing this CAS reports the winner's row.
+        // CAS-claim FIRST — this is what makes a reply happen ONCE.
+        // Routing is NOT idempotent: `RunSteeringService.resume` creates
+        // and DISPATCHES a brand-new AgentRun on every call, so two
+        // replies racing on the same open item (two tabs, a double
+        // submit, a retried API client) would resume the same question
+        // twice and pay for both runs. Claiming the row before routing
+        // makes the second caller lose the CAS and route nothing.
+        //
+        // The claim is released again if routing throws, so a downstream
+        // hiccup still leaves the human an answerable item — the reason
+        // the original order routed first.
         const claimed = await this.items.markAnswered(id, userId, {
             text: text || null,
             optionId: option?.id ?? null,
         });
+        if (!claimed) {
+            const winner = await this.items.findOwned(id, userId);
+            if (!winner) throw new NotFoundException(`Inbox item ${id} not found.`);
+            return { item: toInboxItemDto(winner), routed: 'already-decided' };
+        }
+
+        let routed: InboxReplyRouted = 'none';
+        let runId: string | undefined;
+        try {
+            switch (row.kind) {
+                case 'question': {
+                    const outcome = await this.routeQuestionReply(row, userId, composed);
+                    routed = outcome.routed;
+                    runId = outcome.runId;
+                    break;
+                }
+                case 'approval': {
+                    routed = await this.routeApprovalReply(row, userId, option);
+                    break;
+                }
+                case 'escalation': {
+                    routed = await this.routeEscalationReply(row, userId, composed);
+                    if (routed === 'escalation-resolved') {
+                        const resumed = await this.tryResumeLinkedRun(row, userId, composed);
+                        if (resumed) runId = resumed;
+                    }
+                    break;
+                }
+                case 'notice':
+                    routed = 'none';
+                    break;
+            }
+        } catch (err) {
+            await this.items.reopen(id, userId).catch((reopenErr) => {
+                this.logger.warn(
+                    `Inbox item ${id}: routing failed AND the claim could not be released: ${reopenErr}`,
+                );
+                return false;
+            });
+            throw err;
+        }
+
         const fresh = await this.items.findOwned(id, userId);
         if (!fresh) throw new NotFoundException(`Inbox item ${id} not found.`);
-        if (!claimed) {
-            return { item: toInboxItemDto(fresh), routed: 'already-decided' };
-        }
 
         this.logAnswered(fresh, routed);
         return { item: toInboxItemDto(fresh), routed, runId };

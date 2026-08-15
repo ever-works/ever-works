@@ -114,6 +114,15 @@ function makeStore(seed: InboxItem[] = []) {
                 return true;
             },
         ),
+        reopen: jest.fn(async (id: string, userId: string) => {
+            const row = rows.get(id);
+            if (!row || row.userId !== userId || row.status !== 'answered') return false;
+            row.status = 'open';
+            row.answeredAt = null;
+            row.answerText = null;
+            row.answerOptionId = null;
+            return true;
+        }),
         deleteOwned: jest.fn(async (id: string, userId: string) => {
             const row = rows.get(id);
             if (!row || row.userId !== userId) return false;
@@ -366,6 +375,22 @@ describe('InboxService', () => {
             expect(notifications.notifyInboxItem).toHaveBeenCalledWith(
                 expect.objectContaining({ kind: 'notice' }),
             );
+        });
+
+        it('files but does NOT ring when the producer already notified (notify:false)', async () => {
+            // Budget thresholds are the live case: `BudgetAlertHandler`
+            // writes the in-app row + email for the same event, so ringing
+            // here too would double every crossing.
+            const notifications = { notifyInboxItem: jest.fn(async () => undefined) };
+            const { service, store } = build({ notifications });
+            await service.notice('u1', {
+                title: 'Budget 90% reached',
+                body: 'Spend is at 90% of the cap.',
+                workId: 'w1',
+                notify: false,
+            });
+            expect(store.create).toHaveBeenCalledTimes(1);
+            expect(notifications.notifyInboxItem).not.toHaveBeenCalled();
         });
     });
 
@@ -700,6 +725,72 @@ describe('InboxService', () => {
             const outcome = await service.reply('u1', 'i1', { text: 'ok' });
 
             expect(outcome.routed).toBe('already-decided');
+        });
+
+        it('claims BEFORE routing — a lost CAS resumes nothing', async () => {
+            // `resume` creates and dispatches a NEW AgentRun every call, so
+            // routing before claiming would let two racing replies pay for
+            // two runs answering one question.
+            const store = makeStore([makeRow({ id: 'i1', agentRunId: 'run-1' })]);
+            store.markAnswered.mockResolvedValue(false);
+            const runs = makeRuns({
+                id: 'run-1',
+                status: 'completed',
+                awaitingInput: true,
+                taskId: 't1',
+            });
+            const steering = makeSteering();
+            const { service } = build({ store, runs, steering });
+
+            const outcome = await service.reply('u1', 'i1', { text: 'Postgres' });
+
+            expect(outcome.routed).toBe('already-decided');
+            expect(steering.resume).not.toHaveBeenCalled();
+            expect(steering.steer).not.toHaveBeenCalled();
+        });
+
+        it('releases the claim when routing throws, so the item stays answerable', async () => {
+            const store = makeStore([makeRow({ id: 'i1', agentRunId: 'run-1' })]);
+            const runs = makeRuns({
+                id: 'run-1',
+                status: 'completed',
+                awaitingInput: true,
+                taskId: 't1',
+            });
+            const steering = makeSteering();
+            steering.resume.mockRejectedValue(new ConflictException('dispatch failed'));
+            const { service } = build({ store, runs, steering });
+
+            await expect(service.reply('u1', 'i1', { text: 'Postgres' })).rejects.toBeInstanceOf(
+                ConflictException,
+            );
+
+            expect(store.reopen).toHaveBeenCalledWith('i1', 'u1');
+            expect(store.rows.get('i1')?.status).toBe('open');
+            expect(store.rows.get('i1')?.answerText).toBeNull();
+        });
+
+        it('an approval reply with no option is rejected without ever claiming', async () => {
+            const store = makeStore([
+                makeRow({
+                    id: 'i1',
+                    kind: 'approval',
+                    proposalId: 'p1',
+                    options: [
+                        { id: 'approve', label: 'Approve' },
+                        { id: 'reject', label: 'Reject' },
+                    ],
+                }),
+            ]);
+            const approvals = { decide: jest.fn() };
+            const { service } = build({ store, approvals });
+
+            await expect(service.reply('u1', 'i1', { text: 'looks fine' })).rejects.toBeInstanceOf(
+                BadRequestException,
+            );
+
+            expect(store.markAnswered).not.toHaveBeenCalled();
+            expect(store.rows.get('i1')?.status).toBe('open');
         });
 
         it('marks a notice answered without routing anywhere', async () => {
