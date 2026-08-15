@@ -110,8 +110,8 @@
         "forgotPassword": {
             "title": "Забули пароль?",
             "subtitle": "Не турбуйтеся, ми надішлемо інструкції для скидання",
-            "successTitle": "Перевірте вашу пошту",
-            "successSubtitle": "Ми надіслали вам інструкції для скидання пароля",
+            "successTitle": "Check your email",
+            "successSubtitle": "If an account exists for that address, password reset instructions are on their way",
             "form": {
                 "email": {
                     "label": "Адреса електронної пошти",
@@ -121,8 +121,8 @@
                 "submitting": "Надсилання..."
             },
             "success": {
-                "title": "Email успішно надіслано",
-                "message": "Ми надіслали інструкції для скидання пароля на {email}",
+                "title": "Reset instructions sent — if the account exists",
+                "message": "If an account exists for {email}, we have sent password reset instructions there. Nothing arrives if the address is not registered, so double-check it for typos.",
                 "checkSpam": "Якщо не бачите email, перевірте папку спам."
             },
             "errors": {

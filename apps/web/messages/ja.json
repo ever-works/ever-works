@@ -110,8 +110,8 @@
         "forgotPassword": {
             "title": "パスワードをお忘れですか？",
             "subtitle": "心配いりません、リセット手順をお送りします",
-            "successTitle": "メールを確認してください",
-            "successSubtitle": "パスワードリセットの手順をお送りしました",
+            "successTitle": "Check your email",
+            "successSubtitle": "If an account exists for that address, password reset instructions are on their way",
             "form": {
                 "email": {
                     "label": "メールアドレス",
@@ -121,8 +121,8 @@
                 "submitting": "送信中..."
             },
             "success": {
-                "title": "メールが正常に送信されました",
-                "message": "パスワードリセットの手順を {email} に送信しました",
+                "title": "Reset instructions sent — if the account exists",
+                "message": "If an account exists for {email}, we have sent password reset instructions there. Nothing arrives if the address is not registered, so double-check it for typos.",
                 "checkSpam": "メールが見つからない場合は、迷惑メールフォルダを確認してください。"
             },
             "errors": {

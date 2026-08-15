@@ -110,8 +110,8 @@
         "forgotPassword": {
             "title": "पासवर्ड भूल गए?",
             "subtitle": "चिंता न करें, हम आपको रीसेट निर्देश भेजेंगे",
-            "successTitle": "अपना ईमेल जांचें",
-            "successSubtitle": "हमने आपको पासवर्ड रीसेट निर्देश भेज दिए हैं",
+            "successTitle": "Check your email",
+            "successSubtitle": "If an account exists for that address, password reset instructions are on their way",
             "form": {
                 "email": {
                     "label": "ईमेल पता",
@@ -121,8 +121,8 @@
                 "submitting": "भेजा जा रहा है..."
             },
             "success": {
-                "title": "ईमेल सफलतापूर्वक भेजा गया",
-                "message": "हमने {email} को पासवर्ड रीसेट निर्देश भेजे हैं",
+                "title": "Reset instructions sent — if the account exists",
+                "message": "If an account exists for {email}, we have sent password reset instructions there. Nothing arrives if the address is not registered, so double-check it for typos.",
                 "checkSpam": "यदि ईमेल न दिखे तो स्पैम फोल्डर जांचें।"
             },
             "errors": {

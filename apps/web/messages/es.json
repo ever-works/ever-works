@@ -110,8 +110,8 @@
         "forgotPassword": {
             "title": "¿Olvidaste tu contraseña?",
             "subtitle": "No te preocupes, te enviaremos instrucciones de restablecimiento",
-            "successTitle": "Revisa tu email",
-            "successSubtitle": "Te hemos enviado instrucciones de restablecimiento de contraseña",
+            "successTitle": "Check your email",
+            "successSubtitle": "If an account exists for that address, password reset instructions are on their way",
             "form": {
                 "email": {
                     "label": "Dirección de email",
@@ -121,8 +121,8 @@
                 "submitting": "Enviando..."
             },
             "success": {
-                "title": "Email enviado exitosamente",
-                "message": "Te hemos enviado instrucciones de restablecimiento de contraseña a {email}",
+                "title": "Reset instructions sent — if the account exists",
+                "message": "If an account exists for {email}, we have sent password reset instructions there. Nothing arrives if the address is not registered, so double-check it for typos.",
                 "checkSpam": "Si no ves el email, revisa tu carpeta de spam."
             },
             "errors": {

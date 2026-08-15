@@ -110,8 +110,8 @@
         "forgotPassword": {
             "title": "نسيت كلمة مرورك؟",
             "subtitle": "لا تقلق، سنرسل لك تعليمات إعادة التعيين",
-            "successTitle": "تحقق من بريدك الإلكتروني",
-            "successSubtitle": "لقد أرسلنا لك تعليمات إعادة تعيين كلمة المرور",
+            "successTitle": "Check your email",
+            "successSubtitle": "If an account exists for that address, password reset instructions are on their way",
             "form": {
                 "email": {
                     "label": "عنوان البريد الإلكتروني",
@@ -121,8 +121,8 @@
                 "submitting": "جاري الإرسال..."
             },
             "success": {
-                "title": "تم إرسال البريد بنجاح",
-                "message": "لقد أرسلنا تعليمات إعادة تعيين كلمة المرور إلى {email}",
+                "title": "Reset instructions sent — if the account exists",
+                "message": "If an account exists for {email}, we have sent password reset instructions there. Nothing arrives if the address is not registered, so double-check it for typos.",
                 "checkSpam": "إذا لم ترَ البريد، تحقق من مجلد البريد غير المرغوب فيه."
             },
             "errors": {

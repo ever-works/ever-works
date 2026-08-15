@@ -111,7 +111,7 @@
             "title": "Forgot your password?",
             "subtitle": "No worries, we'll send you reset instructions",
             "successTitle": "Check your email",
-            "successSubtitle": "We've sent you password reset instructions",
+            "successSubtitle": "If an account exists for that address, password reset instructions are on their way",
             "form": {
                 "email": {
                     "label": "Email address",
@@ -121,8 +121,8 @@
                 "submitting": "Sending..."
             },
             "success": {
-                "title": "Email sent successfully",
-                "message": "We've sent password reset instructions to {email}",
+                "title": "Reset instructions sent — if the account exists",
+                "message": "If an account exists for {email}, we have sent password reset instructions there. Nothing arrives if the address is not registered, so double-check it for typos.",
                 "checkSpam": "If you don't see the email, check your spam folder."
             },
             "errors": {

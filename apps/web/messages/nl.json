@@ -110,8 +110,8 @@
         "forgotPassword": {
             "title": "Wachtwoord vergeten?",
             "subtitle": "Geen probleem, we sturen u resetinstructies",
-            "successTitle": "Controleer uw e-mail",
-            "successSubtitle": "We hebben u wachtwoordresetinstructies gestuurd",
+            "successTitle": "Check your email",
+            "successSubtitle": "If an account exists for that address, password reset instructions are on their way",
             "form": {
                 "email": {
                     "label": "E-mailadres",
@@ -121,8 +121,8 @@
                 "submitting": "Aan het versturen..."
             },
             "success": {
-                "title": "E-mail succesvol verzonden",
-                "message": "We hebben wachtwoordresetinstructies gestuurd naar {email}",
+                "title": "Reset instructions sent — if the account exists",
+                "message": "If an account exists for {email}, we have sent password reset instructions there. Nothing arrives if the address is not registered, so double-check it for typos.",
                 "checkSpam": "Als u de e-mail niet ziet, controleer dan uw spam-map."
             },
             "errors": {
