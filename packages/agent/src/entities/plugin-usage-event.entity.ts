@@ -48,6 +48,13 @@ export enum PluginUsageCapability {
 // `AddRunIdToPluginUsageEvents1783600000000` adds the column + index.
 // No FK to `agent_runs` — run deletion must NOT cascade-drop audit rows.
 @Index('idx_plugin_usage_events_run_occurred', ['runId', 'occurredAt'])
+// Costs dashboard — the per-agent and per-model account-wide rollups
+// group one user's events inside a date window. `(userId, occurredAt)`
+// above narrows the window; leading with the grouping column lets the
+// planner satisfy the GROUP BY from the index instead of sorting the
+// window. Migration: `AddCostsDashboardIndexes1785010000000`.
+@Index('idx_plugin_usage_events_user_agent_occurred', ['userId', 'agentId', 'occurredAt'])
+@Index('idx_plugin_usage_events_user_model_occurred', ['userId', 'modelId', 'occurredAt'])
 @Entity({ name: 'plugin_usage_events' })
 export class PluginUsageEvent {
     @PrimaryGeneratedColumn('uuid')
