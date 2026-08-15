@@ -1,5 +1,16 @@
 import { describe, expect, it, vi, beforeEach } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, configure, fireEvent, render, screen, waitFor } from '@testing-library/react';
+
+// CI-grade async wait. Testing Library's default findBy*/waitFor timeout is
+// 1000ms, which is comfortable locally (this file runs 42/42 in ~4s) but too
+// tight on a loaded CI runner: the two summary-generation tests wait on a
+// mocked promise to settle AND React to re-render, and they timed out on the
+// stage cascade while the SAME commit passed an earlier run. Every assertion
+// BEFORE the async boundary passed in that failure — only the post-resolution
+// findByText calls lost the race, which is the signature of load, not of a
+// wrong expectation. Raising the ceiling costs nothing when the element does
+// appear: waitFor polls and returns as soon as it is there.
+configure({ asyncUtilTimeout: 10_000 });
 
 vi.mock('next-intl', () => ({
     useTranslations: () => (key: string) => key,
