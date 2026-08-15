@@ -36,7 +36,7 @@ export type InboundTriggerFireStatus = 'running' | 'done' | 'failed' | 'refused'
  * outlive event-row pruning or dedupe silently breaks. Raw uuid
  * reference columns (no @ManyToOne — EW-654 cycle avoidance); the
  * `triggerId` FK (CASCADE) lives in migration
- * `1786600000000-ExtendInboundTriggersForEvents`.
+ * `1786890000000-ExtendInboundTriggersForEvents`.
  *
  * NOTE: also registered in `database/_entities-inventory.ts` — this
  * repo has no `autoLoadEntities`; a forFeature'd-but-unregistered

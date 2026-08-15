@@ -37,8 +37,8 @@ fires" log: `triggerId`, `dedupeKey` (UNIQUE with triggerId), `origin`
 `tasks.hiddenFromBoard` boolean (false) — server-written only (absent from
 `CreateTaskDto`); `ListTasksFilter.includeHidden` opts hidden rows back in.
 
-Migrations: `1786600000000-ExtendInboundTriggersForEvents` (sourceType/matcher/
-templates + the fires table) and `1786700000000-AddTriggerModesAndBoardVisibility`
+Migrations: `1786890000000-ExtendInboundTriggersForEvents` (sourceType/matcher/
+templates + the fires table) and `1786890001000-AddTriggerModesAndBoardVisibility`
 (mode/prompt/board/replay/autoStart/variables + `tasks.hiddenFromBoard`).
 
 ### Firing
@@ -134,7 +134,7 @@ board visibility, auto-start, replay window, fire-now, fire log),
   `@CreateDateColumn`, which entity persistence treats as insert-only, and a
   re-claim that failed to move it would leave the replay window anchored on the
   original delivery.
-- **The `1786600000000` migration was edited in place** (`eventId` → `dedupeKey`,
+- **The `1786890000000` migration was edited in place** (`eventId` → `dedupeKey`,
   plus the log columns) rather than patched by a follow-up migration. It is
   branch-local and has never been applied anywhere, so this yields the correct
   final schema without a rename migration.

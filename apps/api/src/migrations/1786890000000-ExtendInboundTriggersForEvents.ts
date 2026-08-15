@@ -41,8 +41,8 @@ import { MigrationInterface, QueryRunner, Table, TableForeignKey, TableIndex } f
  * Built with TypeORM's portable APIs because CI/e2e run better-sqlite3
  * while production runs Postgres.
  */
-export class ExtendInboundTriggersForEvents1786600000000 implements MigrationInterface {
-    name = 'ExtendInboundTriggersForEvents1786600000000';
+export class ExtendInboundTriggersForEvents1786890000000 implements MigrationInterface {
+    name = 'ExtendInboundTriggersForEvents1786890000000';
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         const triggers = await queryRunner.getTable('inbound_triggers');

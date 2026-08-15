@@ -43,8 +43,8 @@ import { MigrationInterface, QueryRunner } from 'typeorm';
  * 1784100000000-AddRunSteeringColumns). Portable across postgres and
  * better-sqlite3 (CI/e2e).
  */
-export class AddTriggerModesAndBoardVisibility1786700000000 implements MigrationInterface {
-    name = 'AddTriggerModesAndBoardVisibility1786700000000';
+export class AddTriggerModesAndBoardVisibility1786890001000 implements MigrationInterface {
+    name = 'AddTriggerModesAndBoardVisibility1786890001000';
 
     public async up(queryRunner: QueryRunner): Promise<void> {
         const triggers = await queryRunner.getTable('inbound_triggers');
