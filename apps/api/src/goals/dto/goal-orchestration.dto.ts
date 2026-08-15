@@ -5,6 +5,7 @@ import {
     IsBoolean,
     IsIn,
     IsInt,
+    IsISO8601,
     IsOptional,
     IsString,
     IsUUID,
@@ -105,6 +106,26 @@ export class GoalDoDCriterionDto {
     @IsOptional()
     @IsBoolean()
     proposed?: boolean;
+
+    /**
+     * Round-trip field. `normalizeDoDCriteria` STAMPS `updatedAt` on every
+     * persisted criterion, so the checklist a client reads back always
+     * carries it — and the DoD tab replaces the whole list on every add and
+     * remove. Without this property `forbidNonWhitelisted` 400s
+     * ("property updatedAt should not exist") the moment the Goal has one
+     * saved criterion, i.e. every add after the first.
+     *
+     * Preserved rather than restamped by the service, which is the point:
+     * re-saving the list must not make untouched criteria look edited.
+     */
+    @ApiProperty({
+        required: false,
+        format: 'date-time',
+        description: 'ISO timestamp of the last status/evidence write. Echoed back unchanged.',
+    })
+    @IsOptional()
+    @IsISO8601()
+    updatedAt?: string;
 }
 
 /** Body for `PUT /api/me/goals/:id/dod` — replaces the whole checklist. */
