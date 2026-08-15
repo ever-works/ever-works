@@ -441,4 +441,15 @@ export async function removeAgentCollaboratorAction(agentId: string, collaborato
     const result = await agentsAPI.removeCollaborator(agentId, collaboratorAgentId);
     revalidatePath(`/agents/${agentId}/collaborators`);
     return result;
+/**
+ * Session detail (Feature K) — read used by the detail page's refresh
+ * button, live-follow poll and timeline pagination. No revalidatePath —
+ * a poll, not a mutation (same posture as `listRunSessionsAction`).
+ */
+export async function getRunSessionDetailAction(
+    runId: string,
+    query: { cursor?: string; limit?: number } = {},
+) {
+    await ensureAuth();
+    return agentsAPI.getSessionDetail(runId, query);
 }
