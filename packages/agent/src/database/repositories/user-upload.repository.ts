@@ -50,4 +50,87 @@ export class UserUploadRepository {
     async findOwnedByUser(sha256: string, userId: string): Promise<UserUpload | null> {
         return this.repo.findOne({ where: { sha256, userId } });
     }
+
+    // ─── Memory Files (folder membership) ────────────────────────────────
+
+    /** The upload row by primary id, owned by `userId`, else null (⇒ 404). */
+    async findByIdOwned(id: string, userId: string): Promise<UserUpload | null> {
+        return this.repo.findOne({ where: { id, userId } });
+    }
+
+    /**
+     * The caller's uploads for the /memory Files list. `folderId` filters
+     * folder membership (`null` = unfiled/root); leave it `undefined` for
+     * no folder filter (search mode). `q` matches the original filename,
+     * case-insensitively via LOWER() so it behaves the same on postgres
+     * and better-sqlite3.
+     */
+    async listForMemoryFiles(opts: {
+        userId: string;
+        folderId?: string | null;
+        q?: string;
+        limit?: number;
+    }): Promise<UserUpload[]> {
+        const qb = this.repo.createQueryBuilder('upload');
+        qb.where('upload.userId = :userId', { userId: opts.userId });
+        if (opts.folderId !== undefined) {
+            if (opts.folderId === null) {
+                qb.andWhere('upload.folderId IS NULL');
+            } else {
+                qb.andWhere('upload.folderId = :folderId', { folderId: opts.folderId });
+            }
+        }
+        if (opts.q) {
+            qb.andWhere('LOWER(upload.originalFilename) LIKE :q', {
+                q: `%${opts.q.toLowerCase()}%`,
+            });
+        }
+        qb.orderBy('upload.updatedAt', 'DESC');
+        if (opts.limit !== undefined) qb.take(opts.limit);
+        return qb.getMany();
+    }
+
+    /** Move one owned upload into a folder (or to the root with `null`). */
+    async setFolder(userId: string, id: string, folderId: string | null): Promise<boolean> {
+        const result = await this.repo.update({ id, userId }, { folderId });
+        return (result.affected ?? 0) > 0;
+    }
+
+    /** File a just-created upload (looked up by content hash) into a folder. */
+    async setFolderBySha256(
+        userId: string,
+        sha256: string,
+        folderId: string | null,
+    ): Promise<boolean> {
+        const result = await this.repo.update({ userId, sha256 }, { folderId });
+        return (result.affected ?? 0) > 0;
+    }
+
+    /** Per-folder file counts, for the Files tree. Missing id = zero. */
+    async countByFolderIds(userId: string, folderIds: string[]): Promise<Map<string, number>> {
+        const counts = new Map<string, number>();
+        if (folderIds.length === 0) return counts;
+        const rows = (await this.repo
+            .createQueryBuilder('upload')
+            .select('upload.folderId', 'folderId')
+            .addSelect('COUNT(*)', 'cnt')
+            .where('upload.userId = :userId', { userId })
+            .andWhere('upload.folderId IN (:...folderIds)', { folderIds })
+            .groupBy('upload.folderId')
+            .getRawMany()) as Array<{ folderId: string; cnt: number | string }>;
+        for (const row of rows) counts.set(row.folderId, Number(row.cnt));
+        return counts;
+    }
+
+    /** Unlink every upload filed under the given folders (folder delete). */
+    async clearFolders(userId: string, folderIds: string[]): Promise<void> {
+        if (folderIds.length === 0) return;
+        await this.repo
+            .createQueryBuilder()
+            .update(UserUpload)
+            .set({ folderId: null })
+            .where('userId = :userId', { userId })
+            .andWhere('folderId IN (:...folderIds)', { folderIds })
+            .execute();
+    }
 }

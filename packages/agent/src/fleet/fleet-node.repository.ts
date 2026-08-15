@@ -23,6 +23,10 @@ export interface ConsumeEnrollmentPatch {
     platform?: string | null;
     version?: string | null;
     capabilities?: string[];
+    /** Agent-CLI version reported by the machine (not the daemon's own). */
+    cliVersion?: string | null;
+    /** Free bytes on the node's workspace volume. */
+    diskFreeBytes?: number | null;
 }
 
 /**

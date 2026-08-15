@@ -257,6 +257,11 @@ function InstalledList({ installed }: { installed: Skill[] }) {
                     <p className="text-xs text-text-muted dark:text-text-muted-dark mt-1.5 line-clamp-2 min-h-8">
                         {s.description}
                     </p>
+                    {s.invocationSlug && (
+                        <span className="self-start mt-2 text-[10px] font-mono px-1.5 py-0.5 rounded bg-primary/10 text-primary">
+                            /{s.invocationSlug}
+                        </span>
+                    )}
                     <div className="flex items-center justify-between gap-2 mt-4 pt-3 border-t border-border/40 dark:border-border-dark/40 text-[11px] text-text-secondary dark:text-text-secondary-dark">
                         <span className="min-w-0 truncate font-mono">{s.slug}</span>
                         <span className="shrink-0 flex items-center gap-2">

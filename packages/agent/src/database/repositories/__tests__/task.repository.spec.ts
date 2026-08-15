@@ -107,3 +107,44 @@ describe('TaskRepository.findByWorkAndBranchRef', () => {
         expect(findOne).not.toHaveBeenCalled();
     });
 });
+
+/**
+ * Board visibility (Task Triggers) — Tasks a trigger chose to keep off
+ * the Kanban carry `hiddenFromBoard`, and every list read must exclude
+ * them unless the caller opts in. Asserted on the emitted predicate
+ * because that is the whole mechanism.
+ */
+describe('TaskRepository.findByUserIdFiltered board visibility', () => {
+    function makeListSvc() {
+        const qb: any = {
+            where: jest.fn().mockReturnThis(),
+            andWhere: jest.fn().mockReturnThis(),
+            orderBy: jest.fn().mockReturnThis(),
+            take: jest.fn().mockReturnThis(),
+            skip: jest.fn().mockReturnThis(),
+            getCount: jest.fn().mockResolvedValue(0),
+            getMany: jest.fn().mockResolvedValue([]),
+        };
+        const repo: any = { createQueryBuilder: jest.fn().mockReturnValue(qb) };
+        return { svc: new TaskRepository(repo), qb };
+    }
+
+    const hiddenClauses = (qb: any) =>
+        qb.andWhere.mock.calls.filter((call: unknown[]) =>
+            String(call[0]).includes('hiddenFromBoard'),
+        );
+
+    it('excludes hidden Tasks by default', async () => {
+        const { svc, qb } = makeListSvc();
+        await svc.findByUserIdFiltered('u1', {});
+        expect(hiddenClauses(qb)).toEqual([
+            ['task.hiddenFromBoard = :hiddenFromBoard', { hiddenFromBoard: false }],
+        ]);
+    });
+
+    it('includes them when the caller opts in', async () => {
+        const { svc, qb } = makeListSvc();
+        await svc.findByUserIdFiltered('u1', { includeHidden: true });
+        expect(hiddenClauses(qb)).toHaveLength(0);
+    });
+});

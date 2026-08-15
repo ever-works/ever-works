@@ -82,7 +82,11 @@ export interface ProcessBatchResult {
  * fan-out step failed is retried next tick, kind processor included.
  */
 export interface IngestedEventKindProcessor {
-    /** Source-namespaced kinds this processor consumes. */
+    /**
+     * Source-namespaced kinds this processor consumes. The single
+     * entry `'*'` subscribes to EVERY kind (Task Triggers — matching
+     * happens inside the processor against user-authored rules).
+     */
     readonly kinds: readonly string[];
     process(event: IngestedEvent): Promise<void>;
 }
@@ -311,10 +315,10 @@ export class EventIngestService {
         return result;
     }
 
-    /** Run every registered processor whose kinds include this event's. */
+    /** Run every registered processor whose kinds include this event's (or `'*'`). */
     private async runKindProcessors(event: IngestedEvent): Promise<void> {
         for (const processor of this.kindProcessors) {
-            if (processor.kinds.includes(event.kind)) {
+            if (processor.kinds.includes('*') || processor.kinds.includes(event.kind)) {
                 await processor.process(event);
             }
         }

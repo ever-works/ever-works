@@ -453,7 +453,7 @@ test.describe('Meetings — /meetings/:id detail (UI)', () => {
         });
     });
 
-    test('a stored transcript renders in the body and hides the composer behind Replace', async ({
+    test('a stored transcript renders in the body and hides the composer behind Edit', async ({
         page,
         request,
     }) => {
@@ -468,10 +468,18 @@ test.describe('Meetings — /meetings/:id detail (UI)', () => {
         const body = page.getByTestId('meeting-transcript-body');
         await expect(body).toBeVisible({ timeout: 30_000 });
         await expect(body).toContainText(marker);
-        // With a transcript present the composer is collapsed behind Replace.
+        // With a transcript present the composer is collapsed behind Edit.
         await expect(page.getByTestId('meeting-transcript-composer')).toHaveCount(0);
-        const toggle = page.getByTestId('meeting-replace-transcript-toggle');
-        await expect(toggle).toBeVisible();
+        // `meeting-edit-transcript-toggle` since the Replace→Edit relabel
+        // (a2791b66). That commit renamed the control in the product and in the
+        // component unit spec but not here, and this line was the ONLY remaining
+        // reference to the old id anywhere in the repo — e2e runs solely on
+        // `stage`, so nothing executed it until the cascade.
+        const toggle = page.getByTestId('meeting-edit-transcript-toggle');
+        // Explicit budget: this assertion inherited Playwright's 5s default
+        // while its neighbours above use 30s, so a slow first paint would fail
+        // it for a reason unrelated to what it is testing.
+        await expect(toggle).toBeVisible({ timeout: 30_000 });
         await clickUntil(toggle, () =>
             page
                 .getByTestId('meeting-transcript-composer')
@@ -638,7 +646,12 @@ test.describe('Meetings — /meetings/new capture form (UI)', () => {
         await expect(page.getByTestId('meeting-started-at')).toBeVisible();
         await expect(page.getByTestId('meeting-ended-at')).toBeVisible();
         await expect(page.getByTestId('meeting-source-select')).toBeVisible();
-        await expect(page.getByTestId('meeting-participants-input')).toBeVisible();
+        // The roster is the structured editor since a2791b66 — it replaced the
+        // free-text `meeting-participants-input` textarea with name/email rows
+        // (MeetingParticipantsEditor: "The roster used to be a raw textarea").
+        // That commit updated the product and the component unit specs but not
+        // this file, and e2e only runs on `stage`, so nothing caught it.
+        await expect(page.getByTestId('meeting-edit-participants')).toBeVisible();
         await expect(page.getByTestId('meeting-transcript-input')).toBeVisible();
 
         await expect(page.getByTestId('meeting-create-submit')).toBeVisible();
@@ -714,15 +727,23 @@ test.describe('Meetings — /meetings/new capture form (UI)', () => {
         expect(created?.source).toBe('manual');
     });
 
-    test('a pasted roster round-trips through the participant parser', async ({
+    test('a roster entered in the editor round-trips to the stored participants', async ({
         page,
         request,
     }) => {
+        // Re-aimed at the structured editor. This used to paste
+        // "Ada Lovelace <ada@example.com>\nGrace Hopper" into a textarea, but
+        // a2791b66 replaced that control with name/email rows on purpose, so the
+        // old input does not exist. The OUTCOME under test is unchanged and is
+        // still the point: what the user enters becomes exactly two stored
+        // participants, one with an email and one without.
         const title = `Roster In UI ${suffix()}`;
         await page.goto('/en/meetings/new', { waitUntil: 'domcontentloaded' });
         const titleInput = page.getByLabel('Title');
         await expect(titleInput).toBeVisible({ timeout: 30_000 });
-        const roster = page.getByTestId('meeting-participants-input');
+        const addRow = page.getByTestId('meeting-edit-participant-add');
+        const names = page.getByTestId('meeting-edit-participant-name');
+        const emails = page.getByTestId('meeting-edit-participant-email');
         const create = page.getByTestId('meeting-create-submit');
 
         const detailUrl = /\/meetings\/[0-9a-f]{8}-[0-9a-f]{4}-/;
@@ -731,9 +752,38 @@ test.describe('Meetings — /meetings/new capture form (UI)', () => {
                 if ((await titleInput.inputValue().catch(() => '')) !== title) {
                     await titleInput.fill(title).catch(() => undefined);
                 }
-                if ((await roster.inputValue().catch(() => '')) === '') {
-                    await roster
-                        .fill('Ada Lovelace <ada@example.com>\nGrace Hopper')
+                // Rows start empty (MeetingForm: useState<ParticipantRow[]>([])),
+                // so add until two exist. Guarded by the count so a retry of
+                // this whole block cannot pile up extra rows.
+                while ((await names.count().catch(() => 0)) < 2) {
+                    await addRow.click({ timeout: 5_000 }).catch(() => undefined);
+                }
+                if (
+                    (await names
+                        .nth(0)
+                        .inputValue()
+                        .catch(() => '')) === ''
+                ) {
+                    await names
+                        .nth(0)
+                        .fill('Ada Lovelace')
+                        .catch(() => undefined);
+                    await emails
+                        .nth(0)
+                        .fill('ada@example.com')
+                        .catch(() => undefined);
+                }
+                if (
+                    (await names
+                        .nth(1)
+                        .inputValue()
+                        .catch(() => '')) === ''
+                ) {
+                    // Deliberately no email — the second assertion below is that
+                    // it persists without one.
+                    await names
+                        .nth(1)
+                        .fill('Grace Hopper')
                         .catch(() => undefined);
                 }
                 await create.click({ timeout: 5_000, noWaitAfter: true }).catch(() => undefined);

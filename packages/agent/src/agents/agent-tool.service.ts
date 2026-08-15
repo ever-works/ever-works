@@ -8,6 +8,12 @@ import { SkillBindingRepository } from '../database/repositories/skill-binding.r
 import { SkillRepository } from '../database/repositories/skill.repository';
 import { createGetSkillBodyTool } from './agent-tools-skill';
 import {
+    createGetSkillFileTool,
+    SKILL_FILE_CONTENT_READER,
+    type SkillFileContentReader,
+} from './agent-tools-skill-file';
+import { SkillFileRepository } from '../database/repositories/skill-file.repository';
+import {
     AGENT_GIT_FACADE,
     type AgentGitFacade,
     type AgentCommitToRepoResult,
@@ -194,6 +200,14 @@ export class AgentToolService {
         @Optional()
         @Inject(CREDENTIAL_RESOLVER)
         private readonly credentials?: CredentialResolver,
+        // Skill files feature — companion-file rows + the uploads-spine
+        // content reader (bound API-side). APPENDED LAST + @Optional() so
+        // every existing positional constructor call keeps working;
+        // unbound → getSkillFile simply isn't registered / errs politely.
+        @Optional() private readonly skillFiles?: SkillFileRepository,
+        @Optional()
+        @Inject(SKILL_FILE_CONTENT_READER)
+        private readonly skillFileReader?: SkillFileContentReader,
     ) {}
 
     /**
@@ -231,6 +245,28 @@ export class AgentToolService {
                     ideaId: agent.ideaId ?? undefined,
                 }) as AgentToolDescriptor,
             );
+            // getSkillFile — companion to getSkillBody. Registered under
+            // the same predicate (skills bound); the descriptor itself
+            // 404s unknown slugs/filenames and refuses binary mimes.
+            // Scripts are DATA-ONLY in v1 (agent-plugins spec US-6): the
+            // tool returns their text, nothing executes them.
+            if (this.skillFiles) {
+                tools.push(
+                    createGetSkillFileTool(
+                        this.skills,
+                        this.bindings,
+                        this.skillFiles,
+                        this.skillFileReader,
+                        {
+                            userId: agent.userId,
+                            agentId: agent.id,
+                            workId: agent.workId ?? undefined,
+                            missionId: agent.missionId ?? undefined,
+                            ideaId: agent.ideaId ?? undefined,
+                        },
+                    ) as AgentToolDescriptor,
+                );
+            }
         }
 
         // editAgentFile — gated by permissions.canEditAgentFiles.

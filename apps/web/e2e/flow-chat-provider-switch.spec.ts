@@ -56,13 +56,17 @@ import { enablePluginViaAPI, patchPluginSettingsViaAPI } from './helpers/plugins
  *         record layer is permissive.)
  *
  *   - PATCH /api/conversations/:id  → a title-only body returns 204 No Content. The
- *     DTO is whitelisted to `{ title }` ONLY and the global ValidationPipe runs with
+ *     DTO is whitelisted to `{ title, model }` and the global ValidationPipe runs with
  *     forbidNonWhitelisted:true, so a `providerId` in the body is ACTIVELY REJECTED
  *     with 400 "property providerId should not exist" — not applied, not silently
  *     dropped. ⇒ a conversation's provider is IMMUTABLE after creation via PATCH (the
  *     hardened API refuses the field outright); switching the panel provider mid-thread
  *     changes which provider serves the NEXT message (the `providerOverride` the web
  *     /api/chat route forwards) but cannot rewrite the conversation's recorded providerId.
+ *     `model` IS whitelisted (204) — the model is a dial INSIDE one thread rather than
+ *     the thread's identity, so the composer's model picker re-points the same provider
+ *     and the pin survives a reload. An empty-string `model` clears it back to NULL
+ *     ("resolve the provider's configured default").
  *
  *   - POST /api/conversations/:id/messages { messages:[{ role, content, model? }] }
  *       → 201 { success:true }. A per-message `model` is PERSISTED on the message
@@ -628,7 +632,7 @@ test.describe('Chat provider switch — configured gate, switch routing, record 
         expect(byId.get(onOpenAi.id), 'list: thread 3 openai').toBe('openai');
     });
 
-    test('Flow 6: UI — the chat side-panel provider selector renders, shows the active provider, and gates non-configured providers with the "Not configured" badge', async ({
+    test('Flow 6: UI — the chat side-panel provider selector renders ONLY when there is a choice, shows the active provider, and gates non-configured providers with the "Not configured" badge', async ({
         page,
         request,
     }) => {
@@ -687,9 +691,24 @@ test.describe('Chat provider switch — configured gate, switch routing, record 
             await page.waitForTimeout(1_500);
         }
 
-        // The provider selector trigger renders the ACTIVE provider's name. The
-        // composer is the deterministic "panel is alive" anchor.
+        // The composer is the deterministic "panel is alive" anchor.
         await expect(page.getByPlaceholder('Ask me anything...')).toBeVisible({ timeout: 45_000 });
+
+        // CONTRACT: the provider selector is a CHOICE, so it renders only when
+        // there is more than one AI provider activated for the account. With a
+        // single provider it is hidden entirely — a one-option dropdown beside
+        // the composer's model picker read as two competing controls, which is
+        // the confusion this gate removes. Most accounts activate exactly one
+        // provider, so "hidden" is the common case and the assertions below
+        // branch on the real count rather than assuming the chip is there.
+        if (seededProviders.length < 2) {
+            await expect(
+                page.getByText('AI Assistant', { exact: false }),
+                'a single-provider account gets no provider dropdown at all',
+            ).toHaveCount(0);
+            return;
+        }
+
         const selectorTrigger = page
             .getByRole('button', { name: new RegExp(orForSeeded?.name ?? 'OpenRouter', 'i') })
             .first();

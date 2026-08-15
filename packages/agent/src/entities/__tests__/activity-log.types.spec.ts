@@ -116,7 +116,10 @@ describe('activity-log.types', () => {
             // +1 agent_unarchived (Agent archive/restore, #1994) -> 123.
             // +2 inbox_item_created / inbox_item_answered (Inbox operator
             //    message center) -> 125.
-            expect(literals).toHaveLength(125);
+            // +3 memory_folder_created / _deleted / _synced (Memory Files —
+            //    the /memory Files area folder tree) -> 128 after the
+            //    Inbox and Memory Files trains merged together.
+            expect(literals).toHaveLength(128);
         });
 
         it('every literal value is unique (no accidental duplicate string)', () => {
