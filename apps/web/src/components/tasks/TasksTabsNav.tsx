@@ -13,7 +13,12 @@ import { cn } from '@/lib/utils/cn';
 export async function TasksTabsNav({ active }: { active: 'tasks' | 'triggers' }) {
     const t = await getTranslations('dashboard.taskTriggers.tabs');
     const tabs = [
-        { key: 'tasks' as const, href: ROUTES.DASHBOARD_TASKS, label: t('tasks'), Icon: ListChecks },
+        {
+            key: 'tasks' as const,
+            href: ROUTES.DASHBOARD_TASKS,
+            label: t('tasks'),
+            Icon: ListChecks,
+        },
         {
             key: 'triggers' as const,
             href: ROUTES.DASHBOARD_TASK_TRIGGERS,
