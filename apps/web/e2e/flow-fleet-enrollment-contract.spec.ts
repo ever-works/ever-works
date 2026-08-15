@@ -22,8 +22,10 @@ import { API_BASE, authedHeaders, registerUserViaAPI } from './helpers/api';
  *     (a replay is 401, not a second node);
  *   - every invalid credential path is ONE undifferentiated 401 — the
  *     response must never say which check failed;
- *   - the heartbeat secret is minted at enroll, and a DISABLED node
- *     stops being able to report (drain actually drains).
+ *   - the heartbeat secret is minted at enroll, and a DISABLED node's
+ *     beat is still accepted but can never re-enable it (c98337eb:
+ *     drain drains LEASING, not observability — a drained node that
+ *     goes dark would be indistinguishable from a crashed one).
  */
 
 const UNKNOWN_UUID = 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa';
@@ -247,10 +249,19 @@ test.describe('the enrollment protocol, end to end', () => {
         expect(drained.status()).toBe(200);
         expect((await drained.json()).status).toBe('disabled');
 
+        // c98337eb (A29, pause/drain): drain drains LEASING, not observability.
+        // The old contract 401'd a disabled node's heartbeat; the new one
+        // accepts it (200) but keeps the status sticky — a drained node that
+        // goes dark is indistinguishable from a crashed one, so the beat stays
+        // welcome while the node stays out of the lease pool. The invariant
+        // worth pinning is that the beat must never RE-ENABLE the node.
         const after = await request.post(`${API_BASE}/api/fleet/heartbeat`, {
             data: { nodeId, secret },
         });
-        expect(after.status(), 'a drained node must not be able to report').toBe(401);
+        expect(after.status(), 'a drained node may still report (observability)').toBe(200);
+        const beat = await after.json();
+        expect(beat.ok).toBe(true);
+        expect(beat.node.status, 'a beat must never re-enable a drained node').toBe('disabled');
     });
 });
 
@@ -271,7 +282,10 @@ test.describe('PATCH / DELETE /api/fleet/nodes/:id', () => {
             data: {},
         });
         expect(empty.status()).toBe(400);
-        expect(errText(await empty.json())).toContain('Provide name and/or disabled');
+        // The full message has grown twice as PATCH gained fields (72940460
+        // added capabilities, c98337eb added paused). Pin the stable prefix,
+        // not the whole enumeration — the 400-on-empty-body is the contract.
+        expect(errText(await empty.json())).toContain('Provide name');
     });
 
     test('authz: stranger 404, unknown 404, malformed 400, anon 401; delete is 204', async ({
